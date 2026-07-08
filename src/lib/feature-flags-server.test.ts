@@ -78,6 +78,34 @@ describe("isFeatureFlagEnabled", () => {
     expect(result).toBe(false);
   });
 
+  it("returns false when the flag fetch times out (5s abort)", async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch.mockImplementation(
+        (_url: string, options: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            options.signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted", "AbortError"));
+            });
+          })
+      );
+
+      const { isFeatureFlagEnabled } = await import("./feature-flags-server");
+      const resultPromise = isFeatureFlagEnabled("randomized_order");
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchOptions = mockFetch.mock.calls[0][1];
+      expect(fetchOptions.signal.aborted).toBe(false);
+
+      vi.advanceTimersByTime(5000);
+
+      expect(fetchOptions.signal.aborted).toBe(true);
+      await expect(resultPromise).resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("returns false when no Supabase config", async () => {
     process.env = {
       ...originalEnv,
