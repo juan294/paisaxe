@@ -115,6 +115,52 @@ Revisit this exception if Tailwind CSS or Vite drop `lightningcss`, if `lightnin
 
 ---
 
+## Exception 4: `@sentry/cli` + `@sentry/cli-darwin` (FSL-1.1-MIT)
+
+| Field | Value |
+|-------|-------|
+| Packages | `@sentry/cli@2.58.5`, `@sentry/cli-darwin@2.58.5` |
+| License | FSL-1.1-MIT (Functional Source License) |
+| Parent dependency | `@sentry/nextjs` build tooling |
+| Dependency type | **devDependency / build-time only** — not shipped to clients |
+| Added | 2026-07-08 |
+| Identified by | Security agent license scan (2026-07-03) |
+
+### Why this is acceptable
+
+FSL-1.1-MIT is a source-available license that converts to plain MIT two years after each version's release. Its only restriction during that window is against offering the licensed software itself as a competing product or service.
+
+None of the triggering conditions apply here:
+
+- **Paisaxe does not compete with Sentry CLI** — it is used internally as a build-time tool to upload source maps and release metadata to Sentry, not resold or re-offered as a service.
+- **Build-time only** — `@sentry/cli` runs during the build to upload source maps; its code is never bundled into the shipped client or server output.
+- **Time-limited restriction** — the license converts to MIT after two years regardless, so the restriction is not permanent.
+
+Under these conditions, FSL-1.1-MIT imposes no obligations relevant to Paisaxe's use.
+
+### CI enforcement
+
+The CI license-check workflow (`license-check.yml`) blocks strong copyleft (GPL/AGPL/SSPL) on production deps and reports (non-blocking) on dev deps. `@sentry/cli` is dev-only and is not a copyleft license, so it does not trigger either path — it is recorded here purely for policy transparency.
+
+### Review schedule
+
+Revisit if `@sentry/cli` is ever added as a production dependency, or if Sentry changes the license terms in a future release.
+
+---
+
+## Dual-licensed dependencies (permissive branch selected)
+
+Some dependencies are published under an "OR" dual license where one branch is permissive and satisfies the policy directly. These are **not exceptions** — Paisaxe elects the permissive branch — but they are recorded here because license scanners repeatedly surface the copyleft branch of the "OR" expression.
+
+| Package | Declared license | Permissive branch elected | Parent dependency | Notes |
+|---------|------------------|---------------------------|-------------------|-------|
+| `dompurify@3.4.11` | `(MPL-2.0 OR Apache-2.0)` | Apache-2.0 | `posthog-js` | Used internally by PostHog analytics; no application code calls DOMPurify directly. |
+| `expand-template@2.0.3` | `(MIT OR WTFPL)` | MIT | `canvas` → `prebuild-install` | Build-time only (native binary prebuild install); not shipped to clients. |
+
+Because a permissive branch is available and elected, no weak-copyleft review is required. Identified by the security agent license scan (2026-07-01).
+
+---
+
 ## Dev-dependency scanning (policy decision)
 
 Historically the CI license check (`license-check.yml`) and the weekly security agent (`scripts/security-agent.sh`) ran `license-checker --production` only, so weak-copyleft devDependencies such as `lightningcss` (MPL-2.0) were invisible (gap noted in #576 / #623).

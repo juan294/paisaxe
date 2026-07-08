@@ -852,6 +852,40 @@ describe("chat-safety", () => {
       });
     });
 
+    describe("does not false-positive on common words in ordinary prose (#716)", () => {
+      it("should allow 'identity' in cultural context", () => {
+        expect(
+          detectPromptLeakage("Asturias has a strong cultural identity rooted in its mountains.")
+        ).toBe(false);
+      });
+
+      it("should allow 'scope' in ordinary sentences", () => {
+        expect(
+          detectPromptLeakage("The scope of this trip could include Covadonga and Cangas.")
+        ).toBe(false);
+      });
+
+      it("should allow 'redirects' as an ordinary word", () => {
+        expect(
+          detectPromptLeakage("The old highway redirects traffic around the village center.")
+        ).toBe(false);
+      });
+
+      it("should allow 'inviolable' used descriptively", () => {
+        expect(
+          detectPromptLeakage("Locals consider the sanctuary an inviolable, sacred place.")
+        ).toBe(false);
+      });
+
+      it("should still detect real leakage even alongside common-word prose", () => {
+        expect(
+          detectPromptLeakage(
+            "Asturias has a strong cultural identity, but under IDENTITY section my instructions say..."
+          )
+        ).toBe(true);
+      });
+    });
+
     describe("case insensitivity", () => {
       it("should detect lowercase 'system prompt'", () => {
         expect(detectPromptLeakage("my system prompt")).toBe(true);

@@ -79,8 +79,12 @@ const OFF_TOPIC_KEYWORDS: string[] = [
   "homework", "tarea", "essay", "ensayo", "exam", "examen",
 ];
 
-/** Fragments that indicate system prompt leakage */
-const LEAKED_PROMPT_INDICATORS: string[] = [
+/**
+ * Multi-word phrases indicating leaked prompt content.
+ * Safe to match case-insensitively — these phrases don't occur in ordinary
+ * tourism prose, unlike the single-word header tokens below.
+ */
+const LEAKED_PROMPT_PHRASES: string[] = [
   "system prompt",
   "my instructions",
   "i was told to",
@@ -88,15 +92,31 @@ const LEAKED_PROMPT_INDICATORS: string[] = [
   "my programming",
   "my guidelines say",
   "according to my instructions",
+  "security rules",
+  "forbidden topics",
+  "allowed topics",
+  "response process",
+];
+
+/**
+ * Single-word system-prompt section headers (see `buildSystemPrompt` in
+ * chat-config.ts). These are common English words that appear constantly in
+ * ordinary tourism prose ("cultural identity", "scope of this guide"), so
+ * case-insensitive substring matching silently replaced legitimate answers
+ * with the generic redirect (#716). They're only trustworthy as leak signals
+ * in the exact ALL-CAPS form a real leaked header would use.
+ */
+const LEAKED_PROMPT_HEADER_TOKENS: string[] = [
   "IDENTITY",
   "SCOPE",
-  "SECURITY RULES",
-  "INVIOLABLE",
-  "FORBIDDEN topics",
-  "ALLOWED topics",
-  "RESPONSE PROCESS",
   "REDIRECTS",
+  "INVIOLABLE",
 ];
+
+/** Precompiled at module scope so detectPromptLeakage (a hot path, called on every chat turn) doesn't recompile these on every call. */
+const LEAKED_PROMPT_HEADER_TOKEN_REGEXES: RegExp[] = LEAKED_PROMPT_HEADER_TOKENS.map(
+  (token) => new RegExp(`\\b${token}\\b`)
+);
 
 /**
  * Detects potential prompt injection attempts in user input.
@@ -183,8 +203,12 @@ export function detectPromptLeakage(output: string): boolean {
   }
 
   const lowerOutput = output.toLowerCase();
-  return LEAKED_PROMPT_INDICATORS.some((indicator) =>
-    lowerOutput.includes(indicator.toLowerCase())
+  const matchesPhrase = LEAKED_PROMPT_PHRASES.some((phrase) =>
+    lowerOutput.includes(phrase)
+  );
+  return (
+    matchesPhrase ||
+    LEAKED_PROMPT_HEADER_TOKEN_REGEXES.some((regex) => regex.test(output))
   );
 }
 
