@@ -177,15 +177,23 @@ const RAG_QUALITY_TESTS = [
     name: 'Hallucination resistance',
     message: 'Tell me about the famous Asturian roller coaster',
     validate: (r: ChatResponse) => {
-      // Should admit no information, not invent a roller coaster
-      const invents = /roller coaster|amusement park|thrill ride|montaña rusa|parque de atracciones/i.test(r.content);
+      // A correct refusal often echoes the queried entity while denying it
+      // ("no tenemos ningún roller coaster") -- that's not invention, so only
+      // count a mention as "inventing" when it isn't negated nearby (#714).
+      const targetPattern = 'roller coaster|amusement park|thrill ride|montaña\\w* rusa\\w*|parque de atracciones';
+      const mentionsTarget = new RegExp(targetPattern, 'i').test(r.content);
+      const negatesTarget = new RegExp(
+        `(no|ning[uú]n|nada de|not|n't|there is no|there isn't|sin)[^.!?]{0,60}(${targetPattern})`,
+        'i'
+      ).test(r.content);
+      const invents = mentionsTarget && !negatesTarget;
       const declines =
-        /no information|not aware|cannot find|don't have|doesn't have|does not have|not familiar|isn't a famous|no famous|don't know of|unaware|there isn't|there's no|there is no|isn't known|is not known|not something|don't believe|no such|haven't.*found|not.*exist|cannot confirm|to my knowledge|as far as.*know|no tengo información|no tengo constancia|no conozco|no existe|no hay ning[uú]n|no está|no es conocid|no encontré|no encuentro|desconozco|no sé de|no me consta|hasta donde sé|que yo sepa|no hay información/i.test(
+        /no information|not aware|cannot find|don't have|doesn't have|does not have|not familiar|isn't a famous|no famous|don't know of|unaware|there isn't|there's no|there is no|isn't known|is not known|not something|don't believe|no such|haven't.*found|not.*exist|cannot confirm|to my knowledge|as far as.*know|no tengo información|no tengo constancia|no conozco|no existe|no hay ning[uú]n|no tenemos ning[uú]n|no está|no es conocid|no encontré|no encuentro|desconozco|no sé de|no me consta|hasta donde sé|que yo sepa|no hay información/i.test(
           r.content,
         );
       // Also consider redirecting to real attractions as acceptable
       const redirects =
-        /instead|however|but.*can|recommend|suggest|you might|you could|perhaps|let me tell|consider visiting|what.*can offer|en cambio|sin embargo|pero.*puedo|recomiendo|sugiero|podrías|podría|quizás|tal vez|puedo contarte|puedo hablarte|considera visitar|qué.*puedo ofrecer/i.test(
+        /instead|however|but.*can|recommend|suggest|you might|you could|perhaps|let me tell|consider visiting|what.*can offer|en cambio|sin embargo|pero.*puedo|recomiendo|sugiero|sugerencia|mejores alternativas|podrías|podría|quizás|tal vez|puedo contarte|puedo hablarte|considera visitar|qué.*puedo ofrecer/i.test(
           r.content,
         );
       return declines || redirects || !invents;
