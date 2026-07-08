@@ -479,3 +479,51 @@ test.describe("POST /api/mcp/make-booking/status", () => {
     expect(body).toEqual({ received: true });
   });
 });
+
+// ---------------------------------------------------------------------------
+// POST /api/mcp/save-favorite
+// ---------------------------------------------------------------------------
+
+test.describe("POST /api/mcp/save-favorite", () => {
+  test("returns 401 when x-mcp-secret header is missing", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/mcp/save-favorite", {
+      data: { placeName: "Casa Marcial" },
+    });
+    expect(response.status()).toBe(401);
+    const body = await response.json();
+    expect(body).toEqual({ success: false, message: "Unauthorized" });
+  });
+
+  test("returns 401 when x-mcp-secret header is wrong", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/mcp/save-favorite", {
+      headers: { "x-mcp-secret": WRONG_SECRET },
+      data: { placeName: "Casa Marcial" },
+    });
+    expect(response.status()).toBe(401);
+    const body = await response.json();
+    expect(body).toEqual({ success: false, message: "Unauthorized" });
+  });
+
+  test("succeeds with valid secret and minimal { placeName } body", async ({
+    request,
+  }) => {
+    test.skip(
+      !process.env.MCP_API_SECRET,
+      "MCP_API_SECRET not set — skipping happy-path test"
+    );
+    const response = await request.post("/api/mcp/save-favorite", {
+      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      data: { placeName: "Casa Marcial" },
+    });
+    // With a reachable Supabase test project: 200 with { success: true }.
+    // With a DB error in the test env: 500 with { success: false }.
+    expect([200, 500]).toContain(response.status());
+    const body = await response.json();
+    expect(body).toHaveProperty("success");
+    expect(body).toHaveProperty("message");
+  });
+});

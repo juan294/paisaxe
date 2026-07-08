@@ -100,7 +100,11 @@ export default defineConfig({
     // Default local runs to an isolated production-style server because next dev's
     // issues overlay can intercept mobile clicks and hide real regressions.
     reuseExistingServer,
-    timeout: 180_000,
+    // Bumped from 180s: the P1 Supabase deferral (async getClient() in
+    // stories-data.ts/realtime.ts) adds an on-demand webpack chunk compile
+    // to the first dev-server request that touches Supabase, widening
+    // cold-start time. Not a production concern (chunks are pre-built).
+    timeout: 240_000,
     // Wait for the liveness endpoint, not just an open TCP port.
     ...(isCI && { stdout: "pipe" }),
     env: {

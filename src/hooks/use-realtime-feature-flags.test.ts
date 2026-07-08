@@ -46,7 +46,7 @@ describe("useRealtimeFeatureFlags", () => {
     capturedCallback = null;
     mockCleanup = vi.fn<() => void>();
 
-    vi.mocked(subscribeToFeatureFlags).mockImplementation((cb) => {
+    vi.mocked(subscribeToFeatureFlags).mockImplementation(async (cb) => {
       capturedCallback = cb;
       return mockCleanup;
     });
@@ -92,6 +92,9 @@ describe("useRealtimeFeatureFlags", () => {
       useRealtimeFeatureFlags(initialFlags)
     );
 
+    // Let the subscribe promise resolve before the update fires
+    await act(async () => {});
+
     // Simulate a realtime update: related_stories toggled to true
     const updatedRow = makeFlagRow("related_stories", true);
     act(() => {
@@ -120,6 +123,8 @@ describe("useRealtimeFeatureFlags", () => {
     const { result } = renderHook(() =>
       useRealtimeFeatureFlags(initialFlags)
     );
+
+    await act(async () => {});
 
     const updatedRow = makeFlagRow("surprise_me", true);
     updatedRow.updated_at = "2025-06-15T12:00:00Z";
@@ -152,6 +157,8 @@ describe("useRealtimeFeatureFlags", () => {
       useRealtimeFeatureFlags(initialFlags)
     );
 
+    await act(async () => {});
+
     // A new flag arrives that wasn't in the initial array
     const newRow = makeFlagRow("story_sharing", true);
     act(() => {
@@ -172,6 +179,8 @@ describe("useRealtimeFeatureFlags", () => {
     const { unmount } = renderHook(() =>
       useRealtimeFeatureFlags(initialFlags)
     );
+
+    await act(async () => {});
 
     unmount();
 

@@ -1,17 +1,22 @@
 import { cache } from "react";
 import type { PublicStoryRow, Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
 import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
-import { supabase } from "./supabase";
-import { createSupabaseBrowserClient } from "./supabase-browser";
 import { logger } from "@/lib/logger";
 
 // In the browser, reuse the existing createBrowserClient singleton to avoid
 // a duplicate GoTrueClient instance (which would share the same storage key
-// as the one created by AuthProvider).
-function getClient() {
+// as the one created by AuthProvider). Both clients are dynamically imported
+// so the ~324 KB Supabase JS chunk doesn't load on the /immersive first-paint
+// path — every call site below is already inside an async function, so this
+// adds no architectural change, just deferred parse/execute (Performance
+// Agent P1, sequenced after QA #720's hydration-tolerance fix).
+async function getClient() {
   if (typeof window !== "undefined") {
-    return createSupabaseBrowserClient() ?? supabase;
+    const { createSupabaseBrowserClient } = await import("./supabase-browser");
+    const browser = createSupabaseBrowserClient();
+    if (browser) return browser;
   }
+  const { supabase } = await import("./supabase");
   return supabase;
 }
 
@@ -44,7 +49,8 @@ export async function getStoriesFromDB(): Promise<Story[]> {
   }
 
   try {
-    const { data, error } = await getClient()
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
@@ -80,7 +86,8 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
   }
 
   try {
-    const { data, error } = await getClient()
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
@@ -113,7 +120,8 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
  */
 export async function getStoriesByLocationFromDB(location: StoryLocation): Promise<Story[]> {
   try {
-    const { data, error } = await getClient()
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
@@ -146,7 +154,8 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
  */
 export async function getStoriesByDurationFromDB(duration: StoryDuration): Promise<Story[]> {
   try {
-    const { data, error } = await getClient()
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
@@ -179,7 +188,8 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
  */
 export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> {
   try {
-    const { data, error } = await getClient()
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("slug", slug)
@@ -235,7 +245,8 @@ function fallbackStoryMetadata(slug: string): StoryMetadataSlim | null {
 export const getStoryMetadataBySlug = cache(
   async (slug: string): Promise<StoryMetadataSlim | null> => {
     try {
-      const { data, error } = await getClient()
+      const client = await getClient();
+      const { data, error } = await client
         .from("stories")
         .select(STORY_METADATA_SELECT)
         .eq("slug", slug)

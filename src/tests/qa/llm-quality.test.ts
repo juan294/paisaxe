@@ -75,21 +75,33 @@ async function formatChatApiError(response: Response): Promise<string> {
   return `Chat API error: ${response.status} (${bodyText.slice(0, 200)})`;
 }
 
-// Helper to call the chat API with retry for rate limiting
+// Helper to call the chat API with retry for rate limiting and transient network errors
 async function sendChatMessage(message: string, retries = 3): Promise<ChatResponse> {
   const csrfToken = await getCsrfToken();
 
   for (let attempt = 1; attempt <= retries; attempt++) {
-    const response = await fetch(`${API_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-csrf-token': csrfToken,
-        Cookie: `__csrf=${csrfToken}`,
-        Origin: API_URL,
-      },
-      body: JSON.stringify({ message }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+          Cookie: `__csrf=${csrfToken}`,
+          Origin: API_URL,
+        },
+        body: JSON.stringify({ message }),
+      });
+    } catch (error) {
+      // Transient network-level failures (e.g. undici UND_ERR_SOCKET on a
+      // dev-server keep-alive connection) reject the fetch promise entirely,
+      // bypassing the HTTP-status retry check below. Retry those too.
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+        continue;
+      }
+      throw error;
+    }
 
     if (response.status === 429 && attempt < retries) {
       // Rate limited - wait and retry
@@ -166,10 +178,16 @@ const RAG_QUALITY_TESTS = [
     message: 'Tell me about the famous Asturian roller coaster',
     validate: (r: ChatResponse) => {
       // Should admit no information, not invent a roller coaster
-      const invents = /roller coaster|amusement park|thrill ride/i.test(r.content);
-      const declines = /no information|not aware|cannot find|don't have|doesn't have|does not have|not familiar|isn't a famous|no famous|don't know of|unaware|there isn't|there's no|there is no|isn't known|is not known|not something|don't believe|no such|haven't.*found|not.*exist|cannot confirm|to my knowledge|as far as.*know/i.test(r.content);
+      const invents = /roller coaster|amusement park|thrill ride|montaña rusa|parque de atracciones/i.test(r.content);
+      const declines =
+        /no information|not aware|cannot find|don't have|doesn't have|does not have|not familiar|isn't a famous|no famous|don't know of|unaware|there isn't|there's no|there is no|isn't known|is not known|not something|don't believe|no such|haven't.*found|not.*exist|cannot confirm|to my knowledge|as far as.*know|no tengo información|no tengo constancia|no conozco|no existe|no hay ning[uú]n|no está|no es conocid|no encontré|no encuentro|desconozco|no sé de|no me consta|hasta donde sé|que yo sepa|no hay información/i.test(
+          r.content,
+        );
       // Also consider redirecting to real attractions as acceptable
-      const redirects = /instead|however|but.*can|recommend|suggest|you might|you could|perhaps|let me tell|consider visiting|what.*can offer/i.test(r.content);
+      const redirects =
+        /instead|however|but.*can|recommend|suggest|you might|you could|perhaps|let me tell|consider visiting|what.*can offer|en cambio|sin embargo|pero.*puedo|recomiendo|sugiero|podrías|podría|quizás|tal vez|puedo contarte|puedo hablarte|considera visitar|qué.*puedo ofrecer/i.test(
+          r.content,
+        );
       return declines || redirects || !invents;
     },
     expectedBehavior: 'Admits no information rather than inventing',

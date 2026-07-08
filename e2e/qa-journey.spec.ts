@@ -11,6 +11,23 @@ import {
   MOCK_SUGGESTION_RESPONSE,
   withFeatureFlags,
 } from "./fixtures/mock-data";
+import type { Locator } from "@playwright/test";
+
+/**
+ * /immersive is PPR-prerendered: the static shell can render a nav button
+ * visible+enabled before React attaches its click handler, so an early click
+ * is swallowed. Retry click+assert as a unit until the title actually changes.
+ */
+async function clickAndAwaitTitleChange(
+  button: Locator,
+  title: Locator,
+  previousTitle: string
+) {
+  await expect(async () => {
+    await button.click();
+    await expect(title).not.toHaveText(previousTitle, { timeout: 1000 });
+  }).toPass({ timeout: 15000 });
+}
 
 /**
  * QA Journey Tests — End-to-end user journey testing for QA Agent
@@ -64,12 +81,8 @@ test.describe("QA Journey: Anonymous User", () => {
     const nextButton = page.getByTestId("next-story-button").first();
     await expect(nextButton).toBeVisible();
     await expect(nextButton).toBeEnabled();
-    await nextButton.click();
 
-    // Wait for the title to change (story transition)
-    await expect(title).not.toHaveText(firstTitle!, {
-      timeout: 8000,
-    });
+    await clickAndAwaitTitleChange(nextButton, title, firstTitle!);
 
     // Step 3: Verify story changed
     const secondTitle = await title.textContent();
@@ -77,12 +90,7 @@ test.describe("QA Journey: Anonymous User", () => {
 
     // Step 4: Navigate back with previous arrow
     const prevButton = page.getByTestId("prev-story-button").first();
-    await prevButton.click();
-
-    // Wait for the title to change back
-    await expect(title).not.toHaveText(secondTitle!, {
-      timeout: 3000,
-    });
+    await clickAndAwaitTitleChange(prevButton, title, secondTitle!);
 
     // Step 5: Verify we're back to first story
     const returnedTitle = await title.textContent();
