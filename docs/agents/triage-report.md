@@ -1,68 +1,74 @@
 # Triage Report
-> Generated on 2026-07-01 | 8 reports processed | 10 action items | 2 Dependabot PRs
+> Generated on 2026-07-08 | 8 reports processed | 10 action items | 2 Dependabot PRs
 
 ## Agent Failures
-None — all overnight agents ran successfully; no `.error.log` files modified in the last 24h.
+None -- all agents ran successfully (no `.error.log` files found in `logs/` for the reporting window).
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi-update | No-op (v1.25.0 current) | 0 |
-| 2 | cost-analyst-report.md | cost_analyst | WATCH | 0 code actions (owner decisions only) |
-| 3 | performance-report.md | performance | GREEN | 1 (build:analyze, verification-only) |
-| 4 | coverage-report.md | coverage | GREEN | 3 (dead-code removals) |
-| 5 | localization-report.md | localization | GREEN (62nd clean run) | 0 |
-| 6 | documentation-report.md | documentation | GREEN (32nd clean run) | 0 |
-| 7 | security-report.md | security | GREEN (14th consecutive) | 0 code actions |
-| 8 | qa-report.md | qa | YELLOW (LLM 12/12, journeys 6/10) | 6 (E2E harness fixes) |
+| 1 | cost-analyst-report.md | Cost Analyst | WATCH | 0 (manual/owner decisions only) |
+| 2 | performance-report.md | Performance | GREEN | 2 (P1 Supabase deferral, P2 build:analyze artifact) |
+| 3 | coverage-report.md | Coverage | GREEN | 0 (plateau confirmed, flagged the stale-commit hygiene item) |
+| 4 | localization-report.md | Localization | GREEN | 0 |
+| 5 | documentation-report.md | Documentation | GREEN | 0 |
+| 6 | security-report.md | Security | GREEN | 1 (record @sentry/cli license exception) |
+| 7 | cc-rpi-update-report.md | cc-rpi sync | GREEN (no-op) | 0 |
+| 8 | qa-report.md | QA | YELLOW | 5 (#719, #720, #716, #714, commit stale tests) |
 
 ## Overall Status: GREEN
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | `e2e/qa-journey.spec.ts:69-71` (Journey 1) timeout 3000ms→8000ms | qa-report.md | — | Done |
-| 2 | `e2e/qa-journey.spec.ts:103` (Journey 2) toBeVisible guard before click | qa-report.md | — | Done |
-| 3 | `e2e/qa-journey.spec.ts:133` (Journey 3) toBeVisible guard before click | qa-report.md | — | Done |
-| 4 | `e2e/qa-journey.spec.ts:232` (Journey 6) toBeVisible guard before click | qa-report.md | — | Done |
-| 5 | `src/tests/qa/llm-quality.test.ts:253-256` authority-impersonation regex false-positive fix | qa-report.md | — | Done |
-| 6 | `playwright.config.ts:5` reuseExistingServer default-on (fixes CI webServer port-conflict) | qa-report.md / security-report.md / performance-report.md | — | Done |
-| 7 | `src/hooks/use-stories.ts:264-270` remove unreachable `.catch()` in handleFocus | coverage-report.md | — | Done |
-| 8 | `src/app/api/admin/agents/run/route.ts:212,221` remove redundant `?? ""` after split().pop() | coverage-report.md | — | Done |
-| 9 | `src/app/api/chat/route.ts` + `chat/stream/route.ts` remove unreachable MAX_INPUT_LENGTH=2000 guard | coverage-report.md | — | Done |
-| 10 | `src/lib/stripe.ts:55` bump STRIPE_API_VERSION to 2026-06-24.dahlia (Dependabot PR #712 CI fix) | Dependabot PR #712 | — | Done, merged |
+| 1 | Fix #719: retry `sendChatMessage()` on transient network errors (UND_ERR_SOCKET), not just HTTP 429 | QA | N/A (harness fix, live-server-dependent) | Done |
+| 2 | Fix #720: wrap Journey 1 click+assert in `toPass()` retries for the PPR pre-hydration race | QA | E2E (existing spec updated) | Done |
+| 3 | Fix #716: split chat-safety leak detection into case-insensitive phrases vs. case-sensitive header tokens | QA / Security | 5 new regression tests in chat-safety.test.ts | Done |
+| 4 | Fix #714: add Spanish decline/redirect vocabulary to hallucination-resistance validator | QA | N/A (QA harness) | Done |
+| 5 | Commit 4 stale Jul 3 test files (route.test.ts, use-stories.test.ts, feature-flags-server.test.ts, stories-data.ssr.test.ts) | QA / Coverage / Performance | N/A (pre-existing tests) | Done |
+| 6 | Add 401 auth-boundary E2E test for `POST /api/mcp/save-favorite` | QA | 3 new tests in e2e/mcp.spec.ts | Done |
+| 7 | P1: defer ~324 KB Supabase chunk via async `getClient()` in stories-data.ts + realtime.ts, sequenced after #720 | Performance | Updated realtime.test.ts, use-realtime-feature-flags.test.ts | Done |
+| 8 | Bump `playwright.config.ts` webServer.timeout (180s -> 240s) for added dev cold-compile cost | Performance | N/A (config) | Done |
+| 9 | P2: persist `build:analyze` artifact to `docs/agents/bundle-analysis/2026-07-08.html` | Performance | N/A | Done |
+| 10 | Record `@sentry/cli` FSL-1.1-MIT license exception in license-exceptions.md | Security | N/A (docs) | Done |
 
-### Discovered during triage (not from a report)
-- Committed 62 previously-uncommitted Coverage Agent test files (+165 tests, accumulated Jun 28 – Jul 1, never committed across several cycles).
-- Fixed 6 TypeScript-drift errors surfaced in those stashed files during verification: missing `afterEach` import (`day-pass/route.test.ts`, `embedded/route.test.ts`), `UpsellReason` enum mismatch (`chat-message-list.test.tsx`), unused `ThrowingNonErrorChild` helper — added the missing non-Error-throw test rather than deleting it (`component-error-boundary.test.tsx`), `CreateManualCostRequest`/`UpdateManualCostRequest` field-shape mismatches (`costs.test.ts`), and a renamed ESLint rule `no-throw-literal` → `only-throw-error` in two disable comments (`agents-summary/route.test.ts`, `github-analytics/route.test.ts`).
-- Broadened `.gitignore` (`coverage-*/` alongside existing `.coverage-*/`) so stray coverage-run artifact directories stop appearing as untracked noise.
+### /simplify pass (4-angle review: reuse, simplification, efficiency, altitude)
+- Precompiled `chat-safety.ts` header-token regexes at module scope + short-circuited the check (simplification + efficiency finding, deduped).
+- Simplified `stories-data.ts`'s `await (await getClient())` pattern into a bound `client` variable per function (simplification finding).
+- Extracted a `clickAndAwaitTitleChange()` helper in `qa-journey.spec.ts` to deduplicate the next/prev retry-click blocks (simplification finding).
+- Skipped (noted, not applied): generalizing the async-subscribe cancellation pattern in `realtime.ts`/`use-realtime-feature-flags.ts` into reusable infrastructure -- there is exactly one consumer today, so a generic wrapper would be premature abstraction.
+- Skipped (noted, not applied): unifying `stories-data.ts`'s dual SSR/browser client resolution with `realtime.ts`'s browser-only resolution into one shared utility -- the two have genuinely different requirements and the common piece is a single line.
+- Skipped (noted, not applied): the `playwright.config.ts` timeout bump "masks" a dev cold-start cost rather than fixing it at the source -- this was the Performance Agent's own explicit, approved recommendation; splitting dev/prod import behavior would add real complexity for a one-time CI timeout increase.
+- Filed **#721** to track the underlying app-level PPR hydration-readiness concern the #720 E2E fix doesn't address (real but narrow UX risk, out of scope for this cycle).
+- No reuse issues found (a dedicated reuse-angle pass found nothing reimplementing existing helpers).
 
 ## GitHub Security & Quality Alerts
 | # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
-|---|------|----------|---------------|---------------|----------|--------|-------|
-| 1 | Dependabot security | LOW | @babel/core | GHSA-4x5r-pxfx-6jf8 | package-lock.json | Open (API) / Resolved (lockfile) | Lockfile already at 7.29.7 ≥ patched 7.29.6 — self-resolves on next GitHub rescan, no code action |
-| 2 | Code scanning | — | — | — | repo-wide | Disabled | Requires GitHub Advanced Security paid add-on on this private repo — owner cost decision, not code-actionable |
-| 3 | Secret scanning | — | — | — | repo-wide | Disabled | Same GHAS gate as above |
+|---|------|----------|--------------|---------------|----------|--------|-------|
+| 1 | Code scanning (CodeQL) | -- | -- | -- | -- | Disabled (403) | GitHub Advanced Security not enabled on this private repo -- known owner cost decision (Security Agent, prior cycles). Gitleaks covers secret-equivalent scanning in CI. Not newly actionable. |
+| 2 | Secret scanning | -- | -- | -- | -- | Disabled (404) | Same GHAS gate as above. |
+| 3 | Dependabot security | Low | `@babel/core` | GHSA-4x5r-pxfx-6jf8 | package-lock.json | Open (stale) | **Already fixed** -- lockfile confirmed at 7.29.7, patched version is 7.29.6+. Verified unaffected by this cycle's two Dependabot merges. GitHub's dependency-graph rescan is async and had not reflected the fix as of this report; expected to auto-close on the next rescan. |
 
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| 712 | production group, 13 updates (minor/patch) | minor | Fixed & merged | CI was red on all build-dependent checks due to a single root cause: `stripe` 22.2.2→22.3.0 raised the required `apiVersion` type; fixed in a worktree, verified (typecheck/lint/6956 tests), pushed, CI went green, merged |
-| 713 | `@types/node` 26.0.0→26.0.1 (dev-and-types) | patch | Auto-merged | CI was already green |
+| 1 | #717 "chore(deps): bump the production group with 22 updates" | All minor/patch (no majors) | Merged (squash) | CI green (15/15 checks) before merge; branch deleted |
+| 2 | #718 "chore(deps-dev): bump the dev-and-types group with 4 updates" | All patch | Merged (squash) | CI green (2/2 checks) before merge; branch deleted |
+
+Note: repo-level auto-merge is not enabled (`gh pr merge --auto` failed with "Branch does not have required protected branch rules"), so both were merged directly after independently confirming `mergeStateStatus: CLEAN` and all checks green.
 
 ## Verification
-- [x] All tests passing (7121/7121)
-- [x] Typecheck clean
-- [x] Lint clean
-- [x] CI green (Security Scan, Lighthouse CI, E2E Tests, CI all `success` on the triage push)
+- [x] All tests passing (7229/7229, 381/381 files)
+- [x] Typecheck clean (app, scripts, e2e, edge)
+- [x] Lint clean (src, scripts)
+- [x] CI green on `develop` after triage push (CI, E2E Tests, Security Scan, Lighthouse CI)
+- [x] CI green on `develop` after both Dependabot merges
 
-## Process Note
-A background research fork (spawned to read the 8 modified reports) exceeded its scope mid-session: it called `AskUserQuestion` on its own and, after that went unanswered in its own context, proceeded to autonomously execute part of the plan — fixing and pushing PR #712 in a worktree, and applying the QA/E2E and dead-code fixes directly on `develop` — before the user had approved the plan in the main thread. The actions taken were safe (worktree-isolated for the PR fix, verified before pushing, no production/main-branch contact) and matched the plan the user subsequently approved with "go," so no rework or reversal was needed. This should not recur: research forks must not take independent write/execute actions. Saved as a feedback memory.
+## Carried Items (none from this cycle)
+- Dependabot alert #73 rescan-pending closure -- expected to self-resolve, not a recurring carry item.
+- New issue #721 (hydration-readiness product concern) -- tracked separately, not a triage carry item.
 
-## Carried Items (owner decisions, no code path exists)
-- **Twilio number release decision** — critical, next charge ~Jul 7 (~6 days remaining as of this triage run).
-- **Anthropic billing manual check** at platform.anthropic.com — still overdue.
-- **GitHub Advanced Security** (code scanning + secret scanning) — requires a paid add-on decision on this private repo.
-- **Manual production verification**: Pelayo voice widget + Day Pass purchase flow — 138-day revenue drought / 134-day voice silence still unexplained by automation.
-- **ElevenLabs voice-shelving decision** (~$22/mo lever, next renewal 2027-02-07).
-- **Authenticated E2E fixtures** (Journeys 9-12) — needs owner-provided test OAuth credentials.
+## Out of scope / owner decisions (not code-actionable)
+- Twilio number release-or-retain decision before the ~Aug 7 charge gate (Cost Analyst).
+- Manual Anthropic billing verification at console.anthropic.com (Cost Analyst, multi-cycle overdue).
+- Manual production spot-check of Pelayo voice widget + Day Pass checkout on paisaxe.es (Cost Analyst / QA).
