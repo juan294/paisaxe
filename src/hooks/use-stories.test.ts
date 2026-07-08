@@ -704,6 +704,13 @@ describe("useStories localStorage persistence", () => {
     expect(stored.timestamp).toBeDefined();
   });
 
+  // Coverage note (line 157): `if (localStorageBootstrapped.current) return;` in the
+  // bootstrap effect guards against React StrictMode's dev-only double effect
+  // invocation. The effect has [] deps, so on production React (which vitest resolves
+  // — verified empirically: a StrictMode-wrapped probe effect fires exactly once)
+  // it runs once per mount and the guard is unreachable. Untestable in this
+  // environment; documented rather than forced.
+
   it("persists only the slim public story payload to localStorage", async () => {
     mockGetStoriesFromDB.mockResolvedValue([
       {

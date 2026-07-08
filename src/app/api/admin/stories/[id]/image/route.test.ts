@@ -1333,6 +1333,46 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
       fetchSpy.mockRestore();
     });
+
+    // Line 158: `await reader.cancel().catch(() => undefined)` — when the stream's
+    // cancel() rejects (e.g. the underlying source throws during teardown), the
+    // .catch swallows the rejection so RemoteImageTooLargeError still propagates.
+    it("still rejects with 400 when reader.cancel() itself rejects (line 158 catch)", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const { mockUpdate } = setupStoryUpdateMock("https://example.com/huge-stream.jpg");
+
+      let cancelAttempted = false;
+      const oversizedChunk = new Uint8Array(11 * 1024 * 1024); // 11MB > MAX_REMOTE_SIZE (10MB)
+      const bodyStream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(oversizedChunk);
+          // Intentionally do not close — the reader loop should abort/cancel first.
+        },
+        cancel() {
+          cancelAttempted = true;
+          throw new Error("underlying source teardown failed");
+        },
+      });
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({}),
+        body: bodyStream,
+      } as unknown as Response);
+
+      const request = createJsonImageRequest("https://example.com/huge-stream.jpg");
+      const response = await PUT(request, mockParams);
+
+      // The cancel() rejection is swallowed; the too-large error still wins.
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("Image too large (max 10MB)");
+      expect(cancelAttempted).toBe(true);
+      expect(mockUpdate).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
   });
 
   describe("fetch timeout abort callback (line 322)", () => {
