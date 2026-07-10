@@ -1,161 +1,158 @@
-# Performance Agent Report — 2026-07-07
+# Performance Agent Report — 2026-07-09
 
 ## Summary
 
-Status: GREEN. Total JS is 3,022 KB — 478 KB under the 3,500 KB total budget, byte-for-byte identical to every cycle since Jul 1 (same ten chunk sizes). No `src/` or `package.json` commit has landed since 9f61331a (Jul 1 08:20); every intervening change is docs, agent reports, or uncommitted test files. Build provenance: `.next` (Jul 7 08:02) postdates the last source/dep commit, so cached bundle numbers are authoritative for the current source tree.
+Status: GREEN. This cycle delivers the **formal post-dependency-batch baseline** that the last two cycles requested, and **closes both remaining open attribution items**. A fresh production build exists (BUILD_ID `T_qWHxOJUMuWN3TeggWBG`, built Jul 9 08:02, postdating both the #717/#718 dep batch and every source commit), so every number below is authoritative — no stale-build caveats this cycle.
 
-The CSS watch item from Jul 6 has one new data point: **Total CSS is holding at 134 KB for a 2nd consecutive cycle**, and the two on-disk chunks are byte-identical to yesterday (`0c2nogbb481gq.css` = 135,679 B, `1vpmbl4hekwi8.css` = 2,111 B, both mtime Jul 7 08:02). The 122 KB → 134 KB step happened once (between Jul 4 and Jul 6) and is now stable — this looks like a one-time build-environment shift rather than ongoing growth. Cause remains unattributed; `build:analyze` (P2) is still the one-run way to resolve it.
+Note on the metrics script's "CACHED" flag: the build was not run by the metrics script, but `.next` (Jul 9 08:02) postdates the last source/dep commit (`c9aeb037`, Jul 8 09:12) and was compiled with the post-batch installed tree (next 16.2.10, posthog-js 1.396.7, @supabase/supabase-js 2.110.0 — verified in node_modules on Jul 8). This IS the fresh post-batch build; the flag is a labeling artifact, not a data-quality problem.
 
-Both standing action items re-verified open this cycle:
+Three findings this cycle:
 
-1. **P1: defer the ~324 KB Supabase chunk off first paint — NOT landed.** `src/lib/stories-data.ts:4-5` still statically imports `supabase` and `createSupabaseBrowserClient`, and `getClient()` (lines 11-16) is still synchronous. `src/lib/realtime.ts:1` still statically imports the browser client. Unchanged since Jul 2.
-2. **P2: no `build:analyze` artifact exists.** `.next/analyze/` and `docs/agents/bundle-analysis/` both absent.
+1. **Dep batch impact confirmed at +8 KB total, zero first-paint impact.** Total JS moved 3,049 -> 3,057 KB. The delta decomposes cleanly: Supabase chunk +2.3 KB (supabase-js 2.110.0), PostHog chunk +2.4 KB (posthog-js 1.396.7), remainder spread across small chunks. Both grown chunks are deferred/async. Route-level first-loads are unchanged: `/immersive` 887 KB, base routes 707 KB, `/admin` 1,107 KB (+2 KB). Security's "expected ~zero impact" prediction holds.
+2. **The 110 KB unclassified chunk is CLASSIFIED after 8+ cycles: it is core-js polyfills.** `0cz1d0mv5g_q7.js` (112,594 B) contains core-js internal module names (`symbol-to-string-registry`, `string-to-symbol-registry`, `native-string-replace`). `npm ls core-js` shows exactly one dependent: `posthog-js@1.396.7 -> core-js@3.48.0`. The chunk appears in NO route's first-load list — it loads asynchronously alongside the deferred PostHog chunk. Combined real PostHog cost: 244 + 110 = ~354 KB, all off first paint.
+3. **P1 (Supabase deferral) verified holding post-batch.** The rebuilt Supabase chunk (`2iccnjqtww60x.js`, 315,234 B; signatures: supabase x65, gotrue x25, realtime x31) appears in exactly one first-load list: `/admin`. Every public route still loads it on demand. A second Supabase-adjacent chunk (`1dnam7n9w7rav.js`, 65 KB, supabase x27 — the @supabase/ssr auth-helper side) is also `/admin`-only.
 
-**New sequencing constraint on P1 (from QA Jul 7):** QA filed issue #720 — Journey 1's next-button click is swallowed by a PPR pre-hydration race in the E2E harness. QA explicitly asks that the #720 fix (a `toPass()` retry around click+assert) land BEFORE the P1 Supabase deferral, because making `getClient()` async widens the dev-server hydration window that caused the failure. P1 is therefore blocked-by-preference on #720, in addition to the standing `webServer.timeout` bump and `stories-data.ssr.test.ts` mock coordination. None of this changes the production value of P1; it only sequences the landing.
+One new informational flag: `.next` disk usage jumped to 1,529 MB (previous observed range 1,088–1,242 MB). This is Turbopack incremental-cache accumulation plus the retained Jul 8 webpack analyze cache — not shipped weight. Harmless; clear with `rm -rf .next` before a build if disk matters.
 
 ## Key Metrics
 
-| Signal | Value | Authoritative? | Status |
-|---|---:|:---:|:---:|
-| Total JS | 3,022 KB | Yes (cached build postdates all source/dep changes) | PASS — 478 KB under 3,500 KB budget |
-| Total CSS | 134 KB | Yes (byte-identical to Jul 6 on disk) | Watch — stable at new level for 2nd cycle, cause unattributed |
-| Largest chunk — ElevenLabs + LiveKit, deferred | 591 KB (605,492 B) | Yes | PASS — click-to-mount, zero first-paint cost |
-| Second — Supabase JS client | 324 KB (331,533 B) | Yes | OPEN — statically imported into first-paint graph via `stories-data.ts`; deferrable (P1) |
-| Third — PostHog | 241 KB (247,124 B) | Yes | PASS — dynamically imported (`posthog-provider.tsx:86`), deferred |
-| Fourth — React DOM + Next.js App Router runtime | 232 KB (237,128 B) | Yes | Settled — framework chunk, cannot be deferred |
-| Production deps | 34 / 40 | Yes | PASS — 6 headroom |
-| node_modules disk | 1,029 MB | Yes | GREEN — flat |
-| .next disk | 1,100 MB | Yes | Informational — within normal cache fluctuation (1,088–1,172 MB range) |
+| Signal | Value | Status |
+|---|---:|:---:|
+| Total JS | 3,057 KB (+8 KB, dep batch) | PASS — 443 KB under 3,500 KB budget |
+| First-load JS, `/immersive` (primary page) | 887 KB (908,821 B, measured) | PASS — unchanged post-batch |
+| First-load JS, worst route (`/admin`) | 1,107 KB (1,133,572 B, measured) | PASS — admin-only surface |
+| First-load JS, base routes (`/`, `/story/[slug]`) | 707 KB (724,443 B, measured) | PASS — unchanged |
+| Total CSS | 134 KB (main file byte-identical 135,679 B) | Stable — 4th consecutive cycle |
+| Largest chunk — ElevenLabs + LiveKit | 591 KB (605,492 B, byte-identical) | PASS — deferred, in no first-load list |
+| Supabase JS client chunk | 308 KB (315,234 B, +2.3 KB) | PASS — first-load only on /admin |
+| PostHog chunk | 244 KB (249,535 B, +2.4 KB) | PASS — deferred |
+| core-js via posthog-js (newly classified) | 110 KB (112,594 B) | PASS — async, loads with PostHog |
+| React DOM + Next.js runtime | 232 KB (237,129 B, +1 B) | Settled — framework chunk |
+| Production deps | 34 / 40 | PASS — 6 headroom |
+| node_modules disk | 1,031 MB | Stable |
+| .next disk | 1,529 MB (new high, was 1,242 MB) | Informational — cache accumulation, not shipped weight |
 
 ## Budget Status
 
 | Budget | Limit | Current | Status |
 |---|---:|---:|:---:|
-| Total JS | 3,500 KB | 3,022 KB | PASS — 478 KB headroom (13.7% under) |
-| Initial JS | 2,100 KB | est. ~900–1,100 KB (includes the 324 KB Supabase chunk on /immersive) | PASS (estimated) — a fresh `next build` First Load JS table would confirm precisely |
+| Total JS | 3,500 KB | 3,057 KB | PASS — 443 KB headroom (12.7% under) |
+| Initial JS | 2,100 KB | 887 KB on /immersive; 1,107 KB worst (/admin) | PASS — measured; 47.3% under on worst route |
 | Per-chunk (informal 650 KB) | 650 KB | 591 KB max | PASS |
 | Production deps | 40 | 34 | PASS |
-| Total CSS | (no hard budget) | 134 KB | Watch — flat this cycle; one-time step from 122 KB, unattributed |
+| Total CSS | (no hard budget) | 134 KB | Baseline — stable 4th cycle |
 
-No budgets exceeded.
+No budgets exceeded. All numbers from the fresh post-batch build.
 
-## Chunk Classification (unchanged since Jul 2 content-signature analysis; verified byte-identical again)
+## First-Load JS by Route (from `.next/diagnostics/route-bundle-stats.json`, Jul 9 build)
+
+| Route | First-load JS | Delta vs Jul 8 | Carries Supabase chunk? |
+|---|---:|---:|:---:|
+| /admin | 1,107 KB | +2 KB | Yes (expected — eager auth) |
+| /immersive | 887 KB | ~0 | No |
+| /favorites | 778 KB | ~0 | No |
+| /pricing/checkout | 739 KB | +1 KB | No |
+| /pricing | 731 KB | ~0 | No |
+| /about, /privacy, /terms | 718 KB | +1 KB | No |
+| /, /story/[slug], /coming-soon, /_not-found | 707 KB | ~0 | No |
+
+## Chunk Classification (post-batch chunk graph — all sizes verified by signature grep)
 
 | Size | Chunk | Contents (evidence) | Loading |
 |---:|---|---|---|
-| 591 KB | `3iklgkjh5uyog.js` | ElevenLabs SDK + LiveKit (`livekit` x168, `elevenlabs` x11) | Deferred — click-to-mount |
-| 324 KB | `1wc2k45fb81oe.js` | Supabase JS: GoTrue + Postgrest + Realtime + Storage (`supabase` x91, `storage` x197, `websocket` x31) | First-paint on /immersive via static import chain (see Opportunity 1) |
-| 241 KB | `3i6-rmo-y6p32.js` | PostHog (`posthog` x147, `$feature_flag` x21) | Deferred — dynamic import in `posthog-provider.tsx:86-87` |
-| 232 KB | `3wy6iknrljhg9.js` | React DOM + Next.js App Router runtime | First paint (required) |
-| 145 KB | `33-ly4xjin9t2.js` | Shared vendor incl. pino browser build + scheduler | Shared |
-| 110 KB | `0cz1d0mv5g_q7.js` | No library signatures — likely app code / Next.js internals | Unknown (only remaining JS mystery, low priority) |
-| 110 KB | `3su_i9204gfx5.js` | App code (references supabase/posthog/elevenlabs config, not the SDKs) | App code |
-| 75 KB | `1-5gb9zqmqb7l.js` | App/UI code (`cva`, storage refs) | App code |
-| 52 KB | `445ry45b8bclp.js` | App code | App code |
-| 50 KB | `30ag7c5m39-7t.js` | App shell + web vitals | App shell + speed-insights |
+| 591 KB | `3iklgkjh5uyog.js` | ElevenLabs SDK + LiveKit (livekit x168, elevenlabs x11) | Deferred — click-to-mount, in no first-load list |
+| 308 KB | `2iccnjqtww60x.js` | Supabase JS: GoTrue + Postgrest + Realtime + Storage (supabase x65, gotrue x25, realtime x31) | Async on public routes; first-load only on /admin |
+| 244 KB | `1zuww-tizgmla.js` | PostHog (posthog x148) | Deferred — dynamic import in `posthog-provider.tsx` |
+| 232 KB | `0hgypyft3yzsy.js` | React DOM + Next.js App Router runtime | First paint (required) |
+| 145 KB | `33-ly4xjin9t2.js` | Shared vendor (unchanged) | First paint — in all first-load lists |
+| 110 KB | `0cz1d0mv5g_q7.js` | **CLASSIFIED: core-js@3.48.0 polyfills, sole dependent posthog-js** (core-js internal module names present; `npm ls core-js` confirms) | Async — loads with PostHog chunk, in no first-load list |
+| 110 KB | `3su_i9204gfx5.js` | App code — service config/wrappers (supabase, posthog, elevenlabs, stripe, voyage refs) | Async — in no first-load list |
+| 75 KB | `1-5gb9zqmqb7l.js` | Shared app/UI code | First paint — in all first-load lists |
+| 64 KB | `1dnam7n9w7rav.js` | Supabase SSR/auth-helper side (supabase x27, radix x4) | First-load only on /admin |
+| 52 KB | `445ry45b8bclp.js` | /immersive UI (story-info-panel, nav-hint, mood-dismissed strings, motion x24) | On /immersive first-load list |
 
-**node_modules disk sizes are install footprints, not bundle weight.** `pdfjs-dist` (61 MB) and `pdf-parse` (57 MB) are devDependencies — never shipped to the client. `canvas` (19 MB) is an optional server-side dep. `next` (186 MB), `@next` (117 MB), `@sentry` (79 MB), `typescript` (24 MB) are tooling/runtime install sizes.
+node_modules disk sizes remain install footprints, not bundle weight: `pdfjs-dist` (61 MB) and `pdf-parse` (57 MB) are devDependencies; `canvas` (19 MB) is optional server-side; `next`/`@next`/`@sentry`/`typescript` are tooling. `core-js` (15 MB on disk) ships only the ~110 KB subset posthog-js imports.
 
 ## Top Optimization Opportunities (prioritized by impact)
 
-### 1. Defer the 324 KB Supabase chunk off the first-paint path (MEDIUM EFFORT, HIGHEST REMAINING IMPACT) — STILL OPEN, now sequenced after QA #720
+### 1. CLOSED THIS CYCLE: Post-batch baseline build (was P2 since Jul 7)
 
-Confirmed still unimplemented this cycle. The chain pulling the Supabase JS client onto the /immersive first-paint graph:
+The Jul 9 08:02 build is the authoritative post-#717/#718 baseline. Confirmed: +8 KB total, entirely in deferred chunks (posthog-js +2.4 KB, supabase-js +2.3 KB), zero change to any route's first-paint payload. The STALE-flag anxiety of the last two cycles is resolved. Nothing further to do.
 
-- `use-stories.ts` → `stories-data.ts:4-5` (static `import { supabase }` + `import { createSupabaseBrowserClient }`)
-- `use-realtime-feature-flags.ts` → `realtime.ts:1` (static `import { createSupabaseBrowserClient }`)
-- `use-admin-role.ts` (admin-only surface — lower priority)
+### 2. CLOSED THIS CYCLE: 110 KB unclassified chunk identified (open since ~Jun 25)
 
-The correct pattern already exists in `auth-provider.tsx`, which dynamic-imports the client inside an async function. Every Supabase call site in `stories-data.ts` already sits inside an async function, so `getClient()` can become async with no architectural change:
+`0cz1d0mv5g_q7.js` = core-js polyfills pulled exclusively by posthog-js, loaded async with the PostHog chunk. No action required — it is off the first-paint path. For the record, the only way to shed it would be replacing posthog-js with a lighter client (e.g. posthog-js-lite, which drops session replay/surveys and the reverse-proxy autocapture used here) — **not recommended**: the cost is 110 KB of deferred, cached JS on an analytics path, and the feature loss is real. Classified, closed, no action.
 
-```ts
-// stories-data.ts — replace the two static imports (lines 4-5) with:
-async function getClient() {
-  if (typeof window !== "undefined") {
-    const { createSupabaseBrowserClient } = await import("./supabase-browser");
-    const browser = createSupabaseBrowserClient();
-    if (browser) return browser;
-  }
-  const { supabase } = await import("./supabase");
-  return supabase;
-}
-// call sites: getClient().from(...) → (await getClient()).from(...)
-```
+### 3. CSS 122 -> 134 KB attribution — CLOSE as baseline
 
-Apply the same treatment to `realtime.ts` — a single remaining static import in the initial graph keeps the whole chunk in it.
+Main CSS file has been byte-identical (135,679 B) for 4 consecutive cycles. Treat 134 KB as the standing baseline; removing this from the open-items list.
 
-Honest framing: the 324 KB does not disappear — it moves off the hydration critical path and loads in parallel right after mount (the data fetch happens on mount anyway). The gain is deferred parse/execute of ~324 KB during the LCP window on the primary page, plus it stops counting against the 2,100 KB initial budget. Verify with the First Load JS table from a fresh `next build` before/after.
+### 4. QA's +19% LLM-runtime question — answered from the bundle side
 
-**Landing checklist (updated this cycle):**
-1. QA #720 fix first — `toPass()` retry around the Journey 1 click+assert in `qa-journey.spec.ts` (the async chunk widens the hydration window that already caused a flake on Jul 7).
-2. `playwright.config.ts` `webServer.timeout` bump (dev-server cold-compile risk for on-demand chunks; not a production concern).
-3. Update `stories-data.ssr.test.ts` mocks for the async `getClient()` conversion — note this file is still UNCOMMITTED in the working tree (4 days old, per Coverage Jul 6/QA Jul 7); it should be committed before P1 touches it.
+QA (Jul 9) asked whether the fresh post-batch build shows a latency-relevant change. From the client side: no — first-load payloads are byte-flat on every public route, so no client-bundle change can explain the LLM suite's +19% wall time. Server-side, the batch moved next 16.2.9 -> 16.2.10 (patch) and @anthropic-ai/sdk 0.106 -> 0.110 (server-external, not bundled); neither is a plausible +19% source, but the LLM suite's runtime is dominated by model/API latency, which this agent cannot measure from build artifacts. Recommendation stands with QA's own plan: watch 2 more cycles before escalating; if it persists, profile the dev-server API route timings rather than the bundle.
 
-### 2. Persist a `build:analyze` artifact (LOW EFFORT) — P2, still open, still the CSS-delta resolver
+### 5. ElevenLabs voice-shelving — product/cost lever (WATCH, unchanged)
 
-`.next/analyze/` is absent again. One run answers three questions: module-level breakdown of the 145 KB and 110 KB unclassified JS chunks, and what module accounts for the 122 KB → 134 KB CSS step (now stable, so a single artifact fully characterizes the new baseline):
+The 591 KB chunk is byte-identical and fully deferred (in no first-load list); it costs current users nothing. Per Cost Analyst Jul 8, this is a Feb 2027 renewal decision, not a bundle item.
 
-```bash
-cd /Users/juan/code/paisaxe   # main repo, NOT a worktree
-npm run build:analyze
-mkdir -p docs/agents/bundle-analysis && cp .next/analyze/client.html docs/agents/bundle-analysis/2026-07-07.html
-```
+### 6. Monitor total JS headroom (ONGOING WATCH)
 
-### 3. ElevenLabs voice-shelving — product/cost lever (WATCH, unchanged)
+443 KB headroom (was 451 KB). Threshold unchanged: revisit if headroom drops below 300 KB. The only foreseeable pressure is issue #721 (hydration-readiness UI work on /immersive), if it ever lands client code.
 
-The 591 KB ElevenLabs + LiveKit chunk remains fully deferred (click-to-mount) and serves zero users (140-day Paisaxe voice silence per Cost Analyst Jul 7; the ElevenLabs cycle closed today at 3.4% utilization, all of it non-Paisaxe). Nothing further to optimize in the bundle; the remaining lever is the cost decision at the Feb 2027 renewal, which Cost Analyst notes now converges with Twilio balance depletion into a single voice-stack decision point.
+### 7. Housekeeping (LOW): .next cache growth
 
-### 4. Monitor total JS headroom (ONGOING WATCH)
-
-478 KB headroom, flat for the 7th consecutive tracked cycle. If Opportunity 1 lands, initial-path JS drops by ~324 KB while total stays constant. Revisit only if headroom drops below 300 KB. The routine dependency-freshness batch (28 outdated packages per Security Jul 7, all minor/patch, zero CVEs — largest gaps `@anthropic-ai/sdk` 0.106→0.110, `posthog-js` 1.395→1.398, `@supabase/supabase-js` 2.108→2.110) is expected to have zero bundle impact: posthog is deferred, `@anthropic-ai/sdk` is server-only via `serverExternalPackages`, and the rest are patch-level. The new `eslint` 10 major is dev-only. When the batch merges, the next fresh build will confirm.
+`.next` at 1,529 MB is a new high (+287 MB over the previous peak) from Turbopack incremental cache plus the retained webpack analyze cache. Not shipped weight, no user impact. If local disk becomes a concern: `rm -rf .next && npm run build`. Do not schedule a dedicated run for this.
 
 ## Comparison to Previous Runs
 
-| Metric | Jul 1 | Jul 2 | Jul 3 | Jul 4 | Jul 6 | Jul 7 |
+| Metric | Jul 3 | Jul 4 | Jul 6 | Jul 7 | Jul 8 | Jul 9 |
 |---|---:|---:|---:|---:|---:|---:|
-| Total JS | 3,022 KB | 3,022 KB | 3,022 KB | 3,022 KB | 3,022 KB | 3,022 KB |
-| vs 3,500 KB budget | -478 KB | -478 KB | -478 KB | -478 KB | -478 KB | -478 KB |
-| Total CSS | 122 KB | 122 KB | 122 KB | 122 KB | 134 KB | 134 KB |
-| ElevenLabs + LiveKit chunk | 591 KB | 591 KB | 591 KB | 591 KB | 591 KB | 591 KB |
-| Supabase chunk | 324 KB | 324 KB | 324 KB | 324 KB | 324 KB | 324 KB |
-| PostHog chunk | 241 KB | 241 KB | 241 KB | 241 KB | 241 KB | 241 KB |
+| Total JS | 3,022 KB | 3,022 KB | 3,022 KB | 3,022 KB | 3,049 KB | 3,057 KB |
+| vs 3,500 KB budget | -478 KB | -478 KB | -478 KB | -478 KB | -451 KB | -443 KB |
+| /immersive first-load | est. only | est. only | est. only | est. only | 887 KB | 887 KB (flat) |
+| Total CSS | 122 KB | 122 KB | 134 KB | 134 KB | 134 KB | 134 KB |
+| Supabase chunk | 324 KB (first-paint) | 324 KB (first-paint) | 324 KB (first-paint) | 324 KB (first-paint) | 306 KB (deferred) | 308 KB (deferred) |
+| ElevenLabs chunk | 591 KB | 591 KB | 591 KB | 591 KB | 591 KB | 591 KB (byte-identical) |
+| PostHog chunk | 241 KB | 241 KB | 241 KB | 241 KB | 241 KB | 244 KB (batch) |
 | Production deps | 34/40 | 34/40 | 34/40 | 34/40 | 34/40 | 34/40 |
-| node_modules | 1,029 MB | 1,029 MB | 1,024 MB | 1,029 MB | 1,029 MB | 1,029 MB |
-| .next disk | 1,127 MB | 1,154 MB | 1,126 MB | 1,172 MB | 1,088 MB | 1,100 MB |
+| node_modules | 1,024 MB | 1,029 MB | 1,029 MB | 1,029 MB | 1,031 MB | 1,031 MB |
+| .next disk | 1,126 MB | 1,172 MB | 1,088 MB | 1,100 MB | 1,242 MB | 1,529 MB |
 
-No regressions, no improvements — JS flat for the 7th consecutive cycle, CSS stable at its new 134 KB level for the 2nd. The entire JS optimization backlog (P1 Supabase deferral, P2 analyze artifact) remains unchanged and unactioned since Jul 2.
+The +8 KB is the expected, now-measured cost of the 26-package dependency batch, and it landed entirely in deferred chunks. No regression: every route's first-paint payload is flat.
 
 ## Cross-Agent Observations This Cycle
 
-**QA Jul 7 YELLOW (GREEN streak ends at 2).** Both failures are harness-level, not app-level: #719 (test retry loop misses network errors) and #720 (PPR pre-hydration click race in Journey 1). #720 directly affects P1 sequencing — see Opportunity 1. No production performance signal in either failure.
+**QA Jul 9 GREEN.** First fully clean sweep (12/12 LLM, 10/10 journeys) — the post-P1 hydration behavior is stable in E2E for a 2nd validation cycle. Their +19% LLM-runtime flag is addressed in item 4 above: not bundle-attributable; support their 2-cycle watch plan.
 
-**Security Jul 7 GREEN (9th consecutive).** 0 advisories, npm audit clean full-tree. 28 outdated packages, all minor/patch, 0 CVEs; batch confirmed zero-bundle-impact per prior analysis. eslint 10 major is dev-only, deferred.
+**Security Jul 9 GREEN.** Their root-cause on Dependabot alert #73 (alerts track main's lockfile, develop is patched) has no bundle implication. The remaining 17-package drift is patch/minor with posthog-js the only client-visible one — future batches should repeat this cycle's pattern: expect single-digit KB deltas in deferred chunks.
 
-**Cost Analyst Jul 7 WATCH.** Twilio July base rental posted — the number-release window is closed for July; next gate ~Aug 7. ElevenLabs cycle closed at 3.4% utilization, all non-Paisaxe. Confirms no bundle lever remains on voice; it is a Feb 2027 renewal decision.
+**Cost Analyst Jul 8 WATCH.** ElevenLabs chunk position unchanged (deferred, byte-identical); no bundle lever remains on the voice stack, matching their framing of it as a Feb 2027 renewal decision.
 
-**Coverage Jul 6 GREEN.** Plateau holds (98.84% stmts), 4th consecutive identical cycle. The 4 uncommitted Jul 3 test files — including `stories-data.ssr.test.ts`, which P1 must update — are still uncommitted (4 days old).
+**Localization Jul 9.** i18n lazy-loading confirmed unaffected by the P1 deferral, matching their finding; no i18n bundle action needed.
 
-**Localization Jul 7.** i18n bundles stable (~15 KB each), es+en static, others lazy — no action. Also flags a local-env issue: stale `.next/dev/types/` artifacts break local `npm run typecheck` (not CI, not bundle-related).
+**Triage.** No performance code actions this cycle — both standing open items closed by analysis of the existing fresh build, no new build or code change needed.
 
 ## Open Items
 
 | Item | Priority | Status |
 |---|---|---|
-| Defer Supabase chunk (324 KB) via async import in `stories-data.ts` + `realtime.ts` | P1 | Open — verified unimplemented this cycle; land AFTER QA #720 fix, with `webServer.timeout` bump and `stories-data.ssr.test.ts` coordination |
-| Persist `build:analyze` output to `docs/agents/bundle-analysis/` | P2 | Open — resolves the CSS-step attribution and the two unclassified JS chunks in one run |
-| Explain the CSS step (122 KB → 134 KB, now stable) | Medium | Open — verified byte-identical for 2nd cycle; one-time step, not ongoing growth; resolve via P2 |
-| Classify `0cz1d0mv5g_q7.js` (110 KB, no library signatures) | Informational | Open — likely app code; resolve with P2 treemap |
-| ElevenLabs voice-shelving product decision | User decision | Open — cost lever only (Feb 2027 renewal, converging with Twilio runway per Cost Analyst) |
+| Total JS headroom watch (443 KB; act below 300 KB) | Watch | Open — ongoing |
+| Issue #721 hydration readiness — potential future client-code cost | Watch | Open (QA owns the issue) |
+| LLM suite +19% runtime — server/API side | Watch | Open (QA owns; not bundle-attributable, see item 4) |
+| ElevenLabs voice-shelving product decision | User decision | Open — Feb 2027 renewal window (Cost Analyst owns) |
 
 ## Closed / No-Action Items (for the record)
 
 | Item | Resolution |
 |---|---|
-| Twilio number release decision (July window) | CLOSED for July (Jul 7) — base rental posted, charge sunk; next decision gate ~Aug 7 (Cost Analyst owns) |
-| Classify all top-10 JS chunks | CLOSED (Jul 2) — signature-grepping resolved identity; verified flat this cycle |
-| PostHog deferral | CLOSED — dynamic-imported at `posthog-provider.tsx:86-87` |
-| `optimizePackageImports` (lucide-react, posthog-js) | CLOSED — active in `next.config.ts` |
+| Fresh post-#717/#718 baseline build | CLOSED (Jul 9) — build Jul 9 08:02, +8 KB total, all deferred chunks, first-paint flat |
+| Classify `0cz1d0mv5g_q7.js` (110 KB, open since ~Jun 25) | CLOSED (Jul 9) — core-js@3.48.0 via posthog-js (sole dependent), async with PostHog chunk |
+| CSS 122 -> 134 KB attribution | CLOSED — byte-identical 4 cycles; 134 KB is the baseline |
+| P1: Supabase chunk off first paint | CLOSED (Jul 8) — re-verified post-batch: chunk on /admin first-load only |
+| P2: build:analyze artifact | CLOSED (Jul 8) — `docs/agents/bundle-analysis/2026-07-08.html` |
+| PostHog deferral | CLOSED — dynamic-imported; its full deferred cost is 244 KB + 110 KB core-js |
+| `optimizePackageImports` (lucide-react, posthog-js) | CLOSED — active in `next.config.ts:19` |
 | `pdfjs-dist` / `pdf-parse` client-bundle risk | CLOSED — devDependencies, never shipped |
-| ElevenLabs click-to-mount | CLOSED — active, 591 KB fully deferred |
+| ElevenLabs click-to-mount | CLOSED — active, 591 KB in no first-load list |
 
 ---

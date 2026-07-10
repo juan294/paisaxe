@@ -170,6 +170,37 @@ describe("useRealtimeFeatureFlags", () => {
     expect(newFlag?.enabled).toBe(true);
   });
 
+  it("should tear down immediately when the subscription resolves after unmount", async () => {
+    const { useRealtimeFeatureFlags } = await import(
+      "./use-realtime-feature-flags"
+    );
+    // Hold the subscription promise open so we can resolve it after unmount,
+    // simulating the dynamic import behind subscribeToFeatureFlags landing
+    // after a fast unmount/remount.
+    let resolveSubscription: ((fn: () => void) => void) | undefined;
+    vi.mocked(subscribeToFeatureFlags).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSubscription = resolve;
+        })
+    );
+
+    const { unmount } = renderHook(() =>
+      useRealtimeFeatureFlags([makeFlag("contextual_prompts", true)])
+    );
+
+    unmount();
+    expect(mockCleanup).not.toHaveBeenCalled();
+
+    // The late resolution must not leak the subscription — the cancelled
+    // branch calls the cleanup function immediately.
+    await act(async () => {
+      resolveSubscription!(mockCleanup);
+    });
+
+    expect(mockCleanup).toHaveBeenCalledTimes(1);
+  });
+
   it("should clean up the subscription on unmount", async () => {
     const { useRealtimeFeatureFlags } = await import(
       "./use-realtime-feature-flags"

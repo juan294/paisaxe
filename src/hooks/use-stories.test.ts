@@ -249,6 +249,41 @@ describe("useStories", () => {
     consoleSpy.mockRestore();
   });
 
+  it("keeps cached data and stringifies a non-Error refresh rejection (String(err) false branch, line 205)", async () => {
+    // The refresh failure test above rejects with `new Error(...)`, exercising the
+    // `err.message` (true) branch of the STORIES_REFRESH warn. This test rejects with a
+    // NON-Error value while cache.data is already populated, so fetchStories catches,
+    // takes the `if (cache.data)` path, and hits the `String(err)` false branch.
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { result } = renderHook(() => useStories(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Cache is now populated with the successful initial fetch.
+    expect(result.current.stories).toEqual(mockStories);
+
+    // Next fetch rejects with a plain string (non-Error) — cache.data still exists,
+    // so fetchStories returns the cached data and warns via String(err).
+    mockGetStoriesFromDB.mockRejectedValue("refresh string error");
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Cached stories are retained (no throw, no error state).
+    expect(result.current.stories).toEqual(mockStories);
+    expect(result.current.error).toBeNull();
+
+    consoleSpy.mockRestore();
+  });
+
   it("should set error on refresh failure when no cached data", async () => {
     // Start with a fetch that fails immediately - no cache will be populated
     mockGetStoriesFromDB.mockRejectedValue(new Error("Initial error"));
@@ -944,6 +979,23 @@ describe("prefetchStories", () => {
     mockGetStoriesFromDB.mockRejectedValue(new Error("Prefetch error"));
 
     // Should not throw
+    prefetchStories();
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalled();
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("stringifies a non-Error prefetch rejection (String(err) false branch, line 326)", async () => {
+    // The graceful-error test above rejects with `new Error(...)`, hitting the
+    // `err.message` (true) branch of the STORIES_PREFETCH_FAILURE log. This one rejects
+    // with a NON-Error value so the `String(err)` false branch executes.
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetStoriesFromDB.mockRejectedValue("prefetch string error");
+
+    // Should not throw despite the non-Error rejection.
     prefetchStories();
 
     await waitFor(() => {
