@@ -171,13 +171,17 @@ fi
 
 # Check 2: Database Connectivity (production endpoint)
 log_info "Checking database connectivity..." | tee -a "$LOG_FILE"
-DB_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/health/db" 2>&1 || true)
-if echo "$DB_RESPONSE" | grep -q '"success":true'; then
+DB_CURL_EXIT=0
+DB_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/health/db" 2>&1) || DB_CURL_EXIT=$?
+if [[ "$DB_CURL_EXIT" -eq 0 ]] && echo "$DB_RESPONSE" | grep -q '"success":true'; then
   DB_LATENCY=$(echo "$DB_RESPONSE" | grep -oE '"latencyMs":[0-9]+' | cut -d':' -f2 || echo "unknown")
   log_success "Database connectivity: OK (latency: ${DB_LATENCY}ms)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
 else
-  log_error "Database connectivity: FAILED" | tee -a "$LOG_FILE"
+  if [[ -z "$DB_RESPONSE" ]]; then
+    DB_RESPONSE="empty response (curl exit code $DB_CURL_EXIT — likely timeout or connection failure reaching https://paisaxe.es/api/health/db)"
+  fi
+  log_error "Database connectivity: FAILED - $DB_RESPONSE" | tee -a "$LOG_FILE"
   if echo "$DB_RESPONSE" | grep -q "not configured"; then
     log_warn "  -> Possible cause: Supabase environment variables missing or misconfigured" | tee -a "$LOG_FILE"
   fi

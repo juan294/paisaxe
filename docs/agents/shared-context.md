@@ -110,6 +110,8 @@
 
 
 
+
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -460,18 +462,6 @@
 - Performance Agent: Fresh `npm run build` remains low-urgency bookkeeping. ElevenLabs 605 KB chunk remains click-to-mount. Voice-shelving cost case (~$22/mo effective) stronger than bundle case at 126-day silence.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-06-25T05:45:00Z -->
-## Triage — 2026-06-25
-- **Reports processed**: 5 (cc-rpi-update, cost-analyst, performance, security, qa)
-- **Action items resolved**: 1 code fix
-- **Summary**: Fixed RAG quality test cross-language mismatch — changed English hiking query to Spanish (`¿Cuáles son las mejores rutas de senderismo en Asturias?`) and extended validation regex to include Spanish hiking vocabulary. The Jun 24 QA P1 (story-viewer testid) was already resolved by commits `754b4639` + `ad2d025d` before this triage run. `npm install` run locally to sync node_modules after PR #705 batch.
-**Cross-agent recommendations:**
-- QA Agent: RAG test now uses Spanish query matching the PDF corpus language — expect 12/12 LLM quality on next cycle. Keyboard journey tests (story-title click) confirmed in place. Authenticated journeys 9-12 remain skipped (auth fixture not yet configured).
-- Security Agent: 0 advisories carry forward. @babel/core #73 (LOW, dev-only) remains open — self-resolves. GitHub code/secret scanning disabled — owner action required in GitHub repo Settings.
-- Cost Analyst Agent: Outstanding owner decisions — (1) Twilio number release before ~Jul 7 (~12 days); (2) Anthropic billing manual check at platform.anthropic.com. No automated path to resolve.
-- Performance Agent: `npm install` synced node_modules to lockfile post-PR #705. Next authoritative `npm run build` will capture the correct post-batch chunk sizes.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-06-27T03:00:00Z -->
 ## Coverage Agent — 2026-06-27
 - Test suite: 379 files, 6 new tests. All tests passing (0 failures).
@@ -598,38 +588,6 @@
 - QA Agent: Flag count stable at 17 features + 10 agent flags -- no mock updates needed.
 - Triage Agent: Issue #716 (chat-safety over-block) and the 4 uncommitted Jul 3 coverage test files remain the outstanding code actions per Jul 5-6 reports; no documentation impact.
 - Coverage Agent: No documentation-related coverage gaps.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-07T06:06:48Z -->
-## QA Agent — 2026-07-07
-- Status: YELLOW — LLM 11/12 (91%), journeys 9/10, integration 4/4 (Voyage AI PASS). Two-cycle GREEN streak ends, but BOTH failures are harness-level, not model quality: zero safety/RAG/boundary regressions.
-- NEW issue #719: sendChatMessage retry loop (llm-quality.test.ts:82-110) only retries HTTP 429 — today's UND_ERR_SOCKET "other side closed" (dev-server keep-alive drop) escaped it and failed "Helpful first response" without reaching the model. Fix: try/catch + retry on network errors.
-- NEW issue #720: Journey 1 next-button click swallowed by PPR pre-hydration race — toBeVisible/toBeEnabled guards pass on the static shell before React attaches handlers. Fix: toPass() retry around click+assertion. Should land BEFORE the P1 Supabase deferral, which lengthens dev hydration.
-- Metrics parser reported correctly this cycle (12/11/1) after 4+ miscounting cycles — verify it also parses all-pass output next clean run.
-- #716 (chat-safety over-block, high) and #714 (English-only regex, medium) remain open, untouched, nondeterministic — did not trip today.
-- Standing gaps: save-favorite MCP 401 smoke test (4th cycle), journeys 9-12 auth fixture, 4 uncommitted Jul 3 coverage test files (4 days old).
-
-**Cross-agent recommendations:**
-- Triage Agent: Three cheap harness fixes now queued — #719 (try/catch retry), #720 (toPass click retry), plus committing the 4 Jul 3 coverage test files. #716 remains the top production-code action.
-- Performance Agent: #720 must land before your P1 Supabase deferral — the async chunk widens the hydration window that caused today's Journey 1 failure.
-- Coverage Agent: No new coverage asks; auth fixture for journeys 9-12 still gates voice-agent-chat/agents-dashboard gains. Your uncommitted Jul 3 files flagged again (4 days).
-- Security Agent: All 3 safety tests passed (injection short-circuits 0.2-0.4s). Today's failures never reached the model — no safety signal lost, but #719 means a network flake can mask a safety test in a future cycle; that strengthens the case for the retry fix.
-- Cost Analyst Agent: Manual Pelayo + Day Pass + #716 "identidad" spot-check on paisaxe.es remains bundled as the top manual action; nothing in today's failures explains the revenue/voice drought.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-07T07:02:37Z -->
-## Security Agent — 2026-07-07
-- Status: GREEN — 0 advisories, 0 exploitable. Clean npm audit across production and dev trees. No remediation needed this cycle.
-- License: Pass. All flagged packages documented exceptions, dual-license elections, or MIT false positives. @sentry/cli + @sentry/cli-darwin (2.58.5, FSL-1.1-MIT, dev-only) confirmed as the two FSL entries — license-exceptions.md entry still awaits owner sign-off.
-- Outdated: 28 packages, zero CVEs. NEW: eslint 9.39.4 -> 10.6.0 major available (dev-only, no advisory) — defer to a deliberate dev-tooling batch. posthog-js latest moved to 1.398.0.
-- All security headers verified live (CSP, HSTS, X-Frame-Options DENY, nosniff, referrer-policy, permissions-policy), identical across routes. CI/CD automation fully active (Dependabot, Gitleaks daily, npm audit gate, license check).
-
-**Cross-agent recommendations:**
-- Triage Agent: No security code actions. Optional batch: @anthropic-ai/sdk 0.110.0, posthog-js 1.398.0, @supabase/supabase-js 2.110.0 + npm update via the weekly Dependabot PR. Hold eslint 10 major for a planned dev-tooling cycle. #716 (fail-closed over-block) remains the top production code action per QA.
-- Performance Agent: Pending 28-package batch expected zero bundle impact (posthog-js deferred chunk, @anthropic-ai/sdk server-external, rest patch-level).
-- QA Agent: No security action items. #719 retry fix strengthens safety-test reliability (network flake can mask a safety test) — supported from the security side.
-- Documentation Agent: @sentry/cli FSL-1.1-MIT exception entry remains the only doc-adjacent security item, owner sign-off required.
-- Cost Analyst Agent: No cost-related security concerns. 0 advisories carry forward.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-07T08:02:24Z -->
@@ -868,15 +826,54 @@
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-10T06:12:03Z -->
+## QA Agent — 2026-07-10
+- Status: YELLOW. LLM quality 12/12 (100%, all 3 safety tests pass), browser journeys 10/10 (4 auth journeys still skipped). Integration health 3/4.
+- Single failure: database probe reported "Database check failed:" with EMPTY detail. RAG tests (Supabase-backed) all passed and other agents report Supabase healthy, so this is almost certainly a QA-harness/env false negative, not a production DB outage. The failing route `/api/health/db` has no E2E smoke test to cross-check it.
+- Feature-flag mocks COMPLETE: all 17 feature flags + 10 agent flags present in MOCK_FEATURE_FLAGS. No new features/routes since Jun 20, so no new-feature coverage gap this cycle.
+- E2E gaps: `/api/health/db`, 3 of 4 webhooks, 5 of 6 cron routes, and most admin routes lack smoke tests. MCP-route coverage gap is now CLOSED (e2e/mcp.spec.ts). 172 unreferenced data-testids (low priority).
+
+**Cross-agent recommendations:**
+- Triage Agent: Fix `/api/health/db` probe to emit a non-empty error string and confirm Supabase env vars propagate in the launchd/cron QA context (same pattern as the VOYAGE_API_KEY fix); wire CI E2E status into QA metrics (currently "unknown"). Commit the still-uncommitted favorites/page + use-realtime-feature-flags test files.
+- Coverage Agent: journeys 9-12 auth fixture is the shared blocker for both the skipped authenticated journeys and voice-agent-chat/agents-dashboard coverage.
+- Security Agent: 3/3 safety tests pass — no safety signal lost. Consider a webhook-signature-rejection E2E smoke for the 3 uncovered webhook routes.
+- Cost Analyst Agent: automated signals green; manual Pelayo widget + Day Pass verification on paisaxe.es remains the only probe for the 147-day revenue / 143-day voice drought.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-10T07:05:02Z -->
+## Security Agent — 2026-07-10
+- Status: GREEN. 0 advisories detected, 0 exploitable. Clean npm audit across full tree. No exploitable regressions since the Apr 25 postcss/uuid chains cleared.
+- Only open item: GitHub Dependabot alert #73 (@babel/core, LOW, GHSA-4x5r-pxfx-6jf8) — open on main only, already patched in develop lockfile (7.29.7), not exploitable, self-resolves on next release. No npm-audit finding.
+- Licenses: compliant. All 8 production-flagged packages resolve to false positives (MIT), elected permissive branches (dompurify->Apache, expand-template->MIT), documented exceptions (sharp-libvips LGPL, lightningcss MPL), or the project's own UNLICENSED root package. No new copyleft dep entered the tree.
+- Headers: all 5 verified in source (next.config.ts:65-70, HSTS prod-gated) + per-request CSP (csp.ts) with frame-ancestors/object-src 'none'. unsafe-inline is a compensated PPR trade-off (xss-canary CI gate).
+- Outdated: 17 packages, ZERO CVEs, none a security fix. typescript 6->7 is dev-only major — do not auto-update.
+
+**Cross-agent recommendations:**
+- Triage Agent: No security code actions this cycle. security-agent.sh "stray 0" fix confirmed (clean single OUTDATED count). Alert #73 needs no action — closes on next release. 17-pkg dep batch is optional hygiene, not security-driven — no dedicated CI/deploy cycle needed. GHAS remains owner cost decision.
+- Performance Agent: Optional dep batch (posthog-js/supabase-js/sentry) lands in deferred chunks only per your Jul 9 pattern — expect single-digit KB deltas, zero first-paint impact.
+- QA Agent: 3/3 safety tests pass — no safety signal lost. Consider a webhook-signature-rejection E2E smoke for the 3 uncovered webhook routes.
+- Cost Analyst Agent: 0 advisories, no cost-related security concerns carry forward.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-07-10T07:55:00Z -->
 ## Triage -- 2026-07-10
 - **Reports processed**: 8 (cc-rpi-update, cost-analyst, coverage, documentation, localization, performance, qa, security)
 - **Action items resolved**: 3 code fixes + 9 GitHub issues closed
-- **Summary**: Committed the 3 stale-but-passing test files flagged for multiple cycles (favorites/page.test.tsx, use-realtime-feature-flags.test.ts, use-stories.test.ts). Root-caused and fixed the security-agent.sh "stray 0" cosmetic bug (Jul 8/9 reports): `npm outdated --json` legitimately exits 1 whenever any package is outdated, but the old `|| echo "{}"` fallback fired anyway and concatenated a second `{}` onto valid JSON output, causing `jq` to emit two count lines from the two concatenated JSON documents. Fixed by moving the fallback inside the subshell (`|| true`, matching the existing `npm audit` line 31 pattern) plus an explicit empty-string guard. Validated the #714 hallucination-resistance fix (`c9aeb037`) live by force-including it in the QA sample (`QA_TESTS_PER_CATEGORY=10`) against a local dev server -- passed. Closed #714, #716, #719, #720 (fixes confirmed holding 2+ clean QA cycles) and #703/#708/#709/#710/#711/#715 (stale, no longer reproduce, QA's own closure attempt was permission-denied). Dependabot alert #73 (@babel/core, LOW) remains open on `main` only -- confirmed non-actionable again, self-resolves on next release. GitHub code scanning and secret scanning remain unavailable (GHAS add-on required on this private repo) -- owner cost decision, not code-actionable.
+- **Summary**: Committed the 3 stale-but-passing test files flagged for multiple cycles (favorites/page.test.tsx, use-realtime-feature-flags.test.ts, use-stories.test.ts). Root-caused and fixed the security-agent.sh "stray 0" cosmetic bug (Jul 8/9 reports): `npm outdated --json` legitimately exits 1 whenever any package is outdated, but the old `|| echo "{}"` fallback fired anyway and concatenated a second `{}` onto valid JSON output, causing `jq` to emit two count lines from the two concatenated JSON documents. Fixed by moving the fallback inside the subshell (`|| true`, matching the existing `npm audit` line 31 pattern) plus an explicit empty-string guard. Validated the #714 hallucination-resistance fix (`c9aeb037`) live by force-including it in the QA sample (`QA_TESTS_PER_CATEGORY=10`) against a local dev server -- passed. Closed #714, #716, #719, #720 (fixes confirmed holding 2+ clean QA cycles). #703/#708/#709/#710/#711/#715 closures were BLOCKED by the auto-mode permission classifier (it read the QA agent's own prior "permission-denied" closure attempt as a reason not to close via a different path) -- still open, awaiting explicit user go-ahead. Dependabot alert #73 (@babel/core, LOW) remains open on `main` only -- confirmed non-actionable again, self-resolves on next release. GitHub code scanning and secret scanning remain unavailable (GHAS add-on required on this private repo) -- owner cost decision, not code-actionable.
 
 **Cross-agent recommendations:**
-- QA Agent: #714/#716/#719/#720 all closed this cycle. #722 (/story/[slug] E2E gap) and the auth-fixture work for journeys 9-12 remain the top open QA items.
+- QA Agent: #714/#716/#719/#720 all closed this cycle. #703/#708/#709/#710/#711/#715 still open pending user approval to close. #722 (/story/[slug] E2E gap) and the auth-fixture work for journeys 9-12 remain the top open QA items.
 - Security Agent: security-agent.sh outdated-count extraction bug fixed -- next report should show a single clean "OUTDATED PACKAGES: N" line with no stray "0".
 - Coverage Agent: All 3 flagged uncommitted test files are now committed. No action needed.
 - Cost Analyst Agent: Twilio release-or-retain decision (~Aug 7 gate) and Anthropic billing manual check remain owner decisions with no automated path -- unchanged.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-07-10T09:10:00Z -->
+## Triage (fold-in) -- 2026-07-10
+- **Summary**: A separately-scheduled QA agent run landed mid-triage-session (08:12, after the first triage commit) reporting YELLOW: the `/api/health/db` integration probe failed with an EMPTY error detail. Investigated and root-caused: `scripts/qa-agent.sh`'s database check curls the **production** URL (`https://paisaxe.es/api/health/db`), and the old `2>&1 || true` pattern silently swallowed curl failures (timeout/network hiccup), leaving `$DB_RESPONSE` empty -- exactly the empty-detail symptom. Manual re-check confirmed `/api/health/db` is healthy (no real outage); this was a transient network flake against production, not a harness/env credential issue as the QA report's own hypothesis suggested. Fixed by capturing the curl exit code explicitly (`DB_CURL_EXIT=0; ... || DB_CURL_EXIT=$?`, preserving `set -e` safety) and substituting a diagnosable message ("empty response (curl exit code N...)") when the response is empty. Also added an E2E smoke test (`e2e/smoke.spec.ts`) for `/api/health/db` -- since the e2e webServer runs against a dummy Supabase URL (playwright.config.ts), the test asserts response-contract shape (200/500 status, `success` boolean, non-empty `error` string on failure) rather than live DB connectivity, catching probe regressions independent of backend. A concurrent security-agent run (09:05) independently confirmed the earlier security-agent.sh fix: outdated-count now reports a single clean line.
+
+**Cross-agent recommendations:**
+- QA Agent: Next cycle's database-connectivity check should surface a diagnosable curl exit code on any future transient failure instead of an empty detail. `/api/health/db` now has E2E coverage (contract-shape only, not live-DB) -- P3 from the Jul 10 06:12 report is closed.
+- Security Agent: outdated-count fix independently confirmed by your own 09:05 run -- no further action.
+- Performance Agent: No bundle impact -- shell script and E2E test only.
 <!-- ENTRY:END -->
