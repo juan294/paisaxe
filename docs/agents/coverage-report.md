@@ -1,72 +1,70 @@
-# Coverage Agent Report — 2026-07-06
+# Coverage Agent Report — 2026-07-10
 
-## Status: GREEN (plateau confirmed for the 4th consecutive cycle; every sub-100% site re-verified individually, all already covered by prior test-file documentation)
+## Status: GREEN (plateau holds; two branch gaps closed this cycle)
 
-No new tests were written this cycle. Every statement-level gap in the codebase was traced to its exact line via `coverage/coverage-final.json` (not the truncated summary table, which mangles file paths for deeply-nested components) and checked against the relevant test file. Every gap is already explained and documented inline in an existing `.test.tsx`/`.test.ts` file from a prior coverage-agent cycle — there was nothing left to close without writing brittle, unreachable-path tests.
+Two new tests were written this cycle, closing the previously-open `String(err)` false branch in both catch blocks of `src/hooks/use-stories.ts` (the last places in the hook where a non-Error rejection was not exercised). Every other statement-level gap in the codebase was traced to its exact line and confirmed to be already explained by inline documentation in an existing test file from a prior cycle — SSR guards, defensive dead code, V8 async-closure instrumentation artifacts, or Playwright-only components. Nothing else was closeable without brittle, unreachable-path tests or a source change (out of this agent's remit).
 
 ## Overall coverage
 
-| Metric | 2026-07-05 (prior) | 2026-07-06 (this cycle) | Delta |
+| Metric | 2026-07-06 (prior) | 2026-07-10 (this cycle) | Delta |
 |--------|--------------------|-------------------------|-------|
 | Statements | 98.84% | **98.84%** | unchanged |
-| Branches | 96.75% | **96.75%** | unchanged |
+| Branches | 96.75% | **96.78%** | +0.03pp |
 | Functions | 99.05% | **99.05%** | unchanged |
 | Lines | 99.21% | **99.21%** | unchanged |
 | Test files | 381 | **381** | unchanged |
-| Tests | 7224 passing | **7224 passing** (0 failures, confirmed across 3 independent runs) | unchanged |
+| Tests | 7230 passing | **7232 passing** (0 failures) | +2 |
 
-All coverage thresholds (stmts >= 95, branches >= 90, funcs >= 95, lines >= 95) met with wide margin. No source commit landed since Jul 1 (`9f61331a`), so an unchanged number is expected, not a sign of a skipped cycle — this report independently re-derives the uncovered-line list from raw V8 output rather than trusting the prior report's line numbers, several of which had shifted since Jul 5 due to intervening file edits.
+All coverage thresholds (stmts >= 95, branches >= 90, funcs >= 95, lines >= 95) met with wide margin. Statements are unchanged because the two lines closed (205, 326) were already counted as executed via their Error-branch tests; the gain is purely in branch coverage (`use-stories.ts` branches 91.17% → 94.11% in the full suite).
+
+## Tests added this cycle
+
+Both additions live in `src/hooks/use-stories.test.ts` and mirror the systematic `String(err)`-false-branch closure pattern used in prior cycles (Jun 30 entry) across admin-api catch blocks and auth-provider init paths:
+
+1. **`use-stories.ts:205`** — `[STORIES_REFRESH]` warn `String(err)` false branch. New test "keeps cached data and stringifies a non-Error refresh rejection": populates the cache with a successful initial fetch, then forces a refresh that rejects with a plain string. `cache.data` still exists, so `fetchStories` takes the `if (cache.data)` path and logs via `String(err)` instead of `err.message`. Asserts cached stories are retained and no error state is set. The pre-existing refresh-failure test only rejected with `new Error(...)`, hitting the `err.message` (true) branch.
+
+2. **`use-stories.ts:326`** — `[STORIES_PREFETCH_FAILURE]` error `String(err)` false branch. New test "stringifies a non-Error prefetch rejection": calls `prefetchStories()` with a non-Error (string) rejection so the `String(err)` false branch executes. The pre-existing "handle prefetch error gracefully" test rejected with `new Error(...)`.
+
+Both tests pass (use-stories.test.ts now 42/42) and were verified via a targeted per-file coverage run before the full-suite run; lines 205 and 326 dropped out of the uncovered list.
 
 ## Methodology this cycle
 
-Ran `npx vitest run --coverage` three times (all 381/381 files, 7224/7224 tests passing, byte-identical coverage summary each time — no flakes observed this cycle). Rather than relying on the terminal coverage table (which truncates paths like `.../story-editor-dialog.tsx` vs `.../image-editor-dialog.tsx` to the same visual string), parsed `coverage/coverage-final.json` directly to get the exact file path and exact uncovered statement line numbers for every file below 100% statements. This surfaced several files whose truncated names in the printed table looked new/different from the Jul 5 report (e.g. `image-editor-dialog.tsx`, `visitors-analytics-panel.tsx`, `posthog-provider.tsx`, `github-analytics-panel.tsx`, `stripe-analytics-panel.tsx`, `toolbar-overflow-menu.tsx`, `account-config-dialog.tsx`, `voice-chat.tsx`, `post-row.tsx`, `use-stories.ts`, `story-viewer.tsx`). Each was individually re-investigated by reading the source line and its call site.
+Ran `npx vitest run --coverage` (all 381/381 files, 7232/7232 tests passing). Parsed the per-file uncovered-line output for every file below 100% statements and cross-referenced each against its source line and existing test-file documentation. The one file with a genuinely closeable, non-brittle gap was `use-stories.ts` (two symmetric non-Error catch branches); everything else was confirmed pre-documented or Playwright-only. Transient `[Claude Streaming]` retry log lines appeared during the run — expected test-exercised retry paths, not failures (all tests green).
 
-Result: every one of these was already explained by an inline comment/test in its own test file (added in earlier, uncredited coverage-agent cycles), confirming they are not new gaps — they simply weren't itemized by file name in the Jul 5 prose report. No source or test edits were needed.
-
-## Remaining sub-100% statement sites — full re-verified list
+## Remaining sub-100% statement sites — re-verified, all documented or out of remit
 
 ### SSR / environment guards (`typeof window === "undefined"`) — unreachable in jsdom
 - `src/hooks/use-media-query.ts:15`
-- `src/hooks/use-stories.ts:60,97` (`loadFromStorage`/`saveToStorage` early returns)
+- `src/hooks/use-stories.ts:60,97,340` (`loadFromStorage`/`saveToStorage`/`clearStoriesCache` SSR early returns)
+- `src/hooks/use-voice-session.ts:75-111` (`saveState` SSR guard + `useVoiceSession` navigator-guarded memo — no dedicated jsdom path for the SSR branch)
 - `src/lib/request-context.ts:49`
 - `src/components/posthog-provider.tsx:17` (`shouldInitializePostHog`)
-- `src/components/admin/visitors-analytics-panel.tsx:27,35` (`isLocalhost`/`getStoredDevToggle`)
 
 ### Defensive `if (!x) return` guards after a parent null-check already gates rendering — dead code, documented in-test
-- `src/components/admin/image-editor-dialog.tsx:56,109,129` — `handleSave`/`handleApprove`/`handleMarkNeedsCuration` all guard on `story`, but the component itself returns `null` at line 154 when `!story`, so these handlers can never fire with a falsy `story`.
-- `src/components/admin/marketing-dashboard/account-config-dialog.tsx:47` — same pattern; component returns `null` at line 87 when `!platform`.
-- `src/components/admin/marketing-dashboard/post-row.tsx:18` — `formatDate`'s `!dateStr` guard; caller only invokes it inside a `post.scheduledFor &&` short-circuit, so `dateStr` is always truthy at the call site (documented at post-row.test.tsx:140-144).
-- `src/components/immersive/toolbar-overflow-menu.tsx:68` — `!menu` guard inside a keydown handler attached directly to the ref'd element; the ref is guaranteed set whenever the handler can fire.
-- `src/components/immersive/voice-chat.tsx:173` — `handleRetry`'s `!lastMessage || isLoading` guard; the retry button only renders after a message has been sent (making `lastMessage` truthy) and is `disabled={isLoading}` at the DOM level (documented at voice-chat.test.tsx:1691-1702).
-- `src/components/admin/story-editor-dialog/index.tsx:50,79,84` — same defensive-guard family, previously documented as a V8/dead-code mix.
-
-### Chart-component empty-state guards — parent already gates rendering on non-empty data
-- `src/components/admin/github-analytics-panel.tsx:254` (`TrafficChart`) — parent renders it only inside `data.daily.length > 0 &&` (documented at github-analytics-panel.test.tsx:443-462).
-- `src/components/admin/stripe-analytics-panel.tsx:244` (`RevenueChart`) — parent renders it only inside `data.revenueByDay.length > 0 &&` (documented at stripe-analytics-panel.test.tsx:558-577).
-- `src/components/admin/visitors-analytics-panel.tsx:343,544` (`TimeSeriesChart`, `UTMTable`) — same pattern (documented at visitors-analytics-panel.test.tsx:741-772).
-
-### Dead props / architecturally unreachable via public API
-- `src/components/immersive/story-viewer.tsx:240` — `handleToggleFavorite` is passed to `StoryInfoPanel` as `onToggleFavorite`, but `StoryInfoPanel` accepts the prop in its interface and never calls it (confirmed via grep — zero invocation sites). Documented at story-viewer.test.tsx:2007-2009 as an architecturally dead prop, untestable without a source change (out of this agent's remit).
-- `src/app/api/admin/feature-flags/[key]/route.ts:41` — fallthrough branch unreachable by the Zod schema.
-- `src/app/api/admin/stories/[id]/image/route.ts:35,38,49` — `parseIpv4Octets`; `isIP()` pre-validates format upstream.
-- `src/app/api/health/route.ts:264` — `Promise.all` outer catch; every probe has its own try/catch.
-- `src/lib/image-optimization.ts:130` — `processVariant` `default:` throw; only ever called with `"avif"`/`"webp"`.
-- `src/lib/logger-sanitize.ts:52`, `src/lib/sentry-before-send.ts:8` — defensive redaction guards, sole callers pre-guard.
-- `src/hooks/use-voice-session.ts:75` — `saveState` SSR early-return.
-- `src/hooks/use-stories.ts:157` — one-time bootstrap-guard ref check.
+- `src/components/admin/story-editor-dialog/index.tsx:40-84` — `handleMetadataUpdated`/`onSave`/`onApprove`/`onMarkNeedsCuration` all guard on `story`, but the component returns `null` at line 88 when `!story`, so these handlers can never fire with a falsy `story`. Reaching them requires rendering the full admin dialog, which the shared context flags as timeout-prone (create-story-dialog/account-config-dialog/details-tab). Not force-tested.
+- `src/components/admin/marketing-dashboard/post-row.tsx:18` — `formatDate`'s `!dateStr` guard; caller only invokes it inside a `post.scheduledFor &&` short-circuit (documented at post-row.test.tsx).
+- `src/app/favorites/page.tsx:38,157,205-210` — loadMore guard, unreachable spinner branch (setIsLoadingMore true→false batched with no yield), and GalleryItem itemRef null-safety guards. All three thoroughly documented as architecturally unreachable in favorites/page.test.tsx (coverage-notes describe blocks).
+- `src/lib/logger-sanitize.ts:52`, `src/lib/sentry-before-send.ts:8` — defensive redaction guards; sole callers pre-guard.
 - `src/components/immersive/language-switcher.tsx:115,118` — defensive branches, documented prior cycles.
 
-### V8 statement-instrumentation artifacts (100% line coverage, <100% statements)
-- `src/components/immersive/author-typewriter.tsx:40,59,67,79,84,86,88,90,92,94,96` — ref-based timer callbacks; standalone run shows 100% lines/functions.
-- `src/components/immersive/voice-chat/chat-message-list.tsx:105` — scroll-effect closure.
+### V8 async-closure / statement-instrumentation artifacts (line coverage 100%, statement < 100%)
+- `src/components/immersive/author-typewriter.tsx:40-105`
+- `src/components/immersive/voice-chat/chat-message-list.tsx:105-110`
 
-### Concurrency race path (unchanged)
-- `src/lib/claude.ts:201,202` — `waitForWork` fast-path, timing-dependent, not deterministically reproducible; `:469` is an unreachable "TypeScript needs it" guard after a loop that always returns/throws.
+### Dead / "should not reach here" satisfiers
+- `src/lib/claude.ts:201-202` (`waitForWork` pending-before-wait race resolve; internal streaming timing), `:469` (`throw lastError || ...` after a loop that always returns/throws — TypeScript satisfier).
+- `src/app/api/admin/feature-flags/[key]/route.ts:41` — fallthrough branch unreachable by the Zod schema.
+- `src/app/api/admin/stories/[id]/image/route.ts:35-53` — `parseIpv4Octets`, unreachable because `isIP()` pre-validates format upstream.
+- `src/app/api/health/route.ts:264` — outer `Promise.all` catch; every probe has its own try/catch.
+- `src/lib/image-optimization.ts:130` — `processVariant` `default:` throw; only ever called with `"avif"`/`"webp"`.
 
-### Playwright-only components (unchanged — the only sites where real coverage gain is possible, and only via E2E)
-- `src/components/admin/voice-agent-chat.tsx` — 45.24% stmts.
-- `src/components/admin/agents-dashboard/index.tsx` — 49.28% stmts.
+### Playwright-only components (jsdom cannot mount their full runtime)
+- `src/components/admin/voice-agent-chat.tsx` — ~45% (unchanged)
+- `src/components/admin/agents-dashboard/index.tsx` — ~49% (unchanged)
 
-## Conclusion
+These two remain the largest coverage headroom in the tree, and both are gated on the E2E auth fixture for journeys 9-12 (flagged by QA). Until that fixture lands, they cannot be meaningfully exercised in the unit suite without brittle deep-mocking.
 
-The codebase remains at its practical vitest/jsdom ceiling: 98.84% statements / 96.75% branches / 99.05% functions / 99.21% lines, unchanged across 3 consecutive cycles (Jul 4/5/6) with no intervening source commit. This cycle's contribution was a full re-derivation of the uncovered-line list from raw coverage data (rather than the lossy printed table) to positively confirm no gap was hiding behind a truncated/ambiguous file name — none was. The only path to further coverage gain is standing up the authenticated Playwright fixture (journeys 9-12, currently skipped per QA Agent) to exercise `voice-agent-chat.tsx` and `agents-dashboard/index.tsx`, which are architecturally out of reach for vitest/jsdom.
+## Cross-agent notes consumed
+
+- QA Agent (Jul 8/9): flagged `favorites/page.test.tsx` and `use-realtime-feature-flags.test.ts` as uncommitted (same drift pattern as Jun 30). Both remain modified in the working tree this cycle; they verified passing as part of the full 7232-test suite. Per this agent's remit, nothing is committed — surfacing for triage.
+- Performance/Security (Jul 8/9): dep batch #717/#718 synced; no coverage regression from the batch. Webhook/CSRF/auth error paths remain fully covered.

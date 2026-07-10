@@ -57,7 +57,8 @@ DEV_FLAGGED_LICENSES=$(npx license-checker --csv 2>/dev/null | grep -iE "MPL|LGP
 
 # Check for outdated packages
 log_info "Checking for outdated packages..." | tee -a "$LOG_FILE"
-OUTDATED_OUTPUT=$(npm outdated --json 2>/dev/null || echo "{}")
+OUTDATED_OUTPUT=$(npm outdated --json 2>/dev/null || true)
+[[ -z "$OUTDATED_OUTPUT" ]] && OUTDATED_OUTPUT="{}"
 FILTERED_OUTDATED_OUTPUT=$(printf '%s' "$OUTDATED_OUTPUT" | npx tsx scripts/lib/filter-npm-outdated.ts json 2>/dev/null || printf '%s' "$OUTDATED_OUTPUT")
 OUTDATED_COUNT=$(echo "$FILTERED_OUTDATED_OUTPUT" | jq 'keys | length' 2>/dev/null || echo "0")
 

@@ -537,11 +537,24 @@ describe("FavoritesPage", () => {
     });
   });
 
-  describe("loadMore guard (line 36)", () => {
-    it("should guard loadMore when already loading or no more items (line 36)", async () => {
+  describe("loadMore guard (page.tsx line 38)", () => {
+    it("should guard loadMore when already loading or no more items", async () => {
+      // COVERAGE NOTE (2026-07-09): the guard `if (isLoadingMore || !hasMore) return;`
+      // inside loadMore (page.tsx:38) is defensive dead code, unreachable in
+      // jsdom AND in production:
+      //   1. Its sole caller — the IntersectionObserver callback — pre-checks
+      //      `hasMore && !isLoadingMore` from the SAME render closure before
+      //      invoking loadMore, so the guard's condition is always false when
+      //      loadMore runs (even via stale closures, both see identical values).
+      //   2. `setIsLoadingMore(true)` / `setDisplayCount` / `setIsLoadingMore(false)`
+      //      batch into a single commit, so no rendered closure ever observes
+      //      `isLoadingMore === true`.
+      // This test verifies the observable behavior (no extra items load when
+      // hasMore is false via the observer pre-check); the in-function guard
+      // itself cannot be executed without a source change.
+      //
       // With exactly 20 stories (= ITEMS_PER_PAGE), hasMore starts as false,
-      // so the loadMore guard `if (isLoadingMore || !hasMore) return;` triggers
-      // on the `!hasMore` branch. This verifies the guard prevents unnecessary loading.
+      // so no further page is loaded on intersection.
       const exactStories = Array.from({ length: 20 }, (_, i) => ({
         id: `story-${i}`,
         slug: `story-slug-${i}`,
@@ -568,7 +581,8 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       // All 20 items fit in the first page, so hasMore = false.
-      // The IntersectionObserver fires, but loadMore's guard (line 36) returns early.
+      // The IntersectionObserver fires, but its pre-check short-circuits
+      // before loadMore is even called (see coverage note above).
       await waitFor(() => {
         expect(screen.getByText("Story Title 0")).toBeInTheDocument();
         expect(screen.getByText("Story Title 19")).toBeInTheDocument();
@@ -579,7 +593,7 @@ describe("FavoritesPage", () => {
     });
   });
 
-  describe("loadMore isLoadingMore guard (line 36)", () => {
+  describe("loadMore pagination behavior (UX-L2)", () => {
     // Create 25 stories to exceed ITEMS_PER_PAGE (20), so hasMore starts as true
     const manyStories = Array.from({ length: 25 }, (_, i) => ({
       id: `story-${i}`,

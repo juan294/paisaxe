@@ -1,71 +1,47 @@
 # Localization Report
 
-Date: 2026-07-08
+Date: 2026-07-10
 Agent: Paisaxe Localization Agent
-Status: GREEN — 100% translation coverage. No edits made this cycle.
+Status: GREEN — 100% translation coverage across all 6 locales. No edits required.
 
 ## Summary
 
-All supported locales are at full parity. This is the 70th consecutive clean run.
+| Locale | UI leaf keys | Missing | Orphaned | Placeholder mismatches | Story records |
+|--------|-------------:|--------:|---------:|-----------------------:|--------------:|
+| es (source) | 411 | — | — | — | — |
+| en | 411 | 0 | 0 | 0 | 113 |
+| fr | 411 | 0 | 0 | 0 | 113 |
+| de | 411 | 0 | 0 | 0 | 113 |
+| pt | 411 | 0 | 0 | 0 | 113 |
+| ast | 411 | 0 | 0 | 0 | 113 |
 
-Supported locales: es (source of truth), en, fr, de, pt, ast (Asturianu).
-Note: the operational codebase carries six locales — the fifth non-Spanish
-locale, ast (Asturianu), is a first-class supported locale in
-`src/lib/i18n/types.ts` and is validated on equal footing with en/fr/de/pt.
+- UI strings: 411 leaf keys per locale. All 5 non-Spanish locales match the Spanish source exactly — 0 missing, 0 orphaned, 0 placeholder mismatches.
+- Story translations: 113 stories x 5 target locales = 565 translation records. Every record has title, subtitle, and description present (0 partials, 0 empty fields).
+- Completion: 100% for every locale, both UI strings and story content.
+- Note: The task brief lists 5 locales (es, en, fr, de, pt). The codebase ships a 6th supported locale, ast (Asturianu), which is verified at full parity here as it has been in prior cycles.
 
-### UI Strings (`src/lib/i18n/*.ts`)
+## Verification method
 
-| Locale | Leaf keys | Missing vs es | Orphaned | Completion |
-|--------|-----------|---------------|----------|------------|
-| es (source) | 411 | — | — | 100% |
-| en | 411 | 0 | 0 | 100% |
-| fr | 411 | 0 | 0 | 100% |
-| de | 411 | 0 | 0 | 100% |
-| pt | 411 | 0 | 0 | 100% |
-| ast | 411 | 0 | 0 | 100% |
+Independent programmatic verification, not only the existing test suite:
 
-- Every non-Spanish locale has exactly 411 leaf keys — full parity with the Spanish source. Independently recomputed this cycle with a recursive key-collector script run via `npx tsx`, not just the test suite.
-- 0 missing keys, 0 orphaned keys across all five target locales.
-- Placeholder parity verified: every interpolation token (e.g. `{current}`, `{total}`, `{title}`) present in a Spanish string appears, unmodified, in the corresponding string of all five target locales. 0 mismatches.
-- Key count unchanged since Jun 20 — no commits have touched `src/lib/i18n/` since then (last: `a449504e`).
-
-### Story Translations (`content/translations/story-translations.ts`)
-
-| Metric | Value |
-|--------|-------|
-| Stories with translations | 113 |
-| Target locales per story | 5 (en, fr, de, pt, ast) |
-| Total target-locale records | 565 |
-| Records missing title or description | 0 |
-| Records missing subtitle | 0 |
-| Known slugs without a translation entry | 0 |
-
-- All 113 story slugs carry a complete record (title + subtitle + description) in every one of the five target locales — 565/565 records complete, verified programmatically this cycle (subtitle presence checked with a dedicated pass in addition to the title/description check).
-- Slug coverage against the seeded story sources is enforced by `src/lib/i18n/story-translations-coverage.test.ts`, which passed (see Type Safety below).
-- File unchanged since Jun 10 — no new stories have been added since the last full validation.
+1. Loaded all 6 locale modules via tsx and flattened each to its leaf-key set. Compared every non-Spanish locale against `es.ts` as source of truth for missing keys, orphaned keys, and placeholder drift (regex `\{[a-zA-Z_]+\}` — e.g. `{current}`, `{total}`, `{title}`). Result: 411/411 keys, all sets identical, all placeholders preserved.
+2. Loaded `STORY_TRANSLATIONS` and checked all 113 slugs for presence and non-empty title/subtitle/description in en/fr/de/pt/ast. Result: 565/565 records complete.
+3. Ran the in-repo parity suites: `translations.test.ts` + `story-translations-coverage.test.ts` — 105/105 tests passing.
+4. `npx tsc --noEmit -p tsconfig.json` — exit 0, 0 errors.
 
 ## Fixed
 
-No translations were added, edited, or removed this cycle. Coverage was already complete on entry.
+None. No translations were missing, orphaned, or malformed. No files were modified this cycle.
 
-## Remaining Gaps
+## Remaining gaps
 
-None. All UI keys and all story translations are complete across all six locales.
+None. All auto-generatable translations are present.
 
-## Orphaned Keys
+## Orphaned keys
 
-None. No key exists in a non-Spanish locale without a corresponding Spanish source.
+None. No keys exist in any non-Spanish locale that are absent from the Spanish source.
 
-## Type Safety
+## Cross-agent notes
 
-- `vitest run` on `translations.test.ts` + `story-translations-coverage.test.ts` — Pass. 105/105 tests passing (includes dynamic key-count parity checks per locale and story slug coverage).
-- Full-project `npm run typecheck` — Pass, zero errors. The stale `.next/dev/types/` artifact failure flagged in the Jul 7 report no longer reproduces; the environmental issue has resolved itself (dev server regenerated the truncated files). No action needed from Triage on that item.
-- CI guardrail active: `translations.test.ts` compares each locale's key set against the Spanish source, so any future key addition without full locale parity fails CI automatically.
-
-## Cross-Agent Notes
-
-- Cost Analyst (Jul 8): ElevenLabs cycle reset on schedule; Twilio July charge posted and reconciled. No translation or locale-content implication.
-- QA Agent (Jul 7): New harness issues #719 (network-error retry) and #720 (PPR pre-hydration click race) are E2E-infrastructure items with no i18n involvement. Standing issues #716 (chat-safety over-block) and #714 (English-only decline/redirect validators) remain language-handling bugs in the safety filter and QA harness respectively — neither touches the translation files.
-- Security Agent (Jul 7): no tokens, secrets, or PII in any locale file or in `story-translations.ts`. Files unchanged since the last security pass — re-confirmed by mtime/git-log inspection this cycle.
-- Performance Agent (Jul 7): locale bundle lazy-loading (es + en static, fr/de/pt/ast dynamic-imported) unchanged. If the P1 Supabase `getClient()` async deferral lands, it does not touch the i18n layer.
-- General note: no source changes have landed in `src/lib/i18n/` (since Jun 20) or `content/translations/` (since Jun 10) — this cycle's clean result reflects a stable, unmodified translation surface.
+- Coverage Agent's CI safety net (`translations.test.ts` dynamically compares each locale's key count to ES) continues to catch any future key addition that lands without locale parity — no drift can slip through unnoticed.
+- No PII, tokens, or secrets present in any locale file or in `story-translations.ts` (relevant to Security Agent's recurring locale scan).
