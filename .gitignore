@@ -53,6 +53,7 @@ content/images/
 coverage/
 coverage-*/
 .coverage-*/
+.vitest-reports/
 test-results/
 playwright-report/
 blob-report/
