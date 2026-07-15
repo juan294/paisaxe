@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-07-10 06:00:04
+> Auto-generated on 2026-07-14 06:00:03
 
 ## CLAUDE.md Status
 
@@ -127,6 +127,13 @@ src/tests/qa/llm-quality.test.ts
 
 No new migrations since documentation update.
 
+### Scripts
+
+```
+scripts/qa-agent.sh
+scripts/security-agent.sh
+```
+
 ## Documentation Gaps
 
 ### Potentially Undocumented API Routes
@@ -200,23 +207,13 @@ webhooks/translate
 | CLAUDE.md | 2026-07-01 |
 | README.md | 2026-06-13 |
 
-## Changes Made This Run (2026-07-10)
+## Changes Made This Run
 
-Status: GREEN — No documentation gaps found. Thirty-second consecutive clean run.
+**Date: 2026-07-14** — Status: GREEN. No documentation gaps found. Thirty-second consecutive clean run.
 
-No changes were made this cycle. Nothing to add.
-
-Feature flags: The gaps file reports zero undocumented feature flags. Verified directly against source: `FeatureFlagKey` in `src/types/feature-flags.ts` defines exactly 17 flags, and all 17 are present in the Feature Flags Reference table of `docs/project/features.md` (Discovery 7, Experience 4, Social 2, Voice 3, System 1). All 10 agent flags (Agents tab) also remain documented. Zero gaps.
-
-API routes: All 54 flagged routes confirmed internal — no external-consumption routes require documentation.
-- `admin/*` — admin dashboard routes, gated by `validateAdminAuth()`.
-- `cron/*` — Vercel cron endpoints, secured by cron secret; not publicly callable.
-- `webhooks/*` (elevenlabs, stripe, supabase, translate) — inbound webhooks from external services, signature/secret verified; already documented in the Infrastructure > Webhooks table of `features.md`.
-- `mcp/*` (make-booking, make-booking/status, places, save-favorite, weather) — Pelayo voice-agent tools; already documented in the Premium Voice Agent section of `features.md`.
-- `health/live`, `health/db`, `health` — internal liveness and diagnostic probes; already documented in Infrastructure > Health checks.
-- `chat`, `chat/stream`, `checkout/*`, `favorites`, `feature-flags`, `suggestions`, `voice-access` — internal client-side fetches, not third-party APIs.
-
-CLAUDE.md current (last modified 2026-07-01). `features.md` complete — no additions needed. No new feature flags, migrations with user-facing impact, or external-facing API routes since the last run.
+- Feature flags: Zero undocumented flags. Verified `FeatureFlagKey` in `src/types/feature-flags.ts` contains exactly 17 flags, all present in the Feature Flags Reference of `docs/project/features.md`. Verified all 10 agent flags (master `automated_agents` + 9 agents in `scripts/agent-config.defaults.json`) are documented in the Agent Flags table. No additions needed.
+- API routes: All 55 flagged routes confirmed internal. The count rose from 51 (prior runs) to 55; spot-checked the routes not individually verified before — `admin/stories/bulk-delete` and `admin/stories/bulk-status` (both `validateAdminAuth`-gated bulk story operations), `admin/marketing/accounts` (`withAdmin`-gated marketing account management), and `checkout/health` (admin-gated Stripe pipeline diagnostic). None are for external consumption. Externally-relevant surfaces (chat flow, MCP voice-agent tools, webhooks, health probes) remain documented in features.md.
+- No edits made to `docs/project/features.md` or `CLAUDE.md` — both accurate and complete as-is.
 
 ---
 

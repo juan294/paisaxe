@@ -10,6 +10,12 @@ LOG_FILE="$LOG_DIR/security-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/security-report.md"
 METRICS_FILE="$PROJECT_DIR/.security-metrics.tmp"
 
+# Guarantee cleanup on every exit path (early "disabled" exit, failed prompt
+# load, or an unexpected failure under `set -e`) — a plain end-of-script
+# `rm -f` only ran when every step in between succeeded, leaving the tmp
+# file behind whenever the run errored out early.
+trap 'rm -f "$METRICS_FILE"' EXIT
+
 mkdir -p "$LOG_DIR"
 
 # Source shared utilities and check feature flags
@@ -194,9 +200,6 @@ sys.stdout.write(cleaned)
 else
   log_info "No shared context block found in report" | tee -a "$LOG_FILE"
 fi
-
-# Cleanup
-rm -f "$METRICS_FILE"
 
 log_success "Security report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== Security Agent finished ===" | tee -a "$LOG_FILE"
