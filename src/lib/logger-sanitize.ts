@@ -48,10 +48,6 @@ function redactPhoneLikeContent(value: string) {
 }
 
 function sanitizeString(value: string, key?: string, seen?: WeakSet<object>): string {
-  if (key && isSensitiveKey(key)) {
-    return REDACTED;
-  }
-
   if (looksLikeJson(value)) {
     try {
       return JSON.stringify(sanitizeValue(JSON.parse(value), key, seen));

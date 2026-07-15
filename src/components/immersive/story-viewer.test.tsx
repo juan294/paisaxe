@@ -2004,10 +2004,6 @@ describe("StoryViewer", () => {
     });
   });
 
-  // Line 306: `onToggleFavorite={() => toggleFavorite(story.id)}` is a dead prop —
-  // StoryInfoPanel accepts it in its interface but never calls it. Architecturally
-  // untestable without modifying the source.
-
   // Lines 559-560: `story ? isFavorite(story.id) : false` and `story && toggleFavorite(story.id)`
   // The falsy branches are architecturally unreachable because the component returns null
   // at line 215 when `!story`, so BookmarkButton at line 556 is never rendered without a

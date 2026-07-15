@@ -48,6 +48,27 @@ read_env_file_value() {
   trim_value "$value"
 }
 
+# Run a curl GET against a remote host, retrying once after a short pause if
+# the initial attempt fails to connect (curl exit != 0). Prints curl's
+# stdout and returns curl's exit code — callers keep their own response
+# parsing. Extra args after the URL are passed through to curl (e.g.
+# `-o /dev/null -w "%{http_code}"` for a status-only probe).
+retry_curl_probe() {
+  local url="$1"
+  shift
+  local exit_code=0
+  local output
+  output=$(curl -s --max-time 15 "$url" "$@") || exit_code=$?
+  if [[ "$exit_code" -ne 0 ]]; then
+    log_warn "Probe failed for $url (curl exit code $exit_code) — retrying once after 3s" | tee -a "$LOG_FILE"
+    sleep 3
+    exit_code=0
+    output=$(curl -s --max-time 15 "$url" "$@") || exit_code=$?
+  fi
+  printf '%s' "$output"
+  return "$exit_code"
+}
+
 get_config_value() {
   local key="$1"
   local value=""
@@ -172,14 +193,14 @@ fi
 # Check 2: Database Connectivity (production endpoint)
 log_info "Checking database connectivity..." | tee -a "$LOG_FILE"
 DB_CURL_EXIT=0
-DB_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/health/db" 2>&1) || DB_CURL_EXIT=$?
+DB_RESPONSE=$(retry_curl_probe "https://paisaxe.es/api/health/db") || DB_CURL_EXIT=$?
 if [[ "$DB_CURL_EXIT" -eq 0 ]] && echo "$DB_RESPONSE" | grep -q '"success":true'; then
   DB_LATENCY=$(echo "$DB_RESPONSE" | grep -oE '"latencyMs":[0-9]+' | cut -d':' -f2 || echo "unknown")
   log_success "Database connectivity: OK (latency: ${DB_LATENCY}ms)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
 else
   if [[ -z "$DB_RESPONSE" ]]; then
-    DB_RESPONSE="empty response (curl exit code $DB_CURL_EXIT — likely timeout or connection failure reaching https://paisaxe.es/api/health/db)"
+    DB_RESPONSE="empty response (curl exit code $DB_CURL_EXIT after retry — likely timeout or connection failure reaching https://paisaxe.es/api/health/db)"
   fi
   log_error "Database connectivity: FAILED - $DB_RESPONSE" | tee -a "$LOG_FILE"
   if echo "$DB_RESPONSE" | grep -q "not configured"; then
@@ -193,7 +214,11 @@ fi
 # The /api/checkout/health endpoint requires admin authentication (Supabase session cookies).
 # From an unauthenticated context we can only verify the route is reachable and auth is enforced.
 log_info "Checking Stripe endpoint reachability..." | tee -a "$LOG_FILE"
-STRIPE_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://paisaxe.es/api/checkout/health" 2>&1 || true)
+STRIPE_CURL_EXIT=0
+STRIPE_HTTP_CODE=$(retry_curl_probe "https://paisaxe.es/api/checkout/health" -o /dev/null -w "%{http_code}") || STRIPE_CURL_EXIT=$?
+if [[ "$STRIPE_CURL_EXIT" -ne 0 ]]; then
+  STRIPE_HTTP_CODE="000 (curl exit code $STRIPE_CURL_EXIT after retry — likely timeout or connection failure reaching https://paisaxe.es/api/checkout/health)"
+fi
 if [[ "$STRIPE_HTTP_CODE" == "401" ]]; then
   log_success "Stripe endpoint: reachable, auth enforced (HTTP 401 — expected without admin session)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
@@ -352,9 +377,12 @@ else
 fi
 TEST_EXIT_CODE=${TEST_EXIT_CODE:-0}
 
-# Parse test results from vitest output
-PASSED_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || echo "0")
-FAILED_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || echo "0")
+# Parse test results from vitest output. Vitest's summary block has both a
+# "Test Files  N passed" line and a "Tests  M passed" line; without anchoring
+# to "Tests" specifically, grep matches the Test Files line first and reports
+# the file count instead of the test count.
+PASSED_TESTS=$(echo "$TEST_OUTPUT" | grep -E '^ *Tests ' | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || echo "0")
+FAILED_TESTS=$(echo "$TEST_OUTPUT" | grep -E '^ *Tests ' | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || echo "0")
 TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
 
 # Calculate pass rate

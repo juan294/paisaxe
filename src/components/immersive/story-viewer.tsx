@@ -231,13 +231,11 @@ export function StoryViewer({
   // Get localized story text based on current locale (falls back to Spanish)
   const localizedStory = story ? getLocalizedStory(story, locale) : null;
 
-  // FE-L1: Stable callbacks for StoryInfoPanel props — prevents re-renders when
+  // FE-L1: Stable callback for StoryInfoPanel props — prevents re-renders when
   // only the index changes (story/id change is reflected via the story prop itself).
-  // These must be declared BEFORE the early return so hooks are always called in
+  // Must be declared BEFORE the early return so hooks are always called in
   // the same order (React rules-of-hooks).
-  const storyId = story?.id ?? "";
   const handleFavoritesNav = useCallback(() => router.push("/favorites"), [router]);
-  const handleToggleFavorite = useCallback(() => toggleFavorite(storyId), [toggleFavorite, storyId]);
 
   if (!story || !localizedStory) return null;
 
@@ -353,7 +351,6 @@ export function StoryViewer({
         onAuthRequired={signInWithGoogle}
         onFavoritesNav={handleFavoritesNav}
         isFavorite={isFavorite(story.id)}
-        onToggleFavorite={handleToggleFavorite}
         chatTriggerRef={chatTriggerRef}
       />
 

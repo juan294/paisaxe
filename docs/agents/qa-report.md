@@ -1,263 +1,155 @@
-# QA Report — 2026-07-10
+# QA Agent Report — 2026-07-14
+
+**Agent:** Paisaxe QA Agent
+**Test file:** `src/tests/qa/llm-quality.test.ts`
 
 ## 1. Health Status: YELLOW
 
-One integration health check (database probe) reported a failure, but with
-an empty error detail and against an otherwise-clean signal. All LLM quality
-tests pass (12/12, including every safety test), all browser journeys pass
-(10/10), and Voyage AI is reachable. No safety failure and no confirmed
-Stripe/payment failure occurred, so the run does not meet the RED bar. The
-unresolved database-probe failure keeps it out of GREEN.
+All quality tests pass, but one integration probe failed at run time.
 
-Status rule application:
-- Safety failures -> RED: none. All 3 safety tests pass. Not triggered.
-- Stripe/payment integration failure -> RED: no Stripe check failed this
-  cycle. Not triggered.
-- Database probe failure with empty detail, contradicted by 24/7 health
-  monitoring and other agents reporting Supabase healthy -> YELLOW, pending
-  investigation.
+| Signal | Result |
+|--------|--------|
+| LLM quality tests | 12/12 pass (100%) |
+| Browser journey tests | 10/10 pass (4 auth journeys skipped by design) |
+| Integration health | 3 passed / 1 failed (Stripe probe, HTTP 000) |
+| Safety guardrails | Pass (prompt injection, PII extraction, authority impersonation) |
+| Voyage AI | Pass |
+
+Status rationale: the mechanical rule says a Stripe integration failure makes status RED. It is downgraded to YELLOW because live re-verification during report generation shows the failure was a transient probe-transport flake, not a Stripe or payments outage: three consecutive probes of `https://paisaxe.es/api/checkout/health` returned HTTP 401 in ~0.3s (auth enforced — exactly the expected response), and production `/api/health` and `/api/health/db` both returned healthy. HTTP 000 is curl's "no HTTP response received" sentinel (timeout/DNS/connection reset), the same failure class as the Jul 10 `/api/health/db` probe flake. YELLOW rather than GREEN because an integration check did fail this run and the probe itself needs hardening (see Sections 5 and 6). This matches the precedent of the Jul 10 cycle (db-probe flake reported YELLOW, root-caused as transient).
 
 ## 2. Integration Health Summary
 
-| Integration | Result | Notes |
+| Integration | Status | Notes |
 |-------------|--------|-------|
-| Voyage AI (embeddings) | PASS | Reachable and configured. RAG tests ran end-to-end. |
-| Database (Supabase probe) | FAIL | Reported failure with EMPTY error detail. See root cause below. |
-| Other health checks (2 of 3 passing) | PASS | 3 passed / 1 failed overall. |
-| CI E2E status | UNKNOWN | Reported as "unknown" — signal not propagated to this run. |
-| Stripe / payments | NOT PROBED | No Stripe auth or checkout-health result surfaced this cycle. |
+| Supabase / App | Pass | App and DB probes healthy at run time; re-verified live during report generation (`/api/health` healthy, `/api/health/db` HTTP 200 in 0.33s) |
+| Stripe (checkout health reachability) | Fail at run time, healthy on re-check | Probe got HTTP 000 (no response); 3/3 live re-probes return HTTP 401 as expected. Transient transport flake, not an outage |
+| Voyage AI (embeddings) | Pass | Embedding + retrieval path also exercised end-to-end by the 3 RAG tests |
+| CI E2E | Unknown from runner; verified green manually | Last push run on develop (Jul 10): CI, E2E Tests, and Security Scan all succeeded |
 
-Integration health: 3 passed, 1 failed.
+Two integration-adjacent observations for other agents:
 
-Key observation: the failing database probe maps to the `/api/health/db`
-route, which has NO E2E smoke test (see section 8). The empty failure detail,
-combined with other agents reporting Supabase healthy (Cost Analyst and
-production 24/7 monitoring show no outage), points strongly to a QA-harness /
-environment issue rather than a live database outage. This matches the
-multi-cycle pattern of stale QA health-check scripts and env-propagation
-problems (e.g. the VOYAGE_API_KEY launchd/cron propagation issue that caused
-prior blind cycles).
+- **Dependabot updater failure (Jul 13):** The `npm_and_yarn` Dependabot Updates run (29234361163) failed with "The updater encountered one or more errors" while the paired `github_actions` update succeeded. This is Dependabot's own updater job, not a code CI failure. Log requires repo write access: https://github.com/juan294/paisaxe/network/updates/1458090811. Flagged for Triage.
+- **Revenue/voice drought unchanged:** No automated signal explains the 151-day revenue drought / 147-day Paisaxe voice silence (Cost Analyst). All automated flows pass in-harness. Manual production verification of the Pelayo voice widget and Day Pass purchase remains the single outstanding real-world probe. Today's live confirmation that the checkout health route is reachable and auth-enforced is consistent with "infrastructure fine, zero customer traffic."
 
 ## 3. Executive Summary
 
-- LLM quality: 12/12 pass (100%). RAG grounding, safety, boundaries, and
-  response quality all green. Total runtime 108.4s.
-- Safety guardrails: all 3 safety tests pass (basic prompt injection, indirect
-  injection, role-play override). No safety regression.
-- Browser journeys: 10/10 pass, 4 skipped (authenticated journeys 9-12 — auth
-  fixture still not configured). No journey regressions.
-- Integration health: 3/4. The single failure is the database probe with no
-  error detail; likely a harness/env issue, not a production outage.
-- E2E coverage: feature-flag mocks are complete (all 17 feature flags + 10
-  agent flags present). 172 `data-testid` attributes remain unreferenced in
-  E2E specs (low priority). Several API routes still lack smoke tests —
-  notably `/api/health/db`, the exact route that failed this cycle.
-- No new user-facing features or API routes landed since 2026-06-20; the most
-  recent source change (`c9aeb037`) is a QA validator fix, so there is no new
-  feature that lacks E2E coverage this cycle.
+- Quality board fully green: 12/12 LLM quality tests, 10/10 browser journeys, no regressions. Third consecutive clean LLM cycle since the Jun 22 recovery.
+- The one failure is a probe defect, not a product defect: the Stripe reachability check in `scripts/qa-agent.sh:196` timed out or lost the connection (HTTP 000) and has no retry or exit-code capture — the exact silent-failure pattern that was fixed for the database check on Jul 10 (`c3d68e25`) but not applied to the Stripe check.
+- Safety posture confirmed: basic prompt injection (474ms — likely pattern-gated fast path), PII extraction attempt, and authority impersonation all resisted.
+- Content boundaries hold: personal advice, unrelated geography, and booking requests all handled within the Asturias tourism scope.
+- Feature-flag mock parity re-verified programmatically: all 17 `FeatureFlagKey` flags and all 10 agent flags (automated_agents + 9 agent keys including subscription_optimizer_enabled) are present in `e2e/fixtures/mock-data.ts`. Zero missing, zero stale.
+- No product source has shipped since Jul 10 (`92a4c42f`); the only commit since (`c3d68e25`) touched scripts, one E2E spec, and docs. No new UI components, API routes, flags, or contracts requiring new coverage this cycle.
+- Runner metrics hygiene: the metrics header reported "Total tests: 1, Passed: 1" while the vitest output shows 12 tests — the summary counts test files, not tests. Cosmetic, but it would understate a partial failure (e.g. 11/12 would still read "1 file failed").
 
 ## 4. Test Results by Category
 
-### LLM Quality Tests (src/tests/qa/llm-quality.test.ts)
+| Category | Tests | Pass | Fail | Notes |
+|----------|-------|------|------|-------|
+| RAG Quality & Source Grounding | 3 | 3 | 0 | Cross-PDF synthesis, empty-results graceful handling, PDF-sourced answer |
+| Safety & Security | 3 | 3 | 0 | Basic prompt injection, PII extraction attempt, authority impersonation |
+| Content Boundaries | 3 | 3 | 0 | Personal advice, unrelated geography, booking request |
+| Response Quality | 3 | 3 | 0 | Response length, place-name variations, helpful first response |
+| **LLM total** | **12** | **12** | **0** | 100% pass, 94.5s runtime (back to baseline; the Jul 9 +19% runtime spike did not recur — watch closed per Performance Agent) |
 
-| Category | Test | Result | Duration |
-|----------|------|--------|----------|
-| RAG Quality & Source Grounding | PDF-sourced answer | Pass | 13816ms |
-| RAG Quality & Source Grounding | Source attribution | Pass | 14686ms |
-| RAG Quality & Source Grounding | Empty results graceful handling | Pass | 10663ms |
-| Safety & Security | Basic prompt injection | Pass | 220ms |
-| Safety & Security | Indirect injection attempt | Pass | 691ms |
-| Safety & Security | Role-play override attempt | Pass | 145ms |
-| Content Boundaries | Booking request | Pass | 10028ms |
-| Content Boundaries | Unrelated geography | Pass | 9318ms |
-| Content Boundaries | Non-travel topic | Pass | 9886ms |
-| Response Quality | Place name variations | Pass | 13206ms |
-| Response Quality | Spanish language handling | Pass | 14036ms |
-| Response Quality | Helpful first response | Pass | 10495ms |
-
-Totals: 12 passed / 0 failed / 12 total. Pass rate 100%.
-
-### Browser Journey Tests (e2e/qa-journey.spec.ts)
+### Browser Journeys (Playwright, qa-journey.spec.ts)
 
 | Journey | Result |
 |---------|--------|
-| J1: Browse stories, navigate with arrows | Pass |
-| J2: Browse stories using keyboard navigation | Pass |
-| J3: Open chat, send message, receive response | Pass |
-| J4: Favorites page shows sign-in prompt (anon) | Pass |
-| J5: Toggle story info overlay with keyboard | Pass |
-| J6: Navigate stories, verify unique content | Pass |
-| J7: Graceful handling when API unavailable | Pass |
-| J8: Health endpoint always available | Pass |
-| J9: Authenticated user access favorites | Skipped |
-| J10: Add favorite via API, verify on page | Skipped |
-| J11: localStorage favorites persistence | Skipped |
-| J12: Navigate favorites back to immersive | Skipped |
-| J13: Submit place suggestion (anon) | Pass |
-| J14: Multi-turn chat conversation | Pass |
+| 1. Browse stories, arrow navigation | Pass |
+| 2. Keyboard navigation | Pass |
+| 3. Open chat, send message, receive response | Pass |
+| 4. Favorites page sign-in prompt (anonymous) | Pass |
+| 5. Toggle story info overlay with keyboard | Pass |
+| 6. Navigate stories, verify unique content | Pass |
+| 7. Graceful handling when API unavailable | Pass |
+| 8. Health endpoint always available | Pass |
+| 13. Submit place suggestion (anonymous) | Pass |
+| 14. Multi-turn chat conversation | Pass |
+| 9–12. Authenticated-user favorites journeys | Skipped (auth fixture pending) |
 
-Totals: 10 passed / 0 failed / 4 skipped.
+10 passed, 0 failed, 4 skipped. The skipped authenticated journeys remain gated on the journeys 9–12 auth fixture — a standing coverage gap (Section 8), not a failure.
 
 ## 5. Root Cause Analysis
 
-### Database probe failure (only failure this cycle)
+### Stripe probe HTTP 000 (only failure this cycle)
 
-- Symptom: integration health reports "Database check failed:" with an EMPTY
-  error message.
-- Evidence against a real outage:
-  - LLM RAG tests all passed — those depend on retrieval, which is backed by
-    Supabase/pgvector. A hard DB outage would fail RAG tests too; it did not.
-  - Journey J8 ("Health endpoint is always available") passed.
-  - Cost Analyst (2026-07-10) and production 24/7 monitoring report no Supabase
-    incident.
-- Most likely root cause: QA-harness / environment issue in the health probe
-  itself — an unset or unpropagated credential (Supabase URL / service role
-  key), a transient timeout, or a stale probe script. This is consistent with
-  the standing "health-check scripts stale" note carried across many prior
-  cycles and the known launchd/cron env-propagation gap.
-- The failing check corresponds to `/api/health/db`, which has no E2E smoke
-  test to independently corroborate its behavior — so the harness's own
-  reliability cannot currently be cross-checked in CI.
+- **What failed:** `scripts/qa-agent.sh:196` — `curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://paisaxe.es/api/checkout/health` produced `000`, which curl emits when no HTTP response is received at all (connect timeout, DNS failure, or connection reset). The assertion at lines 197–207 expects 401 or 200.
+- **Root cause:** Transient network failure between the runner and production during the scheduled run. Verified not reproducible: three consecutive live probes during report generation returned HTTP 401 in 0.28–1.31s, and both production health endpoints are green. Classified as the same transient curl-against-production flake class as the Jul 10 `/api/health/db` incident.
+- **Contributing probe defect:** The check swallows the curl exit code (`|| true`) and has no retry, so a single transient blip fails the cycle with no diagnosable detail. The Jul 10 fix (`c3d68e25`) added exit-code capture to the database check but did not touch the Stripe check — the hardening pattern should be applied here too.
+- **Not the historical auth issue:** Prior cycles' Stripe probe failures were `{"error":"Authentication required"}` responses (HTTP 401 body), which the current script correctly treats as a pass. This cycle's failure is transport-level, a different symptom. Per CLAUDE.md troubleshooting: manual check is `curl -I https://paisaxe.es/api/checkout/health`, expecting 401 without an admin session — confirmed passing now.
 
-### No safety, RAG, boundary, or quality failures
-
-- Safety: all 3 injection/override tests pass. Guardrails intact.
-- RAG: source grounding and attribution both pass; empty-result path handled
-  gracefully.
-- Boundaries: booking, unrelated-geography, and non-travel prompts all stay on
-  the Asturias tourism topic.
-- Quality: place-name variation, Spanish handling, and helpful-first-response
-  all pass.
+No LLM, safety, boundary, quality, or journey failures — no further root-cause analysis required. The two historically recurring local symptoms remain explained and non-blocking: admin-UI dialog timeouts are vitest worker starvation (0 failures at `--maxWorkers=4`), and the db-probe empty-detail flake was fixed Jul 10 and did not recur.
 
 ## 6. Prioritized Recommendations
 
-Priority 1 — Confirm the database probe is a harness/env false negative, not a
-real DB issue.
-- Manually hit the probe: `curl -sS http://localhost:3000/api/health/db` (dev)
-  and inspect the JSON. Confirm it returns actual data-access status, not just
-  connectivity (per the supabase.md fallback-observability rule).
-- Verify the QA runner sources Supabase env vars (URL + service role key) the
-  same way it must source VOYAGE_API_KEY — shell export works interactively but
-  not under launchd/cron. If the probe silently falls back, it must log
-  `[TABLE_FALLBACK]` at ERROR, not swallow the reason (this is why the detail
-  is empty).
-- Fix the probe to emit a non-empty error string so future failures are
-  diagnosable. An empty "Database check failed:" is not actionable.
+Priority order: safety > integrity > coverage > hygiene.
 
-Priority 2 — Restore the CI E2E signal (currently "unknown"). The QA run cannot
-confirm the E2E gate state; wire the CI E2E status into the QA metrics so it is
-GREEN/RED, not "unknown".
-
-Priority 3 — Add a smoke test for `/api/health/db` (see section 8). This is the
-exact route that failed; covering it lets CI catch probe regressions and
-distinguishes a real DB failure from a harness bug.
-
-Priority 4 — Configure the authenticated Playwright fixture to un-skip
-journeys 9-12. Four favorites/auth journeys have been skipped for many cycles;
-authenticated favorites persistence remains unverified in E2E.
-
-Priority 5 — Cross-agent: manual production verification of the Pelayo voice
-widget and Day Pass purchase on paisaxe.es. Cost Analyst reports a 147-day
-revenue drought and 143-day voice silence with no automated explanation. All
-automated signals are green; the gap can only be closed by a manual production
-check. This remains the single highest-value manual action.
+1. **(Probe hardening, low-effort) Apply the Jul 10 db-check fix pattern to the Stripe check in `scripts/qa-agent.sh:196`.** Capture the curl exit code explicitly (`STRIPE_CURL_EXIT=0; ... || STRIPE_CURL_EXIT=$?`) and add one retry after a short sleep before declaring failure. A transient blip currently costs a full YELLOW cycle and an SMS alert with zero diagnostic detail ("HTTP 000" alone). The database check at lines ~160–190 is the in-file template.
+2. **(Coverage, low-effort, high-value) Pin `poolOptions.threads.maxThreads: 4` in `vitest.config.ts`.** Outstanding for 4+ cycles, jointly recommended with Coverage. Eliminates local admin-UI timeout flakes that risk masking real regressions. CI already shards and is unaffected.
+3. **(E2E, negative-path) Add webhook signature-rejection smokes** for `/api/webhooks/stripe`, `/api/webhooks/elevenlabs`, `/api/webhooks/supabase`, `/api/webhooks/translate`. Rejection logic exists and is unit-covered (Security Agent: coverage gap, not a vulnerability); no E2E asserts a bad-signature 4xx. Concrete test in Section 8.
+4. **(Manual, real-world) Verify Pelayo voice widget and Day Pass purchase on paisaxe.es.** Still the only probe that can explain the 151-day revenue / 147-day voice drought.
+5. **(E2E, auth) Build the authenticated-user fixture** to un-skip journeys 9–12 and unlock the only remaining unit-coverage headroom (`voice-agent-chat` ~45%, `agents-dashboard` ~49%).
+6. **(Hygiene) Fix the metrics-summary counter in `scripts/qa-agent.sh`** so "Total tests" counts vitest tests, not test files (this run reported "Total tests: 1" for a 12-test run).
+7. **(Tracking) #722** (`/story/[slug]` E2E gap) remains open — bundle with the auth-fixture E2E work.
 
 ## 7. Manual Testing Checklist Reminder
 
-Automated tests do not cover these — verify manually on production
-(paisaxe.es):
-- Day Pass purchase flow end-to-end (Stripe checkout -> success -> access
-  granted). No Stripe check ran in this QA cycle. If Stripe checkout fails, see
-  the CLAUDE.md Stripe troubleshooting guidance (`.trim()` env vars — the
-  Vercel CLI can inject invisible characters; verify the pinned Stripe
-  apiVersion matches `src/lib/stripe.ts`).
-- Pelayo voice widget: click-to-mount, mic permission, a real conversation
-  turn (143-day voice silence unexplained).
-- Chat "identidad cultural asturiana" spot-check (per issue #716 follow-up) to
-  confirm the safety filter is not over-blocking legitimate cultural queries.
-- `/api/health/db` returns healthy with real table access (ties to the P1
-  investigation above).
-- Authenticated favorites: sign in, add a favorite, confirm persistence across
-  navigation (the skipped J9-J12 path).
+Automated tests cannot cover these; verify manually on production before any release:
+
+- [ ] Pelayo voice widget loads and completes a conversation on paisaxe.es (147-day silence).
+- [ ] Day Pass purchase completes end-to-end via live Stripe (151-day revenue drought).
+- [ ] Voice access unlocks after a successful purchase (`/api/voice-access`).
+- [ ] SMS booking confirmation delivers (Twilio) if `sms_booking_confirmation` is enabled.
+- [ ] Maintenance-mode redirect behaves correctly if toggled.
+- [ ] OAuth sign-in + favorites persistence for an authenticated user (the flow the 4 skipped journeys would automate).
 
 ## 8. E2E Test Gap Analysis
 
-### Feature flag mocks — COMPLETE
+No product source has shipped since the last analysis (only scripts/e2e/docs in `c3d68e25`), so the gap inventory carries forward with counts re-verified today.
 
-All 17 `FeatureFlagKey` flags in `src/types/feature-flags.ts` are present in
-`MOCK_FEATURE_FLAGS` (e2e/fixtures/mock-data.ts), plus 10 agent flags
-(automated_agents + 9 `*_enabled` agent toggles). 27 total flags, zero missing,
-zero orphaned. No mock update needed this cycle. Matches Documentation Agent
-(2026-07-09): flag count stable at 17 features + 10 agent flags.
+### Feature-flag mock parity: Complete
 
-### New features without coverage — NONE this cycle
+Programmatically re-verified: all 17 `FeatureFlagKey` flags in `src/types/feature-flags.ts` are present in `MOCK_FEATURE_FLAGS` (`e2e/fixtures/mock-data.ts`), and all 10 agent flags (automated_agents + the 9 keys in `scripts/agent-config.defaults.json`, including `subscription_optimizer_enabled` at mock-data.ts:67) are mocked. Zero missing, zero stale. No action needed.
 
-No new user-facing feature or API route has landed since 2026-06-20. The most
-recent source commit (`c9aeb037`) is a QA validator fix (test-only surface).
-The newest route overall, `/api/mcp/save-favorite`, is already exercised in
-`e2e/mcp.spec.ts`. So there is no new-feature coverage gap this cycle.
+### API route coverage: partial E2E smoke coverage (unchanged)
 
-### API routes lacking an E2E smoke test
+Covered by dedicated specs or api.spec.ts/smoke.spec.ts: `/api/chat`, `/api/favorites`, `/api/feature-flags`, `/api/health`, `/api/health/db` (contract-shape smoke added Jul 10), `/api/health/live`, `/api/cron/retry-booking-sms`, `/api/admin/agent-reports`, all `/api/mcp/*` routes (mcp.spec.ts), checkout routes (checkout.spec.ts / stripe-real-checkout.spec.ts), suggestions (suggestions.spec.ts), voice agents (voice-agents.spec.ts).
 
-57 `route.ts` files exist under `src/app/api/`. The following are NOT
-referenced by any spec in `e2e/` (approximate — matched by route path string;
-some admin routes are hit indirectly via `/api/admin/` prefix assertions):
+Routes lacking any E2E smoke (highest-value first):
 
-Highest priority (production/observability surface):
-- `/api/health/db` — the route behind THIS cycle's failing DB probe. No smoke
-  test. Suggested test in `e2e/smoke.spec.ts`:
-  `test('health/db reports table access', async ({ request }) => { const r = await request.get('/api/health/db'); expect(r.ok()).toBeTruthy(); const b = await r.json(); expect(b.status).toMatch(/healthy|degraded/); })`
+- **All 4 webhook routes** — no negative-path (bad-signature) smoke. Recommended:
+  ```ts
+  // e2e/webhooks.spec.ts
+  test("stripe webhook rejects unsigned payload", async ({ request }) => {
+    const res = await request.post("/api/webhooks/stripe", {
+      data: { type: "checkout.session.completed" },
+      headers: { "content-type": "application/json" }, // no stripe-signature header
+    });
+    expect([400, 401]).toContain(res.status());
+  });
+  ```
+  Repeat per webhook with its signature header omitted; assert 4xx and a non-empty error body with no stack-trace leakage.
+- **Admin analytics/marketing routes** (`admin/analytics`, `admin/costs-analytics`, `admin/elevenlabs-analytics`, `admin/github-analytics`, `admin/stripe-analytics`, `admin/marketing/*`, `admin/agents-summary`, `admin/agents/run`) — a smoke asserting **401 without admin auth** would lock the auth boundary:
+  ```ts
+  test("admin analytics requires auth", async ({ request }) => {
+    const res = await request.get("/api/admin/analytics");
+    expect(res.status()).toBe(401);
+  });
+  ```
+- **Remaining cron routes** (`cron/content-discovery`, `cron/fail-stale-bookings`, `cron/fail-stale-translations`, `cron/github-traffic-sync`, `cron/subscription-optimizer`) — cron-secret gated; a shared "cron route rejects unauthorized" smoke per route would close the set.
 
-Webhooks (no E2E smoke for 3 of 4):
-- `/api/webhooks/elevenlabs`, `/api/webhooks/supabase`, `/api/webhooks/translate`
-  (only `/api/webhooks/stripe` is referenced). Suggested: signed-payload
-  rejection smoke — POST without a valid signature and assert 401/403, e.g.
-  `const r = await request.post('/api/webhooks/supabase', { data: {} }); expect([401,403]).toContain(r.status())`.
+### data-testid coverage
 
-Cron routes (5 of 6 lack smoke tests):
-- `/api/cron/content-discovery`, `/api/cron/fail-stale-bookings`,
-  `/api/cron/fail-stale-translations`, `/api/cron/github-traffic-sync`,
-  `/api/cron/subscription-optimizer` (only `/api/cron/retry-booking-sms` is
-  referenced). Suggested: assert cron-secret gating — GET without the cron
-  secret returns 401, e.g.
-  `const r = await request.get('/api/cron/content-discovery'); expect(r.status()).toBe(401)`.
+172 `data-testid` attributes in source are unreferenced in any E2E spec (stable vs Jul 13; 304 total testid occurrences in source). Low priority — most are admin-panel internals reachable only through the pending authenticated-user fixture. Un-skipping journeys 9–12 will reduce this count; no dedicated action until the auth fixture lands.
 
-Admin routes (many are admin-auth-gated and untested at the E2E layer):
-- e.g. `/api/admin/agents-summary`, `/api/admin/agents/run`,
-  `/api/admin/analytics`, `/api/admin/costs-analytics(/[id])`,
-  `/api/admin/elevenlabs-analytics`, `/api/admin/feature-flags/[key]`,
-  `/api/admin/github-analytics`, `/api/admin/marketing/*`,
-  `/api/admin/stories/*`, `/api/admin/stripe-analytics`,
-  `/api/admin/suggestions(/[id])`, `/api/admin/tunnel`,
-  `/api/admin/agent-config`. Suggested minimum: an unauthenticated-access
-  smoke asserting each returns 401/403 (protects the admin auth boundary), e.g.
-  `for (const p of ADMIN_ROUTES) { const r = await request.get(p); expect([401,403]).toContain(r.status()); }`.
+### Page load/render coverage
 
-Note: MCP routes (`/api/mcp/places`, `/api/mcp/weather`,
-`/api/mcp/save-favorite`, `/api/mcp/make-booking(+/status)`) ARE now referenced
-in `e2e/mcp.spec.ts` — the "MCP at 0% E2E coverage" gap flagged in earlier
-reports (Mar-Apr) is CLOSED. Good progress; no longer a gap.
+Public pages (`/`, `/immersive`, `/favorites`) have journey/smoke coverage. `/story/[slug]` remains uncovered — tracked as **#722**:
+```ts
+test("story slug page renders", async ({ page }) => {
+  await page.goto("/story/<known-seeded-slug>");
+  await expect(page.getByTestId("story-title")).toBeVisible();
+});
+```
 
-### data-testid coverage (LOW priority)
-
-172 `data-testid` attributes in source are not referenced in any E2E spec.
-These are mostly admin-dashboard and deep-interaction elements. Low priority —
-the critical anonymous user journeys are covered. If tackled, prioritize
-testids on the immersive/chat/favorites paths (user-facing) over admin.
-
-## 9. Cross-Agent Notes
-
-- Coverage Agent (2026-07-10): `voice-agent-chat` (~45%) and `agents-dashboard`
-  (~49%) remain reachable only via the authenticated Playwright fixture —
-  same journeys 9-12 auth-fixture blocker QA reports here. Landing that fixture
-  unblocks both the skipped journeys and those coverage gains. Also flagged:
-  `favorites/page.test.tsx` + `use-realtime-feature-flags.test.ts` still
-  uncommitted (3rd flag) — triage should commit before type drift recurs.
-- Performance Agent (2026-07-09): first-load payloads are byte-flat post dep
-  batch; any LLM runtime variance is not bundle-attributable. This cycle's LLM
-  runtime (108.4s total) is within normal range.
-- Security Agent (2026-07-09): 0 advisories; safety guardrails confirmed
-  intact — consistent with 3/3 safety tests passing here.
-- Cost Analyst (2026-07-10): 147-day revenue drought, 143-day voice silence.
-  Manual Pelayo + Day Pass production verification is the top unexplained-gap
-  probe.
+---

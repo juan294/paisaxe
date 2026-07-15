@@ -39,7 +39,6 @@ describe("StoryInfoPanel", () => {
         onAuthRequired={undefined}
         onFavoritesNav={undefined}
         isFavorite={false}
-        onToggleFavorite={undefined}
       />
     );
 
@@ -62,7 +61,6 @@ describe("StoryInfoPanel", () => {
         onAuthRequired={undefined}
         onFavoritesNav={undefined}
         isFavorite={false}
-        onToggleFavorite={undefined}
       />
     );
 
@@ -86,7 +84,6 @@ describe("StoryInfoPanel", () => {
         onAuthRequired={undefined}
         onFavoritesNav={undefined}
         isFavorite={false}
-        onToggleFavorite={undefined}
       />
     );
 
@@ -109,7 +106,6 @@ describe("StoryInfoPanel", () => {
         onAuthRequired={undefined}
         onFavoritesNav={undefined}
         isFavorite={false}
-        onToggleFavorite={undefined}
       />
     );
 
@@ -133,7 +129,6 @@ describe("StoryInfoPanel", () => {
         onAuthRequired={undefined}
         onFavoritesNav={undefined}
         isFavorite={false}
-        onToggleFavorite={undefined}
       />
     );
 
@@ -160,7 +155,6 @@ describe("StoryInfoPanel", () => {
         onAuthRequired={undefined}
         onFavoritesNav={undefined}
         isFavorite={false}
-        onToggleFavorite={undefined}
       />
     );
 
@@ -186,7 +180,6 @@ describe("StoryInfoPanel", () => {
         onAuthRequired={undefined}
         onFavoritesNav={undefined}
         isFavorite={false}
-        onToggleFavorite={undefined}
       />
     );
 
@@ -212,7 +205,6 @@ describe("StoryInfoPanel", () => {
         onAuthRequired={undefined}
         onFavoritesNav={undefined}
         isFavorite={false}
-        onToggleFavorite={undefined}
       />
     );
 

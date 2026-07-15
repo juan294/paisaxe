@@ -32,7 +32,6 @@ interface StoryInfoPanelProps {
   onAuthRequired: (() => void) | undefined;
   onFavoritesNav: (() => void) | undefined;
   isFavorite: boolean;
-  onToggleFavorite: (() => void) | undefined;
   chatTriggerRef?: RefObject<HTMLButtonElement | null>;
 }
 

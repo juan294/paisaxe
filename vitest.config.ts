@@ -49,6 +49,11 @@ export default defineConfig({
         lines: 95,
       },
     },
+    // Local `npm run test` over-subscribes this machine at default thread
+    // count, producing admin-UI dialog timeout flakes (worker starvation, not
+    // regressions — 0 failures at this cap). CI is unaffected: coverage runs
+    // sharded across 4 runners in ci.yml, each with its own process budget.
+    maxWorkers: 4,
   },
   resolve: {
     alias: {
