@@ -974,12 +974,14 @@ describe("translate webhook", () => {
     });
   });
 
-  describe("outer catch block (lines 384-389)", () => {
-    it("returns 500 Internal server error when request.json() throws (lines 384-389)", async () => {
-      // Covers lines 384-389: the outer try-catch around the entire handler body.
-      // createAdminClient is called before the try block (line 156), so it cannot
-      // trigger this path. Instead we send a request with invalid JSON so that
-      // request.json() (line 172, inside the try block) throws a SyntaxError.
+  describe("outer catch block (lines 376-380)", () => {
+    it("returns 500 Internal server error when request.json() throws (lines 376-380)", async () => {
+      // Covers lines 376-380: the outer try-catch around the entire handler body.
+      // createAdminClient is mocked to always succeed in this suite, so it
+      // cannot trigger this path even though it now runs inside the try block
+      // (after the auth check, line 156 area). Instead we send a request with
+      // invalid JSON so that request.json() (inside the try block) throws a
+      // SyntaxError.
       const invalidJsonRequest = new NextRequest(
         "http://localhost/api/webhooks/translate",
         {

@@ -153,8 +153,6 @@ async function processClaimedJob(
  * row-level leased claims so bulk approvals do not fan out unbounded work.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const supabase = createAdminClient();
-
   try {
     const secret = request.headers.get("x-webhook-secret");
     const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
@@ -168,6 +166,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       logger.error("[TRANSLATE_WEBHOOK_UNAUTHORIZED]");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = createAdminClient();
 
     const rawBody: unknown = await request.json();
     const parsed = parseRequestBody(rawBody);
