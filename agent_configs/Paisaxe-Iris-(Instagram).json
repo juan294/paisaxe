@@ -22,7 +22,7 @@
             "turn_model": "turn_v2"
         },
         "tts": {
-            "model_id": "eleven_turbo_v2",
+            "model_id": "eleven_flash_v2",
             "voice_id": "EXAVITQu4vr4xnSDxMaL",
             "supported_voices": [],
             "expressive_mode": false,
