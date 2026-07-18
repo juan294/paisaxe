@@ -15,6 +15,9 @@ import { appendFileSync, existsSync } from 'fs';
 const API_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3006';
 const TESTS_PER_CATEGORY = parseInt(process.env.QA_TESTS_PER_CATEGORY || '3', 10);
 const REPORT_FILE = process.env.QA_REPORT_FILE;
+// Wide enough for the 3-attempt retry loop in sendChatMessage (each attempt
+// bounded by its own 20s AbortSignal.timeout) to fit within the test timeout.
+const QUALITY_TEST_TIMEOUT_MS = 60000;
 
 interface ChatResponse {
   content: string;
@@ -91,11 +94,17 @@ async function sendChatMessage(message: string, retries = 3): Promise<ChatRespon
           Origin: API_URL,
         },
         body: JSON.stringify({ message }),
+        // Bound each individual attempt so the 3-attempt retry loop can
+        // actually fit inside the per-test timeout. Without this, the only
+        // bound on the whole loop was the test timeout itself — a single
+        // rate-limited retry was a near-guaranteed timeout.
+        signal: AbortSignal.timeout(20000),
       });
     } catch (error) {
       // Transient network-level failures (e.g. undici UND_ERR_SOCKET on a
-      // dev-server keep-alive connection) reject the fetch promise entirely,
-      // bypassing the HTTP-status retry check below. Retry those too.
+      // dev-server keep-alive connection, or the AbortSignal.timeout above)
+      // reject the fetch promise entirely, bypassing the HTTP-status retry
+      // check below. Retry those too.
       if (attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
         continue;
@@ -367,8 +376,9 @@ const QUALITY_TESTS = [
     name: 'Place name variations',
     message: 'Tell me about Xixón',
     validate: (r: ChatResponse) => {
-      // Should recognize as Gijón
-      const recognizes = /gij|xix|city|coast|beach|port/i.test(r.content);
+      // Should recognize as Gijón. "city" alone is too weak a signal — it
+      // matches on an otherwise wrong answer, so it's excluded.
+      const recognizes = /gij|xix|coast|beach|port/i.test(r.content);
       return recognizes && r.content.length > 50;
     },
     expectedBehavior: 'Recognizes Asturian spelling of Gijón',
@@ -390,7 +400,7 @@ describe('LLM Quality Tests', () => {
     appendToReport('|------|--------|-------|');
 
     tests.forEach((test) => {
-      it(test.name, { timeout: 30000 }, async () => {
+      it(test.name, { timeout: QUALITY_TEST_TIMEOUT_MS }, async () => {
         const response = await sendChatMessage(test.message);
         const passed = test.validate(response);
         if (!passed) {
@@ -414,7 +424,7 @@ describe('LLM Quality Tests', () => {
     appendToReport('|------|--------|-------|');
 
     tests.forEach((test) => {
-      it(test.name, { timeout: 30000 }, async () => {
+      it(test.name, { timeout: QUALITY_TEST_TIMEOUT_MS }, async () => {
         const response = await sendChatMessage(test.message);
         const passed = test.validate(response);
         if (!passed) {
@@ -438,7 +448,7 @@ describe('LLM Quality Tests', () => {
     appendToReport('|------|--------|-------|');
 
     tests.forEach((test) => {
-      it(test.name, { timeout: 30000 }, async () => {
+      it(test.name, { timeout: QUALITY_TEST_TIMEOUT_MS }, async () => {
         const response = await sendChatMessage(test.message);
         const passed = test.validate(response);
         if (!passed) {
@@ -462,7 +472,7 @@ describe('LLM Quality Tests', () => {
     appendToReport('|------|--------|-------|');
 
     tests.forEach((test) => {
-      it(test.name, { timeout: 30000 }, async () => {
+      it(test.name, { timeout: QUALITY_TEST_TIMEOUT_MS }, async () => {
         const response = await sendChatMessage(test.message);
         const passed = test.validate(response);
         if (!passed) {

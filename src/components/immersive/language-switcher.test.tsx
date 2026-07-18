@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { LanguageSwitcher } from "./language-switcher";
+import { LanguageSwitcher, LOCALE_COVERAGE } from "./language-switcher";
 
 // Mock the useTranslation hook
 const mockSetLocale = vi.fn();
@@ -522,6 +522,36 @@ describe("LanguageSwitcher", () => {
       options[0].focus();
       fireEvent.keyDown(listbox, { key: "ArrowDown" });
       expect(document.activeElement).toBe(options[1]);
+    });
+  });
+
+  describe("coverage gate fallback", () => {
+    it("should treat a locale missing from LOCALE_COVERAGE as 0% coverage and gate it (line 62 `?? 0`)", () => {
+      // Line 62: `const coverage = LOCALE_COVERAGE[lang.code] ?? 0;`
+      // LOCALE_COVERAGE is a Partial record by design — a locale absent from the
+      // map falls back to 0, which is below MIN_COVERAGE_THRESHOLD, so the
+      // language is hidden from the dropdown. Simulate a missing entry by
+      // temporarily deleting 'fr' from the exported (mutable) map.
+      const originalFr = LOCALE_COVERAGE.fr;
+      delete LOCALE_COVERAGE.fr;
+      try {
+        mockLocale = "es";
+        render(<LanguageSwitcher />);
+
+        // fr now has no coverage entry → gated; ast already gated → 4 options
+        const options = screen.getAllByRole("option");
+        expect(options).toHaveLength(4);
+        expect(
+          screen.queryByRole("option", { name: /Français/ })
+        ).not.toBeInTheDocument();
+        // Reference locales are always present regardless of coverage
+        expect(screen.getByRole("option", { name: /Español/ })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: /English/ })).toBeInTheDocument();
+      } finally {
+        if (originalFr !== undefined) {
+          LOCALE_COVERAGE.fr = originalFr;
+        }
+      }
     });
   });
 

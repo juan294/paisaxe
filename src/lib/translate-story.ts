@@ -55,7 +55,7 @@ async function patchStoryTranslationMetadata(
   return supabase.rpc("patch_story_translation_metadata", {
     p_story_id: storyId,
     p_translations: patch.translations || {},
-    p_translation_status: patch.translationStatus || {},
+    p_translation_status: patch.translationStatus,
     p_last_translated_at: patch.lastTranslatedAt || null,
     p_set_last_translated_at: patch.lastTranslatedAt !== undefined,
   });

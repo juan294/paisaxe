@@ -845,6 +845,66 @@ describe("useStreamChat", () => {
     expect(result.current.isStreaming).toBe(false);
   });
 
+  it("HandledError catch: leaves messages empty when assistantIndex is out of bounds after reset (line 264 guard)", async () => {
+    // Covers the falsy branch of `if (updated[assistantIndex])` inside the
+    // HandledError catch block:
+    // 1. sendMessage starts → assistantIndex = 1, user + assistant placeholder added
+    // 2. resetMessages() is called while the fetch is still pending → messages = []
+    // 3. fetch resolves with a non-ok response → setError + throw HandledError
+    // 4. The HandledError catch runs setMessages(prev => ...) with prev = []
+    //    → updated[1] is undefined → the guard is skipped and nothing is pushed
+    let resolveFetch: (value: unknown) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolveFetch = resolve;
+    });
+    mockFetch.mockReturnValueOnce(pendingPromise);
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    // Start sending (don't await — we need to reset messages while it's in progress)
+    let sendPromise: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.isStreaming).toBe(true);
+    expect(result.current.messages).toHaveLength(2);
+
+    // Reset messages while the send is in progress
+    act(() => {
+      result.current.resetMessages();
+    });
+    expect(result.current.messages).toEqual([]);
+
+    // Resolve the fetch with a 500 → setError(server) then throw HandledError
+    await act(async () => {
+      resolveFetch!({ ok: false, status: 500 });
+      await sendPromise!;
+    });
+
+    // Error state was set by the non-ok handler, but no message was pushed
+    // because updated[assistantIndex] no longer exists after the reset.
+    expect(result.current.error).toBe(
+      "Ocurrió un error en el servidor. Inténtalo de nuevo más tarde."
+    );
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.isStreaming).toBe(false);
+  });
+
+  // Line 203: `} else if (event.type === "error") {` — the false arm (an event
+  // reaching this branch whose type is NOT "error") is unreachable. parseSseEvent
+  // (src/types/sse.ts) validates every parsed line and only ever returns events of
+  // type "text" | "done" | "error"; unknown/malformed events return null and are
+  // filtered by the `if (!event) return;` guard before the chain. Since "text" and
+  // "done" are consumed by the earlier if/else-if branches, any event evaluated at
+  // this final else-if always has type "error".
+
   it("should skip non-data SSE lines in processEvent (line 112)", async () => {
     // processEvent skips lines that don't start with "data: ".
     // This tests the early return on line 112.

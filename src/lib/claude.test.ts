@@ -446,6 +446,41 @@ describe("claude", () => {
       expect(mockExecFile).toHaveBeenCalledTimes(1);
     });
 
+    it("should parse string curl exit codes for retry classification (line 400)", async () => {
+      // execFile errors can carry a string `code`; parseInt("7") = 7 → retryable
+      mockExecFile
+        .mockRejectedValueOnce({ code: "7", stderr: "connect refused" })
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify({
+            content: [{ type: "text", text: "Recovered from string code" }],
+          }),
+          stderr: "",
+        });
+
+      const response = await generateChatResponse("Test", []);
+      expect(response).toBe("Recovered from string code");
+      expect(mockExecFile).toHaveBeenCalledTimes(2);
+    });
+
+    it("should fall back to stderr in the error message when exit code is falsy (line 424)", async () => {
+      // code 0 is a number → non-retryable; falsy → message uses stderr
+      mockExecFile.mockRejectedValue({ code: 0, stderr: "TLS handshake failure" });
+
+      await expect(generateChatResponse("Test", [])).rejects.toThrow(
+        "curl failed: TLS handshake failure"
+      );
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+    });
+
+    it("should fall back to 'unknown error' when exit code and stderr are both falsy (line 424)", async () => {
+      mockExecFile.mockRejectedValue({ code: 0, stderr: "" });
+
+      await expect(generateChatResponse("Test", [])).rejects.toThrow(
+        "curl failed: unknown error"
+      );
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+    });
+
     it("should use exponential backoff on retries", async () => {
       mockExecFile
         .mockRejectedValueOnce({ code: 7, stderr: "connect refused" })
@@ -753,6 +788,31 @@ describe("claude", () => {
       expect(userContent).not.toContain("B".repeat(3500));
     });
 
+    it("should drop the overflowing chunk entirely when remaining space is <= 100 chars (line 515)", async () => {
+      setupMockAPIResponse({
+        content: [{ type: "text", text: "Response" }],
+      });
+
+      // Chunk 1: header "[Fuente 1: a.pdf]\n" (18 chars) + 3900 = 3918 chars → fits.
+      // Chunk 2 overflows with remaining = 4000 - 3918 - 50 = 32 (<= 100), so it
+      // is skipped entirely instead of being truncated with "...".
+      const chunks: Chunk[] = [
+        { id: "1", content: "A".repeat(3900), sourcePdf: "a.pdf" },
+        { id: "2", content: "B".repeat(500), sourcePdf: "b.pdf" },
+      ];
+
+      await generateChatResponse("Question", chunks);
+
+      const body = getCurlBody();
+      const userContent = body.messages[0].content;
+
+      expect(userContent).toContain("[Fuente 1: a.pdf]");
+      // Second chunk is dropped — no header and no truncation marker
+      expect(userContent).not.toContain("[Fuente 2");
+      expect(userContent).not.toContain("B");
+      expect(userContent).not.toContain("...");
+    });
+
     it("should include dividers between chunks in truncated context", async () => {
       setupMockAPIResponse({
         content: [{ type: "text", text: "Response" }],
@@ -880,6 +940,99 @@ describe("claude", () => {
           chunks.push(chunk);
         }
       }).rejects.toThrow("overloaded");
+    });
+
+    it("should use 'Streaming error' fallback when an error event has no message (line 253)", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        // error event with no `error` object → event.error?.message is undefined
+        proc.stdout.emit("data", sseData({ type: "error" }));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      await expect(async () => {
+        for await (const chunk of streamChatResponse("Test", [])) {
+          chunks.push(chunk);
+        }
+      }).rejects.toThrow("Streaming error");
+    });
+
+    it("skips waitForWork when an error lands while a chunk is being consumed (line 294 re-check)", async () => {
+      const proc = setupMockSpawn();
+
+      const gen = streamChatResponse("Test", []);
+      const iterator = gen[Symbol.asyncIterator]();
+
+      // Start the generator; it parks in waitForWork() once listeners are attached.
+      const firstNext = iterator.next();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      proc.stdout.emit("data", sseDelta("first"));
+      await expect(firstNext).resolves.toEqual({ value: "first", done: false });
+
+      // The generator is now suspended at `yield`. Deliver an error event BEFORE
+      // resuming it: on resume, the post-drain re-check (chunks empty && !done &&
+      // !error) is false because `error` is set, so waitForWork() is skipped and
+      // the loop throws immediately.
+      proc.stdout.emit(
+        "data",
+        sseData({ type: "error", error: { message: "mid-stream failure" } })
+      );
+
+      await expect(iterator.next()).rejects.toThrow("mid-stream failure");
+    });
+
+    it("should wrap context chunks in <context> tags in the streaming request body (line 572)", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseDelta("ok"));
+        proc.emit("close");
+      }, 10);
+
+      const contextChunks: Chunk[] = [
+        { id: "1", content: "Cudillero is a fishing village", sourcePdf: "coast.pdf" },
+      ];
+
+      const received: string[] = [];
+      for await (const chunk of streamChatResponse("Test", contextChunks)) {
+        received.push(chunk);
+      }
+      expect(received).toEqual(["ok"]);
+
+      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const dIndex = curlArgs.indexOf("-d");
+      const body = JSON.parse(curlArgs[dIndex + 1]);
+      const userContent: string = body.messages[0].content;
+      expect(userContent).toContain("<context>");
+      expect(userContent).toContain("Cudillero is a fishing village");
+      expect(userContent).toContain("<user_question>");
+    });
+
+    it("should prepend available_images without context tags when streaming with images only (line 573)", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseDelta("ok"));
+        proc.emit("close");
+      }, 10);
+
+      const images: ImageResult[] = [
+        { id: "img1", path: "/images/faro.jpg", caption: "Faro de Cudillero", sourcePdf: "coast.pdf" },
+      ];
+
+      const received: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [], false, 0, images)) {
+        received.push(chunk);
+      }
+      expect(received).toEqual(["ok"]);
+
+      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const dIndex = curlArgs.indexOf("-d");
+      const body = JSON.parse(curlArgs[dIndex + 1]);
+      const userContent: string = body.messages[0].content;
+      expect(userContent).toContain("<available_images>");
+      expect(userContent).toContain("Faro de Cudillero");
+      expect(userContent).not.toContain("<context>");
     });
 
     it("should throw on process error event", async () => {
@@ -1652,6 +1805,36 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       }
 
       expect(chunks).toEqual(["retry success"]);
+      expect(mockStream).toHaveBeenCalledTimes(2);
+    });
+
+    it("should stringify a non-Error thrown by the SDK stream in the retry warning (line 123)", async () => {
+      let callCount = 0;
+      mockStream.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            async *[Symbol.asyncIterator]() {
+              // Non-Error rejection — the retry log must String() it
+              throw "socket hang up";
+            },
+          };
+        }
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield { type: "content_block_delta", delta: { type: "text_delta", text: "recovered" } };
+          },
+        };
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(["recovered"]);
       expect(mockStream).toHaveBeenCalledTimes(2);
     });
 

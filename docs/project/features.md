@@ -24,6 +24,7 @@ A complete catalog of everything Paisaxe can do, organized by audience.
     - [Visitors Analytics](#visitors-analytics)
     - [Revenue Analytics](#revenue-analytics)
     - [Voice Analytics](#voice-analytics)
+    - [GitHub Analytics](#github-analytics)
   - [Agents Dashboard](#agents-dashboard)
     - [Agent Toggles](#agent-toggles)
     - [Agent Status Grid](#agent-status-grid)
@@ -355,16 +356,17 @@ See [Feature Flags Reference](#feature-flags-reference) below for the full list.
 
 ### Analytics Dashboard
 
-The Analytics tab organizes metrics into four sub-tabs, each focused on a specific data source. Switch between sub-tabs using the pill buttons or keyboard shortcuts.
+The Analytics tab organizes metrics into five sub-tabs, each focused on a specific data source. Switch between sub-tabs using the pill buttons or keyboard shortcuts.
 
 | Sub-tab | Shortcut | Data Source | Default Date Range |
 |---------|----------|-------------|-------------------|
-| Visitors | `v` | PostHog | Last 7 days |
-| Revenue | `r` | Stripe | Last 30 days |
-| Voice | `e` | ElevenLabs | Last 30 days |
-| Costs | `c` | Anthropic, Twilio, ElevenLabs, manual | Current month |
+| Visitors | `Cmd+U` | PostHog | Last 7 days |
+| Voice | `Cmd+I` | ElevenLabs | Last 30 days |
+| GitHub | `Cmd+O` | GitHub Traffic API | Last 30 days |
+| Costs | `Cmd+P` | Anthropic, Twilio, ElevenLabs, manual | Current month |
+| Revenue | `Cmd+L` | Stripe | Last 30 days |
 
-**Caching architecture** — All four panels are mounted simultaneously (CSS `display:none` for inactive tabs) so they fetch data in parallel on first load. An in-memory stale-while-revalidate cache (`AnalyticsCacheProvider`) ensures tab switches are instant. Data becomes stale after 2 minutes, triggering a background refresh that shows a subtle blue indicator bar. API routes also set `Cache-Control: private, max-age=120, stale-while-revalidate=300` for browser-level caching.
+**Caching architecture** — Panels are lazy-mounted on first visit — only rendered when their tab is first clicked. Once mounted, a panel stays in the DOM (CSS `display:none` when inactive) so its state and data survive tab switches. An in-memory stale-while-revalidate cache (`AnalyticsCacheProvider`) ensures tab switches are instant. Data becomes stale after 2 minutes, triggering a background refresh that shows a subtle blue indicator bar. API routes also set `Cache-Control: private, max-age=120, stale-while-revalidate=300` for browser-level caching.
 
 #### Visitors Analytics
 
@@ -449,6 +451,32 @@ Voice agent metrics from ElevenLabs Conversational AI.
 | Recent Conversations | Last 10 conversations with timestamp, status, and duration |
 
 **Configuration** — Requires `ELEVENLABS_API_KEY` environment variable. Only shows data for agents with names starting with "Paisaxe".
+
+#### GitHub Analytics
+
+Repository traffic metrics from the GitHub Traffic API.
+
+**Summary cards:**
+
+| Metric | Description |
+|--------|-------------|
+| Total Views | All repository page views in the date range |
+| Unique Visitors | Count of distinct visitors |
+| Total Clones | All repository clones |
+| Unique Cloners | Count of distinct cloners |
+| Days Tracked | Number of days with recorded traffic data |
+
+**Breakdown sections:**
+
+| Section | Description |
+|---------|-------------|
+| Traffic Over Time | Chart of views and clones by day |
+| Top Referrers | Sites sending traffic to the repository |
+| Popular Paths | Most visited repository paths |
+
+**Sync** — `/api/cron/github-traffic-sync` snapshots GitHub traffic into the database every 6 hours, so history is retained beyond the API's own rolling window. A manual sync button in the panel header triggers the same sync on demand and refreshes the view. An empty state ("No traffic data yet") shows until the first sync lands.
+
+**Configuration** — Requires the `GITHUB_TOKEN` environment variable; returns an error if unset.
 
 ### Agents Dashboard
 

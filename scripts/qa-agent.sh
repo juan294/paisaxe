@@ -373,17 +373,36 @@ if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
   TEST_OUTPUT="QA PREFLIGHT: Voyage AI embedding availability failed - ${VOYAGE_HEALTH_DETAILS}. Set VOYAGE_API_KEY in the QA environment or .env.local before running npm run test:qa."
   TEST_EXIT_CODE=1
 else
-  TEST_OUTPUT=$(npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
+  TEST_OUTPUT=$(NO_COLOR=1 npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
 fi
 TEST_EXIT_CODE=${TEST_EXIT_CODE:-0}
+
+# Strip ANSI escapes defensively before parsing. Vitest's summary line can
+# begin with a color escape (e.g. ESC[2m) before the leading whitespace, which
+# breaks an anchored `^ *Tests ` grep even with NO_COLOR set upstream (some
+# terminals/CI force color regardless) and silently parses every count as 0.
+TEST_OUTPUT_PLAIN=$(printf '%s' "$TEST_OUTPUT" | sed -E 's/\x1b\[[0-9;]*m//g')
 
 # Parse test results from vitest output. Vitest's summary block has both a
 # "Test Files  N passed" line and a "Tests  M passed" line; without anchoring
 # to "Tests" specifically, grep matches the Test Files line first and reports
 # the file count instead of the test count.
-PASSED_TESTS=$(echo "$TEST_OUTPUT" | grep -E '^ *Tests ' | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || echo "0")
-FAILED_TESTS=$(echo "$TEST_OUTPUT" | grep -E '^ *Tests ' | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || echo "0")
+PASSED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}')
+FAILED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}')
+PASSED_TESTS=${PASSED_TESTS:-0}
+FAILED_TESTS=${FAILED_TESTS:-0}
 TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
+
+# A 0-test result is ambiguous: it could be a real empty run, or a parser that
+# failed to match the summary line. Preflight failures aside, a non-zero
+# vitest exit code with zero parsed tests means the parser broke, not that
+# nothing ran — flag it distinctly so a 0% pass rate never masquerades as a
+# real measurement.
+PARSE_FAILURE=false
+if [[ $TOTAL_TESTS -eq 0 && $TEST_EXIT_CODE -ne 0 && "$VOYAGE_HEALTH_STATUS" == "PASS" ]]; then
+  PARSE_FAILURE=true
+  log_error "Parsed 0 tests from a failed run (exit $TEST_EXIT_CODE) — likely a test-count parser failure, not a real 0-test result" | tee -a "$LOG_FILE"
+fi
 
 # Calculate pass rate
 if [[ $TOTAL_TESTS -gt 0 ]]; then
@@ -395,7 +414,7 @@ fi
 log_info "Test results: $PASSED_TESTS passed, $FAILED_TESTS failed ($PASS_RATE% pass rate)" | tee -a "$LOG_FILE"
 
 # Extract failed test details
-FAILED_DETAILS=$(echo "$TEST_OUTPUT" | grep -A 20 "FAIL\|AssertionError\|Expected\|Received" || echo "No failure details available")
+FAILED_DETAILS=$(echo "$TEST_OUTPUT_PLAIN" | grep -A 20 "FAIL\|AssertionError\|Expected\|Received" || echo "No failure details available")
 
 # Write metrics to temp file for Claude
 {
@@ -403,6 +422,10 @@ FAILED_DETAILS=$(echo "$TEST_OUTPUT" | grep -A 20 "FAIL\|AssertionError\|Expecte
   echo "====================================="
   echo ""
   echo "TEST SUMMARY:"
+  if [[ "$PARSE_FAILURE" == "true" ]]; then
+    echo "- PARSE FAILURE: vitest exited non-zero but 0 tests were parsed from its output."
+    echo "  Treat this as a broken measurement, not a real 0-test/0% result."
+  fi
   echo "- Total tests: $TOTAL_TESTS"
   echo "- Passed: $PASSED_TESTS"
   echo "- Failed: $FAILED_TESTS"
@@ -416,7 +439,7 @@ FAILED_DETAILS=$(echo "$TEST_OUTPUT" | grep -A 20 "FAIL\|AssertionError\|Expecte
   echo "- Response Quality: Tests for helpfulness, appropriate length, language handling"
   echo ""
   echo "FULL TEST OUTPUT:"
-  echo "$TEST_OUTPUT"
+  echo "$TEST_OUTPUT_PLAIN"
   echo ""
   if [[ $FAILED_TESTS -gt 0 ]]; then
     echo "FAILED TEST DETAILS:"
@@ -500,7 +523,7 @@ if [[ "$ENABLE_GITHUB_ISSUES" == "true" && $TOTAL_FAILURES -gt 0 ]]; then
   # File issues for LLM test failures
   if [[ $FAILED_TESTS -gt 0 ]]; then
     # Extract individual failure names and create issues
-    FAILURE_NAMES=$(echo "$TEST_OUTPUT" | grep -E "^\s*[✗×]|FAIL" | head -5 || echo "")
+    FAILURE_NAMES=$(echo "$TEST_OUTPUT_PLAIN" | grep -E "^\s*[✗×]|FAIL" | head -5 || echo "")
     if [[ -n "$FAILURE_NAMES" ]]; then
       create_summary_issue "$PASS_RATE" "$FAILED_TESTS" "$FAILURE_NAMES" 2>&1 | tee -a "$LOG_FILE" || {
         log_warn "Failed to create GitHub issue (gh CLI may not be configured)" | tee -a "$LOG_FILE"
