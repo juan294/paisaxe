@@ -45,8 +45,10 @@ export async function readSseStream(
       buffer += decoder.decode(value, { stream: true });
 
       const lines = buffer.split("\n\n");
-      // Keep the last (potentially incomplete) chunk in the buffer
-      buffer = lines.pop() ?? "";
+      // Keep the last (potentially incomplete) chunk in the buffer.
+      // String.split always returns an array of length >= 1, so pop() here
+      // is never undefined.
+      buffer = lines.pop()!;
 
       for (const line of lines) {
         if (line.trim()) {

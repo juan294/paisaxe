@@ -138,6 +138,25 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -546,48 +565,6 @@
 - Performance Agent: Test-only additions. Zero bundle impact.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-07-08T04:01:45Z -->
-## Documentation Agent -- 2026-07-08
-- Status: GREEN -- No documentation gaps found. Thirty-second consecutive clean run. No files edited.
-- Feature flags: Zero undocumented flags. All 17 feature flags + 10 agent flags verified against docs/project/features.md.
-- API routes: All 55 flagged routes confirmed internal (admin auth-gated, cron, webhooks, MCP voice tools, health probes, client-side access checks). Gaps-scan count rose 51 to 55 due to scanner coverage, not new routes -- no route files added since Jun 21.
-- Spot-checked admin/tunnel (dev-only cloudflared control) and admin/agent-reports (local report reader, empty in production) -- both admin-auth gated and internal.
-
-**Cross-agent recommendations:**
-- Triage Agent: No documentation code actions. The 4 uncommitted Jul 3 coverage test files (flagged by Coverage/QA/Performance since Jul 4) remain the standing commit-hygiene item.
-- QA Agent: No new features or flags for mock sets. Flag count stable at 17 features + 10 agent flags.
-- Security Agent: The @sentry/cli FSL-1.1-MIT entry in license-exceptions.md still awaits owner sign-off -- doc-adjacent, owner action, not agent-editable.
-- Coverage Agent: No documentation-related coverage gaps.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-07-08T08:05:00Z -->
-## Triage -- 2026-07-08
-- **Reports processed**: 8 (cost-analyst, performance, coverage, localization, documentation, security, cc-rpi-update, qa)
-- **Action items resolved**: 10 (fixes #719, #720, #716, #714; committed 4 stale Jul 3 test files; committed staged license-exceptions.md dual-license doc; recorded @sentry/cli FSL-1.1-MIT exception; added save-favorite 401 E2E test; landed P1 async getClient() Supabase deferral + webServer.timeout bump; persisted build:analyze artifact)
-- **Summary**: Fixed all QA-flagged defects (network retry, PPR hydration race, chat-safety false positive, Spanish decline vocab), landed the Performance Agent's P1/P2 backlog in the agreed order (#720 fix first, then async Supabase deferral), cleared the multi-cycle stale-test-commit hygiene item, and ran a 4-angle /simplify pass on the full diff (precompiled chat-safety regexes, simplified stories-data.ts client binding, extracted a qa-journey.spec.ts retry helper). Filed #721 to track the underlying hydration-readiness product concern the E2E fix doesn't address. Dependabot alert #73 (@babel/core, already fixed in lockfile) expected to auto-close once PR #717/#718 merge and trigger a rescan. GitHub code scanning and secret scanning remain disabled (GHAS not enabled on this private repo) -- known, Gitleaks-covered gap, not newly actionable.
-
-**Cross-agent recommendations:**
-- Performance Agent: P1 (async getClient() in stories-data.ts + realtime.ts) and P2 (build:analyze artifact at docs/agents/bundle-analysis/2026-07-08.html) both landed this cycle -- verify chunk sizes in the next fresh build.
-- QA Agent: #719, #720, #716, #714 all fixed and should close on merge. New issue #721 tracks the residual product-level hydration-readiness concern (not a #720 duplicate -- that one was E2E-harness-scoped).
-- Coverage Agent: The 4 stale Jul 3 test files are committed; stories-data.ssr.test.ts mocks were compatible with the async getClient() conversion with no changes needed.
-- Security Agent: @sentry/cli FSL-1.1-MIT exception recorded in license-exceptions.md per your Jul 7 recommendation -- no longer outstanding.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-07-09T04:03:14Z -->
-## Documentation Agent -- 2026-07-09
-- Status: GREEN -- No documentation gaps found. Thirty-second consecutive clean run.
-- Feature flags: Zero undocumented flags. Verified 17 FeatureFlagKey flags + 10 agent flags (master + 9) against docs/project/features.md — all documented.
-- API routes: All 55 flagged routes confirmed internal. Count delta vs Jun 22 (51 -> 55) is gaps-script re-baselining after the Jul 1 CLAUDE.md edit, not new routes. `mcp/save-favorite` (only recent route addition) already documented under Pelayo MCP tools.
-- Spot-checked checkout/health (admin-auth diagnostic), mcp/make-booking/status (Twilio callback), cron/github-traffic-sync (cron-gated), voice-access (client auth check) -- all internal.
-- No changes to features.md or CLAUDE.md this cycle.
-
-**Cross-agent recommendations:**
-- QA Agent: No new features or flags for mock sets. Flag count stable at 17 features + 10 agent flags, matching your Jul 8 MOCK_FEATURE_FLAGS cross-reference.
-- Triage Agent: No documentation actions. Note the gaps-script route count re-baselined (51 -> 55) after the Jul 1 CLAUDE.md edit -- cosmetic, not actionable.
-- Security Agent: No documentation changes this cycle. @sentry/cli FSL exception already recorded per your Jul 8 report -- doc-side security items are clear.
-- Coverage Agent: No documentation-related coverage gaps.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-07-10T07:55:00Z -->
 ## Triage -- 2026-07-10
 - **Reports processed**: 8 (cc-rpi-update, cost-analyst, coverage, documentation, localization, performance, qa, security)
@@ -611,176 +588,6 @@
 - Performance Agent: No bundle impact -- shell script and E2E test only.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-07-12T01:07:22Z -->
-## Cost Analyst — 2026-07-12
-- Status: WATCH. Day 12 of July. Revenue drought **149 days** (since Feb 13). Paisaxe voice silence **145 days** (since Feb 17).
-- ElevenLabs: Creator tier, **9,085 / 300,000 chars (3.028%)** — +2,193 vs Jul 11. The increase is attributed to Jul 11 but has NO matching ConvAI conversation (last call still Jul 10 Aria) — it was direct TTS, personal/non-Paisaxe, $0 marginal cost on the flat annual plan. Cycle-to-date reconciles exactly: Jul 9 (5,241) + Jul 10 (1,651) + Jul 11 (2,193) = 9,085. Projected cycle-end ~18.7%. No Paisaxe agent in a 30-conversation scan.
-- Twilio: Balance **$9.8946** (flat, 6th consecutive stable day). July $1.39 fully settled. Runway ~7.1 months. Next charge/decision gate ~Aug 7 (~26 days).
-- Fixed operational burn $3.2145/day ($99.65/mo). July MTD ~$38.57. Revenue $0. Cumulative operational loss since launch: **~$520**.
-
-**Cross-agent recommendations:**
-- QA Agent: All automated signals GREEN (your Jul 11 report); manual Pelayo voice widget + Day Pass verification on paisaxe.es remains the only outstanding probe for the 149-day revenue / 145-day voice drought.
-- Triage Agent: Two owner/time-sensitive decisions — (1) Twilio number release-or-retain before ~Aug 7 (~26 days); (2) Anthropic billing manual check at console.anthropic.com still overdue. No code actions from cost analyst this cycle.
-- Performance Agent: ElevenLabs chunk fully deferred (click-to-mount) — zero cost to current users at 145-day silence; shelving is a Feb 2027 renewal decision, not a bundle lever.
-- Security Agent: 0 advisories carry forward; no cost-related security concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-07-12T05:05:13Z -->
-## Localization Agent — 2026-07-12
-- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 63rd consecutive clean run.
-- UI strings: 411 leaf keys per locale (programmatically verified — all 5 non-Spanish locales exactly match ES, 0 missing, 0 orphaned, 0 empty). Unchanged from Jul 11.
-- Story translations: 113 stories x 5 target locales = 565 records, all complete (title + subtitle + description).
-- Type safety: Pass — 105/105 translation tests passing, 0 TypeScript errors.
-- No source files modified this cycle.
-
-**Cross-agent recommendations:**
-- Performance Agent: i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
-- Coverage Agent: translations.test.ts dynamically compares each locale key count to ES — any future key additions without locale parity are caught in CI automatically.
-- QA Agent: No locale-related issues. All translations stable for 63 consecutive cycles.
-- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-12T06:07:46Z -->
-## QA Agent — 2026-07-12
-- Status: GREEN. LLM quality 12/12 (100%), browser journeys 10/10 (100%, J9-12 skipped on auth fixture), integration health 4/4. 3rd consecutive fully-green cycle.
-- Safety guardrails all pass (prompt injection, PII extraction, authority impersonation). No integration failures; Voyage/Supabase/Claude all reachable. VOYAGE_API_KEY propagation confirmed resolved.
-- Feature-flag mocks complete: 17 FeatureFlagKey + 10 agent flags all in MOCK_FEATURE_FLAGS. Suite runtime back in normal band (105.5s) — Jul 9 +19% flag not reproduced.
-- Open gaps: 4 webhook routes lack signature-rejection smokes; journeys 9-12 skipped; 172 unreferenced data-testids; /story/[slug] E2E (#722).
-
-**Cross-agent recommendations:**
-- Cost Analyst Agent: Automated signals all green. Manual Pelayo voice widget + Day Pass purchase verification on paisaxe.es remains the ONLY probe for the 149-day revenue / 145-day voice drought.
-- Security Agent: Webhook signature-rejection E2E smokes (stripe/elevenlabs/supabase/translate) still absent — a bad-signature 4xx smoke would close the negative-path gap. 3/3 safety tests held, no security signal lost.
-- Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) still gated on the journeys 9-12 auth fixture — landing it is the only real coverage headroom.
-- Performance Agent: LLM suite runtime normal this cycle; +19% Jul 9 spike not reproduced. Confirmed non-bundle-attributable per your byte-flat first-load finding — watch can close.
-- Triage/Infra Agent: Pin vitest maxThreads: 4 to make local `npm run test` deterministic (admin-UI timeouts are worker-starvation flakes, not regressions).
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-12T07:04:03Z -->
-## Security Agent — 2026-07-12
-- Status GREEN. 0 advisories detected, 0 exploitable. npm audit = 0 vulnerabilities. GREEN streak intact.
-- License Pass. No strong copyleft. All 8 flagged packages documented in license-exceptions.md (LGPL sharp-libvips + MPL lightningcss exceptions; dompurify/expand-template dual-license permissive branch; @babel/template, simple-concat, simple-get are MIT false positives; paisaxe@1.6.0 is our own UNLICENSED root).
-- Headers Pass: HSTS preload, CSP (object-src/frame-ancestors none), X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy all verified in source.
-- Webhook security Pass: all 7 timingSafeEqual call sites verified. CSP 'unsafe-inline' is a documented PPR trade-off with xss-canary + render-sink compensating controls.
-- 19 outdated packages, zero CVEs. Only client-visible one is posthog-js 1.396.7->1.399.2.
-
-**Cross-agent recommendations:**
-- QA Agent: Webhook signature-rejection is a test-coverage gap, NOT a vulnerability — rejection logic exists and is unit-covered. A bad-signature 4xx E2E smoke for stripe/elevenlabs/supabase/translate would close the negative-path net.
-- Triage Agent: No security code actions. Optional dep batch (19 pkgs, no CVEs) — isolate typescript v7 + knip v26 majors in a worktree with full CI. GHAS code/secret scanning still owner cost decision (Gitleaks-covered).
-- Performance Agent: Next posthog-js/supabase-js batch = single-digit KB deferred-chunk deltas only, no first-paint impact.
-- Cost Analyst Agent: 0 advisories; no cost-related security concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-12T08:04:20Z -->
-## Performance Agent — 2026-07-12
-- Status: GREEN. 5th consecutive plateau cycle. Fresh build today (new BUILD_ID TvOcg1lbnZ89EGDsm07Fz, Jul 12 08:03) — every shipped-weight number byte-identical to Jul 8–11. No src/ or package.json commit since 92a4c42f (Jul 10); the only later commit (c3d68e25) is scripts/tests/docs only.
-- Total JS 3,057 KB (443 KB under 3,500 budget). /immersive first-load 888 KB (908,821 B), /admin worst 1,107 KB. Deps 34/40. CSS 134 KB (7th flat cycle).
-- Verified against fresh route-bundle-stats: Supabase chunk (308 KB) on /admin first-load only; ElevenLabs (591 KB) and PostHog (244 KB) chunks in NO first-load list. All three deferral optimizations holding.
-
-**Cross-agent recommendations:**
-- QA Agent: LLM suite runtime normal this cycle; the Jul 9 +19% spike did not recur and is confirmed non-bundle-attributable (first-load payloads byte-flat on every public route). Recommend closing that watch item.
-- Security Agent: Next posthog-js/supabase-js Dependabot batch will land single-digit KB deltas in deferred chunks only — zero first-paint impact. TypeScript v6→v7 is dev-only, no bundle relevance.
-- Cost Analyst Agent: ElevenLabs 591 KB chunk fully deferred (click-to-mount) — zero cost to current users at 145-day voice silence. Shelving is a Feb 2027 renewal decision, not a bundle lever.
-- Triage Agent: No performance code actions this cycle. All standing items closed or watch-level owned elsewhere.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-07-13T00:11:38Z -->
-## Coverage Agent — 2026-07-13
-- Suite: 381 files, 7232 tests, all passing at --maxWorkers=4 (0 failures). No tests added.
-- Coverage: 98.83% stmts (11211/11343), 96.78% branches, 99.00% funcs, 99.21% lines. Codebase totals identical to Jul 11; the 1-stmt/1-func delta is V8 async-closure instrumentation noise, not a regression. Plateau holds.
-- All sub-100% sites re-verified as documented: SSR guards, defensive dead code, V8 artifacts, "should not reach here" satisfiers, or Playwright-only components. sentry-before-send.ts:8 already has a direct no-headers test; logger-sanitize.ts:52 is a pre-guarded branch fallback.
-
-**Cross-agent recommendations:**
-- Infra/Triage Agent: Pin poolOptions.threads.maxThreads: 4 in vitest.config.ts — local flaky admin-UI timeouts are worker starvation, not regressions (0 failures at cap). Recommended by both Coverage and QA for 3+ cycles now.
-- QA Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain the only real unit-coverage headroom; both gated on the journeys 9-12 auth fixture. /story/[slug] (#722) and webhook signature-rejection smokes are E2E-only, out of unit remit.
-- Security Agent: chat/stream MAX_INPUT_LENGTH=2000 guard is dead code after the Zod 500-char cap (redundant, not a vuln). All error/redaction paths remain covered.
-- Performance Agent: Test-only cycle, zero bundle impact, no new dependencies.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-07-13T01:07:11Z -->
-## Cost Analyst — 2026-07-13
-- Status: WATCH. Day 13 of July. Revenue drought **150 days** (since Feb 13). Paisaxe voice silence **146 days** (since Feb 17).
-- ElevenLabs: Creator tier, **14,794 / 300,000 chars (4.931%)** — +5,709 since Jul 12, entirely the Jul 12 daily bucket. One new personal Aria call (56 s) + direct TTS; the rest non-conversational TTS. Fourth consecutive active day (Jul 9-12), largest single bucket of the cycle. All non-Paisaxe, $0 marginal (flat annual plan). Cycle-end projection ~27.8%, far under limit.
-- Twilio: Balance **$9.8946** (flat, 7th consecutive stable day). July $1.39 fully settled ($1.15 base + $0.24 fee). Runway ~7.1 months. Next release-decision gate ~Aug 7 (~25 days).
-- Fixed operational burn $3.2145/day ($99.65/mo). July MTD ~$41.79. Revenue $0. Cumulative operational loss since launch: **~$523**.
-
-**Cross-agent recommendations:**
-- QA Agent: Manual Pelayo voice widget + Day Pass purchase verification on paisaxe.es remains the only probe for the 150-day revenue / 146-day voice drought. All automated signals GREEN Jul 12.
-- Security Agent: 0 advisories carry forward; no cost-related security concerns. posthog-js batch is hygiene-only.
-- Triage Agent: Two owner decisions with no automated path — (1) Twilio release-or-retain before ~Aug 7; (2) Anthropic billing manual check at console.anthropic.com. No code actions from cost analyst this cycle.
-- Performance Agent: ElevenLabs 591 KB deferred chunk still costs current users nothing at 146-day silence — shelving is a Feb 2027 renewal decision, not a bundle lever.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-07-13T05:08:30Z -->
-## Localization Agent — 2026-07-13
-- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 64th consecutive clean run.
-- UI strings: 411 leaf keys per locale (programmatically verified — all 5 non-Spanish locales exactly 411 keys, 0 missing, 0 orphaned, 0 empty).
-- Placeholder integrity: 0 mismatches across all 411 keys x 5 target locales.
-- Story translations: 113 stories x 5 target locales = 565 records, all complete (title + subtitle + description).
-- Type safety: Pass — 105/105 translation tests passing, 0 TypeScript errors.
-
-**Cross-agent recommendations:**
-- Performance Agent: i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
-- Coverage Agent: translations.test.ts dynamically compares each locale key count to ES — any future key additions without locale parity are caught in CI automatically.
-- QA Agent: No locale-related issues. All translations stable for 64 consecutive cycles.
-- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-13T06:06:40Z -->
-## QA Agent — 2026-07-13
-- Status GREEN. LLM quality 12/12 (100%), browser journeys 10/10 (4 auth journeys skipped by design), integration 4/4, Voyage AI PASS. All safety, boundary, RAG, and quality tests pass. Second consecutive clean LLM cycle since VOYAGE_API_KEY recovery (Jun 22).
-- Feature-flag mock parity complete: all 17 FeatureFlagKey flags + 10 agent flags present in MOCK_FEATURE_FLAGS. No stale mocks.
-- E2E gaps stable and non-safety: 4 webhook routes lack bad-signature smokes; admin analytics/marketing routes lack a 401-without-auth smoke; 172 data-testid unreferenced (up from 153). No product source shipped since Jul 3 (only test/doc/script commits).
-
-**Cross-agent recommendations:**
-- Infra/Triage Agent: Pin poolOptions.threads.maxThreads:4 in vitest.config.ts — local admin-UI dialog timeouts are worker starvation (0 failures at cap), not regressions. Recommended by Coverage + QA for 3+ cycles; CI unaffected (sharded).
-- Security Agent: Webhook signature-rejection remains an E2E coverage gap (not a vuln) for stripe/elevenlabs/supabase/translate — a bad-signature 4xx smoke would close the negative-path net.
-- Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) still gated on the journeys 9-12 auth fixture — building it is the highest-value coverage unlock.
-- Cost Analyst Agent: All automated signals GREEN; manual Pelayo voice widget + Day Pass verification on paisaxe.es remains the only outstanding probe for the 150-day revenue / 146-day voice drought.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-13T07:06:30Z -->
-## Security Agent — 2026-07-13
-- Status GREEN. 0 advisories detected, 0 exploitable. npm audit = "found 0 vulnerabilities" across the full tree. No npm audit fix needed.
-- License Pass: no strong copyleft. All flagged packages documented or dual-license permissive-branch (LGPL sharp-libvips, MPL lightningcss/dompurify, FSL @sentry/cli). paisaxe@1.6.0 UNLICENSED is the private app root, expected.
-- All 6 security headers verified in source: CSP (per-request, 'unsafe-inline' for PPR + compensating XSS-canary/render-sink gates), HSTS (prod-only), X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy. Live check skipped (server not running).
-- All webhook/CSRF timingSafeEqual sites verified constant-time (csrf, cron-auth, mcp-auth, supabase/translate/elevenlabs webhooks).
-- CI/CD security complete: Dependabot + Gitleaks + npm audit + license-check active. Renovate absent (redundant, no gap). GHAS code/secret scanning still owner-cost-gated (Gitleaks covers secrets).
-- 20 outdated packages, zero with security implications (0 CVEs). All minor/patch except typescript 6->7 (dev-only major).
-
-**Cross-agent recommendations:**
-- Performance Agent: posthog-js/supabase-js dep batch = single-digit-KB deltas in deferred chunks only, zero first-paint impact. typescript 6->7 is dev-only.
-- QA Agent: webhook bad-signature 4xx E2E smoke still absent for stripe/elevenlabs/supabase/translate — negative-path gap, not a vuln; timingSafeEqual paths verified correct in source.
-- Triage Agent: no security code actions this cycle. Optional hygiene: .security-metrics.tmp is untracked in the working tree (no secrets, aggregate metrics only) — have the script clean it up or gitignore it.
-- Cost Analyst Agent: 0 advisories; no cost-related security concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-13T08:03:14Z -->
-## Performance Agent — 2026-07-13
-- Status: GREEN. 6th consecutive plateau cycle — every shipped-weight number byte-identical to the Jul 8–12 baseline. No src/ or package.json commit since Jul 10 (92a4c42f); post-that commits are scripts/e2e/docs only.
-- Build fresh and authoritative: new BUILD_ID (IdfhGFkcIn3dHhEWovuik), route-bundle-stats dated Jul 13 08:02, postdating last source commit by 3 days. Numbers re-derived from the artifact, not copied.
-- Total JS 3,057 KB (443 KB under 3,500 KB budget). /immersive first-load 888 KB, /admin worst at 1,107 KB — both well under the 2,100 KB initial budget. All three deferrals (ElevenLabs 591 KB, Supabase 308 KB, PostHog 244 KB) confirmed holding; optimizePackageImports active at next.config.ts:19.
-- No actionable optimizations. Only open items are watch/decision-level owned elsewhere.
-
-**Cross-agent recommendations:**
-- Cost Analyst Agent: ElevenLabs 591 KB chunk is fully deferred (click-to-mount), zero first-paint cost at 146-day voice silence — shelving is a Feb 2027 renewal decision, not a bundle lever.
-- Security Agent: Next posthog-js/supabase-js Dependabot batch = single-digit-KB deltas in deferred chunks only, zero first-paint impact; TypeScript v6→v7 is dev-only, no bundle relevance.
-- QA Agent: LLM-suite +19% runtime (Jul 9) did not recur Jul 11–13; confirmed non-bundle-attributable — watch closed. Issue #721 hydration work is the only foreseeable future client-weight pressure.
-- Triage Agent: No performance code actions this cycle; every standing item is closed or watch-level owned elsewhere.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-07-14T00:11:45Z -->
-## Coverage Agent — 2026-07-14
-- Test suite: 381 files, 7232 tests, all passing under --maxWorkers=4. Coverage 98.84% stmts / 96.78% branches / 99.05% funcs / 99.21% lines — identical to Jul 11 baseline (Jul 13's -0.01pp confirmed as V8 two-value oscillation noise, not a regression).
-- Zero source changes since Jul 13; no tests added. Instead, derived the exact uncovered-statement inventory from coverage-final.json and verified all 8 previously-unenumerated gap sites (github/stripe/visitors analytics chart empty-guards, image-editor-dialog and account-config-dialog !story/!platform guards, story-viewer dead onToggleFavorite prop, toolbar-overflow-menu ref guard, voice-chat handleRetry guard) already carry explicit in-test unreachable documentation. The plateau inventory is now complete and fully enumerated in the report.
-- Playwright-only headroom unchanged: voice-agent-chat 45.24%, agents-dashboard/index 49.28% — both gated on the journeys 9-12 auth fixture.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: story-info-panel.tsx:35 `onToggleFavorite` is a dead prop (accepted, never called) — story-viewer.tsx:240 builds a closure for it that can never run. Removing the prop end-to-end would close a permanent coverage artifact and delete dead code.
-- Triage/Infra Agent: vitest.config.ts maxThreads:4 pin still outstanding (4th+ cycle, jointly recommended with QA). Local default-parallelism runs remain flaky; capped runs are 100% green.
-- QA Agent: journeys 9-12 auth fixture remains the only unlock for the two sub-50% Playwright-only components.
-- Performance Agent: no test or dependency changes this cycle; zero bundle impact.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-07-14T04:02:41Z -->
 ## Documentation Agent -- 2026-07-14
 - Status: GREEN -- No documentation gaps found. Thirty-second consecutive clean run.
@@ -793,79 +600,6 @@
 - Security Agent: checkout/health is admin-gated (validateAdminAuth) -- consistent with the QA Jun 23 finding that its 401 requires admin credentials; not a regression.
 - Coverage Agent: No documentation-related coverage gaps.
 - Triage Agent: No documentation actions this cycle. Outstanding owner items unchanged (Twilio release-or-retain by ~Aug 7, Anthropic billing manual check).
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-07-14T05:05:39Z -->
-## Localization Agent -- 2026-07-14
-- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 65th consecutive clean run.
-- UI strings: 411 leaf keys per locale (programmatically verified -- all 5 non-Spanish locales have exactly 411 keys, 0 missing, 0 orphaned, 0 placeholder mismatches).
-- Story translations: 113 stories x 5 target locales = 565 records, all complete (title + subtitle + description present for every entry).
-- Type safety: Pass -- 105/105 translation tests passing, 0 TypeScript errors. No translation file modified since Jun 20 (UI) / Jun 10 (stories).
-
-**Cross-agent recommendations:**
-- Performance Agent: i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
-- Coverage Agent: translations.test.ts dynamically compares each locale key count to ES -- any future key additions without locale parity are caught in CI automatically.
-- QA Agent: No locale-related issues. All translations stable for 65 consecutive cycles.
-- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-14T06:10:53Z -->
-## QA Agent — 2026-07-14
-- Status: YELLOW — LLM tests 12/12 (100%, 3rd consecutive clean cycle), journeys 10/10; the only failure is the Stripe integration probe returning HTTP 000 (curl transport failure, no HTTP response).
-- Stripe verified healthy on live re-check: 3/3 probes of /api/checkout/health return HTTP 401 (auth enforced, expected) in ~0.3s; production /api/health and /api/health/db green. Transient flake, same class as the Jul 10 db-probe incident — NOT a payments outage.
-- Probe defect: the Stripe check in scripts/qa-agent.sh:196 still has the pre-Jul-10 silent-failure pattern (|| true, no exit-code capture, no retry). The db-check fix (c3d68e25) was never applied to it.
-- Feature-flag mock parity re-verified programmatically: 17/17 feature flags + 10/10 agent flags present in e2e/fixtures/mock-data.ts.
-- Dependabot npm_and_yarn updater run failed Jul 13 (run 29234361163, "updater encountered errors"); the github_actions update succeeded. Not a code CI failure — last develop push (Jul 10) has CI/E2E/Security all green.
-
-**Cross-agent recommendations:**
-- Triage Agent: (1) Harden the Stripe probe in scripts/qa-agent.sh:196 with exit-code capture + one retry, mirroring the Jul 10 db-check fix; (2) investigate the failed Dependabot npm_and_yarn update (log at github.com/juan294/paisaxe/network/updates/1458090811, needs write access); (3) vitest maxThreads:4 pin still outstanding (5th cycle); (4) qa-agent.sh metrics header counts test files not tests ("Total tests: 1" for a 12-test run).
-- Security Agent: Safety 3/3 held (injection, PII, authority impersonation). Webhook bad-signature 4xx E2E smokes still absent — unchanged gap.
-- Cost Analyst Agent: Checkout health route confirmed reachable + auth-enforced on production today — infrastructure is fine; the 151-day revenue drought still has no automated explanation. Manual Pelayo + Day Pass verification remains the only outstanding probe.
-- Coverage Agent: No product source shipped since Jul 10; no new coverage targets. Journeys 9-12 auth fixture remains the unlock for voice-agent-chat and agents-dashboard.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-14T07:03:02Z -->
-## Security Agent — 2026-07-14
-- Status: GREEN — 0 advisories, 0 exploitable. npm audit clean across the full tree. GREEN streak continues since Apr 20.
-- All security headers verified LIVE this cycle (CSP, HSTS w/ preload, XFO DENY, nosniff, Referrer-Policy, Permissions-Policy). CSP unchanged and correct for PPR.
-- License: Pass. All flagged packages accounted for — LGPL sharp-libvips (Exception 1), lightningcss MPL-2.0 (Exception 3, dev-only), dompurify + expand-template (dual-license permissive branch elected), paisaxe@1.6.0 UNLICENSED (app root, expected), 3 MIT false positives (@babel/template, simple-concat, simple-get).
-- Outdated: 21 packages, zero CVEs. Only major is typescript 6.0.3 -> 7.0.2 (dev-only, isolate in own worktree). Rest is routine minor/patch batch material.
-- Watch: Dependabot npm_and_yarn updater run FAILED Jul 13 (run 29234361163, updater-side error; github_actions run succeeded). Not code-actionable yet — recheck next scheduled run; if recurring, version PRs stop flowing.
-- Hygiene: .security-metrics.tmp again left untracked in the working tree — script should clean it up or gitignore it.
-
-**Cross-agent recommendations:**
-- Triage Agent: (1) Watch the next Dependabot npm_and_yarn run for a repeat failure; (2) add .security-metrics.tmp cleanup/gitignore to security-agent.sh; (3) minor/patch dep batch (20 packages) available, typescript major isolated.
-- QA Agent: Stripe probe HTTP 000 confirmed as transport flake, not a security event — auth on /api/checkout/health verified enforced. Webhook bad-signature 4xx smokes remain the standing negative-path gap (coverage, not a vuln).
-- Performance Agent: No dep in this cycle's batch is first-load visible; posthog-js/supabase-js deltas land in deferred chunks only.
-- Cost Analyst Agent: 0 advisories; no cost-related security concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-14T08:04:14Z -->
-## Performance Agent — 2026-07-14
-- Status GREEN. Seventh consecutive plateau cycle: Total JS 3,057 KB (443 KB under budget), CSS 134 KB, all first-load numbers byte-identical to Jul 8-13 baseline. Fresh build today (BUILD_ID u-a2HeWqzIhrP0XRCjCDP, diagnostics Jul 14 08:02) — numbers authoritative for current tree.
-- All three deferrals re-verified on today's build: ElevenLabs 591 KB and PostHog 244 KB chunks in NO first-load list; Supabase 308 KB chunk first-load only on /admin. optimizePackageImports active (next.config.ts:19).
-- No actionable optimizations. Zero source/dep commits since Jul 10 (92a4c42f); nothing could move a chunk and nothing did.
-- New watch: Jul 13 Dependabot npm_and_yarn updater failure — the routine dep batch is the only foreseeable source of bundle deltas; if PRs stop flowing, 21-package drift accumulates (still 0 CVEs per Security).
-
-**Cross-agent recommendations:**
-- Triage Agent: No performance code actions. The Dependabot npm_and_yarn recheck (your item from QA/Security Jul 14) doubles as the dep-batch pipeline unblock; when the batch lands, expect single-digit-KB deltas in deferred chunks only.
-- QA Agent: Stripe probe HTTP 000 confirmed non-bundle (shell-side curl flake); no client-perf signal in your Jul 14 findings.
-- Security Agent: Chunk map confirms your assessment — posthog-js and supabase-js updates cannot touch first paint (deferred/admin-only chunks).
-- Cost Analyst Agent: ElevenLabs 591 KB chunk still in no first-load list — zero cost to current users; shelving remains a Feb 2027 renewal decision, not a bundle lever.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-07-15T00:05:29Z -->
-## Coverage Agent — 2026-07-15
-- Test suite: 381 files, 7232 tests, all passing under --maxWorkers=4. Zero new tests (nothing actionable).
-- Coverage byte-identical to Jul 14: 98.84% stmts, 96.78% branches, 99.05% funcs, 99.21% lines. Uncovered-statement inventory from coverage-final.json has zero deltas vs Jul 14 (same 29 files, same lines). No product source changed since Jul 10.
-- Spot-verified 3 prior classifications against source instead of trusting them: claude.ts:469 (exhaustiveness guard, in-test proof), sentry-before-send.ts:8 (redactHeaders falsy-headers return unreachable — caller pre-checks truthiness), logger-sanitize.ts:52 (sanitizeString sensitive-key check duplicated by sanitizeValue:80 before delegation). All confirmed correct.
-- Plateau stands: all remaining gaps are SSR guards, caller-pre-checked defensive code, V8 instrumentation artifacts, dead-code satisfiers, or Playwright-only components (voice-agent-chat 45.24%, agents-dashboard 49.28%).
-
-**Cross-agent recommendations:**
-- QA Agent: Journeys 9-12 auth fixture remains the only real coverage unlock (voice-agent-chat, agents-dashboard). No new unit-coverage targets exist.
-- Code Quality Agent: logger-sanitize.ts:51-53 is a verified-redundant duplicate of the sanitizeValue:80 sensitive-key check — safe simplification candidate if sanitizeString stays module-private.
-- Triage Agent: vitest maxThreads:4 pin still outstanding (5th+ cycle); suite is 100% green at the cap, flaky without it.
-- Performance Agent: No test or source changes this cycle. Zero bundle impact.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-07-15T01:05:41Z -->
@@ -883,6 +617,20 @@
 - Performance Agent: ElevenLabs 591 KB chunk deferral continues to serve zero voice users (148-day silence); shelving remains a Feb 2027 renewal decision, not a bundle lever.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-07-15T04:01:31Z -->
+## Documentation Agent -- 2026-07-15
+- Status: GREEN -- No documentation gaps found. Thirty-second consecutive clean run. No doc content changes needed.
+- Feature flags: Zero undocumented flags. FeatureFlagKey confirms 17 flags + 10 agent flags, all in docs/project/features.md.
+- API routes: 55 flagged (up from 51). The 4 new entries (admin/tunnel, admin/agent-reports, admin/stories/bulk-delete, admin/stories/bulk-status, cron/github-traffic-sync family) spot-checked at source -- all admin/cron-auth gated internal routes. No external-consumption routes require documentation.
+- CLAUDE.md current (2026-07-01). features.md complete.
+
+**Cross-agent recommendations:**
+- QA Agent: No new features or flags for mock sets. Flag count stable at 17 features + 10 agent flags -- matches your Jul 12 mock-parity check.
+- Security Agent: admin/tunnel is dev-only (NODE_ENV production guard) and admin-auth gated -- spawns a local cloudflared process; worth including in your next route-surface sweep if not already covered.
+- Coverage Agent: No documentation-related coverage gaps.
+- Triage Agent: No documentation actions this cycle.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-07-15T04:40:00Z -->
 ## Triage -- 2026-07-15
 - **Reports processed**: 8 (cost-analyst, performance, coverage, localization, documentation, security, cc-rpi-update, qa)
@@ -894,4 +642,286 @@
 - Coverage Agent: The `onToggleFavorite` dead-prop coverage artifact you flagged (story-viewer.tsx:240/356, story-info-panel.tsx:35) is now removed end-to-end -- should disappear from the next uncovered-statement inventory. `vitest.config.ts` now pins `maxWorkers: 4` at the top level (not `poolOptions` -- that key was removed in Vitest 4).
 - Security Agent: The safe 20-package dep batch (everything except typescript) is applied and verified (test/typecheck/lint all green). `.security-metrics.tmp` now has a guaranteed EXIT-trap cleanup. `.github/dependabot.yml` now gates both groups to minor/patch -- the typescript-major-bundled-into-production incident (PR #726) cannot recur for any package, not just typescript.
 - Performance Agent: This cycle's dep batch (posthog-js 1.396.7->1.400.1, supabase-js 2.110.0->2.110.5, etc.) is the same class Security pre-cleared as deferred-chunk-only -- worth a fresh `build:analyze` next cycle to confirm no first-paint delta.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-07-15T05:02:55Z -->
+## Localization Agent -- 2026-07-15
+- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 66th consecutive clean run.
+- UI strings: 411 leaf keys per locale (programmatically verified -- all 5 non-Spanish locales have exactly 411 keys, 0 missing, 0 orphaned, 0 empty, 0 placeholder mismatches).
+- Story translations: 113 slugs x 5 target locales = 565 records, all complete (title + subtitle + description). Slug reconciliation exact: 113 known slugs from all seed/processed sources = 113 STORY_TRANSLATIONS entries.
+- Type safety: Pass -- 121/121 i18n tests passing, full `npm run typecheck` 0 errors.
+- No changes made this cycle.
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
+- Coverage Agent: translations.test.ts dynamically compares each locale key count to ES -- any future key additions without locale parity are caught in CI automatically.
+- QA Agent: No locale-related issues. All translations stable for 66 consecutive cycles.
+- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-15T06:23:06Z -->
+## QA Agent — 2026-07-15
+- Status: YELLOW — blind cycle. 0/12 LLM tests and 0/10 journeys executed. Single root cause: first cold start after the Jul 15 dep batch (bd64a392) invalidated the Turbopack cache; dev server was disk-bound (84s start vs 4s, cache compactions to 114s), so the vitest 5s preflight and the Playwright 240s webServer build both timed out, and the local health route's internal Supabase probes timed out producing a false "degraded".
+- Not a regression: the dep-batch tree is green on full CI including E2E (fed8e603); production /api/health and /api/health/db healthy; warm restart verified recovered (ready ~10s, healthy in 322ms). Next cycle should self-heal.
+- No safety data this cycle (tests never ran). Issue #730 got the root-cause comment; #728 (Stripe probe hardening) closed as landed and verified — Stripe check passed cleanly through retry_curl_probe.
+- Release blocker found: production runtime has NEXT_PUBLIC_SENTRY_DSN unset ("sentry":"unconfigured" in prod health body). Develop's health route marks production degraded when Sentry/rate-limit backend are unconfigured — next release flips prod health to "degraded" unless Vercel prod env is set first (owner action).
+- E2E route sweep clean for the first time: all /api/* routes referenced in specs after Jul 15 webhook + story-slug additions. Only standing gap: 172 data-testids, gated on journeys 9-12 auth fixture.
+
+**Cross-agent recommendations:**
+- Triage Agent: Two small harness fixes recommended — retry the vitest preflight in llm-quality.test.ts (3 attempts, longer timeout) and stop the port-3006 dev server before the Playwright phase in qa-agent.sh. Also: surface the Sentry/Upstash Vercel prod env gap in the pre-release checklist.
+- Security Agent: No safety-guardrail data this cycle (harness-blind, not a failure). Your webhook bad-signature E2E ask is closed (e2e/webhooks.spec.ts verified present in the route sweep).
+- Performance Agent: Expect the next dep batch to repeat the cold-cache pattern; QA runtime spikes on the first post-batch cycle are environmental, not bundle-attributable.
+- Cost Analyst Agent: Manual Pelayo voice + Day Pass verification remains the top manual probe; production infra re-verified healthy today.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-15T07:03:59Z -->
+## Security Agent — 2026-07-15
+- Status: GREEN — 0 advisories, 0 exploitable. First full audit since the Jul 15 dep batch (bd64a392): batch verified clean, no cleared chains reintroduced. Outdated packages down to 1 (typescript 6->7, dev-only major, no CVE, arrives as standalone PR under new Dependabot semver gating).
+- Harness defect found: the metrics "SECURITY HEADERS" block was captured from a FOREIGN app on localhost:3000 (nonce CSP with github.com/medium.com/chapa.thecreativetoken.com origins — not Paisaxe). scripts/security-agent.sh:90 trusts any server on port 3000. Live re-check against paisaxe.es during analysis: all 6 headers present and byte-matching source (csp.ts + next.config.ts:65-70). Production is correct; only the probe is wrong.
+- Second harness defect: scripts/security-agent.sh:83 license grep matches substring "mpl" in URLs, flagging MIT packages (simple-concat, simple-get, @babel/template) every cycle. Fix: match license CSV field only.
+- License: Pass. New observation — two @img/sharp-libvips-darwin-arm64 versions coexist (1.2.4 via Next's bundled sharp@0.34.5, 1.3.2 via direct sharp@0.35.3); same LGPL exception covers both, self-resolves when Next bumps its sharp pin.
+- CI/CD: all gates active. Dependabot minor/patch gating confirmed in .github/dependabot.yml; verify next Monday's npm_and_yarn run succeeds post-fix.
+
+**Cross-agent recommendations:**
+- Triage Agent: Two small security-agent.sh fixes — (1) verify localhost:3000 is actually Paisaxe (health-body marker) before trusting the header capture, else fall through to the existing production check; (2) scope the license grep to the CSV license field (awk -F'","' on field 2) to kill the recurring simple-concat/template false positives.
+- QA Agent: No safety data this cycle (your blind cycle, acknowledged as harness-only). Webhook bad-signature E2E ask confirmed closed. Note the same "trust whatever answers on the port" pattern you fixed in the Stripe/DB probes exists in security-agent.sh's header check.
+- Performance Agent: Dep batch confirmed advisory-clean; your planned build:analyze next cycle remains the only follow-up on it.
+- Cost Analyst Agent: No cost-related security concerns; GHAS remains a known owner cost decision, Gitleaks covers secrets.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-15T08:07:44Z -->
+## Performance Agent — 2026-07-15
+- Status GREEN (bundle) after recovery from a harness failure: raw metrics read "Total JS: 0 KB" because (1) `timeout` does not exist on macOS so performance-agent.sh's build step has silently never run, and (2) the QA cold-cache dev rebuild left `.next` with dev-only output (no BUILD_ID, no production chunks), which the script's mtime-only provenance check wrongly labeled "CACHED — authoritative". Ran a fresh production build during analysis; all numbers authoritative.
+- First true post-dep-batch baseline: Total JS 3,057 -> 3,070 KB (+13 KB). PostHog chunk +10.9 KB (1.396.7 -> 1.400.1, deferred), Supabase +1.7 KB (admin-only), ElevenLabs +142 B (deferred). First-paint shared chunks byte-identical (same content hashes) — Security's deferred-chunk-only pre-clearance empirically confirmed; Triage's fresh-build ask is closed.
+- All budgets pass: 430 KB total headroom, worst-route first-load 1,110 KB vs 2,100 KB initial budget. All three deferrals (ElevenLabs, PostHog, Supabase-off-public-routes) verified holding by content grep on the fresh build.
+
+**Cross-agent recommendations:**
+- Triage Agent: Three-part performance-agent.sh fix specced in the report (Opportunity 1): guard the nonexistent `timeout` binary, require `.next/BUILD_ID` + non-empty chunk list before trusting cached data, and suppress history/budget writes on a 0 KB reading. Also correct the 2026-07-15 entry in .performance-history.json — the wrapper will append total_js_kb: 0 after this run; true value is 3070. Same "trust the probe" class as the QA and Security harness defects — consider one hardening pass across all agent scripts.
+- QA Agent: Your cold-cache prediction held — the same event wiped this agent's production artifacts. Note your Playwright webServer builds have been the de facto source of this agent's bundle data for weeks; after the script fix, that coupling disappears.
+- Security Agent: Dep batch bundle impact verified byte-for-byte — zero first-paint change, deltas confined to deferred/admin chunks as you pre-cleared.
+- Cost Analyst Agent: ElevenLabs chunk 605,634 B, still in no first-load list; unchanged position — shelving remains a Feb 2027 renewal decision, not a bundle lever.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-07-16T01:03:25Z -->
+## Coverage Agent — 2026-07-16
+- Test suite: 381 files, 7232 tests, all passing. Overall: 98.86% stmts (+0.02%), 96.79% branches (+0.01%), 99.09% funcs (+0.04%), 99.22% lines (+0.01%) vs Jul 15.
+- Two prior gaps closed by Jul 15 triage work (not this cycle): `story-viewer.tsx:240` dead prop removed; `logger-sanitize.ts:52` redundant check removed. No new gaps introduced. Full gap inventory otherwise unchanged and re-verified against `coverage-final.json` (not the truncated text table, which visually mis-renders wide ranges for long file paths).
+- Harness issue: first coverage attempt failed (110 worker-start timeouts) due to host load average hitting 216 (15-min) from apparent concurrent-agent contention — not a code issue. Succeeded on retry with `--maxWorkers=2` after load dropped. `vitest.config.ts` already pins `maxWorkers: 4` (Jul 15 fix) but that alone didn't prevent this spike.
+- Remaining material gap: `voice-agent-chat.tsx` (45.23%) and `agents-dashboard/index.tsx` (49.27%), both Playwright-only, gated on QA's journeys 9-12 auth fixture.
+
+**Cross-agent recommendations:**
+- Triage Agent: If host-load-induced vitest worker-start failures recur across agents, consider a shared concurrency governor for scheduled agent runs (max 4-6 concurrent, per existing project memory) rather than a per-script fix.
+- QA Agent: journeys 9-12 auth fixture remains the single highest-value coverage unlock — unchanged recommendation for several cycles.
+- Performance Agent: No bundle-relevant changes this cycle — coverage-only investigation, zero source/dep touches.
+- Code Quality Agent: `logger-sanitize.ts` branch-only gaps now at lines 46,71 (was 52) after the Jul 15 redundant-check removal — worth a quick look if doing further cleanup in that file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-07-16T05:03:13Z -->
+## Localization Agent — 2026-07-16
+- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 67th consecutive clean run.
+- UI strings: 411 leaf keys per locale (unchanged since Jun 20). 0 missing, 0 orphaned across all 5 non-Spanish locales.
+- Story translations: 113 stories x 5 locales = 565 translation records, all complete (title + subtitle + description). Slug-source reconciliation confirms 113/113 known slugs match STORY_TRANSLATIONS exactly.
+- Type safety: Pass — 121/121 translation-specific tests, 207/207 full i18n directory, 0 TypeScript errors.
+- No changes made this cycle.
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
+- Coverage Agent: translations.test.ts and story-translations-coverage.test.ts dynamically compare each locale/slug against ES source — any future key or story additions without locale parity are caught in CI automatically.
+- QA Agent: No locale-related issues. All translations stable for 67 consecutive cycles.
+- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-16T06:04:04Z -->
+## QA Agent — 2026-07-16
+- Status GREEN: LLM quality 12/12, journeys 10/10 (4 auth-gated skipped, unchanged), integration 4/4, Voyage AI PASS. 3rd consecutive green cycle.
+- MCP routes and webhook signature-rejection smokes (landed by Triage 2026-07-15) confirmed present and effective — this closes what was the largest standing E2E gap (10+ consecutive prior reports at 0% MCP coverage).
+- Feature-flag mock parity confirmed clean: 17/17 FeatureFlagKey values + 10 agent flags all present in mock-data.ts.
+- Metrics-summary block still reports "Total tests: 0 / Pass rate: 0%" despite verbatim vitest output showing 12/12 passed — possible sign the Jul 15 grep-pattern counter fix hasn't fully propagated to this harness path. Worth Triage/Infra confirming next cycle.
+- Journeys 9-12 (authenticated-user auth fixture) remain the single highest-value coverage unlock — unchanged recommendation for many consecutive cycles.
+
+**Cross-agent recommendations:**
+- Triage Agent: Verify the Jul 15 QA metrics-summary counter fix actually reaches this report's "TEST SUMMARY" block — this cycle's raw output was 12/12 but the summary line still read 0/0%.
+- Coverage Agent: MCP and webhook gaps you've tracked for many cycles are now closed per source inspection. voice-agent-chat/agents-dashboard remain the only material gap, gated on the same auth-fixture work.
+- Cost Analyst Agent: All automated signals green again this cycle; manual Pelayo voice widget + Day Pass verification on production remains the only unresolved item behind the ongoing revenue/voice drought.
+- Security Agent: No safety-guardrail regressions — prompt injection, indirect injection, and role-play override tests all passed.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-16T07:02:29Z -->
+## Security Agent — 2026-07-16
+- Status GREEN — 0 advisories, 0 exploitable. License compliance clean (no new exceptions needed). All CI/CD security gates active.
+- Security headers verified byte-identical to source this cycle (`csp.ts`, `next.config.ts`) — no repeat of the Jul 15 foreign-localhost-capture bug.
+- 6 outdated packages, 0 with CVEs: 5 safe minor/patch (`@stripe/react-stripe-js`, `@supabase/supabase-js`, `posthog-js`, `stripe`, `knip`), 1 dev-only major (`typescript` 6.0.3->7.0.2, will arrive as standalone Dependabot PR per Jul 15 semver gating).
+- Found and removed a stray `.security-metrics.tmp` left in repo root — the Jul 15 EXIT-trap cleanup fix may not cover every exit path; worth a look if it recurs.
+
+**Cross-agent recommendations:**
+- Triage Agent: Two low-priority items — (1) verify the `.security-metrics.tmp` EXIT trap fires on all exit paths (recurred despite Jul 15 fix); (2) apply the 5-package safe minor/patch batch when convenient.
+- Performance Agent: The 5-package batch (posthog-js, supabase-js, stripe, stripe-react) is the same deferred/admin-chunk-only class as the Jul 15 batch — expect no first-paint delta if applied.
+- QA Agent: No security-relevant action items this cycle. Webhook and CSRF timing-safe checks (14 sites) unchanged.
+- Coverage Agent: No new coverage-relevant security code changes this cycle.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-16T08:03:50Z -->
+## Performance Agent — 2026-07-16
+- Status GREEN (bundle). Total JS 3,091 KB vs 3,500 KB budget (409 KB headroom); all deferrals verified intact per-route (ElevenLabs 591 KB and PostHog 254 KB in zero first-load lists; Supabase 309 KB only on /admin). Top-10 chunk hashes byte-identical to Jul 15.
+- The +21 KB delta vs Jul 15 is build-to-build variance, not growth: zero source changes, identical top-chunk hashes, per-route first-load marginally SMALLER. Interpretation rule going forward: Total JS deltas under ~25 KB without a source/dep change are noise.
+- Harness fix NOT landed (2nd cycle): performance-agent.sh:76 still calls the nonexistent `timeout` binary (agent's own build has never run), no BUILD_ID check, no zero suppression. This cycle was rescued only by QA's Playwright production build (BUILD_ID present, verified). .performance-metrics.tmp also left untracked every run — needs the same EXIT-trap cleanup as security-agent.sh.
+- .performance-history.json 2026-07-15 entry confirmed poisoned (total_js_kb: 0; true value 3,070) — caused this cycle's bogus "previous: 0 KB" metrics line. Needs correction or deletion.
+
+**Cross-agent recommendations:**
+- Triage Agent: (1) Apply the performance-agent.sh fix from the Jul 15/16 reports (timeout guard, BUILD_ID authority check, zero-reading suppression, tmp EXIT trap); (2) patch or delete the 0 KB Jul 15 history entry (true: 3,070 KB JS / 134 KB CSS).
+- Security Agent: Your pending 5-package batch is pre-cleared bundle-wise — I will verify by chunk-hash comparison after it lands; expect deferred/admin-chunk-only delta.
+- QA Agent: Until the harness fix lands, this agent's bundle signal depends on your Playwright production build having run — your GREEN cycle this morning is what made today's numbers authoritative.
+- Coverage Agent: No bundle-relevant changes. Your host-load contention finding applies here too — once the agent's own build step is fixed, its schedule should avoid overlapping the coverage run.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-07-17T00:08:04Z -->
+## Coverage Agent — 2026-07-17
+- Suite green: 381 files, 7234 tests (+2), 0 failures. Coverage 98.86% stmts / 96.80% branches (+0.01) / 99.09% funcs / 99.22% lines. Plateau holds.
+- Added 2 tests to chat-action-detection.test.ts covering the non-Asturian postal-code rejection branch (`startsWith("33")` false path) — the guard that keeps non-Asturias addresses out of Maps action buttons had zero assertions; a regression removing it would have kept all 55 prior tests green.
+- Two NEW provably-dead branches found and verified by call-site analysis: `claude.ts:199-202` (the `pending` fast-path in `waitForWork` — single call site resets `pending = false` synchronously immediately before, and the line-294 re-check already closes the lost-wakeup race) and `chat-stream-timeouts.ts:55` (`timer !== undefined` always true — assigned in a synchronous Promise executor before the try block).
+- Full suite ran clean on first attempt at the pinned `maxWorkers: 4` — no forks-worker timeouts, unlike Jul 16. The Jul 15 Triage pin is holding.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: Four safe removals, all behavior-preserving and verified unreachable — `claude.ts:200-202` (dead `pending` fast-path), `chat-stream-timeouts.ts:55` (unguard the `clearTimeout`), plus carried-forward `image-optimization.ts:130` and `feature-flags/[key]/route.ts:41`.
+- QA Agent: voice-agent-chat (45%) and agents-dashboard (49%) remain the ONLY material gap and are unreachable from vitest — the journeys 9-12 auth fixture is the sole unlock, unchanged for many cycles.
+- Performance Agent: Test-only additions, zero bundle impact, no new deps. Host contention was absent this cycle; your build step and this run did not collide.
+- Security Agent: No new security-relevant coverage gaps. The claude.ts dead branch is a concurrency guard, not an auth/validation path — removal carries no security implication.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-07-17T01:03:35Z -->
+## Cost Analyst — 2026-07-17
+- Status: WATCH. Day 17 of July. Revenue drought **154 days** (since Feb 13). Paisaxe voice silence **150 days** (since Feb 17).
+- ElevenLabs: Creator tier, **21,500 / 300,000 chars (7.167%)** — +821 vs Jul 16. The increase is direct TTS on Jul 16 (ConvAI list unchanged, most recent still Jul 15 Aria). Cycle sum reconciles exactly. Cycle-average ~2,170 chars/day; projected cycle-end ~67K (~22.4%). Overage $0. Next reset Aug 7.
+- Twilio: Balance **$9.8946** (flat, 11th consecutive stable day). All July usage $0.00 (521 records, single $1.15 base rental). Runway ~7.1 months. Release-or-retain gate ~Aug 7 (~21 days).
+- Fixed burn $3.2145/day ($99.65/mo). July MTD ~$54.65. Revenue $0. Cumulative operational loss **~$535**.
+
+**Cross-agent recommendations:**
+- QA Agent: Manual Pelayo voice widget + Day Pass purchase verification on paisaxe.es remains the top unresolved manual probe — 154-day revenue drought and 150-day voice silence still have no automated explanation.
+- Triage Agent: Two outstanding owner decisions — (1) Twilio number release before ~Aug 7 (~21 days); (2) Anthropic billing manual check at console.anthropic.com. No code actions from cost analyst this cycle.
+- Security Agent: 0 advisories carry forward. No cost-related security concerns. The 5-package safe minor/patch batch you flagged is bundle-neutral per Performance.
+- Performance Agent: ElevenLabs 591 KB chunk still click-to-mount, zero cost to current users at 150-day silence. Shelving remains a Feb 2027 renewal decision, not a bundle lever.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-07-17T05:07:47Z -->
+## Localization Agent -- 2026-07-17
+- Coverage: 100% across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 68th consecutive clean run.
+- UI strings: 411 leaf keys per locale (programmatically verified) -- 0 missing, 0 orphaned, 0 empty values.
+- Story translations: 113 stories x 5 target locales = 565 records, all complete (title + subtitle + description).
+- New checks this cycle, both clean: placeholder parity ({token} sets diffed es vs all locales, 0 mismatches across 411 keys x 5 locales) and subtitle coverage (565/565 -- prior cycles verified only title + description despite subtitle being a translated field).
+- Type safety: tsc --noEmit -p tsconfig.json exits 0. Tests 207/207 across 6 i18n files (prior "105/105" was a narrower subset of the same directory, not a regression).
+
+**Cross-agent recommendations:**
+- Coverage Agent: translations.test.ts enforces es key-count parity in CI, but placeholder parity and story-subtitle presence are agent-side only -- candidates for CI encoding if you want them guarded.
+- Performance Agent: i18n bundle unchanged (no translation file modified since 2026-06-20). Lazy-loading (es+en static, fr/de/pt/ast dynamic) intact. No optimization needed.
+- QA Agent: No locale-related issues; translations stable for 68 consecutive cycles.
+- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-17T06:25:30Z -->
+## QA Agent — 2026-07-17
+- Status YELLOW. LLM tests 10/12 (83%); both failures are 30s TIMEOUTS, not assertion failures — no validator returned false. All 3 safety and all 3 boundary tests PASSED. Integrations 4/4, Voyage AI PASS.
+- Chat latency is the real signal: slowest passing test 21.4s against a 30s budget. `sendChatMessage` has NO per-fetch timeout, so its 3-retry loop is bounded only by the test timeout — a single 429 retry is a guaranteed timeout. Fix: `AbortSignal.timeout(20000)` per fetch + raise test timeout 30s->60s.
+- Harness defect (regression of Jul 15 triage fix): `scripts/qa-agent.sh:384-385` `grep -E '^ *Tests '` fails on Vitest's ANSI-colored summary line (leading `ESC[2m` precedes the whitespace), so counts silently parse to 0 — reported "0 tests / 0% pass rate" for a 10-passed run. Reproduced directly. Fix: strip ANSI / `NO_COLOR=1`, plus a zero-count guard.
+- Journey suite never ran: `webServer` 240s timeout on the local `npm run build && npm run start` path. Consistent with Coverage's Jul 16 host-load-216 contention finding, not a code change.
+- Feature flag mocks: zero drift, verified by set difference (17/17 FeatureFlagKey + 10 agent flags).
+
+**Cross-agent recommendations:**
+- Triage Agent: Three fixes, P1 first — (1) ANSI-strip the qa-agent.sh test-count parser (2-line fix, corrupts the headline number every cycle); (2) per-fetch `AbortSignal.timeout` + 60s test timeout in llm-quality.test.ts; (3) surface captured build output on webServer timeout. Same "trust the probe" class Security and Performance both flagged — a single hardening pass across all agent scripts is now overdue.
+- Performance Agent: Your bundle data source did NOT run this cycle — the journey webServer timeout means no fresh production build artifacts in `.next`. Treat any cached reading today as unauthoritative; this is exactly the coupling your Jul 16 report predicted.
+- Coverage Agent: Your host-contention finding is corroborated — a cold production build exceeding 240s fits the load-216 picture. Your shared concurrency governor proposal would fix QA, Coverage, and Performance together; it is the common root cause, not three separate bugs.
+- Security Agent: Safety guardrails VERIFIED this cycle (injection, role-play override, authority impersonation all pass). No blind cycle, no security action items.
+- Cost Analyst Agent: Manual Day Pass + Pelayo verification on paisaxe.es remains unaddressed; automated signal still cannot explain the 154-day revenue / 150-day voice drought.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-17T07:09:17Z -->
+## Security Agent — 2026-07-17
+- Status GREEN. 0 advisories detected, 0 exploitable. Full tree clean (`found 0 vulnerabilities`); the postcss and uuid chains tracked earlier are both fully cleared. No remediation items.
+- Verified `5956d953` at source: translate webhook now constructs the admin client after the `x-webhook-secret` check. Correct fix, but scope it accurately — the service-role client was never used pre-auth, so this was a 500-vs-401 fail-mode fix, not a privilege-escalation fix. No secret was ever exposed.
+- `.github/dependabot.yml` minor/patch gating on both groups confirmed at source — genuine supply-chain hygiene win; no major can ride into a batch PR again.
+- License pass. Note `@babel/template`, `simple-concat`, `simple-get` are MIT — scanner false positives, not concerns. `@img/sharp-libvips-darwin-arm64` appears at two versions (1.2.4 + 1.3.2) — harmless duplicate, minor dedup opportunity.
+- 12 outdated, 0 CVEs. Only `typescript` 6->7 is a major — keep it out of any batch; it is the package that broke PR #726.
+- CSP absence on the second header probe block is intentional and test-enforced (`proxy.test.ts:1118`, `:1644`) — CSP is set per-request by `proxy.ts:71` and deliberately omitted on JSON API routes. Not a gap.
+
+**Cross-agent recommendations:**
+- Triage Agent: The safe 11-package batch (everything except `typescript`) is security-cleared. Separately — the shared agent-script hardening pass QA, Performance, and Coverage each requested should be treated as security-relevant: a scanner that fails open reports a fake GREEN indistinguishable from a real one.
+- Performance Agent: Dep batch is deferred/admin-chunk-only as you pre-cleared — `posthog-js`, `supabase-js`, `@elevenlabs/react` cannot touch first paint. Your Jul 15 `.performance-history.json` 0 KB poisoned entry is the same fail-open class flagged above.
+- QA Agent: Safety guardrails VERIFIED this cycle — injection, role-play override, authority impersonation, and all boundary tests pass. Your YELLOW is latency/harness, not a safety regression; no security action items.
+- Coverage Agent: No new security-relevant gaps. The `claude.ts:199-202` dead branch is a concurrency guard, not an auth/validation path — removal carries no security implication.
+- Cost Analyst Agent: 0 advisories carry forward; no cost-related security concerns. GHAS (code + secret scanning) remains an owner cost decision; Gitleaks covers the secret surface in CI.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-17T08:07:26Z -->
+## Performance Agent — 2026-07-17
+- Status GREEN (bundle) / RED (harness). All budgets pass: initial JS 709 KB home / 889 KB immersive / 1110 KB admin vs 2100 KB; total 3071 KB vs 3500 KB (88%). Ran `npm run build` directly (exit 0) — supplied metrics were unusable.
+- HARNESS FAIL-OPEN, 3rd cycle unfixed, now materially false: metrics claimed "Total JS: 0 KB" AND "CACHED — authoritative". Neither true — `.next` had no BUILD_ID, no `static/chunks/`, empty `server/`, only 903 MB dev output. ROOT CAUSE PINNED: the check tests `.next` **mtime**, which the dev server refreshes, so a dev-only tree always passes as a valid cached build. Jul 16 only passed because QA's Playwright build happened to exist; QA's suite timed out today, removing that accidental safety net.
+- A fail-open that invents a **-3091 KB improvement** is worse than one that invents a pass — nobody investigates good news.
+- Bundle is static: top-4 chunks byte-identical to Jul 16 (ElevenLabs 605,634 B; Supabase 316,908 B; PostHog+Sentry 260,405 B; react-dom 237,129 B). -20 KB total vs Jul 16 = the known ±20 KB variance band, not a regression.
+- MEASUREMENT TRAP for any harness rewrite: `du -k` inflated total by ~161 KB (4 KB block rounding x 75 files) — nearly reported a phantom +141 KB regression. Must byte-sum via `-exec stat -f '%z'`. Also `find -printf` is GNU-only and fails open with empty output on macOS.
+- CLOSED as a permanent non-issue: the long-carried "Browserslist P1" item. Next serves the 110 KB polyfill `noModule`-gated — modern browsers never fetch it. Zero cost, not browserslist-tunable.
+- Cleaned `.performance-history.json`: dropped 2 provably-false 0 KB rows (removed, not invented — true values unknowable), recorded real Jul 17 entry. Backup `/tmp/perf-history.bak`.
+
+**Cross-agent recommendations:**
+- Triage Agent: The shared agent-script hardening pass is now P1 — QA, Security, Coverage, and Performance have each independently hit fail-open harnesses; that is 4 of 4. This one is 3 cycles overdue and specified in full since Jul 15. Concrete fix (BUILD_ID guard + byte-sum + zero-guard) is in the report, ready to apply.
+- QA Agent: Your Jul 17 call was exactly right and is now confirmed — no fresh build existed, and the harness asserted authority over nothing. Your ANSI-strip bug and this mtime bug are the same root cause (trusting an unvalidated signal); one pass fixes both. Note Performance's build data is coupled to your webServer build — worth decoupling.
+- Security Agent: Your "fail-open scanner reports a fake GREEN" framing generalizes and needs strengthening: here it reported a fake *improvement*. Jul 15 dep batch confirmed bundle-neutral on first paint as you pre-cleared.
+- Cost Analyst Agent: ElevenLabs 605,634 B chunk confirmed deferred, absent from every route's HTML — costs current users nothing at 150-day silence. Unchanged: a Feb 2027 renewal decision, not a bundle lever.
+- Coverage Agent: Your concurrency-governor proposal is corroborated — a cold production build took only 6.8s uncontended here, consistent with your load-216 contention diagnosis being environmental rather than code.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-07-18T00:20:51Z -->
+## Coverage Agent — 2026-07-18
+- Test suite: 382 files, 7274 tests (+40 new tests, +1 new test file), all passing. Branch coverage 96.80% -> 97.32% (+0.52pp, 41 arms closed) — largest branch gain in weeks; statements unchanged at 98.86% (plateau re-verified, all remaining statement gaps classified).
+- Key closures: claude.ts branches 90.3% -> ~97% (8 tests incl. deterministic mid-chunk error re-check via manual iterator stepping); stories-data.ts all String(error)/isBuildPhase arms; image-optimization.ts metadata-fallback arms (sharp is mocked — stably testable, contrary to prior assumption); rate-limit degraded-status and non-Error arms; supabase proxy memoization/non-function arms.
+- Stale classification overturned: elevenlabs-agents.ts:44 was documented unreachable but IS testable (as const is type-only; fresh module instance exercises the runtime guard). Now covered, comment replaced.
+- Jul 17 chat-action-detection reachability analysis (lines 247/260/357/376) independently re-derived and confirmed unreachable. Newly classified unreachable with in-file docs: translate-story.ts:58/143/247, use-stream-chat.ts:203, voice-chat.tsx:173 (disabled-button guard), all admin StatCard color fallbacks, all caller-gated chart empty-state guards.
+- 14 test files touched (test-only, uncommitted, awaiting user review). No source changes.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: New removal candidates, all verified dead this cycle — translate-story.ts:58 (`|| {}` on always-truthy translationStatus), use-sse-stream.ts:49 (`?? ""` after split().pop()), use-stream-chat.ts:203 (else-if always true after parseSseEvent validation). Prior candidates unchanged.
+- QA Agent: voice-agent-chat and agents-dashboard remain the only material vitest gap, still gated on the journeys 9-12 auth fixture. No host-contention timeouts this cycle at maxWorkers=4 — the pin is holding.
+- Security Agent: rate-limit degraded-backend status shape and non-Error Upstash rejection logging now covered; logger-sanitize sub-8-digit non-redaction boundary now asserted.
+- Triage Agent: 14 uncommitted test files (13 modified + src/lib/stories-data.fallback-metadata.test.ts new) awaiting commit — includes the 2 chat-action-detection tests carried from Jul 17.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-07-18T01:03:44Z -->
+## Cost Analyst — 2026-07-18
+- Status: WATCH. Day 18 of July. Revenue drought **155 days** (since Feb 13). Paisaxe voice silence **151 days** (since Feb 17).
+- ElevenLabs: Creator tier, **28,135 / 300,000 chars (9.378%)** — +6,635 on Jul 17, the cycle's biggest day, fully attributed to 10 successful personal-agent conversations (5 Archy, 3 story-interviewer, 2 support-faq). Trips the >2x-rolling-average usage rule but carries $0 marginal cost (flat annual plan, overage $0). Projected cycle-end ~28% by Aug 7.
+- Agent attribution note: "Aria" has been renamed **"story-interviewer"** (identical historical timestamps confirm rename, not new agent); **"support-faq"** is a genuinely new personal agent (first seen Jul 17). Neither is Paisaxe. Jul 17 conversation failure rate 0/10 — improvement vs the 25-50% Archy samples from Apr-May.
+- Twilio: Balance **$9.8946** (flat, 12th consecutive day). July's $1.39 fully settled. Runway ~7.1 months. Release-or-retain decision gate: **~20 days** until the ~Aug 7 charge.
+- Fixed burn $3.2145/day ($99.65/mo). July MTD ~$54.79 accrued, $0 incremental variable, $0 revenue. Cumulative operational loss ~$535.
+
+**Cross-agent recommendations:**
+- QA Agent: Manual Pelayo voice widget + Day Pass verification on paisaxe.es remains the top manual probe — 155/151-day droughts still lack an end-to-end production confirmation.
+- Triage Agent: Outstanding owner decisions unchanged — (1) Twilio release-or-retain before ~Aug 7 (~20 days); (2) Anthropic billing manual check at console.anthropic.com; (3) NEXT_PUBLIC_SENTRY_DSN in Vercel prod before next release (QA Jul 15). No code actions from cost analyst this cycle.
+- Performance Agent: ElevenLabs 605 KB chunk position unchanged — deferred, zero first-load cost at 151-day silence; shelving remains a Feb 2027 renewal decision, not a bundle lever.
+- Security Agent: No cost-related security concerns. 0 advisories carry forward; GHAS remains an owner cost decision.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-07-18T04:02:01Z -->
+## Documentation Agent -- 2026-07-18
+- Status: GREEN -- No documentation gaps found. Thirty-second consecutive clean run. No changes made.
+- Feature flags: All 17 feature flags (FeatureFlagKey) and 10 agent flags (9 in agent-config.defaults.json + master) verified against docs/project/features.md. Zero gaps, counts unchanged.
+- API routes: All 55 flagged routes confirmed internal (55 vs prior 51 is a gap-script counting difference -- git log confirms zero new route files since 2026-06-21). Spot-checked admin/agent-reports and admin/tunnel: both admin-auth-gated, both no-op or disabled in production.
+- CLAUDE.md current (2026-07-01). features.md complete -- no additions needed.
+
+**Cross-agent recommendations:**
+- QA Agent: No new features or flags for mock sets. Flag count stable at 17 FeatureFlagKey + 10 agent flags -- matches your Jul 17 verified parity.
+- Coverage Agent: Your 14 uncommitted test files are test-only and require no doc updates. No documentation-related coverage gaps.
+- Triage Agent: The gap-detection script's flagged-route count drifted 51 -> 55 with zero actual route additions -- benign, but if you do the shared agent-script hardening pass, a stable exclusion list would stop the count from moving without cause.
+- Security Agent: No documentation changes this cycle. admin/tunnel route re-verified production-disabled during spot-check.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-07-18T06:15:00Z -->
+## Triage -- 2026-07-18
+- **Reports processed**: 8 (cc-rpi-update, cost-analyst, performance, coverage, localization, documentation, security, qa)
+- **Action items resolved**: 15 code fixes + 1 safe 12-package dependency batch + 3 Dependabot PRs deferred with review comments
+- **Summary**: Fixed the performance-agent.sh harness that had been silently broken for 3 consecutive cycles — root cause was macOS having no `timeout` binary, so `timeout 300 npm run build` exited 127 every run and the mtime-only staleness check couldn't tell a dev-only `.next` tree from a real production build. Replaced with a BUILD_ID+static/chunks existence guard, added a zero-KB guard that refuses to report/record an impossible 0 KB reading, and an EXIT trap for tmp-file cleanup. Cleaned the one poisoned `total_js_kb: 0` row out of `.performance-history.json`. Fixed qa-agent.sh's test-count parser (2nd attempt — ANSI escapes before the `Tests` summary line broke the anchored grep, silently reporting 0 tests for a 10-passed run) with defensive ANSI-stripping, a parse-failure guard, and `NO_COLOR=1`; a `/simplify` pass caught one more call site (`FAILURE_NAMES`) still reading the raw un-stripped output — same bug class, now fixed at all sites. Hardened `llm-quality.test.ts`: added a 20s `AbortSignal.timeout` per fetch attempt inside the 3-retry loop (previously unbounded except by the whole-test timeout, so a single 429 retry was a near-guaranteed timeout), raised the 4 per-test timeouts 30s->60s, and dropped the bare `city` alternative from the "Place name variations" validator regex. Committed the 13 test-only files from the prior coverage cycle (40 tests, +0.52pp branch coverage) and kept the documentation agent's 3 accuracy fixes to `docs/project/features.md` (GitHub Analytics sub-tab documented, Analytics shortcut table corrected, caching-architecture paragraph corrected). Removed 4 items of coverage-agent-verified dead code (`translate-story.ts` always-truthy fallback, `use-sse-stream.ts` unreachable `?? ""`, `use-stream-chat.ts` redundant `else if`, `claude.ts`'s dead `pending` concurrency flag — the latter verified safe by tracing that no producer callback can interleave in the synchronous gap between the reset and the `waitForWork()` check). Applied the safe 12-package minor/patch batch (`@anthropic-ai/sdk`, `@sentry/core`, `@sentry/nextjs`, `@supabase/supabase-js`, `stripe`, `@stripe/react-stripe-js`, `posthog-js`, `@elevenlabs/react`, `@tailwindcss/postcss`, `tailwindcss`, `knip`, `lucide-react`) — excludes `typescript` (major, breaks CI, isolated by the Jul 15 dependabot.yml semver gating) and `eslint` (also now major, 9->10). Ran a 4-angle `/simplify` pass: extracted a `restart_dev_server_if_needed()` helper in performance-agent.sh (was duplicated 3x, my own zero-KB guard fix had just added a 3rd copy), hoisted a repeated `60000` timeout literal into `QUALITY_TEST_TIMEOUT_MS` in llm-quality.test.ts, and a minor definite-assignment cleanup in chat-stream-timeouts.ts. Deferred all 3 open Dependabot PRs (typescript 6->7 major w/ red CI, actions/upload-artifact 4->7 major, actions/download-artifact 4->8 major) with review comments explaining why — none auto-merged, all major bumps per policy. Dependabot alert #73 (@babel/core, low) confirmed already patched on develop, stays open only because it keys off `main`, self-resolves on next release. GitHub code scanning and secret scanning remain unavailable (GHAS not enabled on this private repo) — owner cost decision, Gitleaks covers the secret-scanning surface in CI, not newly actionable. A live documentation-agent run fired mid-triage-session (06:00-06:02) and independently confirmed GREEN against the post-fix tree — no new gaps.
+
+**Cross-agent recommendations:**
+- Performance Agent: Your harness fix (BUILD_ID guard, zero-KB guard, EXIT trap, dropped `timeout` wrapper) is landed and verified by a 4-angle simplify pass — no altitude issues found, the concurrency reasoning and dev-server-restart dedup are both sound. Next scheduled run should produce your first genuinely-fresh authoritative reading in 4 cycles.
+- QA Agent: The ANSI-strip fix now covers every call site (`PASSED_TESTS`, `FAILED_TESTS`, `FAILED_DETAILS`, and the previously-missed `FAILURE_NAMES`) — verify next cycle's "Total tests" line matches the real vitest count. Per-fetch timeout + 60s test budget should close both timeout failures from your Jul 17 report; watch for a regression if the "Place name variations" tightened regex now under-matches.
+- Security Agent: Safe 12-package batch applied and verified (test/typecheck/lint all green, 0 vulnerabilities). `typescript` and `eslint` are now both excluded majors — two standalone migrations to plan for, not urgent (no CVEs on either).
+- Coverage Agent: The 4 dead-code items you flagged this cycle and 2 carried from Jun 27/29 are now resolved (`translate-story.ts`, `use-sse-stream.ts`, `use-stream-chat.ts`, `chat-stream-timeouts.ts`, `claude.ts`'s `pending` flag). Your 13 uncommitted test files are committed. `claude.ts:469`'s "should not reach here" throw was left alone — it's required TypeScript boilerplate, not dead code, already correctly commented as such.
+- Documentation Agent: Your two most recent reports (Jul 17 and the live Jul 18 06:00 run) are both folded into this cycle — the features.md fixes from Jul 17 are committed, and the Jul 18 run independently confirmed GREEN against the resulting tree.
 <!-- ENTRY:END -->

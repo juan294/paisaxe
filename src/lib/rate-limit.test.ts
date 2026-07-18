@@ -301,6 +301,51 @@ describe("rate-limit", () => {
       });
     });
 
+    it("getRateLimitBackendStatus returns degraded upstash status after a failed Upstash call (line 178)", async () => {
+      vi.stubEnv("NODE_ENV", "test");
+      mockLimit.mockRejectedValue(new Error("Redis connection failed"));
+
+      const loggerModule = await import("./logger");
+      const errorSpy = vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(loggerModule.logger, "warn").mockImplementation(() => {});
+
+      await checkRateLimit("user1");
+
+      expect(getRateLimitBackendStatus()).toEqual({
+        backend: "upstash",
+        configured: true,
+        degraded: true,
+        reason: "upstash_unavailable",
+      });
+
+      vi.unstubAllEnvs();
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it("stringifies non-Error rejections from Upstash in the fallback log (line 233)", async () => {
+      vi.stubEnv("NODE_ENV", "test");
+      // Upstash client rejects with a plain string, not an Error instance
+      mockLimit.mockRejectedValue("socket hang up");
+
+      const loggerModule = await import("./logger");
+      const errorSpy = vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(loggerModule.logger, "warn").mockImplementation(() => {});
+
+      const result = await checkRateLimit("user1");
+
+      // Falls back to in-memory in dev/test
+      expect(result.allowed).toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[RATE_LIMIT_FALLBACK]",
+        expect.objectContaining({ error: "socket hang up" })
+      );
+
+      vi.unstubAllEnvs();
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
     it("BE-M1: emits logger.warn([RATE_LIMIT_DEGRADED]) with reason 'upstash_unavailable' in production fallback path", async () => {
       // In production Upstash fails → fail closed, but must still warn
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});

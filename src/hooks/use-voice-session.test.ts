@@ -182,6 +182,11 @@ describe("useVoiceSession", () => {
   // useState(getStoredState), and React DOM cannot execute without a window object.
   // This is a standard SSR safety pattern that can only be covered in a Node.js
   // server-side rendering environment (e.g., renderToString).
+  //
+  // Line 111: `typeof navigator !== "undefined" ? navigator.language : "en-US"`
+  // in useVoiceSession() is the same class of SSR guard. The "en-US" fallback arm
+  // is unreachable in jsdom because `navigator` always exists in a browser-like
+  // environment, and React DOM cannot render hooks without one.
 
   it("should handle localStorage.setItem throwing on resetSession", () => {
     // First set some valid state

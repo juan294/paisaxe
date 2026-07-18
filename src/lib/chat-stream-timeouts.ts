@@ -31,7 +31,7 @@ export async function withChatStreamStageTiming<T>(
 ): Promise<T> {
   const startedAt = Date.now();
   const timeoutMs = CHAT_STREAM_STAGE_TIMEOUTS_MS[stage];
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timer!: ReturnType<typeof setTimeout>;
   let timedOut = false;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -52,7 +52,9 @@ export async function withChatStreamStageTiming<T>(
     }
     throw error;
   } finally {
-    if (timer !== undefined) clearTimeout(timer);
+    // timer is always assigned synchronously by the Promise executor above
+    // before this finally block can run.
+    clearTimeout(timer);
     logger.info("[CHAT_STREAM_STAGE_TIMING]", {
       stage,
       durationMs: Date.now() - startedAt,

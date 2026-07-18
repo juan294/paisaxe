@@ -67,6 +67,13 @@ describe("sanitizeValue", () => {
       const result = sanitizeValue("code 1234");
       expect(result).toBe("code 1234");
     });
+
+    it("returns a phone-like match unredacted when it has fewer than 8 digits (line 46 false arm)", () => {
+      // "12-3456-7" matches the phone pattern shape (digit + 7 chars of [\d\s().-] + digit)
+      // but contains only 7 digits, so the replacer returns the original match.
+      const result = sanitizeValue("ref 12-3456-7 pendiente");
+      expect(result).toBe("ref 12-3456-7 pendiente");
+    });
   });
 
   describe("Email address redaction", () => {
@@ -183,6 +190,15 @@ describe("sanitizeValue", () => {
       const err = new TypeError("bad token sk_live_xyz");
       const result = sanitizeValue(err) as { name: string; message: string };
       expect(result.name).toBe("TypeError");
+    });
+
+    it("omits the stack when error.stack is undefined (line 71 falsy arm)", () => {
+      const err = new Error("boom");
+      err.stack = undefined;
+      const result = sanitizeValue(err) as { name: string; message: string; stack?: string };
+      expect(result.name).toBe("Error");
+      expect(result.message).toBe("boom");
+      expect(result.stack).toBeUndefined();
     });
   });
 

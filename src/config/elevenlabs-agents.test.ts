@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   ELEVENLABS_AGENT_IDS,
   ELEVENLABS_API_BASE,
@@ -69,11 +69,23 @@ describe("ElevenLabs Agent Configuration", () => {
       expect(() => getElevenLabsAgentId("penny")).not.toThrow();
     });
 
-    // Branch coverage note: line 44 `id.length > 0 ? id : undefined`
-    // The falsy branch (empty-string agent ID) is unreachable because all
-    // ELEVENLABS_AGENT_IDS values are non-empty string literals (`as const`).
-    // This is a defensive guard for deploys where agents haven't been set up yet.
-    // The branch can only be exercised by modifying the source constants, and
-    // mocking the module would only test the mock itself, not the real code path.
+    // Line 44 `id.length > 0 ? id : undefined` — the falsy branch is a defensive
+    // guard for deploys where agents haven't been set up yet (empty-string IDs).
+    // The IDs are hard-coded literals, so we exercise the branch by mutating a
+    // FRESH module instance (`as const` is type-only; the object is mutable at
+    // runtime). vi.resetModules + dynamic import keeps the statically-imported
+    // instance used by the other tests untouched.
+    it("returns undefined for a known agent whose ID is an empty string (unconfigured deploy)", async () => {
+      vi.resetModules();
+      const mod = await import("./elevenlabs-agents");
+      (mod.ELEVENLABS_AGENT_IDS as Record<string, string>).pelayo = "";
+
+      expect(mod.getElevenLabsAgentId("pelayo")).toBeUndefined();
+      // Other agents are still configured, so this exercises only the empty-ID guard
+      expect(mod.getElevenLabsAgentId("xander")).toBe(mod.ELEVENLABS_AGENT_IDS.xander);
+
+      // Drop the mutated instance so later dynamic imports get a clean copy
+      vi.resetModules();
+    });
   });
 });

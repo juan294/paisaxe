@@ -309,6 +309,31 @@ describe("readSseStream", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
+  it("skips empty segments produced by consecutive delimiters (line 52 false arm)", async () => {
+    const onEvent = vi.fn();
+    const onDone = vi.fn();
+    const onError = vi.fn();
+
+    // "\n\n\n\n" between events splits into ["data: ...a", "", "data: ...b", ""].
+    // After pop() the trailing "" goes to the buffer, leaving an empty middle
+    // segment that must hit the `if (line.trim())` false arm (no onEvent call).
+    const stream = makeStream([
+      `data: {"type":"text","content":"a"}\n\n\n\ndata: {"type":"text","content":"b"}\n\n`,
+    ]);
+
+    await readSseStream(stream, { onEvent, onDone, onError });
+
+    expect(onEvent).toHaveBeenCalledTimes(2);
+    expect(onEvent).toHaveBeenNthCalledWith(1, `data: {"type":"text","content":"a"}`);
+    expect(onEvent).toHaveBeenNthCalledWith(2, `data: {"type":"text","content":"b"}`);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  // Line 49 `lines.pop() ?? ""` — the `?? ""` arm is unreachable dead code:
+  // String.prototype.split always returns an array with at least one element,
+  // so pop() on its result can never return undefined. Documented, not tested.
+
   it("wraps a non-Error, non-DOMException thrown value in a new Error (line 78)", async () => {
     // This covers the final else branch: `err` is not an Error instance and does
     // not have both `name` and `message` properties, so it is wrapped via String().

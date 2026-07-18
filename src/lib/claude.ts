@@ -174,19 +174,18 @@ async function* streamWithCurl(
   //
   // Event-driven handoff (PE-M2): producers (stdout/close/error/abort) call
   // `wake()` whenever new work is available; the consumer loop below awaits a
-  // promise that resolves on the next `wake()`. A `pending` flag closes the
-  // classic lost-wakeup race — if a wake fires between the consumer draining
-  // the queue and re-awaiting, the next `waitForWork()` resolves immediately
-  // instead of blocking. This replaces the previous 100ms `setTimeout` poll,
-  // which masked the race at the cost of up to 100ms of added latency per gap.
+  // promise that resolves on the next `wake()`. This replaces the previous
+  // 100ms `setTimeout` poll, which added up to 100ms of latency per gap.
+  // No lost-wakeup guard is needed: the single call site always constructs
+  // this promise synchronously (no `await` in between) right after checking
+  // there's no pending work, and Node's single-threaded event loop cannot run
+  // a producer callback in that synchronous gap.
   const chunks: string[] = [];
   let resolveNext: (() => void) | null = null;
-  let pending = false;
   let done = false;
   let error: Error | null = null;
 
   const wake = () => {
-    pending = true;
     if (resolveNext) {
       const resolve = resolveNext;
       resolveNext = null;
@@ -196,11 +195,6 @@ async function* streamWithCurl(
 
   const waitForWork = () =>
     new Promise<void>((resolve) => {
-      if (pending) {
-        // Work arrived (or completed) before we started waiting — resume now.
-        resolve();
-        return;
-      }
       resolveNext = resolve;
     });
 
@@ -285,12 +279,7 @@ async function* streamWithCurl(
 
       if (done) break;
 
-      // Reset the pending flag, then wait for the next wake() (new chunk,
-      // close, error, or abort). The flag is consumed here so the next
-      // waitForWork() blocks until genuinely new work arrives.
-      pending = false;
-      // Re-check after clearing the flag to avoid a wake() that landed between
-      // the drain above and this reset being lost.
+      // Wait for the next wake() (new chunk, close, error, or abort).
       if (chunks.length === 0 && !done && !error) {
         await waitForWork();
       }

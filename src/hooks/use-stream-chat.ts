@@ -200,7 +200,9 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
               };
               return updated;
             });
-          } else if (event.type === "error") {
+          } else {
+            // event.type === "error" — the only remaining member of the
+            // ChatStreamEvent union once "text" and "done" are ruled out.
             // FE-H2: differentiate server-side error messages
             const isTimeout =
               event.message === "response_timeout" ||

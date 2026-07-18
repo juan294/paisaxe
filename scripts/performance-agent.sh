@@ -12,6 +12,7 @@ HISTORY_FILE="$PROJECT_DIR/.performance-history.json"
 METRICS_FILE="$PROJECT_DIR/.performance-metrics.tmp"
 
 mkdir -p "$LOG_DIR"
+trap 'rm -f "$METRICS_FILE"' EXIT
 
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
@@ -26,6 +27,14 @@ fi
 log_success "Feature flags enabled — proceeding with Performance Agent" | tee -a "$LOG_FILE"
 
 cd "$PROJECT_DIR"
+
+restart_dev_server_if_needed() {
+  if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
+    log_info "Restarting dev server..." | tee -a "$LOG_FILE"
+    cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
+    log_success "Dev server restarted" | tee -a "$LOG_FILE"
+  fi
+}
 
 # Performance budgets (split budget adopted 2026-04-04 — single 2,500 KB budget retired)
 # Raised 2026-05-02 to reflect structural growth since Apr 4 baseline (Wave 1+2 + dep bumps)
@@ -72,22 +81,24 @@ if [[ -n "$DEV_SERVER_PID" ]]; then
   log_success "Dev server stopped" | tee -a "$LOG_FILE"
 fi
 
-log_info "Building application (timeout: 300s)..." | tee -a "$LOG_FILE"
-if BUILD_OUTPUT=$(timeout 300 npm run build 2>&1); then
+log_info "Building application..." | tee -a "$LOG_FILE"
+# macOS has no `timeout` binary — do not wrap this in `timeout N ...`.
+# It silently exits 127, so the build step never actually runs and every
+# cycle falls through to the (previously unguarded) cached-data branch below.
+if BUILD_OUTPUT=$(npm run build 2>&1); then
   log_success "Build completed" | tee -a "$LOG_FILE"
 else
   FRESH_BUILD=false
-  if [[ -d ".next/static" ]]; then
+  # A cached .next tree is only a valid production build if BUILD_ID and a
+  # non-empty static/chunks directory both exist. Directory mtime is NOT a
+  # reliable signal — the dev server touches .next on every run, so a
+  # dev-only tree always looks "fresh" even with zero production chunks.
+  if [[ -f ".next/BUILD_ID" ]] && [[ -n "$(find .next/static/chunks -name '*.js' -type f 2>/dev/null | head -1)" ]]; then
     log_warn "Build failed. Using existing .next data for analysis." | tee -a "$LOG_FILE"
   else
-    log_error "Build failed and no existing .next/static data to analyze" | tee -a "$LOG_FILE"
+    log_error "Build failed and no valid production build in .next to analyze (missing BUILD_ID or static/chunks)" | tee -a "$LOG_FILE"
     echo "$BUILD_OUTPUT" >> "$LOG_FILE"
-    # Still try to restart dev server before exiting
-    if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
-      log_info "Restarting dev server..." | tee -a "$LOG_FILE"
-      cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
-      log_success "Dev server restarted" | tee -a "$LOG_FILE"
-    fi
+    restart_dev_server_if_needed
     exit 1
   fi
 fi
@@ -98,6 +109,14 @@ log_info "Analyzing bundle sizes..." | tee -a "$LOG_FILE"
 # Get JS bundle sizes
 TOTAL_JS_BYTES=$(find .next/static -name "*.js" -type f -exec stat -f%z {} + 2>/dev/null | awk '{s+=$1} END {print s}')
 TOTAL_JS_KB=$((TOTAL_JS_BYTES / 1024))
+
+# A 0 KB bundle is physically impossible for a built Next app — treat it as a
+# harness error, never as a real measurement, and never write it to history.
+if [[ "${TOTAL_JS_KB:-0}" -eq 0 ]]; then
+  log_error "Measured 0 KB total JS — refusing to report or record this as a real reading" | tee -a "$LOG_FILE"
+  restart_dev_server_if_needed
+  exit 1
+fi
 
 # Get largest chunks with their sizes
 LARGEST_CHUNKS=$(find .next/static -name "*.js" -type f -exec stat -f "%z %N" {} \; 2>/dev/null | sort -rn | head -10)
@@ -301,15 +320,7 @@ else
   echo "[$NEW_ENTRY]" > "$HISTORY_FILE"
 fi
 
-# Cleanup
-rm -f "$METRICS_FILE"
-
-# Restart dev server if we stopped it
-if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
-  log_info "Restarting dev server..." | tee -a "$LOG_FILE"
-  cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
-  log_success "Dev server restarted" | tee -a "$LOG_FILE"
-fi
+restart_dev_server_if_needed
 
 log_success "Performance report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== Performance Agent finished ===" | tee -a "$LOG_FILE"
