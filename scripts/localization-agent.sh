@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Localization Agent — Runs weekly (Sundays at 7:00 AM) via launchd (com.paisaxe.localization-agent)
+# Localization Agent — Runs weekly (Sundays at 7:00 AM) via launchd (com.paisaxe.localization-agent StartCalendarInterval Weekday=0)
 # Checks for missing translations across all locales and fills gaps automatically
 set -euo pipefail
 
