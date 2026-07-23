@@ -5,6 +5,7 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
+MODEL="claude-haiku-4-5-20251001"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/cost-analyst-agent-$(date +%Y-%m-%d).log"
 DOC_FILE="$PROJECT_DIR/docs/agents/cost-analyst-report.md"
@@ -52,6 +53,7 @@ SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-in
 # Run the cost analyst agent via Claude CLI in non-interactive mode
 # No server startup needed — Claude curls external APIs directly
 "$CLAUDE_BIN" -p \
+  --model "$MODEL" \
   --allowedTools 'Read,Write,Edit,Bash(curl*),Bash(date*),Bash(jq*),Glob,Grep' \
   >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
