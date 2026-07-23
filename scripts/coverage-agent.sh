@@ -5,6 +5,7 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
+MODEL="claude-haiku-4-5-20251001"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/coverage-agent-$(date +%Y-%m-%d).log"
 DOC_FILE="$PROJECT_DIR/docs/agents/coverage-report.md"
@@ -59,6 +60,7 @@ LOCK_ACQUIRED=true
 trap 'if [[ "$LOCK_ACQUIRED" == "true" ]]; then rmdir "$LOCK_DIR" 2>/dev/null || true; fi' EXIT
 
 "$CLAUDE_BIN" -p \
+  --model "$MODEL" \
   --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' \
   >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT

@@ -25,6 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 CLAUDE_BIN="${CLAUDE_BIN:-$HOME/.local/bin/claude}"
+MODEL="claude-haiku-4-5-20251001"
 AGENT_NAME="cc-rpi-update"
 REPORT_FILE="docs/agents/${AGENT_NAME}-report.md"
 UPDATE_INSTRUCTIONS="$CC_RPI_PATH/templates/commands/update.md"
@@ -109,6 +110,7 @@ echo "[$(date)] Blueprint: $CC_RPI_PATH"
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   if "$CLAUDE_BIN" -p "$PROMPT" \
+    --model "$MODEL" \
     --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git *)" \
     --permission-mode bypassPermissions \
     --output-format text \

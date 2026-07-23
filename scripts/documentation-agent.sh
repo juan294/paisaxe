@@ -5,6 +5,7 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
+MODEL="claude-haiku-4-5-20251001"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/documentation-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/documentation-report.md"
@@ -211,6 +212,7 @@ if [[ -n "$UNDOCUMENTED_ROUTES" ]] || [[ -n "$UNDOCUMENTED_FLAGS" ]]; then
 
   # Run Claude to update documentation
   "$CLAUDE_BIN" -p \
+    --model "$MODEL" \
     --allowedTools 'Read,Edit,Glob,Grep' \
     >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT

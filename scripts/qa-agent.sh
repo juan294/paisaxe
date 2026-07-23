@@ -5,6 +5,7 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
+MODEL="sonnet"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/qa-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/qa-report.md"
@@ -713,6 +714,7 @@ SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-in
 
 # Run Claude to analyze and write report
 "$CLAUDE_BIN" -p \
+  --model "$MODEL" \
   --allowedTools 'Read,Edit,Write,Glob,Grep' \
   >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
