@@ -153,6 +153,15 @@ export function buildAgentUpdateBody(
   };
 }
 
+export function formatProviderFailure(
+  operation: string,
+  status: number,
+  requestId?: string | null
+): string {
+  const request = requestId ? `, request ${requestId}` : "";
+  return `${operation} (${status}${request}).`;
+}
+
 export function buildToolCliArgs(
   operation: ToolOperation,
   options: ToolOptions
@@ -324,7 +333,11 @@ async function runDirectAgentOperation(
     });
   if (!update.ok) {
     throw new Error(
-      `ElevenLabs agent update failed (${update.status}): ${await update.text()}`
+      formatProviderFailure(
+        "ElevenLabs agent update failed",
+        update.status,
+        update.headers.get("request-id") ?? update.headers.get("x-request-id")
+      )
     );
   }
   const updated = (await update.json()) as {

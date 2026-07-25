@@ -3,6 +3,7 @@ import {
   buildAgentCliArgs,
   buildAgentUpdateBody,
   buildToolCliArgs,
+  formatProviderFailure,
 } from "./elevenlabs-scoped-ops";
 
 describe("Paisaxe-scoped ElevenLabs operations", () => {
@@ -109,5 +110,17 @@ describe("Paisaxe-scoped ElevenLabs operations", () => {
       agent: { prompt: Record<string, unknown> };
     };
     expect(conversationConfig.agent.prompt).toEqual({ tool_ids: ["tool-1"] });
+  });
+
+  it("reports provider failures without echoing response bodies", () => {
+    const message = formatProviderFailure(
+      "ElevenLabs agent update failed",
+      400,
+      "req-safe-123"
+    );
+    expect(message).toBe(
+      "ElevenLabs agent update failed (400, request req-safe-123)."
+    );
+    expect(message).not.toContain("secret");
   });
 });

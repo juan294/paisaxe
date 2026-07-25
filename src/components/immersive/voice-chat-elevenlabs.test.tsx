@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
+import { getElevenLabsLanguage } from "@/hooks/use-voice-session";
 import type { Story } from "@/types/immersive";
 
 // Mock ElevenLabs React hook
@@ -29,17 +30,22 @@ vi.mock("@/lib/localize-story", () => ({
 }));
 
 // Mock voice session hook
-vi.mock("@/hooks/use-voice-session", () => ({
-  useVoiceSession: () => ({
-    conversationCount: 0,
-    isReturning: false,
-    userLocale: "es-ES",
-    preferredLanguage: "Spanish" as const,
-    timeOfDay: "morning" as const,
-    incrementConversation: mockIncrementConversation,
-    resetSession: vi.fn(),
-  }),
-}));
+vi.mock("@/hooks/use-voice-session", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/hooks/use-voice-session")>();
+  return {
+    ...actual,
+    useVoiceSession: () => ({
+      conversationCount: 0,
+      isReturning: false,
+      userLocale: "es-ES",
+      preferredLanguage: "Spanish" as const,
+      timeOfDay: "morning" as const,
+      incrementConversation: mockIncrementConversation,
+      resetSession: vi.fn(),
+    }),
+  };
+});
 
 // Mock i18n
 vi.mock("@/lib/i18n", () => ({
@@ -623,9 +629,9 @@ describe("VoiceChatElevenLabs", () => {
     });
   });
 
-  describe("language override for non-Spanish (line 185)", () => {
-    it("should set language override to 'en' when preferredLanguage is not Spanish", async () => {
-      // Override voice session mock to return English preference
+  describe("app-selected language override", () => {
+    it("keeps the selected Spanish locale when the browser prefers English", async () => {
+      // Browser/session metadata says English, while the app language mock is Spanish.
       const voiceSessionModule = await import("@/hooks/use-voice-session");
       vi.spyOn(voiceSessionModule, "useVoiceSession").mockReturnValue({
         conversationCount: 2,
@@ -655,11 +661,12 @@ describe("VoiceChatElevenLabs", () => {
           expect.objectContaining({
             overrides: {
               agent: {
-                language: "en",
+                language: "es",
               },
             },
             dynamicVariables: expect.objectContaining({
-              preferred_language: "English",
+              user_locale: "es",
+              preferred_language: "Spanish",
               is_returning: "true",
               conversation_count: "2",
             }),
@@ -668,6 +675,13 @@ describe("VoiceChatElevenLabs", () => {
       });
 
       vi.restoreAllMocks();
+    });
+  });
+
+  describe("native language routing", () => {
+    it("maps French and Portuguese app selections to native presets", () => {
+      expect(getElevenLabsLanguage("fr")).toBe("fr");
+      expect(getElevenLabsLanguage("pt")).toBe("pt-br");
     });
   });
 
