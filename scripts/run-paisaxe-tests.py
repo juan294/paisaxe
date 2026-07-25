@@ -22,15 +22,12 @@ import sys
 import time
 import urllib.request
 import urllib.error
+import argparse
 from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-API_KEY = os.environ.get("ELEVENLABS_API_KEY", "").strip()
-if not API_KEY:
-    raise RuntimeError("ELEVENLABS_API_KEY is not set in the environment.")
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 IDS_PATH = os.path.join(SCRIPT_DIR, "../docs/agents/paisaxe-test-ids.json")
 PLAN_PATH = os.path.join(SCRIPT_DIR, "../docs/agents/paisaxe-voice-agent-test-plan.md")
@@ -40,26 +37,37 @@ PLAN_END = "<!-- LAST-RUN-END -->"
 POLL_INTERVAL_SECS = 4
 TIMEOUT_SECS = 300  # 5 minutes
 
+AGENT_ALIASES = {
+    "pelayo": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv",
+    "booking": "agent_5201kgm2956ge8ct95yxjas867z5",
+}
+
 
 # ---------------------------------------------------------------------------
 # API helpers
 # ---------------------------------------------------------------------------
 
 def api_get(path: str) -> dict:
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("ELEVENLABS_API_KEY is not set in the environment.")
     req = urllib.request.Request(
         f"https://api.elevenlabs.io{path}",
-        headers={"xi-api-key": API_KEY},
+        headers={"xi-api-key": api_key},
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read())
 
 
 def api_post(path: str, body: dict) -> dict:
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("ELEVENLABS_API_KEY is not set in the environment.")
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
         f"https://api.elevenlabs.io{path}",
         data=data,
-        headers={"xi-api-key": API_KEY, "Content-Type": "application/json"},
+        headers={"xi-api-key": api_key, "Content-Type": "application/json"},
         method="POST",
     )
     try:
@@ -108,26 +116,42 @@ def load_tests(filter_keys: list[str] | None = None) -> list[dict]:
 # Run & poll
 # ---------------------------------------------------------------------------
 
-def run_tests_by_agent(tests: list[dict]) -> list[tuple[str, list[dict]]]:
-    """Send tests grouped by agent_id. Returns [(invocation_id, group), ...]."""
+def run_tests_by_agent(
+    tests: list[dict],
+    branch_id: str | None = None,
+    repeat_count: int = 1,
+    batch_size: int | None = None,
+) -> list[tuple[str, list[dict]]]:
+    """Send tests grouped by agent and bounded batches."""
     by_agent: dict[str, list[dict]] = {}
     for t in tests:
         by_agent.setdefault(t["agent_id"], []).append(t)
 
     invocations = []
     for agent_id, group in by_agent.items():
-        print(f"  Sending {len(group)} tests to agent {agent_id}...")
-        payload = {"tests": [{"test_id": t["test_id"]} for t in group]}
-        resp = api_post(f"/v1/convai/agents/{agent_id}/run-tests", payload)
-        if "error" in resp:
-            print(f"  ERROR: {resp['error']}")
-            sys.exit(1)
-        inv_id = resp.get("id") or resp.get("invocation_id") or resp.get("test_invocation_id")
-        if not inv_id:
-            print(f"  ERROR: no invocation ID in response: {resp}")
-            sys.exit(1)
-        invocations.append((inv_id, group))
-        time.sleep(0.5)
+        size = batch_size or len(group)
+        for offset in range(0, len(group), size):
+            batch = group[offset:offset + size]
+            print(f"  Sending {len(batch)} tests to agent {agent_id}...")
+            payload = {
+                "tests": [{"test_id": t["test_id"]} for t in batch],
+                **({"branch_id": branch_id} if branch_id else {}),
+                **({"repeat_count": repeat_count} if repeat_count != 1 else {}),
+            }
+            resp = api_post(f"/v1/convai/agents/{agent_id}/run-tests", payload)
+            if "error" in resp:
+                print(f"  ERROR: {resp['error']}")
+                sys.exit(1)
+            inv_id = (
+                resp.get("id")
+                or resp.get("invocation_id")
+                or resp.get("test_invocation_id")
+            )
+            if not inv_id:
+                print(f"  ERROR: no invocation ID in response: {resp}")
+                sys.exit(1)
+            invocations.append((inv_id, batch))
+            time.sleep(0.5)
 
     return invocations
 
@@ -151,6 +175,38 @@ def poll_invocation(invocation_id: str, expected_count: int) -> dict:
         time.sleep(POLL_INTERVAL_SECS)
     print("\nTimeout waiting for results.")
     return {}
+
+
+def run_and_poll(
+    tests: list[dict],
+    branch_id: str | None,
+    repeat_count: int,
+    batch_size: int | None,
+) -> list[tuple[dict, list[dict]]]:
+    """Run bounded batches serially so provider concurrency cannot corrupt evidence."""
+    if not batch_size:
+        invocations = run_tests_by_agent(
+            tests,
+            branch_id=branch_id,
+            repeat_count=repeat_count,
+        )
+        return [
+            (poll_invocation(invocation_id, len(group) * repeat_count), group)
+            for invocation_id, group in invocations
+        ]
+
+    all_data: list[tuple[dict, list[dict]]] = []
+    for offset in range(0, len(tests), batch_size):
+        batch = tests[offset:offset + batch_size]
+        invocations = run_tests_by_agent(
+            batch,
+            branch_id=branch_id,
+            repeat_count=repeat_count,
+        )
+        for invocation_id, group in invocations:
+            data = poll_invocation(invocation_id, len(group) * repeat_count)
+            all_data.append((data, group))
+    return all_data
 
 
 # ---------------------------------------------------------------------------
@@ -307,42 +363,98 @@ def write_results_to_plan(
 # Main
 # ---------------------------------------------------------------------------
 
-def parse_args(argv: list[str]) -> tuple[list[str] | None, str]:
-    """Return (filter_keys_or_None, scope_label)."""
-    if not argv:
-        return None, "full suite"
-    if "--section" in argv:
-        idx = argv.index("--section")
-        section = argv[idx + 1]
-        all_tests = load_tests()
-        keys = [t["key"] for t in all_tests if t["key"].startswith(f"{section}.")]
-        return keys, f"section {section}"
-    return argv, ", ".join(argv)
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return parsed
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the billed Paisaxe ElevenLabs agent test suite."
+    )
+    parser.add_argument("test_ids", nargs="*", help="Test plan IDs such as 9.1")
+    parser.add_argument("--section", help="Run all test IDs in one section")
+    parser.add_argument(
+        "--agent",
+        help="Restrict to pelayo, booking, or an exact Paisaxe agent ID",
+    )
+    parser.add_argument("--branch", help="Exact ElevenLabs branch ID")
+    parser.add_argument("--repeat-count", type=positive_int, default=1)
+    parser.add_argument(
+        "--batch-size",
+        type=positive_int,
+        help="Maximum tests per provider invocation.",
+    )
+    return parser.parse_args(argv)
 
 
 def main():
-    filter_keys, scope = parse_args(sys.argv[1:])
+    args = parse_args(sys.argv[1:])
+    all_tests = load_tests()
+
+    filter_keys: list[str] | None = None
+    if args.section:
+        filter_keys = [
+            t["key"]
+            for t in all_tests
+            if t["key"].startswith(f"{args.section}.")
+        ]
+    elif args.test_ids:
+        filter_keys = args.test_ids
+
     tests = load_tests(filter_keys)
+
+    if args.agent:
+        agent_id = AGENT_ALIASES.get(args.agent, args.agent)
+        owned_ids = {t["agent_id"] for t in all_tests}
+        if agent_id not in owned_ids:
+            print("ERROR: --agent must resolve to a Paisaxe agent in the test registry.")
+            sys.exit(2)
+        tests = [test for test in tests if test["agent_id"] == agent_id]
 
     if not tests:
         print("No tests matched. Check your filter or run create-paisaxe-tests.py.")
         sys.exit(1)
+
+    if args.branch and len({test["agent_id"] for test in tests}) != 1:
+        print("ERROR: --branch requires a run scoped to exactly one agent.")
+        sys.exit(2)
+
+    scope_parts = []
+    if args.section:
+        scope_parts.append(f"section {args.section}")
+    elif args.test_ids:
+        scope_parts.append(", ".join(args.test_ids))
+    else:
+        scope_parts.append("full suite")
+    if args.agent:
+        scope_parts.append(f"agent {args.agent}")
+    if args.branch:
+        scope_parts.append(f"branch {args.branch}")
+    if args.repeat_count != 1:
+        scope_parts.append(f"repeat {args.repeat_count}")
+    if args.batch_size:
+        scope_parts.append(f"batch {args.batch_size}")
+    scope = " / ".join(scope_parts)
 
     print(f"\nRunning {len(tests)} Paisaxe tests ({scope})...")
     for t in tests:
         print(f"  [{t['key']}] {t['name']}")
 
     print()
-    invocations = run_tests_by_agent(tests)
-
-    print(f"\nPolling {len(invocations)} invocation(s)...")
-    all_data: list[tuple[dict, list[dict]]] = []
-    for inv_id, group in invocations:
-        data = poll_invocation(inv_id, len(group))
+    print("\nRunning and polling provider invocation(s)...")
+    all_data = run_and_poll(
+        tests,
+        branch_id=args.branch,
+        repeat_count=args.repeat_count,
+        batch_size=args.batch_size,
+    )
+    for data, _ in all_data:
         if not data:
             print("No result data returned.")
             sys.exit(1)
-        all_data.append((data, group))
 
     passed, failed, errors = print_results(all_data)
     write_results_to_plan(all_data, passed, failed, errors, scope)

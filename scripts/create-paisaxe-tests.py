@@ -512,9 +512,11 @@ TESTS = [
             {"role": "user", "message": "Sí, adelante.", "time_in_call_secs": 17},
         ],
         "success_condition": (
-            "Calls make_booking tool and reports the result honestly. "
-            "If the tool fails or times out, provides the restaurant's phone number so the user can call directly. "
-            "Does NOT say the booking is confirmed unless the tool returns a success."
+            "Pass if the agent calls make_booking with the venue, restaurant phone, party size, date, time, "
+            "customer name, and customer phone, and does not claim that the reservation is confirmed. "
+            "The test harness returns a synthetic testing_tool_result and may end before the agent receives a "
+            "normal post-tool turn, so a tool call followed only by that synthetic result is a complete success. "
+            "Fail if the agent omits required tool fields or falsely claims confirmation."
         ),
     },
 
@@ -610,9 +612,9 @@ TESTS = [
             {"role": "user", "message": "¿Cuánto cuesta la entrada al Museo de Bellas Artes de Asturias?", "time_in_call_secs": 0},
         ],
         "success_condition": (
-            "Either uses the search_places tool to find the price, or acknowledges it doesn't have "
-            "the specific current price and directs the user to check the official website. "
-            "Does NOT invent a price."
+            "Pass if the agent says entry is free (the documented policy), uses the search_places "
+            "tool, or directs the user to the official website for a current price. "
+            "Fail only if it invents a nonzero price or unsupported opening hours."
         ),
     },
     {
@@ -745,11 +747,13 @@ TESTS = [
         "agent": BOOKING_AGENT_ID,
         "name": "11.5 — Confirms booking and ends the call gracefully",
         "chat_history": [
-            {"role": "user", "message": "Perfecto, mesa para 4 personas, hoy a las 21:00, a nombre de Juan García López. Quedamos así.", "time_in_call_secs": 0},
+            {"role": "agent", "message": "Hola, llamo para hacer una reserva. Sería para cuatro personas, hoy a las nueve de la noche, a nombre de Juan García López.", "time_in_call_secs": 0},
+            {"role": "user", "message": "Perfecto, mesa para 4 personas, hoy a las 21:00, a nombre de Juan García López. Quedamos así.", "time_in_call_secs": 5},
         ],
         "success_condition": (
-            "Confirms the reservation details are correct. "
-            "Thanks the restaurant staff and says goodbye politely. "
+            "After the restaurant confirms the details, thanks the restaurant staff and closes politely. "
+            "A concise closing such as 'Perfecto, muchas gracias.' or "
+            "'Muchas gracias. Hasta luego.' is a complete success. "
             "Does not drag out the conversation after the booking is confirmed."
         ),
     },

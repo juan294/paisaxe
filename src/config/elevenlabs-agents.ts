@@ -24,7 +24,7 @@ export const ELEVENLABS_AGENT_IDS = {
   penny: "agent_1601kg4wghnzewc9aqpkf4r2fkfw",
 } as const;
 
-type ElevenLabsAgentId = keyof typeof ELEVENLABS_AGENT_IDS;
+export type ElevenLabsAgentKey = keyof typeof ELEVENLABS_AGENT_IDS;
 
 /**
  * Check if ElevenLabs agents are configured
@@ -40,6 +40,6 @@ export function getElevenLabsAgentId(agentId: string): string | undefined {
   if (!(agentId in ELEVENLABS_AGENT_IDS)) {
     return undefined;
   }
-  const id: string = ELEVENLABS_AGENT_IDS[agentId as ElevenLabsAgentId];
+  const id: string = ELEVENLABS_AGENT_IDS[agentId as ElevenLabsAgentKey];
   return id.length > 0 ? id : undefined;
 }
