@@ -29,10 +29,10 @@
             }
         },
         "tts": {
-            "model_id": "eleven_flash_v2",
+            "model_id": "eleven_v3_conversational",
             "voice_id": "EXAVITQu4vr4xnSDxMaL",
             "supported_voices": [],
-            "expressive_mode": false,
+            "expressive_mode": true,
             "suggested_audio_tags": [],
             "agent_output_audio_format": "pcm_16000",
             "optimize_streaming_latency": 3,
@@ -239,10 +239,10 @@
         "guardrails": {
             "version": "1",
             "focus": {
-                "is_enabled": false
+                "is_enabled": true
             },
             "prompt_injection": {
-                "is_enabled": false
+                "is_enabled": true
             },
             "content": {
                 "execution_mode": "streaming",

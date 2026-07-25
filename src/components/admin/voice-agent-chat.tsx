@@ -156,7 +156,21 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
       }
 
       await conversation.startSession({
-        agentId: selectedAgent.elevenLabsAgentId,
+        signedUrl: await (async () => {
+          const response = await fetch("/api/admin/voice-session", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...csrfHeaders(),
+            },
+            body: JSON.stringify({ agentKey: selectedAgent.id }),
+          });
+          const body = (await response.json()) as { signedUrl?: unknown };
+          if (!response.ok || typeof body.signedUrl !== "string") {
+            throw new Error("Signed voice session unavailable");
+          }
+          return body.signedUrl;
+        })(),
         connectionType: "websocket",
       });
     } catch (err) {

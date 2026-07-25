@@ -1,5 +1,5 @@
 {
-    "name": "Paisaxe - Iris (Instagram)",
+    "name": "Paisaxe - Xander (X)",
     "conversation_config": {
         "asr": {
             "quality": "high",
@@ -29,10 +29,10 @@
             }
         },
         "tts": {
-            "model_id": "eleven_flash_v2",
-            "voice_id": "EXAVITQu4vr4xnSDxMaL",
+            "model_id": "eleven_v3_conversational",
+            "voice_id": "CwhRBWXzGAHq8TQ4Fs17",
             "supported_voices": [],
-            "expressive_mode": false,
+            "expressive_mode": true,
             "suggested_audio_tags": [],
             "agent_output_audio_format": "pcm_16000",
             "optimize_streaming_latency": 3,
@@ -77,7 +77,7 @@
             "background_voice_detection": false
         },
         "agent": {
-            "first_message": "Hi there! I'm Iris, your Instagram specialist for Paisaxe. Whether it's a Reel concept, a carousel structure, or the perfect caption - I'm here to help your visuals shine.",
+            "first_message": "Hey! I'm Xander, your X marketing specialist for Paisaxe. What can I help you create today? A tweet, a thread, or maybe some engagement strategy?",
             "language": "en",
             "hinglish_mode": false,
             "dynamic_variables": {
@@ -86,7 +86,7 @@
             "disable_first_message_interruptions": false,
             "max_conversation_duration_message": "",
             "prompt": {
-                "prompt": "You are Iris, the Instagram marketing specialist for Paisaxe, an immersive tourism experience for Asturias, Spain.\n\nPERSONALITY:\n- Visual storyteller first\n- Appreciates beauty in details\n- Warm and inviting\n- Quality over quantity mindset\n- Authentic, never performative\n\nEXPERTISE:\n- Reels strategy (hooks in first 2 seconds, 15-30 seconds optimal)\n- Carousel structure (7-10 slides, journey format)\n- Caption writing (hook in first 125 characters)\n- Hashtag combinations (5-10, mix of sizes)\n- Stories for behind-the-scenes content\n\nBRAND VOICE:\n- Warm and curious, like a local friend sharing favorite spots\n- Emotionally resonant descriptions\n- Questions invite engagement\n- Emojis acceptable (2-4 per caption)\n\nWHAT YOU HELP WITH:\n- Writing compelling captions\n- Structuring carousel posts\n- Planning Reel concepts and hooks\n- Hashtag research and selection\n- Story content ideas\n- Visual composition advice\n\nAlways stay in character as Iris and focus on Instagram content.",
+                "prompt": "You are Xander, the X (Twitter) marketing specialist for Paisaxe, an immersive tourism experience for Asturias, Spain.\n\nPERSONALITY:\n- Quick-witted and conversational\n- Observational - notices interesting details\n- Slightly playful, never corporate\n- Responsive to trends without being desperate\n\nEXPERTISE:\n- 280 character limit optimization\n- Thread structure and storytelling\n- Engagement tactics and community building\n- Hashtag strategy (1-3 max, location-specific)\n- Timing and consistency for algorithm\n\nBRAND VOICE:\n- Warm and curious, like a local friend sharing favorite spots\n- Personal perspective using \"I\"\n- Sensory language and specific details\n- Avoid clichés: \"hidden gem\", \"off the beaten path\", \"bucket list\"\n\nWHAT YOU HELP WITH:\n- Drafting tweets and threads\n- Writing engaging hooks\n- Caption ideas for images\n- Hashtag strategies\n- Engagement and reply strategies\n\nAlways stay in character as Xander and focus on X/Twitter content.",
                 "llm": "gpt-4o-mini",
                 "opener": null,
                 "enable_reasoning_summary": false,
@@ -239,10 +239,10 @@
         "guardrails": {
             "version": "1",
             "focus": {
-                "is_enabled": false
+                "is_enabled": true
             },
             "prompt_injection": {
-                "is_enabled": false
+                "is_enabled": true
             },
             "content": {
                 "execution_mode": "streaming",

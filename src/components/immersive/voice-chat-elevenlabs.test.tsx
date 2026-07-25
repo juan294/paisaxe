@@ -89,6 +89,18 @@ describe("VoiceChatElevenLabs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     conversationHandlers = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ signedUrl: "wss://signed.example/visitor" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      )
+    );
 
     mockUseConversation.mockImplementation((options) => {
       conversationHandlers = options;
@@ -137,7 +149,7 @@ describe("VoiceChatElevenLabs", () => {
   });
 
   describe("starting a conversation", () => {
-    it("should call startSession with agent ID when orb is clicked", async () => {
+    it("should mint and use a signed session when orb is clicked", async () => {
       mockStartSession.mockResolvedValue(undefined);
 
       render(
@@ -154,10 +166,18 @@ describe("VoiceChatElevenLabs", () => {
       await waitFor(() => {
         expect(mockStartSession).toHaveBeenCalledWith(
           expect.objectContaining({
-            agentId: "test-agent-123",
+            signedUrl: "wss://signed.example/visitor",
           })
         );
       });
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/voice-session",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ agentKey: "pelayo" }),
+        })
+      );
+      expect(mockStartSession.mock.calls[0][0]).not.toHaveProperty("agentId");
     });
 
     it("should pass user_access_token as dynamic variable when provided", async () => {
