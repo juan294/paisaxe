@@ -1,0 +1,148 @@
+{
+  "id": "tool_4801kgqhsetdf3vr045n8r1h55js",
+  "tool_config": {
+    "type": "webhook",
+    "name": "make_booking",
+    "description": "Make an outbound call to a restaurant or business to book a reservation for the visitor. Use this AFTER you have collected ALL required info: venue name, phone (from search_places), party size, date, time, visitor's full name, and visitor's phone number.",
+    "response_timeout_secs": 20,
+    "disable_interruptions": true,
+    "interruption_mode": "disable_during_tool_and_turn",
+    "force_pre_tool_speech": false,
+    "pre_tool_speech": "auto",
+    "assignments": [],
+    "tool_call_sound": null,
+    "tool_call_sound_behavior": "auto",
+    "tool_error_handling_mode": "auto",
+    "dynamic_variables": {
+      "dynamic_variable_placeholders": {}
+    },
+    "execution_mode": "immediate",
+    "api_schema": {
+      "request_headers": {
+        "Content-Type": "application/json",
+        "x-mcp-secret": {
+          "secret_id": "[REDACTED]"
+        }
+      },
+      "url": "https://paisaxe.es/api/mcp/make-booking",
+      "method": "POST",
+      "path_params_schema": {},
+      "query_params_schema": null,
+      "request_body_schema": {
+        "description": "Booking request details. Before calling, you MUST have collected: venue_name and phone_number (from search_places), party_size, date, time, customer_name (full name), and customer_phone (visitor's callback number).",
+        "dynamic_variable": "",
+        "is_omitted": false,
+        "type": "object",
+        "required": [
+          "venue_name",
+          "phone_number",
+          "party_size",
+          "date",
+          "time",
+          "customer_name",
+          "customer_phone"
+        ],
+        "properties": {
+          "venue_name": {
+            "type": "string",
+            "description": "Name of the venue (restaurant, hotel, activity provider) to call",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "Phone number of the business (from search_places result)",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          },
+          "party_size": {
+            "type": "number",
+            "description": "Number of people for the reservation",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          },
+          "date": {
+            "type": "string",
+            "description": "Date for the reservation (e.g., 'hoy', 'mañana', 'el viernes', '15 de febrero')",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          },
+          "time": {
+            "type": "string",
+            "description": "Time for the reservation (e.g., '21:00', 'a las nueve de la noche')",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          },
+          "customer_name": {
+            "type": "string",
+            "description": "Visitor's FULL NAME for the reservation (e.g., 'Juan García López')",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          },
+          "customer_phone": {
+            "type": "string",
+            "description": "Visitor's phone number for the restaurant to call back if needed (e.g., '612345678', '+34612345678')",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          },
+          "special_requests": {
+            "type": "string",
+            "description": "Any special requests (e.g., 'trona para bebé', 'mesa en terraza', 'alergia al gluten')",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          }
+        }
+      },
+      "response_body_schema": null,
+      "response_filter": null,
+      "content_type": "application/json",
+      "auth_resolved_params": [],
+      "auth_connection": null
+    }
+  },
+  "access_info": {
+    "is_creator": true,
+    "creator_name": "juan294@gmail.com",
+    "creator_email": "juan294@gmail.com",
+    "role": "admin",
+    "anonymous_access_level_override": null,
+    "access_source": "creator"
+  },
+  "usage_stats": {
+    "total_calls": 12,
+    "avg_latency_secs": 1.48
+  },
+  "response_mocks": null
+}

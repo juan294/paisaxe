@@ -17,8 +17,8 @@ interface UseVoiceSessionResult {
   isReturning: boolean;
   /** Browser/device language from navigator */
   userLocale: string;
-  /** Preferred language for the agent (Spanish or English) */
-  preferredLanguage: "Spanish" | "English";
+  /** Browser-language hint for analytics; app-selected locale governs the agent */
+  preferredLanguage: "Spanish" | "English" | "French" | "Portuguese";
   /** Time of day for greeting customization */
   timeOfDay: TimeOfDay;
   /** Increment conversation count after a conversation completes */
@@ -43,6 +43,30 @@ export function getTimeOfDay(): TimeOfDay {
   } else {
     return "evening";
   }
+}
+
+export type ElevenLabsLanguage = "es" | "en" | "fr" | "pt-br";
+
+/**
+ * Maps Paisaxe locales to language presets that have verified native voices.
+ * Unsupported locales use English rather than silently selecting another
+ * locale-specific preset.
+ */
+export function getElevenLabsLanguage(locale: string): ElevenLabsLanguage {
+  if (locale.startsWith("es")) return "es";
+  if (locale.startsWith("fr")) return "fr";
+  if (locale.startsWith("pt")) return "pt-br";
+  return "en";
+}
+
+export function getPreferredLanguage(
+  locale: string
+): UseVoiceSessionResult["preferredLanguage"] {
+  const language = getElevenLabsLanguage(locale);
+  if (language === "es") return "Spanish";
+  if (language === "fr") return "French";
+  if (language === "pt-br") return "Portuguese";
+  return "English";
 }
 
 /**
@@ -111,9 +135,7 @@ export function useVoiceSession(): UseVoiceSessionResult {
       typeof navigator !== "undefined" ? navigator.language : "en-US";
 
     // Determine preferred language based on locale
-    const preferredLanguage: "Spanish" | "English" = userLocale.startsWith("es")
-      ? "Spanish"
-      : "English";
+    const preferredLanguage = getPreferredLanguage(userLocale);
 
     return {
       conversationCount: state.conversationCount,
