@@ -242,6 +242,11 @@ All env vars are documented in `.env.local`. Key groups: Anthropic, Voyage AI, E
 - **Pelayo**: Visitor-facing tourism guide (gated by `visitor_voice_agent` feature flag)
 - Xander, Iris, Penny: Admin-only social media marketing agents (in `src/agents/index.ts`)
 
+Before changing any provider configuration, read
+`docs/agents/elevenlabs-modernization-handoff.md`. It records the five-agent
+ownership boundary, zero-traffic candidates, unchanged Main privacy state,
+and the signed-session, language, and listening promotion gates.
+
 ### Admin Auth
 - Supabase Auth (Google OAuth) + `user_profiles.role = 'admin'`
 - Server: `validateAdminAuth()` checks cookies
