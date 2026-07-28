@@ -4,6 +4,22 @@ Model tier: **sonnet** — Sonnet 5 (1M context) session.
 
 Prepare and publish a new version release, adapted to the project type.
 
+> **Paisaxe: `docs/runbooks/release-checklist.md` is the procedural authority.**
+> This command handles versioning, CHANGELOG and the GitHub release. The *sequence* — identify
+> candidate, gates, merge, verify deployed identity, run required probes, analyze evidence,
+> obtain authorization, tag last — lives in the runbook. Where the two differ, the runbook wins.
+>
+> **The tag gate is hard: no tag without a passing analyzer run for the shipped tree.**
+>
+> ```bash
+> CANDIDATE_TREE=$(npx tsx scripts/release/candidate-identity.ts --tree origin/main)
+> npm run analyze-release -- --evidence "docs/release/evidence/${CANDIDATE_TREE}.yaml"
+> ```
+>
+> Exit 0 is the only green. A missing evidence file is a blocker, not an omission to work
+> around — a tag asserts that a specific tree was verified in production, and an unverified
+> tag is a false claim.
+
 ## Step 1: Orientation
 
 Gather release context before making any changes.
@@ -99,6 +115,9 @@ After the user provides a version number, prepare all files for release. Do not 
 ## Step 3: Publish
 
 After human approval, execute the release. The flow depends on the branching strategy detected in Step 1.
+
+**Before any tag is created**, the analyzer must exit 0 for the tree being tagged (see the note at
+the top of this file). If it blocks, fix the blockers and re-run — never tag past it.
 
 ### Main-only flow
 
