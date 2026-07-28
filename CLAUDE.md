@@ -78,55 +78,22 @@ develop   # Active development (DEFAULT)
 
 #### Release Process
 
-**Step 1: User requests a release.** The agent does NOT initiate this.
+**`docs/runbooks/release-checklist.md` is the single procedural authority.** Follow it; do not
+improvise a different sequence here or in any other file. Its ordering is:
 
-**Step 2: Agent prepares a release summary** (does NOT create the PR yet):
-```bash
-# Show what will be released
-git log main..develop --oneline
+1. Identify the candidate (by **tree hash** — squash merges do not preserve the tested SHA)
+2. Pre-deployment gates — full suite, `npm run check-migrations`, `npm run check-required-probes`,
+   `npm run prelaunch`, the 6 manual gates in `docs/operations/pre-launch-security-checklist.md`,
+   and the mutating probes against the **local Docker** stack
+3. Merge and deploy — user says "go ahead", then `gh pr merge --squash`
+4. Verify the deployed identity matches the candidate tree
+5. Run the required probes (`quality/required-probes.yaml`)
+6. Analyze the evidence — `npm run analyze-release`
+7. Obtain authorization
+8. **Tag last** — no tag without a passing analyzer run for the shipped tree
 
-# Verify all checks pass on develop
-gh run list --branch develop --limit 3
-
-# Run the full local test suite
-npm run test && npm run typecheck && npm run lint && npm run prelaunch
-
-# Explicit live integration gate (requires Stripe/Supabase QA credentials)
-npm run prelaunch:live
-```
-
-Also complete the 6 manual gates in `docs/operations/pre-launch-security-checklist.md`
-before the release PR is created.
-
-Present the summary to the user:
-- List of commits since last release
-- CI status on develop
-- Any known risks or breaking changes
-- Recommendation: safe to release or not
-
-**Step 3: User confirms.** Only after explicit "go ahead" or equivalent:
-```bash
-# Create the PR
-gh pr create --base main --head develop --title "Release: description of changes"
-
-# Wait for all 5 status checks to pass
-gh pr checks
-```
-
-**Step 4: User authorizes merge.** Report CI status and wait for the user to say "merge it":
-```bash
-# Merge once user confirms
-gh pr merge --squash
-```
-
-**Step 5: Verify deployment** (agent can do this autonomously after merge):
-```bash
-vercel ls --limit 5
-# Check /api/health on production (must return HTTP 200 with status=healthy)
-curl -sS https://paisaxe.es/api/health
-```
-
-**Never bypass branch protection.** If CI fails on the PR, fix on `develop` first, push, and let the PR update.
+The user requests a release; the agent never initiates one. **Never bypass branch protection.**
+If CI fails on the PR, fix on `develop` first, push, and let the PR update.
 
 ### Worktree-First Development (MANDATORY)
 

@@ -169,7 +169,7 @@ describe("analyzeRelease — blocking cases", () => {
 
     expect(result.ok).toBe(false);
     expect(result.blockers).toContainEqual(
-      expect.stringMatching(/left fixture data behind/)
+      expect.stringMatching(/does not evidence cleanup \(cleanup: left-behind\)/)
     );
   });
 

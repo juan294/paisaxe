@@ -173,7 +173,7 @@ export function analyzeRelease(
       }
       if (oracle === "cleanup" && observed.cleanup !== "removed") {
         blockers.push(
-          `Required probe "${required.id}" left fixture data behind (cleanup: ${observed.cleanup ?? "absent"})`
+          `Required probe "${required.id}" does not evidence cleanup (cleanup: ${observed.cleanup ?? "absent"})`
         );
       }
     }

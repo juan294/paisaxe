@@ -4,6 +4,16 @@ Runbook for rolling back production deployments, code changes, and database migr
 
 > **Key lesson from the 2026-03-24 incident**: Roll back first, investigate second. Every minute spent diagnosing on a broken production deployment is a minute of user-facing downtime. Promote the last known good deployment immediately, then investigate in isolation.
 
+> **Rolling forward is a release.** This runbook covers getting production back to a known good
+> state. Shipping the fix afterwards goes through `docs/runbooks/release-checklist.md` — the single
+> procedural authority — including the deployed-identity check and the analyzer gate. After any
+> rollback, confirm which tree production is actually serving rather than assuming:
+>
+> ```bash
+> npx tsx scripts/release/candidate-identity.ts --verify \
+>   --expected "$(git rev-parse <known-good-ref>^{tree})" --url https://paisaxe.es
+> ```
+
 ## 1. Vercel Rollback
 
 ### Via Dashboard (fastest)
