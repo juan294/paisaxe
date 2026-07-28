@@ -66,14 +66,14 @@ git branch --show-current && git commit -m "feat: add feature"
 Wrong -- relative paths and lowercase -d:
 
 ```bash
-cd ../worktree && pnpm test           # cwd resets between calls
+cd ../worktree && npm test           # cwd resets between calls
 git worktree remove <path> && git branch -d <branch>  # -d fails
 ```
 
 Right -- absolute paths, force remove, uppercase -D:
 
 ```bash
-cd /absolute/path/to/worktree && pnpm test
+cd /absolute/path/to/worktree && npm test
 git worktree remove --force <path>; git branch -D <branch>
 ```
 

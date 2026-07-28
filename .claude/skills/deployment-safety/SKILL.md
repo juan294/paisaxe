@@ -59,7 +59,7 @@ git push  # 9 workflows triggered, guess and check
 Right -- test locally, push once:
 
 ```bash
-pnpm run typecheck 2>&1; pnpm run lint 2>&1; pnpm run test 2>&1
+npm run typecheck 2>&1; npm run lint 2>&1; npm run test 2>&1
 git push  # confident it works
 ```
 

@@ -74,7 +74,7 @@ Right -- include full context since teammates don't inherit history:
 "Fix the login bug in /absolute/path/src/auth/login.ts:42.
 The session token is not being refreshed on 401 responses.
 The fix: add a retry with token refresh in the catch block.
-Run 'cd /absolute/path && pnpm test src/auth/' to verify."
+Run 'cd /absolute/path && npm test src/auth/' to verify."
 ```
 
 ## File Ownership

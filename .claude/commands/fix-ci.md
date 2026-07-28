@@ -26,7 +26,7 @@ Process:
 5. For typecheck/lint/build failures, fix them directly (these are usually straightforward).
 
 6. After all fixes, run the full test suite locally:
-   `pnpm run typecheck 2>&1; pnpm run lint 2>&1; pnpm run test 2>&1`
+   `npm run typecheck 2>&1; npm run lint 2>&1; npm run test 2>&1`
 
 7. If new failures appear, repeat the fix cycle (max 3 iterations).
 

@@ -2,6 +2,16 @@
 
 Detailed documentation for database maintenance, monitoring, webhooks, and automated agents.
 
+## Related runbooks
+
+| Document | Use when |
+|---|---|
+| `docs/runbooks/release-checklist.md` | Releasing to production — the single procedural authority |
+| `docs/operations/rollback.md` | Production is broken. Roll back first, investigate second |
+| `docs/operations/alerting-runbook.md` | Responding to a specific alert type |
+| `docs/operations/migration-policy.md` | Writing or applying a migration |
+| `docs/operations/pre-launch-security-checklist.md` | The 6 manual security gates before a release PR |
+
 ## Health Check Endpoints
 
 Two endpoints serve different consumers:
@@ -30,7 +40,7 @@ npm run prelaunch:live # Real Stripe/Supabase QA happy path; fails if credential
 
 **Expected results:**
 - Local pre-launch gate: runs verification coverage, env docs, migrations, build, and browser E2E without invoking live services
-- Tests: All passing (currently ~6,347 tests)
+- Tests: All passing (current count in `docs/agents/coverage-report.md` — do not hardcode here)
 - TypeScript: Exit code 0, no output
 - Lint: Exit code 0, no output
 - Verification wiring: reports explicit coverage for non-src TS surfaces and live integration gate
@@ -321,7 +331,7 @@ Automated quality checks run on every push and pull request to `develop` and `ma
 
 | Job | Description |
 |-----|-------------|
-| **lint-and-typecheck** | Runs `npm run typecheck`, `npm run check-verification-coverage`, `npm run lint`, `npm run check-env`, and migration numbering check (`npm run check-migrations`) |
+| **lint-and-typecheck** | Runs `npm run typecheck`, `npm run check-verification-coverage`, `npm run lint`, `npm run check-env`, migration validation (`npm run check-migrations`), and circular-dependency check (`madge --circular`) |
 | **test** | Runs `npm run test` |
 | **build** | Verifies production build with `npm run build` |
 
@@ -341,8 +351,8 @@ On PRs targeting `main`, waits for the Vercel preview deployment and runs `scrip
 
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
-| **Security Audit** (`security.yml`) | Push/PR + weekly Monday 08:00 UTC | `npm audit --audit-level=critical` |
-| **Gitleaks** (`gitleaks.yml`) | Push/PR + daily 04:00 UTC | Scans for secrets in git history |
+| **Security Audit** (`security.yml`) | Push/PR + daily 08:00 UTC | `npm audit --omit=dev --audit-level=moderate`; also runs `vercel-env-safety` |
+| **Gitleaks** (job in `security.yml`) | Push/PR + daily 08:00 UTC | Scans for secrets in git history |
 | **License Check** (`license-check.yml`) | PRs only | Blocks copyleft/GPL dependencies |
 | **Lighthouse CI** (`lighthouse.yml`) | PRs only | Performance & accessibility auditing |
 | **Bundle Size** (`bundle-size.yml`) | PRs only | Reports JS bundle sizes as PR comment |

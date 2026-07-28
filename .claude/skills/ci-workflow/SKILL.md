@@ -34,16 +34,16 @@ gh run list --branch <branch-under-test> --limit 1
 Wrong -- run typecheck, lint, test as parallel tool calls:
 
 ```bash
-# Parallel call 1: pnpm run typecheck
-# Parallel call 2: pnpm run lint
-# Parallel call 3: pnpm run test
+# Parallel call 1: npm run typecheck
+# Parallel call 2: npm run lint
+# Parallel call 3: npm run test
 # If one fails, all parallel calls are killed (Error #1)
 ```
 
 Right -- chain sequentially with semicolons:
 
 ```bash
-pnpm run typecheck 2>&1; pnpm run lint 2>&1; pnpm run test 2>&1
+npm run typecheck 2>&1; npm run lint 2>&1; npm run test 2>&1
 ```
 
 ## Pre-Commit Verification
@@ -58,7 +58,7 @@ git commit -m "feat: add feature"
 Right -- run checks before committing:
 
 ```bash
-pnpm run typecheck 2>&1; pnpm run lint 2>&1
+npm run typecheck 2>&1; npm run lint 2>&1
 git add <files> && git commit -m "feat: add feature"
 ```
 
@@ -76,6 +76,6 @@ Right -- run full test suite immediately after config changes:
 
 ```bash
 # Edit tsconfig.json
-pnpm run typecheck 2>&1; pnpm run lint 2>&1; pnpm run test 2>&1
+npm run typecheck 2>&1; npm run lint 2>&1; npm run test 2>&1
 # Fix any breakage before proceeding
 ```

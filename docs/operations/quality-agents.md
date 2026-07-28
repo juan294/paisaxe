@@ -30,20 +30,20 @@
 ```
 GitHub Actions (Push/PR)
   +-- ci.yml .............. Lint, Typecheck, Tests, Build
-  +-- e2e.yml ............. Playwright E2E tests (18 spec files)
+  +-- e2e.yml ............. Playwright E2E tests (20 spec files)
   +-- e2e-stripe-integration.yml .. Stripe test-mode E2E
   +-- preview-smoke.yml ... Smoke test on Vercel preview deploy
-  +-- gitleaks.yml ........ Secret scanning
+  +-- (gitleaks is a job inside security.yml)
   +-- license-check.yml ... Dependency license compliance
   +-- lighthouse.yml ...... Performance & accessibility audit
   +-- bundle-size.yml ..... JS bundle size tracking
   +-- knip.yml ............ Dead code detection
   +-- claude-review.yml ... AI-powered code review
-  +-- security.yml ........ npm audit (also weekly cron)
+  +-- security.yml ........ npm audit (also daily cron)
 
 GitHub Actions (Scheduled)
-  +-- gitleaks.yml ........ Daily 04:00 UTC - full history scan
-  +-- security.yml ........ Weekly Monday 08:00 UTC - npm audit
+  +-- security.yml ........ Daily 08:00 UTC - gitleaks full history scan
+  +-- security.yml ........ Daily 08:00 UTC - npm audit
 
 Local Agents (macOS launchd)
   +-- coverage-agent ...... Daily 02:00 AM - test coverage analysis
@@ -303,7 +303,7 @@ These run on PRs but don't block merges:
 
 ### Gitleaks (Secret Scanning)
 
-**File**: `.github/workflows/gitleaks.yml`
+**File**: `.github/workflows/security.yml` (job `gitleaks`)
 
 **Triggers**:
 - Every push to `develop` or `main`
@@ -334,7 +334,7 @@ npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
 
 **File**: `.github/workflows/security.yml`
 
-Runs `npm audit --audit-level=critical` on every push/PR and weekly on Mondays.
+Runs `npm audit --omit=dev --audit-level=moderate` on every push/PR and daily at 08:00 UTC.
 
 ### Dependabot
 
