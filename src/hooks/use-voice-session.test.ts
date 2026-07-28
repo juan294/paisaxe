@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useVoiceSession, getTimeOfDay } from "./use-voice-session";
+import {
+  getElevenLabsLanguage,
+  getPreferredLanguage,
+  getTimeOfDay,
+  useVoiceSession,
+} from "./use-voice-session";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -144,7 +149,7 @@ describe("useVoiceSession", () => {
     expect(result.current.preferredLanguage).toBe("English");
   });
 
-  it("should detect French locale and default to English", () => {
+  it("should detect French as a native voice preference", () => {
     Object.defineProperty(navigator, "language", {
       value: "fr-FR",
       configurable: true,
@@ -152,7 +157,15 @@ describe("useVoiceSession", () => {
 
     const { result } = renderHook(() => useVoiceSession());
 
-    expect(result.current.preferredLanguage).toBe("English");
+    expect(result.current.preferredLanguage).toBe("French");
+  });
+
+  it("maps app locales to configured native ElevenLabs presets", () => {
+    expect(getElevenLabsLanguage("es")).toBe("es");
+    expect(getElevenLabsLanguage("fr")).toBe("fr");
+    expect(getElevenLabsLanguage("pt")).toBe("pt-br");
+    expect(getElevenLabsLanguage("de")).toBe("en");
+    expect(getPreferredLanguage("pt-PT")).toBe("Portuguese");
   });
 
   it("should handle localStorage.setItem throwing (storage full)", () => {
