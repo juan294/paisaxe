@@ -6,9 +6,14 @@ import { Mic, MicOff, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
-import { useVoiceSession } from "@/hooks/use-voice-session";
+import {
+  getElevenLabsLanguage,
+  getPreferredLanguage,
+  useVoiceSession,
+} from "@/hooks/use-voice-session";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { clientLogger } from "@/lib/client-logger";
+import { csrfHeaders } from "@/lib/csrf-client";
 import type { Story } from "@/types/immersive";
 
 interface Message {
@@ -218,11 +223,30 @@ export function VoiceChatElevenLabs({
         return;
       }
 
-      // Determine language override based on user's locale
-      const languageOverride = voiceSession.preferredLanguage === "Spanish" ? "es" : "en";
+      // The in-app language switcher is authoritative. Browser locale remains
+      // session metadata only and must not override an explicit visitor choice.
+      const languageOverride = getElevenLabsLanguage(locale);
+      const preferredLanguage = getPreferredLanguage(locale);
+      const signedSessionResponse = await fetch("/api/voice-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...csrfHeaders(),
+        },
+        body: JSON.stringify({ agentKey: "pelayo" }),
+      });
+      const signedSession = (await signedSessionResponse.json()) as {
+        signedUrl?: unknown;
+      };
+      if (
+        !signedSessionResponse.ok ||
+        typeof signedSession.signedUrl !== "string"
+      ) {
+        throw new Error("Signed voice session unavailable");
+      }
 
       await conversation.startSession({
-        agentId,
+        signedUrl: signedSession.signedUrl,
         connectionType: "websocket",
         dynamicVariables: {
           // Story context
@@ -237,8 +261,8 @@ export function VoiceChatElevenLabs({
           is_returning: voiceSession.isReturning ? "true" : "false",
 
           // Language/locale
-          user_locale: voiceSession.userLocale,
-          preferred_language: voiceSession.preferredLanguage,
+          user_locale: locale,
+          preferred_language: preferredLanguage,
 
           // Time context
           time_of_day: voiceSession.timeOfDay,

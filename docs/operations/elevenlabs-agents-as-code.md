@@ -29,34 +29,39 @@ tool_configs/            # Full tool configuration JSON files
 | Iris (Instagram) | `agent_1301kg4wggmvfwgbx91h7sn2xsbh` |
 | Xander (X) | `agent_5901kg4wgebce0abca4ssyav3684` |
 
-## npm Scripts
+## Scoped npm scripts
 
 | Command | What it does |
 |---------|-------------|
-| `npm run agents:pull` | Pull latest agent configs from ElevenLabs into `agent_configs/` |
-| `npm run agents:push:dry` | Preview what would change (dry run — no write) |
-| `npm run agents:push` | Apply `agent_configs/` changes to ElevenLabs |
-| `npm run agents:status` | Show drift between local files and remote |
-| `npm run tools:pull` | Pull tool configs into `tool_configs/` |
-| `npm run tools:push:dry` | Preview tool changes |
-| `npm run tools:push` | Apply `tool_configs/` changes |
+| `npm run agents:pull -- --agent pelayo --branch <exact-id>` | Pull exactly one registered Paisaxe branch |
+| `npm run agents:status -- --agent pelayo --branch <exact-id>` | Compare one registered branch with its live readback |
+| `npm run agents:push:dry -- --agent pelayo --branch <exact-id>` | Preview one branch update |
+| `npm run agents:push -- --agent pelayo --branch <exact-id> --apply` | PATCH exactly one registered branch and verify the returned branch/version |
+| `npm run tools:pull -- --tool search_places` | Pull exactly one registered Paisaxe tool |
+| `npm run tools:push:dry -- --tool search_places` | Preview exactly one tool update |
+| `npm run tools:push -- --tool search_places --apply` | PATCH exactly one tool and verify readback |
+
+Broad agent or tool pushes are intentionally unavailable. The scoped agent
+writer uses the API directly because ElevenLabs CLI 0.5.4 resolves
+`--branch` but reads the top-level Main config instead of the registered
+branch config. Never bypass the scoped writer for a branch update.
 
 ## Workflow
 
 ### Editing an agent
 
 ```bash
-# 1. Pull current state
-npm run agents:pull
+# 1. Pull current branch state
+npm run agents:pull -- --agent pelayo --branch <exact-branch-id>
 
 # 2. Edit the JSON config
 code agent_configs/Paisaxe-Pelayo-\(Visitor-Guide\).json
 
 # 3. Preview changes
-npm run agents:push:dry
+npm run agents:push:dry -- --agent pelayo --branch <exact-branch-id>
 
 # 4. Apply
-npm run agents:push
+npm run agents:push -- --agent pelayo --branch <exact-branch-id> --apply
 
 # 5. Commit the updated JSON
 git add agent_configs/ && git commit -m "chore: update Pelayo system prompt"
@@ -67,7 +72,7 @@ git add agent_configs/ && git commit -m "chore: update Pelayo system prompt"
 If someone edits the agent in the ElevenLabs dashboard directly:
 
 ```bash
-npm run agents:pull
+npm run agents:pull -- --agent pelayo --branch <exact-branch-id>
 git diff agent_configs/
 ```
 
@@ -75,19 +80,40 @@ If the change is intentional, commit it. If not, revert and push.
 
 ## Authentication
 
-The CLI reads `ELEVENLABS_API_KEY` from the environment. Global login is stored via:
+The CLI and scoped writer read `ELEVENLABS_API_KEY` from the process
+environment. Never put it in a tracked file or command output. Global login is
+stored via:
 
 ```bash
 npx elevenlabs auth login
 ```
 
-## Limitations
+## Branch and production gates
 
-The CLI tracks configuration but **cannot**:
+- Keep `agents.json` top-level `branch_id` and `version_id` on Main. Candidate
+  branches live under each agent's `branches` map.
+- Candidate branches remain at zero traffic until behavioral tests, signed
+  production sessions, and first-word audio review all pass.
+- Authentication and privacy are shared production settings. Do not enable
+  signed-only auth or change recording/retention until the deployed app proves
+  signed visitor and admin sessions immediately before cutover.
+- A language preset may be exposed only when its voice ID resolves in the
+  workspace and its first spoken word has been reviewed.
+
+## Current limitations
+
+The tracked workflow does not:
 
 - Upload or manage knowledge base PDF files (must be done in the ElevenLabs dashboard)
-- Manage voice settings (voice ID, stability, similarity) — these are configured in the dashboard
-- Create new agents or tools (use the dashboard, then add the ID to `agents.json`)
+- Create new agents or tools. Create them deliberately, then add the exact ID
+  and config to the scoped registry.
+- Prove accent, interruption behavior, or background-noise behavior through
+  text simulation. Those require an audio session and listening evidence.
+
+`save_favorite` is not registered or attached because
+`https://paisaxe.es/api/mcp/save-favorite` returned 404 during the 2026-07-25
+audit. Add it only after the production endpoint exists and passes an
+authenticated contract test.
 
 ## What Changed vs Old Scripts
 

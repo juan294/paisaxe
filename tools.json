@@ -14,10 +14,6 @@
             "type": "webhook",
             "config": "tool_configs/get_weather.json",
             "id": "tool_7901kgqhsetben3bbbg4p360d987"
-        },
-        {
-            "type": "webhook",
-            "config": "tool_configs/save_favorite.json"
         }
     ]
 }

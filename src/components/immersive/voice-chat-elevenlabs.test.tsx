@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
+import { getElevenLabsLanguage } from "@/hooks/use-voice-session";
 import type { Story } from "@/types/immersive";
 
 // Mock ElevenLabs React hook
@@ -29,17 +30,22 @@ vi.mock("@/lib/localize-story", () => ({
 }));
 
 // Mock voice session hook
-vi.mock("@/hooks/use-voice-session", () => ({
-  useVoiceSession: () => ({
-    conversationCount: 0,
-    isReturning: false,
-    userLocale: "es-ES",
-    preferredLanguage: "Spanish" as const,
-    timeOfDay: "morning" as const,
-    incrementConversation: mockIncrementConversation,
-    resetSession: vi.fn(),
-  }),
-}));
+vi.mock("@/hooks/use-voice-session", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/hooks/use-voice-session")>();
+  return {
+    ...actual,
+    useVoiceSession: () => ({
+      conversationCount: 0,
+      isReturning: false,
+      userLocale: "es-ES",
+      preferredLanguage: "Spanish" as const,
+      timeOfDay: "morning" as const,
+      incrementConversation: mockIncrementConversation,
+      resetSession: vi.fn(),
+    }),
+  };
+});
 
 // Mock i18n
 vi.mock("@/lib/i18n", () => ({
@@ -89,6 +95,18 @@ describe("VoiceChatElevenLabs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     conversationHandlers = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ signedUrl: "wss://signed.example/visitor" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      )
+    );
 
     mockUseConversation.mockImplementation((options) => {
       conversationHandlers = options;
@@ -137,7 +155,7 @@ describe("VoiceChatElevenLabs", () => {
   });
 
   describe("starting a conversation", () => {
-    it("should call startSession with agent ID when orb is clicked", async () => {
+    it("should mint and use a signed session when orb is clicked", async () => {
       mockStartSession.mockResolvedValue(undefined);
 
       render(
@@ -154,10 +172,18 @@ describe("VoiceChatElevenLabs", () => {
       await waitFor(() => {
         expect(mockStartSession).toHaveBeenCalledWith(
           expect.objectContaining({
-            agentId: "test-agent-123",
+            signedUrl: "wss://signed.example/visitor",
           })
         );
       });
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/voice-session",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ agentKey: "pelayo" }),
+        })
+      );
+      expect(mockStartSession.mock.calls[0][0]).not.toHaveProperty("agentId");
     });
 
     it("should pass user_access_token as dynamic variable when provided", async () => {
@@ -603,9 +629,9 @@ describe("VoiceChatElevenLabs", () => {
     });
   });
 
-  describe("language override for non-Spanish (line 185)", () => {
-    it("should set language override to 'en' when preferredLanguage is not Spanish", async () => {
-      // Override voice session mock to return English preference
+  describe("app-selected language override", () => {
+    it("keeps the selected Spanish locale when the browser prefers English", async () => {
+      // Browser/session metadata says English, while the app language mock is Spanish.
       const voiceSessionModule = await import("@/hooks/use-voice-session");
       vi.spyOn(voiceSessionModule, "useVoiceSession").mockReturnValue({
         conversationCount: 2,
@@ -635,11 +661,12 @@ describe("VoiceChatElevenLabs", () => {
           expect.objectContaining({
             overrides: {
               agent: {
-                language: "en",
+                language: "es",
               },
             },
             dynamicVariables: expect.objectContaining({
-              preferred_language: "English",
+              user_locale: "es",
+              preferred_language: "Spanish",
               is_returning: "true",
               conversation_count: "2",
             }),
@@ -648,6 +675,13 @@ describe("VoiceChatElevenLabs", () => {
       });
 
       vi.restoreAllMocks();
+    });
+  });
+
+  describe("native language routing", () => {
+    it("maps French and Portuguese app selections to native presets", () => {
+      expect(getElevenLabsLanguage("fr")).toBe("fr");
+      expect(getElevenLabsLanguage("pt")).toBe("pt-br");
     });
   });
 

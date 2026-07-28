@@ -425,12 +425,12 @@ test.describe("QA Journey: New Features", () => {
     await expect(chatPanel).toBeVisible();
 
     // Dismiss privacy notice if shown
-    const privacyButton = chatPanel
-      .locator("button")
-      .filter({ hasText: /entend|understood|got it|ok|compris/i });
-    if (await privacyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await privacyButton.click();
-    }
+    await chatPanel
+      .getByRole("button", {
+        name: /^(entendido|entendío|got it|compris|verstanden)$/i,
+      })
+      .click({ timeout: 2000 })
+      .catch(() => {});
 
     // Step 3: Send first message
     await chatPanel.locator("input").fill("Tell me about the lakes");

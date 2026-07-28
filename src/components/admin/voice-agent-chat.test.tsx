@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VoiceAgentChat } from "./voice-agent-chat";
 
 // Mock the ElevenLabs SDK
 const mockUseConversation = vi.fn();
 const mockSetMuted = vi.fn();
+const mockStartSession = vi.fn();
 
 vi.mock("@elevenlabs/react", () => ({
   useConversation: () => mockUseConversation(),
@@ -26,12 +27,21 @@ describe("VoiceAgentChat", () => {
     mockUseConversation.mockReturnValue({
       status: "disconnected",
       isSpeaking: false,
-      startSession: vi.fn(),
+      startSession: mockStartSession,
       endSession: vi.fn(),
       sendUserMessage: vi.fn(),
       setMuted: mockSetMuted,
     });
     mockGetUserMedia.mockRejectedValue(new Error("Permission denied"));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ signedUrl: "wss://signed.example/admin" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+    );
   });
 
   it("renders agent selector with three agents", () => {
@@ -139,5 +149,29 @@ describe("VoiceAgentChat", () => {
 
     await user.click(screen.getByRole("button", { name: "Unmute microphone" }));
     expect(mockSetMuted).toHaveBeenLastCalledWith(false);
+  });
+
+  it("starts an allowlisted admin agent through a signed session", async () => {
+    const user = userEvent.setup();
+    mockGetUserMedia.mockResolvedValue({} as MediaStream);
+
+    render(<VoiceAgentChat agentIds={{ xander: "agent-admin" }} />);
+
+    await user.click(screen.getByRole("button", { name: "Start Call" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/admin/voice-session",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ agentKey: "xander" }),
+        })
+      );
+      expect(mockStartSession).toHaveBeenCalledWith({
+        signedUrl: "wss://signed.example/admin",
+        connectionType: "websocket",
+      });
+    });
+    expect(mockStartSession.mock.calls[0][0]).not.toHaveProperty("agentId");
   });
 });
