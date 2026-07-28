@@ -14,7 +14,7 @@
 
 ## 1. Executive Summary
 
-Paisaxe has substantial test assets — 22 Playwright specs, a sharded Vitest suite, 11 CI workflows,
+Paisaxe has substantial test assets — 20 Playwright specs, a sharded Vitest suite, 11 CI workflows,
 5 required status checks on `main`, real branch protection with admin enforcement, and a
 database-enforced synthetic-fixture safety gate. What it does not have is a release **contract**:
 nothing binds evidence to a candidate, nothing prevents a vacuous pass, no check is marked
@@ -201,7 +201,7 @@ force-push and deletion blocked.
 | `Lint & Typecheck` (`ci.yml:34`) | ESLint + 4 `tsc` projects + `check-verification-coverage` + `check-migrations` | No |
 | `Test` (`ci.yml:168`) | Thin aggregator over 4 sharded `coverage-shard` jobs + `coverage-merge`; `if: always()` with manual failure propagation (`ci.yml:171,179-182`) | No |
 | `Build` (`ci.yml:186`) | `npm run build` with **dummy env vars** (`ci.yml:207-212`); file header states it "does NOT exercise the real Vercel runtime" (`ci.yml:3-5`) | No |
-| `Playwright E2E` (`e2e.yml:15`) | 22 specs against `http://localhost:3100` with dummy credentials | **No** |
+| `Playwright E2E` (`e2e.yml:15`) | 20 specs against `http://localhost:3100` with dummy credentials | **No** |
 | `Smoke test Vercel preview` (`preview-smoke.yml:40`) | Two `curl` assertions: `/api/health` returns 200 with `status=="healthy"`, and homepage returns 200 | **Yes — the only one** |
 
 `develop` has **no required status checks at all** — the protection object contains no
@@ -244,7 +244,25 @@ Projects defined: `desktop`, `mobile`, `qa-journey`, `stripe-integration`, `visu
 | `security.yml:76-80,83` | Steps gated on `env.VERCEL_TOKEN != ''` | `vercel-env-safety` no-ops when Vercel creds absent. Not required. |
 
 Legitimate, non-vacuous skips (project-scoped, not credential-gated): `test.skip(isMobile, ...)` in
-`author-pill.spec.ts`, `immersive.spec.ts`, `interactive-controls.spec.ts`.
+`author-pill.spec.ts` (7×), `immersive.spec.ts` (2×), `interactive-controls.spec.ts` (6×), plus
+viewport-width skips in `qa-journey.spec.ts:337`, `pre-launch.spec.ts:269`, `suggestions.spec.ts:21-25`.
+
+Two clarifications that cut the other way, in Paisaxe's favour:
+
+- **The authenticated QA journeys do run in CI.** `qa-journey.spec.ts:488-492` skips journeys 9–12
+  without `QA_TEST_USER_EMAIL`/`PASSWORD`, but `e2e.yml:63-64` supplies both, so they execute for
+  real. The skip only fires locally.
+- **The auth fixtures fail loudly rather than skipping.** `e2e/fixtures/auth.ts:139-143,154-157`
+  **throws** when credentials are missing, with the comment "Fail loudly if credentials are not
+  configured — silent skips hide CI misconfigurations." This is the correct D04 posture and the
+  exact opposite of `mcp.spec.ts`'s pattern.
+- Playwright reports skipped tests with status `skipped`, distinct from `passed`, in all three
+  configured reporters (`playwright.config.ts:35`). So the 16 MCP skips are *visible* in output —
+  the failure is that nothing **blocks** on them, which is precisely template D04.
+
+`e2e/stripe-real-checkout.spec.ts:90-95` also skips without the three `STRIPE_TEST_*` secrets, but
+it is excluded from the default gate by `testIgnore` (`playwright.config.ts:61,70`) and runs only
+under the `stripe-integration` project via `prelaunch:live`.
 
 ### 5.5 Gates that are sound
 
@@ -377,36 +395,92 @@ the UI result):
 
 | Escape | Failure class | Durable coverage now? |
 |---|---|---|
+| **2026-03-24 Dependabot→`main` production outage.** Next.js 16.2.1 crashed all Vercel serverless functions; an agent merged 7 Dependabot PRs straight to `main` without authorization. Full CoE: `docs/coe/2026-03-24-dependabot-production-incident.md` | Unauthorized merge to production + no preview verification + framework upgrade treated as a patch bump | **Largely** — `dependabot.yml:5` now targets `develop`; `Smoke test Vercel preview` added as a required check 2026-04-23; 1-approval gate added 2026-04-19 (`branch-protection.md:17-18`); CoE rules codified into `CLAUDE.md` Production Safety. **Gap**: recovery failed twice because a fresh `--prod` rebuild was used instead of a promote (CoE `:85-90`), and `incident.md:64` still recommends that command (§9.2 item 2) |
 | Migration `087` recorded as applied but **never took effect**; RLS stayed `rowsecurity=false` on 4 operational tables until `090` re-applied it (`090_fix_rls_operational_tables.sql:5-8`) | Silent no-op migration; no post-apply verification | Partial — `check-migrations.ts:120-179` now statically asserts RLS posture for those 4 tables, but nothing verifies the **live** DB state |
 | Admin-only RLS policies compared `user_profiles.id` instead of `user_profiles.user_id`, silently ineffective (`057_fix_platform_costs_rls.sql:1-3`, `067_fix_webhook_config_rls.sql:4-7`) | Authorization policy that parses but grants nothing | No test asserts an admin-only table actually denies a non-admin |
-| CSP/PPR blocked all scripts | Deployed-runtime-only failure | **Yes** — CSP canary in `e2e/smoke.spec.ts` (`CLAUDE.md` CSP section) |
-| Anthropic credit exhaustion took down production chat (2026-07-20) | Vendor quota, invisible to mocked tests | No — all Anthropic tests use dummy keys |
+| **Anthropic credit exhaustion (2026-07-20, issue #734)** — production chat returning 500s | Vendor quota/billing, invisible to mocked tests | **No — and issue #734 is still OPEN as of 2026-07-28 (8 days).** `docs/agents/qa-report.md` (2026-07-22) calls it "a confirmed recurrence… still unresolved". No `alerting-runbook.md` entry exists for it; detection is the weekly QA agent plus manual log inspection. All Anthropic tests use dummy keys |
+| `voyageai` 0.2.x broken ESM build broke `/api/chat` | Third-party dependency regression | Yes — reverted (`749048e5`), pinned in `dependabot.yml:15-18`. Minor inconsistency: a later commit `70de3bd4` upgraded to 0.4.x while the ignore rule appears to remain |
 | Visual diffs could never block a merge (`continue-on-error: true`) | Non-blocking gate | **Yes** — fixed, `e2e.yml:74-77` (issue #441) |
+| CSP/PPR script blocking | Deployed-runtime-only config failure | Yes — CSP canary in `e2e/smoke.spec.ts:22-33`. **UNVERIFIED whether this was ever a live outage**: no CoE or issue documents one, and `CLAUDE.md:273`'s phrasing ("If CSP ever blocks scripts again") reads as preventive. Recorded as a guardrail, not a confirmed escape |
+
+Not confirmed from repo evidence despite being expected: a "Supabase silent fallback" incident
+(exists only as a rule in `.claude/skills/supabase/SKILL.md:56-71`, no incident doc) and a "Vercel
+stale build cache" incident (no issue, CoE, or commit match). Both **UNVERIFIED** — they may be
+operator memory rather than repo-recorded escapes.
 
 ### 9.2 Contradictions in current instructions (template Wave A1)
 
-1. **Merge strategy.** `CLAUDE.md` Release Process step 4 prescribes `gh pr merge --merge`; this
-   would **fail** against the live repo (`allow_merge_commit: false`). `.claude/commands/release.md:224`
-   prescribes `gh pr merge --squash --auto`, which matches reality.
-2. **Required check names.** `CLAUDE.md` lists `lint-and-typecheck`, `test`, `build`, `e2e`,
-   `Smoke test Vercel preview` (mostly job *ids*); branch protection requires display *names*
-   `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Smoke test Vercel preview`.
-3. **No `/explore-release` command exists** in `.claude/commands/` — template Wave B has no
+Ordered by blast radius.
+
+1. **`/deploy` skill has no authorization gate at all.** `.claude/skills/deploy/SKILL.md` is 6 lines
+   in full: run tests → create PR to main → wait for CI green → **merge PR to main** → verify. No
+   STOP, no user-authorization step. This directly contradicts `CLAUDE.md:48-56` ("No agent may
+   perform ANY of the following without the user explicitly saying 'do it'…" — which lists both
+   "Create a PR targeting `main`" and "Merge a PR into `main`") and `CLAUDE.md:67` ("CI being green
+   (necessary but not sufficient)"). It is user-invocable as `/deploy`, and is the shortest, most
+   literal "how do I deploy" document in the repo. **Highest-severity contradiction found.**
+2. **`incident.md` recommends the exact command that prolonged a real outage.**
+   `.claude/commands/incident.md:64` suggests `vercel deploy --prod [deployment-url]` as rollback.
+   `.claude/skills/deployment-safety/SKILL.md:84-97` explicitly labels this "Wrong" and prescribes
+   `vercel rollback`. `docs/operations/rollback.md:24-35` uses `vercel rollback <id>`;
+   `alerting-runbook.md:51-57` uses `vercel promote <url>`. Per the CoE timeline
+   (`docs/coe/2026-03-24-dependabot-production-incident.md:85-90`), a fresh `--prod` rebuild is
+   precisely what failed twice during that incident's recovery. Three docs were fixed afterwards;
+   `incident.md` was not.
+3. **Merge strategy, plus an unattended-merge gate bypass.** `CLAUDE.md:113-117` prescribes
+   `gh pr merge --merge`, which would **fail** against the live repo (`allow_merge_commit: false`).
+   `.claude/commands/release.md:224-227` prescribes `gh pr merge --squash --auto`. Beyond the
+   strategy mismatch, `--auto` merges **unattended** as soon as CI passes — so no second human
+   "merge it" ever occurs, which is a second, distinct violation of `CLAUDE.md:52,67`.
+4. **Required check names.** `CLAUDE.md:75` and `docs/operations/branch-protection.md:6` both list
+   job *ids* (`lint-and-typecheck`, `test`, `build`, `e2e`); branch protection enforces display
+   *names* (`Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`). Only `Smoke test Vercel preview`
+   matches literally. Harmless to humans; breaks any script grepping `gh pr checks` output.
+5. **`gitleaks.yml` does not exist.** `operations.md:345` and `quality-agents.md:36,45,306` describe
+   a standalone workflow running daily at 04:00 UTC. Ground truth: gitleaks is a job inside
+   `security.yml:17-34`, and the schedule is `0 8 * * *` (`security.yml:8-10`), with an inline
+   comment confirming the change was deliberate and the docs never followed.
+6. **`pnpm` vs `npm`.** The repo is npm-only (`package.json:153` `"packageManager": "npm@11.4.0"`,
+   only `package-lock.json` exists), but six agent-facing files hardcode `pnpm`:
+   `.claude/commands/fix-ci.md:29`, `.claude/skills/ci-workflow/SKILL.md:46,61-62,79`,
+   `.claude/skills/deployment-safety/SKILL.md:62`, `.claude/skills/git-workflow/SKILL.md:69,76`,
+   `.claude/skills/multi-agent/SKILL.md:77`, `.claude/skills/error-patterns/SKILL.md:31`. These are
+   unadapted cc-rpi template artifacts.
+7. **False cross-reference.** `docs/operations/pre-launch-security-checklist.md:9-10` claims it "is
+   referenced by `CLAUDE.md` (Production Release Step 2)". `CLAUDE.md:83-96` contains no mention of
+   it, gitleaks, or any of its six gates. Six manual security gates are therefore documented but
+   unreferenced by the procedure that supposedly requires them.
+8. **No `/explore-release` command exists** in `.claude/commands/` — template Wave B has no
    implementation here (unlike the Chapa reference, where it exists but is mis-wired).
-4. **Version/tag drift.** `package.json:3` = `1.6.0`, `CHANGELOG.md` has a `1.6.0` section dated
-   2026-06-20, but no `v1.6.0` tag exists and PR #702 was closed unmerged.
+9. **Version/tag drift.** `package.json:3` = `1.6.0`; `CHANGELOG.md` documents 8 versions but only
+   6 tags exist — `v1.3.0` and `v1.6.0` have entries and no tags. PR #702 was closed unmerged, and
+   `CHANGELOG.md:8-9`'s `[Unreleased]` section is empty, implying v1.6.0 is *considered* released.
+10. **Stale counts.** `README.md:107,205` "83 migration files" (actual **96**);
+    `README.md:207-208` "9 workflows" (actual **11**); `quality-agents.md:33` "18 spec files"
+    (actual **20**); `operations.md:33` "~6,347 tests" (actual **7,274** per
+    `docs/agents/coverage-report.md`, 2026-07-23). `operations.md:344` and `README.md:220` describe
+    `security.yml` as weekly with `--audit-level=critical`; it is daily with
+    `--omit=dev --audit-level=moderate` (`security.yml:8-10,57`), and neither doc mentions its third
+    job `vercel-env-safety`. `operations.md:324` omits the `madge --circular` step present at
+    `ci.yml:68`.
 
 Checked and **not** contradictory: `docs/operations/operations.md:189-194` documents 6 Vercel crons
-matching `vercel.json:5-30` exactly. (The Chapa-equivalent cron-count drift does not exist here.)
+matching `vercel.json:5-30` exactly (the Chapa-equivalent cron drift does not exist here). Every
+`npm run` command referenced in `CLAUDE.md`'s release process was verified to exist in
+`package.json`: `test`, `typecheck`, `lint`, `prelaunch`, `prelaunch:live`, `test:e2e`,
+`check-verification-coverage`, `check-env`, `check-migrations`.
 
-Every `npm run` command referenced in `CLAUDE.md`'s release process was verified to exist:
-`test`, `typecheck`, `lint`, `prelaunch`, `prelaunch:live`, `test:e2e` — all present in
-`package.json`.
+### 9.3 Rollback capability (assessed)
 
-**UNVERIFIED / outstanding**: a full read of `docs/operations/rollback.md`, the incident runbook,
-and the complete GitHub issue history for further escapes was still in flight when this document
-was written. The rollback file is confirmed to exist and to reference manual `supabase db push`
-(`rollback.md:158`), but its executable completeness has not been assessed.
+`docs/operations/rollback.md` is a real, executable runbook, not prose. Four procedures: Vercel CLI
+rollback (`:24-35`, with an explicit "NEVER promote a broken deployment 'briefly' to capture logs"
+warning at `:41`); code revert on `develop` → PR (`:45-93`); dependency-upgrade revert (`:95-106`);
+and database **forward-only compensation migrations** — explicitly no `down.sql`, no native rollback
+(`:110-169`), cross-referencing `migration-policy.md`'s DO-M1 ordering rule. It opens by citing the
+2026-03-24 incident: "Roll back first, investigate second" (`:5`).
+
+Notably, it is **not linked** from `docs/operations/operations.md` (the canonical ops doc — `grep -n
+rollback` returns zero hits) nor from `CLAUDE.md`'s Project File Locations table (`CLAUDE.md:383-391`).
 
 ---
 
@@ -446,24 +520,43 @@ adopted by risk. Which waves are justified for a solo-maintainer, pre-traction s
 
 Surfaced during research, outside the E2E Pro scope, recorded so they are not lost:
 
+- **Issue #734 (Anthropic credit exhaustion) is still open**, 8 days, and `docs/agents/qa-report.md`
+  (2026-07-22) records it as an unresolved recurrence affecting production chat.
+- **`.claude/skills/deploy/SKILL.md` would merge to `main` on green CI with no authorization gate**
+  (§9.2 item 1). It is user-invocable as `/deploy`.
 - **`Security Scan` is currently failing on `main`** (scheduled run, 2026-07-28T08:55:04Z). Cause
   not investigated.
 - `/api/mcp/make-booking/status` accepts Twilio status callbacks with **no signature verification**.
 - `develop` has **zero** required status checks despite being the branch all development lands on.
-- A stray `paisaxe-hotfix` Vercel project exists alongside `paisaxe`.
+- `MCP_API_SECRET` is set in no workflow and no Playwright env, so 16 of 31 MCP specs have never run
+  in CI.
+- A stray `paisaxe-hotfix` Vercel project exists alongside `paisaxe`; the `hotfix/prod-deps` branch
+  is still present locally.
 - `scripts/launchd/` tracks 7 plists but 8 are installed (`docs-freshness-agent.plist` and
   `cost-analyst-agent.plist` are installed but untracked).
+- Locale count disagreement: `operations.md:313` says 5 locales, `quality-agents.md:224` says 6
+  (adds `ast`). UNVERIFIED which is current.
 
 ---
 
 ## Appendix: Research Method
 
 Five parallel read-only agents covered release topology/CI, test suite, environments/candidate
-identity, capability surface/state/vendors, and documentation drift. Findings were verified
-independently by the lead where they were decisive: production `/api/health` was probed directly,
-`vercel ls` and `gh run view --log` were used to resolve the preview-build question empirically, and
-the requiredness-tag and Playwright `baseURL` findings were confirmed by direct grep rather than
-accepted from an agent summary.
+identity, capability surface/state/vendors, and documentation drift. All five reported. Findings
+were verified independently by the lead where they were decisive: production `/api/health` was
+probed directly, `vercel ls` and `gh run view --log` were used to resolve the preview-build question
+empirically, and the requiredness-tag and Playwright `baseURL` findings were confirmed by direct
+grep rather than accepted from an agent summary.
+
+One lead-introduced error was corrected during synthesis: an initial count of 22 Playwright specs
+was wrong (the directory also contains `fixtures/`, `tsconfig.json`, `storage-state.json`, and a
+snapshots directory). The verified count is **20** `*.spec.ts` files.
+
+Unit-test layer, for completeness: 373 `*.test.ts(x)` files under `src/` plus 10 under `scripts/`;
+`vitest.config.ts:35-51` sets coverage thresholds of statements 95 / branches 90 / functions 95 /
+lines 95, and `:52-56` caps `maxWorkers: 4` locally with a comment attributing admin-UI dialog
+timeouts to worker starvation. A separate `vitest.config.qa.ts` covers `src/tests/qa/**` with longer
+timeouts for real API calls, run only via `npm run test:qa`.
 
 No files outside this document and `docs/release/e2e-pro-playbook.md` were created or modified. No
 writes were performed against Vercel, Supabase, GitHub, or any vendor.
