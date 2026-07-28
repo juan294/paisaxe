@@ -25,6 +25,7 @@
     "check-env": "tsx scripts/check-env.ts",
     "check-migrations": "tsx scripts/check-migrations.ts",
     "check-required-probes": "tsx scripts/release/required-probes.ts",
+    "analyze-release": "tsx scripts/release/analyze-release-run.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
