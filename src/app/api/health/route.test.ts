@@ -689,4 +689,98 @@ describe("GET /api/health", () => {
     const response = await GET();
     expect(response.status).toBe(200);
   });
+
+  // Release verification (Wave A, Phase 2): the deployment reports what it was
+  // built from, but only to an authorized caller — SE-M1 keeps the public shape.
+  describe("build identity", () => {
+    const COMMIT = "9411eada1c2b3d4e5f60718293a4b5c6d7e8f901";
+
+    function authorizedRequest(secret = "test-secret"): Request {
+      return new Request("https://paisaxe.es/api/health", {
+        headers: { authorization: `Bearer ${secret}` },
+      });
+    }
+
+    beforeEach(() => {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+      vi.stubEnv("VERCEL_GIT_COMMIT_SHA", COMMIT);
+    });
+
+    it("reports the commit the build came from to an authorized caller", async () => {
+      const data = await (await GET(authorizedRequest())).json();
+
+      expect(data.build.commit).toBe(COMMIT);
+    });
+
+    it("shortens a full tree hash and passes other values through", async () => {
+      vi.stubEnv("BUILD_TREE_HASH", "95a62c4be18d9b222187b88a450ba02bcc664365");
+      expect((await (await GET(authorizedRequest())).json()).build.tree).toBe(
+        "95a62c4be18d"
+      );
+
+      vi.stubEnv("BUILD_TREE_HASH", "95a62c4be18d");
+      expect((await (await GET(authorizedRequest())).json()).build.tree).toBe(
+        "95a62c4be18d"
+      );
+    });
+
+    it("degrades to 'unknown' off Vercel instead of throwing", async () => {
+      vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "");
+      vi.stubEnv("BUILD_TREE_HASH", "");
+
+      const response = await GET(authorizedRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.build).toEqual({ commit: "unknown", tree: "unknown" });
+    });
+
+    it("never affects overall status — an unknown identity stays healthy", async () => {
+      vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "");
+
+      const data = await (await GET(authorizedRequest())).json();
+
+      expect(data.status).toBe("healthy");
+    });
+
+    it("SE-M1: withholds the identity from an unauthenticated caller", async () => {
+      const monitorRequest = new Request("https://paisaxe.es/api/health");
+
+      for (const response of [await GET(), await GET(monitorRequest)]) {
+        const data = await response.json();
+        expect(data).not.toHaveProperty("build");
+        expect(data.status).toBe("healthy");
+      }
+    });
+
+    it("SE-M1: withholds the identity when the bearer token is wrong", async () => {
+      const data = await (await GET(authorizedRequest("wrong-secret"))).json();
+
+      expect(data).not.toHaveProperty("build");
+    });
+
+    it("SE-M1: withholds the identity when CRON_SECRET is unset", async () => {
+      vi.stubEnv("CRON_SECRET", "");
+
+      const data = await (await GET(authorizedRequest(""))).json();
+
+      expect(data).not.toHaveProperty("build");
+    });
+
+    it("keeps the monitored response shape intact for authorized callers", async () => {
+      const data = await (await GET(authorizedRequest())).json();
+
+      // Upptime and scripts/check-health-readiness.mjs assert on these.
+      expect(Object.keys(data).sort()).toEqual([
+        "build",
+        "cron_auth",
+        "rate_limit",
+        "sentry",
+        "status",
+        "timestamp",
+      ]);
+      expect(data.status).toBe("healthy");
+    });
+  });
 });

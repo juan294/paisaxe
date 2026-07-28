@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { supabase } from "@/lib/supabase";
 import { getEnv } from "@/lib/env";
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
@@ -21,12 +22,22 @@ type CronAuthStatus =
   | { status: "ok" }
   | { status: "misconfigured"; message: string };
 
+interface BuildIdentity {
+  commit: string;
+  tree: string;
+}
+
 interface PublicHealthResponse {
   status: HealthStatus;
   timestamp: string;
   cron_auth: CronAuthStatus;
   sentry: SentryProbeResult;
   rate_limit: RateLimitProbeResult;
+  /**
+   * Present only for authorized callers — see checkBuildIdentity. The public
+   * response keeps the exact shape SE-M1 allow-lists.
+   */
+  build?: BuildIdentity;
 }
 
 interface SupabaseProbeResult {
@@ -52,6 +63,62 @@ function checkRateLimitBackend(): RateLimitProbeResult {
     status: backendStatus.degraded ? "degraded" : "ok",
     backend: backendStatus.backend,
     ...(backendStatus.reason ? { reason: backendStatus.reason } : {}),
+  };
+}
+
+/**
+ * Release verification (Wave A, Phase 2): report what this deployment was built
+ * from, so release evidence can be bound to a candidate rather than to a URL.
+ *
+ * SE-M1 forbids operational recon data on the *unauthenticated* endpoint, and
+ * this repo is private — a deployed commit SHA is exactly that. So the identity
+ * is returned only to callers presenting `Authorization: Bearer <CRON_SECRET>`,
+ * the same trusted-automation credential Vercel Cron uses. The public response
+ * keeps the shape SE-M1 asserts, unchanged.
+ *
+ * The check is silent by design: /api/health is polled continuously by Upptime,
+ * so borrowing verifyVercelCron() would emit a [CRON_AUTH_REJECTED] warning on
+ * every monitor hit. Constant-time comparison follows validateMcpSecret.
+ */
+const UNKNOWN_BUILD_IDENTITY = "unknown";
+const SHORT_HASH_LENGTH = 12;
+
+function isReleaseIdentityAuthorized(request: Request | undefined): boolean {
+  const cronSecret = getEnv("CRON_SECRET");
+  if (!request || !cronSecret) {
+    return false;
+  }
+
+  const provided = request.headers.get("authorization");
+  const expected = `Bearer ${cronSecret}`;
+  if (!provided || provided.length !== expected.length) {
+    return false;
+  }
+
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
+
+function shortenHash(value: string): string {
+  return /^[0-9a-f]{40}$/i.test(value)
+    ? value.slice(0, SHORT_HASH_LENGTH)
+    : value;
+}
+
+/**
+ * Both fields degrade to "unknown" (never throw) so local and non-Vercel runs
+ * still return a well-formed response. "unknown" is the fail-closed signal
+ * consumers check — scripts/release/candidate-identity.ts refuses to verify an
+ * unidentified build. `tree` is only populated when the build injects
+ * BUILD_TREE_HASH; verification does not depend on it, because the tree is
+ * re-derived locally from the commit.
+ */
+function checkBuildIdentity(): BuildIdentity {
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA?.trim();
+  const tree = process.env.BUILD_TREE_HASH?.trim();
+
+  return {
+    commit: commit || UNKNOWN_BUILD_IDENTITY,
+    tree: tree ? shortenHash(tree) : UNKNOWN_BUILD_IDENTITY,
   };
 }
 
@@ -194,7 +261,8 @@ function buildHealthResponse(
   status: HealthStatus,
   cronAuth: CronAuthStatus,
   sentry: SentryProbeResult,
-  rateLimit: RateLimitProbeResult
+  rateLimit: RateLimitProbeResult,
+  includeBuildIdentity: boolean
 ): NextResponse<PublicHealthResponse> {
   // DO-H1 / PE-H3: Always return HTTP 200.
   // Degraded state is signalled via the JSON body only.
@@ -208,6 +276,9 @@ function buildHealthResponse(
       cron_auth: cronAuth,
       sentry,
       rate_limit: rateLimit,
+      // Additive and informational only: build identity never affects `status`,
+      // so an unidentified build (local, non-Vercel) cannot flip health to degraded.
+      ...(includeBuildIdentity ? { build: checkBuildIdentity() } : {}),
     },
     {
       status: 200,
@@ -219,10 +290,13 @@ function buildHealthResponse(
   );
 }
 
-export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
+export async function GET(
+  request?: Request
+): Promise<NextResponse<PublicHealthResponse>> {
   const cronAuth = checkCronAuthConfigured();
   const sentryStatus = checkSentry();
   const rateLimitStatus = checkRateLimitBackend();
+  const includeBuildIdentity = isReleaseIdentityAuthorized(request);
 
   try {
     const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
@@ -259,8 +333,20 @@ export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
         ? "degraded"
         : "healthy";
 
-    return buildHealthResponse(overallStatus, cronAuth, sentryStatus, rateLimitStatus);
+    return buildHealthResponse(
+      overallStatus,
+      cronAuth,
+      sentryStatus,
+      rateLimitStatus,
+      includeBuildIdentity
+    );
   } catch {
-    return buildHealthResponse("degraded", cronAuth, sentryStatus, rateLimitStatus);
+    return buildHealthResponse(
+      "degraded",
+      cronAuth,
+      sentryStatus,
+      rateLimitStatus,
+      includeBuildIdentity
+    );
   }
 }
