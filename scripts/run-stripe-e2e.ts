@@ -1,5 +1,9 @@
 import { spawn } from "node:child_process";
 import { request as httpRequest } from "node:http";
+import { readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { assertTestsExecuted } from "./lib/playwright-report";
 
 const REQUIRED_ENV_KEYS = [
   "STRIPE_TEST_SECRET_KEY",
@@ -88,6 +92,15 @@ function runCommand(
   });
 }
 
+/** Returns undefined when no report exists — the guard treats that as a failure. */
+function readReport(path: string) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
 async function main() {
   for (const key of REQUIRED_ENV_KEYS) {
     getEnv(key);
@@ -114,19 +127,28 @@ async function main() {
     stdio: "inherit",
   });
 
+  // Playwright exits 0 when every selected test was skipped, so the run's exit
+  // code alone cannot distinguish "the integration passed" from "nothing ran".
+  // Capture the JSON report and assert that tests actually executed.
+  const reportPath = join(tmpdir(), `stripe-e2e-report-${process.pid}.json`);
+
   try {
     await waitForServer(baseUrl, 120_000);
     await runCommand(
       "npx",
-      ["playwright", "test", "--project=stripe-integration"],
+      ["playwright", "test", "--project=stripe-integration", "--reporter=json"],
       {
         ...sharedEnv,
         PLAYWRIGHT_PORT: port,
         PLAYWRIGHT_REUSE_SERVER: "true",
+        PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
       },
     );
+
+    assertTestsExecuted(readReport(reportPath), "Stripe integration");
   } finally {
     server.kill("SIGTERM");
+    rmSync(reportPath, { force: true });
   }
 }
 

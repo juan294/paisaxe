@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { E2E_MCP_SECRET } from "./e2e/fixtures/mcp-secret";
 
 const isCI = !!process.env.CI;
 const useDevServer = process.env.PLAYWRIGHT_USE_DEV_SERVER === "true";
@@ -167,6 +168,9 @@ export default defineConfig({
       STRIPE_SECRET_KEY: "sk_test_dummy_for_e2e",
       STRIPE_DAY_PASS_PRICE_ID: "price_test_dummy_for_e2e",
       PLAYWRIGHT_TEST_ORIGIN: baseURL,
+      // Shared with the runner so the MCP probes exercise the authenticated
+      // paths instead of skipping — see e2e/fixtures/mcp-secret.ts.
+      MCP_API_SECRET: E2E_MCP_SECRET,
     },
   },
 });

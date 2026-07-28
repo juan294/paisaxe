@@ -361,22 +361,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!process.env.GOOGLE_PLACES_API_KEY) {
-    return NextResponse.json(
-      { error: "Places API not configured" },
-      { status: 500 }
-    );
-  }
-
   try {
     const body = await request.json();
     const paramsParsed = placesPostRequestSchema.safeParse(body);
 
+    // Validate the request before checking upstream configuration, matching GET
+    // above. A malformed request is the caller's error whatever the server's
+    // Google credentials look like; answering 500 hid this from the probe that
+    // asserts the contract — a probe that had never run.
     if (!paramsParsed.success) {
       const firstIssue = paramsParsed.error.issues[0];
       return NextResponse.json(
         { error: firstIssue?.message ?? "Invalid query parameters" },
         { status: 400 }
+      );
+    }
+
+    if (!process.env.GOOGLE_PLACES_API_KEY) {
+      return NextResponse.json(
+        { error: "Places API not configured" },
+        { status: 500 }
       );
     }
 
