@@ -97,11 +97,18 @@ function main(): void {
     pkg.scripts.prelaunch === "tsx scripts/run-prelaunch-gate.ts",
     "prelaunch must run the safe local release gate"
   );
+  // Missing secrets now fail unconditionally. The former live-gate input chose
+  // between failing and silently passing, so the job could report success
+  // having run zero tests; both the input and the skip path are gone.
   assert(
-    stripeWorkflow.includes("require_live_gate") &&
-      stripeWorkflow.includes("REQUIRE_LIVE_INTEGRATION") &&
-      stripeWorkflow.includes("Live gate requires all Stripe/Supabase QA secrets"),
-    "Stripe workflow must fail missing secrets when the live gate is required"
+    !stripeWorkflow.includes("require_live_gate") &&
+      !stripeWorkflow.includes("Skip when secrets are unavailable") &&
+      stripeWorkflow.includes("refusing to report success without running any test"),
+    "Stripe workflow must fail on missing secrets with no skip-and-pass path"
+  );
+  assert(
+    readText("scripts/run-stripe-e2e.ts").includes("assertTestsExecuted"),
+    "Stripe runner must assert tests actually executed (Playwright exits 0 when all are skipped)"
   );
   assert(
     ciWorkflow.includes("npm run check-verification-coverage"),
