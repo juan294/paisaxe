@@ -15,6 +15,25 @@ const mobileChrome = {
   ...(chromeChannel ? { channel: chromeChannel } : {}),
 };
 
+/**
+ * Release verification (Wave A, Phase 3).
+ *
+ * RELEASE_TARGET_URL points the `release-required` project at an already
+ * deployed origin. When it is set, no local web server is started — the probes
+ * exercise the deployment itself, read-only (plan D-B: Preview shares the
+ * production Supabase project and holds live Stripe keys, so a deployed probe
+ * must never mutate).
+ *
+ * Mutating required probes carry `@local-docker` as well as `@release-required`
+ * and are selected by a separate project that only ever runs against localhost.
+ * The `grepInvert` below is the mechanism that makes that separation
+ * unbypassable: a deployed run cannot select a mutating probe.
+ */
+const releaseTargetUrl = process.env.RELEASE_TARGET_URL?.trim();
+const releaseBypassSecret =
+  process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
+const releaseSpecs = ["**/release-required.spec.ts", "**/release-required-local.spec.ts"];
+
 function getWebServerCommand() {
   if (isCI) return `npm run start -- --port ${e2ePort}`;
   if (useDevServer) return `npm run dev -- --port ${e2ePort}`;
@@ -59,6 +78,7 @@ export default defineConfig({
         "**/qa-journey.spec.ts",
         "**/visual-regression.spec.ts",
         "**/stripe-real-checkout.spec.ts",
+        ...releaseSpecs,
       ],
     },
     {
@@ -68,6 +88,7 @@ export default defineConfig({
         "**/qa-journey.spec.ts",
         "**/visual-regression.spec.ts",
         "**/stripe-real-checkout.spec.ts",
+        ...releaseSpecs,
       ],
     },
     {
@@ -92,9 +113,39 @@ export default defineConfig({
       use: { ...mobileChrome, locale: "en-US" },
       testMatch: "visual-regression.spec.ts",
     },
+    {
+      // Deployed, read-only required probes. Anonymous by design: the
+      // admin-denial probe is only meaningful without a stored session.
+      name: "release-required",
+      use: {
+        ...desktopChrome,
+        baseURL: releaseTargetUrl || baseURL,
+        storageState: undefined,
+        ...(releaseBypassSecret
+          ? {
+              extraHTTPHeaders: {
+                "x-vercel-protection-bypass": releaseBypassSecret,
+              },
+            }
+          : {}),
+      },
+      grep: /@release-required/,
+      grepInvert: /@local-docker/,
+      timeout: 60_000,
+      retries: 0,
+    },
+    {
+      // Mutating required probes. Localhost only — never a deployed origin.
+      name: "release-required-local",
+      use: desktopChrome,
+      grep: /@local-docker/,
+      timeout: 60_000,
+      retries: 0,
+    },
   ],
 
-  webServer: {
+  // Targeting a deployment means there is nothing to boot locally.
+  webServer: releaseTargetUrl ? undefined : {
     command: getWebServerCommand(),
     url: `${baseURL}/api/health/live`,
     // Default local runs to an isolated production-style server because next dev's
