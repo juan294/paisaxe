@@ -24,6 +24,7 @@
     "check-verification-coverage": "tsx scripts/check-verification-coverage.ts",
     "check-env": "tsx scripts/check-env.ts",
     "check-migrations": "tsx scripts/check-migrations.ts",
+    "check-required-probes": "tsx scripts/release/required-probes.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -128,7 +129,8 @@
     "tsx": "^4.23.1",
     "twitter-api-v2": "^1.29.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "yaml": "^2.9.0"
   },
   "optionalDependencies": {
     "canvas": "^3.2.3"
