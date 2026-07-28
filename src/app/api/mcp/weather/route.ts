@@ -204,22 +204,24 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!process.env.OPENWEATHERMAP_API_KEY) {
-    return NextResponse.json(
-      { error: "Weather API not configured" },
-      { status: 500 }
-    );
-  }
-
   try {
     const body = await request.json();
     const paramsParsed = weatherPostRequestSchema.safeParse(body);
 
+    // Validate before checking upstream configuration, matching GET above: a
+    // malformed request is a 400 whether or not the server holds a weather key.
     if (!paramsParsed.success) {
       const firstIssue = paramsParsed.error.issues[0];
       return NextResponse.json(
         { error: firstIssue?.message ?? "Invalid query parameters" },
         { status: 400 }
+      );
+    }
+
+    if (!process.env.OPENWEATHERMAP_API_KEY) {
+      return NextResponse.json(
+        { error: "Weather API not configured" },
+        { status: 500 }
       );
     }
 

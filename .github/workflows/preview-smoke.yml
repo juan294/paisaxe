@@ -97,8 +97,15 @@ jobs:
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
           if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
             if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
-              echo "::notice::Skipping protected preview health check because Actions secrets are unavailable to Dependabot PRs."
-              exit 0
+              # This is a REQUIRED check on main. Exiting 0 here reported the
+              # gate as satisfied while probing nothing — requiredness without
+              # evidence. Dependabot PRs cannot read Actions secrets, so the
+              # check genuinely cannot be satisfied; it must block rather than
+              # pass. Dependency updates reach production by being cherry-picked
+              # onto develop and released from there, never by merging a
+              # Dependabot PR into main.
+              echo "::error::Preview smoke cannot run on Dependabot PRs (Actions secrets are unavailable). Cherry-pick this update onto develop and release it from there."
+              exit 1
             fi
             echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
             exit 1
@@ -117,8 +124,10 @@ jobs:
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
           if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
             if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
-              echo "::notice::Skipping protected preview homepage check because Actions secrets are unavailable to Dependabot PRs."
-              exit 0
+              # Same reasoning as the health step: a required check must not
+              # report success without having probed anything.
+              echo "::error::Preview smoke cannot run on Dependabot PRs (Actions secrets are unavailable). Cherry-pick this update onto develop and release it from there."
+              exit 1
             fi
             echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
             exit 1

@@ -65,9 +65,18 @@ describe("verification coverage config", () => {
     expect(pkg.scripts["prelaunch:live"]).toBe(
       "REQUIRE_LIVE_INTEGRATION=true npm run test:e2e:stripe"
     );
-    expect(workflow).toContain("require_live_gate");
-    expect(workflow).toContain("REQUIRE_LIVE_INTEGRATION");
-    expect(workflow).toContain("Live gate requires all Stripe/Supabase QA secrets");
+    // Missing secrets now fail unconditionally. The former require_live_gate
+    // input chose between failing and silently passing, so the job could report
+    // success having run zero tests; both the input and the skip path are gone.
+    expect(workflow).not.toContain("require_live_gate");
+    expect(workflow).not.toContain("Skip when secrets are unavailable");
+    expect(workflow).toContain(
+      "refusing to report success without running any test"
+    );
+
+    // Playwright exits 0 when every selected test is skipped, so the runner
+    // must additionally assert that tests actually executed.
+    expect(readText("scripts/run-stripe-e2e.ts")).toContain("assertTestsExecuted");
   });
 
   it("checks the verification wiring itself in CI", () => {

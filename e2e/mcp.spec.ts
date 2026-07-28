@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures/base-test";
+import { E2E_MCP_SECRET } from "./fixtures/mcp-secret";
 
 /**
  * Playwright API tests for MCP routes.
@@ -16,8 +17,13 @@ import { test, expect } from "./fixtures/base-test";
  * Missing or wrong secret → 401.
  *
  * Upstream dependencies (Google Places, OpenWeatherMap, ElevenLabs, Supabase)
- * are NOT available in test environments.  Happy-path tests that require a real
- * MCP_API_SECRET are skipped when the env var is absent so CI still passes.
+ * are NOT available in test environments, so authenticated probes assert
+ * routing, validation and auth behaviour rather than live upstream results.
+ *
+ * Nothing here skips. These probes previously opted out whenever MCP_API_SECRET
+ * was unset — which in CI was always, leaving 16 of 31 probes unexercised
+ * behind a green suite. The runner and the app under test now share
+ * E2E_MCP_SECRET, so every probe runs on every CI run.
  */
 
 const WRONG_SECRET = "definitely-wrong-secret-value-12345";
@@ -48,12 +54,8 @@ test.describe("GET /api/mcp/places", () => {
   test("returns 400 when query param is missing", async ({ request }) => {
     // No MCP_API_SECRET in test env → 401, but if secret IS set we get 400.
     // This test only exercises the validation branch; skip when secret absent.
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping validation test"
-    );
     const response = await request.get("/api/mcp/places", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
     });
     expect(response.status()).toBe(400);
     const body = await response.json();
@@ -61,12 +63,8 @@ test.describe("GET /api/mcp/places", () => {
   });
 
   test("returns 400 when query param is empty string", async ({ request }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping validation test"
-    );
     const response = await request.get("/api/mcp/places?query=", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
     });
     expect(response.status()).toBe(400);
     const body = await response.json();
@@ -76,12 +74,8 @@ test.describe("GET /api/mcp/places", () => {
   test(
     "returns JSON response with correct shape when secret is valid",
     async ({ request }) => {
-      test.skip(
-        !process.env.MCP_API_SECRET,
-        "MCP_API_SECRET not set — skipping happy-path test"
-      );
       const response = await request.get("/api/mcp/places?query=fabada", {
-        headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+        headers: { "x-mcp-secret": E2E_MCP_SECRET },
       });
       // With no GOOGLE_PLACES_API_KEY in test env: 500 with { error: "..." }
       // With a real key: 200 with { places, query, city, type }
@@ -125,12 +119,8 @@ test.describe("POST /api/mcp/places", () => {
   });
 
   test("returns 400 when query is missing from body", async ({ request }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping validation test"
-    );
     const response = await request.post("/api/mcp/places", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: {},
     });
     expect(response.status()).toBe(400);
@@ -141,12 +131,8 @@ test.describe("POST /api/mcp/places", () => {
   test("accepts flat format { query } with valid secret", async ({
     request,
   }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping happy-path test"
-    );
     const response = await request.post("/api/mcp/places", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: { query: "restaurante", city: "Oviedo" },
     });
     // 500 = upstream not configured, 200 = success
@@ -158,12 +144,8 @@ test.describe("POST /api/mcp/places", () => {
   test("accepts MCP tool-call format { arguments: { query } } with valid secret", async ({
     request,
   }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping happy-path test"
-    );
     const response = await request.post("/api/mcp/places", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: { arguments: { query: "museo", city: "Gijón" } },
     });
     expect([200, 500]).toContain(response.status());
@@ -196,12 +178,8 @@ test.describe("GET /api/mcp/weather", () => {
   });
 
   test("returns 400 when city param is missing", async ({ request }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping validation test"
-    );
     const response = await request.get("/api/mcp/weather", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
     });
     expect(response.status()).toBe(400);
     const body = await response.json();
@@ -209,12 +187,8 @@ test.describe("GET /api/mcp/weather", () => {
   });
 
   test("returns 400 when city param is empty string", async ({ request }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping validation test"
-    );
     const response = await request.get("/api/mcp/weather?city=", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
     });
     expect(response.status()).toBe(400);
     const body = await response.json();
@@ -224,12 +198,8 @@ test.describe("GET /api/mcp/weather", () => {
   test(
     "returns JSON response with correct shape when secret is valid",
     async ({ request }) => {
-      test.skip(
-        !process.env.MCP_API_SECRET,
-        "MCP_API_SECRET not set — skipping happy-path test"
-      );
       const response = await request.get("/api/mcp/weather?city=Oviedo", {
-        headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+        headers: { "x-mcp-secret": E2E_MCP_SECRET },
       });
       // 500 = upstream not configured, 200 = success
       expect([200, 500]).toContain(response.status());
@@ -273,12 +243,8 @@ test.describe("POST /api/mcp/weather", () => {
   });
 
   test("returns 400 when city is missing from body", async ({ request }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping validation test"
-    );
     const response = await request.post("/api/mcp/weather", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: {},
     });
     expect(response.status()).toBe(400);
@@ -287,12 +253,8 @@ test.describe("POST /api/mcp/weather", () => {
   });
 
   test("accepts flat format { city } with valid secret", async ({ request }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping happy-path test"
-    );
     const response = await request.post("/api/mcp/weather", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: { city: "Gijón" },
     });
     expect([200, 500]).toContain(response.status());
@@ -305,12 +267,8 @@ test.describe("POST /api/mcp/weather", () => {
   test("accepts MCP tool-call format { arguments: { city } } with valid secret", async ({
     request,
   }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping happy-path test"
-    );
     const response = await request.post("/api/mcp/weather", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: { arguments: { city: "Llanes" } },
     });
     expect([200, 500]).toContain(response.status());
@@ -362,12 +320,8 @@ test.describe("POST /api/mcp/make-booking", () => {
   });
 
   test("returns 400 when required fields are missing", async ({ request }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping validation test"
-    );
     const response = await request.post("/api/mcp/make-booking", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: { venue_name: "Test Restaurant" }, // missing required fields
     });
     expect(response.status()).toBe(400);
@@ -377,12 +331,8 @@ test.describe("POST /api/mcp/make-booking", () => {
   });
 
   test("returns 400 for invalid Spanish phone number", async ({ request }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping validation test"
-    );
     const response = await request.post("/api/mcp/make-booking", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: {
         ...VALID_BOOKING_PAYLOAD,
         phone_number: "123", // too short / invalid
@@ -396,13 +346,9 @@ test.describe("POST /api/mcp/make-booking", () => {
   test("returns a booking response with valid secret and payload", async ({
     request,
   }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping happy-path test"
-    );
     const response = await request.post("/api/mcp/make-booking", {
       headers: {
-        "x-mcp-secret": process.env.MCP_API_SECRET!,
+        "x-mcp-secret": E2E_MCP_SECRET,
         "Idempotency-Key": `test-${Date.now()}`,
       },
       data: VALID_BOOKING_PAYLOAD,
@@ -511,12 +457,8 @@ test.describe("POST /api/mcp/save-favorite", () => {
   test("succeeds with valid secret and minimal { placeName } body", async ({
     request,
   }) => {
-    test.skip(
-      !process.env.MCP_API_SECRET,
-      "MCP_API_SECRET not set — skipping happy-path test"
-    );
     const response = await request.post("/api/mcp/save-favorite", {
-      headers: { "x-mcp-secret": process.env.MCP_API_SECRET! },
+      headers: { "x-mcp-secret": E2E_MCP_SECRET },
       data: { placeName: "Casa Marcial" },
     });
     // With a reachable Supabase test project: 200 with { success: true }.
