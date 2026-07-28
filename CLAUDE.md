@@ -72,7 +72,7 @@ develop   # Active development (DEFAULT)
 **This is a user-initiated process. Agents prepare, users authorize.**
 
 `main` is protected with branch protection rules:
-- **Required status checks**: `lint-and-typecheck`, `test`, `build`, `e2e`, `Smoke test Vercel preview` must all pass
+- **Required status checks**: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Smoke test Vercel preview` must all pass
 - **Force pushes blocked**, **deletion blocked**
 - **PRs required with 1 approval** (solo dev self-approval is allowed, but the approval click is required before merge)
 
@@ -95,6 +95,9 @@ npm run test && npm run typecheck && npm run lint && npm run prelaunch
 npm run prelaunch:live
 ```
 
+Also complete the 6 manual gates in `docs/operations/pre-launch-security-checklist.md`
+before the release PR is created.
+
 Present the summary to the user:
 - List of commits since last release
 - CI status on develop
@@ -113,7 +116,7 @@ gh pr checks
 **Step 4: User authorizes merge.** Report CI status and wait for the user to say "merge it":
 ```bash
 # Merge once user confirms
-gh pr merge --merge
+gh pr merge --squash
 ```
 
 **Step 5: Verify deployment** (agent can do this autonomously after merge):
@@ -389,6 +392,10 @@ Go directly to these paths — never search the codebase for them.
 | PR descriptions | `docs/prs/{number}_description.md` | |
 | Research docs | `docs/research/YYYY-MM-DD-description.md` | |
 | Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
+| Release procedure | `docs/runbooks/release-checklist.md` | Single procedural authority — all release docs delegate to it |
+| Rollback | `docs/operations/rollback.md` | Roll back first, investigate second. `vercel rollback`, never `vercel deploy --prod` |
+| Incident alerting | `docs/operations/alerting-runbook.md` | Per-alert-type response procedures |
+| Security gates | `docs/operations/pre-launch-security-checklist.md` | 6 manual gates required before a release PR |
 
 ## Issue Tracking (GitHub Issues)
 

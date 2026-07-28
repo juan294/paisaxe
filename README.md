@@ -104,7 +104,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 5. Set up the database:
    - Create a Supabase project
    - Enable the pgvector extension
-   - Run the migrations in `supabase/migrations/` (83 migration files)
+   - Run the migrations in `supabase/migrations/` (96 migration files)
 
 6. Seed the database with tourism content:
    ```bash
@@ -202,10 +202,10 @@ paisaxe/
 ├── scripts/                    # Data processing & automation
 ├── supabase/
 │   ├── functions/              # Edge Functions (Deno)
-│   └── migrations/             # Database schema (83 migrations)
+│   └── migrations/             # Database schema (96 migrations)
 ├── docs/                       # Project documentation
 └── .github/
-    └── workflows/              # CI/CD (9 workflows)
+    └── workflows/              # CI/CD (11 workflows)
 ```
 
 ## CI/CD
@@ -217,7 +217,7 @@ Automated quality checks run on every push and pull request via GitHub Actions.
 | **CI** | Push/PR | Lint, typecheck, verification wiring, test, build |
 | **E2E** | Push/PR | Playwright end-to-end tests |
 | **Stripe E2E Integration** | Stripe-touching PR paths, nightly, manual dispatch | Real Stripe test-mode checkout; manual live gate fails if required secrets are missing |
-| **Security Audit** | Push/PR + weekly | `npm audit` for vulnerabilities |
+| **Security Audit** | Push/PR + daily 08:00 UTC | `npm audit --omit=dev --audit-level=moderate` |
 | **Gitleaks** | Push/PR + daily | Scans for secrets in git history |
 | **License Check** | PRs | Blocks copyleft/GPL dependencies |
 | **Lighthouse CI** | PRs | Performance & accessibility auditing |

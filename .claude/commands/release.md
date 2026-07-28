@@ -224,7 +224,7 @@ branch -- the integration branch already holds the changes.
 4. Merge with squash + auto-merge. NEVER pass `--delete-branch` -- `develop` is permanent:
 
    ```bash
-   gh pr merge --squash --auto
+   gh pr merge --squash
    ```
 
    Repos standardized per Rule #76 enable delete-branch-on-merge, but that only removes

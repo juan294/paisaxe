@@ -28,7 +28,7 @@ Spawn background agent to monitor CI after every push.
 Write the failing test FIRST. Red-Green-Refactor.
 
 **#16: Dependencies not installed** --
-Run `pnpm install` / `uv sync` before build/test/lint.
+Run `npm install` / `uv sync` before build/test/lint.
 
 **#25: No upstream tracking** --
 First push: `git push -u origin branch-name`.
