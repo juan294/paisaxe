@@ -64,16 +64,33 @@ analyzer's guarantees hollow.
 
 ## Phases
 
-| # | Phase | Batch | Depends on |
-|---|---|---|---|
-| 1 | Reconcile release instructions | `[batch-eligible]` | — |
-| 2 | Candidate identity: app self-identification + tree binding | `[batch-eligible]` | — |
-| 3 | Release-required probe set | — | 2 |
-| 4 | Release analyzer (fail-closed) | — | 3 |
-| 5 | Close the vacuous-pass holes | `[batch-eligible]` | — |
-| 6 | Release procedure + delegation | — | 1, 4, 5 |
+| # | Phase | Batch | Depends on | Status |
+|---|---|---|---|---|
+| 1 | Reconcile release instructions | `[batch-eligible]` | — | ✅ `2da0d09e` |
+| 2 | Candidate identity: app self-identification + tree binding | `[batch-eligible]` | — | ✅ `4746d7f5` |
+| 3 | Release-required probe set | — | 2 | ✅ `a57b5ca6` |
+| 4 | Release analyzer (fail-closed) | — | 3 | ✅ `c40ede8d` |
+| 5 | Close the vacuous-pass holes | `[batch-eligible]` | — | ✅ `d1a4e829` |
+| 6 | Release procedure + delegation | — | 1, 4, 5 | ✅ `c9697861` |
 
 Phases 1, 2, and 5 are mutually independent and may run in parallel worktrees.
+
+### Deviations from the plan as written
+
+- **Phase 2** — the plan called for an unconditional `build` object on `/api/health`. An existing
+  security regression test (`src/app/api/health/route.test.ts:376`, SE-M1) deliberately
+  allow-lists the public top-level fields and deny-lists version-like recon data, and the repo is
+  private. On the user's decision, `build` is returned only to a caller presenting
+  `Authorization: Bearer <CRON_SECRET>`; the public response shape is unchanged.
+- **Phase 5** — un-skipping the 16 MCP probes surfaced a real defect (issue #744): `POST`
+  `/api/mcp/places` and `/api/mcp/weather` checked their upstream API key before validating the
+  request body, returning 500 where the matching `GET` handlers return 400. Fixed in the same
+  phase.
+- **Phase 6** — the dry-run rehearsal correctly **blocks**: production predates build-identity
+  reporting, so no deployed tree can be established, and the mutating probe was not run (the local
+  Docker stack was not started). The six deployed read-only probes passed against `paisaxe.es` and
+  `check-migrations` validated 96 files. A passing end-to-end rehearsal is only possible after this
+  work is itself released.
 
 ---
 
