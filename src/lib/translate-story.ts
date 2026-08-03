@@ -10,9 +10,9 @@ import type { StoryLocale, StoryTranslation, TranslationStatus, StoryMetadata } 
 import { CHAT_MODEL } from "./models";
 import { callAnthropicAPI } from "./claude";
 import { createAdminClient } from "./supabase-admin";
-import { LOCALE_NAMES, TRANSLATION_LOCALES } from "./translation-locales";
+import { TRANSLATION_LOCALES } from "./translation-locales";
 
-export { LOCALE_NAMES, TRANSLATION_LOCALES };
+export { TRANSLATION_LOCALES };
 
 interface TranslationOptions {
   /** Specific locales to translate. If omitted, translates all 5 locales */
