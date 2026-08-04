@@ -1048,6 +1048,7 @@ describe("CSP header", () => {
     const csp = response.headers.get("Content-Security-Policy")!;
     // Must allow Stripe scripts
     expect(csp).toContain("https://js.stripe.com");
+    expect(csp).toContain("https://checkout.stripe.com");
     // Must allow blob: for ElevenLabs AudioWorklet
     expect(csp).toContain("blob:");
     // script-src now uses 'unsafe-inline' instead of nonce+'strict-dynamic'

@@ -41,6 +41,7 @@ export function buildCspHeader({ nodeEnv = process.env.NODE_ENV }: BuildCspHeade
     nodeEnv === "development" ? "'unsafe-eval'" : null,
     "blob:",
     "https://js.stripe.com",
+    "https://checkout.stripe.com",
   ]
     .filter(Boolean)
     .join(" ");
@@ -49,12 +50,12 @@ export function buildCspHeader({ nodeEnv = process.env.NODE_ENV }: BuildCspHeade
     "default-src 'self'",
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com",
+    "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com https://*.stripe.com",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com https://checkout.stripe.com",
     "media-src 'self' blob:",
     "worker-src 'self' blob:",
-    "frame-src https://js.stripe.com",
+    "frame-src https://js.stripe.com https://checkout.stripe.com",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
