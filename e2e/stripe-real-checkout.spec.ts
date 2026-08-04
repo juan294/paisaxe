@@ -162,6 +162,14 @@ test.describe("Real Stripe checkout", () => {
 
       const checkoutFrame = authenticatedPage.frameLocator("#checkout iframe").first();
 
+      // Stripe can preselect Link based on runner/browser state, which makes a
+      // phone number mandatory and turns this card checkout into a Link signup
+      // flow. Keep the release gate deterministic by explicitly opting out.
+      const saveForLink = checkoutFrame.locator("#enableStripePass");
+      if (await saveForLink.isChecked().catch(() => false)) {
+        await saveForLink.uncheck();
+      }
+
       await fillFirstVisible(
         checkoutFrame,
         [
@@ -202,12 +210,12 @@ test.describe("Real Stripe checkout", () => {
       await fillFirstVisible(
         checkoutFrame,
         [
-          "input[autocomplete='postal-code']",
+          "input[autocomplete~='postal-code']",
+          "input[name='billingPostalCode']",
           "input[name='postalCode']",
           "input[name='postal_code']",
         ],
         "28001",
-        { required: false, timeout: 2_000 },
       );
 
       await checkoutFrame
