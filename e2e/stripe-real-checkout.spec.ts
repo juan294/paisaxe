@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { FrameLocator } from "@playwright/test";
+import type { FrameLocator, Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures/auth";
 
 const STRIPE_TIMEOUT_MS = 30_000;
@@ -104,6 +104,41 @@ async function fillFirstVisible(
 
   await frame.locator(visibleSelector!).first().fill(value);
   return true;
+}
+
+async function submitCheckout(
+  page: Page,
+  payButton: Locator,
+): Promise<void> {
+  const returnUrl = /\/pricing\/checkout\/return\?session_id=/;
+
+  // Stripe occasionally accepts the pointer event without starting checkout:
+  // the page remains on the form and the Pay button stays enabled. Retry that
+  // user action once only in that no-op state. If the button is disabled,
+  // payment is already processing and a second click could duplicate intent.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const committed = page
+      .waitForURL(returnUrl, {
+        timeout: 15_000,
+        waitUntil: "commit",
+      })
+      .then(
+        () => true,
+        () => false,
+      );
+
+    await payButton.click();
+    if (await committed) return;
+    if (returnUrl.test(page.url())) return;
+
+    const canSafelyResubmit = await payButton.isEnabled().catch(() => false);
+    if (!canSafelyResubmit || attempt === 2) break;
+  }
+
+  await page.waitForURL(returnUrl, {
+    timeout: STRIPE_TIMEOUT_MS,
+    waitUntil: "commit",
+  });
 }
 
 test.describe("Real Stripe checkout", () => {
@@ -223,17 +258,7 @@ test.describe("Real Stripe checkout", () => {
       });
       await expect(payButton).toBeEnabled({ timeout: STRIPE_TIMEOUT_MS });
 
-      // Register the navigation before submitting and wait only for commit.
-      // The release oracle needs the Checkout Session ID from the return URL;
-      // waiting for every third-party resource on that page to emit `load`
-      // made a completed payment appear flaky in slower CI runs.
-      await Promise.all([
-        authenticatedPage.waitForURL(/\/pricing\/checkout\/return\?session_id=/, {
-          timeout: STRIPE_TIMEOUT_MS,
-          waitUntil: "commit",
-        }),
-        payButton.click(),
-      ]);
+      await submitCheckout(authenticatedPage, payButton);
 
       const sessionId = authenticatedPage.url().match(/[?&]session_id=([^&]+)/)?.[1];
       expect(sessionId).toBeTruthy();
