@@ -12,6 +12,7 @@ const mockIncrementConversation = vi.fn();
 const mockSetMuted = vi.fn();
 
 vi.mock("@elevenlabs/react", () => ({
+  ConversationProvider: ({ children }: { children: React.ReactNode }) => children,
   useConversation: (options: {
     onConnect?: () => void;
     onDisconnect?: () => void;
