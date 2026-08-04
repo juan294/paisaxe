@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { request as httpRequest } from "node:http";
-import { readFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { assertTestsExecuted } from "./lib/playwright-report";
 
 const REQUIRED_ENV_KEYS = [
@@ -136,7 +136,12 @@ async function main() {
   // Playwright exits 0 when every selected test was skipped, so the run's exit
   // code alone cannot distinguish "the integration passed" from "nothing ran".
   // Capture the JSON report and assert that tests actually executed.
-  const reportPath = join(tmpdir(), `stripe-e2e-report-${process.pid}.json`);
+  const configuredReportPath =
+    process.env.PLAYWRIGHT_JSON_OUTPUT_NAME?.trim();
+  const reportPath =
+    configuredReportPath ??
+    join(tmpdir(), `stripe-e2e-report-${process.pid}.json`);
+  mkdirSync(dirname(reportPath), { recursive: true });
 
   try {
     await waitForServer(baseUrl, 120_000);
@@ -154,7 +159,12 @@ async function main() {
     assertTestsExecuted(readReport(reportPath), "Stripe integration");
   } finally {
     server.kill("SIGTERM");
-    rmSync(reportPath, { force: true });
+    // CI supplies a repository-relative output path so the JSON proof can be
+    // uploaded even when the clean run creates no screenshots or traces.
+    // Ad-hoc local runs keep using a disposable report in the system temp dir.
+    if (!configuredReportPath) {
+      rmSync(reportPath, { force: true });
+    }
   }
 }
 

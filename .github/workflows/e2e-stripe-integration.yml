@@ -99,6 +99,7 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
           QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/stripe-e2e-report.json
         run: npm run test:e2e:stripe
 
       - name: Upload Playwright report
