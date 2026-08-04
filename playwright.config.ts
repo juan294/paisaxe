@@ -103,6 +103,9 @@ export default defineConfig({
       use: { ...desktopChrome, locale: "en-US" },
       testMatch: "stripe-real-checkout.spec.ts",
       timeout: 120_000,
+      // This is a release gate: a Playwright retry would turn a flaky payment
+      // into a green check that does not satisfy the pre-launch contract.
+      retries: 0,
     },
     {
       name: "visual-desktop",
