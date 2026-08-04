@@ -66,8 +66,13 @@ jobs:
         env:
           ANTHROPIC_API_KEY: dummy_key_for_build
           VOYAGE_API_KEY: dummy_key_for_build
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # Keep the browser bundle deterministic: immersive E2E tests mock
+          # /api/feature-flags per scenario. A live URL here server-seeds the
+          # production flags at build time and bypasses those browser mocks.
+          # The real public credentials remain available to the runtime step
+          # below, where the authenticated QA fixture signs in.
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
 
       - name: Run E2E tests
         run: npm run test:e2e
