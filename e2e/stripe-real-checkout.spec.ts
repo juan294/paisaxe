@@ -218,13 +218,22 @@ test.describe("Real Stripe checkout", () => {
         "28001",
       );
 
-      await checkoutFrame
-        .getByRole("button", { name: /Pay|Pagar|Payer|Bezahlen/i })
-        .click();
-
-      await authenticatedPage.waitForURL(/\/pricing\/checkout\/return\?session_id=/, {
-        timeout: STRIPE_TIMEOUT_MS,
+      const payButton = checkoutFrame.getByRole("button", {
+        name: /Pay|Pagar|Payer|Bezahlen/i,
       });
+      await expect(payButton).toBeEnabled({ timeout: STRIPE_TIMEOUT_MS });
+
+      // Register the navigation before submitting and wait only for commit.
+      // The release oracle needs the Checkout Session ID from the return URL;
+      // waiting for every third-party resource on that page to emit `load`
+      // made a completed payment appear flaky in slower CI runs.
+      await Promise.all([
+        authenticatedPage.waitForURL(/\/pricing\/checkout\/return\?session_id=/, {
+          timeout: STRIPE_TIMEOUT_MS,
+          waitUntil: "commit",
+        }),
+        payButton.click(),
+      ]);
 
       const sessionId = authenticatedPage.url().match(/[?&]session_id=([^&]+)/)?.[1];
       expect(sessionId).toBeTruthy();
