@@ -106,5 +106,8 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: playwright-report-stripe
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: error
           retention-days: 14

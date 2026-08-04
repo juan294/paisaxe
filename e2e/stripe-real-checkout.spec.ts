@@ -10,6 +10,15 @@ const START_TALKING_TEXT =
 const UPGRADE_CTA_TEXT =
   /Use your voice|Usa tu voz|Utilisez votre voix|Nutze deine Stimme|Usa la to voz/i;
 
+function safeRequestTarget(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return "unparseable URL";
+  }
+}
+
 function requireEnv(key: string): string {
   const value = process.env[key]?.trim();
   if (!value) {
@@ -40,6 +49,7 @@ async function getActiveStorySlug(supabaseAdmin: SupabaseClient): Promise<string
     .from("stories")
     .select("slug")
     .eq("is_active", true)
+    .eq("curation_status", "approved")
     .order("display_order", { ascending: true })
     .limit(1)
     .single();
@@ -69,16 +79,31 @@ async function fillFirstVisible(
   frame: FrameLocator,
   selectors: string[],
   value: string,
-) {
-  for (const selector of selectors) {
-    const locator = frame.locator(selector).first();
-    if (await locator.isVisible().catch(() => false)) {
-      await locator.fill(value);
-      return;
-    }
+  options: { required?: boolean; timeout?: number } = {},
+): Promise<boolean> {
+  let visibleSelector: string | null = null;
+  try {
+    await expect
+      .poll(
+        async () => {
+          for (const selector of selectors) {
+            if (await frame.locator(selector).first().isVisible().catch(() => false)) {
+              visibleSelector = selector;
+              return selector;
+            }
+          }
+          return null;
+        },
+        { timeout: options.timeout ?? STRIPE_TIMEOUT_MS },
+      )
+      .not.toBeNull();
+  } catch (error) {
+    if (options.required === false) return false;
+    throw error;
   }
 
-  throw new Error(`Unable to find Stripe input for selectors: ${selectors.join(", ")}`);
+  await frame.locator(visibleSelector!).first().fill(value);
+  return true;
 }
 
 test.describe("Real Stripe checkout", () => {
@@ -102,10 +127,38 @@ test.describe("Real Stripe checkout", () => {
     await cleanupVoicePurchases(supabaseAdmin, userId);
 
     try {
-      await authenticatedPage.goto(`/pricing/checkout?returnTo=${storySlug}`);
-      await expect(authenticatedPage.locator("#checkout iframe").first()).toBeVisible({
-        timeout: STRIPE_TIMEOUT_MS,
+      const checkoutDiagnostics: string[] = [];
+      authenticatedPage.on("requestfailed", (request) => {
+        checkoutDiagnostics.push(
+          `request failed: ${safeRequestTarget(request.url())} (${request.failure()?.errorText ?? "unknown error"})`,
+        );
       });
+      authenticatedPage.on("response", (response) => {
+        if (response.status() >= 400) {
+          checkoutDiagnostics.push(
+            `HTTP ${response.status()}: ${safeRequestTarget(response.url())}`,
+          );
+        }
+      });
+      authenticatedPage.on("pageerror", (error) => {
+        checkoutDiagnostics.push(`page error: ${error.message}`);
+      });
+
+      await authenticatedPage.goto(`/pricing/checkout?returnTo=${storySlug}`);
+      try {
+        await expect(authenticatedPage.locator("#checkout iframe").first()).toBeVisible({
+          timeout: STRIPE_TIMEOUT_MS,
+        });
+      } catch (error) {
+        const pageText = (await authenticatedPage.locator("body").innerText())
+          .replace(/\s+/g, " ")
+          .slice(0, 500);
+        throw new Error(
+          `Embedded Checkout did not render. URL=${safeRequestTarget(authenticatedPage.url())}; ` +
+            `page=${JSON.stringify(pageText)}; diagnostics=${JSON.stringify(checkoutDiagnostics)}; ` +
+            `cause=${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
 
       const checkoutFrame = authenticatedPage.frameLocator("#checkout iframe").first();
 
@@ -136,6 +189,15 @@ test.describe("Real Stripe checkout", () => {
         ],
         "123",
       );
+      await fillFirstVisible(
+        checkoutFrame,
+        [
+          "input[autocomplete='cc-name']",
+          "input[name='name']",
+          "input[placeholder*='name on card' i]",
+        ],
+        "Paisaxe QA",
+      );
 
       await fillFirstVisible(
         checkoutFrame,
@@ -145,6 +207,7 @@ test.describe("Real Stripe checkout", () => {
           "input[name='postal_code']",
         ],
         "28001",
+        { required: false, timeout: 2_000 },
       );
 
       await checkoutFrame
@@ -159,6 +222,8 @@ test.describe("Real Stripe checkout", () => {
       expect(sessionId).toBeTruthy();
 
       const session = await stripe.checkout.sessions.retrieve(sessionId!);
+      const paymentProviderId = session.payment_intent;
+      expect(typeof paymentProviderId).toBe("string");
       const event = {
         id: `evt_local_${Date.now()}`,
         object: "event",
@@ -193,7 +258,7 @@ test.describe("Real Stripe checkout", () => {
               .from("voice_purchases")
               .select("payment_provider_id")
               .eq("user_id", userId)
-              .eq("payment_provider_id", session.id)
+              .eq("payment_provider_id", paymentProviderId as string)
               .maybeSingle();
 
             if (error) {
@@ -204,7 +269,7 @@ test.describe("Real Stripe checkout", () => {
           },
           { timeout: STRIPE_TIMEOUT_MS },
         )
-        .toBe(session.id);
+        .toBe(paymentProviderId);
 
       await authenticatedPage.reload();
       await expect(authenticatedPage.getByRole("link", { name: START_TALKING_TEXT })).toBeVisible();
@@ -213,7 +278,20 @@ test.describe("Real Stripe checkout", () => {
       await authenticatedPage.waitForURL(new RegExp(`/immersive\\?story=${storySlug}&voice=ready`), {
         timeout: STRIPE_TIMEOUT_MS,
       });
-      await expect(authenticatedPage.getByRole("button", { name: TALK_BUTTON_TEXT })).toBeVisible();
+      try {
+        await expect(authenticatedPage.getByRole("button", { name: TALK_BUTTON_TEXT })).toBeVisible({
+          timeout: STRIPE_TIMEOUT_MS,
+        });
+      } catch (error) {
+        const pageText = (await authenticatedPage.locator("body").innerText())
+          .replace(/\s+/g, " ")
+          .slice(0, 500);
+        throw new Error(
+          `Voice dialog did not become ready. URL=${safeRequestTarget(authenticatedPage.url())}; ` +
+            `page=${JSON.stringify(pageText)}; diagnostics=${JSON.stringify(checkoutDiagnostics)}; ` +
+            `cause=${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       await expect(authenticatedPage.getByRole("link", { name: UPGRADE_CTA_TEXT })).toHaveCount(0);
     } finally {
       await cleanupVoicePurchases(supabaseAdmin, userId);
