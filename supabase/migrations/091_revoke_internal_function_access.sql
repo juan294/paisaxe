@@ -14,8 +14,30 @@
 REVOKE ALL ON FUNCTION public.claim_booking_sms_job(p_event_key text, p_lease_seconds integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_booking_sms_job(p_event_key text, p_lease_seconds integer) TO service_role;
 
-REVOKE ALL ON FUNCTION public.complete_booking_sms_job(p_event_key text, p_provider_sid text, p_outcome_message text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.complete_booking_sms_job(p_event_key text, p_provider_sid text, p_outcome_message text) TO service_role;
+-- Some environments recorded migration 085 without applying its replacement
+-- of the two-argument overload. Revoke/grant every live overload by identity so
+-- this security migration is safe in both schema states.
+DO $$
+DECLARE
+  v_function text;
+BEGIN
+  FOR v_function IN
+    SELECT format(
+      '%I.%I(%s)',
+      n.nspname,
+      p.proname,
+      pg_get_function_identity_arguments(p.oid)
+    )
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'complete_booking_sms_job'
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', v_function);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', v_function);
+  END LOOP;
+END;
+$$;
 
 REVOKE ALL ON FUNCTION public.fail_booking_sms_job(p_event_key text, p_error text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.fail_booking_sms_job(p_event_key text, p_error text) TO service_role;

@@ -6,7 +6,7 @@
  */
 
 import { test as base, expect, Page, BrowserContext } from "@playwright/test";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient, type Session } from "@supabase/supabase-js";
 
 // Test user credentials from environment
 const QA_TEST_EMAIL = process.env.QA_TEST_USER_EMAIL || "";
@@ -63,21 +63,39 @@ async function signInTestUser(page: Page): Promise<{ userId: string }> {
     throw new Error("No session returned from sign in");
   }
 
-  // Inject the session into the browser's localStorage
-  // This mimics what Supabase Auth does client-side
+  // The application uses @supabase/ssr's browser client, which persists auth
+  // in base64url-encoded cookies. Writing localStorage here creates a token the
+  // application never reads and produces a false "authenticated" fixture.
   const storageKey = `sb-${new URL(SUPABASE_URL).hostname.split(".")[0]}-auth-token`;
-
-  await page.evaluate(
-    ({ key, session }) => {
-      localStorage.setItem(key, JSON.stringify(session));
-    },
-    { key: storageKey, session: data.session }
-  );
+  await injectSessionCookies(page, storageKey, data.session);
 
   // Reload page to pick up the session and wait for it to fully load
   await page.reload({ waitUntil: "domcontentloaded" });
 
   return { userId: data.user.id };
+}
+
+async function injectSessionCookies(
+  page: Page,
+  storageKey: string,
+  session: Session,
+): Promise<void> {
+  const encoded = `base64-${Buffer.from(JSON.stringify(session), "utf8").toString("base64url")}`;
+  const chunkSize = 3180;
+  const values = Array.from(
+    { length: Math.ceil(encoded.length / chunkSize) },
+    (_, index) => encoded.slice(index * chunkSize, (index + 1) * chunkSize),
+  );
+  const origin = new URL(page.url()).origin;
+
+  await page.context().addCookies(
+    values.map((value, index) => ({
+      name: values.length === 1 ? storageKey : `${storageKey}.${index}`,
+      value,
+      url: origin,
+      sameSite: "Lax" as const,
+    })),
+  );
 }
 
 /**
@@ -168,16 +186,18 @@ export const test = base.extend<AuthFixtures>({
     // Sign in and inject session
     await signInTestUser(page);
 
-    // Verify auth state is ready (wait for user-dependent UI)
-    // This is a flakiness mitigation - wait for auth to propagate
-    await page.waitForFunction(
-      () => {
-        // Check if Supabase auth is initialized
-        const keys = Object.keys(localStorage);
-        return keys.some((k) => k.includes("auth-token"));
-      },
-      { timeout: 10000 }
-    );
+    // Verify the SSR auth cookie reached the browser before handing the page
+    // to a test. Page-level assertions still wait for React auth hydration.
+    const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
+    await expect
+      .poll(
+        async () =>
+          (await authenticatedContext.cookies()).some((cookie) =>
+            cookie.name.startsWith(`sb-${projectRef}-auth-token`),
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
 
     await use(page);
 

@@ -107,13 +107,19 @@ async function main() {
   }
 
   const port = process.env.PLAYWRIGHT_PORT?.trim() || "3101";
-  const baseUrl = `http://127.0.0.1:${port}`;
+  // Keep this identical to playwright.config.ts. Mixing 127.0.0.1 here with
+  // localhost in the browser changes the Origin and correctly trips CSRF.
+  const baseUrl = `http://localhost:${port}`;
   const sharedEnv = {
     ...process.env,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY?.trim() || "dummy_key_for_e2e",
     VOYAGE_API_KEY: process.env.VOYAGE_API_KEY?.trim() || "dummy_key_for_e2e",
     MAINTENANCE_MODE: "false",
     NEXT_PUBLIC_SITE_URL: baseUrl,
+    // This runner boots `next start` itself instead of Playwright's webServer,
+    // so it must explicitly allow its localhost origin through the shared
+    // CORS/CSRF gate.
+    PLAYWRIGHT_TEST_ORIGIN: baseUrl,
     STRIPE_SECRET_KEY: getEnv("STRIPE_TEST_SECRET_KEY"),
     STRIPE_DAY_PASS_PRICE_ID: getEnv("STRIPE_TEST_DAY_PASS_PRICE_ID"),
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: getEnv("NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY"),

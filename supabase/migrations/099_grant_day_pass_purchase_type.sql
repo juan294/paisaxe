@@ -23,12 +23,25 @@
 --   SECURITY DEFINER + SET search_path = '' with fully-qualified references.
 --   EXECUTE granted only to service_role.
 
--- 1. Ensure voice_purchases.purchase_type column can hold the new tier values.
---    If the column was typed as text this is a no-op; if it's an enum we extend
---    it. For safety we cast the DEFAULT rather than altering an enum type.
---    (The existing 'day_pass' value continues to work unchanged.)
+-- 1. Ensure voice_purchases can store the complete grant ledger. Production
+--    may have recorded migration 084 without applying its amount_paid column.
 ALTER TABLE public.voice_purchases
+  ADD COLUMN IF NOT EXISTS amount_paid integer,
   ALTER COLUMN purchase_type SET DEFAULT 'day_pass';
+
+-- The original table constraint allowed only day_pass. Setting a default does
+-- not widen that constraint, so replace it explicitly before weekly/monthly
+-- grants are enabled.
+ALTER TABLE public.voice_purchases
+  DROP CONSTRAINT IF EXISTS voice_purchases_purchase_type_check;
+
+ALTER TABLE public.voice_purchases
+  ADD CONSTRAINT voice_purchases_purchase_type_check
+  CHECK (purchase_type IN ('day_pass', 'weekly_pass', 'monthly_pass'))
+  NOT VALID;
+
+ALTER TABLE public.voice_purchases
+  VALIDATE CONSTRAINT voice_purchases_purchase_type_check;
 
 -- 2. Add purchase_type audit column to stripe_webhook_events (additive + idempotent).
 ALTER TABLE public.stripe_webhook_events
