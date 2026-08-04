@@ -52,7 +52,7 @@ export function getPriceIdForPurchaseType(
  * Explicit pin prevents silent behavior changes when the SDK is upgraded.
  * Update this after reading the Stripe API changelog and testing locally.
  */
-const STRIPE_API_VERSION = "2026-06-24.dahlia" as const;
+const STRIPE_API_VERSION = "2026-07-29.dahlia" as const;
 
 /**
  * Get server-side Stripe client.
@@ -153,7 +153,7 @@ export async function createEmbeddedCheckoutSession(
   const priceId = requirePriceId(purchaseType);
 
   const session = await stripe.checkout.sessions.create({
-    ui_mode: "form",
+    ui_mode: "embedded",
     mode: "payment",
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],

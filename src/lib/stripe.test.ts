@@ -318,7 +318,7 @@ describe("stripe", () => {
 
       expect(clientSecret).toBe("cs_test_secret_123");
       expect(mockCreate).toHaveBeenCalledWith({
-        ui_mode: "form",
+        ui_mode: "embedded",
         mode: "payment",
         payment_method_types: ["card"],
         line_items: [{ price: "price_123", quantity: 1 }],
