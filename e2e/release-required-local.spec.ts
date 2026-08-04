@@ -1,4 +1,8 @@
-import { test, expect } from "./fixtures/auth";
+import {
+  test,
+  expect,
+  readSessionFromAuthCookies,
+} from "./fixtures/auth";
 import { createClient } from "@supabase/supabase-js";
 import { assertLocalDatastore } from "../scripts/release/probe-guards";
 
@@ -26,12 +30,9 @@ test("@release-required @local-docker favorite-roundtrip: create, read back from
 }) => {
   const page = authenticatedPage;
 
-  // Read the session the auth fixture injected, and drive the real API from
-  // inside the page — the same path the browser client takes.
-  const session = await page.evaluate(() => {
-    const key = Object.keys(localStorage).find((k) => k.includes("auth-token"));
-    return key ? JSON.parse(localStorage.getItem(key) as string) : null;
-  });
+  // Read the SSR cookie session the auth fixture injected, then drive the real
+  // API from inside the page — the same path the browser client takes.
+  const session = await readSessionFromAuthCookies(page.context());
   const accessToken = session?.access_token as string | undefined;
   const userId = session?.user?.id as string | undefined;
   expect(accessToken, "authenticated session must carry an access token").toBeTruthy();

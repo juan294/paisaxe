@@ -99,6 +99,50 @@ async function injectSessionCookies(
 }
 
 /**
+ * Read the Supabase SSR session back from a browser context.
+ *
+ * @supabase/ssr may split a base64url-encoded session across numbered cookie
+ * chunks. Release probes need the access token for direct datastore oracles,
+ * so they must read the same cookie storage used by the application rather
+ * than the obsolete localStorage key.
+ */
+export async function readSessionFromAuthCookies(
+  context: BrowserContext,
+  supabaseUrl: string = SUPABASE_URL,
+): Promise<Session | null> {
+  if (!supabaseUrl) return null;
+
+  const storageKey = `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token`;
+  const matchingCookies = (await context.cookies())
+    .filter(
+      (cookie) =>
+        cookie.name === storageKey || cookie.name.startsWith(`${storageKey}.`),
+    )
+    .sort((left, right) => {
+      const chunkIndex = (name: string): number =>
+        name === storageKey
+          ? 0
+          : Number.parseInt(name.slice(storageKey.length + 1), 10);
+      return chunkIndex(left.name) - chunkIndex(right.name);
+    });
+
+  if (matchingCookies.length === 0) return null;
+
+  const encoded = matchingCookies.map((cookie) => cookie.value).join("");
+  if (!encoded.startsWith("base64-")) return null;
+
+  try {
+    return JSON.parse(
+      Buffer.from(encoded.slice("base64-".length), "base64url").toString(
+        "utf8",
+      ),
+    ) as Session;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Clean up test user's data (favorites, etc.)
  * Called before and after tests for isolation
  */
