@@ -28,6 +28,26 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      - name: Check authenticated QA secrets
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
+          QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+        run: |
+          for key in \
+            NEXT_PUBLIC_SUPABASE_URL \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY \
+            SUPABASE_SERVICE_KEY \
+            QA_TEST_USER_EMAIL \
+            QA_TEST_USER_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: ${key}" >&2
+              exit 1
+            fi
+          done
+
       - name: Install canvas system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
@@ -46,8 +66,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: dummy_key_for_build
           VOYAGE_API_KEY: dummy_key_for_build
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Run E2E tests
         run: npm run test:e2e
@@ -55,8 +75,9 @@ jobs:
           CI: true
           ANTHROPIC_API_KEY: dummy_key_for_e2e
           VOYAGE_API_KEY: dummy_key_for_e2e
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           MAINTENANCE_MODE: "false"
           STRIPE_SECRET_KEY: sk_test_dummy_for_e2e
           STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
