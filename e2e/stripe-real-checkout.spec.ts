@@ -200,9 +200,14 @@ test.describe("Real Stripe checkout", () => {
       // Stripe can preselect Link based on runner/browser state, which makes a
       // phone number mandatory and turns this card checkout into a Link signup
       // flow. Keep the release gate deterministic by explicitly opting out.
+      // Stripe animates the accordion while this checkbox is visible, and a
+      // neighboring postal-code field can briefly intercept pointer events.
+      // Force only this idempotent opt-out action, then verify the resulting
+      // state before entering payment details.
       const saveForLink = checkoutFrame.locator("#enableStripePass");
       if (await saveForLink.isChecked().catch(() => false)) {
-        await saveForLink.uncheck();
+        await saveForLink.setChecked(false, { force: true });
+        await expect(saveForLink).not.toBeChecked();
       }
 
       await fillFirstVisible(
