@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useConversation } from "@elevenlabs/react";
+import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { Mic, MicOff, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
@@ -114,6 +114,27 @@ function VoiceOrb({
 }
 
 export function VoiceChatElevenLabs({
+  story,
+  agentId,
+  onFallbackToText,
+  userAccessToken,
+}: VoiceChatElevenLabsProps) {
+  // @elevenlabs/react 1.12 scopes callback registration and conversation state
+  // to this provider. Calling useConversation without it crashes as soon as
+  // the paid voice chunk mounts.
+  return (
+    <ConversationProvider>
+      <VoiceChatElevenLabsContent
+        story={story}
+        agentId={agentId}
+        onFallbackToText={onFallbackToText}
+        userAccessToken={userAccessToken}
+      />
+    </ConversationProvider>
+  );
+}
+
+function VoiceChatElevenLabsContent({
   story,
   agentId,
   onFallbackToText,
