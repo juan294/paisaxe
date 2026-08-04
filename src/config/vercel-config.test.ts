@@ -9,7 +9,13 @@ import { join } from "node:path";
 describe("vercel.json", () => {
   const vercelConfig = JSON.parse(
     readFileSync(join(process.cwd(), "vercel.json"), "utf-8"),
-  ) as { regions?: unknown };
+  ) as { ignoreCommand?: unknown; regions?: unknown };
+
+  it("builds production and pull-request deployments while ignoring ordinary previews", () => {
+    expect(vercelConfig.ignoreCommand).toBe(
+      'test "$VERCEL_ENV" != "production" && test -z "$VERCEL_GIT_PULL_REQUEST_ID"',
+    );
+  });
 
   it("declares exactly one region", () => {
     expect(Array.isArray(vercelConfig.regions)).toBe(true);
