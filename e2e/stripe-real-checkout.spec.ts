@@ -202,11 +202,12 @@ test.describe("Real Stripe checkout", () => {
       // flow. Keep the release gate deterministic by explicitly opting out.
       // Stripe animates the accordion while this checkbox is visible, and a
       // neighboring postal-code field can briefly intercept pointer events.
-      // Force only this idempotent opt-out action, then verify the resulting
+      // Use the checkbox's keyboard interaction path, then verify the resulting
       // state before entering payment details.
       const saveForLink = checkoutFrame.locator("#enableStripePass");
       if (await saveForLink.isChecked().catch(() => false)) {
-        await saveForLink.setChecked(false, { force: true });
+        await saveForLink.focus();
+        await saveForLink.press("Space");
         await expect(saveForLink).not.toBeChecked();
       }
 
