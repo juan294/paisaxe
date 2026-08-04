@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.6.0] - 2026-06-20
+## [1.6.0] - 2026-08-04
 
 ### Added
 
+- Fail-closed E2E Pro release verification: deployed build identity and
+  tree-hash readback, a declared release-required probe set, candidate-bound
+  evidence, an authenticated local-datastore oracle with a deterministic seed,
+  and a release analyzer that rejects missing, stale, or mismatched proof.
+- A single authoritative release checklist covering rehearsal, preview
+  verification, production promotion, rollback, and tag-last publication.
 - `retry-booking-sms` Vercel Cron job — retries failed SMS booking confirmations every 10 minutes (`/api/cron/retry-booking-sms`)
 - Durable cron job locking via `cron_job_locks` DB table and `src/lib/cron-job-lock.ts` (`acquireCronJobLease` / `releaseCronJobLease` helpers backed by DB RPC)
 - `/api/health` response now includes `rate_limit` field reporting backend status (`upstash`, `memory`, or `blocked`)
@@ -40,6 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Required CI checks can no longer pass vacuously when their test discovery,
+  preview deployment, or probe execution produced no meaningful evidence.
+- Bearer-authenticated favorites requests now propagate the validated token to
+  PostgREST, so RLS evaluates the caller instead of an anonymous cookie client.
+- Compatible dependency updates close the current production security
+  advisories while preserving the existing Next.js release line.
+- Voice-agent configuration uses the supported ElevenLabs Flash model and
+  webhook admin-client construction now occurs only after authentication.
 - Rate-limit production detection now uses `VERCEL_ENV === "production"` instead of `NODE_ENV` — fixes false 429s in CI and Vercel preview deployments
 - `NEXT_PUBLIC_*` env getters use literal `process.env.X` access — fixes undefined values in client bundle caused by Turbopack dynamic bracket-notation inlining (#556)
 - Auth provider: null-safe state updates + `deferInitialAuth` correctly defers loading state and calls `setIsLoading(false)` synchronously (#556)
@@ -79,6 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The default Claude model moves to Sonnet 5, and routine production,
+  development, and GitHub Action dependencies are refreshed.
 - `npm run typecheck` now runs 4 sub-commands: `typecheck:app`, `typecheck:scripts`, `typecheck:e2e`, `typecheck:edge`
 - `npm run lint` now includes `lint:scripts` sub-command
 - `npm run check-migrations` is now an npm script (replaces inline `npx tsx scripts/check-migrations.ts` in CI)
