@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures/auth";
+import { createClient } from "@supabase/supabase-js";
 import { assertLocalDatastore } from "../scripts/release/probe-guards";
 
 /**
@@ -22,11 +23,30 @@ test.beforeAll(() => {
 
 test("@release-required @local-docker favorite-roundtrip: create, read back from the datastore, clean up", async ({
   authenticatedPage,
-  supabaseAdmin,
 }) => {
   const page = authenticatedPage;
 
-  const { data: story, error: storyError } = await supabaseAdmin
+  // Read the session the auth fixture injected, and drive the real API from
+  // inside the page — the same path the browser client takes.
+  const session = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.includes("auth-token"));
+    return key ? JSON.parse(localStorage.getItem(key) as string) : null;
+  });
+  const accessToken = session?.access_token as string | undefined;
+  const userId = session?.user?.id as string | undefined;
+  expect(accessToken, "authenticated session must carry an access token").toBeTruthy();
+  expect(userId, "authenticated session must identify a user").toBeTruthy();
+
+  const userSupabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    }
+  );
+
+  const { data: story, error: storyError } = await userSupabase
     .from("stories")
     .select("id")
     .limit(1)
@@ -35,62 +55,42 @@ test("@release-required @local-docker favorite-roundtrip: create, read back from
   if (storyError || !story) {
     throw new Error(
       `No story available to favorite: ${storyError?.message ?? "empty stories table"}. ` +
-        "Seed the local stack (npm run seed-db) before running release probes."
+        "Reset the local stack so supabase/seed.sql is applied."
     );
   }
 
   const storyId = story.id as string;
 
-  // Read the session the auth fixture injected, and drive the real API from
-  // inside the page — the same path the browser client takes.
-  const accessToken = await page.evaluate(() => {
-    const key = Object.keys(localStorage).find((k) => k.includes("auth-token"));
-    return key ? JSON.parse(localStorage.getItem(key) as string).access_token : null;
-  });
-  expect(accessToken, "authenticated session must carry an access token").toBeTruthy();
-
-  async function createFavorite(): Promise<number> {
+  async function callFavoriteApi(method: "POST" | "DELETE"): Promise<number> {
     return page.evaluate(
-      async ({ storyId, token }) => {
-        const response = await fetch("/api/favorites", {
-          method: "POST",
+      async ({ method, storyId, token }) => {
+        const isDelete = method === "DELETE";
+        const csrfToken = document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("__csrf="))
+          ?.slice("__csrf=".length);
+        if (!csrfToken) {
+          throw new Error("CSRF cookie was not issued before the mutating probe");
+        }
+        const response = await fetch(isDelete
+          ? `/api/favorites?storyId=${encodeURIComponent(storyId)}`
+          : "/api/favorites", {
+          method,
           headers: {
             "content-type": "application/json",
             authorization: `Bearer ${token}`,
+            "x-csrf-token": csrfToken,
           },
-          body: JSON.stringify({ storyIds: [storyId] }),
+          body: isDelete ? undefined : JSON.stringify({ storyIds: [storyId] }),
         });
         return response.status;
       },
-      { storyId, token: accessToken }
+      { method, storyId, token: accessToken }
     );
   }
-
-  // DELETE takes storyId as a query parameter, not a body.
-  async function deleteFavorite(): Promise<number> {
-    return page.evaluate(
-      async ({ storyId, token }) => {
-        const response = await fetch(
-          `/api/favorites?storyId=${encodeURIComponent(storyId)}`,
-          {
-            method: "DELETE",
-            headers: { authorization: `Bearer ${token}` },
-          }
-        );
-        return response.status;
-      },
-      { storyId, token: accessToken }
-    );
-  }
-
-  const userId = await page.evaluate(() => {
-    const key = Object.keys(localStorage).find((k) => k.includes("auth-token"));
-    return key ? JSON.parse(localStorage.getItem(key) as string).user.id : null;
-  });
-  expect(userId, "authenticated session must identify a user").toBeTruthy();
 
   async function readBack(): Promise<number> {
-    const { count, error } = await supabaseAdmin
+    const { count, error } = await userSupabase
       .from("user_favorites")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
@@ -103,14 +103,14 @@ test("@release-required @local-docker favorite-roundtrip: create, read back from
   }
 
   try {
-    expect(await createFavorite()).toBeLessThan(300);
+    expect(await callFavoriteApi("POST")).toBeLessThan(300);
 
     // Datastore oracle: the write is observed in Postgres, not inferred from
     // the HTTP response.
     expect(await readBack(), "favorite must exist in user_favorites").toBe(1);
   } finally {
     // Cleanup oracle: the row is removed, and its removal is verified.
-    expect(await deleteFavorite()).toBeLessThan(300);
+    expect(await callFavoriteApi("DELETE")).toBeLessThan(300);
   }
 
   expect(await readBack(), "favorite must be removed after cleanup").toBe(0);

@@ -107,6 +107,32 @@ describe("getSupabaseClient", () => {
     expect(client).toBe(mockClient);
   });
 
+  it("forwards a request bearer token to PostgREST operations", async () => {
+    const request = new NextRequest("http://localhost:3000/api/favorites", {
+      headers: { Authorization: "Bearer request-access-token" },
+    });
+
+    await getSupabaseClient(request);
+
+    const options = mockCreateServerClient.mock.calls[0][2];
+    expect(options).toEqual(expect.objectContaining({
+      global: {
+        headers: { Authorization: "Bearer request-access-token" },
+      },
+    }));
+  });
+
+  it("does not forward non-bearer authorization schemes", async () => {
+    const request = new NextRequest("http://localhost:3000/api/favorites", {
+      headers: { Authorization: "Basic credentials" },
+    });
+
+    await getSupabaseClient(request);
+
+    const options = mockCreateServerClient.mock.calls[0][2];
+    expect(options).not.toHaveProperty("global");
+  });
+
   describe("cookies callbacks", () => {
     async function getCookiesConfig() {
       await getSupabaseClient();

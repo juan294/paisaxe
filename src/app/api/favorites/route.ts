@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const supabase = await getSupabaseClient();
+  const supabase = await getSupabaseClient(request);
 
   const { data, error } = await supabase
     .from("user_favorites")
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   const { storyIds } = parsed.data;
 
-  const supabase = await getSupabaseClient();
+  const supabase = await getSupabaseClient(request);
 
   const rows = storyIds.map((storyId: string) => ({
     user_id: user.id,
@@ -105,7 +105,7 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const supabase = await getSupabaseClient();
+  const supabase = await getSupabaseClient(request);
 
   const { error } = await supabase
     .from("user_favorites")
