@@ -74,7 +74,7 @@ develop   # Active development (DEFAULT)
 `main` is protected with branch protection rules:
 - **Required status checks**: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Smoke test Vercel preview` must all pass
 - **Force pushes blocked**, **deletion blocked**
-- **PRs required with 1 approval** (solo dev self-approval is allowed, but the approval click is required before merge)
+- **PRs required with 0 approvals** (solo-developer repository; explicit user authorization in the current conversation and green required checks are the human release gate)
 
 #### Release Process
 
