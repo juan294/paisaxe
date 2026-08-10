@@ -217,6 +217,33 @@ describe("POST /api/webhooks/supabase", () => {
       // isValidPayload requires table_name + operation + timestamp, so 400
       expect(response.status).toBe(400);
     });
+
+    it("should map a field-level Zod issue (non-strict-mode, has a path) to its dotted path", async () => {
+      // `record` isn't type-checked by isValidPayload, so a wrong-typed `record`
+      // sails past isValidPayload but fails Zod's z.record() check with an
+      // `invalid_type` issue that has a non-empty `path` and no `keys` array.
+      // This exercises the `i.path.length > 0 ? [i.path.join(".")] : []` branch.
+      const request = createRequest(
+        {
+          table_name: "stories",
+          operation: "UPDATE",
+          timestamp: new Date().toISOString(),
+          record: "not-an-object",
+        },
+        { "x-webhook-secret": "test-webhook-secret" }
+      );
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Zod failure is warn-only — request still succeeds
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(logger.warn).toHaveBeenCalledWith("[WEBHOOK_UNKNOWN_SHAPE]", {
+        webhook: "supabase",
+        fields: ["record"],
+      });
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -245,5 +272,28 @@ describe("POST /api/webhooks/supabase", () => {
     expect(logger.error).toHaveBeenCalled();
 
     consoleSpy.mockRestore();
+  });
+
+  it("should stringify a non-Error thrown value in the logged error message", async () => {
+    // Force revalidatePath to throw a non-Error (a plain string) so the
+    // `error instanceof Error ? error.message : String(error)` branch takes
+    // the String(error) path instead of error.message.
+    vi.mocked(revalidatePath).mockImplementationOnce(() => {
+       
+      throw "boom: not-an-error-object";
+    });
+
+    const request = createRequest(validPayload({ table_name: "stories" }), {
+      "x-webhook-secret": "test-webhook-secret",
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+    expect(logger.error).toHaveBeenCalledWith("[webhook] Error processing webhook:", {
+      error: "boom: not-an-error-object",
+    });
   });
 });

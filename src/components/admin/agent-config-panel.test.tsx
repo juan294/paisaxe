@@ -192,4 +192,26 @@ describe("AgentConfigPanel", () => {
 
     expect(screen.getByText("No changes to save")).toBeInTheDocument();
   });
+
+  it("does not call onUpdate or show 'Saved successfully' when result has no data and no error", async () => {
+    const user = userEvent.setup();
+    // Covers line 69 false branch: `if (result.data)` when result.data is falsy
+    // but result.error is also falsy (e.g. an empty success response).
+    vi.mocked(adminApi.updateFeatureFlagConfig).mockResolvedValue({});
+
+    render(<AgentConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
+
+    const textarea = screen.getByRole("textbox");
+    await user.clear(textarea);
+    await user.type(textarea, "New prompt with no data response");
+
+    await user.click(screen.getByText("Save"));
+
+    await waitFor(() => {
+      expect(adminApi.updateFeatureFlagConfig).toHaveBeenCalled();
+    });
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByText("Saved successfully")).not.toBeInTheDocument();
+  });
 });

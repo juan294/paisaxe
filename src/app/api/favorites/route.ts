@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { favoritesPostSchema } from "@/lib/schemas";
+import { readJsonBody } from "@/lib/request-validation";
 import { logger } from "@/lib/logger";
 
 // GET /api/favorites - Get user's favorites
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const supabase = await getSupabaseClient();
+  const supabase = await getSupabaseClient(request);
 
   const { data, error } = await supabase
     .from("user_favorites")
@@ -46,8 +47,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const rawBody = await request.json();
-  const parsed = favoritesPostSchema.safeParse(rawBody);
+  const bodyResult = await readJsonBody(request);
+  if (!bodyResult.ok) {
+    return bodyResult.error;
+  }
+  const parsed = favoritesPostSchema.safeParse(bodyResult.data);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -58,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   const { storyIds } = parsed.data;
 
-  const supabase = await getSupabaseClient();
+  const supabase = await getSupabaseClient(request);
 
   const rows = storyIds.map((storyId: string) => ({
     user_id: user.id,
@@ -101,7 +105,7 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const supabase = await getSupabaseClient();
+  const supabase = await getSupabaseClient(request);
 
   const { error } = await supabase
     .from("user_favorites")

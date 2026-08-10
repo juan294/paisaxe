@@ -8,11 +8,11 @@ describe("CHAT_MODEL", () => {
   });
 
   it("matches the claude model ID pattern", () => {
-    // Expected format: claude-<variant>-<version>
-    expect(CHAT_MODEL).toMatch(/^claude-[a-z0-9]+-[a-z0-9-]+-\d{8}$/);
+    // Claude 4.6+ model IDs are dateless pinned snapshots.
+    expect(CHAT_MODEL).toMatch(/^claude-[a-z0-9]+-[a-z0-9-]+(?:-\d{8})?$/);
   });
 
   it("is the expected model ID", () => {
-    expect(CHAT_MODEL).toBe("claude-sonnet-4-20250514");
+    expect(CHAT_MODEL).toBe("claude-sonnet-5");
   });
 });

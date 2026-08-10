@@ -14,14 +14,16 @@ test.describe("SSE abort", () => {
 
   test("reloading during an in-flight chat stream aborts the request and the next chat still works", async ({ page }) => {
     let chatRequests = 0;
-    let releaseFirstRequest: (() => void) | null = null;
+    const firstRequest = {
+      release: undefined as (() => void) | undefined,
+    };
 
     await page.route("**/api/chat/stream", async (route) => {
       chatRequests += 1;
 
       if (chatRequests === 1) {
         await new Promise<void>((resolve) => {
-          releaseFirstRequest = resolve;
+          firstRequest.release = resolve;
         });
 
         try {
@@ -67,7 +69,7 @@ test.describe("SSE abort", () => {
     await expect.poll(() => chatRequests).toBe(1);
 
     await page.reload();
-    releaseFirstRequest?.();
+    firstRequest.release?.();
 
     await expect(page.locator("h1").first()).toBeVisible();
 

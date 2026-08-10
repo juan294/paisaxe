@@ -11,13 +11,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { runDiscovery, type DiscoverySupabaseClient } from "@/lib/content-discovery";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
+import { acquireCronJobLease, releaseCronJobLease } from "@/lib/cron-job-lock";
 
-/** Postgres advisory lock ID — unique per cron route. */
-const LOCK_ID = 1003;
+const LOCK_KEY = "content-discovery";
+const LOCK_LEASE_SECONDS = 20 * 60;
 
 /** Core discovery logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
 async function discoverContent(): Promise<NextResponse> {
@@ -39,18 +40,19 @@ async function discoverContent(): Promise<NextResponse> {
   }
 
   const supabaseAdmin = createAdminClient();
+  let lockToken: string | null = null;
 
-  // Acquire advisory lock to prevent concurrent runs
-  const { data: locked, error: lockError } = await supabaseAdmin.rpc(
-    "pg_try_advisory_lock",
-    { lockid: LOCK_ID }
-  );
-  if (lockError || !locked) {
+  const lease = await acquireCronJobLease(supabaseAdmin, LOCK_KEY, LOCK_LEASE_SECONDS);
+  if (!lease.acquired) {
+    if (lease.error) {
+      logger.error("[CONTENT_DISCOVERY_LOCK_FAILED]", { error: lease.error });
+    }
     return NextResponse.json(
       { status: "skipped", reason: "concurrent run in progress" },
       { status: 409 }
     );
   }
+  lockToken = lease.token;
 
   const supabase = supabaseAdmin as unknown as DiscoverySupabaseClient;
 
@@ -78,7 +80,11 @@ async function discoverContent(): Promise<NextResponse> {
       { status: 500 }
     );
   } finally {
-    await supabaseAdmin.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
+    try {
+      await releaseCronJobLease(supabaseAdmin, LOCK_KEY, lockToken);
+    } catch (error) {
+      logger.error("[CONTENT_DISCOVERY_LOCK_RELEASE_FAILED]", { error });
+    }
   }
 }
 
@@ -97,6 +103,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!auth.valid) {
       return auth.error;
     }
+    // BE-M1: webhook secret was absent/wrong but admin auth succeeded — log for ops visibility
+    logger.warn("[CRON_AUTH_FALLBACK]", { source: "webhook", fellBackTo: "admin_auth" });
   }
   return discoverContent();
 }

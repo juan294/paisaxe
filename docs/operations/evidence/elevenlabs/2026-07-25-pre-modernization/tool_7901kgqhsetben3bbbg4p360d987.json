@@ -1,0 +1,72 @@
+{
+  "id": "tool_7901kgqhsetben3bbbg4p360d987",
+  "tool_config": {
+    "type": "webhook",
+    "name": "get_weather",
+    "description": "Get current weather for a city in Asturias or Picos de Europa. Use this when the visitor asks about weather conditions. Supported cities: Oviedo, Gijón, Avilés, Llanes, Cangas de Onís, Cudillero, Luarca, Ribadesella, Covadonga, Picos de Europa, Fuente Dé.",
+    "response_timeout_secs": 20,
+    "disable_interruptions": false,
+    "interruption_mode": "allow",
+    "force_pre_tool_speech": false,
+    "pre_tool_speech": "auto",
+    "assignments": [],
+    "tool_call_sound": null,
+    "tool_call_sound_behavior": "auto",
+    "tool_error_handling_mode": "auto",
+    "dynamic_variables": {
+      "dynamic_variable_placeholders": {}
+    },
+    "execution_mode": "immediate",
+    "api_schema": {
+      "request_headers": {
+        "Content-Type": "application/json",
+        "x-mcp-secret": {
+          "secret_id": "[REDACTED]"
+        }
+      },
+      "url": "https://paisaxe.es/api/mcp/weather",
+      "method": "POST",
+      "path_params_schema": {},
+      "query_params_schema": null,
+      "request_body_schema": {
+        "description": "The city or location name in Asturias that the user is asking about the weather for. Extract from the conversation.",
+        "dynamic_variable": "",
+        "is_omitted": false,
+        "type": "object",
+        "required": [
+          "city"
+        ],
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "City name for weather lookup. Infer from story context if user says 'here' or 'there'.",
+            "enum": null,
+            "is_system_provided": false,
+            "dynamic_variable": "",
+            "allowed_values_dynamic_variable": "",
+            "constant_value": "",
+            "is_omitted": false
+          }
+        }
+      },
+      "response_body_schema": null,
+      "response_filter": null,
+      "content_type": "application/json",
+      "auth_resolved_params": [],
+      "auth_connection": null
+    }
+  },
+  "access_info": {
+    "is_creator": true,
+    "creator_name": "juan294@gmail.com",
+    "creator_email": "juan294@gmail.com",
+    "role": "admin",
+    "anonymous_access_level_override": null,
+    "access_source": "creator"
+  },
+  "usage_stats": {
+    "total_calls": 7,
+    "avg_latency_secs": 0.55
+  },
+  "response_mocks": null
+}

@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 
 /** Number of candidates to retrieve from vector search before reranking */
 const RERANK_CANDIDATE_COUNT = 10;
+export const RERANK_TIMEOUT_MS = 2_500;
 
 export async function searchChunks(
   queryEmbedding: number[],
@@ -98,9 +99,15 @@ export async function search(
   const allCandidateRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
   const uniqueCandidateRefs = [...new Set(allCandidateRefs)];
 
+  const rerankWithFallback = withRerankTimeout(
+    rerankChunks(queryText, candidates, limit),
+    candidates,
+    limit
+  );
+
   // Start both in parallel — neither depends on the other's result yet.
   const [rerankedChunks, allImages] = await Promise.all([
-    rerankChunks(queryText, candidates, limit),
+    rerankWithFallback,
     getRelatedImages(uniqueCandidateRefs),
   ]);
 
@@ -109,6 +116,24 @@ export async function search(
   const images = allImages.filter((img) => topKRefs.has(img.path));
 
   return { chunks: rerankedChunks, images };
+}
+
+function withRerankTimeout(
+  rerankPromise: Promise<Chunk[]>,
+  candidates: Chunk[],
+  limit: number
+): Promise<Chunk[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<Chunk[]>((resolve) => {
+    timer = setTimeout(() => {
+      logger.warn("[SEARCH_RERANK_TIMEOUT]", { timeoutMs: RERANK_TIMEOUT_MS });
+      resolve(candidates.slice(0, limit));
+    }, RERANK_TIMEOUT_MS);
+  });
+
+  return Promise.race([rerankPromise, timeoutPromise]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
 }
 
 // Keyword-based fallback search for specific place names

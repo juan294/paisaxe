@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { config } from "dotenv";
 import Anthropic from "@anthropic-ai/sdk";
+import { CHAT_MODEL } from "../src/lib/models";
 
 // Load environment variables from .env.local
 config({ path: ".env.local" });
@@ -248,7 +249,7 @@ Generate up to ${maxStories} stories. Return ONLY valid JSON, no explanations.`;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: CHAT_MODEL,
         max_tokens: 8000,
         messages: [
           { role: "user", content: prompt }
@@ -348,7 +349,7 @@ async function main() {
     console.log(`✓ ${valid.length} stories passed validation`);
 
     // Strip sourceQuote before adding to output (validation-only field)
-    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote, ...rest }) => rest);
+    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote: _sourceQuote, ...rest }) => rest);
     allStories.push(...cleaned);
 
     // Rate limiting
@@ -379,7 +380,7 @@ async function main() {
 
     console.log(`✓ ${valid.length} stories passed validation`);
 
-    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote, ...rest }) => rest);
+    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote: _sourceQuote, ...rest }) => rest);
     allStories.push(...cleaned);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -387,8 +388,6 @@ async function main() {
 
   // Deduplicate by ID and assign display order
   const uniqueStories = new Map<string, GeneratedStory>();
-  let displayOrder = 1;
-
   for (const story of allStories) {
     if (!uniqueStories.has(story.id)) {
       uniqueStories.set(story.id, {
@@ -396,7 +395,6 @@ async function main() {
         id: story.id.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
         slug: story.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
       });
-      displayOrder++;
     }
   }
 

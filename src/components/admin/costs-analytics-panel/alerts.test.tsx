@@ -12,7 +12,7 @@ vi.mock("@/lib/admin-api", () => ({
 
 // Mock computeTierAlerts
 const mockComputeTierAlerts = vi.fn();
-vi.mock("@/lib/costs", () => ({
+vi.mock("@/lib/costs/tier-alerts", () => ({
   computeTierAlerts: (...args: unknown[]) => mockComputeTierAlerts(...args),
 }));
 

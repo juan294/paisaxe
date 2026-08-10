@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { ChatActions } from "./chat-actions";
 import { createMockT } from "@/test/i18n-mock";
 
@@ -380,6 +380,46 @@ describe("ChatActions", () => {
       clearTimeoutSpy.mockRestore();
     });
 
+    it("clears existing success timer when a subsequent copy attempt fails", async () => {
+      // Covers chat-actions.tsx:74 — clearTimeout inside the catch block
+      // Sequence: first copy succeeds (sets timerRef.current) → second copy fails
+      // (catch block must cancel the pending success timer before setting the error timer)
+      const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+      const messages: Message[] = [
+        { role: "assistant", content: "Hello Asturias!" },
+      ];
+
+      render(<ChatActions messages={messages} />);
+
+      const copyButton = screen.getByRole("button", {
+        name: /copiar conversación/i,
+      });
+
+      // First click succeeds — sets the success reset timer on timerRef.current
+      fireEvent.click(copyButton);
+      await waitFor(() => {
+        expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
+      });
+
+      // Now make the next copy attempt fail
+      const originalWriteText = mockClipboard.writeText;
+      mockClipboard.writeText = vi.fn().mockRejectedValue(new Error("Clipboard revoked"));
+
+      // Second click fails — catch block should call clearTimeout on the existing timer
+      fireEvent.click(copyButton);
+      await waitFor(() => {
+        expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
+      });
+
+      // clearTimeout must be called — that is line 74
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      // Restore
+      mockClipboard.writeText = originalWriteText;
+      clearTimeoutSpy.mockRestore();
+    });
+
     it("handles clipboard writeText failure gracefully", async () => {
       const originalWriteText = mockClipboard.writeText;
       mockClipboard.writeText = vi.fn().mockRejectedValue(new Error("Clipboard API not available"));
@@ -436,6 +476,34 @@ describe("ChatActions", () => {
       });
 
       // Restore
+      mockClipboard.writeText = originalWriteText;
+    });
+
+    it("line 76 — error toast clears after 2s timeout (setCopyError(false) callback)", async () => {
+      vi.useFakeTimers();
+      const originalWriteText = mockClipboard.writeText;
+      mockClipboard.writeText = vi.fn().mockRejectedValue(new Error("Clipboard denied"));
+
+      const messages: Message[] = [
+        { role: "assistant", content: "Hello Asturias!" },
+      ];
+
+      render(<ChatActions messages={messages} />);
+
+      // act() flushes the async click handler including the catch block microtasks
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /copiar conversación/i }));
+      });
+
+      // After act, setCopyError(true) has run and setTimeout at line 76 is registered
+      expect(screen.getByText(/no se pudo copiar/i)).toBeInTheDocument();
+
+      // Fire the 2s timer — covers the () => setCopyError(false) callback body at line 76
+      act(() => { vi.advanceTimersByTime(2000); });
+
+      expect(screen.queryByText(/no se pudo copiar/i)).not.toBeInTheDocument();
+
+      vi.useRealTimers();
       mockClipboard.writeText = originalWriteText;
     });
   });

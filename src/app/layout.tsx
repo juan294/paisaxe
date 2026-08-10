@@ -119,6 +119,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // NOTE: locale is resolved client-side in LanguageProvider. Reading headers()
+  // here would make the root layout dynamic and break the PPR static shell
+  // (see CLAUDE.md "CSP and PPR Compatibility"); FE-M4 server-side locale was
+  // reverted for that reason — the i18n first-paint flash remains a known item.
   return (
     <html lang={LOCATION_CONFIG.primaryLanguage} suppressHydrationWarning>
       <head>
@@ -141,9 +145,9 @@ export default function RootLayout({
         <JsonLd type="website" />
         <Providers>
           <PostHogPageView />
-          <main id="main-content">
+          <div id="main-content">
             {children}
-          </main>
+          </div>
         </Providers>
         <VercelAnalytics />
       </body>

@@ -150,6 +150,34 @@ describe("useVoiceAccess", () => {
     expect(result.current.agentId).toBe("");
   });
 
+  it("sets no paid access when the API returns a non-ok status (line 62)", async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-1", email: "test@example.com" },
+      session: { access_token: "token-123" },
+      isLoading: false,
+    });
+    mockUseVisitorVoiceAccess.mockReturnValue({
+      featureEnabled: true,
+      needsSignIn: false,
+      isLoading: false,
+    });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "Unauthorized" }),
+    });
+
+    const { result } = renderHook(() => useVoiceAccess());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.canUseVoice).toBe(false);
+    expect(result.current.needsPurchase).toBe(true);
+  });
+
   it("handles fetch errors gracefully", async () => {
     mockUseAuth.mockReturnValue({
       user: { id: "user-1", email: "test@example.com" },

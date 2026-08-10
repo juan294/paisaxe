@@ -241,7 +241,7 @@ async function listAvailableVoices(): Promise<void> {
       console.log(`  - ${voice.name} (${voice.voice_id})`);
     }
     console.log("\nUsing pre-selected voices for agents...\n");
-  } catch (error) {
+  } catch {
     console.log("Could not fetch voices, using default voice IDs...\n");
   }
 }

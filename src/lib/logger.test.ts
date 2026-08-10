@@ -11,11 +11,27 @@ describe("logger", () => {
   });
 
   describe("exported methods", () => {
-    it("exports info, warn, and error methods", async () => {
+    it("exports debug, info, warn, and error methods", async () => {
       const { logger } = await import("./logger");
+      expect(typeof logger.debug).toBe("function");
       expect(typeof logger.info).toBe("function");
       expect(typeof logger.warn).toBe("function");
       expect(typeof logger.error).toBe("function");
+    });
+
+    it("emits structured JSON output on logger.debug", async () => {
+      const { logger } = await import("./logger");
+      const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
+
+      logger.debug("[VOYAGE_TOKENS]", { total_tokens: 42 });
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+      expect(parsed).toMatchObject({
+        level: "debug",
+        msg: "[VOYAGE_TOKENS]",
+        total_tokens: 42,
+      });
     });
   });
 
@@ -186,6 +202,55 @@ describe("logger", () => {
       expect(parsed.req.headers.cookie).toBe("[REDACTED]");
       expect(parsed.req.headers.authorization).toBe("[REDACTED]");
       expect(parsed.rawBody).toContain("[REDACTED]");
+    });
+  });
+
+  describe("in production environment (makePinoLogger)", () => {
+    it("routes info, warn, error, and child calls through pino instance", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+
+      const mockChild = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        child: vi.fn(),
+      };
+      const mockPinoInstance = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        child: vi.fn().mockReturnValue(mockChild),
+      };
+      vi.doMock("pino", () => ({ default: vi.fn().mockReturnValue(mockPinoInstance) }));
+
+      const { logger } = await import("./logger");
+
+      // info with meta → hits the "meta keys present" branch (line 118)
+      logger.info("[TEST_META]", { key: "value" });
+      expect(mockPinoInstance.info).toHaveBeenCalledTimes(1);
+
+      // info without meta → hits the no-meta branch (line 122)
+      logger.info("[TEST_NO_META]");
+      expect(mockPinoInstance.info).toHaveBeenCalledTimes(2);
+
+      // warn (line 127)
+      logger.warn("[WARN]");
+      expect(mockPinoInstance.warn).toHaveBeenCalledTimes(1);
+
+      // debug (line 128 — previously uncovered)
+      logger.debug("[DEBUG]");
+      expect(mockPinoInstance.debug).toHaveBeenCalledTimes(1);
+
+      // error (line 131)
+      logger.error("[ERROR]");
+      expect(mockPinoInstance.error).toHaveBeenCalledTimes(1);
+
+      // child (line 129)
+      const child = logger.child({ service: "test" });
+      expect(mockPinoInstance.child).toHaveBeenCalledWith(expect.objectContaining({ service: "test" }));
+      expect(typeof child.info).toBe("function");
     });
   });
 });

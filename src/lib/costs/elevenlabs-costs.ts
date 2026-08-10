@@ -1,5 +1,6 @@
 import type { ServiceCost } from "@/types/costs-analytics";
 import { PLATFORM_SERVICES } from "@/types/costs-analytics";
+import { logger } from "@/lib/logger";
 
 // ElevenLabs pricing tiers (as of 2026)
 // These are estimates based on public pricing
@@ -60,11 +61,10 @@ export async function fetchElevenLabsCosts(
     );
 
     if (!response.ok) {
-      console.error(
-        "ElevenLabs subscription API error:",
-        response.status,
-        await response.text()
-      );
+      logger.error("ElevenLabs subscription API error", {
+        status: response.status,
+        body: await response.text(),
+      });
       return null;
     }
 
@@ -110,7 +110,9 @@ export async function fetchElevenLabsCosts(
       notes: `${charactersRemaining.toLocaleString()} / ${charactersLimit.toLocaleString()} credits remaining (${usagePercent}% used)`,
     };
   } catch (error) {
-    console.error("Error fetching ElevenLabs usage:", error);
+    logger.error("Error fetching ElevenLabs usage", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }

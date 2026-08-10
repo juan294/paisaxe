@@ -62,6 +62,18 @@ describe("sanitizeSentryEvent", () => {
     expect(event.tags?.request_id).toBe("req-context-5678");
   });
 
+  it("handles undefined request.headers gracefully (line 8 — redactHeaders no-op path)", async () => {
+    const event = await sanitizeSentryEvent({
+      request: {
+        cookies: { session: "abc" },
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.request?.headers).toBeUndefined();
+    expect(event.request?.cookies).toBeUndefined();
+  });
+
   it("keeps the repo package manager and direct sentry dependency aligned", () => {
     const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
       dependencies?: Record<string, string>;

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
+import { getElevenLabsLanguage } from "@/hooks/use-voice-session";
 import type { Story } from "@/types/immersive";
 
 // Mock ElevenLabs React hook
@@ -8,8 +9,10 @@ const mockStartSession = vi.fn();
 const mockEndSession = vi.fn();
 const mockUseConversation = vi.fn();
 const mockIncrementConversation = vi.fn();
+const mockSetMuted = vi.fn();
 
 vi.mock("@elevenlabs/react", () => ({
+  ConversationProvider: ({ children }: { children: React.ReactNode }) => children,
   useConversation: (options: {
     onConnect?: () => void;
     onDisconnect?: () => void;
@@ -28,17 +31,22 @@ vi.mock("@/lib/localize-story", () => ({
 }));
 
 // Mock voice session hook
-vi.mock("@/hooks/use-voice-session", () => ({
-  useVoiceSession: () => ({
-    conversationCount: 0,
-    isReturning: false,
-    userLocale: "es-ES",
-    preferredLanguage: "Spanish" as const,
-    timeOfDay: "morning" as const,
-    incrementConversation: mockIncrementConversation,
-    resetSession: vi.fn(),
-  }),
-}));
+vi.mock("@/hooks/use-voice-session", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/hooks/use-voice-session")>();
+  return {
+    ...actual,
+    useVoiceSession: () => ({
+      conversationCount: 0,
+      isReturning: false,
+      userLocale: "es-ES",
+      preferredLanguage: "Spanish" as const,
+      timeOfDay: "morning" as const,
+      incrementConversation: mockIncrementConversation,
+      resetSession: vi.fn(),
+    }),
+  };
+});
 
 // Mock i18n
 vi.mock("@/lib/i18n", () => ({
@@ -88,6 +96,18 @@ describe("VoiceChatElevenLabs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     conversationHandlers = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ signedUrl: "wss://signed.example/visitor" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      )
+    );
 
     mockUseConversation.mockImplementation((options) => {
       conversationHandlers = options;
@@ -96,6 +116,7 @@ describe("VoiceChatElevenLabs", () => {
         isSpeaking: false,
         startSession: mockStartSession,
         endSession: mockEndSession,
+        setMuted: mockSetMuted,
       };
     });
 
@@ -135,7 +156,7 @@ describe("VoiceChatElevenLabs", () => {
   });
 
   describe("starting a conversation", () => {
-    it("should call startSession with agent ID when orb is clicked", async () => {
+    it("should mint and use a signed session when orb is clicked", async () => {
       mockStartSession.mockResolvedValue(undefined);
 
       render(
@@ -152,10 +173,18 @@ describe("VoiceChatElevenLabs", () => {
       await waitFor(() => {
         expect(mockStartSession).toHaveBeenCalledWith(
           expect.objectContaining({
-            agentId: "test-agent-123",
+            signedUrl: "wss://signed.example/visitor",
           })
         );
       });
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/voice-session",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ agentKey: "pelayo" }),
+        })
+      );
+      expect(mockStartSession.mock.calls[0][0]).not.toHaveProperty("agentId");
     });
 
     it("should pass user_access_token as dynamic variable when provided", async () => {
@@ -215,6 +244,7 @@ describe("VoiceChatElevenLabs", () => {
           isSpeaking: false,
           startSession: mockStartSession,
           endSession: mockEndSession,
+          setMuted: mockSetMuted,
         };
       });
 
@@ -261,6 +291,7 @@ describe("VoiceChatElevenLabs", () => {
           isSpeaking: false,
           startSession: mockStartSession,
           endSession: mockEndSession,
+          setMuted: mockSetMuted,
         };
       });
 
@@ -502,6 +533,7 @@ describe("VoiceChatElevenLabs", () => {
           isSpeaking: false,
           startSession: mockStartSession,
           endSession: mockEndSession,
+          setMuted: mockSetMuted,
         };
       });
 
@@ -519,11 +551,17 @@ describe("VoiceChatElevenLabs", () => {
 
       // Click to mute
       fireEvent.click(muteButton);
+      expect(mockSetMuted).toHaveBeenLastCalledWith(true);
 
       // Now should show "Activar sonido" label
+      const unmuteButton = screen.getByRole("button", { name: /Activar sonido/i });
+      expect(unmuteButton).toBeInTheDocument();
+
+      fireEvent.click(unmuteButton);
+      expect(mockSetMuted).toHaveBeenLastCalledWith(false);
       expect(
-        screen.getByRole("button", { name: /Activar sonido/i })
-      ).toBeInTheDocument();
+        screen.queryByRole("button", { name: /Activar sonido/i })
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -592,9 +630,9 @@ describe("VoiceChatElevenLabs", () => {
     });
   });
 
-  describe("language override for non-Spanish (line 185)", () => {
-    it("should set language override to 'en' when preferredLanguage is not Spanish", async () => {
-      // Override voice session mock to return English preference
+  describe("app-selected language override", () => {
+    it("keeps the selected Spanish locale when the browser prefers English", async () => {
+      // Browser/session metadata says English, while the app language mock is Spanish.
       const voiceSessionModule = await import("@/hooks/use-voice-session");
       vi.spyOn(voiceSessionModule, "useVoiceSession").mockReturnValue({
         conversationCount: 2,
@@ -624,11 +662,12 @@ describe("VoiceChatElevenLabs", () => {
           expect.objectContaining({
             overrides: {
               agent: {
-                language: "en",
+                language: "es",
               },
             },
             dynamicVariables: expect.objectContaining({
-              preferred_language: "English",
+              user_locale: "es",
+              preferred_language: "Spanish",
               is_returning: "true",
               conversation_count: "2",
             }),
@@ -637,6 +676,13 @@ describe("VoiceChatElevenLabs", () => {
       });
 
       vi.restoreAllMocks();
+    });
+  });
+
+  describe("native language routing", () => {
+    it("maps French and Portuguese app selections to native presets", () => {
+      expect(getElevenLabsLanguage("fr")).toBe("fr");
+      expect(getElevenLabsLanguage("pt")).toBe("pt-br");
     });
   });
 
@@ -708,12 +754,65 @@ describe("VoiceChatElevenLabs", () => {
       // The error should be caught silently (logged to console)
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
-          "Failed to end conversation:",
-          expect.any(Error)
+          expect.stringContaining("[VOICE_END_FAILURE]")
         );
       });
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  // FE-H1: unmount cleanup — endSession + mic track teardown
+  describe("FE-H1: unmount cleanup", () => {
+    it("calls endSession when the component unmounts", () => {
+      const { unmount } = render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      unmount();
+
+      expect(mockEndSession).toHaveBeenCalled();
+    });
+
+    it("stops mic tracks when component unmounts after a session was started", async () => {
+      const mockTrack = { stop: vi.fn() } as unknown as MediaStreamTrack;
+      const mockStream = {
+        getTracks: vi.fn().mockReturnValue([mockTrack]),
+      } as unknown as MediaStream;
+
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: {
+          getUserMedia: vi.fn().mockResolvedValue(mockStream),
+        },
+        writable: true,
+      });
+
+      mockStartSession.mockResolvedValue(undefined);
+
+      const { unmount } = render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Start conversation to capture the MediaStream
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalled();
+      });
+
+      unmount();
+
+      // After unmount, mic tracks must be stopped
+      expect(mockTrack.stop).toHaveBeenCalled();
     });
   });
 
@@ -885,6 +984,167 @@ describe("VoiceChatElevenLabs", () => {
       await waitFor(() => {
         const log = screen.getByRole("log");
         expect(log).toHaveAttribute("aria-live", "polite");
+      });
+    });
+  });
+
+  describe("startConversation error handling (lines 260-265)", () => {
+    it("shows error and calls onFallbackToText when startSession throws an Error", async () => {
+      mockStartSession.mockRejectedValue(new Error("WebRTC failed"));
+      const onFallbackToText = vi.fn();
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={onFallbackToText}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /Háblame/i }));
+
+      await waitFor(() => {
+        expect(onFallbackToText).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        const alerts = screen.getAllByRole("alert");
+        expect(alerts.some((a) => a.textContent?.includes("Error de conexión"))).toBe(true);
+      });
+
+      consoleSpy.mockRestore();
+    });
+
+    it("covers String(err) branch when startSession throws a non-Error value (line 261 false branch)", async () => {
+      // Throwing a non-Error (e.g. a string) exercises the `String(err)` else-branch of
+      // `err instanceof Error ? err.message : String(err)` inside the catch block.
+      mockStartSession.mockRejectedValue("plain string error");
+      const onFallbackToText = vi.fn();
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={onFallbackToText}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /Háblame/i }));
+
+      await waitFor(() => {
+        expect(onFallbackToText).toHaveBeenCalled();
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("endConversation non-Error throw (line 273 false branch)", () => {
+    it("covers String(err) branch when endSession throws a non-Error value", async () => {
+      mockEndSession.mockRejectedValue("connection closed unexpectedly");
+
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const stopButton = screen.getByRole("button", { name: /Parar/i });
+      fireEvent.click(stopButton);
+
+      await waitFor(() => {
+        expect(mockEndSession).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining("[VOICE_END_FAILURE]")
+        );
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("auto-scroll with prefersReducedMotion (line 196)", () => {
+    it("calls scrollIntoView with behavior='auto' when reduced motion is preferred", async () => {
+      // Configure matchMedia to signal prefers-reduced-motion
+      Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+          matches: query.includes("prefers-reduced-motion: reduce"),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+
+      const scrollSpy = vi.fn();
+      window.HTMLElement.prototype.scrollIntoView = scrollSpy;
+
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Trigger a message so the messages state changes and the scroll effect fires
+      act(() => {
+        conversationHandlers.onMessage?.({ message: "Hola!", source: "ai" });
+      });
+
+      await waitFor(() => {
+        // With prefersReducedMotion=true the effect uses behavior:"auto"
+        expect(scrollSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ behavior: "auto" })
+        );
+      });
+
+      // Restore matchMedia
+      Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+          matches: false,
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
       });
     });
   });

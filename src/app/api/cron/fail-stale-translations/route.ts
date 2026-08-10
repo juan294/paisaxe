@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const STALE_TRANSLATION_WINDOW_MS = 30 * 60 * 1000;
 
@@ -72,6 +72,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!auth.valid) {
       return auth.error;
     }
+    // BE-M1: webhook secret was absent/wrong but admin auth succeeded — log for ops visibility
+    logger.warn("[CRON_AUTH_FALLBACK]", { source: "webhook", fellBackTo: "admin_auth" });
   }
 
   return failStaleTranslations();

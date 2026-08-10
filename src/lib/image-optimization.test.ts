@@ -147,6 +147,18 @@ describe("image-optimization", () => {
       expect(result.valid).toBe(false);
       expect(result.error).toBe("Invalid image");
     });
+
+    it("should use generic message when sharp rejects with a non-Error (line 236)", async () => {
+      const { validateImageBuffer } = await import("./image-optimization");
+      const inputBuffer = Buffer.from("test image");
+
+      mockSharpInstance.metadata.mockRejectedValue("corrupt buffer");
+
+      const result = await validateImageBuffer(inputBuffer);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe("Invalid image data");
+    });
   });
 
   describe("selectVariantForWidth", () => {
@@ -216,6 +228,21 @@ describe("image-optimization", () => {
 
       await optimizeSingleImage(inputBuffer, 1200);
 
+      expect(mockSharpInstance.resize).toHaveBeenCalledWith(1200, null, {
+        withoutEnlargement: true,
+        fit: "inside",
+      });
+    });
+
+    it("should fall back to maxWidth when metadata has no width (line 173)", async () => {
+      const { optimizeSingleImage } = await import("./image-optimization");
+      const inputBuffer = Buffer.from("test image");
+
+      mockSharpInstance.metadata.mockResolvedValue({ format: "jpeg" });
+
+      await optimizeSingleImage(inputBuffer, 1200);
+
+      // metadata.width is undefined → targetWidth = min(1200, 1200) = 1200
       expect(mockSharpInstance.resize).toHaveBeenCalledWith(1200, null, {
         withoutEnlargement: true,
         fit: "inside",
@@ -298,6 +325,27 @@ describe("image-optimization", () => {
       // for a 500px image
       expect(result.variants.size).toBe(0);
     });
+
+    it("should fall back to default dimensions when metadata has no width/height (lines 77-78, 138-139)", async () => {
+      const { optimizeImage } = await import("./image-optimization");
+      const inputBuffer = Buffer.from("test image");
+
+      // Metadata without width/height — both the original-dimension fallbacks
+      // (2048/1365) and the per-variant fallbacks (targetWidth/0) are exercised
+      mockSharpInstance.metadata.mockResolvedValue({ format: "jpeg" });
+
+      const result = await optimizeImage(inputBuffer);
+
+      expect(result.originalWidth).toBe(2048);
+      expect(result.originalHeight).toBe(1365);
+
+      // Variant metadata also lacks width/height → width falls back to the
+      // target width, height falls back to 0
+      const variant = result.variants.get("avif-640");
+      expect(variant).toBeDefined();
+      expect(variant!.width).toBe(640);
+      expect(variant!.height).toBe(0);
+    });
   });
 
   describe("estimateOptimizedSizes", () => {
@@ -332,6 +380,19 @@ describe("image-optimization", () => {
       const formats = new Set(result.optimized.map((e) => e.format));
       expect(formats.has("avif")).toBe(true);
       expect(formats.has("webp")).toBe(true);
+    });
+
+    it("should fall back to 2048 original width when metadata has no width (line 254)", async () => {
+      const { estimateOptimizedSizes } = await import("./image-optimization");
+      const inputBuffer = Buffer.alloc(1000000);
+
+      mockSharpInstance.metadata.mockResolvedValue({ format: "jpeg" });
+
+      const result = await estimateOptimizedSizes(inputBuffer);
+
+      // originalWidth defaults to 2048 → all three sizes are estimated
+      const widths = new Set(result.optimized.map((e) => e.width));
+      expect(widths).toEqual(new Set([640, 1200, 2048]));
     });
 
     it("should skip sizes larger than original width", async () => {

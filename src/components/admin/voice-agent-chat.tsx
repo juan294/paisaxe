@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 import type { MarketingPlatform } from "@/types/marketing";
 
 interface Message {
@@ -98,7 +99,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
       }
     },
     onError: (error) => {
-      console.error("Conversation error:", error);
+      clientLogger.error("[VOICE_AGENT_CONVERSATION_ERROR]", { error: String(error) });
       setError("Connection error. Try again or switch to text mode.");
     },
   });
@@ -155,11 +156,25 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
       }
 
       await conversation.startSession({
-        agentId: selectedAgent.elevenLabsAgentId,
+        signedUrl: await (async () => {
+          const response = await fetch("/api/admin/voice-session", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...csrfHeaders(),
+            },
+            body: JSON.stringify({ agentKey: selectedAgent.id }),
+          });
+          const body = (await response.json()) as { signedUrl?: unknown };
+          if (!response.ok || typeof body.signedUrl !== "string") {
+            throw new Error("Signed voice session unavailable");
+          }
+          return body.signedUrl;
+        })(),
         connectionType: "websocket",
       });
     } catch (err) {
-      console.error("Failed to start voice call:", err);
+      clientLogger.error("Failed to start voice call", { error: err instanceof Error ? err.message : String(err) });
       setError("Failed to connect. Check your microphone permissions.");
     }
   };
@@ -168,13 +183,14 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
     try {
       await conversation.endSession();
     } catch (err) {
-      console.error("Failed to end call:", err);
+      clientLogger.error("Failed to end call", { error: err instanceof Error ? err.message : String(err) });
     }
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
-    // The SDK handles muting internally based on state
+    const nextMuted = !isMuted;
+    conversation.setMuted(nextMuted);
+    setIsMuted(nextMuted);
   };
 
   // Text mode fallback
@@ -343,6 +359,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
                   <>
                     <button
                       onClick={toggleMute}
+                      aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
                       className={cn(
                         "flex h-8 w-8 items-center justify-center border transition-all",
                         isMuted

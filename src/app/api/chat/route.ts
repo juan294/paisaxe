@@ -6,17 +6,21 @@ import { chatRequestSchema } from "@/lib/schemas";
 // Static here so they are resolved once at module load, not on every request.
 // This removes 100-300 ms of cold-start dynamic-import cost for rejected
 // requests (rate-limit, validation, injection) that never need the AI stack.
-import { validateChatRequest } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { withRouteContext } from "@/lib/request-validation";
 import { getClientIp } from "@/lib/request-utils";
 import {
   detectInjectionAttempt,
   sanitizeInput,
   assessTopicRelevance,
-  MAX_INPUT_LENGTH,
 } from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
+import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
+import {
+  isChatStreamStageTimeout,
+  withChatStreamStageTiming,
+} from "@/lib/chat-stream-timeouts";
 
 /**
  * Extended response type with security metadata
@@ -31,27 +35,45 @@ interface SecureChatResponse extends ChatResponse {
 }
 
 export async function POST(request: NextRequest) {
+  // DO-M1 (#619): bind X-Request-ID into the request context so handler logs
+  // carry request_id.
+  return withRouteContext(request, () => handlePost(request));
+}
+
+// BE-H1: stricter shared-bucket rate limit for requests without a trusted Vercel IP
+// header. All such clients share one bucket with a tighter cap (3 req/60s) to prevent
+// the "unknown" key from being used as a bypass. On Vercel production, all real
+// requests carry x-vercel-forwarded-for, so this only fires in unusual conditions.
+const UNTRUSTED_RATE_LIMIT = { windowMs: 60_000, maxRequests: 3, maxEntries: 1 };
+
+async function handlePost(request: NextRequest) {
   try {
     // Rate limiting - check before any processing
     const ip = getClientIp(request);
-    const rateLimit = await checkRateLimit(ip);
+    if (ip === "unknown") {
+      logger.warn("[CHAT_UNTRUSTED_IP]", {
+        path: "/api/chat",
+        reason: "no_vercel_forwarded_for",
+      });
+    }
+    const rateLimit = await checkRateLimit(
+      ip === "unknown" ? "untrusted" : ip,
+      ip === "unknown" ? UNTRUSTED_RATE_LIMIT : undefined
+    );
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         {
           status: 429,
-          headers: {
-            "Retry-After": String(rateLimit.retryAfter),
-            "X-RateLimit-Limit": String(rateLimit.limit),
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(rateLimit.resetAt),
-          },
+          headers: buildRateLimitHeaders(rateLimit, true),
         }
       );
     }
 
-    // Input validation — Zod runtime schema check first
+    // Input validation — single Zod parse path (BE-L3 #524).
+    // The schema sanitizes message/context and validates post-sanitization
+    // lengths, so the former validateChatRequest helper is no longer needed.
     const body = await request.json().catch(() => null);
     const zodResult = chatRequestSchema.safeParse(body);
     if (!zodResult.success) {
@@ -61,32 +83,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validation = validateChatRequest(body);
-
-    if (!validation.valid) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
-    }
-
-    const { sanitizedMessage: message, sanitizedContext: context, messageIndex } = validation;
+    const { message, context, messageIndex } = zodResult.data;
 
     // === SECURITY PRE-PROCESSING ===
-
-    // Check message length (additional check beyond validation)
-    if (message && message.length > MAX_INPUT_LENGTH) {
-      return NextResponse.json(
-        {
-          message:
-            "Your message is quite long. Could you please summarize your question about Asturias?",
-          flagged: true,
-          flagReason: "length_exceeded",
-        } satisfies SecureChatResponse,
-        {
-          headers: {
-            "X-RateLimit-Remaining": String(rateLimit.remaining),
-          },
-        }
-      );
-    }
 
     // Detect injection attempts
     if (message && detectInjectionAttempt(message)) {
@@ -116,7 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Sanitize input (remove potential delimiters)
-    const cleanMessage = sanitizeInput(message!);
+    const cleanMessage = sanitizeInput(message);
 
     // Assess topic relevance for analytics
     const topicRelevance = assessTopicRelevance(cleanMessage);
@@ -139,29 +138,83 @@ export async function POST(request: NextRequest) {
 
     // === MAIN PROCESSING ===
 
-    // Parallelize the embedding call with the feature flag lookup — they are
-    // independent and can be inflight simultaneously. The search step still
-    // has to wait for the embedding (data dependency), but the flag check does not.
-    const [queryEmbedding, asturianEnabled] = await Promise.all([
-      generateEmbedding(cleanMessage),
-      isFeatureFlagEnabled("asturianu_touches"),
-    ]);
+    // Keep the feature-flag lookup concurrent with retrieval, but cap every
+    // pre-response stage so this legacy JSON route cannot hang indefinitely.
+    const asturianEnabledPromise = isFeatureFlagEnabled("asturianu_touches");
+    void asturianEnabledPromise.catch(() => {});
 
-    // Search for relevant content (with reranking via query text)
-    const { chunks, images } = await search(queryEmbedding, 3, cleanMessage);
+    let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
+    let images: Awaited<ReturnType<typeof search>>["images"] = [];
+    try {
+      const queryEmbedding = await withChatStreamStageTiming(
+        "embedding",
+        generateEmbedding(cleanMessage)
+      );
+      ({ chunks, images } = await withChatStreamStageTiming(
+        "search",
+        search(queryEmbedding, 3, cleanMessage)
+      ));
+    } catch (searchErr) {
+      if (!isChatStreamStageTimeout(searchErr)) {
+        throw searchErr;
+      }
+
+      logger.warn("[CHAT_SEARCH_UNAVAILABLE]", {
+        error: searchErr,
+        stage: searchErr.stage,
+      });
+      return NextResponse.json(
+        { error: "search_unavailable" },
+        {
+          status: 503,
+          headers: {
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        }
+      );
+    }
 
     // If context is provided (e.g., from immersive mode), prepend it
-    const enrichedMessage = context
-      ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
-      : cleanMessage;
+    const enrichedMessage = buildEnrichedChatMessage(cleanMessage, context);
+
+    let asturianEnabled = false;
+    try {
+      asturianEnabled = await withChatStreamStageTiming("featureFlag", asturianEnabledPromise);
+    } catch (flagErr) {
+      logger.warn("[CHAT_FEATURE_FLAG_FALLBACK]", { error: flagErr });
+    }
 
     // Generate response using Claude with context
-    const responseText = await generateChatResponse(
-      enrichedMessage,
-      chunks,
-      asturianEnabled,
-      messageIndex
-    );
+    let responseText: string;
+    try {
+      responseText = await withChatStreamStageTiming(
+        "response",
+        generateChatResponse(
+          enrichedMessage,
+          chunks,
+          asturianEnabled,
+          messageIndex
+        )
+      );
+    } catch (responseErr) {
+      if (!isChatStreamStageTimeout(responseErr)) {
+        throw responseErr;
+      }
+
+      logger.warn("[CHAT_RESPONSE_TIMEOUT]", {
+        error: responseErr,
+        stage: responseErr.stage,
+      });
+      return NextResponse.json(
+        { error: "response_timeout" },
+        {
+          status: 504,
+          headers: {
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        }
+      );
+    }
 
     // === SECURITY POST-PROCESSING ===
 

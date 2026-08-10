@@ -126,9 +126,8 @@ async function processVariant(
     case "webp":
       buffer = await pipeline.webp(FORMAT_SETTINGS.webp).toBuffer();
       break;
-    case "jpeg":
-      buffer = await pipeline.jpeg(FORMAT_SETTINGS.jpeg).toBuffer();
-      break;
+    default:
+      throw new Error(`processVariant called with unexpected format: ${format as string}`);
   }
 
   const resultMetadata = await sharp(buffer).metadata();

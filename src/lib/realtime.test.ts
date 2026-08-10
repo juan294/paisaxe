@@ -44,7 +44,7 @@ describe("realtime", () => {
       const { subscribeToTable } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToTable("feature_flags", callback);
+      await subscribeToTable("feature_flags", callback);
 
       expect(mockClient.channel).toHaveBeenCalledWith("table-feature_flags");
     });
@@ -53,7 +53,7 @@ describe("realtime", () => {
       const { subscribeToTable } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToTable("feature_flags", callback);
+      await subscribeToTable("feature_flags", callback);
 
       expect(mockChannel.on).toHaveBeenCalledWith(
         "postgres_changes",
@@ -70,7 +70,7 @@ describe("realtime", () => {
       const { subscribeToTable } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToTable("feature_flags", callback, { event: "UPDATE" });
+      await subscribeToTable("feature_flags", callback, { event: "UPDATE" });
 
       expect(mockChannel.on).toHaveBeenCalledWith(
         "postgres_changes",
@@ -87,7 +87,7 @@ describe("realtime", () => {
       const { subscribeToTable } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToTable("stories", callback, {
+      await subscribeToTable("stories", callback, {
         event: "UPDATE",
         filter: "is_active=eq.true",
       });
@@ -108,7 +108,7 @@ describe("realtime", () => {
       const { subscribeToTable } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToTable("feature_flags", callback);
+      await subscribeToTable("feature_flags", callback);
 
       expect(mockChannel.subscribe).toHaveBeenCalled();
     });
@@ -117,7 +117,7 @@ describe("realtime", () => {
       const { subscribeToTable } = await import("./realtime");
       const callback = vi.fn();
 
-      const cleanup = subscribeToTable("feature_flags", callback);
+      const cleanup = await subscribeToTable("feature_flags", callback);
 
       expect(typeof cleanup).toBe("function");
       cleanup();
@@ -128,7 +128,7 @@ describe("realtime", () => {
       const { subscribeToTable } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToTable("feature_flags", callback);
+      await subscribeToTable("feature_flags", callback);
 
       // Extract the callback that was passed to .on()
       const onCallback = mockChannel.on.mock.calls[0][2];
@@ -149,7 +149,7 @@ describe("realtime", () => {
       const { subscribeToFeatureFlags } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToFeatureFlags(callback);
+      await subscribeToFeatureFlags(callback);
 
       expect(mockClient.channel).toHaveBeenCalledWith("table-feature_flags");
       expect(mockChannel.on).toHaveBeenCalledWith(
@@ -169,7 +169,7 @@ describe("realtime", () => {
       const { subscribeToFeatureFlags } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToFeatureFlags(callback);
+      await subscribeToFeatureFlags(callback);
 
       const onCallback = mockChannel.on.mock.calls[0][2];
       const payload = {
@@ -197,7 +197,7 @@ describe("realtime", () => {
       const { subscribeToFeatureFlags } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToFeatureFlags(callback);
+      await subscribeToFeatureFlags(callback);
 
       const onCallback = mockChannel.on.mock.calls[0][2];
       const payload = {
@@ -225,7 +225,7 @@ describe("realtime", () => {
       const { subscribeToFeatureFlags } = await import("./realtime");
       const callback = vi.fn();
 
-      const cleanup = subscribeToFeatureFlags(callback);
+      const cleanup = await subscribeToFeatureFlags(callback);
 
       expect(typeof cleanup).toBe("function");
       cleanup();
@@ -238,7 +238,7 @@ describe("realtime", () => {
       const { subscribeToStories } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToStories(callback);
+      await subscribeToStories(callback);
 
       expect(mockClient.channel).toHaveBeenCalledWith("table-stories");
       expect(mockChannel.on).toHaveBeenCalledWith(
@@ -257,7 +257,7 @@ describe("realtime", () => {
       const { subscribeToStories } = await import("./realtime");
       const callback = vi.fn();
 
-      subscribeToStories(callback);
+      await subscribeToStories(callback);
 
       const onCallback = mockChannel.on.mock.calls[0][2];
       const payload = {
@@ -280,7 +280,7 @@ describe("realtime", () => {
       const { subscribeToStories } = await import("./realtime");
       const callback = vi.fn();
 
-      const cleanup = subscribeToStories(callback);
+      const cleanup = await subscribeToStories(callback);
 
       expect(typeof cleanup).toBe("function");
       cleanup();

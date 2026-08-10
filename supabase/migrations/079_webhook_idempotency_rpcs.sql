@@ -480,7 +480,7 @@ CREATE OR REPLACE FUNCTION public.trigger_translation_webhook()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = ''
 AS $$
 DECLARE
   _base_url text;

@@ -1,19 +1,9 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-30 06:00:02
-
-## Changes Made This Run
-
-No changes made. Zero documentation gaps found.
-
-- **Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
-- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, chat/checkout/favorites internal APIs). No external-consumption routes require new documentation.
-- **CLAUDE.md**: Current (last modified 2026-04-29).
-- **features.md**: Complete — no additions needed.
-- **Source changes noted**: `auth-provider.tsx`, `supabase-browser.ts`, and `cors.ts` modified since last CLAUDE.md update — these are internal library changes with no user-facing feature documentation impact.
+> Auto-generated on 2026-08-06
 
 ## CLAUDE.md Status
 
-Last modified: **2026-04-29**
+Last modified: **2026-07-28**
 
 ## Files Modified Since Documentation Update
 
@@ -22,15 +12,32 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/components/auth/auth-provider.test.tsx
-src/components/auth/auth-provider.tsx
-src/lib/proxy/cors.test.ts
-src/lib/proxy/cors.ts
-src/lib/supabase-browser.test.ts
-src/lib/supabase-browser.ts
+src/app/api/admin/voice-session/route.test.ts
+src/app/api/admin/voice-session/route.ts
+src/app/api/voice-session/route.test.ts
+src/app/api/voice-session/route.ts
+src/components/admin/voice-agent-chat.test.tsx
+src/components/admin/voice-agent-chat.tsx
+src/components/immersive/voice-chat-elevenlabs.test.tsx
+src/components/immersive/voice-chat-elevenlabs.tsx
+src/config/elevenlabs-agents.ts
+src/hooks/use-voice-session.test.ts
+src/hooks/use-voice-session.ts
+src/lib/elevenlabs-signed-session.test.ts
+src/lib/elevenlabs-signed-session.ts
 ```
 
 No new migrations since documentation update.
+
+### Scripts
+
+```
+scripts/check-verification-coverage.ts
+scripts/elevenlabs-scoped-ops.test.ts
+scripts/elevenlabs-scoped-ops.ts
+scripts/modernize-paisaxe-agent-config.test.ts
+scripts/modernize-paisaxe-agent-config.ts
+```
 
 ## Documentation Gaps
 
@@ -68,6 +75,7 @@ admin/stripe-analytics
 admin/suggestions
 admin/suggestions/[id]
 admin/tunnel
+admin/voice-session
 chat
 chat/stream
 checkout/day-pass
@@ -77,6 +85,7 @@ cron/content-discovery
 cron/fail-stale-bookings
 cron/fail-stale-translations
 cron/github-traffic-sync
+cron/retry-booking-sms
 cron/subscription-optimizer
 favorites
 feature-flags
@@ -85,9 +94,11 @@ health/live
 mcp/make-booking
 mcp/make-booking/status
 mcp/places
+mcp/save-favorite
 mcp/weather
 suggestions
 voice-access
+voice-session
 webhooks/elevenlabs
 webhooks/stripe
 webhooks/supabase
@@ -100,10 +111,20 @@ webhooks/translate
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-04-29 |
-| README.md | 2026-04-29 |
+| CLAUDE.md | 2026-07-28 |
+| README.md | 2026-07-28 |
 
----
+## Changes Made This Run
+
+**None.** All documentation is current and complete (32nd consecutive clean run).
+
+- Feature flags: All 17 documented with accurate descriptions and categories in features.md
+- API routes: All 57 confirmed internal (admin, cron, webhooks, MCP, health, internal access)
+- CLAUDE.md: Current, comprehensive coverage of all user-facing features and admin capabilities
+- No external-consumption API routes require documentation
+- No undocumented feature flags identified
+
+Documentation update cycle is operating at 100% completeness.
 
 ---
 

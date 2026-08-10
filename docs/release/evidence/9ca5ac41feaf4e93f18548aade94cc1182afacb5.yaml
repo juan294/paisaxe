@@ -1,0 +1,63 @@
+# Dry-run rehearsal — Wave A, Phase 6.
+#
+# This is a REHEARSAL, not a release. It records the real outcome of running the
+# release procedure against the current branch tree while production is still
+# serving an older build, and it is expected to BLOCK. Every value below is a
+# real observation; nothing is aspirational.
+#
+# Reproduce with:
+#   npx tsx scripts/release/candidate-identity.ts --tree HEAD
+#   RELEASE_TARGET_URL=https://paisaxe.es npx playwright test --project=release-required
+#   npm run check-migrations
+#   npm run analyze-release -- --evidence docs/release/evidence/9ca5ac41feaf4e93f18548aade94cc1182afacb5.yaml
+
+version: 1
+
+candidate_tree: 9ca5ac41feaf4e93f18548aade94cc1182afacb5
+# Production is still on the pre-release main tree, so shipped != candidate.
+shipped_tree: 95a62c4be18d9b222187b88a450ba02bcc664365
+# Production predates build-identity reporting, so /api/health discloses no
+# commit and the deployed tree cannot be established at all.
+deployed_tree:
+deployed_commit:
+target_url: https://paisaxe.es
+generated_at: "2026-07-28T21:35:00Z"
+
+probes:
+  # candidate-identity: candidate-identity.ts --verify exited 1 against
+  # production — "Deployment reports no build identity".
+  - id: candidate-identity
+    status: failed
+    oracles: [identity]
+
+  # The six deployed read-only probes all passed against https://paisaxe.es.
+  - id: health-status
+    status: passed
+    oracles: [http]
+  - id: health-db
+    status: passed
+    oracles: [http]
+  - id: csp-canary
+    status: passed
+    oracles: [ui]
+  - id: story-read-path
+    status: passed
+    oracles: [http, ui]
+  - id: admin-denial
+    status: passed
+    oracles: [http]
+  - id: webhook-unsigned
+    status: passed
+    oracles: [http]
+
+  # The local Docker stack was not started for this rehearsal, so the only
+  # mutating probe did not run. Recorded as skipped, which blocks — a required
+  # probe that did not run is not a probe that passed.
+  - id: favorite-roundtrip
+    status: skipped
+    oracles: []
+
+  # npm run check-migrations: 96 migration files validated.
+  - id: migration-posture
+    status: passed
+    oracles: [static]

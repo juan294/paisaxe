@@ -12,7 +12,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 // Mock dependencies
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -24,7 +24,7 @@ vi.mock("@/lib/environment", () => ({
   getEnvironment: vi.fn(() => "development"),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { getEnvironment } from "@/lib/environment";
 
@@ -53,7 +53,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
       error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
     });
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: true }),
     });
@@ -75,7 +75,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: true }),
     });
@@ -108,7 +108,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: true }),
     });
@@ -124,7 +124,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   it("should return 400 if enabled is not a boolean (invalid type)", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: "yes" }),
     });
@@ -139,7 +139,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   it("should return 400 if neither enabled nor config is provided", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({}),
     });
@@ -164,7 +164,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: false }),
     });
@@ -189,7 +189,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/nonexistent_flag", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/nonexistent_flag", {
       method: "PUT",
       body: JSON.stringify({ enabled: true }),
     });
@@ -216,7 +216,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: true }),
     });
@@ -234,7 +234,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
       throw new Error("Unexpected");
     });
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: true }),
     });
@@ -266,7 +266,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: true }),
     });
@@ -287,7 +287,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
       body: JSON.stringify({ enabled: true }),
     });
@@ -327,7 +327,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
       vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
       const newConfig = { whitelisted_emails: ["new@example.com"], agent_id: "new-agent" };
-      const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/visitor_voice_agent", {
+      const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/visitor_voice_agent", {
         method: "PUT",
         body: JSON.stringify({ config: newConfig }),
       });
@@ -353,7 +353,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
       vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
       const newConfig = { whitelisted_emails: ["both@example.com"], agent_id: "both-agent" };
-      const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/visitor_voice_agent", {
+      const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/visitor_voice_agent", {
         method: "PUT",
         body: JSON.stringify({ enabled: false, config: newConfig }),
       });
@@ -369,7 +369,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
     it("should return 400 if config is not an object", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-      const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/visitor_voice_agent", {
+      const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/visitor_voice_agent", {
         method: "PUT",
         body: JSON.stringify({ config: "invalid" }),
       });

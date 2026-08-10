@@ -16,7 +16,7 @@ vi.mock("@/lib/admin-auth", () => ({
 }));
 
 // Mock supabase
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -25,7 +25,7 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const mockValidateAdminAuth = validateAdminAuth as ReturnType<typeof vi.fn>;
 const mockCreateAdminClient = createAdminClient as ReturnType<typeof vi.fn>;
@@ -134,6 +134,26 @@ describe("POST /api/admin/stories/approve-all", () => {
     expect(data.error).toBe("Internal server error");
   });
 
+  it("should stringify a non-Error thrown value on unexpected error", async () => {
+    mockCreateAdminClient.mockImplementation(() => {
+       
+      throw "raw string failure";
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+      method: "POST",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe("Internal server error");
+    expect(logger.error).toHaveBeenCalledWith(
+      "Admin approve-all API error:",
+      { error: "raw string failure" }
+    );
+  });
+
   describe("BE-H3: bulk approval concurrency cap", () => {
     it("fires at most 5 concurrent webhook notifications when approving stories", async () => {
       // Arrange: 10 stories approved — fan-out must be capped at 5 concurrent
@@ -173,6 +193,36 @@ describe("POST /api/admin/stories/approve-all", () => {
       expect(maxConcurrent).toBeLessThanOrEqual(5);
       // All 10 stories should have been notified
       expect(mockFetch).toHaveBeenCalledTimes(10);
+    });
+
+    it("skips the webhook ping entirely when no base URL is configured", async () => {
+      // Neither NEXT_PUBLIC_APP_URL nor VERCEL_URL set -> pingTranslateWebhook
+      // should hit its early-return branch and never call fetch.
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+      vi.stubEnv("VERCEL_URL", "");
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: "story-only" }],
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      vi.unstubAllEnvs();
+
+      expect(response.status).toBe(200);
+      expect(data.data.approvedCount).toBe(1);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("does not call webhook when no stories are approved", async () => {
@@ -227,6 +277,39 @@ describe("POST /api/admin/stories/approve-all", () => {
       // Webhook failures are non-fatal — stories are still approved
       expect(response.status).toBe(200);
       expect(data.data.approvedCount).toBe(2);
+    });
+
+    it("stringifies a non-Error rejection from a failed webhook ping", async () => {
+      // Exercises the `err instanceof Error ? err.message : String(err)` false
+      // branch when fetch rejects with a non-Error value (e.g. a plain string).
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: "story-x" }],
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+       
+      mockFetch.mockRejectedValue("raw string rejection");
+
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data.approvedCount).toBe(1);
+      expect(logger.error).toHaveBeenCalledWith(
+        "[APPROVE_ALL_WEBHOOK_PING_FAILED]",
+        { story_id: "story-x", error: "raw string rejection" }
+      );
     });
   });
 

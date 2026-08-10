@@ -36,14 +36,49 @@ export function AgentTerminal({
     }
   }, [logs.length]);
 
-  // Update elapsed time every second while running
+  // Update elapsed time every second while running.
+  // PE-L1 (#537): pause the interval when the tab is hidden to avoid waking the
+  // page for a timer no one can see; resume (and catch up) on visibilitychange.
   useEffect(() => {
     if (!startedAt || finished) return;
 
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     const tick = () => setElapsed(formatElapsed(startedAt));
-    tick();
-    const interval = setInterval(tick, 1_000);
-    return () => clearInterval(interval);
+
+    const start = () => {
+      if (interval !== null) return;
+      tick(); // immediate catch-up when (re)starting
+      interval = setInterval(tick, 1_000);
+    };
+
+    const stop = () => {
+      if (interval !== null) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        start();
+      }
+    };
+
+    // Only run the interval if the tab is currently visible.
+    if (!document.hidden) {
+      start();
+    } else {
+      tick(); // render an initial value even when starting hidden
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [startedAt, finished]);
 
   // Compute final elapsed when finished

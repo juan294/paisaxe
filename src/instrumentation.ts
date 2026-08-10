@@ -1,9 +1,16 @@
+import * as Sentry from "@sentry/nextjs";
 import { sanitizeValue } from "@/lib/logger-sanitize";
+
+/**
+ * DO-H1: Next.js 15/16 calls this named export to forward server-side errors to Sentry.
+ * Without it, unhandled route/middleware errors are never captured.
+ */
+export const onRequestError = Sentry.captureRequestError;
 
 declare global {
   var __paisaxeConsolePatched: boolean | undefined;
   var __paisaxeOriginalConsole:
-    | Pick<Console, "error" | "info" | "warn">
+    | Pick<Console, "debug" | "error" | "info" | "warn">
     | undefined;
 }
 
@@ -25,14 +32,14 @@ function normalizeConsoleMessage(message: unknown) {
   return JSON.stringify(sanitized) ?? "[CONSOLE_MESSAGE_EMPTY]";
 }
 
-function buildConsoleMeta(method: "error" | "info" | "warn", args: unknown[]) {
+function buildConsoleMeta(method: "debug" | "error" | "info" | "warn", args: unknown[]) {
   return args.length > 0
     ? { args, source: `console.${method}` }
     : { source: `console.${method}` };
 }
 
 function wrapConsoleMethod(
-  method: "error" | "info" | "warn",
+  method: "debug" | "error" | "info" | "warn",
   log: (message: string, meta?: Record<string, unknown>) => void,
 ) {
   return (message?: unknown, ...args: unknown[]) => {
@@ -52,12 +59,14 @@ export async function register() {
   }
 
   globalThis.__paisaxeOriginalConsole = {
+    debug: console.debug.bind(console),
     error: console.error.bind(console),
     info: console.info.bind(console),
     warn: console.warn.bind(console),
   };
   globalThis.__paisaxeConsolePatched = true;
 
+  console.debug = wrapConsoleMethod("debug", logger.debug);
   console.error = wrapConsoleMethod("error", logger.error);
   console.info = wrapConsoleMethod("info", logger.info);
   console.warn = wrapConsoleMethod("warn", logger.warn);

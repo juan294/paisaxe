@@ -90,6 +90,16 @@ describe("elevenlabs-costs", () => {
       expect(result).toBeNull();
     });
 
+    it("returns null when fetch throws a non-Error value (String(error) fallback)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-key";
+
+      global.fetch = vi.fn().mockRejectedValue("string rejection");
+
+      const result = await fetchElevenLabsCosts("2024-01-01", "2024-01-31");
+
+      expect(result).toBeNull();
+    });
+
     it("handles zero character_count and character_limit", async () => {
       process.env.ELEVENLABS_API_KEY = "test-key";
 

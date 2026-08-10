@@ -78,6 +78,34 @@ describe("isFeatureFlagEnabled", () => {
     expect(result).toBe(false);
   });
 
+  it("returns false when the flag fetch times out (5s abort)", async () => {
+    vi.useFakeTimers();
+    try {
+      mockFetch.mockImplementation(
+        (_url: string, options: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            options.signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted", "AbortError"));
+            });
+          })
+      );
+
+      const { isFeatureFlagEnabled } = await import("./feature-flags-server");
+      const resultPromise = isFeatureFlagEnabled("randomized_order");
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const fetchOptions = mockFetch.mock.calls[0][1];
+      expect(fetchOptions.signal.aborted).toBe(false);
+
+      vi.advanceTimersByTime(5000);
+
+      expect(fetchOptions.signal.aborted).toBe(true);
+      await expect(resultPromise).resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("returns false when no Supabase config", async () => {
     process.env = {
       ...originalEnv,
@@ -155,11 +183,13 @@ describe("isFeatureFlagEnabled", () => {
 
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "[FEATURE_FLAG_FAILURE]",
-      expect.objectContaining({
-        flag: "randomized_order",
-        error: "Connection failed",
-      })
+      expect.stringContaining("[FEATURE_FLAG_FAILURE]")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"flag":"randomized_order"')
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"error":"Connection failed"')
     );
   });
 
@@ -175,11 +205,10 @@ describe("isFeatureFlagEnabled", () => {
 
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "[FEATURE_FLAG_FAILURE]",
-      expect.objectContaining({
-        flag: "randomized_order",
-        statusCode: 503,
-      })
+      expect.stringContaining("[FEATURE_FLAG_FAILURE]")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"statusCode":503')
     );
   });
 
@@ -193,11 +222,10 @@ describe("isFeatureFlagEnabled", () => {
 
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "[FEATURE_FLAG_FAILURE]",
-      expect.objectContaining({
-        flag: "randomized_order",
-        error: expect.stringContaining("aborted"),
-      })
+      expect.stringContaining("[FEATURE_FLAG_FAILURE]")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("aborted")
     );
   });
 
@@ -232,6 +260,7 @@ describe("getAllFeatureFlagsServer", () => {
 
   afterEach(() => {
     process.env = originalEnv;
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -286,8 +315,10 @@ describe("getAllFeatureFlagsServer", () => {
 
     expect(result).toEqual({});
     expect(consoleWarn).toHaveBeenCalledWith(
-      "Failed to fetch all feature flags:",
-      503
+      expect.stringContaining("Failed to fetch all feature flags")
+    );
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringContaining('"statusCode":503')
     );
   });
 
@@ -300,8 +331,7 @@ describe("getAllFeatureFlagsServer", () => {
 
     expect(result).toEqual({});
     expect(consoleWarn).toHaveBeenCalledWith(
-      "Error fetching all feature flags:",
-      expect.any(Error)
+      expect.stringContaining("Error fetching all feature flags")
     );
   });
 
@@ -342,5 +372,43 @@ describe("getAllFeatureFlagsServer", () => {
 
     const fetchOptions = mockFetch.mock.calls[0][1];
     expect(fetchOptions.next).toEqual({ revalidate: 60 });
+  });
+
+  it("passes an AbortSignal to fetch for timeout control", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    });
+
+    const { getAllFeatureFlagsServer } = await import("./feature-flags-server");
+    await getAllFeatureFlagsServer();
+
+    const fetchOptions = mockFetch.mock.calls[0][1];
+    expect(fetchOptions.signal).toBeDefined();
+    expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns empty object when the all-flags fetch times out", async () => {
+    vi.useFakeTimers();
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockFetch.mockImplementation(
+      (_url: string, options: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted", "AbortError"));
+          });
+        })
+    );
+
+    const { getAllFeatureFlagsServer } = await import("./feature-flags-server");
+    const resultPromise = getAllFeatureFlagsServer();
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(5000);
+
+    await expect(resultPromise).resolves.toEqual({});
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringContaining("Error fetching all feature flags")
+    );
   });
 });

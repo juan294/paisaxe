@@ -12,12 +12,12 @@ CREATE OR REPLACE FUNCTION public.fail_stale_story_translations_locked(
 ) RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = ''
 AS $$
 DECLARE
   v_count integer;
 BEGIN
-  IF NOT pg_try_advisory_xact_lock(1006) THEN
+  IF NOT pg_catalog.pg_try_advisory_xact_lock(1006) THEN
     RETURN -1;
   END IF;
 

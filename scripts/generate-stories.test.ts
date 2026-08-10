@@ -3,7 +3,6 @@ import {
   validateGeneratedStories,
   NON_ASTURIAN_BLOCKLIST,
   type GeneratedStoryWithQuote,
-  type ValidationResult,
 } from "./generate-stories";
 
 describe("NON_ASTURIAN_BLOCKLIST", () => {

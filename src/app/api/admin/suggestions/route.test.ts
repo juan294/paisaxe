@@ -99,7 +99,7 @@ const defaultSupabaseClient = () => ({
 
 mockCreateAdminClient.mockImplementation(defaultSupabaseClient);
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: (...args: unknown[]) => mockCreateAdminClient(...args),
 }));
 
@@ -330,6 +330,25 @@ describe("/api/admin/suggestions", () => {
       expect(response.status).toBe(200);
       expect(data.data).toHaveLength(1);
     });
+  });
+
+  it("should stringify a non-Error thrown value on unexpected error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin-1" });
+    mockCreateAdminClient.mockImplementation(() => {
+       
+      throw "raw string failure";
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/suggestions");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+    expect(logger.error).toHaveBeenCalledWith(
+      "Admin suggestions API error:",
+      { error: "raw string failure" }
+    );
   });
 
   it("should use logger.error (not console.error) on unhandled GET error", async () => {

@@ -36,10 +36,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: 'npm'
@@ -53,60 +53,134 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
+      - name: Check verification coverage wiring
+        run: npm run check-verification-coverage
+
       - name: Run lint
         run: npm run lint
 
       - name: Check env vars documented
         run: npm run check-env
 
-      - name: Check migration numbering
-        run: npx tsx scripts/check-migrations.ts
+      - name: Validate migrations
+        run: npm run check-migrations
 
+      - name: Check circular dependencies
+        run: npm run lint:deps
+
+  # -----------------------------------------------------------------------
+  # Test suite runs ONCE, sharded across 4 runners for wall-clock speed.
+  #
+  # WHY: Previously two jobs ran the same ~400-file suite end-to-end — a
+  # `test` job (`vitest run`) AND a `coverage` job (`vitest run --coverage`),
+  # each ~8-9 min. That double-ran the suite and burned a full extra runner
+  # per CI run for zero added signal (if coverage passes, the tests passed).
+  #
+  # NOW: a single sharded coverage suite. Each shard runs a quarter of the
+  # suite with coverage instrumentation and emits a blob report. Per-shard
+  # coverage thresholds are forced to 0 (a shard only sees 1/4 of the files,
+  # so its partial coverage is meaningless); the REAL thresholds are enforced
+  # exactly once on the merged total in `coverage-merge`. This preserves the
+  # exact coverage gate while cutting the critical-path long pole ~9m -> ~4m.
+  # -----------------------------------------------------------------------
+  coverage-shard:
+    name: Coverage (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      # Don't cancel sibling shards when one fails — we want the full picture.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install canvas system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - name: Install dependencies
+        run: npm ci
+
+      # No positional path arg: vitest.config.ts's `include` already scopes
+      # both src/** and scripts/** test files; a positional would override it.
+      # --reporter=blob writes .vitest-reports/blob-<shard>-4.json for merging.
+      - name: Run tests with coverage (sharded)
+        run: >-
+          npx vitest run
+          --shard=${{ matrix.shard }}/4
+          --coverage
+          --reporter=blob
+          --coverage.thresholds.lines=0
+          --coverage.thresholds.functions=0
+          --coverage.thresholds.statements=0
+          --coverage.thresholds.branches=0
+
+      - name: Upload coverage blob
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-blob-${{ matrix.shard }}
+          path: .vitest-reports/*
+          include-hidden-files: true
+          retention-days: 1
+
+  coverage-merge:
+    name: Coverage merge
+    runs-on: ubuntu-latest
+    needs: coverage-shard
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download coverage blobs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+
+      # --merge-reports combines the shard blobs and reports/enforces the REAL
+      # coverage thresholds from vitest.config.ts once, on the combined total.
+      - name: Merge reports and enforce coverage thresholds
+        run: npx vitest run --merge-reports --coverage
+
+  # Thin aggregator that PRESERVES the `Test` required status check on main.
+  # `main` branch protection requires a check literally named "Test"; deleting
+  # the old `test` job would block every develop->main release PR. This gate
+  # reports green iff the sharded suite + merged coverage gate passed.
   test:
     name: Test
     runs-on: ubuntu-latest
+    needs: [coverage-shard, coverage-merge]
+    if: always()
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install canvas system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm run test
-
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install canvas system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests with coverage
-        run: npm run test:coverage
+      - name: Verify test/coverage suite succeeded
+        run: |
+          shards='${{ needs.coverage-shard.result }}'
+          merge='${{ needs.coverage-merge.result }}'
+          echo "coverage-shard=$shards coverage-merge=$merge"
+          if [ "$shards" != "success" ] || [ "$merge" != "success" ]; then
+            echo "::error::Test suite failed (shards=$shards, merge=$merge)"
+            exit 1
+          fi
+          echo "Test suite passed (sharded) and coverage thresholds met."
 
   build:
     name: Build
@@ -114,10 +188,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: 'npm'
@@ -167,6 +241,14 @@ jobs:
       statuses: read
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
       - name: Wait for Vercel preview deployment
         id: vercel-wait
         env:
@@ -188,13 +270,18 @@ jobs:
 
               if [ "$state" = "success" ] && [ -n "$preview_url" ]; then
                 echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+                echo "vercel_outcome=success" >> "$GITHUB_OUTPUT"
                 echo "Preview URL: $preview_url"
                 exit 0
               fi
 
               if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
-                echo "Vercel deployment failed with state=$state — skipping smoke probes"
+                echo "::warning::Vercel preview deployment FAILED (state=$state) — smoke probes skipped. Check Vercel dashboard for build logs."
+                echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+                echo ":x: **Vercel preview deployment failed** (state=\`$state\`). Smoke probes were not run." >> "$GITHUB_STEP_SUMMARY"
+                echo "Check the [Vercel dashboard](https://vercel.com/dashboard) for build error details." >> "$GITHUB_STEP_SUMMARY"
                 echo "url=" >> "$GITHUB_OUTPUT"
+                echo "vercel_outcome=failed" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             else
@@ -204,11 +291,16 @@ jobs:
             sleep 15
           done
 
-          echo "Timed out waiting for Vercel preview deployment — skipping smoke probes"
+          echo "::warning::Timed out waiting for Vercel preview deployment after 5 minutes — smoke probes skipped. Verify the deployment manually."
+          echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+          echo ":warning: **Vercel preview deployment timed out** after 5 minutes. Smoke probes were not run." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verify the deployment at the [Vercel dashboard](https://vercel.com/dashboard) manually." >> "$GITHUB_STEP_SUMMARY"
           echo "url=" >> "$GITHUB_OUTPUT"
+          echo "vercel_outcome=timeout" >> "$GITHUB_OUTPUT"
 
       - name: Smoke check - liveness endpoint
         if: steps.vercel-wait.outputs.url != ''
+        id: smoke-live
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
@@ -219,7 +311,9 @@ jobs:
             "$PREVIEW_URL/api/health/live" \
             -o /tmp/live.json -w "%{http_code}")
           if [ "$response" != "200" ]; then
-            echo "Liveness check failed: HTTP $response"
+            echo "::warning::Smoke probe FAILED: /api/health/live returned HTTP $response on $PREVIEW_URL"
+            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+            echo ":x: **Liveness probe failed**: \`/api/health/live\` returned HTTP $response on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
             cat /tmp/live.json
             exit 1
           fi
@@ -228,25 +322,18 @@ jobs:
 
       - name: Smoke check - health endpoint
         if: steps.vercel-wait.outputs.url != ''
+        id: smoke-health
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
-          echo "Testing: $PREVIEW_URL/api/health"
-          response=$(curl -sS \
-            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
-            "$PREVIEW_URL/api/health" \
-            -o /tmp/health.json -w "%{http_code}")
-          if [ "$response" != "200" ]; then
-            echo "Health check failed: HTTP $response"
-            cat /tmp/health.json
+          if node scripts/check-health-readiness.mjs "$PREVIEW_URL"; then
+            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+            echo ":white_check_mark: **Smoke probes passed** — \`/api/health/live\` and \`/api/health\` returned healthy on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Smoke probe FAILED: /api/health returned unhealthy on $PREVIEW_URL — check Sentry/logs for runtime errors."
+            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+            echo ":x: **Health probe failed**: \`/api/health\` returned unhealthy on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "Check Sentry and Vercel function logs for runtime errors." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          status=$(python3 -c 'import json; print(json.load(open("/tmp/health.json"))["status"])')
-          if [ "$status" != "healthy" ]; then
-            echo "Health check failed: status=$status (expected healthy)"
-            cat /tmp/health.json
-            exit 1
-          fi
-          echo "Health check passed (HTTP 200, status=healthy)"
-          cat /tmp/health.json

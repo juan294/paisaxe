@@ -1,4 +1,3 @@
-import { createSupabaseBrowserClient } from "./supabase-browser";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import type { FeatureFlagRow } from "@/types/feature-flags";
 import type { StoryRow } from "@/types/immersive";
@@ -16,17 +15,22 @@ interface SubscribeToTableOptions {
 /**
  * Subscribe to Postgres Changes on a specific table via Supabase Realtime.
  *
- * Returns a cleanup function that removes the channel when called.
+ * Returns a cleanup function that removes the channel when called. The
+ * Supabase browser client is dynamically imported so this module doesn't pull
+ * the ~324 KB Supabase JS chunk onto the first-paint path for pages that only
+ * import `realtime.ts` for its type-level exports (see stories-data.ts for
+ * the same pattern).
  *
  * @param tableName - The database table to subscribe to
  * @param callback - Called with the full payload on each change event
  * @param options - Optional event type and column filter
  */
-export function subscribeToTable(
+export async function subscribeToTable(
   tableName: string,
   callback: (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => void,
   options?: SubscribeToTableOptions
-): () => void {
+): Promise<() => void> {
+  const { createSupabaseBrowserClient } = await import("./supabase-browser");
   const supabase = createSupabaseBrowserClient();
   const event = options?.event ?? "*";
 
@@ -60,9 +64,9 @@ export function subscribeToTable(
  * @param callback - Called with the updated FeatureFlagRow
  * @returns Cleanup function to remove the subscription
  */
-export function subscribeToFeatureFlags(
+export async function subscribeToFeatureFlags(
   callback: (row: FeatureFlagRow) => void
-): () => void {
+): Promise<() => void> {
   const environment = getEnvironment();
 
   return subscribeToTable(
@@ -90,9 +94,9 @@ export function subscribeToFeatureFlags(
  * @param callback - Called with the updated StoryRow
  * @returns Cleanup function to remove the subscription
  */
-export function subscribeToStories(
+export async function subscribeToStories(
   callback: (row: StoryRow) => void
-): () => void {
+): Promise<() => void> {
   return subscribeToTable(
     "stories",
     (payload) => {

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 import { bulkStatusStoriesSchema } from "@/lib/schemas";
+import { readJsonBody } from "@/lib/request-validation";
 
 export async function PUT(request: NextRequest) {
   // Validate admin auth
@@ -12,13 +13,17 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const bodyResult = await readJsonBody<{ storyIds?: unknown }>(request);
+    if (!bodyResult.ok) {
+      return bodyResult.error;
+    }
+    const body = bodyResult.data;
 
     // Zod schema validation (BE-M1)
     const parsed = bulkStatusStoriesSchema.safeParse(body);
     if (!parsed.success) {
       const hasStoryIds = Array.isArray(body?.storyIds);
-      if (!hasStoryIds || body.storyIds.length === 0) {
+      if (!hasStoryIds || (body.storyIds as unknown[]).length === 0) {
         return NextResponse.json(
           { error: "Story IDs array is required" },
           { status: 400 }

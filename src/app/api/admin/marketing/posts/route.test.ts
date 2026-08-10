@@ -28,7 +28,7 @@ const mockSupabaseEq = vi.fn();
 const mockSupabaseOrder = vi.fn();
 const mockSupabaseLimit = vi.fn();
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => ({
     from: () => ({
       select: (...args: unknown[]) => {

@@ -7,6 +7,24 @@
  * - A single choke-point for configuration debugging
  *
  * See: https://github.com/juanmgonzalez/paisaxe/issues/289 (AR-M1)
+ *
+ * ─── SECURITY BOUNDARY ────────────────────────────────────────────────────────
+ * This file is imported by client components (e.g. auth-provider.tsx) for the
+ * NEXT_PUBLIC_* getters, so it CANNOT carry `import "server-only"` at the top.
+ *
+ * The getters marked "server-only" below (Supabase service keys, Stripe secret
+ * keys) must NEVER be called from client-side code. They are safe here because:
+ *   1. `process.env[key]` is a Node.js runtime lookup — the browser polyfill
+ *      always returns `undefined`, so no secret is inlined into the bundle.
+ *   2. The module that USES these secrets (supabase-admin.ts, stripe.ts, etc.)
+ *      carries `import "server-only"`, which enforces the boundary at the
+ *      call-site level. A client bundle that somehow reached those modules
+ *      would fail the Next.js build before shipping.
+ *
+ * If you add a new getter for a secret (non-NEXT_PUBLIC_) env var, mark it
+ * "server-only" in its JSDoc and ensure it is only consumed by server-guarded
+ * modules.
+ * ──────────────────────────────────────────────────────────────────────────────
  */
 
 /**
@@ -68,6 +86,12 @@ export const getStripeSecretKey = () => getEnv("STRIPE_SECRET_KEY");
 
 /** Stripe day-pass price ID (server-only, trimmed) */
 export const getStripeDayPassPriceId = () => getEnv("STRIPE_DAY_PASS_PRICE_ID");
+
+/** Stripe weekly-pass price ID (server-only, trimmed) — #137 */
+export const getStripeWeeklyPassPriceId = () => getEnv("STRIPE_WEEKLY_PRICE_ID");
+
+/** Stripe monthly-pass price ID (server-only, trimmed) — #137 */
+export const getStripeMonthlyPassPriceId = () => getEnv("STRIPE_MONTHLY_PRICE_ID");
 
 /** Stripe webhook secret (server-only, trimmed) */
 export const getStripeWebhookSecret = () => getEnv("STRIPE_WEBHOOK_SECRET");

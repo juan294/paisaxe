@@ -42,7 +42,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
 
       - name: Wait for Vercel preview deployment
         id: vercel-wait
@@ -81,8 +86,9 @@ jobs:
 
       # ------------------------------------------------------------------ #
       # Health endpoint — must return HTTP 200 and JSON status "healthy".   #
-      # A 503 (degraded) or a non-healthy body means a backend dependency   #
-      # is down, so fail the preview gate instead of silently merging it.   #
+      # A non-healthy body means a backend dependency or runtime config     #
+      # required in this Vercel environment is broken, so fail the preview  #
+      # gate instead of silently merging it.                                #
       # ------------------------------------------------------------------ #
       - name: Smoke test - health endpoint
         env:
@@ -91,27 +97,20 @@ jobs:
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
           if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
             if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
-              echo "::notice::Skipping protected preview health check because Actions secrets are unavailable to Dependabot PRs."
-              exit 0
+              # This is a REQUIRED check on main. Exiting 0 here reported the
+              # gate as satisfied while probing nothing — requiredness without
+              # evidence. Dependabot PRs cannot read Actions secrets, so the
+              # check genuinely cannot be satisfied; it must block rather than
+              # pass. Dependency updates reach production by being cherry-picked
+              # onto develop and released from there, never by merging a
+              # Dependabot PR into main.
+              echo "::error::Preview smoke cannot run on Dependabot PRs (Actions secrets are unavailable). Cherry-pick this update onto develop and release it from there."
+              exit 1
             fi
             echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
             exit 1
           fi
-          echo "Testing: $PREVIEW_URL/api/health"
-          response=$(curl -sS -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL/api/health" -o /tmp/health.json -w "%{http_code}")
-          if [ "$response" != "200" ]; then
-            echo "Health check failed: HTTP $response"
-            cat /tmp/health.json
-            exit 1
-          fi
-          status=$(python3 -c 'import json; print(json.load(open("/tmp/health.json"))["status"])')
-          if [ "$status" != "healthy" ]; then
-            echo "Health check failed: status=$status"
-            cat /tmp/health.json
-            exit 1
-          fi
-          echo "Health check passed"
-          cat /tmp/health.json
+          node scripts/check-health-readiness.mjs "$PREVIEW_URL"
 
       # ------------------------------------------------------------------ #
       # Homepage — must serve HTTP 200.                                     #
@@ -125,8 +124,10 @@ jobs:
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
           if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
             if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
-              echo "::notice::Skipping protected preview homepage check because Actions secrets are unavailable to Dependabot PRs."
-              exit 0
+              # Same reasoning as the health step: a required check must not
+              # report success without having probed anything.
+              echo "::error::Preview smoke cannot run on Dependabot PRs (Actions secrets are unavailable). Cherry-pick this update onto develop and release it from there."
+              exit 1
             fi
             echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
             exit 1

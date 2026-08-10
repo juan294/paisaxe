@@ -53,6 +53,16 @@ describe("getClientIp", () => {
     expect(getClientIp(request)).toBe("unknown");
   });
 
+  it('returns "unknown" (not null or undefined) when no IP headers are present — untrusted path', () => {
+    // BE-H1: "unknown" is the sentinel for the untrusted shared-bucket path.
+    // This test documents the contract: the return value is exactly "unknown".
+    const request = new Request("http://localhost");
+    const ip = getClientIp(request);
+    expect(ip).toBe("unknown");
+    // Must not be a falsy value — routes must be able to do ip === "unknown"
+    expect(ip).toBeTruthy();
+  });
+
   it("falls back to x-real-ip when all x-forwarded-for entries are whitespace-only", () => {
     const request = new Request("http://localhost", {
       headers: {

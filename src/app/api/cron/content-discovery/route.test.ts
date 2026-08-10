@@ -60,10 +60,10 @@ describe("POST /api/cron/content-discovery", () => {
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       SUPABASE_SERVICE_KEY: "test-service-key",
     };
-    // Default: advisory lock succeeds
+    // Default: durable cron lease succeeds
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -201,10 +201,10 @@ describe("GET /api/cron/content-discovery (Vercel Cron)", () => {
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       SUPABASE_SERVICE_KEY: "test-service-key",
     };
-    // Default: advisory lock succeeds
+    // Default: durable cron lease succeeds
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -242,7 +242,7 @@ describe("GET /api/cron/content-discovery (Vercel Cron)", () => {
   });
 });
 
-describe("Advisory lock (DO-M2) — content-discovery", () => {
+describe("Cron lease (DO-M2) — content-discovery", () => {
   const ORIGINAL_ENV = { ...process.env };
 
   beforeEach(() => {
@@ -262,9 +262,9 @@ describe("Advisory lock (DO-M2) — content-discovery", () => {
     process.env = ORIGINAL_ENV;
   });
 
-  it("returns 409 when advisory lock is already held (concurrent run)", async () => {
+  it("returns 409 when durable cron lease is already held (concurrent run)", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: false, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: false, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -275,9 +275,9 @@ describe("Advisory lock (DO-M2) — content-discovery", () => {
     expect(body.reason).toMatch(/concurrent/);
   });
 
-  it("returns 409 when pg_try_advisory_lock returns an error", async () => {
+  it("returns 409 when try_acquire_cron_job_lease returns an error", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock")
+      if (fn === "try_acquire_cron_job_lock")
         return Promise.resolve({ data: null, error: { message: "DB error" } });
       return Promise.resolve({ data: null, error: null });
     });
@@ -286,10 +286,10 @@ describe("Advisory lock (DO-M2) — content-discovery", () => {
     expect(res.status).toBe(409);
   });
 
-  it("executes discovery and calls pg_advisory_unlock when lock is acquired", async () => {
+  it("executes discovery and calls release_cron_job_lock when lease is acquired", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -305,15 +305,42 @@ describe("Advisory lock (DO-M2) — content-discovery", () => {
     expect(res.status).toBe(200);
 
     const unlockCalls = mockRpc.mock.calls.filter(
-      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+      (args: unknown[]) => args[0] === "release_cron_job_lock"
     );
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("calls pg_advisory_unlock in finally block even when discovery throws", async () => {
+  it("#440 QA-H2: uses durable cron lease RPCs instead of session durable cron lease RPCs", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock")
+        return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock")
+        return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    (runDiscovery as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      discovered: 1,
+      created: 1,
+      skippedDuplicates: 0,
+      errors: [],
+      stories: [],
+    });
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(200);
+
+    const rpcNames = mockRpc.mock.calls.map((args: unknown[]) => args[0]);
+    expect(rpcNames).toContain("try_acquire_cron_job_lock");
+    expect(rpcNames).toContain("release_cron_job_lock");
+    expect(rpcNames).not.toContain("pg_try_advisory_lock");
+    expect(rpcNames).not.toContain("pg_advisory_unlock");
+  });
+
+  it("calls release_cron_job_lock in finally block even when discovery throws", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -327,13 +354,38 @@ describe("Advisory lock (DO-M2) — content-discovery", () => {
     expect(res.status).toBe(500);
 
     const unlockCalls = mockRpc.mock.calls.filter(
-      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+      (args: unknown[]) => args[0] === "release_cron_job_lock"
     );
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
     consoleSpy.mockRestore();
     expect(consoleSpy).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalled();
+  });
+
+  it("logs CONTENT_DISCOVERY_LOCK_RELEASE_FAILED when releaseCronJobLease throws in finally (line 86)", async () => {
+    // releaseCronJobLease throws when the RPC returns an error
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: null, error: { message: "lock release failed" } });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    (runDiscovery as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      discovered: 1,
+      created: 1,
+      skippedDuplicates: 0,
+      errors: [],
+      stories: [],
+    });
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    // Discovery succeeded — should still return 200 despite lock release failure
+    expect(res.status).toBe(200);
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CONTENT_DISCOVERY_LOCK_RELEASE_FAILED]",
+      expect.objectContaining({ error: expect.anything() })
+    );
   });
 });
 
@@ -352,8 +404,8 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — content-discovery", () => {
       SUPABASE_SERVICE_KEY: "test-service-key",
     };
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEnvironment } from "@/lib/environment";
 import { getEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 /**
  * Routes that bypass maintenance mode.
@@ -104,7 +105,9 @@ export async function isMaintenanceModeEnabled(): Promise<boolean> {
     );
 
     if (!response.ok) {
-      console.error("Failed to fetch maintenance mode flag:", response.status);
+      logger.error("Failed to fetch maintenance mode flag", {
+        status: response.status,
+      });
       return false;
     }
 
@@ -119,7 +122,9 @@ export async function isMaintenanceModeEnabled(): Promise<boolean> {
 
     return enabled;
   } catch (error) {
-    console.error("Error checking maintenance mode:", error);
+    logger.error("Error checking maintenance mode", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 }

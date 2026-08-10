@@ -5,6 +5,7 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
+MODEL="sonnet"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/qa-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/qa-report.md"
@@ -12,12 +13,77 @@ METRICS_FILE="$PROJECT_DIR/.qa-metrics.tmp"
 JOURNEY_METRICS_FILE="$PROJECT_DIR/.qa-journey-metrics.tmp"
 SERVER_PID=""
 SERVER_LOG="$LOG_DIR/qa-agent-server.log"
+VOYAGE_API_KEY_VALUE=""
+ANTHROPIC_API_KEY_VALUE=""
+RUN_COMPLETED=false
+CURRENT_PHASE="startup"
 
 # Test user configuration (for authenticated journey tests)
 QA_TEST_USER_EMAIL="${QA_TEST_USER_EMAIL:-}"
 QA_TEST_USER_PASSWORD="${QA_TEST_USER_PASSWORD:-}"
 
 mkdir -p "$LOG_DIR"
+
+trim_value() {
+  local value="${1:-}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+read_env_file_value() {
+  local key="$1"
+  local env_file="$PROJECT_DIR/.env.local"
+  local line=""
+  local value=""
+
+  [[ -f "$env_file" ]] || return 0
+
+  line=$(grep -E "^[[:space:]]*${key}=" "$env_file" | tail -n 1 || true)
+  [[ -n "$line" ]] || return 0
+
+  value="$(trim_value "${line#*=}")"
+  if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+
+  trim_value "$value"
+}
+
+# Run a curl GET against a remote host, retrying once after a short pause if
+# the initial attempt fails to connect (curl exit != 0). Prints curl's
+# stdout and returns curl's exit code — callers keep their own response
+# parsing. Extra args after the URL are passed through to curl (e.g.
+# `-o /dev/null -w "%{http_code}"` for a status-only probe).
+retry_curl_probe() {
+  local url="$1"
+  shift
+  local exit_code=0
+  local output
+  output=$(curl -s --max-time 15 "$url" "$@") || exit_code=$?
+  if [[ "$exit_code" -ne 0 ]]; then
+    log_warn "Probe failed for $url (curl exit code $exit_code) — retrying once after 3s" | tee -a "$LOG_FILE"
+    sleep 3
+    exit_code=0
+    output=$(curl -s --max-time 15 "$url" "$@") || exit_code=$?
+  fi
+  printf '%s' "$output"
+  return "$exit_code"
+}
+
+get_config_value() {
+  local key="$1"
+  local value=""
+
+  value="$(trim_value "${!key:-}")"
+  if [[ -z "$value" ]]; then
+    value="$(read_env_file_value "$key")"
+  fi
+
+  trim_value "$value"
+}
 
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
@@ -35,8 +101,39 @@ cleanup() {
   rm -f "$JOURNEY_METRICS_FILE"
   rm -f "$PROJECT_DIR/.qa-health-metrics.tmp"
   rm -f "$PROJECT_DIR/.qa-gap-metrics.tmp"
+  rm -f "${REPORT_FILE}.aborted.tmp"
 }
-trap cleanup EXIT
+
+write_abnormal_exit_report() {
+  local exit_status="$1"
+  local aborted_report="${REPORT_FILE}.aborted.tmp"
+  local context="QA agent aborted during ${CURRENT_PHASE} with exit status ${exit_status}. See ${REPORT_FILE} for the preserved failure report."
+
+  mkdir -p "$(dirname "$REPORT_FILE")"
+  {
+    echo "# QA Agent Report"
+    echo ""
+    echo "**Status:** ABORTED"
+    echo "**Date:** $(date '+%Y-%m-%d %H:%M:%S %Z')"
+    echo "**Exit status:** $exit_status"
+    echo "**Last phase:** $CURRENT_PHASE"
+    echo ""
+    echo "The QA wrapper exited before its normal report-generation step. Review $LOG_FILE for the underlying failure."
+  } > "$aborted_report"
+  mv "$aborted_report" "$REPORT_FILE"
+  write_shared_context "qa_agent_enabled" "$context" || true
+}
+
+handle_exit() {
+  local exit_status="$1"
+  set +e
+  if [[ "$exit_status" -ne 0 && "$RUN_COMPLETED" != "true" ]]; then
+    write_abnormal_exit_report "$exit_status"
+  fi
+  cleanup
+}
+
+trap 'handle_exit $?' EXIT
 
 # Check if agent is enabled via feature flags
 log_info "=== QA Agent starting ===" | tee -a "$LOG_FILE"
@@ -56,15 +153,31 @@ ENABLE_GITHUB_ISSUES=$(get_agent_config "qa_agent_enabled" "enableGithubIssues" 
 ENABLE_GAP_ANALYSIS=$(get_agent_config "qa_agent_enabled" "enableGapAnalysis" || echo "true")
 log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES, gapAnalysis=$ENABLE_GAP_ANALYSIS" | tee -a "$LOG_FILE"
 
+VOYAGE_API_KEY_VALUE="$(get_config_value "VOYAGE_API_KEY")"
+if [[ -n "$VOYAGE_API_KEY_VALUE" ]]; then
+  export VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE"
+fi
+
+ANTHROPIC_API_KEY_VALUE="$(get_config_value "ANTHROPIC_API_KEY")"
+if [[ -n "$ANTHROPIC_API_KEY_VALUE" ]]; then
+  export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY_VALUE"
+fi
+
 # Check if server is already running (any HTTP response = server is up)
-PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3000/api/health 2>/dev/null || echo "000")
+CURRENT_PHASE="server startup"
+PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3006/api/health 2>/dev/null || true)
+[[ -z "$PRECHECK_CODE" ]] && PRECHECK_CODE="000"
 if [[ "$PRECHECK_CODE" != "000" ]]; then
-  log_info "Dev server already running on port 3000 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
+  log_info "Dev server already running on port 3006 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
 else
   log_info "Starting Next.js dev server..." | tee -a "$LOG_FILE"
 
   # Start the server in the background
-  npm run dev > "$SERVER_LOG" 2>&1 &
+  if [[ -n "$VOYAGE_API_KEY_VALUE" ]]; then
+    VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE" npm run dev > "$SERVER_LOG" 2>&1 &
+  else
+    npm run dev > "$SERVER_LOG" 2>&1 &
+  fi
   SERVER_PID=$!
 
   # Wait for server to respond (max 240 seconds)
@@ -74,7 +187,8 @@ else
   MAX_WAIT=240
   WAITED=0
   while true; do
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3000/api/health" 2>/dev/null || echo "000")
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3006/api/health" 2>/dev/null || true)
+    [[ -z "$HTTP_CODE" ]] && HTTP_CODE="000"
     [[ "$HTTP_CODE" != "000" ]] && break
     if [[ $WAITED -ge $MAX_WAIT ]]; then
       log_error "Server failed to start within ${MAX_WAIT}s" | tee -a "$LOG_FILE"
@@ -94,16 +208,23 @@ fi
 # PHASE 0: Integration Health Checks
 # =============================================================================
 log_info "=== Phase 0: Integration Health Checks ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 0 integration health checks"
 
 HEALTH_CHECKS_PASSED=0
 HEALTH_CHECKS_FAILED=0
 HEALTH_CHECK_DETAILS=""
+VOYAGE_HEALTH_STATUS="unknown"
+VOYAGE_HEALTH_DETAILS=""
+ANTHROPIC_HEALTH_STATUS="unknown"
+ANTHROPIC_HEALTH_DETAILS=""
+# Declare CI_E2E_STATUS/RUN_ID early so they are never unbound under set -u
+# (Phase 0.5 re-assigns them after Phase 0 health metrics are written)
 CI_E2E_STATUS="unknown"
 CI_E2E_RUN_ID=""
 
 # Check 1: App Health Endpoint
 log_info "Checking app health..." | tee -a "$LOG_FILE"
-HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3000/api/health" 2>&1)
+HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3006/api/health" 2>&1 || true)
 if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
   log_success "App health: OK" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
@@ -115,13 +236,17 @@ fi
 
 # Check 2: Database Connectivity (production endpoint)
 log_info "Checking database connectivity..." | tee -a "$LOG_FILE"
-DB_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/health/db" 2>&1)
-if echo "$DB_RESPONSE" | grep -q '"success":true'; then
+DB_CURL_EXIT=0
+DB_RESPONSE=$(retry_curl_probe "https://paisaxe.es/api/health/db") || DB_CURL_EXIT=$?
+if [[ "$DB_CURL_EXIT" -eq 0 ]] && echo "$DB_RESPONSE" | grep -q '"success":true'; then
   DB_LATENCY=$(echo "$DB_RESPONSE" | grep -oE '"latencyMs":[0-9]+' | cut -d':' -f2 || echo "unknown")
   log_success "Database connectivity: OK (latency: ${DB_LATENCY}ms)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
 else
-  log_error "Database connectivity: FAILED" | tee -a "$LOG_FILE"
+  if [[ -z "$DB_RESPONSE" ]]; then
+    DB_RESPONSE="empty response (curl exit code $DB_CURL_EXIT after retry — likely timeout or connection failure reaching https://paisaxe.es/api/health/db)"
+  fi
+  log_error "Database connectivity: FAILED - $DB_RESPONSE" | tee -a "$LOG_FILE"
   if echo "$DB_RESPONSE" | grep -q "not configured"; then
     log_warn "  -> Possible cause: Supabase environment variables missing or misconfigured" | tee -a "$LOG_FILE"
   fi
@@ -133,7 +258,11 @@ fi
 # The /api/checkout/health endpoint requires admin authentication (Supabase session cookies).
 # From an unauthenticated context we can only verify the route is reachable and auth is enforced.
 log_info "Checking Stripe endpoint reachability..." | tee -a "$LOG_FILE"
-STRIPE_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://paisaxe.es/api/checkout/health" 2>&1)
+STRIPE_CURL_EXIT=0
+STRIPE_HTTP_CODE=$(retry_curl_probe "https://paisaxe.es/api/checkout/health" -o /dev/null -w "%{http_code}") || STRIPE_CURL_EXIT=$?
+if [[ "$STRIPE_CURL_EXIT" -ne 0 ]]; then
+  STRIPE_HTTP_CODE="000 (curl exit code $STRIPE_CURL_EXIT after retry — likely timeout or connection failure reaching https://paisaxe.es/api/checkout/health)"
+fi
 if [[ "$STRIPE_HTTP_CODE" == "401" ]]; then
   log_success "Stripe endpoint: reachable, auth enforced (HTTP 401 — expected without admin session)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
@@ -144,6 +273,103 @@ else
   log_error "Stripe endpoint: unexpected response (HTTP $STRIPE_HTTP_CODE)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
   HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Stripe endpoint returned HTTP $STRIPE_HTTP_CODE (expected 401 or 200)"
+fi
+
+# Check 4: Voyage AI Embedding Availability
+log_info "Checking Voyage AI embedding availability..." | tee -a "$LOG_FILE"
+if [[ -z "$VOYAGE_API_KEY_VALUE" ]]; then
+  VOYAGE_HEALTH_STATUS="FAIL"
+  VOYAGE_HEALTH_DETAILS="VOYAGE_API_KEY is not set in the shell environment or .env.local"
+  log_error "Voyage AI: FAILED - VOYAGE_API_KEY missing" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Voyage AI check failed: $VOYAGE_HEALTH_DETAILS"
+else
+  export VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE"
+  VOYAGE_HTTP_CODE=$(
+    node <<'NODE' 2>/dev/null || true
+const key = process.env.VOYAGE_API_KEY;
+const body = {
+  input: ["qa preflight"],
+  model: "voyage-3.5",
+  input_type: "query",
+  output_dimension: 512,
+};
+
+fetch("https://api.voyageai.com/v1/embeddings", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(body),
+  signal: AbortSignal.timeout(15_000),
+})
+  .then((response) => console.log(response.status))
+  .catch(() => console.log("000"));
+NODE
+  )
+  [[ -z "$VOYAGE_HTTP_CODE" ]] && VOYAGE_HTTP_CODE="000"
+
+  if [[ "$VOYAGE_HTTP_CODE" == "200" ]]; then
+    VOYAGE_HEALTH_STATUS="PASS"
+    VOYAGE_HEALTH_DETAILS="Voyage AI embeddings endpoint reachable"
+    log_success "Voyage AI: OK" | tee -a "$LOG_FILE"
+    HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
+  else
+    VOYAGE_HEALTH_STATUS="FAIL"
+    VOYAGE_HEALTH_DETAILS="Voyage AI embeddings endpoint returned HTTP $VOYAGE_HTTP_CODE"
+    log_error "Voyage AI: FAILED - HTTP $VOYAGE_HTTP_CODE" | tee -a "$LOG_FILE"
+    HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+    HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Voyage AI check failed: $VOYAGE_HEALTH_DETAILS"
+  fi
+fi
+
+# Check 5: Anthropic Generation Availability
+log_info "Checking Anthropic generation availability..." | tee -a "$LOG_FILE"
+if [[ -z "$ANTHROPIC_API_KEY_VALUE" ]]; then
+  ANTHROPIC_HEALTH_STATUS="FAIL"
+  ANTHROPIC_HEALTH_DETAILS="ANTHROPIC_API_KEY is not set in the shell environment or .env.local"
+  log_error "Anthropic: FAILED - ANTHROPIC_API_KEY missing" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Anthropic check failed: $ANTHROPIC_HEALTH_DETAILS"
+else
+  ANTHROPIC_HTTP_CODE=$(
+    node <<'NODE' 2>/dev/null || true
+const key = process.env.ANTHROPIC_API_KEY;
+const body = {
+  model: "claude-sonnet-5",
+  max_tokens: 1,
+  messages: [{ role: "user", content: "Reply with OK" }],
+};
+
+fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "x-api-key": key,
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(body),
+  signal: AbortSignal.timeout(15_000),
+})
+  .then((response) => console.log(response.status))
+  .catch(() => console.log("000"));
+NODE
+  )
+  [[ -z "$ANTHROPIC_HTTP_CODE" ]] && ANTHROPIC_HTTP_CODE="000"
+
+  if [[ "$ANTHROPIC_HTTP_CODE" == "200" ]]; then
+    ANTHROPIC_HEALTH_STATUS="PASS"
+    ANTHROPIC_HEALTH_DETAILS="Anthropic messages endpoint accepted a minimal generation"
+    log_success "Anthropic: OK" | tee -a "$LOG_FILE"
+    HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
+  else
+    ANTHROPIC_HEALTH_STATUS="FAIL"
+    ANTHROPIC_HEALTH_DETAILS="Anthropic messages endpoint returned HTTP $ANTHROPIC_HTTP_CODE"
+    log_error "Anthropic: FAILED - HTTP $ANTHROPIC_HTTP_CODE" | tee -a "$LOG_FILE"
+    HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+    HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Anthropic check failed: $ANTHROPIC_HEALTH_DETAILS"
+  fi
 fi
 
 log_info "Health checks complete: $HEALTH_CHECKS_PASSED passed, $HEALTH_CHECKS_FAILED failed" | tee -a "$LOG_FILE"
@@ -165,6 +391,14 @@ if [[ $HEALTH_CHECKS_FAILED -gt 0 ]]; then
     [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
     FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Stripe"
   fi
+  if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
+    [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
+    FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Voyage AI"
+  fi
+  if [[ "$ANTHROPIC_HEALTH_STATUS" != "PASS" ]]; then
+    [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
+    FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Anthropic"
+  fi
 
   send_health_summary_alert "$HEALTH_CHECKS_FAILED" "$FAILED_CHECK_NAMES" 2>&1 | tee -a "$LOG_FILE" || {
     log_warn "SMS alert failed (Twilio may not be configured)" | tee -a "$LOG_FILE"
@@ -177,17 +411,19 @@ HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
   echo "INTEGRATION HEALTH CHECKS:"
   echo "- Passed: $HEALTH_CHECKS_PASSED"
   echo "- Failed: $HEALTH_CHECKS_FAILED"
-  echo "- CI E2E Status: $CI_E2E_STATUS"
+  echo "- Voyage AI Status: $VOYAGE_HEALTH_STATUS"
+  echo "- Anthropic Status: $ANTHROPIC_HEALTH_STATUS"
+  echo "- CI E2E Status: ${CI_E2E_STATUS:-unknown}"
   if [[ -n "$HEALTH_CHECK_DETAILS" ]]; then
     echo ""
     echo "FAILURE DETAILS:"
     echo -e "$HEALTH_CHECK_DETAILS"
   fi
-  if [[ "$CI_E2E_STATUS" == "FAIL" ]]; then
+  if [[ "${CI_E2E_STATUS:-unknown}" == "FAIL" ]]; then
     echo ""
-    echo "CI E2E REGRESSION: E2E tests are failing on develop (run $CI_E2E_RUN_ID)."
+    echo "CI E2E REGRESSION: E2E tests are failing on develop (run ${CI_E2E_RUN_ID:-})."
     echo "This blocks production releases. Investigate immediately:"
-    echo "  gh run view $CI_E2E_RUN_ID --log-failed"
+    echo "  gh run view ${CI_E2E_RUN_ID:-} --log-failed"
   fi
 } > "$HEALTH_METRICS_FILE"
 
@@ -195,6 +431,7 @@ HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
 # PHASE 0.5: CI E2E Status Check
 # =============================================================================
 log_info "=== Phase 0.5: CI E2E Status Check ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 0.5 CI E2E status check"
 
 CI_E2E_STATUS="unknown"
 CI_E2E_CONCLUSION=""
@@ -224,17 +461,50 @@ fi
 # PHASE 1: LLM Quality Tests
 # =============================================================================
 log_info "=== Phase 1: LLM Quality Tests ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 1 LLM quality tests"
 
 export QA_TESTS_PER_CATEGORY="$TESTS_PER_CATEGORY"
+export NEXT_PUBLIC_SITE_URL="http://localhost:3006"
 
 # Run vitest and capture both output and exit code
-TEST_OUTPUT=$(npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
+TEST_EXIT_CODE=0
+if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
+  TEST_OUTPUT="QA PREFLIGHT: Voyage AI embedding availability failed - ${VOYAGE_HEALTH_DETAILS}. Set VOYAGE_API_KEY in the QA environment or .env.local before running npm run test:qa."
+  TEST_EXIT_CODE=1
+elif [[ "$ANTHROPIC_HEALTH_STATUS" != "PASS" ]]; then
+  TEST_OUTPUT="QA PREFLIGHT: Anthropic generation availability failed - ${ANTHROPIC_HEALTH_DETAILS}. Set ANTHROPIC_API_KEY in the QA environment or .env.local before running npm run test:qa."
+  TEST_EXIT_CODE=1
+else
+  TEST_OUTPUT=$(NO_COLOR=1 npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
+fi
 TEST_EXIT_CODE=${TEST_EXIT_CODE:-0}
 
-# Parse test results from vitest output
-PASSED_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || echo "0")
-FAILED_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || echo "0")
+# Strip ANSI escapes defensively before parsing. Vitest's summary line can
+# begin with a color escape (e.g. ESC[2m) before the leading whitespace, which
+# breaks an anchored `^ *Tests ` grep even with NO_COLOR set upstream (some
+# terminals/CI force color regardless) and silently parses every count as 0.
+TEST_OUTPUT_PLAIN=$(printf '%s' "$TEST_OUTPUT" | sed -E 's/\x1b\[[0-9;]*m//g')
+
+# Parse test results from vitest output. Vitest's summary block has both a
+# "Test Files  N passed" line and a "Tests  M passed" line; without anchoring
+# to "Tests" specifically, grep matches the Test Files line first and reports
+# the file count instead of the test count.
+PASSED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}')
+FAILED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}')
+PASSED_TESTS=${PASSED_TESTS:-0}
+FAILED_TESTS=${FAILED_TESTS:-0}
 TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
+
+# A 0-test result is ambiguous: it could be a real empty run, or a parser that
+# failed to match the summary line. Preflight failures aside, a non-zero
+# vitest exit code with zero parsed tests means the parser broke, not that
+# nothing ran — flag it distinctly so a 0% pass rate never masquerades as a
+# real measurement.
+PARSE_FAILURE=false
+if [[ $TOTAL_TESTS -eq 0 && $TEST_EXIT_CODE -ne 0 && "$VOYAGE_HEALTH_STATUS" == "PASS" && "$ANTHROPIC_HEALTH_STATUS" == "PASS" ]]; then
+  PARSE_FAILURE=true
+  log_error "Parsed 0 tests from a failed run (exit $TEST_EXIT_CODE) — likely a test-count parser failure, not a real 0-test result" | tee -a "$LOG_FILE"
+fi
 
 # Calculate pass rate
 if [[ $TOTAL_TESTS -gt 0 ]]; then
@@ -246,7 +516,7 @@ fi
 log_info "Test results: $PASSED_TESTS passed, $FAILED_TESTS failed ($PASS_RATE% pass rate)" | tee -a "$LOG_FILE"
 
 # Extract failed test details
-FAILED_DETAILS=$(echo "$TEST_OUTPUT" | grep -A 20 "FAIL\|AssertionError\|Expected\|Received" || echo "No failure details available")
+FAILED_DETAILS=$(echo "$TEST_OUTPUT_PLAIN" | grep -A 20 "FAIL\|AssertionError\|Expected\|Received" || echo "No failure details available")
 
 # Write metrics to temp file for Claude
 {
@@ -254,6 +524,10 @@ FAILED_DETAILS=$(echo "$TEST_OUTPUT" | grep -A 20 "FAIL\|AssertionError\|Expecte
   echo "====================================="
   echo ""
   echo "TEST SUMMARY:"
+  if [[ "$PARSE_FAILURE" == "true" ]]; then
+    echo "- PARSE FAILURE: vitest exited non-zero but 0 tests were parsed from its output."
+    echo "  Treat this as a broken measurement, not a real 0-test/0% result."
+  fi
   echo "- Total tests: $TOTAL_TESTS"
   echo "- Passed: $PASSED_TESTS"
   echo "- Failed: $FAILED_TESTS"
@@ -267,7 +541,7 @@ FAILED_DETAILS=$(echo "$TEST_OUTPUT" | grep -A 20 "FAIL\|AssertionError\|Expecte
   echo "- Response Quality: Tests for helpfulness, appropriate length, language handling"
   echo ""
   echo "FULL TEST OUTPUT:"
-  echo "$TEST_OUTPUT"
+  echo "$TEST_OUTPUT_PLAIN"
   echo ""
   if [[ $FAILED_TESTS -gt 0 ]]; then
     echo "FAILED TEST DETAILS:"
@@ -278,6 +552,7 @@ FAILED_DETAILS=$(echo "$TEST_OUTPUT" | grep -A 20 "FAIL\|AssertionError\|Expecte
 # =============================================================================
 # PHASE 2: Browser Journey Tests (Playwright)
 # =============================================================================
+CURRENT_PHASE="phase 2 browser journey tests"
 JOURNEY_PASSED=0
 JOURNEY_FAILED=0
 JOURNEY_OUTPUT=""
@@ -314,6 +589,7 @@ fi
 # PHASE 3: Test User Cleanup
 # =============================================================================
 log_info "=== Phase 3: Test User Cleanup ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 3 test user cleanup"
 
 if [[ -n "$QA_TEST_USER_EMAIL" ]]; then
   # Validate email pattern before calling cleanup
@@ -342,6 +618,7 @@ fi
 # PHASE 4: GitHub Issue Filing
 # =============================================================================
 log_info "=== Phase 4: GitHub Issue Filing ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 4 GitHub issue filing"
 
 TOTAL_FAILURES=$((FAILED_TESTS + JOURNEY_FAILED + HEALTH_CHECKS_FAILED))
 
@@ -351,7 +628,7 @@ if [[ "$ENABLE_GITHUB_ISSUES" == "true" && $TOTAL_FAILURES -gt 0 ]]; then
   # File issues for LLM test failures
   if [[ $FAILED_TESTS -gt 0 ]]; then
     # Extract individual failure names and create issues
-    FAILURE_NAMES=$(echo "$TEST_OUTPUT" | grep -E "^\s*[✗×]|FAIL" | head -5 || echo "")
+    FAILURE_NAMES=$(echo "$TEST_OUTPUT_PLAIN" | grep -E "^\s*[✗×]|FAIL" | head -5 || echo "")
     if [[ -n "$FAILURE_NAMES" ]]; then
       create_summary_issue "$PASS_RATE" "$FAILED_TESTS" "$FAILURE_NAMES" 2>&1 | tee -a "$LOG_FILE" || {
         log_warn "Failed to create GitHub issue (gh CLI may not be configured)" | tee -a "$LOG_FILE"
@@ -392,6 +669,7 @@ fi
 # =============================================================================
 # PHASE 6: Test Gap Analysis
 # =============================================================================
+CURRENT_PHASE="phase 6 test gap analysis"
 GAP_METRICS_FILE="$PROJECT_DIR/.qa-gap-metrics.tmp"
 
 if [[ "$ENABLE_GAP_ANALYSIS" == "true" ]]; then
@@ -525,6 +803,7 @@ fi
 # PHASE 5: Claude Analysis & Report Generation
 # =============================================================================
 log_info "=== Phase 5: Claude Analysis & Report ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 5 report generation"
 log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FILE"
 
 # Load the agent prompt from shared TypeScript config
@@ -541,6 +820,7 @@ SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-in
 
 # Run Claude to analyze and write report
 "$CLAUDE_BIN" -p \
+  --model "$MODEL" \
   --allowedTools 'Read,Edit,Write,Glob,Grep' \
   >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
@@ -595,5 +875,7 @@ else
 fi
 
 # Cleanup handled by trap
+CURRENT_PHASE="complete"
+RUN_COMPLETED=true
 log_success "QA report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== QA Agent finished ===" | tee -a "$LOG_FILE"

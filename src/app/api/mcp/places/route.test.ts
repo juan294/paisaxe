@@ -334,6 +334,37 @@ describe("/api/mcp/places", () => {
       expect(data.places[0].name).toBe("Sidrería Tierra Astur");
     });
 
+    it("sets the same Cache-Control header as GET (#614)", async () => {
+      const mockPlacesResponse = createPlacesApiResponse([
+        {
+          name: "Sidrería Tierra Astur",
+          address: "Oviedo, Asturias",
+          rating: 4.2,
+          reviewsCount: 500,
+          priceLevel: "PRICE_LEVEL_MODERATE",
+          lat: 43.3619,
+          lng: -5.8494,
+          id: "ChIJcache",
+        },
+      ]);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPlacesResponse),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "sidra", type: "restaurant" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("public, max-age=3600");
+    });
+
     it("should return 400 for invalid MCP request", async () => {
       const request = new Request("http://localhost:3000/api/mcp/places", {
         method: "POST",
@@ -343,6 +374,65 @@ describe("/api/mcp/places", () => {
 
       const response = await POST(request);
       expect(response.status).toBe(400);
+    });
+
+    it("returns 400 when POST body is an array (normalizeMcpParams null-guard, schemas.ts line 293)", async () => {
+      // When body is an array, normalizeMcpParams hits the `Array.isArray(input)` branch
+      // and returns { query: "" }, which fails the min(1) Zod check → 400.
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify([]),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(400);
+    });
+
+    it.each([
+      {
+        name: "oversized flat query",
+        body: { query: "a".repeat(201) },
+      },
+      {
+        name: "malformed flat query",
+        body: { query: { value: "sidra" } },
+      },
+      {
+        name: "oversized flat city",
+        body: { query: "sidra", city: "a".repeat(201) },
+      },
+      {
+        name: "malformed flat city",
+        body: { query: "sidra", city: ["Oviedo"] },
+      },
+      {
+        name: "oversized MCP-nested query",
+        body: { arguments: { query: "a".repeat(201) } },
+      },
+      {
+        name: "malformed MCP-nested query",
+        body: { arguments: { query: ["sidra"] } },
+      },
+      {
+        name: "oversized MCP-nested city",
+        body: { arguments: { query: "sidra", city: "a".repeat(201) } },
+      },
+      {
+        name: "malformed MCP-nested city",
+        body: { arguments: { query: "sidra", city: { name: "Oviedo" } } },
+      },
+    ])("should reject $name before searching", async ({ body }) => {
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify(body),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("should support flat format from ElevenLabs", async () => {

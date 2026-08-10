@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { StoryProgressBar } from "./story-progress-bar";
 
 const defaultProps = {
@@ -9,6 +9,14 @@ const defaultProps = {
   t: (key: string) => key,
 };
 
+function getProgressNav() {
+  return screen.getByRole("navigation", { name: "accessibility.story_progress" });
+}
+
+function getSegments() {
+  return within(getProgressNav()).getAllByRole("button");
+}
+
 describe("StoryProgressBar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -17,17 +25,33 @@ describe("StoryProgressBar", () => {
   // -------------------------------------------------------------------------
   // Segment count
   // -------------------------------------------------------------------------
+  it("uses navigation buttons instead of interactive descendants inside a progressbar", () => {
+    render(<StoryProgressBar {...defaultProps} />);
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "accessibility.story_progress" });
+    expect(nav).toBeInTheDocument();
+    expect(screen.getAllByRole("button")).toHaveLength(5);
+  });
+
   it("renders correct number of segments (min of PAGE_SIZE and storiesLength)", () => {
     render(<StoryProgressBar {...defaultProps} />);
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     expect(segments.length).toBe(5); // 5 stories < 20 PAGE_SIZE
+  });
+
+  // UX-M6 (#479): list items must carry a stable, story-position-derived key
+  // (data-story-index) rather than the volatile within-page index.
+  it("renders list items keyed by the absolute story index (stable key)", () => {
+    const { container } = render(<StoryProgressBar {...defaultProps} />);
+    const items = container.querySelectorAll("li[data-story-index]");
+    expect(items).toHaveLength(5);
+    const indices = Array.from(items).map((el) => el.getAttribute("data-story-index"));
+    expect(indices).toEqual(["0", "1", "2", "3", "4"]);
   });
 
   it("caps segments at PAGE_SIZE (20) for large story counts", () => {
     render(<StoryProgressBar {...defaultProps} storiesLength={50} />);
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     expect(segments.length).toBe(20);
   });
 
@@ -39,8 +63,7 @@ describe("StoryProgressBar", () => {
     render(
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     // base = 2 - (2 % 5) = 0, targetIndex = 0 + 0 = 0
     fireEvent.click(segments[0]);
     expect(onIndexChange).toHaveBeenCalledWith(0);
@@ -51,8 +74,7 @@ describe("StoryProgressBar", () => {
     render(
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     fireEvent.click(segments[3]);
     expect(onIndexChange).toHaveBeenCalledWith(3);
   });
@@ -65,8 +87,7 @@ describe("StoryProgressBar", () => {
     render(
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     fireEvent.keyDown(segments[0], { key: "Enter" });
     expect(onIndexChange).toHaveBeenCalledWith(0);
   });
@@ -76,8 +97,7 @@ describe("StoryProgressBar", () => {
     render(
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     fireEvent.keyDown(segments[1], { key: " " });
     expect(onIndexChange).toHaveBeenCalledWith(1);
   });
@@ -87,34 +107,29 @@ describe("StoryProgressBar", () => {
     render(
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     fireEvent.keyDown(segments[0], { key: "Tab" });
     expect(onIndexChange).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
-  // Click/keydown on progressbar container (no segment target)
+  // Click/keydown on navigation container (no segment target)
   // -------------------------------------------------------------------------
-  it("does not call onIndexChange when clicking the progressbar container directly", () => {
+  it("does not call onIndexChange when clicking the navigation container directly", () => {
     const onIndexChange = vi.fn();
     render(
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
-    const progressbar = screen.getByRole("progressbar");
-    // Click directly on the progressbar div, not on a segment
-    fireEvent.click(progressbar);
+    fireEvent.click(getProgressNav());
     expect(onIndexChange).not.toHaveBeenCalled();
   });
 
-  it("does not call onIndexChange when pressing a key on the progressbar container directly", () => {
+  it("does not call onIndexChange when pressing a key on the navigation container directly", () => {
     const onIndexChange = vi.fn();
     render(
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
-    const progressbar = screen.getByRole("progressbar");
-    // Fire keyDown directly on the progressbar div, not on a segment
-    fireEvent.keyDown(progressbar, { key: "Enter" });
+    fireEvent.keyDown(getProgressNav(), { key: "Enter" });
     expect(onIndexChange).not.toHaveBeenCalled();
   });
 
@@ -126,9 +141,8 @@ describe("StoryProgressBar", () => {
     render(
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
-    const innerDiv = segments[0].querySelector("div");
+    const segments = getSegments();
+    const innerDiv = segments[0].querySelector("span[aria-hidden='true']");
     expect(innerDiv).toBeTruthy();
     fireEvent.click(innerDiv!);
     expect(onIndexChange).toHaveBeenCalledWith(0);
@@ -137,18 +151,16 @@ describe("StoryProgressBar", () => {
   // -------------------------------------------------------------------------
   // Accessibility attributes
   // -------------------------------------------------------------------------
-  it("has proper progressbar ARIA attributes", () => {
+  it("has proper navigation labelling and current item", () => {
     render(<StoryProgressBar {...defaultProps} />);
-    const progressbar = screen.getByRole("progressbar");
-    expect(progressbar).toHaveAttribute("aria-valuenow", "3"); // currentIndex + 1
-    expect(progressbar).toHaveAttribute("aria-valuemin", "1");
-    expect(progressbar).toHaveAttribute("aria-valuemax", "5");
+    const nav = getProgressNav();
+    expect(nav).toHaveAttribute("aria-label", "accessibility.story_progress");
+    expect(getSegments()[2]).toHaveAttribute("aria-current", "page");
   });
 
   it("segments have descriptive aria-labels", () => {
     render(<StoryProgressBar {...defaultProps} />);
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     segments.forEach((segment) => {
       expect(segment).toHaveAttribute("aria-label");
       expect(segment.getAttribute("aria-label")).toBeTruthy();
@@ -157,8 +169,7 @@ describe("StoryProgressBar", () => {
 
   it("uses roving tabindex — only current segment has tabIndex 0", () => {
     render(<StoryProgressBar {...defaultProps} />);
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     // currentIndex=2, fillPosition=2: only segment at fillPosition gets tabIndex 0
     segments.forEach((segment, i) => {
       if (i === 2) {
@@ -174,9 +185,9 @@ describe("StoryProgressBar", () => {
   // -------------------------------------------------------------------------
   it("React.memo prevents re-render when props are unchanged", () => {
     const { rerender } = render(<StoryProgressBar {...defaultProps} />);
-    const progressbar1 = screen.getByRole("progressbar");
+    const progressbar1 = getProgressNav();
     rerender(<StoryProgressBar {...defaultProps} />);
-    const progressbar2 = screen.getByRole("progressbar");
+    const progressbar2 = getProgressNav();
     expect(progressbar1).toBe(progressbar2);
   });
 
@@ -187,10 +198,9 @@ describe("StoryProgressBar", () => {
     // currentIndex=2, storiesLength=5: fillPosition = 2 % 5 = 2
     // Segments 0,1,2 should have w-full; segments 3,4 should have w-0
     render(<StoryProgressBar {...defaultProps} />);
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     for (let i = 0; i < 5; i++) {
-      const fillDiv = segments[i].querySelector("div");
+      const fillDiv = segments[i].querySelector("span[aria-hidden='true']");
       expect(fillDiv).toBeTruthy();
       if (i <= 2) {
         expect(fillDiv!.className).toContain("w-full");
@@ -205,8 +215,7 @@ describe("StoryProgressBar", () => {
   // -------------------------------------------------------------------------
   it("returns base label without story title when storyTitles is not provided", () => {
     render(<StoryProgressBar {...defaultProps} />);
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     // Without storyTitles, label should NOT contain a story title, just the base label
     const label = segments[0].getAttribute("aria-label");
     expect(label).toBeTruthy();
@@ -243,8 +252,7 @@ describe("StoryProgressBar", () => {
 
     it("does NOT call onIndexChange when clicking an out-of-bounds segment (line 42)", () => {
       render(<StoryProgressBar {...overflowProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Segment 5 -> targetIndex = 20 + 5 = 25 >= 25 -> guard prevents call
       fireEvent.click(segments[5]);
       expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
@@ -252,8 +260,7 @@ describe("StoryProgressBar", () => {
 
     it("does NOT call onIndexChange on ArrowRight into out-of-bounds (line 62)", () => {
       render(<StoryProgressBar {...overflowProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Segment 4 -> ArrowRight -> nextIdx=5, targetIndex=25 >= 25 -> guard
       fireEvent.keyDown(segments[4], { key: "ArrowRight" });
       expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
@@ -261,8 +268,7 @@ describe("StoryProgressBar", () => {
 
     it("does NOT call onIndexChange on ArrowLeft wrapping to out-of-bounds (line 75)", () => {
       render(<StoryProgressBar {...overflowProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Segment 0 -> ArrowLeft -> prevIdx=19, targetIndex=20+19=39 >= 25 -> guard
       fireEvent.keyDown(segments[0], { key: "ArrowLeft" });
       expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
@@ -270,8 +276,7 @@ describe("StoryProgressBar", () => {
 
     it("does NOT call onIndexChange on End key when last segment is out-of-bounds (line 98)", () => {
       render(<StoryProgressBar {...overflowProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // End -> lastIdx=19, targetIndex=20+19=39 >= 25 -> guard
       fireEvent.keyDown(segments[2], { key: "End" });
       expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
@@ -279,8 +284,7 @@ describe("StoryProgressBar", () => {
 
     it("does NOT call onIndexChange on Enter for out-of-bounds segment (line 110)", () => {
       render(<StoryProgressBar {...overflowProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Segment 10 -> Enter -> targetIndex=20+10=30 >= 25 -> guard
       fireEvent.keyDown(segments[10], { key: "Enter" });
       expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
@@ -288,8 +292,7 @@ describe("StoryProgressBar", () => {
 
     it("does NOT call onIndexChange on Space for out-of-bounds segment (line 110)", () => {
       render(<StoryProgressBar {...overflowProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Segment 6 -> Space -> targetIndex=20+6=26 >= 25 -> guard
       fireEvent.keyDown(segments[6], { key: " " });
       expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
@@ -297,8 +300,7 @@ describe("StoryProgressBar", () => {
 
     it("still calls onIndexChange for in-bounds segments on the last page", () => {
       render(<StoryProgressBar {...overflowProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Segment 4 -> targetIndex=20+4=24 < 25 -> valid
       fireEvent.click(segments[4]);
       expect(overflowProps.onIndexChange).toHaveBeenCalledWith(24);
@@ -325,8 +327,7 @@ describe("StoryProgressBar", () => {
       render(
         <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
       );
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Focus current segment (index 2), press ArrowRight -> should go to index 3
       fireEvent.keyDown(segments[2], { key: "ArrowRight" });
       expect(onIndexChange).toHaveBeenCalledWith(3);
@@ -337,8 +338,7 @@ describe("StoryProgressBar", () => {
       render(
         <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
       );
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Focus current segment (index 2), press ArrowLeft -> should go to index 1
       fireEvent.keyDown(segments[2], { key: "ArrowLeft" });
       expect(onIndexChange).toHaveBeenCalledWith(1);
@@ -349,8 +349,7 @@ describe("StoryProgressBar", () => {
       render(
         <StoryProgressBar {...arrowNavProps} currentIndex={4} onIndexChange={onIndexChange} />
       );
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       fireEvent.keyDown(segments[4], { key: "ArrowRight" });
       expect(onIndexChange).toHaveBeenCalledWith(0);
     });
@@ -360,16 +359,14 @@ describe("StoryProgressBar", () => {
       render(
         <StoryProgressBar {...arrowNavProps} currentIndex={0} onIndexChange={onIndexChange} />
       );
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       fireEvent.keyDown(segments[0], { key: "ArrowLeft" });
       expect(onIndexChange).toHaveBeenCalledWith(4);
     });
 
     it("only current segment has tabIndex 0, others have tabIndex -1 (roving tabindex)", () => {
       render(<StoryProgressBar {...arrowNavProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // currentIndex=2, fillPosition=2
       segments.forEach((segment, i) => {
         if (i === 2) {
@@ -382,8 +379,7 @@ describe("StoryProgressBar", () => {
 
     it("includes story title in segment aria-label when storyTitles provided", () => {
       render(<StoryProgressBar {...arrowNavProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       // Each segment label should include the story title
       expect(segments[0].getAttribute("aria-label")).toContain("Lagos de Covadonga");
       expect(segments[1].getAttribute("aria-label")).toContain("Oviedo Cathedral");
@@ -393,8 +389,7 @@ describe("StoryProgressBar", () => {
     // UX-M10 (#520): Touch affordance — segments must be at least h-1.5, contrast bg-white/40
   it("UX-M10: segments use h-1.5 default height for better touch affordance", () => {
     render(<StoryProgressBar {...defaultProps} />);
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     // All segments must have h-1.5 (not the old h-1)
     segments.forEach((segment) => {
       expect(segment.className).toContain("h-1.5");
@@ -403,8 +398,7 @@ describe("StoryProgressBar", () => {
 
   it("UX-M10: segments use bg-white/40 inactive contrast (not bg-white/30)", () => {
     render(<StoryProgressBar {...defaultProps} />);
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
     segments.forEach((segment) => {
       expect(segment.className).toContain("bg-white/40");
     });
@@ -412,9 +406,8 @@ describe("StoryProgressBar", () => {
 
   it("current segment has aria-current='true'", () => {
       render(<StoryProgressBar {...arrowNavProps} />);
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
-      expect(segments[2]).toHaveAttribute("aria-current", "true");
+    const segments = getSegments();
+      expect(segments[2]).toHaveAttribute("aria-current", "page");
       expect(segments[0]).not.toHaveAttribute("aria-current");
       expect(segments[4]).not.toHaveAttribute("aria-current");
     });
@@ -424,8 +417,7 @@ describe("StoryProgressBar", () => {
       render(
         <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
       );
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       fireEvent.keyDown(segments[2], { key: "Home" });
       expect(onIndexChange).toHaveBeenCalledWith(0);
     });
@@ -435,8 +427,7 @@ describe("StoryProgressBar", () => {
       render(
         <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
       );
-      const progressbar = screen.getByRole("progressbar");
-      const segments = progressbar.querySelectorAll('[role="button"]');
+    const segments = getSegments();
       fireEvent.keyDown(segments[2], { key: "End" });
       expect(onIndexChange).toHaveBeenCalledWith(4);
     });

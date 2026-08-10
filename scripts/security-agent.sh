@@ -5,10 +5,17 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
+MODEL="sonnet"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/security-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/security-report.md"
 METRICS_FILE="$PROJECT_DIR/.security-metrics.tmp"
+
+# Guarantee cleanup on every exit path (early "disabled" exit, failed prompt
+# load, or an unexpected failure under `set -e`) — a plain end-of-script
+# `rm -f` only ran when every step in between succeeded, leaving the tmp
+# file behind whenever the run errored out early.
+trap 'rm -f "$METRICS_FILE"' EXIT
 
 mkdir -p "$LOG_DIR"
 
@@ -45,13 +52,22 @@ log_info "Running license check..." | tee -a "$LOG_FILE"
 LICENSE_SUMMARY=$(npx license-checker --production --summary 2>&1 || true)
 LICENSE_FULL=$(npx license-checker --production --json 2>/dev/null || echo "{}")
 
-# Check for copyleft licenses
+# Check for copyleft licenses in PRODUCTION deps (these ship to clients — blocking concern)
 COPYLEFT_CHECK=$(npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;LGPL-2.0;LGPL-2.1;LGPL-3.0" 2>&1) && COPYLEFT_FOUND="false" || COPYLEFT_FOUND="true"
+
+# Check for copyleft licenses across the FULL tree (incl. devDependencies).
+# Build-time-only tooling (e.g. lightningcss MPL-2.0) never ships, so this is
+# reported for review rather than treated as a hard failure (#623).
+# See docs/project/license-exceptions.md → "Dev-dependency scanning".
+DEV_COPYLEFT_CHECK=$(npx license-checker --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;SSPL-1.0;BSL-1.1" 2>&1) && DEV_COPYLEFT_FOUND="false" || DEV_COPYLEFT_FOUND="true"
+DEV_FLAGGED_LICENSES=$(npx license-checker --csv 2>/dev/null | grep -iE "MPL|LGPL|GPL|UNLICENSED|Unknown" | head -30 || echo "none")
 
 # Check for outdated packages
 log_info "Checking for outdated packages..." | tee -a "$LOG_FILE"
-OUTDATED_OUTPUT=$(npm outdated --json 2>/dev/null || echo "{}")
-OUTDATED_COUNT=$(echo "$OUTDATED_OUTPUT" | jq 'keys | length' 2>/dev/null || echo "0")
+OUTDATED_OUTPUT=$(npm outdated --json 2>/dev/null || true)
+[[ -z "$OUTDATED_OUTPUT" ]] && OUTDATED_OUTPUT="{}"
+FILTERED_OUTDATED_OUTPUT=$(printf '%s' "$OUTDATED_OUTPUT" | npx tsx scripts/lib/filter-npm-outdated.ts json 2>/dev/null || printf '%s' "$OUTDATED_OUTPUT")
+OUTDATED_COUNT=$(echo "$FILTERED_OUTDATED_OUTPUT" | jq 'keys | length' 2>/dev/null || echo "0")
 
 # Check for packages with security updates available
 SECURITY_UPDATES=$(echo "$AUDIT_OUTPUT" | jq -r '.vulnerabilities | to_entries | map(select(.value.fixAvailable == true)) | length' 2>/dev/null || echo "0")
@@ -67,11 +83,15 @@ NPM_AUDIT_IN_CI=$(grep -rqlE "npm audit|npm run audit" .github/workflows/ 2>/dev
 log_info "Identifying flagged license packages..." | tee -a "$LOG_FILE"
 FLAGGED_LICENSES=$(npx license-checker --production --csv 2>/dev/null | grep -iE "MPL|LGPL|GPL|UNLICENSED|Unknown" | head -20 || echo "none")
 
-# Check security headers (if server is running)
+# Check security headers. Prefer a local server when available, then fall back
+# to production so CSP/HSTS delivery is still visible in scheduled reports.
 log_info "Checking security headers..." | tee -a "$LOG_FILE"
 SECURITY_HEADERS="Server not running - skipped"
+SECURITY_HEADER_PATTERN="^(content-security-policy|x-frame-options|x-content-type-options|strict-transport-security|referrer-policy|permissions-policy):"
 if curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; then
-  SECURITY_HEADERS=$(curl -sI "http://localhost:3000" 2>/dev/null | grep -iE "^(content-security-policy|x-frame-options|x-content-type-options|strict-transport-security|referrer-policy|permissions-policy):" || echo "No security headers found")
+  SECURITY_HEADERS=$(curl -sIL "http://localhost:3000" 2>/dev/null | grep -iE "$SECURITY_HEADER_PATTERN" || echo "No security headers found")
+elif curl -s --max-time 5 "https://paisaxe.es/api/health/live" > /dev/null 2>&1; then
+  SECURITY_HEADERS=$(curl -sIL "https://paisaxe.es/" 2>/dev/null | grep -iE "$SECURITY_HEADER_PATTERN" || echo "No security headers found")
 fi
 
 # Write metrics to temp file for Claude
@@ -93,14 +113,20 @@ fi
   echo "LICENSE SUMMARY:"
   echo "$LICENSE_SUMMARY"
   echo ""
-  echo "COPYLEFT LICENSES FOUND: $COPYLEFT_FOUND"
+  echo "COPYLEFT LICENSES FOUND (production deps): $COPYLEFT_FOUND"
   if [[ "$COPYLEFT_FOUND" == "true" ]]; then
-    echo "Copyleft details:"
+    echo "Copyleft details (production):"
     echo "$COPYLEFT_CHECK"
   fi
   echo ""
+  echo "COPYLEFT LICENSES FOUND (dev/build deps, non-blocking): $DEV_COPYLEFT_FOUND"
+  if [[ "$DEV_COPYLEFT_FOUND" == "true" ]]; then
+    echo "Copyleft details (dev/build — review against docs/project/license-exceptions.md):"
+    echo "$DEV_COPYLEFT_CHECK"
+  fi
+  echo ""
   echo "OUTDATED PACKAGES: $OUTDATED_COUNT"
-  echo "$OUTDATED_OUTPUT" | jq -r 'to_entries | .[] | "\(.key): \(.value.current) -> \(.value.latest)"' 2>/dev/null || true
+  printf '%s' "$FILTERED_OUTDATED_OUTPUT" | npx tsx scripts/lib/filter-npm-outdated.ts list 2>/dev/null || true
   echo ""
   echo "CI/CD SECURITY AUTOMATION:"
   echo "- Dependabot configured: $DEPENDABOT_EXISTS"
@@ -108,8 +134,11 @@ fi
   echo "- Gitleaks in CI: $GITLEAKS_IN_CI"
   echo "- npm audit in CI: $NPM_AUDIT_IN_CI"
   echo ""
-  echo "FLAGGED LICENSE PACKAGES (MPL/LGPL/GPL/UNLICENSED):"
+  echo "FLAGGED LICENSE PACKAGES — PRODUCTION (MPL/LGPL/GPL/UNLICENSED):"
   echo "$FLAGGED_LICENSES"
+  echo ""
+  echo "FLAGGED LICENSE PACKAGES — DEV+PROD FULL TREE (MPL/LGPL/GPL/UNLICENSED):"
+  echo "$DEV_FLAGGED_LICENSES"
   echo ""
   echo "SECURITY HEADERS:"
   echo "$SECURITY_HEADERS"
@@ -132,6 +161,7 @@ SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-in
 
 # Run Claude to analyze and write report
 "$CLAUDE_BIN" -p \
+  --model "$MODEL" \
   --allowedTools 'Read,Edit,Write,Glob,Grep' \
   >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
@@ -172,9 +202,6 @@ sys.stdout.write(cleaned)
 else
   log_info "No shared context block found in report" | tee -a "$LOG_FILE"
 fi
-
-# Cleanup
-rm -f "$METRICS_FILE"
 
 log_success "Security report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== Security Agent finished ===" | tee -a "$LOG_FILE"

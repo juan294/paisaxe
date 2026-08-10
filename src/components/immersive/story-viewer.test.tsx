@@ -1,10 +1,60 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { StoryViewer } from "./story-viewer";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ReactNode } from "react";
 import { createMockT } from "@/test/i18n-mock";
+import { useState, useEffect } from "react";
+import type { ComponentType } from "react";
+
+// #569: StoryViewer now loads its flag-gated tools via next/dynamic. The real
+// next/dynamic loader does not resolve under vitest, so mock it to eagerly load
+// the underlying module and render the real component (after a microtask, so
+// tests use findBy*/waitFor — matching production's async-load behavior).
+vi.mock("next/dynamic", () => ({
+  default: (
+    loader: () => Promise<ComponentType<Record<string, unknown>>>,
+    options?: { loading?: () => ReactNode }
+  ) => {
+    function DynamicLoaded(props: Record<string, unknown>) {
+      const [Comp, setComp] = useState<ComponentType<Record<string, unknown>> | null>(null);
+      useEffect(() => {
+        let active = true;
+        Promise.resolve(loader()).then((mod) => {
+          if (active) setComp(() => mod);
+        });
+        return () => {
+          active = false;
+        };
+      }, []);
+      // Mirror real next/dynamic behavior: render the `loading` option's output
+      // while the import promise is pending (covers the `loading: () => null`
+      // callbacks declared alongside each dynamic() call in story-viewer.tsx).
+      return Comp ? <Comp {...props} /> : (options?.loading?.() ?? null);
+    }
+    return DynamicLoaded;
+  },
+}));
+
+// #569: dynamically-imported (next/dynamic) controls mount only after their
+// loader import promise resolves. The number of microtask turns needed to
+// resolve that promise varies with vitest's module-cache state under parallel
+// load, so a single `await Promise.resolve()` is racy. Fake timers block
+// findBy*/waitFor polling, so drain the microtask queue manually until the
+// control appears (bounded, deterministic).
+async function flushUntil(query: () => HTMLElement | null): Promise<HTMLElement> {
+  for (let i = 0; i < 500; i++) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const result = query();
+    if (result) return result;
+  }
+
+  throw new Error("Timed out waiting for dynamically imported StoryViewer control");
+}
 
 // Mock i18n
 const mockT = createMockT();
@@ -211,22 +261,19 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // With 3 stories (< PAGE_SIZE), should show 3 segments
-      const progressbar = screen.getByRole("progressbar");
-      const progressBars = progressbar.querySelectorAll('[role="button"]');
+      const progressBars = within(screen.getByRole("navigation", { name: "Progreso de historias" })).getAllByRole("button");
       expect(progressBars).toHaveLength(3);
     });
 
     it("should cycle progress bar position based on current index", async () => {
       // At index 1 of 3 stories, position 1 should be filled (segments 0 and 1)
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
-
-      const progressbar = screen.getByRole("progressbar");
-      const progressBars = progressbar.querySelectorAll('[role="button"]');
+      const progressBars = within(screen.getByRole("navigation", { name: "Progreso de historias" })).getAllByRole("button");
 
       // First two segments should have filled inner div (w-full)
-      const filled0 = progressBars[0]?.querySelector("div");
-      const filled1 = progressBars[1]?.querySelector("div");
-      const filled2 = progressBars[2]?.querySelector("div");
+      const filled0 = progressBars[0]?.querySelector("span[aria-hidden='true']");
+      const filled1 = progressBars[1]?.querySelector("span[aria-hidden='true']");
+      const filled2 = progressBars[2]?.querySelector("span[aria-hidden='true']");
 
       expect(filled0?.classList.contains("w-full")).toBe(true);
       expect(filled1?.classList.contains("w-full")).toBe(true);
@@ -267,17 +314,37 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Más opciones" }));
-      fireEvent.click(screen.getByRole("menuitem"));
+      // #569: SuggestPlaceButton is now dynamically imported — flush the import
+      // until the menuitem mounts (fake timers are active, so findBy* can't poll).
+      const suggestMenuItem = await flushUntil(() => screen.queryByRole("menuitem"));
+      fireEvent.click(suggestMenuItem);
 
       expect(querySelectorSpy).not.toHaveBeenCalled();
     });
 
-    // UX-L2 (#522): Hero images are decorative (title announced by adjacent <h1>)
-    // so alt="" — query by src or the specific img within the background div instead.
+    // UX-M5: Hero image now has a meaningful alt derived from the localized story title.
+    it("UX-M5: hero image has non-empty alt text derived from localized story title", async () => {
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      expect(img).not.toBeNull();
+      // Must have a non-empty alt tied to the story title
+      expect(img).toHaveAttribute("alt", "Lagos de Covadonga");
+    });
+
+    it("UX-M5: hero image alt text updates when story changes", async () => {
+      const { container } = await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
+      );
+
+      const img = container.querySelector(`img[src="${mockStories[1].image}"]`);
+      expect(img).not.toBeNull();
+      expect(img).toHaveAttribute("alt", "Oviedo Cathedral");
+    });
+
     it("should render story image with blur placeholder", async () => {
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // Hero image is decorative (alt=""), find it by src
       const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-placeholder", "blur");
@@ -460,9 +527,7 @@ describe("StoryViewer", () => {
 
     it("should jump to specific story when clicking progress bar", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
-
-      const progressbar = screen.getByRole("progressbar");
-      const progressBars = progressbar.querySelectorAll('[role="button"]');
+      const progressBars = within(screen.getByRole("navigation", { name: "Progreso de historias" })).getAllByRole("button");
 
       if (progressBars[2]) {
         fireEvent.click(progressBars[2]);
@@ -578,7 +643,12 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      // The overlay toggle button is the one carrying aria-expanded (#634: the
+      // panel's dedicated hide button does not, so scope by `expanded`).
+      const infoToggleBtn = screen.getByRole("button", {
+        name: /mostrar información|ocultar información/i,
+        expanded: true,
+      });
       fireEvent.click(infoToggleBtn);
 
       // After clicking the overlay button on desktop, info should be hidden
@@ -603,7 +673,7 @@ describe("StoryViewer", () => {
       expect(bottomContent).toHaveClass("opacity-100");
     });
 
-    it("should toggle info when clicking the article content area", async () => {
+    it("does NOT toggle info when clicking the article text body (#634)", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // The article element is the content overlay at the bottom
@@ -612,9 +682,13 @@ describe("StoryViewer", () => {
         .closest("article[class*='bottom-0']");
       expect(article).not.toBeNull();
 
-      fireEvent.click(article!);
+      // #634: reading the description/title must not dismiss the panel.
+      fireEvent.click(screen.getByText("Beautiful glacial lakes in the mountains"));
+      fireEvent.click(screen.getByText("Lagos de Covadonga"));
+      expect(article).toHaveClass("opacity-100");
 
-      // After clicking article content, info should be hidden
+      // The dedicated hide button DOES dismiss it.
+      fireEvent.click(screen.getByTestId("hide-info-button"));
       expect(article).toHaveClass("opacity-0");
     });
 
@@ -654,7 +728,11 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
-      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      // #634: scope to the overlay toggle (the one with aria-expanded).
+      const infoToggleBtn = screen.getByRole("button", {
+        name: /mostrar información|ocultar información/i,
+        expanded: true,
+      });
 
       fireEvent.click(infoToggleBtn);
 
@@ -1088,19 +1166,17 @@ describe("StoryViewer", () => {
       vi.spyOn(Math, "random").mockRestore();
     });
 
-    it("should show autoplay toggle in overflow when flag enabled", async () => {
+    // UX-M1: autoplay toggle is now a top-level button (not in overflow) so it's always reachable
+    it("should show autoplay toggle as a top-level button (promoted from overflow) when flag enabled", async () => {
       mockIsEnabled.mockImplementation(
         (flag: string) => flag === "autoplay_button"
       );
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const menuButton = screen.getByLabelText("Más opciones");
-      fireEvent.click(menuButton);
-
-      expect(
-        screen.getByText("accessibility.play_short", { exact: true })
-      ).toBeInTheDocument();
+      // The ambient toggle button is now always visible at top level
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      expect(ambientToggle).toBeInTheDocument();
     });
 
     it("should show share option in overflow when flag enabled", async () => {
@@ -1418,7 +1494,11 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const suggestItem = screen.getByText("suggestions.suggest_short");
+      // #569: SuggestPlaceButton is dynamically imported — flush the import
+      // until the action mounts (fake timers block findBy* polling).
+      const suggestItem = await flushUntil(() =>
+        screen.queryByText("suggestions.suggest_short")
+      );
       fireEvent.click(suggestItem);
 
       expect(querySelectorSpy).not.toHaveBeenCalled();
@@ -1426,21 +1506,18 @@ describe("StoryViewer", () => {
     });
   });
 
-  describe("mobile overflow autoplay toggle without ambient", () => {
-    it("should toggle simple autoplay from overflow when ambient_discovery is NOT enabled (line 496)", async () => {
-      // Enable autoplay_button but NOT ambient_discovery — triggers the else branch (line 496)
+  describe("top-level autoplay toggle without ambient (UX-M1: promoted from overflow)", () => {
+    it("should toggle simple autoplay from top-level button when ambient_discovery is NOT enabled", async () => {
+      // Enable autoplay_button but NOT ambient_discovery
       mockIsEnabled.mockImplementation(
         (flag: string) => flag === "autoplay_button"
       );
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const menuButton = screen.getByLabelText("Más opciones");
-      fireEvent.click(menuButton);
-
-      // Find and click the play item in the overflow
-      const playItem = screen.getByText("accessibility.play_short");
-      fireEvent.click(playItem);
+      // The ambient/autoplay toggle is now always visible at the top level
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      fireEvent.click(ambientToggle);
 
       // After clicking, auto-play should start — advance non-ambient interval (6s)
       act(() => {
@@ -1456,20 +1533,17 @@ describe("StoryViewer", () => {
     });
   });
 
-  describe("mobile overflow ambient toggle", () => {
-    it("should toggle ambient mode from overflow menu when ambient_discovery is enabled", async () => {
+  describe("top-level ambient toggle (UX-M1: promoted from overflow)", () => {
+    it("should toggle ambient mode from top-level button when ambient_discovery is enabled", async () => {
       mockIsEnabled.mockImplementation(
         (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
       );
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const menuButton = screen.getByLabelText("Más opciones");
-      fireEvent.click(menuButton);
-
-      // Find the play/pause item in the overflow
-      const playItem = screen.getByText("accessibility.play_short");
-      fireEvent.click(playItem);
+      // Click the top-level ambient toggle button
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      fireEvent.click(ambientToggle);
 
       // After clicking, auto-play should start — advance ambient interval (12s)
       act(() => {
@@ -1935,6 +2009,65 @@ describe("StoryViewer", () => {
   // at line 215 when `!story`, so BookmarkButton at line 556 is never rendered without a
   // valid story. The ternary guards are defensive programming.
 
+  describe("FE-M1: timer cancellation on rapid prev navigation (line 123)", () => {
+    it("should cancel the pending backward transition timer on rapid double-click", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
+      );
+
+      const prevButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("left-0")
+      );
+      expect(prevButton).toBeDefined();
+
+      // Rapid double-click on prev: second click calls clearTimeout (line 123) on the first timer
+      fireEvent.click(prevButton!);
+      fireEvent.click(prevButton!);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      // onIndexChange called once (second call wins — first timer was cancelled)
+      expect(onIndexChange).toHaveBeenCalledTimes(1);
+    }, 30000);
+  });
+
+  describe("suggest place dialog lifecycle (lines 388, 490)", () => {
+    it("should invoke onOpen on SuggestPlaceButton click and onClose when dialog Cancel is pressed", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "user_story_suggestions"
+      );
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Trigger onOpen (line 388): click the desktop SuggestPlaceButton.
+      // #569: SuggestPlaceButton is dynamically imported — flush the import
+      // microtask before querying (fake timers block findBy* polling).
+      await act(async () => { await Promise.resolve(); });
+      const suggestBtn = screen.getByRole("button", {
+        name: "suggestions.suggest_place",
+      });
+      fireEvent.click(suggestBtn);
+
+      // Verify dialog opened (Cancel button appears)
+      const cancelBtn = screen.getByRole("button", {
+        name: "suggestions.cancel",
+      });
+      expect(cancelBtn).toBeInTheDocument();
+
+      // Trigger onClose (line 490): click Cancel in the dialog
+      fireEvent.click(cancelBtn);
+
+      // Dialog should close
+      expect(
+        screen.queryByRole("button", { name: "suggestions.cancel" })
+      ).not.toBeInTheDocument();
+
+      mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
   describe("FE-H4: Image key stability", () => {
     it("should not include ambient or autoPlay state in the Image key (prevents flash on flag toggle)", async () => {
       // Enable ambient_discovery so isAmbient can become true
@@ -1987,8 +2120,12 @@ describe("StoryViewer", () => {
     it("should have a transparent button overlay for toggling info on desktop", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // There should be a dedicated button for toggling info visibility
-      const infoToggleBtn = screen.queryByRole("button", { name: /mostrar información|ocultar información/i });
+      // There should be a dedicated overlay button for toggling info visibility
+      // (#634: scoped by aria-expanded to distinguish from the panel hide button).
+      const infoToggleBtn = screen.queryByRole("button", {
+        name: /mostrar información|ocultar información/i,
+        expanded: true,
+      });
       expect(infoToggleBtn).toBeInTheDocument();
     });
 
@@ -2007,7 +2144,10 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      const infoToggleBtn = screen.getByRole("button", {
+        name: /mostrar información|ocultar información/i,
+        expanded: true,
+      });
       // Initially info is shown (showInfo = true)
       expect(infoToggleBtn).toHaveAttribute("aria-expanded", "true");
 
@@ -2018,6 +2158,42 @@ describe("StoryViewer", () => {
   });
 
   describe("related stories onSelectStory callback (lines 290-292)", () => {
+    it("calls onIndexChange(line 335) when a related story is selected and found in stories", async () => {
+      // Enable related_stories feature flag
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "related_stories"
+      );
+
+      // story-1 (nature) and story-2 (nature) share a category so getRelatedStories returns story-2
+      const storiesWithSharedCategory: Story[] = [
+        { ...mockStories[0], category: "nature" },
+        { ...mockStories[1], category: "nature" },
+        { ...mockStories[2], category: "food" },
+      ];
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: storiesWithSharedCategory,
+            allStories: storiesWithSharedCategory,
+          })}
+        />
+      );
+
+      // #569: RelatedStories is dynamically imported — flush microtasks until the
+      // story button appears, same pattern used for SuggestPlaceButton above.
+      const relatedButton = await flushUntil(() => {
+        const btns = screen.getAllByRole("button");
+        return btns.find((btn) => btn.textContent?.includes("Oviedo Cathedral")) ?? null;
+      });
+
+      fireEvent.click(relatedButton);
+      // story-2 is at index 1 in storiesWithSharedCategory — onIndexChange must be called
+      expect(onIndexChange).toHaveBeenCalledWith(1);
+
+      mockIsEnabled.mockReturnValue(false);
+    });
+
     it("should call onIndexChange when a related story is selected and found in stories array", async () => {
       // Enable related_stories feature flag
       mockIsEnabled.mockImplementation(
@@ -2106,6 +2282,197 @@ describe("StoryViewer", () => {
       }
 
       mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  describe("PE-M4 (#615): adjacent image prefetch", () => {
+    it("renders preload links for the next and previous story images", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
+      );
+
+      const preloads = Array.from(
+        document.querySelectorAll('link[rel="preload"][as="image"]')
+      ).map((l) => l.getAttribute("href"));
+
+      // currentIndex 1 → prev = story-1 (lagos), next = story-3 (sidra)
+      expect(preloads).toContain("/images/lagos.jpg");
+      expect(preloads).toContain("/images/sidra.jpg");
+    });
+
+    it("wraps around: prefetches next and previous images from index 0", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
+      );
+
+      const preloads = Array.from(
+        document.querySelectorAll('link[rel="preload"][as="image"]')
+      ).map((l) => l.getAttribute("href"));
+
+      // currentIndex 0 → next = story-2 (cathedral), prev wraps to story-3 (sidra)
+      expect(preloads).toContain("/images/cathedral.jpg");
+      expect(preloads).toContain("/images/sidra.jpg");
+    });
+
+    it("does not preload the current story image", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
+      );
+
+      const preloads = Array.from(
+        document.querySelectorAll('link[rel="preload"][as="image"]')
+      ).map((l) => l.getAttribute("href"));
+
+      expect(preloads).not.toContain("/images/lagos.jpg");
+    });
+  });
+
+  describe("UX-M1: ambient/autoplay toggle visible on mobile (promoted from overflow)", () => {
+    beforeEach(() => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
+      );
+    });
+
+    afterEach(() => {
+      mockIsEnabled.mockReturnValue(false);
+    });
+
+    it("ambient toggle is rendered at top level (not only inside overflow menu)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The ambient toggle should be directly reachable without opening the overflow menu.
+      // It has data-testid="ambient-toggle" (and a Play/Pause icon inside).
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      expect(ambientToggle).toBeInTheDocument();
+    });
+
+    it("ambient toggle has aria-pressed=false when stopped", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      expect(ambientToggle).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("ambient toggle has aria-pressed=true after being clicked", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      fireEvent.click(ambientToggle);
+      expect(ambientToggle).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("ambient toggle is NOT inside the overflow menu", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Open the overflow menu
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      // The overflow menu should NOT contain a play/pause item for ambient/autoplay
+      // (it was removed from the overflow since it's now promoted to top-level).
+      // MenuItems inside overflow have role="menuitem"
+      const menuItems = screen.queryAllByRole("menuitem");
+      const playPauseInOverflow = menuItems.find(
+        (item) => item.querySelector(".lucide-play") || item.querySelector(".lucide-pause")
+      );
+      expect(playPauseInOverflow).toBeUndefined();
+    });
+  });
+
+  describe("FE-L1: StoryInfoPanel and StoryToolbar memoization", () => {
+    it("StoryInfoPanel export is a memo component (has $$typeof or displayName)", async () => {
+      // Verify the component is wrapped in memo by checking it renders correctly
+      // and checking the module export type via dynamic import
+      const mod = await import("./story-info-panel");
+      // memo returns an object with $$typeof = Symbol(react.memo)
+      const comp = mod.StoryInfoPanel as unknown as { $$typeof?: symbol; type?: unknown };
+      expect(comp.$$typeof?.toString()).toContain("react.memo");
+    });
+
+    it("StoryToolbar export is a memo component", async () => {
+      const mod = await import("./story-toolbar");
+      const comp = mod.StoryToolbar as unknown as { $$typeof?: symbol; type?: unknown };
+      expect(comp.$$typeof?.toString()).toContain("react.memo");
+    });
+  });
+
+  describe("coverage gaps: adjacentImages, bookmark, overlay", () => {
+    it("adjacentImages skips stories with no image (line 223: img falsy branch)", async () => {
+      const storiesNoImage: Story[] = [
+        { ...mockStories[0], image: undefined as unknown as string },
+        { ...mockStories[1], image: "" },
+        { ...mockStories[2] },
+      ];
+
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ stories: storiesNoImage, allStories: storiesNoImage, currentIndex: 2 })} />
+      );
+
+      // Component renders without crashing when adjacent stories have no image
+      expect(screen.getByText("Sidra House")).toBeInTheDocument();
+    });
+
+    it("BookmarkButton isFavorite falls back to false when story is undefined (line 492: story null branch)", async () => {
+      // Pass empty stories and currentIndex=0 so stories[0] is undefined (story = undefined)
+      const emptyStories: Story[] = [];
+      mockIsFavorite.mockClear();
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: emptyStories,
+            allStories: emptyStories,
+            currentIndex: 0,
+          })}
+        />
+      );
+
+      // story is undefined → isFavorite(story.id) is NEVER called (false branch taken)
+      expect(mockIsFavorite).not.toHaveBeenCalled();
+    });
+
+    it("overlay button click does not toggle info when pointer is not fine (line 278: matches=false)", async () => {
+      // matchMedia already returns matches: false for all queries by default
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Use the transparent overlay button (no testid), not the hide-info panel button
+      const overlayBtn = screen
+        .getAllByRole("button", { name: /mostrar información|ocultar información/i })
+        .find((btn) => !btn.hasAttribute("data-testid"));
+
+      if (overlayBtn) {
+        fireEvent.click(overlayBtn);
+        // With matches=false, info should NOT be toggled — stays visible
+        const bottomContent = screen
+          .getByText("Lagos de Covadonga")
+          .closest("article[class*='bottom-0']");
+        expect(bottomContent).toHaveClass("opacity-100");
+      }
+    });
+
+    it("BookmarkButton onToggle is a no-op when story is undefined (story && toggleFavorite false-path)", async () => {
+      const emptyStories: Story[] = [];
+      mockToggleFavorite.mockClear();
+
+      const { container } = await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: emptyStories,
+            allStories: emptyStories,
+            currentIndex: 0,
+          })}
+        />
+      );
+
+      // Find the bookmark button and click it — onToggle fires but story is undefined
+      const bookmarkBtn = container.querySelector("[data-testid='bookmark-button'], [aria-label*='guardar'], [aria-label*='bookmark']");
+      if (bookmarkBtn) {
+        fireEvent.click(bookmarkBtn as Element);
+      }
+
+      // toggleFavorite should NOT be called since story is undefined (story && ... short-circuits)
+      expect(mockToggleFavorite).not.toHaveBeenCalled();
     });
   });
 });

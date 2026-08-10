@@ -1,9 +1,9 @@
 import fs from "fs";
 import path from "path";
+import { pathToFileURL } from "url";
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { VoyageAIClient } from "voyageai";
-import { GENERATED_STORIES } from "../content/processed/extracted-stories";
 import { getPlaceholderForStory, needsPlaceholderImage } from "../src/lib/unsplash-placeholders";
 import type { StoryCategory } from "../src/types/immersive";
 
@@ -66,6 +66,12 @@ interface Story {
 }
 
 const CHUNKS_FILE = path.join(process.cwd(), "content", "processed", "chunks.json");
+const GENERATED_STORIES_FILE = path.join(
+  process.cwd(),
+  "content",
+  "processed",
+  "extracted-stories.ts"
+);
 
 // All stories including fallback and additional stories
 const ALL_STORIES: Story[] = [
@@ -313,18 +319,27 @@ const ALL_STORIES: Story[] = [
   },
 ];
 
-// Existing slugs from original stories to avoid duplicates
-const existingSlugs = new Set(ALL_STORIES.map(s => s.slug));
+async function loadGeneratedStories(): Promise<Story[]> {
+  if (!fs.existsSync(GENERATED_STORIES_FILE)) {
+    return [];
+  }
 
-// Add generated stories that don't conflict with existing ones
-const filteredGenerated = GENERATED_STORIES
-  .filter(s => !existingSlugs.has(s.slug))
-  .map((s, i) => ({
-    ...s,
-    displayOrder: s.displayOrder ?? (ALL_STORIES.length + i),
-  }));
+  const moduleUrl = pathToFileURL(GENERATED_STORIES_FILE).href;
+  const generatedModule = await import(moduleUrl) as { GENERATED_STORIES?: Story[] };
+  return generatedModule.GENERATED_STORIES ?? [];
+}
 
-ALL_STORIES.push(...filteredGenerated);
+function mergeGeneratedStories(baseStories: Story[], generatedStories: Story[]): Story[] {
+  const existingSlugs = new Set(baseStories.map((story) => story.slug));
+  const filteredGenerated = generatedStories
+    .filter((story) => !existingSlugs.has(story.slug))
+    .map((story, index) => ({
+      ...story,
+      displayOrder: story.displayOrder ?? (baseStories.length + index),
+    }));
+
+  return [...baseStories, ...filteredGenerated];
+}
 
 /**
  * Determine whether an error represents a 429 rate-limit response.
@@ -354,14 +369,15 @@ async function generateContextualizedEmbeddingsWithRetry(
         outputDimension: EMBEDDING_DIMENSIONS,
       });
 
-      if (!result.data || result.data.length === 0 || !result.data[0].data) {
+      // voyageai 0.4.x ExtendedClient returns { results: [{ embeddings: number[][] }], totalTokens }
+      if (!result.results || result.results.length === 0 || !result.results[0].embeddings) {
         throw new Error(`No contextualized embeddings returned for ${sourcePdf}`);
       }
 
-      const chunkEmbeddings = result.data[0].data;
+      const chunkEmbeddings = result.results[0].embeddings.map((embedding) => ({ embedding }));
       return {
         data: chunkEmbeddings,
-        totalTokens: result.usage?.totalTokens || 0,
+        totalTokens: result.totalTokens || 0,
       };
     } catch (error: unknown) {
       if (isRateLimitError(error) && attempt < MAX_RETRIES) {
@@ -381,9 +397,11 @@ async function generateContextualizedEmbeddingsWithRetry(
 
 
 async function seedStories(): Promise<void> {
-  console.log(`\nSeeding ${ALL_STORIES.length} stories...`);
+  const storiesToSeed = mergeGeneratedStories(ALL_STORIES, await loadGeneratedStories());
 
-  const records = ALL_STORIES.map((story, index) => {
+  console.log(`\nSeeding ${storiesToSeed.length} stories...`);
+
+  const records = storiesToSeed.map((story, index) => {
     const slug = story.slug || story.id;
 
     // Auto-assign placeholder for stories without an image or with old Unsplash URLs

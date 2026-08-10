@@ -7,13 +7,18 @@ import { getSupabaseUrl, getSupabaseAnonKey } from "@/lib/env";
  * Create an authenticated Supabase server client using cookies.
  * Shared across API routes that need cookie-based Supabase access.
  */
-export async function getSupabaseClient() {
+export async function getSupabaseClient(request?: NextRequest) {
   const cookieStore = await cookies();
+  const authHeader = request?.headers.get("Authorization");
+  const bearerHeaders = authHeader?.startsWith("Bearer ")
+    ? { global: { headers: { Authorization: authHeader } } }
+    : {};
 
   return createServerClient(
     getSupabaseUrl() ?? "",
     getSupabaseAnonKey() ?? "",
     {
+      ...bearerHeaders,
       cookies: {
         getAll() {
           return cookieStore.getAll();

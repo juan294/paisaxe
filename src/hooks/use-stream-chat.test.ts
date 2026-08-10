@@ -11,6 +11,12 @@ vi.mock("@/lib/i18n", () => ({
       const translations: Record<string, string> = {
         "chat.error_generic": "Lo siento, hubo un error. Intenta de nuevo.",
         "chat.error_processing": "Lo siento, no pude procesar tu pregunta.",
+        "chat.error": "No se pudo conectar. Por favor, inténtalo de nuevo.",
+        "chat.error_auth": "Tu sesión ha expirado. Recarga la página para continuar.",
+        "chat.error_server": "Ocurrió un error en el servidor. Inténtalo de nuevo más tarde.",
+        "chat.connection_lost": "Se perdió la conexión. Reintentar",
+        "chat.error_timeout": "La respuesta tardó demasiado. Por favor, inténtalo de nuevo.",
+        "chat.new_chat_prompt": "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar.",
       };
       return translations[key] || key;
     },
@@ -40,6 +46,11 @@ vi.mock("@/lib/chat-upsell-throttle", () => ({
   canShowUpsell: (...args: unknown[]) => mockCanShowUpsell(...args),
   recordUpsellShown: (...args: unknown[]) => mockRecordUpsellShown(...args),
   recordUpsellDismissed: vi.fn(),
+}));
+
+// Mock chat-safety (read-only — only used for MAX_CONVERSATION_TURNS)
+vi.mock("@/lib/chat-safety", () => ({
+  MAX_CONVERSATION_TURNS: 20,
 }));
 
 // Mock fetch
@@ -834,6 +845,66 @@ describe("useStreamChat", () => {
     expect(result.current.isStreaming).toBe(false);
   });
 
+  it("HandledError catch: leaves messages empty when assistantIndex is out of bounds after reset (line 264 guard)", async () => {
+    // Covers the falsy branch of `if (updated[assistantIndex])` inside the
+    // HandledError catch block:
+    // 1. sendMessage starts → assistantIndex = 1, user + assistant placeholder added
+    // 2. resetMessages() is called while the fetch is still pending → messages = []
+    // 3. fetch resolves with a non-ok response → setError + throw HandledError
+    // 4. The HandledError catch runs setMessages(prev => ...) with prev = []
+    //    → updated[1] is undefined → the guard is skipped and nothing is pushed
+    let resolveFetch: (value: unknown) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolveFetch = resolve;
+    });
+    mockFetch.mockReturnValueOnce(pendingPromise);
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    // Start sending (don't await — we need to reset messages while it's in progress)
+    let sendPromise: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.isStreaming).toBe(true);
+    expect(result.current.messages).toHaveLength(2);
+
+    // Reset messages while the send is in progress
+    act(() => {
+      result.current.resetMessages();
+    });
+    expect(result.current.messages).toEqual([]);
+
+    // Resolve the fetch with a 500 → setError(server) then throw HandledError
+    await act(async () => {
+      resolveFetch!({ ok: false, status: 500 });
+      await sendPromise!;
+    });
+
+    // Error state was set by the non-ok handler, but no message was pushed
+    // because updated[assistantIndex] no longer exists after the reset.
+    expect(result.current.error).toBe(
+      "Ocurrió un error en el servidor. Inténtalo de nuevo más tarde."
+    );
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.isStreaming).toBe(false);
+  });
+
+  // Line 203: `} else if (event.type === "error") {` — the false arm (an event
+  // reaching this branch whose type is NOT "error") is unreachable. parseSseEvent
+  // (src/types/sse.ts) validates every parsed line and only ever returns events of
+  // type "text" | "done" | "error"; unknown/malformed events return null and are
+  // filtered by the `if (!event) return;` guard before the chain. Since "text" and
+  // "done" are consumed by the earlier if/else-if branches, any event evaluated at
+  // this final else-if always has type "error".
+
   it("should skip non-data SSE lines in processEvent (line 112)", async () => {
     // processEvent skips lines that don't start with "data: ".
     // This tests the early return on line 112.
@@ -1050,5 +1121,395 @@ describe("useStreamChat", () => {
 
     // Should have the valid content, skipping the malformed event
     expect(result.current.messages[1].content).toBe("Good content");
+  });
+
+  it("onError: sets error state and replaces assistant message when the stream reader throws", async () => {
+    // Trigger readSseStream's onError by providing a ReadableStream that errors immediately
+    const streamError = new Error("Unexpected read failure");
+    const erroringStream = new ReadableStream({
+      start(controller) {
+        controller.error(streamError);
+      },
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: erroringStream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // onError non-AbortError path: sets error and updates assistant message
+    expect(result.current.error).toBe("No se pudo conectar. Por favor, inténtalo de nuevo.");
+    expect(result.current.messages[1].content).toBe(
+      "Lo siento, hubo un error. Intenta de nuevo."
+    );
+  });
+
+  it("onError: silently ignores AbortError from the stream reader", async () => {
+    const abortError = new Error("AbortError");
+    abortError.name = "AbortError";
+    const erroringStream = new ReadableStream({
+      start(controller) {
+        controller.error(abortError);
+      },
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: erroringStream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // AbortError is silently ignored — no error state set
+    expect(result.current.error).toBeNull();
+  });
+
+  it("onError else branch: pushes new error message when assistantIndex is out of bounds after reset", async () => {
+    // To hit the else branch (line 209), assistantIndex must be out of bounds in the
+    // setMessages callback. This happens when messages are reset while the stream hangs:
+    // 1. sendMessage starts → assistantIndex = 1, messages = [user, assistant]
+    // 2. resetMessages() → messages = []
+    // 3. stream errors → onError fires → setMessages(prev => ...) where prev = []
+    // 4. updated[1] is undefined → else branch (line 209) pushes a new error message
+    let triggerStreamError: (err: Error) => void;
+    const hangingStream = new ReadableStream({
+      start(controller) {
+        triggerStreamError = (err) => controller.error(err);
+      },
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: hangingStream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    let sendPromise: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // Messages should have user + assistant placeholder
+    expect(result.current.messages).toHaveLength(2);
+
+    // Reset messages while the stream is pending
+    act(() => {
+      result.current.resetMessages();
+    });
+    expect(result.current.messages).toEqual([]);
+
+    // Trigger stream error — onError will see an empty messages array
+    await act(async () => {
+      triggerStreamError!(new Error("Stream read error"));
+      await sendPromise!;
+    });
+
+    // else branch (line 209): pushed a new error message
+    expect(result.current.error).toBe("No se pudo conectar. Por favor, inténtalo de nuevo.");
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "Lo siento, hubo un error. Intenta de nuevo.",
+    });
+  });
+
+  it("outer catch: silently ignores AbortError thrown by fetch()", async () => {
+    const abortError = new Error("AbortError");
+    abortError.name = "AbortError";
+    mockFetch.mockRejectedValueOnce(abortError);
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // AbortError from fetch() is silently returned (no error state, no crash)
+    expect(result.current.error).toBeNull();
+  });
+
+  it("60-second timeout aborts the request and surfaces a connection-lost error (FE-H2)", async () => {
+    vi.useFakeTimers();
+
+    let resolvePromise!: (value: unknown) => void;
+    const neverResolvingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockFetch.mockReturnValueOnce(neverResolvingPromise);
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    let sendPromise!: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // Advance 60 seconds — fires the timeout callback
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    // The AbortController abort fires — fetch rejects with AbortError
+    const abortError = new Error("The operation was aborted");
+    abortError.name = "AbortError";
+    resolvePromise(Promise.reject(abortError));
+
+    await act(async () => {
+      await sendPromise;
+    });
+
+    vi.useRealTimers();
+
+    // FE-H2: timeout should now surface an error and timeout message, not silently resolve
+    expect(result.current.isStreaming).toBe(false);
+    expect(result.current.error).toBe("Se perdió la conexión. Reintentar");
+    expect(result.current.messages[1].content).toBe(
+      "La respuesta tardó demasiado. Por favor, inténtalo de nuevo."
+    );
+  });
+
+  it("FE-H2: 401 response sets auth error message", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.error).toBe(
+      "Tu sesión ha expirado. Recarga la página para continuar."
+    );
+  });
+
+  it("FE-H2: 500 response sets server error message", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.error).toBe(
+      "Ocurrió un error en el servidor. Inténtalo de nuevo más tarde."
+    );
+  });
+
+  it("FE-H2: SSE response_timeout event shows timeout message", async () => {
+    const encoder = new TextEncoder();
+    const timeoutEvent = `data: ${JSON.stringify({ type: "error", message: "response_timeout" })}\n\n`;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(timeoutEvent));
+        controller.close();
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.messages[1].content).toBe(
+      "La respuesta tardó demasiado. Por favor, inténtalo de nuevo."
+    );
+  });
+
+  it("FE-M3: 20-turn cap — sends new_chat_prompt instead of fetching when messages === MAX_CONVERSATION_TURNS*2", async () => {
+    // Fill 20 turns (40 messages) via 20 successful sends, then verify
+    // the 21st send is blocked and a new_chat_prompt message is appended.
+    // Use a fast 1-word response to keep each round-trip minimal.
+    for (let i = 0; i < 20; i++) {
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Ok"));
+    }
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    for (let i = 0; i < 20; i++) {
+      await act(async () => {
+        await result.current.sendMessage(`Q${i}`, {
+          context: "ctx",
+          locale: "es",
+          messageIndex: i,
+        });
+      });
+    }
+
+    // Should have exactly 40 messages (20 turns × 2)
+    expect(result.current.messages).toHaveLength(40);
+
+    // 21st send should be blocked
+    mockFetch.mockReset();
+
+    await act(async () => {
+      await result.current.sendMessage("Over the limit", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 20,
+      });
+    });
+
+    // Fetch must NOT have been called
+    expect(mockFetch).not.toHaveBeenCalled();
+    // A new_chat_prompt assistant message should have been appended
+    expect(result.current.messages).toHaveLength(41);
+    const lastMsg = result.current.messages[40];
+    expect(lastMsg.role).toBe("assistant");
+    expect(lastMsg.content).toBe(
+      "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar."
+    );
+  });
+
+  it("onError: sets connection_lost when AbortError arrives after 60s timeout aborts the controller (line 235)", async () => {
+    vi.useFakeTimers();
+
+    // Stream hangs — we'll error it manually after the timeout fires
+    let triggerStreamError!: (err: Error) => void;
+    const hangingStream = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        triggerStreamError = (err) => streamController.error(err);
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: hangingStream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    let sendPromise!: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // Advance 60 s → fires controller.abort() → controller.signal.aborted = true
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    // Manually error the stream with an AbortError now that signal.aborted is true.
+    // readSseStream's catch fires → calls onError(abortError).
+    // onError: err.name === "AbortError" && controller.signal.aborted → line 235 fires.
+    const abortError = new Error("The operation was aborted");
+    abortError.name = "AbortError";
+    await act(async () => {
+      triggerStreamError!(abortError);
+      await sendPromise;
+    });
+
+    vi.useRealTimers();
+
+    expect(result.current.error).toBe("Se perdió la conexión. Reintentar");
+  });
+
+  it("catch block: pushes new timeout message when assistantIndex is out of bounds after reset (line 293)", async () => {
+    vi.useFakeTimers();
+
+    let resolvePromise!: (value: unknown) => void;
+    const neverResolvingFetch = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockFetch.mockReturnValueOnce(neverResolvingFetch);
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    let sendPromise!: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // messages = [user, assistant], assistantIndex = 1
+    expect(result.current.messages).toHaveLength(2);
+
+    // Reset messages while the request is in flight → messages = [], but assistantIndex is still 1
+    act(() => {
+      result.current.resetMessages();
+    });
+    expect(result.current.messages).toEqual([]);
+
+    // Advance 60 s → fires controller.abort() → signal.aborted = true
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    // Reject fetch with AbortError so the outer catch fires
+    const abortError = new Error("The operation was aborted");
+    abortError.name = "AbortError";
+    resolvePromise(Promise.reject(abortError));
+
+    await act(async () => {
+      await sendPromise;
+    });
+
+    vi.useRealTimers();
+
+    // Catch: AbortError + signal.aborted=true + updated[1] undefined → line 293 pushes new message
+    expect(result.current.error).toBe("Se perdió la conexión. Reintentar");
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "La respuesta tardó demasiado. Por favor, inténtalo de nuevo.",
+    });
   });
 });

@@ -29,7 +29,10 @@ function redisKey(text: string): string {
 // ── Tests ────────────────────────────────────────────────────────────────────
 describe("EmbeddingCache (Redis-backed)", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.resetAllMocks();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.com");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-token");
     // Default: cache miss
     mockRedisGet.mockResolvedValue(null);
     mockRedisSet.mockResolvedValue("OK");
@@ -55,6 +58,21 @@ describe("EmbeddingCache (Redis-backed)", () => {
     const result = await cache.get("hello world");
 
     expect(result).toEqual(vector);
+  });
+
+  it("returns embedding directly when Upstash auto-parses JSON (Redis returns Array, not string) — line 34", async () => {
+    // Upstash Redis client can auto-parse JSON responses into native JS types.
+    // When that happens, the stored embedding arrives as an Array, not a JSON string.
+    const vector = [0.4, 0.5, 0.6];
+    mockRedisGet.mockResolvedValue(vector); // already-parsed array, not a string
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    const result = await cache.get("auto-parsed text");
+
+    expect(result).toEqual(vector);
+    expect(Array.isArray(result)).toBe(true);
   });
 
   it("stores embedding as JSON string with 24h TTL", async () => {
@@ -110,6 +128,19 @@ describe("EmbeddingCache (Redis-backed)", () => {
     expect(mockRedisSet).not.toHaveBeenCalled();
   });
 
+  it("skips Redis calls when cache env vars are missing", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await expect(cache.get("text")).resolves.toBeNull();
+    await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+    expect(mockRedisGet).not.toHaveBeenCalled();
+    expect(mockRedisSet).not.toHaveBeenCalled();
+  });
+
   it("silently absorbs Redis.set errors (fire-and-forget)", async () => {
     mockRedisGet.mockResolvedValue(null);
     mockRedisSet.mockRejectedValue(new Error("Write failed"));
@@ -119,6 +150,103 @@ describe("EmbeddingCache (Redis-backed)", () => {
 
     // Should not throw
     await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+  });
+
+  it("stringifies a non-Error rejection when Redis.get throws (falls to String(err) branch)", async () => {
+    mockRedisGet.mockRejectedValue("plain string rejection");
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    const result = await cache.get("weird error text");
+
+    expect(result).toBeNull();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_MISS]",
+      { reason: "plain string rejection" }
+    );
+  });
+
+  it("stringifies a non-Error rejection from Redis.set's async .catch() (fire-and-forget path)", async () => {
+    mockRedisGet.mockResolvedValue(null);
+    mockRedisSet.mockRejectedValue({ code: "ECONNRESET" });
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await cache.set("text", [0.1, 0.2]);
+    // Allow the fire-and-forget .catch() microtask to run.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_SET_FAILED]",
+      { reason: String({ code: "ECONNRESET" }) }
+    );
+  });
+
+  it("stringifies a non-Error value thrown synchronously by getRedis().set (outer catch)", async () => {
+    mockRedisGet.mockResolvedValue(null);
+    // Throwing synchronously (not returning a rejected promise) exercises the
+    // outer try/catch in set(), not the inner .catch() on the returned promise.
+    mockRedisSet.mockImplementation(() => {
+      throw "synchronous non-Error throw";
+    });
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_SET_FAILED]",
+      { reason: "synchronous non-Error throw" }
+    );
+  });
+
+  it("uses err.message when getRedis().set throws a real Error synchronously (outer catch, Error branch)", async () => {
+    mockRedisGet.mockResolvedValue(null);
+    mockRedisSet.mockImplementation(() => {
+      throw new Error("sync boom");
+    });
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_SET_FAILED]",
+      { reason: "sync boom" }
+    );
+  });
+
+  it("does not wait for Redis.set to finish", async () => {
+    mockRedisSet.mockReturnValue(new Promise(() => {}));
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    const result = await Promise.race([
+      cache.set("slow write", [0.1, 0.2]).then(() => "returned"),
+      new Promise((resolve) => setTimeout(() => resolve("blocked"), 10)),
+    ]);
+
+    expect(result).toBe("returned");
+  });
+
+  it("handles synchronous throw from getRedis().set — outer catch at line 65", async () => {
+    // mockRedisSet throws synchronously (not a rejected promise) — this hits the outer
+    // catch block in EmbeddingCache.set(), not the .catch() on the promise chain.
+    mockRedisSet.mockImplementation(() => {
+      throw new Error("sync Redis error");
+    });
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_SET_FAILED]",
+      expect.objectContaining({ reason: "sync Redis error" })
+    );
   });
 
   it("different texts produce different Redis keys", async () => {

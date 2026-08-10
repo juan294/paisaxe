@@ -58,6 +58,12 @@ export function CategoryFilterBadge({
     }
   }, [isExpanded]);
 
+  useEffect(() => {
+    if (!visible) {
+      setIsExpanded(false);
+    }
+  }, [visible]);
+
   // Close on escape
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -75,6 +81,7 @@ export function CategoryFilterBadge({
   return (
     <div
       ref={containerRef}
+      aria-hidden={visible ? undefined : "true"}
       className={cn(
         "absolute top-16 left-6 z-30 transition-all duration-500",
         visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"
@@ -82,6 +89,7 @@ export function CategoryFilterBadge({
     >
       {/* Toggle Button */}
       <button
+        tabIndex={visible ? 0 : -1}
         onClick={(e) => {
           e.stopPropagation();
           setIsExpanded(!isExpanded);
@@ -114,6 +122,7 @@ export function CategoryFilterBadge({
 
       {/* Dropdown Panel */}
       <div
+        aria-hidden={visible && isExpanded ? undefined : "true"}
         className={cn(
           "absolute top-full left-0 mt-2 p-4 rounded-xl",
           "bg-white/10 backdrop-blur-xl border border-white/20",
@@ -147,7 +156,7 @@ export function CategoryFilterBadge({
                   onCategoryChange(selectedCategory === category ? null : category)
                 }
                 delay={100 + index * 30}
-                isVisible={isExpanded}
+                isVisible={visible && isExpanded}
               />
             ))}
           </div>
@@ -174,7 +183,7 @@ export function CategoryFilterBadge({
                   onLocationChange(selectedLocation === location ? null : location)
                 }
                 delay={150 + index * 30}
-                isVisible={isExpanded}
+                isVisible={visible && isExpanded}
               />
             ))}
           </div>
@@ -201,7 +210,7 @@ export function CategoryFilterBadge({
                   onDurationChange(selectedDuration === duration ? null : duration)
                 }
                 delay={200 + index * 30}
-                isVisible={isExpanded}
+                isVisible={visible && isExpanded}
               />
             ))}
           </div>
@@ -209,6 +218,7 @@ export function CategoryFilterBadge({
 
         {/* Clear All */}
         <button
+          tabIndex={visible && isExpanded && hasActiveFilters ? 0 : -1}
           onClick={() => {
             onClearAll();
             setIsExpanded(false);
@@ -244,6 +254,7 @@ function FilterChip({ label, selected, highlighted, onClick, delay = 0, isVisibl
   return (
     <button
       onClick={onClick}
+      tabIndex={isVisible ? 0 : -1}
       style={{
         animationDelay: isVisible ? `${delay}ms` : "0ms",
       }}

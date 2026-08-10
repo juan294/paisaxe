@@ -1,17 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VoiceAgentChat } from "./voice-agent-chat";
 
 // Mock the ElevenLabs SDK
+const mockUseConversation = vi.fn();
+const mockSetMuted = vi.fn();
+const mockStartSession = vi.fn();
+
 vi.mock("@elevenlabs/react", () => ({
-  useConversation: () => ({
-    status: "disconnected",
-    isSpeaking: false,
-    startSession: vi.fn(),
-    endSession: vi.fn(),
-    sendUserMessage: vi.fn(),
-  }),
+  useConversation: () => mockUseConversation(),
 }));
 
 // Mock navigator.mediaDevices
@@ -26,7 +24,24 @@ Object.defineProperty(navigator, "mediaDevices", {
 describe("VoiceAgentChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseConversation.mockReturnValue({
+      status: "disconnected",
+      isSpeaking: false,
+      startSession: mockStartSession,
+      endSession: vi.fn(),
+      sendUserMessage: vi.fn(),
+      setMuted: mockSetMuted,
+    });
     mockGetUserMedia.mockRejectedValue(new Error("Permission denied"));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ signedUrl: "wss://signed.example/admin" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+    );
   });
 
   it("renders agent selector with three agents", () => {
@@ -114,5 +129,49 @@ describe("VoiceAgentChat", () => {
     await user.click(screen.getByText("Iris"));
 
     expect(screen.getByPlaceholderText("Message Iris...")).toBeInTheDocument();
+  });
+
+  it("calls the ElevenLabs mute control when toggling mute during a call", async () => {
+    const user = userEvent.setup();
+    mockUseConversation.mockReturnValue({
+      status: "connected",
+      isSpeaking: false,
+      startSession: vi.fn(),
+      endSession: vi.fn(),
+      sendUserMessage: vi.fn(),
+      setMuted: mockSetMuted,
+    });
+
+    render(<VoiceAgentChat agentIds={{ xander: "agent-admin" }} />);
+
+    await user.click(screen.getByRole("button", { name: "Mute microphone" }));
+    expect(mockSetMuted).toHaveBeenLastCalledWith(true);
+
+    await user.click(screen.getByRole("button", { name: "Unmute microphone" }));
+    expect(mockSetMuted).toHaveBeenLastCalledWith(false);
+  });
+
+  it("starts an allowlisted admin agent through a signed session", async () => {
+    const user = userEvent.setup();
+    mockGetUserMedia.mockResolvedValue({} as MediaStream);
+
+    render(<VoiceAgentChat agentIds={{ xander: "agent-admin" }} />);
+
+    await user.click(screen.getByRole("button", { name: "Start Call" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/admin/voice-session",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ agentKey: "xander" }),
+        })
+      );
+      expect(mockStartSession).toHaveBeenCalledWith({
+        signedUrl: "wss://signed.example/admin",
+        connectionType: "websocket",
+      });
+    });
+    expect(mockStartSession.mock.calls[0][0]).not.toHaveProperty("agentId");
   });
 });

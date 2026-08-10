@@ -161,6 +161,21 @@ describe("useFeatureFlags", () => {
     expect(result.current.flags).toEqual([]);
     expect(result.current.isEnabled("contextual_prompts")).toBe(false);
   });
+
+  it("should not fetch flags when the provider is disabled", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, { enabled: false }, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(result.current.isReady).toBe(false);
+    expect(result.current.flags).toEqual([]);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });
 
 describe("useFeatureFlags isReady state", () => {
@@ -325,6 +340,23 @@ describe("useFeatureFlags initialFlags", () => {
     expect(result.current.isEnabled("related_stories")).toBe(false);
     // Flag not in initialFlags → false
     expect(result.current.isEnabled("surprise_me")).toBe(false);
+  });
+
+  it("should coerce undefined initialFlags value to false (enabled ?? false fallback)", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    // Cast through unknown to allow explicit undefined value in the partial record
+    const initialFlags = { contextual_prompts: undefined } as unknown as Partial<
+      Record<"contextual_prompts", boolean>
+    >;
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, { initialFlags }, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
+
+    // Undefined initial value coerces to false via ?? operator
+    expect(result.current.isEnabled("contextual_prompts")).toBe(false);
+    expect(result.current.isReady).toBe(true);
   });
 
   it("should eventually refetch after stale time and update flags", async () => {
@@ -506,8 +538,7 @@ describe("useFeatureFlags cache behavior", () => {
     expect(result2.current.flags).toEqual(flags);
     // Should have warned about using cached data
     expect(warnSpy).toHaveBeenCalledWith(
-      "Failed to refresh feature flags, using cached:",
-      expect.any(Error)
+      expect.stringContaining("Failed to refresh feature flags, using cached")
     );
 
     warnSpy.mockRestore();
@@ -621,5 +652,61 @@ describe("useFeatureFlags cache behavior", () => {
     // We can't directly check that setFlags wasn't called, but the absence of errors
     // and the fact that isReady stayed false confirms the mounted guard worked.
     expect(result.current.isReady).toBe(false);
+  });
+
+  it("logs String(err) when cached refresh throws a non-Error value (line 117: instanceof false branch)", async () => {
+    const flags = [makeFlag("contextual_prompts", true)];
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: flags }),
+    });
+
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+
+    // First render: populate cache successfully
+    const { result: result1, unmount } = renderHook(() => useFeatureFlags(), { wrapper });
+    await waitFor(() => {
+      expect(result1.current.isReady).toBe(true);
+    });
+    unmount();
+
+    // Force cache stale
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 120_000);
+
+    // Next fetch throws a non-Error value (covers String(err) at line 117)
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockFetch.mockRejectedValueOnce("non-error refresh failure");
+
+    const { result: result2 } = renderHook(() => useFeatureFlags(), { wrapper });
+    await waitFor(() => {
+      expect(result2.current.isReady).toBe(true);
+    });
+
+    // Should fall back to cached flags
+    expect(result2.current.flags).toEqual(flags);
+
+    warnSpy.mockRestore();
+    vi.restoreAllMocks();
+  });
+
+  it("logs String(err) when first fetch throws a non-Error value (line 120: instanceof false branch)", async () => {
+    // No cache yet — first fetch throws non-Error → defaults all to false
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockFetch.mockRejectedValueOnce(42);
+
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    expect(result.current.flags).toEqual([]);
+
+    warnSpy.mockRestore();
   });
 });

@@ -72,55 +72,28 @@ develop   # Active development (DEFAULT)
 **This is a user-initiated process. Agents prepare, users authorize.**
 
 `main` is protected with branch protection rules:
-- **Required status checks**: `lint-and-typecheck`, `test`, `build`, `e2e`, `Smoke test Vercel preview` must all pass
+- **Required status checks**: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Smoke test Vercel preview` must all pass
 - **Force pushes blocked**, **deletion blocked**
-- **PRs required** (0 approvals — solo dev can self-merge after CI passes)
+- **PRs required with 1 approval** (solo dev self-approval is allowed, but the approval click is required before merge)
 
 #### Release Process
 
-**Step 1: User requests a release.** The agent does NOT initiate this.
+**`docs/runbooks/release-checklist.md` is the single procedural authority.** Follow it; do not
+improvise a different sequence here or in any other file. Its ordering is:
 
-**Step 2: Agent prepares a release summary** (does NOT create the PR yet):
-```bash
-# Show what will be released
-git log main..develop --oneline
+1. Identify the candidate (by **tree hash** — squash merges do not preserve the tested SHA)
+2. Pre-deployment gates — full suite, `npm run check-migrations`, `npm run check-required-probes`,
+   `npm run prelaunch`, the 6 manual gates in `docs/operations/pre-launch-security-checklist.md`,
+   and the mutating probes against the **local Docker** stack
+3. Merge and deploy — user says "go ahead", then `gh pr merge --squash`
+4. Verify the deployed identity matches the candidate tree
+5. Run the required probes (`quality/required-probes.yaml`)
+6. Analyze the evidence — `npm run analyze-release`
+7. Obtain authorization
+8. **Tag last** — no tag without a passing analyzer run for the shipped tree
 
-# Verify all checks pass on develop
-gh run list --branch develop --limit 3
-
-# Run the full local test suite
-npm run test && npm run typecheck && npm run lint && npm run test:e2e
-```
-
-Present the summary to the user:
-- List of commits since last release
-- CI status on develop
-- Any known risks or breaking changes
-- Recommendation: safe to release or not
-
-**Step 3: User confirms.** Only after explicit "go ahead" or equivalent:
-```bash
-# Create the PR
-gh pr create --base main --head develop --title "Release: description of changes"
-
-# Wait for all 5 status checks to pass
-gh pr checks
-```
-
-**Step 4: User authorizes merge.** Report CI status and wait for the user to say "merge it":
-```bash
-# Merge once user confirms
-gh pr merge --merge
-```
-
-**Step 5: Verify deployment** (agent can do this autonomously after merge):
-```bash
-vercel ls --limit 5
-# Check /api/health on production (must return HTTP 200 with status=healthy)
-curl -sS https://paisaxe.es/api/health
-```
-
-**Never bypass branch protection.** If CI fails on the PR, fix on `develop` first, push, and let the PR update.
+The user requests a release; the agent never initiates one. **Never bypass branch protection.**
+If CI fails on the PR, fix on `develop` first, push, and let the PR update.
 
 ### Worktree-First Development (MANDATORY)
 
@@ -189,15 +162,6 @@ git branch -d feature/short-name
 8. **Background agents use `.worktrees/`**: Agents spawned with `run_in_background: true` or as team members are sandboxed to the project directory. They CANNOT access `../paisaxe-*` paths. Always use `.worktrees/short-name` inside the project.
 9. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
 
-## TDD Protocol
-
-All code changes follow Red-Green-Refactor:
-1. **Red** -- Write a failing test FIRST
-2. **Green** -- Minimum code to pass
-3. **Refactor** -- Clean up with green tests
-
-No exceptions. Bug fixes need a regression test. Refactors need existing coverage. No "tests later."
-
 ## Key Commands
 
 ```bash
@@ -247,6 +211,11 @@ All env vars are documented in `.env.local`. Key groups: Anthropic, Voyage AI, E
 ### Voice Agents
 - **Pelayo**: Visitor-facing tourism guide (gated by `visitor_voice_agent` feature flag)
 - Xander, Iris, Penny: Admin-only social media marketing agents (in `src/agents/index.ts`)
+
+Before changing any provider configuration, read
+`docs/agents/elevenlabs-modernization-handoff.md`. It records the five-agent
+ownership boundary, zero-traffic candidates, unchanged Main privacy state,
+and the signed-session, language, and listening promotion gates.
 
 ### Admin Auth
 - Supabase Auth (Google OAuth) + `user_profiles.role = 'admin'`
@@ -382,62 +351,23 @@ All significant changes go through four phases:
 - If you can verify it with a command or tool, do so automatically.
 - Don't use Claude for linting/formatting — use automated tools and hooks instead.
 
-## Working Patterns
-
-<examples>
-<example name="push-sequence">
-Commit before pulling -- hook blocks dirty pulls.
-
-```bash
-git add src/feature.ts && git commit -m "feat: add feature"
-git pull --rebase && git push
-```
-
-</example>
-
-<example name="verification">
-Run checks sequentially, never as parallel tool calls.
-
-```bash
-npm run typecheck 2>&1; npm run lint 2>&1; npm run test 2>&1
-```
-
-</example>
-
-<example name="worktree-cleanup">
-Remove worktrees before merging PRs. Use -D (uppercase) for branches.
-
-```bash
-git worktree remove --force ../feature-branch; git branch -D feature-branch
-```
-
-</example>
-
-<example name="file-paths">
-Use absolute paths in all file tools and worktree commands. Never use ~.
-
-```bash
-cd /Users/juan/code/paisaxe && npm run test
-```
-
-</example>
-</examples>
-
-Domain-specific rules (git, CI, deployment, Python, macOS, Supabase, GitHub CLI, multi-agent) are in `.claude/skills/` -- loaded automatically when relevant.
-
 ## Project File Locations
 
 Go directly to these paths — never search the codebase for them.
 
 | Topic | Path | Notes |
 |-------|------|-------|
-| Agent reports | `docs/agents/*-report.md` | Gitignored. Local-only operational history. Never committed (Rule #70) |
+| Agent reports | `docs/agents/*-report.md` | Gitignored on public repos; tracked on private (Rule #70) |
 | Agent logs | `logs/<name>.log`, `<name>.error.log` | Gitignored. Read alongside reports to diagnose failures |
 | Agent scripts | `scripts/agents/` | Gitignored. Standalone bash files invoking Claude CLI headless |
 | ADRs | `docs/decisions/` | Architecture decision records |
 | PR descriptions | `docs/prs/{number}_description.md` | |
 | Research docs | `docs/research/YYYY-MM-DD-description.md` | |
 | Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
+| Release procedure | `docs/runbooks/release-checklist.md` | Single procedural authority — all release docs delegate to it |
+| Rollback | `docs/operations/rollback.md` | Roll back first, investigate second. `vercel rollback`, never `vercel deploy --prod` |
+| Incident alerting | `docs/operations/alerting-runbook.md` | Per-alert-type response procedures |
+| Security gates | `docs/operations/pre-launch-security-checklist.md` | 6 manual gates required before a release PR |
 
 ## Issue Tracking (GitHub Issues)
 

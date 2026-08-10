@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { VoicePurchaseCTA } from "./voice-purchase-cta";
+import { DEFAULT_TIER } from "@/lib/pricing";
 
 // Mock i18n
 vi.mock("@/lib/i18n", () => ({
@@ -100,16 +101,20 @@ describe("VoicePurchaseCTA", () => {
       expect(screen.getByRole("button", { name: "Sign in to purchase" })).toBeInTheDocument();
     });
 
-    it("navigates to embedded checkout when clicking purchase button", () => {
+    it("navigates to checkout with explicit tier=day_pass (UX-H2)", () => {
+      // Regression guard: checkout URL must always carry ?tier= so the
+      // checkout page never silently defaults to an unknown product.
       render(<VoicePurchaseCTA />);
       fireEvent.click(screen.getByRole("button", { name: /Get Day Pass/ }));
-      expect(mockPush).toHaveBeenCalledWith("/pricing/checkout");
+      expect(mockPush).toHaveBeenCalledWith("/pricing/checkout?tier=day_pass");
     });
 
-    it("navigates to checkout with returnTo when slug is provided", () => {
+    it("navigates to checkout with returnTo and explicit tier when slug is provided", () => {
       render(<VoicePurchaseCTA returnTo="oviedo-walking-tour" />);
       fireEvent.click(screen.getByRole("button", { name: /Get Day Pass/ }));
-      expect(mockPush).toHaveBeenCalledWith("/pricing/checkout?returnTo=oviedo-walking-tour");
+      expect(mockPush).toHaveBeenCalledWith(
+        "/pricing/checkout?returnTo=oviedo-walking-tour&tier=day_pass"
+      );
     });
 
     it("calls signInWithGoogle when clicking button without session", () => {
@@ -119,6 +124,32 @@ describe("VoicePurchaseCTA", () => {
       fireEvent.click(screen.getByRole("button", { name: "Sign in to purchase" }));
       expect(mockSignInWithGoogle).toHaveBeenCalled();
     });
+
+    it("preserves returnTo and tier when signing in before purchase", () => {
+      mockUser = null;
+      mockSession = null;
+      render(<VoicePurchaseCTA returnTo="oviedo-walking-tour" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Sign in to purchase" }));
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing/checkout?returnTo=oviedo-walking-tour&tier=day_pass"
+      );
+    });
+
+    it("checkout URL always contains an explicit tier param (UX-H2 regression guard)", () => {
+      render(<VoicePurchaseCTA />);
+      fireEvent.click(screen.getByRole("button", { name: /Get Day Pass/ }));
+      const url: string = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(url).toMatch(/[?&]tier=/);
+    });
+
+    it("focus-ring offset uses neutral-950 (UX-L1)", () => {
+      render(<VoicePurchaseCTA />);
+      const button = screen.getByRole("button", { name: /Get Day Pass/ });
+      expect(button.className).toMatch(/focus-visible:ring-offset-neutral-950/);
+      expect(button.className).not.toMatch(/focus-visible:ring-offset-black/);
+    });
   });
 
   describe("compact view", () => {
@@ -127,9 +158,25 @@ describe("VoicePurchaseCTA", () => {
       expect(screen.getByText("Voice chat is locked")).toBeInTheDocument();
     });
 
-    it("renders purchase button with price in compact mode", () => {
+    it("renders purchase button with DEFAULT_TIER price in compact mode", () => {
       render(<VoicePurchaseCTA compact />);
-      expect(screen.getByRole("button", { name: /Get Day Pass.*€1\.99/ })).toBeInTheDocument();
+      // Price comes from DEFAULT_TIER.price (shared constant), not a hardcoded literal
+      const regex = new RegExp(`Get Day Pass.*${DEFAULT_TIER.price.replace("€", "€")}`);
+      expect(screen.getByRole("button", { name: regex })).toBeInTheDocument();
+    });
+
+    it("compact focus-ring offset uses neutral-950 (UX-L1)", () => {
+      render(<VoicePurchaseCTA compact />);
+      const button = screen.getByRole("button", { name: /Get Day Pass/ });
+      expect(button.className).toMatch(/focus-visible:ring-offset-neutral-950/);
+      expect(button.className).not.toMatch(/focus-visible:ring-offset-black/);
+    });
+
+    it("compact checkout URL always contains an explicit tier param (UX-H2)", () => {
+      render(<VoicePurchaseCTA compact />);
+      fireEvent.click(screen.getByRole("button", { name: /Get Day Pass/ }));
+      const url: string = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(url).toMatch(/[?&]tier=/);
     });
 
     it("does not render title in compact mode", () => {
@@ -178,6 +225,18 @@ describe("VoicePurchaseCTA", () => {
       const html = container.innerHTML;
       expect(html).not.toMatch(/amber-\d{2,3}/);
       expect(html).not.toMatch(/yellow-\d{2,3}/);
+    });
+  });
+
+  describe("UX-H2: pricing constants (prices come from shared module)", () => {
+    it("DEFAULT_TIER.price is €1.99 — single source of truth", () => {
+      expect(DEFAULT_TIER.price).toBe("€1.99");
+    });
+
+    it("full view price display uses DEFAULT_TIER.price, not a hardcoded string", () => {
+      render(<VoicePurchaseCTA />);
+      // If pricing.ts changes, this test catches any leftover hardcoded values
+      expect(screen.getByText(DEFAULT_TIER.price)).toBeInTheDocument();
     });
   });
 });

@@ -775,4 +775,30 @@ describe("GET /api/admin/agents-summary", () => {
 
     consoleSpy.mockRestore();
   });
+
+  it("returns 500 and stringifies a non-Error thrown value from the outer try block", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    // Throw a non-Error value from process.cwd() to hit the outer catch block
+    // with something that isn't `instanceof Error`, exercising the String(error) branch.
+    const originalCwd = process.cwd;
+    try {
+      process.cwd = () => {
+         
+        throw "cwd unavailable";
+      };
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to build agents summary");
+      expect(logger.error).toHaveBeenCalledWith(
+        "Error building agents summary:",
+        { error: "cwd unavailable" },
+      );
+    } finally {
+      process.cwd = originalCwd;
+    }
+  });
 });

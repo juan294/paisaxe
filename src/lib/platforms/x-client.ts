@@ -11,6 +11,7 @@
 
 import { TwitterApi, type ApiResponseError } from "twitter-api-v2";
 import type { MarketingCredentials } from "@/types/marketing";
+import { logger } from "@/lib/logger";
 
 interface XPostResult {
   success: boolean;
@@ -221,7 +222,9 @@ export class XClient {
         bookmarks: metrics.bookmark_count,
       };
     } catch (error) {
-      console.error("Failed to fetch engagement:", error);
+      logger.error("Failed to fetch engagement", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }
@@ -244,7 +247,9 @@ export class XClient {
       });
       return mediaId;
     } catch (error) {
-      console.error("Failed to upload media:", error);
+      logger.error("Failed to upload media", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }

@@ -371,6 +371,71 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     expect(data.data.utmCampaigns[1].campaign).toBe("(none)");
   });
 
+  it("should fall back to defaults for null/falsy categorical breakdown keys", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    let callIndex = 0;
+    const responses = [
+      // Q1: summary
+      { results: [[100, 50, 10, 2, 10, 30, 20]] },
+      // Q2: time series
+      { results: [] },
+      // Q3: 2-col breakdowns with null/empty keys to hit fallback branches
+      {
+        results: [
+          ["topPages", null, 10],
+          ["referrers", null, 5],
+          ["countries", null, 7],
+          ["devices", null, 4],
+          ["browsers", null, 3],
+          ["os", null, 2],
+          ["entryPages", null, 6],
+          ["exitPages", null, 8],
+          ["unknownType", "ignored", 1],
+        ],
+      },
+      // Q4: 3-col breakdowns with null keys to hit "Unknown" / 0 fallbacks
+      {
+        results: [
+          ["cities", null, null, 10],
+          ["screenSizes", null, null, 5],
+          ["unknownType3", null, null, 1],
+        ],
+      },
+      // Q5: UTM
+      { results: [] },
+    ];
+
+    mockFetch.mockImplementation(() => {
+      const response = responses[callIndex] || { results: [] };
+      callIndex++;
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(response),
+      });
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.topPages[0]).toEqual({ url: "", count: 10 });
+    expect(data.data.topReferrers[0]).toEqual({ referrer: "", count: 5 });
+    expect(data.data.countries[0]).toEqual({ country: "Unknown", count: 7 });
+    expect(data.data.devices[0]).toEqual({ device: "Unknown", count: 4 });
+    expect(data.data.browsers[0]).toEqual({ browser: "Unknown", count: 3 });
+    expect(data.data.operatingSystems[0]).toEqual({ os: "Unknown", count: 2 });
+    expect(data.data.entryPages[0]).toEqual({ page: "/", count: 6 });
+    expect(data.data.exitPages[0]).toEqual({ page: "/", count: 8 });
+    expect(data.data.cities[0]).toEqual({
+      city: "Unknown",
+      country: "Unknown",
+      count: 10,
+    });
+    expect(data.data.screenSizes[0]).toEqual({ width: 0, height: 0, count: 5 });
+  });
+
   // -----------------------------------------------------------------------
   // SE-M3 / DO-H3: logger migration — uses structured logger, not console
   // -----------------------------------------------------------------------

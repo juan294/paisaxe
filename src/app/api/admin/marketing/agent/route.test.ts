@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
+import { CHAT_MODEL } from "@/lib/models";
 
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
@@ -186,7 +187,7 @@ describe("/api/admin/marketing/agent", () => {
 
       expect(mocks.anthropicCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: "claude-sonnet-4-20250514",
+          model: CHAT_MODEL,
         })
       );
     });
@@ -279,6 +280,29 @@ describe("/api/admin/marketing/agent", () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBeDefined();
+    });
+
+    it("should fall back to generic error message when zod issues array is empty (line 135)", async () => {
+      const schemasModule = await import("@/lib/schemas");
+      const safeParseSpy = vi
+        .spyOn(schemasModule.agentChatRequestSchema, "safeParse")
+        .mockReturnValue({
+          success: false,
+          error: { issues: [] },
+        } as unknown as ReturnType<typeof schemasModule.agentChatRequestSchema.safeParse>);
+
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST",
+        body: JSON.stringify({ agentId: "xander", message: "Hello" }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+
+      safeParseSpy.mockRestore();
     });
 
     it("should return 400 when message is whitespace only", async () => {

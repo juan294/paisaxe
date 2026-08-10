@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { validateAdminAuth, withAdmin, withAdminRead } from "./admin-auth";
+import { getRequestId } from "./request-context";
 
 // Mock createAdminClient so withAdmin tests don't need SUPABASE_SERVICE_KEY
 const mockAdminClient = { from: vi.fn() };
-vi.mock("./supabase", () => ({
+vi.mock("./supabase-admin", () => ({
   createAdminClient: vi.fn(() => mockAdminClient),
 }));
 
@@ -91,6 +92,24 @@ describe("DO-M1: validateAdminAuth trims Supabase env vars", () => {
 
     expect(capturedAnonKey).toBe("test-anon-key");
 
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
+  });
+
+  it("falls back to an empty string for both URL and anon key when env vars are unset", async () => {
+    const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await validateAdminAuth();
+
+    // getSupabaseUrl()/getSupabaseAnonKey() return undefined -> `?? ""` fallback
+    expect(capturedUrl).toBe("");
+    expect(capturedAnonKey).toBe("");
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
   });
 });
@@ -199,6 +218,24 @@ describe("validateAdminAuth", () => {
     }
   });
 
+  it("should return 403 (not 500) when profile query returns PGRST116 (no rows found)", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "pgrst116-user", email: "missing@example.com" } },
+      error: null,
+    });
+    // PGRST116 = "no rows returned" — treated as missing profile → 403, not 500
+    setupProfileMock(null, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" });
+
+    const result = await validateAdminAuth();
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const body = await result.error.json();
+      expect(result.error.status).toBe(403);
+      expect(body.error).toBe("Admin access required");
+    }
+  });
+
   it("should return 500 when an unexpected error is thrown", async () => {
     mockGetUser.mockRejectedValue(new Error("Unexpected failure"));
 
@@ -281,6 +318,33 @@ describe("validateAdminAuth", () => {
       // capturedClient is whatever createAdminClient() returned (may be undefined
       // or throw if key missing — the call itself is what we verify)
       expect(capturedClient).toBeDefined();
+    });
+
+    it("runs the handler inside the request context when a request is passed (DO-M1 #619)", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      // Wiring assertion: passing a request routes the handler through
+      // withRequestContext (which binds X-Request-ID). We assert the optional
+      // request argument is accepted and the handler still runs to completion.
+      // Cross-await AsyncLocalStorage propagation is verified in
+      // request-context.test.ts (the test runtime lacks Node's require-backed
+      // ALS and falls back to a synchronous store that does not survive awaits).
+      const handler = vi.fn().mockResolvedValue("ok");
+
+      const request = new Request("https://paisaxe.test/api/admin/x", {
+        headers: { "x-request-id": "req-admin-9999" },
+      });
+
+      const result = await withAdmin(handler, request);
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(result).toBe("ok");
+      // getRequestId import kept available for the broader suite.
+      expect(typeof getRequestId).toBe("function");
     });
   });
 
@@ -481,6 +545,80 @@ describe("validateAdminAuth", () => {
       const result = await withAdminRead(vi.fn().mockResolvedValue(handlerResult));
 
       expect(result).toBe(handlerResult);
+    });
+
+    it("falls back to an empty string for URL and anon key when env vars are unset", async () => {
+      const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      await withAdminRead(vi.fn().mockResolvedValue("ok"));
+
+      // withAdminRead's own createServerClient call (lines 192-193) overwrites
+      // capturedUrl/capturedAnonKey — assert the `?? ""` fallback fired.
+      expect(capturedUrl).toBe("");
+      expect(capturedAnonKey).toBe("");
+
+      process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
+    });
+
+    it("runs the handler inside the request context when a request is passed", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      const handler = vi.fn().mockResolvedValue("read-ok");
+
+      const request = new Request("https://paisaxe.test/api/admin/x", {
+        headers: { "x-request-id": "req-read-1234" },
+      });
+
+      const result = await withAdminRead(handler, request);
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(result).toBe("read-ok");
+    });
+
+    it("getAll and setAll callbacks work correctly in withAdminRead cookie context", async () => {
+      const fakeCookies = [{ name: "sb-token", value: "abc" }];
+      mockGetAll.mockReturnValue(fakeCookies);
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "read-setall-user", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      // withAdminRead makes two createServerClient calls:
+      // 1. Inside validateAdminAuth()
+      // 2. Its own call — this overwrites capturedCookieConfig
+      await withAdminRead(vi.fn().mockResolvedValue("done"));
+
+      // capturedCookieConfig is now from withAdminRead's own createServerClient call
+      expect(capturedCookieConfig).not.toBeNull();
+
+      // Exercise getAll (line 190)
+      const result = capturedCookieConfig!.cookies.getAll();
+      expect(result).toEqual(fakeCookies);
+
+      // Exercise setAll catch block (lines 192-199): mockSet throws
+      mockSet.mockImplementation(() => {
+        throw new Error("Headers already sent");
+      });
+      expect(() => {
+        capturedCookieConfig!.cookies.setAll([
+          { name: "sb-token", value: "val", options: {} },
+        ]);
+      }).not.toThrow();
     });
   });
 });

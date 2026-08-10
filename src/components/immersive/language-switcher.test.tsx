@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { LanguageSwitcher } from "./language-switcher";
+import { LanguageSwitcher, LOCALE_COVERAGE } from "./language-switcher";
 
 // Mock the useTranslation hook
 const mockSetLocale = vi.fn();
@@ -31,9 +31,10 @@ describe("LanguageSwitcher", () => {
       expect(within(toggleButton).getByText("ES")).toBeInTheDocument();
 
       // Dropdown is hidden via CSS (opacity-0, pointer-events-none)
-      // The options exist in DOM but are not visible/clickable
+      // UX-M3: options are filtered by coverage threshold. 'ast' is gated
+      // (coverage 40% < 70% threshold), so 5 options: es, en, fr, de, pt.
       const allOptions = screen.getAllByRole("option");
-      expect(allOptions).toHaveLength(6); // 6 language options (hidden)
+      expect(allOptions).toHaveLength(5); // 5 language options (ast gated)
     });
 
     it("should show FR when locale is fr", () => {
@@ -68,7 +69,10 @@ describe("LanguageSwitcher", () => {
       expect(within(toggleButton).getByText("PT")).toBeInTheDocument();
     });
 
-    it("should show AST when locale is ast", () => {
+    it("should show AST in the toggle button when locale is ast (even though ast is gated from dropdown)", () => {
+      // UX-M3: ast is below coverage threshold so it's NOT in the dropdown,
+      // but if the user already has ast selected (e.g. from localStorage),
+      // the toggle button still shows the current locale's label.
       mockLocale = "ast";
       render(<LanguageSwitcher />);
 
@@ -78,7 +82,7 @@ describe("LanguageSwitcher", () => {
   });
 
   describe("expanded state", () => {
-    it("should expand and show all languages when toggle is clicked", () => {
+    it("should expand and show coverage-gated languages when toggle is clicked", () => {
       mockLocale = "es";
       render(<LanguageSwitcher />);
 
@@ -86,9 +90,9 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // All language options should be present
+      // UX-M3: 'ast' is gated (coverage 40% < 70% threshold) — 5 options: es, en, fr, de, pt
       const allOptions = screen.getAllByRole("option");
-      expect(allOptions).toHaveLength(6); // 6 language options
+      expect(allOptions).toHaveLength(5);
     });
 
     it("should highlight the current language in the dropdown", () => {
@@ -154,15 +158,17 @@ describe("LanguageSwitcher", () => {
       expect(mockSetLocale).toHaveBeenCalledWith("pt");
     });
 
-    it("should call setLocale with ast when AST is clicked", () => {
+    it("should NOT show ast option in dropdown (gated by coverage threshold)", () => {
+      // UX-M3: 'ast' has 40% coverage which is below the 70% threshold.
+      // It must not appear as a selectable option in the dropdown.
       mockLocale = "es";
       render(<LanguageSwitcher />);
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("option", { name: /Asturianu/ }));
 
-      expect(mockSetLocale).toHaveBeenCalledWith("ast");
+      // ast option should not be present in the dropdown
+      expect(screen.queryByRole("option", { name: /Asturianu/ })).not.toBeInTheDocument();
     });
 
     it("should call setLocale with es when ES is clicked from different locale", () => {
@@ -415,8 +421,8 @@ describe("LanguageSwitcher", () => {
 
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
-      // Focus on EN (index 2)
-      options[2].focus();
+      // UX-M3: visible list is [es, en, fr, de, pt] — EN is at index 1 (ast gated)
+      options[1].focus();
 
       fireEvent.keyDown(listbox, { key: "Enter" });
       expect(mockSetLocale).toHaveBeenCalledWith("en");
@@ -455,8 +461,8 @@ describe("LanguageSwitcher", () => {
       fireEvent.click(toggleButton);
 
       const options = screen.getAllByRole("option");
-      // EN is index 2 in the languages array
-      expect(options[2]).toHaveAttribute("aria-selected", "true");
+      // UX-M3: visible list is [es, en, fr, de, pt] — EN is at index 1 (ast gated)
+      expect(options[1]).toHaveAttribute("aria-selected", "true");
       expect(options[0]).toHaveAttribute("aria-selected", "false");
     });
 
@@ -494,12 +500,12 @@ describe("LanguageSwitcher", () => {
   });
 
   describe("unreachable guards in handleListboxKeyDown", () => {
-    // Lines 72 and 75: `if (!listbox) return;` and `if (options.length === 0) return;`
-    // are architecturally unreachable. The listboxRef inner div (line 151) is always
-    // rendered in the DOM (just hidden via CSS when collapsed), so listboxRef.current
-    // is never null. Similarly, the 6 language option buttons are always rendered inside
-    // the listbox, so options.length is always 6. These guards are defensive programming
-    // and cannot be exercised via the component's public API.
+    // Lines 72 and 75 (approx): `if (!listbox) return;` and `if (options.length === 0) return;`
+    // are architecturally unreachable. The listboxRef inner div is always rendered in the DOM
+    // (just hidden via CSS when collapsed), so listboxRef.current is never null. Similarly,
+    // coverage-gated language buttons are always rendered inside the listbox (at least es + en),
+    // so options.length is always >= 2. These guards are defensive programming and cannot
+    // be exercised via the component's public API.
 
     it("listboxRef is always set — guard on line 72 is unreachable", () => {
       render(<LanguageSwitcher />);
@@ -507,15 +513,45 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // The listbox always contains 6 option elements
+      // UX-M3: 'ast' is gated — listbox contains 5 option elements (es, en, fr, de, pt)
       const options = screen.getAllByRole("option");
-      expect(options).toHaveLength(6);
+      expect(options).toHaveLength(5);
 
       // Arrow key navigation works, proving listboxRef.current is valid
       const listbox = screen.getByRole("listbox");
       options[0].focus();
       fireEvent.keyDown(listbox, { key: "ArrowDown" });
       expect(document.activeElement).toBe(options[1]);
+    });
+  });
+
+  describe("coverage gate fallback", () => {
+    it("should treat a locale missing from LOCALE_COVERAGE as 0% coverage and gate it (line 62 `?? 0`)", () => {
+      // Line 62: `const coverage = LOCALE_COVERAGE[lang.code] ?? 0;`
+      // LOCALE_COVERAGE is a Partial record by design — a locale absent from the
+      // map falls back to 0, which is below MIN_COVERAGE_THRESHOLD, so the
+      // language is hidden from the dropdown. Simulate a missing entry by
+      // temporarily deleting 'fr' from the exported (mutable) map.
+      const originalFr = LOCALE_COVERAGE.fr;
+      delete LOCALE_COVERAGE.fr;
+      try {
+        mockLocale = "es";
+        render(<LanguageSwitcher />);
+
+        // fr now has no coverage entry → gated; ast already gated → 4 options
+        const options = screen.getAllByRole("option");
+        expect(options).toHaveLength(4);
+        expect(
+          screen.queryByRole("option", { name: /Français/ })
+        ).not.toBeInTheDocument();
+        // Reference locales are always present regardless of coverage
+        expect(screen.getByRole("option", { name: /Español/ })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: /English/ })).toBeInTheDocument();
+      } finally {
+        if (originalFr !== undefined) {
+          LOCALE_COVERAGE.fr = originalFr;
+        }
+      }
     });
   });
 
@@ -572,13 +608,12 @@ describe("LanguageSwitcher", () => {
     });
   });
 
-  // Lines 72 and 75 in language-switcher.tsx are defensive guards inside handleListboxKeyDown:
-  // - Line 72: `if (!listbox) return;` — guard for when listboxRef.current is null.
+  // Defensive guards inside handleListboxKeyDown:
+  // - `if (!listbox) return;` — guard for when listboxRef.current is null.
   //   Unreachable because the `onKeyDown` handler is attached to the outer listbox div, which
   //   always renders alongside the inner div that holds the ref. The ref is always set by the
   //   time any keydown event fires.
-  // - Line 75: `if (options.length === 0) return;` — guard for when no [role="option"] elements
-  //   exist. Unreachable because the `languages` array is a module-level constant with 6 items
-  //   and all 6 buttons with role="option" always render.
+  // - `if (options.length === 0) return;` — guard for when no [role="option"] elements exist.
+  //   Unreachable because coverage-gated languages always include at least es + en (>= 2 options).
   // Both are structurally sound defensive patterns that cannot be exercised via jsdom/vitest.
 });

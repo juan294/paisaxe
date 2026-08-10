@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
@@ -13,10 +13,21 @@ import { Check, Mic, RefreshCw } from "lucide-react";
  * Checks voice access and shows confirmation.
  */
 export default function CheckoutReturnPage() {
+  return (
+    <Suspense fallback={null}>
+      <CheckoutReturnPageContent />
+    </Suspense>
+  );
+}
+
+function CheckoutReturnPageContent() {
   const { canUseVoice, expiresAt, isLoading, refresh } = useVoiceAccess();
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
+  const immersiveHref = returnTo
+    ? `/immersive?story=${encodeURIComponent(returnTo)}&voice=ready`
+    : "/immersive";
 
   // Refresh access on mount to pick up the new purchase
   useEffect(() => {
@@ -25,8 +36,18 @@ export default function CheckoutReturnPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-neutral-500" />
+      <div
+        role="status"
+        aria-live="polite"
+        className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center"
+      >
+        <RefreshCw
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin motion-reduce:animate-none text-neutral-500"
+        />
+        <p className="mt-3 text-sm text-neutral-500">
+          {t("premium.loading_access")}
+        </p>
       </div>
     );
   }
@@ -69,8 +90,8 @@ export default function CheckoutReturnPage() {
 
         {/* CTA */}
         <Link
-          href={returnTo ? `/immersive?story=${returnTo}&voice=ready` : "/immersive"}
-          className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
+          href={immersiveHref}
+          className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
         >
           <Mic className="h-4 w-4" />
           {t("premium.success_cta")}

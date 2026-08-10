@@ -16,6 +16,10 @@ vi.mock("node:util", () => ({
 vi.mock("node:timers/promises", () => ({
   setTimeout: mockSleep,
 }));
+// #138: usage recording is fire-and-forget; stub it so tests don't touch Supabase.
+vi.mock("@/lib/costs/anthropic-usage", () => ({
+  recordAnthropicUsage: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { generateChatResponse, extractSourcesFromChunks, sanitizeOutput, streamChatResponse, formatImagesForContext } from "./claude";
 
@@ -72,7 +76,7 @@ describe("claude", () => {
       expect(response).toBe("This is a response about Asturias");
 
       const body = getCurlBody();
-      expect(body.model).toBe("claude-sonnet-4-20250514");
+      expect(body.model).toBe("claude-sonnet-5");
       expect(body.max_tokens).toBe(1024);
       expect(body.messages).toEqual(
         expect.arrayContaining([
@@ -185,7 +189,7 @@ describe("claude", () => {
       await generateChatResponse("Test", []);
 
       const body = getCurlBody();
-      expect(body.model).toBe("claude-sonnet-4-20250514");
+      expect(body.model).toBe("claude-sonnet-5");
       expect(body.max_tokens).toBe(1024);
       expect(body.system).toBeDefined();
       expect(body.messages).toHaveLength(1);
@@ -442,6 +446,41 @@ describe("claude", () => {
       expect(mockExecFile).toHaveBeenCalledTimes(1);
     });
 
+    it("should parse string curl exit codes for retry classification (line 400)", async () => {
+      // execFile errors can carry a string `code`; parseInt("7") = 7 → retryable
+      mockExecFile
+        .mockRejectedValueOnce({ code: "7", stderr: "connect refused" })
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify({
+            content: [{ type: "text", text: "Recovered from string code" }],
+          }),
+          stderr: "",
+        });
+
+      const response = await generateChatResponse("Test", []);
+      expect(response).toBe("Recovered from string code");
+      expect(mockExecFile).toHaveBeenCalledTimes(2);
+    });
+
+    it("should fall back to stderr in the error message when exit code is falsy (line 424)", async () => {
+      // code 0 is a number → non-retryable; falsy → message uses stderr
+      mockExecFile.mockRejectedValue({ code: 0, stderr: "TLS handshake failure" });
+
+      await expect(generateChatResponse("Test", [])).rejects.toThrow(
+        "curl failed: TLS handshake failure"
+      );
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+    });
+
+    it("should fall back to 'unknown error' when exit code and stderr are both falsy (line 424)", async () => {
+      mockExecFile.mockRejectedValue({ code: 0, stderr: "" });
+
+      await expect(generateChatResponse("Test", [])).rejects.toThrow(
+        "curl failed: unknown error"
+      );
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+    });
+
     it("should use exponential backoff on retries", async () => {
       mockExecFile
         .mockRejectedValueOnce({ code: 7, stderr: "connect refused" })
@@ -611,8 +650,10 @@ describe("claude", () => {
 
       expect(response).toBe("Response despite stderr");
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Claude API] curl stderr:",
-        "* Connection #0 to host api.anthropic.com left intact"
+        expect.stringContaining("[Claude API] curl stderr")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Connection #0 to host api.anthropic.com left intact")
       );
 
       consoleSpy.mockRestore();
@@ -636,8 +677,10 @@ describe("claude", () => {
 
       expect(response).toBe("Oviedo is great");
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Claude API] curl stderr:",
-        "curl: warning: something minor"
+        expect.stringContaining("[Claude API] curl stderr")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("curl: warning: something minor")
       );
 
       consoleSpy.mockRestore();
@@ -656,9 +699,11 @@ describe("claude", () => {
       const response = await generateChatResponse("Test", []);
 
       expect(response).toBe("Clean response");
-      // console.error should NOT be called with the stderr prefix
+      // logger.error should NOT be called with the stderr message
       const stderrCalls = consoleSpy.mock.calls.filter(
-        (call) => call[0] === "[Claude API] curl stderr:"
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("[Claude API] curl stderr")
       );
       expect(stderrCalls).toHaveLength(0);
 
@@ -741,6 +786,31 @@ describe("claude", () => {
 
       // The second chunk's content should NOT be fully present
       expect(userContent).not.toContain("B".repeat(3500));
+    });
+
+    it("should drop the overflowing chunk entirely when remaining space is <= 100 chars (line 515)", async () => {
+      setupMockAPIResponse({
+        content: [{ type: "text", text: "Response" }],
+      });
+
+      // Chunk 1: header "[Fuente 1: a.pdf]\n" (18 chars) + 3900 = 3918 chars → fits.
+      // Chunk 2 overflows with remaining = 4000 - 3918 - 50 = 32 (<= 100), so it
+      // is skipped entirely instead of being truncated with "...".
+      const chunks: Chunk[] = [
+        { id: "1", content: "A".repeat(3900), sourcePdf: "a.pdf" },
+        { id: "2", content: "B".repeat(500), sourcePdf: "b.pdf" },
+      ];
+
+      await generateChatResponse("Question", chunks);
+
+      const body = getCurlBody();
+      const userContent = body.messages[0].content;
+
+      expect(userContent).toContain("[Fuente 1: a.pdf]");
+      // Second chunk is dropped — no header and no truncation marker
+      expect(userContent).not.toContain("[Fuente 2");
+      expect(userContent).not.toContain("B");
+      expect(userContent).not.toContain("...");
     });
 
     it("should include dividers between chunks in truncated context", async () => {
@@ -872,6 +942,99 @@ describe("claude", () => {
       }).rejects.toThrow("overloaded");
     });
 
+    it("should use 'Streaming error' fallback when an error event has no message (line 253)", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        // error event with no `error` object → event.error?.message is undefined
+        proc.stdout.emit("data", sseData({ type: "error" }));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      await expect(async () => {
+        for await (const chunk of streamChatResponse("Test", [])) {
+          chunks.push(chunk);
+        }
+      }).rejects.toThrow("Streaming error");
+    });
+
+    it("skips waitForWork when an error lands while a chunk is being consumed (line 294 re-check)", async () => {
+      const proc = setupMockSpawn();
+
+      const gen = streamChatResponse("Test", []);
+      const iterator = gen[Symbol.asyncIterator]();
+
+      // Start the generator; it parks in waitForWork() once listeners are attached.
+      const firstNext = iterator.next();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      proc.stdout.emit("data", sseDelta("first"));
+      await expect(firstNext).resolves.toEqual({ value: "first", done: false });
+
+      // The generator is now suspended at `yield`. Deliver an error event BEFORE
+      // resuming it: on resume, the post-drain re-check (chunks empty && !done &&
+      // !error) is false because `error` is set, so waitForWork() is skipped and
+      // the loop throws immediately.
+      proc.stdout.emit(
+        "data",
+        sseData({ type: "error", error: { message: "mid-stream failure" } })
+      );
+
+      await expect(iterator.next()).rejects.toThrow("mid-stream failure");
+    });
+
+    it("should wrap context chunks in <context> tags in the streaming request body (line 572)", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseDelta("ok"));
+        proc.emit("close");
+      }, 10);
+
+      const contextChunks: Chunk[] = [
+        { id: "1", content: "Cudillero is a fishing village", sourcePdf: "coast.pdf" },
+      ];
+
+      const received: string[] = [];
+      for await (const chunk of streamChatResponse("Test", contextChunks)) {
+        received.push(chunk);
+      }
+      expect(received).toEqual(["ok"]);
+
+      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const dIndex = curlArgs.indexOf("-d");
+      const body = JSON.parse(curlArgs[dIndex + 1]);
+      const userContent: string = body.messages[0].content;
+      expect(userContent).toContain("<context>");
+      expect(userContent).toContain("Cudillero is a fishing village");
+      expect(userContent).toContain("<user_question>");
+    });
+
+    it("should prepend available_images without context tags when streaming with images only (line 573)", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseDelta("ok"));
+        proc.emit("close");
+      }, 10);
+
+      const images: ImageResult[] = [
+        { id: "img1", path: "/images/faro.jpg", caption: "Faro de Cudillero", sourcePdf: "coast.pdf" },
+      ];
+
+      const received: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [], false, 0, images)) {
+        received.push(chunk);
+      }
+      expect(received).toEqual(["ok"]);
+
+      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const dIndex = curlArgs.indexOf("-d");
+      const body = JSON.parse(curlArgs[dIndex + 1]);
+      const userContent: string = body.messages[0].content;
+      expect(userContent).toContain("<available_images>");
+      expect(userContent).toContain("Faro de Cudillero");
+      expect(userContent).not.toContain("<context>");
+    });
+
     it("should throw on process error event", async () => {
       const proc = setupMockSpawn();
       setTimeout(() => {
@@ -913,8 +1076,10 @@ describe("claude", () => {
       }
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Claude Streaming] curl stderr:",
-        "curl warning"
+        expect.stringContaining("[Claude Streaming] curl stderr")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("curl warning")
       );
       consoleSpy.mockRestore();
     });
@@ -983,6 +1148,101 @@ describe("claude", () => {
       expect(chunks).toEqual(["after error"]);
     });
 
+    // PE-M2 (#534): the streaming handoff must be event-driven, not poll-based.
+    // A chunk that arrives only AFTER the consumer has begun awaiting must still be
+    // delivered without relying on a fixed-interval timer.
+    it("resumes when a chunk arrives after the consumer is already waiting (event-driven, no poll)", async () => {
+      const proc = setupMockSpawn();
+
+      // Emit the first chunk synchronously-ish, then a long gap, then the rest.
+      // With the old 100ms poll removed, delivery is driven purely by wake().
+      setTimeout(() => proc.stdout.emit("data", sseDelta("first ")), 5);
+      setTimeout(() => proc.stdout.emit("data", sseDelta("second")), 40);
+      setTimeout(() => proc.emit("close"), 60);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["first ", "second"]);
+    });
+
+    it("completes when close fires with no chunks (event-driven termination)", async () => {
+      const proc = setupMockSpawn();
+      // Close with a delay so the consumer is parked in waitForWork() first.
+      setTimeout(() => proc.emit("close"), 30);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual([]);
+    });
+
+    // #138: message_start/message_delta usage capture (lines 241-248) feeds
+    // trackUsage() once the stream drains cleanly.
+    it("captures usage from message_start and message_delta events and records it on close", async () => {
+      const { recordAnthropicUsage } = await import("@/lib/costs/anthropic-usage");
+      vi.mocked(recordAnthropicUsage).mockClear();
+
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit(
+          "data",
+          sseData({
+            type: "message_start",
+            message: {
+              usage: {
+                input_tokens: 120,
+                cache_creation_input_tokens: 5,
+                cache_read_input_tokens: 0,
+              },
+            },
+          })
+        );
+        proc.stdout.emit("data", sseDelta("hi"));
+        proc.stdout.emit(
+          "data",
+          sseData({ type: "message_delta", usage: { output_tokens: 42 } })
+        );
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["hi"]);
+
+      expect(recordAnthropicUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usage: expect.objectContaining({
+            input_tokens: 120,
+            cache_creation_input_tokens: 5,
+            cache_read_input_tokens: 0,
+            output_tokens: 42,
+          }),
+          source: "chat_stream",
+        })
+      );
+    });
+
+    it("ignores a message_start event with no usage field on the message (line 241 branch)", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        // message present but no `usage` key — the `event.message?.usage` guard is falsy.
+        proc.stdout.emit("data", sseData({ type: "message_start", message: {} }));
+        proc.stdout.emit("data", sseDelta("hi"));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["hi"]);
+    });
+
     it("should include stream:true in the request body", async () => {
       const proc = setupMockSpawn();
       setTimeout(() => proc.emit("close"), 10);
@@ -994,7 +1254,23 @@ describe("claude", () => {
       const dIndex = curlArgs.indexOf("-d");
       const body = JSON.parse(curlArgs[dIndex + 1]);
       expect(body.stream).toBe(true);
-      expect(body.model).toBe("claude-sonnet-4-20250514");
+      expect(body.model).toBe("claude-sonnet-5");
+    });
+
+    it("throws AbortError immediately when signal is already aborted before streaming starts (line 106)", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _chunk of streamChatResponse("Test", [], false, 0, undefined, {
+          signal: controller.signal,
+        })) {
+          /* noop */
+        }
+      }).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(mockSpawn).not.toHaveBeenCalled();
     });
 
     it("kills curl and surfaces AbortError when the stream signal aborts", async () => {
@@ -1230,12 +1506,12 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       const result = await callAnthropicAPI(
         "system prompt",
         [{ role: "user", content: "Hello" }],
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-5",
         1024
       );
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-5",
         max_tokens: 1024,
         system: [{ type: "text", text: "system prompt", cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: "Hello" }],
@@ -1252,7 +1528,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         callAnthropicAPI(
           "system prompt",
           [{ role: "user", content: "Test" }],
-          "claude-sonnet-4-20250514",
+          "claude-sonnet-5",
           1024
         )
       ).rejects.toThrow("SDK authentication failed");
@@ -1272,7 +1548,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(mockCreate).toHaveBeenCalledTimes(1);
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.model).toBe("claude-sonnet-4-20250514");
+      expect(callArgs.model).toBe("claude-sonnet-5");
       expect(callArgs.max_tokens).toBe(1024);
     });
 
@@ -1355,7 +1631,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
 
       expect(mockStream).toHaveBeenCalledTimes(1);
       const callArgs = mockStream.mock.calls[0][0];
-      expect(callArgs.model).toBe("claude-sonnet-4-20250514");
+      expect(callArgs.model).toBe("claude-sonnet-5");
       expect(callArgs.max_tokens).toBe(1024);
       // PE-M5: system is an array with cache_control
       expect(Array.isArray(callArgs.system)).toBe(true);
@@ -1422,6 +1698,57 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       }
       expect(chunks).toEqual([]);
     });
+
+    // #138: on the SDK path, usage is read from stream.finalMessage() after the
+    // stream drains (line 112-113), not from individual SSE events.
+    it("records usage from stream.finalMessage() once the SDK stream completes", async () => {
+      const { recordAnthropicUsage } = await import("@/lib/costs/anthropic-usage");
+      vi.mocked(recordAnthropicUsage).mockClear();
+
+      const finalMessage = vi.fn().mockResolvedValue({
+        usage: { input_tokens: 10, output_tokens: 20 },
+      });
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          yield { type: "content_block_delta", delta: { type: "text_delta", text: "hi" } };
+        },
+        finalMessage,
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["hi"]);
+      expect(finalMessage).toHaveBeenCalledOnce();
+      expect(recordAnthropicUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usage: { input_tokens: 10, output_tokens: 20 },
+          source: "chat_stream",
+        })
+      );
+    });
+
+    it("swallows errors from stream.finalMessage() without affecting the yielded text", async () => {
+      const finalMessage = vi.fn().mockRejectedValue(new Error("stream errored after text drained"));
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          yield { type: "content_block_delta", delta: { type: "text_delta", text: "hi" } };
+        },
+        finalMessage,
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["hi"]);
+      expect(finalMessage).toHaveBeenCalledOnce();
+    });
   });
 
   // ─── BE-M3: maxRetries in SDK constructor ───────────────────────────
@@ -1433,7 +1760,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       });
 
       const { callAnthropicAPI } = await import("./claude");
-      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-4-20250514", 512);
+      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 512);
 
       expect(capturedConstructorOptions).toMatchObject({ maxRetries: 3 });
     });
@@ -1481,6 +1808,36 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(mockStream).toHaveBeenCalledTimes(2);
     });
 
+    it("should stringify a non-Error thrown by the SDK stream in the retry warning (line 123)", async () => {
+      let callCount = 0;
+      mockStream.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            async *[Symbol.asyncIterator]() {
+              // Non-Error rejection — the retry log must String() it
+              throw "socket hang up";
+            },
+          };
+        }
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield { type: "content_block_delta", delta: { type: "text_delta", text: "recovered" } };
+          },
+        };
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(["recovered"]);
+      expect(mockStream).toHaveBeenCalledTimes(2);
+    });
+
     it("should surface the error after two failed SDK stream attempts", async () => {
       mockStream.mockImplementation(() => ({
         async *[Symbol.asyncIterator]() {
@@ -1512,7 +1869,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       await callAnthropicAPI(
         "my system prompt",
         [{ role: "user", content: "question" }],
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-5",
         512
       );
 

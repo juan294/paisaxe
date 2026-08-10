@@ -1,13 +1,24 @@
 "use client";
 
+import { Suspense, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
+import PricingLoading from "./loading";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
+import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing";
 
 export default function PricingPage() {
+  return (
+    <Suspense fallback={<PricingLoading />}>
+      <PricingPageContent />
+    </Suspense>
+  );
+}
+
+function PricingPageContent() {
   const { user, session, signInWithGoogle } = useAuth();
   const { canUseVoice, isWhitelisted, expiresAt, isLoading } = useVoiceAccess();
   const { t } = useTranslation();
@@ -15,17 +26,25 @@ export default function PricingPage() {
   const router = useRouter();
   const returnTo = searchParams.get("returnTo");
   const isResolvingAuthenticatedAccess = isLoading && !!user && !!session;
+  const encodedReturnTo = returnTo ? encodeURIComponent(returnTo) : null;
+  const pricingUrl = encodedReturnTo
+    ? `/pricing?returnTo=${encodedReturnTo}`
+    : "/pricing";
+
+  // #137: selected pass tier — defaults to the Day Pass.
+  const [selectedTier, setSelectedTier] = useState<PricingTierId>("day_pass");
+
+  const checkoutParams = new URLSearchParams();
+  if (returnTo) checkoutParams.set("returnTo", returnTo);
+  checkoutParams.set("tier", selectedTier);
+  const checkoutUrl = `/pricing/checkout?${checkoutParams.toString()}`;
 
   const handlePurchase = () => {
     if (!user || !session) {
-      signInWithGoogle("/pricing");
+      signInWithGoogle(pricingUrl);
       return;
     }
 
-    // Navigate to embedded checkout page
-    const checkoutUrl = returnTo
-      ? `/pricing/checkout?returnTo=${returnTo}`
-      : "/pricing/checkout";
     router.push(checkoutUrl);
   };
 
@@ -100,13 +119,42 @@ export default function PricingPage() {
         {/* Pricing Card */}
         {(!canUseVoice || isResolvingAuthenticatedAccess) && (
           <div className="rounded-xl border border-neutral-800 overflow-hidden">
-            {/* Price */}
+            {/* Price + tier selector (#137) */}
             <div className="p-6 text-center border-b border-neutral-800">
-              <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-3">
+              <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-4">
                 {t("premium.voice_pass_label")}
               </p>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-semibold text-white">€1.99</span>
+              <div
+                role="radiogroup"
+                aria-label={t("premium.voice_pass_label")}
+                className="grid grid-cols-3 gap-2"
+              >
+                {PRICING_TIERS.map((tier) => {
+                  const selected = selectedTier === tier.id;
+                  return (
+                    <button
+                      key={tier.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setSelectedTier(tier.id)}
+                      className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 ${
+                        selected
+                          ? "border-green-500 bg-green-500/10"
+                          : "border-neutral-800 hover:border-neutral-700"
+                      }`}
+                    >
+                      <span className="text-lg font-semibold text-white">
+                        {tier.price}
+                      </span>
+                      <span className="mt-1 text-[11px] text-neutral-400">
+                        {t(tier.durationKey) === tier.durationKey
+                          ? tier.fallbackLabel
+                          : t(tier.durationKey)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -137,7 +185,7 @@ export default function PricingPage() {
               <button
                 onClick={handlePurchase}
                 disabled={isResolvingAuthenticatedAccess}
-                className="w-full px-5 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black text-sm font-medium rounded-lg hover:from-green-400 hover:to-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed"
+                className="w-full px-5 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black text-sm font-medium rounded-lg hover:from-green-400 hover:to-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
               >
                 {isResolvingAuthenticatedAccess ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />

@@ -5,6 +5,7 @@ import { LanguageContext } from './provider';
 import type { LanguageContextValue } from './provider';
 import { es } from './es';
 import { resolveTranslation } from './resolve';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Hook to access translation function and locale management.
@@ -28,7 +29,7 @@ export function useTranslation(): LanguageContextValue {
 
   if (!context && !hasWarned.current) {
     hasWarned.current = true;
-    console.warn(
+    clientLogger.warn(
       'useTranslation: LanguageProvider not found, using fallback. This may indicate a rendering issue.'
     );
   }

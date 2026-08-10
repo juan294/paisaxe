@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const logger = vi.hoisted(() => ({
@@ -103,6 +103,7 @@ describe("POST /api/checkout/day-pass", () => {
       userEmail: "test@example.com",
       successUrl: "https://paisaxe.es/pricing/success",
       cancelUrl: "https://paisaxe.es/pricing",
+      purchaseType: "day_pass",
     });
   });
 
@@ -413,5 +414,115 @@ describe("POST /api/checkout/day-pass", () => {
     expect(response.status).toBe(500);
     expect(consoleSpy).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalled();
+  });
+
+  it("should forward a valid purchaseType from body to the checkout session", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+      "https://checkout.stripe.com/session-weekly"
+    );
+
+    const request = createRequest(
+      { origin: "https://paisaxe.es" },
+      { purchaseType: "weekly_pass" }
+    );
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({ purchaseType: "weekly_pass" })
+    );
+    expect(data.url).toBe("https://checkout.stripe.com/session-weekly");
+  });
+
+  it("should fall back to the hardcoded default origin when NEXT_PUBLIC_SITE_URL is unset", async () => {
+    // `??` only falls back on null/undefined, not on empty string, so the
+    // env var must be deleted entirely (not stubbed to "") to hit this branch.
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+      "https://checkout.stripe.com/session123"
+    );
+
+    // No origin header, so origin falls through to
+    // `process.env.NEXT_PUBLIC_SITE_URL ?? "https://paisaxe.es"`.
+    // With NEXT_PUBLIC_SITE_URL unset, the hardcoded default must be used.
+    const request = createRequest();
+    await POST(request);
+
+    expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl: "https://paisaxe.es/pricing/success",
+        cancelUrl: "https://paisaxe.es/pricing",
+      })
+    );
+  });
+
+  describe("ALLOWED_ORIGINS in development mode (module-level branch)", () => {
+    // ALLOWED_ORIGINS is computed once at module load time, so exercising the
+    // NODE_ENV === "development" branch requires resetting modules and
+    // re-importing the route with NODE_ENV stubbed *before* import.
+    afterEach(() => {
+      vi.doUnmock("@supabase/ssr");
+      vi.doUnmock("@/lib/stripe");
+      vi.doUnmock("@/lib/logger");
+      vi.doUnmock("next/headers");
+    });
+
+    it("should include http://localhost:3000 in ALLOWED_ORIGINS when NODE_ENV=development", async () => {
+      vi.resetModules();
+      vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://paisaxe.es");
+
+      const devMockGetUser = vi.fn().mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      vi.doMock("next/headers", () => ({
+        cookies: vi.fn(() => ({
+          getAll: () => [],
+          set: vi.fn(),
+        })),
+      }));
+      vi.doMock("@supabase/ssr", () => ({
+        createServerClient: vi.fn(() => ({
+          auth: { getUser: devMockGetUser },
+        })),
+      }));
+      const devCreateDayPassCheckoutSession = vi
+        .fn()
+        .mockResolvedValue("https://checkout.stripe.com/session-dev");
+      vi.doMock("@/lib/stripe", () => ({
+        createDayPassCheckoutSession: devCreateDayPassCheckoutSession,
+        isStripeConfigured: vi.fn(() => true),
+      }));
+      vi.doMock("@/lib/logger", () => ({ logger }));
+
+      const { POST: devPost } = await import("./route");
+
+      const request = createRequest({ origin: "http://localhost:3000" });
+      const response = await devPost(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.url).toBe("https://checkout.stripe.com/session-dev");
+      expect(devCreateDayPassCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          successUrl: "http://localhost:3000/pricing/success",
+          cancelUrl: "http://localhost:3000/pricing",
+        })
+      );
+    });
   });
 });

@@ -1,5 +1,9 @@
 import { spawn } from "node:child_process";
 import { request as httpRequest } from "node:http";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { assertTestsExecuted } from "./lib/playwright-report";
 
 const REQUIRED_ENV_KEYS = [
   "STRIPE_TEST_SECRET_KEY",
@@ -88,19 +92,34 @@ function runCommand(
   });
 }
 
+/** Returns undefined when no report exists — the guard treats that as a failure. */
+function readReport(path: string) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
 async function main() {
   for (const key of REQUIRED_ENV_KEYS) {
     getEnv(key);
   }
 
   const port = process.env.PLAYWRIGHT_PORT?.trim() || "3101";
-  const baseUrl = `http://127.0.0.1:${port}`;
+  // Keep this identical to playwright.config.ts. Mixing 127.0.0.1 here with
+  // localhost in the browser changes the Origin and correctly trips CSRF.
+  const baseUrl = `http://localhost:${port}`;
   const sharedEnv = {
     ...process.env,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY?.trim() || "dummy_key_for_e2e",
     VOYAGE_API_KEY: process.env.VOYAGE_API_KEY?.trim() || "dummy_key_for_e2e",
     MAINTENANCE_MODE: "false",
     NEXT_PUBLIC_SITE_URL: baseUrl,
+    // This runner boots `next start` itself instead of Playwright's webServer,
+    // so it must explicitly allow its localhost origin through the shared
+    // CORS/CSRF gate.
+    PLAYWRIGHT_TEST_ORIGIN: baseUrl,
     STRIPE_SECRET_KEY: getEnv("STRIPE_TEST_SECRET_KEY"),
     STRIPE_DAY_PASS_PRICE_ID: getEnv("STRIPE_TEST_DAY_PASS_PRICE_ID"),
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: getEnv("NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY"),
@@ -114,19 +133,38 @@ async function main() {
     stdio: "inherit",
   });
 
+  // Playwright exits 0 when every selected test was skipped, so the run's exit
+  // code alone cannot distinguish "the integration passed" from "nothing ran".
+  // Capture the JSON report and assert that tests actually executed.
+  const configuredReportPath =
+    process.env.PLAYWRIGHT_JSON_OUTPUT_NAME?.trim();
+  const reportPath =
+    configuredReportPath ??
+    join(tmpdir(), `stripe-e2e-report-${process.pid}.json`);
+  mkdirSync(dirname(reportPath), { recursive: true });
+
   try {
     await waitForServer(baseUrl, 120_000);
     await runCommand(
       "npx",
-      ["playwright", "test", "--project=stripe-integration"],
+      ["playwright", "test", "--project=stripe-integration", "--reporter=json"],
       {
         ...sharedEnv,
         PLAYWRIGHT_PORT: port,
         PLAYWRIGHT_REUSE_SERVER: "true",
+        PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
       },
     );
+
+    assertTestsExecuted(readReport(reportPath), "Stripe integration");
   } finally {
     server.kill("SIGTERM");
+    // CI supplies a repository-relative output path so the JSON proof can be
+    // uploaded even when the clean run creates no screenshots or traces.
+    // Ad-hoc local runs keep using a disposable report in the system temp dir.
+    if (!configuredReportPath) {
+      rmSync(reportPath, { force: true });
+    }
   }
 }
 

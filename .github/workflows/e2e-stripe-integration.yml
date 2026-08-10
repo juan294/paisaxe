@@ -1,6 +1,9 @@
 name: Stripe E2E Integration
 
 on:
+  # The former live-gate input is gone: missing secrets now always fail, so a
+  # knob that chose between "fail" and "silently pass" no longer has a
+  # meaningful setting.
   workflow_dispatch:
   schedule:
     - cron: "0 3 * * *"
@@ -22,10 +25,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: "npm"
@@ -60,31 +63,29 @@ jobs:
             fi
           done
 
+          # A missing secret always fails, with no opt-out.
+          # Previously this exited 0, so the job reported success having run
+          # zero tests — a green check that proved nothing. Requiredness is not
+          # satisfiable without evidence; if the secrets are not configured, say
+          # so loudly rather than banking an unearned pass.
           if [ "$missing" -eq 1 ]; then
+            echo "::error::Stripe integration secrets are not configured; refusing to report success without running any test."
             echo "run=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            exit 1
           fi
 
           echo "run=true" >> "$GITHUB_OUTPUT"
 
-      - name: Skip when secrets are unavailable
-        if: steps.secrets.outputs.run != 'true'
-        run: echo "Skipping Stripe integration workflow because required secrets are not configured."
-
       - name: Install canvas system dependencies
-        if: steps.secrets.outputs.run == 'true'
         run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - name: Install dependencies
-        if: steps.secrets.outputs.run == 'true'
         run: npm ci
 
       - name: Install Playwright Chromium
-        if: steps.secrets.outputs.run == 'true'
         run: npx playwright install chromium --with-deps
 
       - name: Run real Stripe checkout integration
-        if: steps.secrets.outputs.run == 'true'
         env:
           ANTHROPIC_API_KEY: dummy_key_for_e2e
           VOYAGE_API_KEY: dummy_key_for_e2e
@@ -98,12 +99,16 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
           QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/stripe-e2e-report.json
         run: npm run test:e2e:stripe
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() && steps.secrets.outputs.run == 'true' }}
+        if: ${{ !cancelled() }}
         with:
           name: playwright-report-stripe
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: error
           retention-days: 14

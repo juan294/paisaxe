@@ -200,6 +200,100 @@ describe("AgentTerminal", () => {
       expect(screen.getByText("1:05")).toBeInTheDocument();
     });
 
+    it("pauses the elapsed-time tick while the tab is hidden (PE-L1 #537)", () => {
+      const visibilitySpy = vi.spyOn(document, "hidden", "get");
+      visibilitySpy.mockReturnValue(false);
+
+      render(
+        <AgentTerminal
+          {...defaultProps}
+          finished={false}
+          startedAt="2026-02-16T12:00:00Z"
+        />
+      );
+
+      expect(screen.getByText("1:00")).toBeInTheDocument();
+
+      // Tab becomes hidden — ticks must stop.
+      act(() => {
+        visibilitySpy.mockReturnValue(true);
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      // Advance wall-clock 20s while hidden; elapsed must NOT update.
+      act(() => {
+        vi.advanceTimersByTime(20000);
+      });
+      expect(screen.getByText("1:00")).toBeInTheDocument();
+
+      // Tab becomes visible again — tick resumes and catches up immediately
+      // to the real elapsed time (1:00 + 20s = 1:20).
+      act(() => {
+        visibilitySpy.mockReturnValue(false);
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(screen.getByText("1:20")).toBeInTheDocument();
+
+      visibilitySpy.mockRestore();
+    });
+
+    it("renders an initial elapsed value when mounting while the tab starts hidden (line 74)", () => {
+      const visibilitySpy = vi.spyOn(document, "hidden", "get");
+      visibilitySpy.mockReturnValue(true);
+
+      render(
+        <AgentTerminal
+          {...defaultProps}
+          finished={false}
+          startedAt="2026-02-16T12:00:00Z"
+        />
+      );
+
+      // Even though the tab starts hidden (so no interval is scheduled),
+      // the initial tick() call at line 74 still computes the elapsed value.
+      expect(screen.getByText("1:00")).toBeInTheDocument();
+
+      // No interval was started while hidden, so time does not tick further.
+      act(() => {
+        vi.advanceTimersByTime(10000);
+      });
+      expect(screen.getByText("1:00")).toBeInTheDocument();
+
+      visibilitySpy.mockRestore();
+    });
+
+    it("does not restart the interval on a redundant visible event while already running (line 50 guard)", () => {
+      const visibilitySpy = vi.spyOn(document, "hidden", "get");
+      visibilitySpy.mockReturnValue(false);
+
+      render(
+        <AgentTerminal
+          {...defaultProps}
+          finished={false}
+          startedAt="2026-02-16T12:00:00Z"
+        />
+      );
+
+      expect(screen.getByText("1:00")).toBeInTheDocument();
+
+      // Dispatch a redundant "visible" visibilitychange event while the tab
+      // is already visible and the interval is already running. This exercises
+      // the `if (interval !== null) return` early-return branch inside start(),
+      // guarding against a duplicate setInterval.
+      act(() => {
+        visibilitySpy.mockReturnValue(false);
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      // A single 1s tick should still only advance elapsed by 1s (no double interval).
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(screen.getByText("1:01")).toBeInTheDocument();
+
+      visibilitySpy.mockRestore();
+    });
+
     it("stops updating elapsed time when finished", () => {
       const { rerender } = render(
         <AgentTerminal

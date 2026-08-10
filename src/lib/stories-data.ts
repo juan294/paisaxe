@@ -1,7 +1,24 @@
-import type { Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
-import { rowToStory } from "@/types/immersive";
-import { supabase } from "./supabase";
+import { cache } from "react";
+import type { PublicStoryRow, Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
+import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
 import { logger } from "@/lib/logger";
+
+// In the browser, reuse the existing createBrowserClient singleton to avoid
+// a duplicate GoTrueClient instance (which would share the same storage key
+// as the one created by AuthProvider). Both clients are dynamically imported
+// so the ~324 KB Supabase JS chunk doesn't load on the /immersive first-paint
+// path — every call site below is already inside an async function, so this
+// adds no architectural change, just deferred parse/execute (Performance
+// Agent P1, sequenced after QA #720's hydration-tolerance fix).
+async function getClient() {
+  if (typeof window !== "undefined") {
+    const { createSupabaseBrowserClient } = await import("./supabase-browser");
+    const browser = createSupabaseBrowserClient();
+    if (browser) return browser;
+  }
+  const { supabase } = await import("./supabase");
+  return supabase;
+}
 
 // LOCATION-SPECIFIC: Import fallback stories from content directory
 // When replicating, replace content/fallback-stories.json with location-specific stories
@@ -32,9 +49,10 @@ export async function getStoriesFromDB(): Promise<Story[]> {
   }
 
   try {
-    const { data, error } = await supabase
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
       .eq("curation_status", "approved")
       .order("display_order", { ascending: true });
@@ -50,7 +68,7 @@ export async function getStoriesFromDB(): Promise<Story[]> {
       return FALLBACK_STORIES;
     }
 
-    return (data as StoryRow[]).map(rowToStory);
+    return (data as unknown as PublicStoryRow[]).map(rowToPublicStory);
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", error: error instanceof Error ? error.message : String(error) });
@@ -68,9 +86,10 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
   }
 
   try {
-    const { data, error } = await supabase
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
       .eq("curation_status", "approved")
       .eq("category", category)
@@ -87,7 +106,7 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
       return FALLBACK_STORIES.filter(s => s.category === category);
     }
 
-    return (data as StoryRow[]).map(rowToStory);
+    return (data as unknown as PublicStoryRow[]).map(rowToPublicStory);
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "category", error: error instanceof Error ? error.message : String(error) });
@@ -101,9 +120,10 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
  */
 export async function getStoriesByLocationFromDB(location: StoryLocation): Promise<Story[]> {
   try {
-    const { data, error } = await supabase
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
       .eq("curation_status", "approved")
       .eq("location", location)
@@ -120,7 +140,7 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
       return FALLBACK_STORIES.filter(s => s.location === location);
     }
 
-    return (data as StoryRow[]).map(rowToStory);
+    return (data as unknown as PublicStoryRow[]).map(rowToPublicStory);
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "location", error: error instanceof Error ? error.message : String(error) });
@@ -134,9 +154,10 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
  */
 export async function getStoriesByDurationFromDB(duration: StoryDuration): Promise<Story[]> {
   try {
-    const { data, error } = await supabase
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
       .eq("curation_status", "approved")
       .eq("duration", duration)
@@ -153,7 +174,7 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
       return FALLBACK_STORIES.filter(s => s.duration === duration);
     }
 
-    return (data as StoryRow[]).map(rowToStory);
+    return (data as unknown as PublicStoryRow[]).map(rowToPublicStory);
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "duration", error: error instanceof Error ? error.message : String(error) });
@@ -167,9 +188,10 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
  */
 export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> {
   try {
-    const { data, error } = await supabase
+    const client = await getClient();
+    const { data, error } = await client
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("slug", slug)
       .eq("is_active", true)
       .eq("curation_status", "approved")
@@ -182,7 +204,7 @@ export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> 
       return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
     }
 
-    return data ? rowToStory(data as StoryRow) : null;
+    return data ? rowToPublicStory(data as unknown as PublicStoryRow) : null;
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "slug", error: error instanceof Error ? error.message : String(error) });
@@ -190,6 +212,69 @@ export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> 
     return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
   }
 }
+
+/**
+ * Slim story metadata used by `generateMetadata`.
+ * Only the columns required to build <title>/<meta> tags.
+ */
+export interface StoryMetadataSlim {
+  slug: string;
+  title: string;
+  description: string | null;
+}
+
+const STORY_METADATA_SELECT = ["slug", "title", "description"].join(",");
+
+function fallbackStoryMetadata(slug: string): StoryMetadataSlim | null {
+  const fallback = FALLBACK_STORIES.find((s) => s.slug === slug || s.id === slug);
+  if (!fallback) return null;
+  return {
+    slug: fallback.slug || fallback.id,
+    title: fallback.title,
+    description: fallback.description ?? null,
+  };
+}
+
+/**
+ * Fetch ONLY the slim metadata (slug, title, description) for a single story.
+ *
+ * Wrapped in React `cache` so that within a single request the metadata query
+ * is deduplicated. This avoids `generateMetadata` pulling the entire story row
+ * (select('*')) just to read the title/description (#573 / PE-M2).
+ */
+export const getStoryMetadataBySlug = cache(
+  async (slug: string): Promise<StoryMetadataSlim | null> => {
+    try {
+      const client = await getClient();
+      const { data, error } = await client
+        .from("stories")
+        .select(STORY_METADATA_SELECT)
+        .eq("slug", slug)
+        .eq("is_active", true)
+        .eq("curation_status", "approved")
+        .single();
+
+      if (error || !data) {
+        if (error && !isBuildPhase()) {
+          logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "metadata", error: error.message });
+        }
+        return fallbackStoryMetadata(slug);
+      }
+
+      const row = data as unknown as StoryMetadataSlim;
+      return {
+        slug: row.slug,
+        title: row.title,
+        description: row.description ?? null,
+      };
+    } catch (error) {
+      if (!isBuildPhase()) {
+        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "metadata", error: error instanceof Error ? error.message : String(error) });
+      }
+      return fallbackStoryMetadata(slug);
+    }
+  }
+);
 
 // Synchronous functions for backward compatibility (use hardcoded data)
 export function getStoriesByCategory(category: StoryCategory | null): Story[] {

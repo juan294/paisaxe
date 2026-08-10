@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "./use-auth";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const STORAGE_KEY = "paisaxe_favorites";
 
@@ -64,7 +65,7 @@ export function useFavorites(): UseFavoritesReturn {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudFavorites));
         }
       } catch (error) {
-        console.error("Error syncing favorites:", error);
+        clientLogger.error("Error syncing favorites", { error: error instanceof Error ? error.message : String(error) });
       } finally {
         setIsLoading(false);
       }
@@ -98,15 +99,18 @@ export function useFavorites(): UseFavoritesReturn {
       // Sync to cloud
       try {
         if (isCurrentlyFavorite) {
-          await fetch(`/api/favorites?storyId=${storyId}`, {
+          const response = await fetch(`/api/favorites?storyId=${storyId}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${session.access_token}`,
               ...csrfHeaders(),
             },
           });
+          if (!response.ok) {
+            throw new Error(`Failed to remove favorite: ${response.status}`);
+          }
         } else {
-          await fetch("/api/favorites", {
+          const response = await fetch("/api/favorites", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -115,9 +119,12 @@ export function useFavorites(): UseFavoritesReturn {
             },
             body: JSON.stringify({ storyIds: [storyId] }),
           });
+          if (!response.ok) {
+            throw new Error(`Failed to add favorite: ${response.status}`);
+          }
         }
       } catch (error) {
-        console.error("Error syncing favorite to cloud:", error);
+        clientLogger.error("Error syncing favorite to cloud", { error: error instanceof Error ? error.message : String(error) });
         // Revert optimistic update on failure
         setFavorites(previousFavorites);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(previousFavorites));

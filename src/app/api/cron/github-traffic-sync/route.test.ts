@@ -12,7 +12,7 @@ vi.mock("@/lib/logger", () => ({ logger }));
 vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
     headers: Map<string, string>;
-    constructor(url: string, init?: { headers?: Record<string, string> }) {
+    constructor(_url: string, init?: { headers?: Record<string, string> }) {
       this.headers = new Map(Object.entries(init?.headers || {}));
     }
   },
@@ -79,10 +79,10 @@ describe("POST /api/cron/github-traffic-sync", () => {
     logger.info.mockClear();
     logger.error.mockClear();
     logger.warn.mockClear();
-    // Default: advisory lock succeeds (lock acquired, unlock succeeds)
+    // Default: durable cron lease succeeds (lock acquired, unlock succeeds)
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -558,8 +558,8 @@ describe("GET /api/cron/github-traffic-sync (Vercel Cron)", () => {
     mockFrom.mockClear();
     mockRpc.mockReset();
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -612,7 +612,7 @@ describe("GET /api/cron/github-traffic-sync (Vercel Cron)", () => {
   });
 });
 
-describe("Advisory lock (DO-M2) — github-traffic-sync", () => {
+describe("Cron lease (DO-M2) — github-traffic-sync", () => {
   const originalEnv = process.env;
   const WEBHOOK_SECRET = "test-webhook-secret-123";
   const GITHUB_TOKEN = "ghp_test_token_123";
@@ -636,9 +636,9 @@ describe("Advisory lock (DO-M2) — github-traffic-sync", () => {
     process.env = originalEnv;
   });
 
-  it("returns 409 when advisory lock is already held (concurrent run)", async () => {
+  it("returns 409 when durable cron lease is already held (concurrent run)", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: false, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: false, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -655,9 +655,9 @@ describe("Advisory lock (DO-M2) — github-traffic-sync", () => {
     );
   });
 
-  it("returns 409 when pg_try_advisory_lock returns an error", async () => {
+  it("returns 409 when try_acquire_cron_job_lease returns an error", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock")
+      if (fn === "try_acquire_cron_job_lock")
         return Promise.resolve({ data: null, error: { message: "DB error" } });
       return Promise.resolve({ data: null, error: null });
     });
@@ -672,10 +672,10 @@ describe("Advisory lock (DO-M2) — github-traffic-sync", () => {
     expect(response.status).toBe(409);
   });
 
-  it("executes sync and calls pg_advisory_unlock when lock is acquired", async () => {
+  it("executes sync and calls release_cron_job_lock when lease is acquired", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -695,15 +695,46 @@ describe("Advisory lock (DO-M2) — github-traffic-sync", () => {
     expect(response.status).toBe(200);
 
     const unlockCalls = mockRpc.mock.calls.filter(
-      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+      (args: unknown[]) => args[0] === "release_cron_job_lock"
     );
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("calls pg_advisory_unlock in finally block even when sync throws", async () => {
+  it("#439 QA-H1: uses durable cron lease RPCs instead of session durable cron lease RPCs", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock")
+        return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock")
+        return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, views: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, clones: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+
+    const rpcNames = mockRpc.mock.calls.map((args: unknown[]) => args[0]);
+    expect(rpcNames).toContain("try_acquire_cron_job_lock");
+    expect(rpcNames).toContain("release_cron_job_lock");
+    expect(rpcNames).not.toContain("pg_try_advisory_lock");
+    expect(rpcNames).not.toContain("pg_advisory_unlock");
+  });
+
+  it("calls release_cron_job_lock in finally block even when sync throws", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -721,13 +752,35 @@ describe("Advisory lock (DO-M2) — github-traffic-sync", () => {
     // Even though sync failed, it should return 500 from the catch block inside the try
     expect(response.status).toBe(500);
 
-    // pg_advisory_unlock must have been called in the finally block
+    // release_cron_job_lock must have been called in the finally block
     const unlockCalls = mockRpc.mock.calls.filter(
-      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+      (args: unknown[]) => args[0] === "release_cron_job_lock"
     );
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
     consoleSpy.mockRestore();
+  });
+
+  it("logs GITHUB_TRAFFIC_SYNC_LOCK_RELEASE_FAILED when release throws (line 217)", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.reject(new Error("DB lock release failure"));
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    // Should not throw — catch in finally swallows the error
+    await expect(POST(request as never)).resolves.toBeDefined();
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[GITHUB_TRAFFIC_SYNC_LOCK_RELEASE_FAILED]",
+      expect.objectContaining({ error: expect.any(Error) })
+    );
   });
 });
 
@@ -753,8 +806,8 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — github-traffic-sync", () => {
     logger.error.mockClear();
     logger.warn.mockClear();
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });

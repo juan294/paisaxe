@@ -11,13 +11,31 @@
 | Sentry (if configured) | Unhandled exceptions, performance regressions | Juan Gonzalez |
 | Manual monitoring | `/api/health` endpoint status | Juan Gonzalez |
 
-**Escalation path:** All alerts route to Juan Gonzalez (solo developer). No on-call rotation. For incidents affecting real users, triage immediately during business hours; review within 24 h at off-hours.
+## Escalation & On-Call SLO (accepted risk)
+
+Paisaxe is operated by a **single developer** (Juan Gonzalez). There is **no on-call rotation and no paging** — this is a deliberate, documented risk-acceptance decision appropriate to the project's current scale (low-volume tourism site, €1.99 voice passes, no PII beyond auth identity), not an oversight.
+
+**Accepted Service-Level Objective (SLO):**
+
+| Condition | Target response | Rationale |
+|-----------|-----------------|-----------|
+| Critical alert during **business hours** (approx. 09:00–21:00 CET) | Triage immediately (minutes) | Operator is typically reachable |
+| Critical alert **off-hours / asleep** | Best-effort, reviewed within **24 h** | No paging; alerts are pull-based (email/dashboard), so off-hours detection is not guaranteed |
+| Non-critical alert | Reviewed within **24 h** | — |
+
+**What "accepted risk" means here:** an outage that begins off-hours may persist until the operator next checks alerts (worst case ~12 h overnight). For a non-life-critical, low-revenue site this downtime exposure is acceptable and is explicitly chosen over the cost/complexity of a paging rotation. The graceful-degradation fallbacks (fallback stories, fail-closed rate limiting, Stripe's 3-day webhook retry) bound the blast radius of most failure modes during that window.
+
+**Escalation path:** All alert channels (PostHog, Vercel email, Sentry, manual `/api/health` checks) route to the single operator. There is no secondary contact. If the operator becomes unavailable for an extended period, the documented mitigation is to enable `maintenance_mode` (admin panel → Feature Flags → Behavior) to take the site to a safe holding state rather than leave it degraded.
+
+**Re-evaluation trigger:** revisit this risk acceptance (and consider wiring critical alerts to a paging service such as BetterStack email-to-PagerDuty) if any of the following hold: sustained traffic growth, handling of sensitive user data, a second operator joins, or recurring off-hours incidents are observed.
 
 ---
 
 ## Health Endpoint Degraded
 
-**Trigger:** `GET https://paisaxe.es/api/health` returns non-200 or `status != "healthy"`.
+**Trigger:** `GET https://paisaxe.es/api/health` returns `status != "healthy"` in the JSON body (the endpoint always returns HTTP 200; degraded state is signalled via the body only).
+
+**Automated monitor:** CI uses `node scripts/check-health-readiness.mjs <base-url>` to parse `/api/health` and fail on any non-healthy body. The required `Smoke test Vercel preview` gate adds `--require-sentry`, so missing Sentry configuration is treated as release-blocking even though `/api/health/live` still returns liveness.
 
 **Steps:**
 
@@ -63,6 +81,7 @@ All cron handlers emit structured log events on every run:
 | `subscription-optimizer` | `/api/cron/subscription-optimizer` | Weekly Mon 4 AM |
 | `fail-stale-translations` | `/api/cron/fail-stale-translations` | Every 15 min |
 | `fail-stale-bookings` | `/api/cron/fail-stale-bookings` | Every 5 min |
+| `retry-booking-sms` | `/api/cron/retry-booking-sms` | Every 10 min |
 
 **Example log drain query** (filter by structured field in Vercel / log aggregator):
 ```
@@ -102,6 +121,20 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
    curl -X POST https://paisaxe.es/api/cron/<route> \
      -H "Authorization: Bearer $CRON_SECRET"
    ```
+
+---
+
+## Rate Limit Backend Degraded
+
+**Trigger:** `GET https://paisaxe.es/api/health` returns `rate_limit.status: "degraded"` in the JSON body.
+
+**Fields:** `rate_limit.backend` — `"blocked"` (Upstash credentials absent in production) or `"upstash"` with `reason: "upstash_unavailable"` (credentials present but Redis unreachable).
+
+**Steps:**
+
+1. For `backend: "blocked"` / `reason: "upstash_missing"`: verify `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set in Vercel environment variables → Settings → Environment Variables.
+2. For `reason: "upstash_unavailable"`: check the Upstash console for Redis instance health. The rate limiter has already failed closed — all chat/API requests are being denied until Redis recovers.
+3. Once credentials are corrected or Redis recovers, the `rate_limit.status` will return to `"ok"` on the next health probe without a redeploy.
 
 ---
 
@@ -163,7 +196,7 @@ This job uses `continue-on-error: true` so it never blocks the push, but a failu
 1. Check which step failed: `gh run list --branch develop --limit 3`, then `gh run view <run-id> --log-failed`
 2. Identify the failing probe:
    - `Smoke check - liveness endpoint` (`/api/health/live`) — the process is not serving requests (startup crash, build error, or Vercel config issue)
-   - `Smoke check - health endpoint` (`/api/health`) — the app started but a backend dependency (Supabase, Anthropic, etc.) is unreachable or returning `status != "healthy"`
+   - `Smoke check - health endpoint` (`/api/health`) — `scripts/check-health-readiness.mjs` parsed the body and found a non-200 response, invalid JSON, or `status != "healthy"`
 3. Check the Vercel preview URL from the workflow output and hit it manually to confirm the failure.
 4. Fix on `develop`, push, and verify the next smoke run passes before creating a release PR to `main`.
 5. If the failure is from a Dependabot dependency bump: check the dep changelog for breaking changes, then pin or revert as needed.

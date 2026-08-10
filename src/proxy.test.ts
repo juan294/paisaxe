@@ -42,7 +42,7 @@ describe("CORS proxy", () => {
   });
 
   it("should allow requests from paisaxe.com", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       headers: { origin: "https://paisaxe.com" },
     });
 
@@ -51,7 +51,7 @@ describe("CORS proxy", () => {
   });
 
   it("should allow requests from www.paisaxe.com", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       headers: { origin: "https://www.paisaxe.com" },
     });
 
@@ -60,7 +60,7 @@ describe("CORS proxy", () => {
   });
 
   it("should allow requests from paisaxe.es", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       headers: { origin: "https://paisaxe.es" },
     });
 
@@ -69,7 +69,7 @@ describe("CORS proxy", () => {
   });
 
   it("should allow requests from www.paisaxe.es", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       headers: { origin: "https://www.paisaxe.es" },
     });
 
@@ -78,7 +78,7 @@ describe("CORS proxy", () => {
   });
 
   it("should not add CORS headers for unknown origins", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       headers: { origin: "https://evil.com" },
     });
 
@@ -87,7 +87,7 @@ describe("CORS proxy", () => {
   });
 
   it("should handle OPTIONS preflight with 204 for allowed origins", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       method: "OPTIONS",
       headers: { origin: "https://paisaxe.com" },
     });
@@ -99,7 +99,7 @@ describe("CORS proxy", () => {
   });
 
   it("should handle OPTIONS preflight without CORS for unknown origins", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       method: "OPTIONS",
       headers: { origin: "https://evil.com" },
     });
@@ -110,7 +110,7 @@ describe("CORS proxy", () => {
   });
 
   it("should pass through same-origin requests without CORS headers", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat");
+    const request = new NextRequest("http://localhost:3006/api/chat");
     // No origin header (same-origin)
 
     const response = await proxy(request);
@@ -118,7 +118,7 @@ describe("CORS proxy", () => {
   });
 
   it("adds an X-Request-ID response header when upstream did not provide one", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat");
+    const request = new NextRequest("http://localhost:3006/api/chat");
 
     const response = await proxy(request);
 
@@ -128,7 +128,7 @@ describe("CORS proxy", () => {
   });
 
   it("preserves a well-formed upstream X-Request-ID header", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       headers: {
         "x-request-id": "req-upstream-1234",
       },
@@ -157,8 +157,8 @@ describe("CORS proxy - development", () => {
     // Since we can't reliably change NODE_ENV after module load, this test verifies current behavior.
     process.env.MAINTENANCE_MODE = "false";
 
-    const request = new NextRequest("http://localhost:3000/api/chat", {
-      headers: { origin: "http://localhost:3000" },
+    const request = new NextRequest("http://localhost:3006/api/chat", {
+      headers: { origin: "http://localhost:3006" },
     });
 
     const response = await proxy(request);
@@ -166,7 +166,7 @@ describe("CORS proxy - development", () => {
     // In development mode (current test environment), localhost IS allowed
     // In production, it would not be (but we can't test that without reloading the module)
     if (process.env.NODE_ENV === "development") {
-      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3006");
     } else {
       expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
     }
@@ -188,14 +188,14 @@ describe("Maintenance mode", () => {
     });
 
     it("allows all requests through", async () => {
-      const request = new NextRequest("http://localhost:3000/favorites");
+      const request = new NextRequest("http://localhost:3006/favorites");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows /immersive route", async () => {
-      const request = new NextRequest("http://localhost:3000/immersive");
+      const request = new NextRequest("http://localhost:3006/immersive");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -208,52 +208,52 @@ describe("Maintenance mode", () => {
     });
 
     it("redirects root path to /coming-soon", async () => {
-      const request = new NextRequest("http://localhost:3000/");
+      const request = new NextRequest("http://localhost:3006/");
       const response = await proxy(request);
 
       expect(response.status).toBe(307);
       expect(response.headers.get("location")).toBe(
-        "http://localhost:3000/coming-soon"
+        "http://localhost:3006/coming-soon"
       );
     });
 
     it("allows /immersive routes through (purchase flow testing)", async () => {
-      const request = new NextRequest("http://localhost:3000/immersive");
+      const request = new NextRequest("http://localhost:3006/immersive");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows /pricing routes through (purchase flow)", async () => {
-      const request = new NextRequest("http://localhost:3000/pricing");
+      const request = new NextRequest("http://localhost:3006/pricing");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows /admin routes through", async () => {
-      const request = new NextRequest("http://localhost:3000/admin/dashboard");
+      const request = new NextRequest("http://localhost:3006/admin/dashboard");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows /api routes through", async () => {
-      const request = new NextRequest("http://localhost:3000/api/health");
+      const request = new NextRequest("http://localhost:3006/api/health");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows /auth routes through", async () => {
-      const request = new NextRequest("http://localhost:3000/auth/callback");
+      const request = new NextRequest("http://localhost:3006/auth/callback");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows /coming-soon page through", async () => {
-      const request = new NextRequest("http://localhost:3000/coming-soon");
+      const request = new NextRequest("http://localhost:3006/coming-soon");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -261,7 +261,7 @@ describe("Maintenance mode", () => {
 
     it("allows /_next routes through", async () => {
       const request = new NextRequest(
-        "http://localhost:3000/_next/static/chunks/main.js"
+        "http://localhost:3006/_next/static/chunks/main.js"
       );
       const response = await proxy(request);
 
@@ -269,7 +269,7 @@ describe("Maintenance mode", () => {
     });
 
     it("allows favicon through", async () => {
-      const request = new NextRequest("http://localhost:3000/favicon.ico");
+      const request = new NextRequest("http://localhost:3006/favicon.ico");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -277,7 +277,7 @@ describe("Maintenance mode", () => {
 
     it("allows static image files through", async () => {
       const request = new NextRequest(
-        "http://localhost:3000/images/stories/test.webp"
+        "http://localhost:3006/images/stories/test.webp"
       );
       const response = await proxy(request);
 
@@ -285,28 +285,28 @@ describe("Maintenance mode", () => {
     });
 
     it("allows robots.txt through", async () => {
-      const request = new NextRequest("http://localhost:3000/robots.txt");
+      const request = new NextRequest("http://localhost:3006/robots.txt");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows sitemap.xml through", async () => {
-      const request = new NextRequest("http://localhost:3000/sitemap.xml");
+      const request = new NextRequest("http://localhost:3006/sitemap.xml");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows manifest.json through", async () => {
-      const request = new NextRequest("http://localhost:3000/manifest.json");
+      const request = new NextRequest("http://localhost:3006/manifest.json");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows icon files through", async () => {
-      const request = new NextRequest("http://localhost:3000/icon-192.png");
+      const request = new NextRequest("http://localhost:3006/icon-192.png");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -314,7 +314,7 @@ describe("Maintenance mode", () => {
 
     it("allows apple-touch-icon through", async () => {
       const request = new NextRequest(
-        "http://localhost:3000/apple-touch-icon.png"
+        "http://localhost:3006/apple-touch-icon.png"
       );
       const response = await proxy(request);
 
@@ -341,7 +341,7 @@ describe("Maintenance mode", () => {
         json: () => Promise.resolve([{ enabled: false }]),
       });
 
-      const request = new NextRequest("http://localhost:3000/favorites");
+      const request = new NextRequest("http://localhost:3006/favorites");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -353,12 +353,12 @@ describe("Maintenance mode", () => {
         json: () => Promise.resolve([{ enabled: true }]),
       });
 
-      const request = new NextRequest("http://localhost:3000/");
+      const request = new NextRequest("http://localhost:3006/");
       const response = await proxy(request);
 
       expect(response.status).toBe(307);
       expect(response.headers.get("location")).toBe(
-        "http://localhost:3000/coming-soon"
+        "http://localhost:3006/coming-soon"
       );
     });
 
@@ -368,7 +368,7 @@ describe("Maintenance mode", () => {
         status: 500,
       });
 
-      const request = new NextRequest("http://localhost:3000/favorites");
+      const request = new NextRequest("http://localhost:3006/favorites");
       const response = await proxy(request);
 
       // Should default to off when database fails
@@ -381,7 +381,7 @@ describe("Maintenance mode", () => {
         json: () => Promise.resolve([]),
       });
 
-      const request = new NextRequest("http://localhost:3000/favorites");
+      const request = new NextRequest("http://localhost:3006/favorites");
       const response = await proxy(request);
 
       // Should default to off when flag not found
@@ -391,7 +391,7 @@ describe("Maintenance mode", () => {
     it("allows requests when fetch throws error", async () => {
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-      const request = new NextRequest("http://localhost:3000/favorites");
+      const request = new NextRequest("http://localhost:3006/favorites");
       const response = await proxy(request);
 
       // Should default to off when fetch fails
@@ -401,7 +401,7 @@ describe("Maintenance mode", () => {
     it("still bypasses /admin routes even when database flag is true", async () => {
       // No need to mock fetch - bypass routes don't check the flag
 
-      const request = new NextRequest("http://localhost:3000/admin/dashboard");
+      const request = new NextRequest("http://localhost:3006/admin/dashboard");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -418,7 +418,7 @@ describe("Maintenance mode", () => {
     });
 
     it("allows requests when Supabase is not configured", async () => {
-      const request = new NextRequest("http://localhost:3000/favorites");
+      const request = new NextRequest("http://localhost:3006/favorites");
       const response = await proxy(request);
 
       // Should default to off when no Supabase config
@@ -485,27 +485,27 @@ describe("/story/[slug] rewrite", () => {
   });
 
   it("rewrites /story/oviedo-catedral to /immersive?story=oviedo-catedral", async () => {
-    const request = new NextRequest("http://localhost:3000/story/oviedo-catedral");
+    const request = new NextRequest("http://localhost:3006/story/oviedo-catedral");
     const response = await proxy(request);
 
     expect(response.status).toBe(308);
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/immersive?story=oviedo-catedral"
+      "http://localhost:3006/immersive?story=oviedo-catedral"
     );
   });
 
   it("rewrites /story/lagos-de-covadonga to /immersive?story=lagos-de-covadonga", async () => {
-    const request = new NextRequest("http://localhost:3000/story/lagos-de-covadonga");
+    const request = new NextRequest("http://localhost:3006/story/lagos-de-covadonga");
     const response = await proxy(request);
 
     expect(response.status).toBe(308);
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/immersive?story=lagos-de-covadonga"
+      "http://localhost:3006/immersive?story=lagos-de-covadonga"
     );
   });
 
   it("does not rewrite /story without a slug", async () => {
-    const request = new NextRequest("http://localhost:3000/story");
+    const request = new NextRequest("http://localhost:3006/story");
     const response = await proxy(request);
 
     // Should pass through normally (no redirect)
@@ -513,7 +513,7 @@ describe("/story/[slug] rewrite", () => {
   });
 
   it("does not rewrite /story/ with trailing slash but no slug", async () => {
-    const request = new NextRequest("http://localhost:3000/story/");
+    const request = new NextRequest("http://localhost:3006/story/");
     const response = await proxy(request);
 
     // Should pass through normally (no redirect)
@@ -521,14 +521,14 @@ describe("/story/[slug] rewrite", () => {
   });
 
   it("does not rewrite /stories or other similar paths", async () => {
-    const request = new NextRequest("http://localhost:3000/stories/test");
+    const request = new NextRequest("http://localhost:3006/stories/test");
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
   });
 
   it("preserves existing query params on /story/ redirect", async () => {
-    const request = new NextRequest("http://localhost:3000/story/oviedo-catedral?ref=twitter");
+    const request = new NextRequest("http://localhost:3006/story/oviedo-catedral?ref=twitter");
     const response = await proxy(request);
 
     expect(response.status).toBe(308);
@@ -540,13 +540,13 @@ describe("/story/[slug] rewrite", () => {
 
   it("works during maintenance mode (story routes are redirected before maintenance check)", async () => {
     process.env.MAINTENANCE_MODE = "true";
-    const request = new NextRequest("http://localhost:3000/story/oviedo-catedral");
+    const request = new NextRequest("http://localhost:3006/story/oviedo-catedral");
     const response = await proxy(request);
 
     // Should redirect to immersive, not to coming-soon
     expect(response.status).toBe(308);
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/immersive?story=oviedo-catedral"
+      "http://localhost:3006/immersive?story=oviedo-catedral"
     );
   });
 });
@@ -625,7 +625,7 @@ describe("Canonical domain redirect", () => {
   });
 
   it("does not redirect localhost in development", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -662,12 +662,12 @@ describe("Root path redirect", () => {
   });
 
   it("redirects / to /immersive on localhost with 308", async () => {
-    const request = new NextRequest("http://localhost:3000/");
+    const request = new NextRequest("http://localhost:3006/");
     const response = await proxy(request);
 
     expect(response.status).toBe(308);
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/immersive"
+      "http://localhost:3006/immersive"
     );
   });
 
@@ -710,7 +710,7 @@ describe("Auth session refresh timeout", () => {
     // Simulate a hanging getUser (never resolves) — e.g., DNS resolution hang
     mockGetUser.mockImplementation(() => new Promise(() => {}));
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
 
@@ -729,7 +729,7 @@ describe("Auth session refresh timeout", () => {
     // Simulate a fast auth response (getUser call succeeds)
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
     const response = await proxy(request);
@@ -741,7 +741,7 @@ describe("Auth session refresh timeout", () => {
     // Simulate a connection error thrown during getUser
     mockGetUser.mockRejectedValue(new TypeError("fetch failed"));
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
     const response = await proxy(request);
@@ -753,7 +753,7 @@ describe("Auth session refresh timeout", () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -766,7 +766,7 @@ describe("Auth session refresh timeout", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key_for_e2e";
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -807,7 +807,7 @@ describe("Auth session refresh - setAll cookie callback", () => {
       return { data: { user: { id: "user-1" } }, error: null };
     });
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
     const response = await proxy(request);
@@ -836,7 +836,7 @@ describe("Auth session refresh - setAll cookie callback", () => {
       return { data: { user: null }, error: null };
     });
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
     await proxy(request);
@@ -860,7 +860,7 @@ describe("Auth session refresh - setAll cookie callback", () => {
       return { data: { user: { id: "user-1" } }, error: null };
     });
 
-    const request = new NextRequest("http://localhost:3000/some-page", {
+    const request = new NextRequest("http://localhost:3006/some-page", {
       headers: { origin: "https://paisaxe.es" },
     });
     request.cookies.set("sb-abc-auth-token", "old-token");
@@ -884,7 +884,7 @@ describe("Auth session refresh - setAll cookie callback", () => {
       return { data: { user: null }, error: null };
     });
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
     const response = await proxy(request);
@@ -906,7 +906,7 @@ describe("Auth session refresh - setAll cookie callback", () => {
       return { data: { user: null }, error: null };
     });
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value; other-cookie=abc" },
     });
     const response = await proxy(request);
@@ -914,6 +914,33 @@ describe("Auth session refresh - setAll cookie callback", () => {
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
     // Verify capturedCookiesConfig was set (meaning createServerClient was called)
     expect(capturedCookiesConfig).not.toBeNull();
+  });
+
+  it("uses the Supabase SSR 0.12 cookie adapter shape during session refresh", async () => {
+    mockGetUser.mockImplementation(async () => {
+      expect(capturedCookiesConfig?.getAll()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "sb-test-project-auth-token",
+            value: "some-jwt-value",
+          }),
+        ])
+      );
+
+      capturedCookiesConfig?.setAll?.([
+        { name: "sb-test-project-auth-token", value: "refreshed-jwt-value", options: { path: "/" } },
+      ]);
+
+      return { data: { user: { id: "user-1" } }, error: null };
+    });
+
+    const request = new NextRequest("http://localhost:3006/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    expect(response.cookies.get("sb-test-project-auth-token")?.value).toBe("refreshed-jwt-value");
   });
 });
 
@@ -941,16 +968,20 @@ describe("Auth session refresh - error logging", () => {
     // Simulate getUser hanging and the Promise.race timeout firing
     mockGetUser.mockImplementation(() => new Promise(() => {}));
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
     await proxy(request);
 
     // The timeout error message is "Auth refresh timeout" — should be silently caught
-    expect(console.error).not.toHaveBeenCalledWith(
-      "Error refreshing auth session:",
-      expect.anything()
-    );
+    const refreshCalls = vi
+      .mocked(console.error)
+      .mock.calls.filter(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("Error refreshing auth session")
+      );
+    expect(refreshCalls).toHaveLength(0);
   }, 10_000);
 
   it("should log when error is an Error with non-timeout message", async () => {
@@ -958,14 +989,16 @@ describe("Auth session refresh - error logging", () => {
     const realError = new TypeError("fetch failed");
     mockGetUser.mockRejectedValue(realError);
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
     await proxy(request);
 
     expect(console.error).toHaveBeenCalledWith(
-      "Error refreshing auth session:",
-      realError
+      expect.stringContaining("Error refreshing auth session")
+    );
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("fetch failed")
     );
   });
 
@@ -973,16 +1006,20 @@ describe("Auth session refresh - error logging", () => {
     // Simulate a non-Error thrown value (e.g., a string)
     mockGetUser.mockRejectedValue("some string error");
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
     await proxy(request);
 
     // Not an Error instance, so the condition (error instanceof Error) is false
-    expect(console.error).not.toHaveBeenCalledWith(
-      "Error refreshing auth session:",
-      expect.anything()
-    );
+    const refreshCalls = vi
+      .mocked(console.error)
+      .mock.calls.filter(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("Error refreshing auth session")
+      );
+    expect(refreshCalls).toHaveLength(0);
   });
 });
 
@@ -997,7 +1034,7 @@ describe("CSP header", () => {
   });
 
   it("should set a Content-Security-Policy header on every response", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     const csp = response.headers.get("Content-Security-Policy");
@@ -1005,12 +1042,13 @@ describe("CSP header", () => {
   });
 
   it("should include required script-src directives in the CSP", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     const csp = response.headers.get("Content-Security-Policy")!;
     // Must allow Stripe scripts
     expect(csp).toContain("https://js.stripe.com");
+    expect(csp).toContain("https://checkout.stripe.com");
     // Must allow blob: for ElevenLabs AudioWorklet
     expect(csp).toContain("blob:");
     // script-src now uses 'unsafe-inline' instead of nonce+'strict-dynamic'
@@ -1020,7 +1058,7 @@ describe("CSP header", () => {
   });
 
   it("should keep style-src with unsafe-inline for Tailwind/Next.js CSS", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     const csp = response.headers.get("Content-Security-Policy")!;
@@ -1030,8 +1068,8 @@ describe("CSP header", () => {
 
   it("should not set the legacy nonce request header anymore", async () => {
     const legacyNonceHeader = ["x", "csp", "nonce"].join("-");
-    const request1 = new NextRequest("http://localhost:3000/immersive");
-    const request2 = new NextRequest("http://localhost:3000/immersive");
+    const request1 = new NextRequest("http://localhost:3006/immersive");
+    const request2 = new NextRequest("http://localhost:3006/immersive");
 
     await proxy(request1);
     await proxy(request2);
@@ -1041,7 +1079,7 @@ describe("CSP header", () => {
   });
 
   it("should NOT include strict-dynamic in script-src", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     const csp = response.headers.get("Content-Security-Policy")!;
@@ -1050,7 +1088,7 @@ describe("CSP header", () => {
   });
 
   it("should include all required CSP directives", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     const csp = response.headers.get("Content-Security-Policy")!;
@@ -1093,7 +1131,7 @@ describe("CSRF protection", () => {
   });
 
   it("sets a __csrf cookie on responses that don't have one", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     const csrfCookie = response.cookies.get("__csrf");
@@ -1103,7 +1141,7 @@ describe("CSRF protection", () => {
 
   it("preserves existing __csrf cookie instead of generating a new one", async () => {
     const existingToken = "a".repeat(64);
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: {
         cookie: `__csrf=${existingToken}`,
       },
@@ -1120,7 +1158,7 @@ describe("CSRF protection", () => {
   });
 
   it("returns 403 for POST to /api/ without CSRF token", async () => {
-    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+    const request = new NextRequest("http://localhost:3006/api/admin/stories", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1137,7 +1175,7 @@ describe("CSRF protection", () => {
   });
 
   it("returns 403 for PUT to /api/ without CSRF token", async () => {
-    const request = new NextRequest("http://localhost:3000/api/admin/stories/123", {
+    const request = new NextRequest("http://localhost:3006/api/admin/stories/123", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -1150,7 +1188,7 @@ describe("CSRF protection", () => {
   });
 
   it("returns 403 for PATCH to /api/ without CSRF token", async () => {
-    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/test", {
+    const request = new NextRequest("http://localhost:3006/api/admin/feature-flags/test", {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -1163,7 +1201,7 @@ describe("CSRF protection", () => {
   });
 
   it("returns 403 for DELETE to /api/ without CSRF token", async () => {
-    const request = new NextRequest("http://localhost:3000/api/favorites?storyId=123", {
+    const request = new NextRequest("http://localhost:3006/api/favorites?storyId=123", {
       method: "DELETE",
     });
     const response = await proxy(request);
@@ -1173,7 +1211,7 @@ describe("CSRF protection", () => {
 
   it("allows POST when CSRF header matches cookie", async () => {
     const token = "b".repeat(64);
-    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+    const request = new NextRequest("http://localhost:3006/api/chat/stream", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1192,7 +1230,7 @@ describe("CSRF protection", () => {
   });
 
   it("returns 403 when CSRF header does not match cookie", async () => {
-    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+    const request = new NextRequest("http://localhost:3006/api/chat/stream", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1207,7 +1245,7 @@ describe("CSRF protection", () => {
   });
 
   it("does not enforce CSRF on GET requests to /api/", async () => {
-    const request = new NextRequest("http://localhost:3000/api/admin/stories");
+    const request = new NextRequest("http://localhost:3006/api/admin/stories");
     const response = await proxy(request);
 
     expect(response.status).not.toBe(403);
@@ -1215,7 +1253,7 @@ describe("CSRF protection", () => {
   });
 
   it("exempts webhook routes from CSRF", async () => {
-    const request = new NextRequest("http://localhost:3000/api/webhooks/stripe", {
+    const request = new NextRequest("http://localhost:3006/api/webhooks/stripe", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1230,7 +1268,7 @@ describe("CSRF protection", () => {
   });
 
   it("exempts /api/cron/ routes from CSRF", async () => {
-    const request = new NextRequest("http://localhost:3000/api/cron/daily-post", {
+    const request = new NextRequest("http://localhost:3006/api/cron/daily-post", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1244,7 +1282,7 @@ describe("CSRF protection", () => {
   });
 
   it("exempts /api/mcp/ routes from CSRF", async () => {
-    const request = new NextRequest("http://localhost:3000/api/mcp/tools", {
+    const request = new NextRequest("http://localhost:3006/api/mcp/tools", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1258,7 +1296,7 @@ describe("CSRF protection", () => {
   });
 
   it("does not enforce CSRF on non-API routes (e.g., pages)", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       method: "POST",
     });
     const response = await proxy(request);
@@ -1267,7 +1305,7 @@ describe("CSRF protection", () => {
   });
 
   it("sets SameSite=Strict on the CSRF cookie", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     const csrfCookie = response.cookies.get("__csrf");
@@ -1286,19 +1324,19 @@ describe("hasSupabaseAuthCookies", () => {
   });
 
   it("returns false when no cookies present", () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     expect(hasSupabaseAuthCookies(request)).toBe(false);
   });
 
   it("returns true when base auth token cookie present", () => {
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=jwt-value" },
     });
     expect(hasSupabaseAuthCookies(request)).toBe(true);
   });
 
   it("returns true when chunked auth token cookies present", () => {
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token.0=chunk0" },
     });
     expect(hasSupabaseAuthCookies(request)).toBe(true);
@@ -1306,14 +1344,14 @@ describe("hasSupabaseAuthCookies", () => {
 
   it("returns false when Supabase URL not configured", () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=jwt-value" },
     });
     expect(hasSupabaseAuthCookies(request)).toBe(false);
   });
 
   it("returns false for unrelated cookies", () => {
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "__csrf=abc123; theme=dark" },
     });
     expect(hasSupabaseAuthCookies(request)).toBe(false);
@@ -1323,7 +1361,7 @@ describe("hasSupabaseAuthCookies", () => {
     const original = process.env.NEXT_PUBLIC_SUPABASE_URL;
     process.env.NEXT_PUBLIC_SUPABASE_URL = "not-a-valid-url";
 
-    const request = new NextRequest("http://localhost:3000/test");
+    const request = new NextRequest("http://localhost:3006/test");
     expect(hasSupabaseAuthCookies(request)).toBe(false);
 
     process.env.NEXT_PUBLIC_SUPABASE_URL = original;
@@ -1351,7 +1389,7 @@ describe("Auth session refresh - anonymous visitor skip", () => {
 
   it("should skip auth refresh when no Supabase auth cookies exist (anonymous visitor)", async () => {
     // No cookies on request — anonymous visitor
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3006/immersive");
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -1360,7 +1398,7 @@ describe("Auth session refresh - anonymous visitor skip", () => {
   });
 
   it("should run auth refresh when base auth cookie exists", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: {
         cookie: "sb-test-project-auth-token=some-jwt-value",
       },
@@ -1372,7 +1410,7 @@ describe("Auth session refresh - anonymous visitor skip", () => {
   });
 
   it("should run auth refresh when chunked auth cookies exist", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: {
         cookie: "sb-test-project-auth-token.0=chunk0; sb-test-project-auth-token.1=chunk1",
       },
@@ -1419,7 +1457,7 @@ describe("Auth session refresh - skip getUser for fresh tokens (PE-H4)", () => {
   it("skips getUser() when access token has more than 5 minutes remaining", async () => {
     const freshToken = makeAccessToken(600); // 10 minutes remaining
     const cookieValue = makeSessionCookieValue(freshToken);
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: {
         cookie: `sb-test-project-auth-token=${cookieValue}`,
       },
@@ -1435,7 +1473,7 @@ describe("Auth session refresh - skip getUser for fresh tokens (PE-H4)", () => {
   it("calls getUser() when access token expires within 5 minutes", async () => {
     const nearExpiryToken = makeAccessToken(60); // 1 minute remaining
     const cookieValue = makeSessionCookieValue(nearExpiryToken);
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: {
         cookie: `sb-test-project-auth-token=${cookieValue}`,
       },
@@ -1451,7 +1489,7 @@ describe("Auth session refresh - skip getUser for fresh tokens (PE-H4)", () => {
   it("calls getUser() when access token is already expired", async () => {
     const expiredToken = makeAccessToken(-60); // expired 1 minute ago
     const cookieValue = makeSessionCookieValue(expiredToken);
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: {
         cookie: `sb-test-project-auth-token=${cookieValue}`,
       },
@@ -1465,7 +1503,7 @@ describe("Auth session refresh - skip getUser for fresh tokens (PE-H4)", () => {
 
   it("calls getUser() when session cookie cannot be parsed (fail-safe)", async () => {
     // Malformed cookie — can't determine expiry, must err on the side of refreshing
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: {
         cookie: "sb-test-project-auth-token=not-valid-json",
       },
@@ -1521,7 +1559,7 @@ describe("CSRF - Origin not allowed (csrf-proxy.ts SE-L2)", () => {
   it("returns 403 with 'Origin not allowed' when POST has a disallowed Origin header", async () => {
     // A POST to /api/ with an Origin that is NOT in ALLOWED_ORIGINS
     // ALLOWED_ORIGINS in test env: paisaxe.es, paisaxe.com, www.*, localhost:3000
-    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+    const request = new NextRequest("http://localhost:3006/api/admin/stories", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1568,7 +1606,7 @@ describe("emitAuthRefreshTimeoutEvent (auth-refresh.ts:55)", () => {
     // mockFetch handles both the maintenance-mode DB fetch (none needed here) and PostHog capture
     mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
 
-    const request = new NextRequest("http://localhost:3000/immersive", {
+    const request = new NextRequest("http://localhost:3006/immersive", {
       headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
     });
 
@@ -1589,8 +1627,111 @@ describe("emitAuthRefreshTimeoutEvent (auth-refresh.ts:55)", () => {
   }, 10_000);
 });
 
+describe("PE-M2: API fast-path — CSP header decoration skip", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("does NOT set Content-Security-Policy on GET /api/feature-flags responses", async () => {
+    const request = new NextRequest("http://localhost:3006/api/feature-flags");
+    const response = await proxy(request);
+
+    // API responses have no use for CSP — it's a browser page protection header
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+
+  it("does NOT set Content-Security-Policy on GET /api/chat/stream responses", async () => {
+    const request = new NextRequest("http://localhost:3006/api/chat/stream");
+    const response = await proxy(request);
+
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+
+  it("does NOT set Content-Security-Policy on GET /api/health responses", async () => {
+    const request = new NextRequest("http://localhost:3006/api/health");
+    const response = await proxy(request);
+
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+
+  it("still sets Content-Security-Policy on page (non-API) responses", async () => {
+    const request = new NextRequest("http://localhost:3006/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("Content-Security-Policy")).toBeTruthy();
+  });
+
+  it("does NOT set __csrf cookie on API responses (fast-path confirms no cookie decoration)", async () => {
+    const request = new NextRequest("http://localhost:3006/api/feature-flags");
+    const response = await proxy(request);
+
+    // setCsrfCookie already guards against API paths but confirm it via proxy
+    expect(response.cookies.get("__csrf")).toBeUndefined();
+  });
+
+  it("still enforces CSRF validation on mutating POST /api/ requests (fast-path does NOT skip validation)", async () => {
+    // A POST to a non-exempt API route WITHOUT a CSRF token must still return 403
+    const request = new NextRequest("http://localhost:3006/api/admin/stories", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        origin: "https://paisaxe.es",
+      },
+      body: JSON.stringify({ title: "test" }),
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toContain("CSRF");
+  });
+
+  it("still enforces CSRF validation on mutating DELETE /api/ requests (fast-path does NOT skip validation)", async () => {
+    const request = new NextRequest("http://localhost:3006/api/favorites?storyId=xyz", {
+      method: "DELETE",
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+  });
+
+  it("still runs auth session refresh for API routes with auth cookies", async () => {
+    // Auth refresh is NOT skipped on API paths — only CSP/CSRF-cookie decoration is
+    const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = FAKE_JWT_KEY;
+
+    const request = new NextRequest("http://localhost:3006/api/feature-flags", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
+    const response = await proxy(request);
+
+    // Response still passes through (not 403)
+    expect(response.status).not.toBe(403);
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  });
+
+  it("still adds CORS headers on API responses when origin matches", async () => {
+    const request = new NextRequest("http://localhost:3006/api/chat/stream", {
+      headers: { origin: "https://paisaxe.es" },
+    });
+    const response = await proxy(request);
+
+    // CORS decoration is NOT skipped — only CSP + CSRF cookie set
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.es");
+  });
+});
+
 describe("development mode ALLOWED_ORIGINS initialization (proxy.ts:29)", () => {
-  // Line 29: `ALLOWED_ORIGINS.push("http://localhost:3000")` runs at module load time
+  // Line 29: `ALLOWED_ORIGINS.push("http://localhost:3006")` runs at module load time
   // when NODE_ENV === "development". We must vi.resetModules() + dynamic import so the
   // initialization code re-runs with the correct env var.
   it("adds localhost to ALLOWED_ORIGINS when NODE_ENV is development at import time", async () => {
@@ -1603,10 +1744,10 @@ describe("development mode ALLOWED_ORIGINS initialization (proxy.ts:29)", () => 
     process.env.MAINTENANCE_MODE = "false";
     mockFetch.mockReset();
 
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new NextRequest("http://localhost:3006/api/chat", {
       method: "OPTIONS",
       headers: {
-        origin: "http://localhost:3000",
+        origin: "http://localhost:3006",
         "access-control-request-method": "POST",
       },
     });
@@ -1615,7 +1756,7 @@ describe("development mode ALLOWED_ORIGINS initialization (proxy.ts:29)", () => 
 
     // In development mode, localhost is in ALLOWED_ORIGINS → CORS header is set
     expect(response.status).toBe(204);
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3006");
 
     delete process.env.MAINTENANCE_MODE;
     vi.unstubAllEnvs();

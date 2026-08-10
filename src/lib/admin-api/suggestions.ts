@@ -1,6 +1,7 @@
 import type { AdminApiResponse } from "@/types/admin";
 import type { AdminStorySuggestion, SuggestionStatus, StorySuggestion } from "@/types/suggestions";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const API_BASE = "/api/admin";
 
@@ -25,7 +26,7 @@ export async function fetchSuggestions(
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching suggestions:", error);
+    clientLogger.error("Error fetching suggestions", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -51,7 +52,7 @@ export async function updateSuggestion(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating suggestion:", error);
+    clientLogger.error("Error updating suggestion", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -75,7 +76,7 @@ export async function deleteSuggestion(
 
     return await response.json();
   } catch (error) {
-    console.error("Error deleting suggestion:", error);
+    clientLogger.error("Error deleting suggestion", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }

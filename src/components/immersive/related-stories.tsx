@@ -72,7 +72,7 @@ export const RelatedStories = memo(function RelatedStories({
             <div className="absolute inset-0">
               <Image
                 src={story.image}
-                alt=""
+                alt={story.title}
                 fill
                 className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
                 sizes="(max-width: 768px) 50vw, 33vw"

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { logger } from "@/lib/logger";
 import type { FeatureFlagRow } from "@/types/feature-flags";
 import { rowToFeatureFlag } from "@/types/feature-flags";

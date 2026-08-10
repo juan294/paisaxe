@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { createHmac } from "crypto";
 
 // Mock modules before importing route
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -21,7 +21,7 @@ vi.mock("@/lib/twilio-sms", () => ({
 
 import { POST } from "./route";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { sendSMS } from "@/lib/twilio-sms";
 
@@ -401,6 +401,26 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
+    expect(data.ignored).toBe(true);
+  });
+
+  it("logs [ELEVENLABS_WEBHOOK_FETCH_BOOKING_FAILED] and ignores when pending_bookings fetch errors", async () => {
+    // Covers elevenlabs/route.ts:409 — fetchError branch when maybeSingle returns an error
+    // The webhook returns 200+ignored so ElevenLabs doesn't retry indefinitely
+    mockSelect.mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: null,
+          error: { message: "DB connection lost" },
+        }),
+      }),
+    });
+
+    const request = createSignedRequest({ conversation_id: "conv_error" });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
     expect(data.ignored).toBe(true);
   });
 
@@ -874,6 +894,31 @@ describe("POST /api/webhooks/elevenlabs", () => {
     });
   });
 
+  it("returns 500 and logs [ELEVENLABS_WEBHOOK_SMS_ENQUEUE_FAILED] when enqueue_booking_sms_job errors", async () => {
+    // Covers elevenlabs/route.ts:501-506 — SMS enqueue failure path
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "process_elevenlabs_event_idempotent") {
+        return Promise.resolve({ data: "processed", error: null });
+      }
+      if (fn === "enqueue_booking_sms_job") {
+        return Promise.resolve({ data: null, error: { message: "SMS outbox insert failed" } });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: buildTranscript({ role: "user", message: "Confirmado." }),
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Database error");
+  });
+
   it("should return 401 when ELEVENLABS_WEBHOOK_SECRET is not configured", async () => {
     delete process.env.ELEVENLABS_WEBHOOK_SECRET;
 
@@ -965,6 +1010,79 @@ describe("POST /api/webhooks/elevenlabs", () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         "[WEBHOOK_UNKNOWN_SHAPE]",
         expect.objectContaining({ webhook: "elevenlabs" })
+      );
+
+      loggerSpy.mockRestore();
+    });
+
+    it("should include the dotted field path when a known field has the wrong type (line 115 path.length > 0 branch)", async () => {
+      // A wrong-typed known field (conversation_id as number) produces an
+      // "invalid_type" issue with no `keys` array, so unknownFields falls
+      // through to `i.path.length > 0 ? [i.path.join(".")] : []` — exercising
+      // the `> 0` (true) side of the ternary at route.ts:115.
+      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      const payload = JSON.stringify({ conversation_id: 12345 });
+      const sigHeader = createSignatureHeader(payload);
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "elevenlabs-signature": sigHeader,
+          },
+          body: payload,
+        }
+      );
+
+      const response = await POST(request);
+      // The zod schema only warns on unknown shape — it does not block the
+      // request. Since `body.conversation_id` (12345) is still truthy at
+      // runtime, the handler proceeds through the normal (mocked) booking
+      // lookup and succeeds after logging the shape warning.
+      expect(response.status).toBe(200);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "[WEBHOOK_UNKNOWN_SHAPE]",
+        expect.objectContaining({
+          webhook: "elevenlabs",
+          fields: ["conversation_id"],
+        })
+      );
+
+      loggerSpy.mockRestore();
+    });
+
+    it("should emit an empty fields list when the root payload is not an object (line 115 path.length === 0 branch)", async () => {
+      // A root-level JSON primitive (e.g. a bare string) parses fine via
+      // JSON.parse but fails the object schema with a root issue whose
+      // `path` is `[]` — exercising the `=== 0` (false) side of the
+      // ternary at route.ts:115, falling through to the empty-array branch.
+      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      const payload = JSON.stringify("just a string, not an object");
+      const sigHeader = createSignatureHeader(payload);
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "elevenlabs-signature": sigHeader,
+          },
+          body: payload,
+        }
+      );
+
+      const response = await POST(request);
+      // No conversation_id can be derived from a string body, so it's
+      // reported missing after the shape warning is logged.
+      expect(response.status).toBe(400);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "[WEBHOOK_UNKNOWN_SHAPE]",
+        expect.objectContaining({ webhook: "elevenlabs", fields: [] })
       );
 
       loggerSpy.mockRestore();
@@ -1215,6 +1333,277 @@ describe("POST /api/webhooks/elevenlabs", () => {
         }
       );
       expect(outcomeMessageUpdates).toHaveLength(0);
+    });
+  });
+
+  // === SMS DB error paths (lines 518-523, 565, 601) ===
+
+  describe("SMS DB error paths", () => {
+    const successTranscript = {
+      conversation_id: "conv_456",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
+    };
+
+    it("returns 500 when claim_booking_sms_job RPC errors (lines 518-523)", async () => {
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({ data: null, error: { message: "lock table missing" } });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Database error");
+    });
+
+    it("logs error and returns 200 when fail_booking_sms_job RPC errors after failed SMS (line 565)", async () => {
+      vi.mocked(sendSMS).mockResolvedValue({ success: false, error: "Twilio down" });
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({
+            data: {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+            },
+            error: null,
+          });
+        }
+        if (fn === "fail_booking_sms_job") {
+          return Promise.resolve({ data: null, error: { message: "fail mark failed" } });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Booking state was committed — must return 200 even when fail_booking_sms_job errors
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(false);
+    });
+
+    it("returns 200 ignored when process_elevenlabs_event_idempotent reports booking_missing (lines 467-471)", async () => {
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "booking_missing", error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.ignored).toBe(true);
+      expect(data.reason).toBe("Booking missing during processing");
+    });
+
+    it("logs error and returns 200 when complete_booking_sms_job RPC errors after successful SMS (line 601)", async () => {
+      vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM_ok" });
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({
+            data: {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+            },
+            error: null,
+          });
+        }
+        if (fn === "complete_booking_sms_job") {
+          return Promise.resolve({ data: null, error: { message: "complete write failed" } });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Booking state was committed — must return 200 even when complete_booking_sms_job errors
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(true);
+    });
+
+    // BE-M2: complete_booking_sms_job must be retried up to 2 times on error
+    // to avoid the job staying 'processing' and re-claimable → duplicate SMS.
+    it("BE-M2: complete_booking_sms_job succeeds on second attempt after initial failure", async () => {
+      vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM_retry" });
+      let completeCalls = 0;
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({
+            data: {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+            },
+            error: null,
+          });
+        }
+        if (fn === "complete_booking_sms_job") {
+          completeCalls += 1;
+          // First call fails, second succeeds
+          if (completeCalls === 1) {
+            return Promise.resolve({ data: null, error: { message: "transient write error" } });
+          }
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(true);
+      // Must have been called at least twice (retry happened)
+      expect(completeCalls).toBeGreaterThanOrEqual(2);
+    });
+
+    it("BE-M2: complete_booking_sms_job logs [ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED] after all retries exhausted", async () => {
+      vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM_retry" });
+      // Spy on logger.error to capture the final failure log
+      const { logger } = await import("@/lib/logger");
+      const logSpy = vi.spyOn(logger, "error");
+
+      let completeCalls = 0;
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({
+            data: {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+            },
+            error: null,
+          });
+        }
+        if (fn === "complete_booking_sms_job") {
+          completeCalls += 1;
+          return Promise.resolve({ data: null, error: { message: "persistent DB error" } });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Still returns 200 (booking state was committed; this is an ops alert)
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(true);
+      // complete_booking_sms_job must have been retried (2 attempts)
+      expect(completeCalls).toBe(2);
+      // Must have logged the failure prominently after all retries
+      expect(logSpy).toHaveBeenCalledWith(
+        "[ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED]",
+        expect.objectContaining({ booking_id: "booking-123" })
+      );
+
+      logSpy.mockRestore();
+    });
+
+    it("falls back to a generic message when sendSMS throws a non-Error value (line 280 else branch)", async () => {
+      // sendError instanceof Error ? sendError.message : "SMS send threw unexpectedly"
+      // Throwing a plain string (not an Error instance) exercises the ":" side.
+      vi.mocked(sendSMS).mockRejectedValue("raw string rejection, not an Error");
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Booking state was still committed — return 200, not 500.
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(false);
+      expect(data.smsError).toBe("SMS send threw unexpectedly");
+      expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
+        p_event_key: "post_call_transcription:conv_456",
+        p_error: "SMS send threw unexpectedly",
+      });
+    });
+
+    it("falls back to a default error message when a failed SMS result has no error string (line 301 ?? branch)", async () => {
+      // p_error: smsResult.error ?? "SMS delivery failed"
+      // success: false with `error` omitted exercises the ?? fallback.
+      vi.mocked(sendSMS).mockResolvedValue({ success: false });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(false);
+      expect(data.smsError).toBeUndefined();
+      expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
+        p_event_key: "post_call_transcription:conv_456",
+        p_error: "SMS delivery failed",
+      });
+    });
+
+    it("passes null as the provider sid when a successful SMS result has no sid (line 342 ?? branch)", async () => {
+      // p_provider_sid: smsResult.sid ?? null
+      // success: true with `sid` omitted exercises the ?? fallback to null.
+      vi.mocked(sendSMS).mockResolvedValue({ success: true });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(true);
+      expect(mockRpc).toHaveBeenCalledWith("complete_booking_sms_job", {
+        p_event_key: "post_call_transcription:conv_456",
+        p_provider_sid: null,
+        p_outcome_message: "Confirmation SMS",
+      });
     });
   });
 });

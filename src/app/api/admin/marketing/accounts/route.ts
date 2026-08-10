@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdmin } from "@/lib/admin-auth";
 import { encryptJson, isEncryptionConfigured } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
 import {
@@ -16,41 +15,36 @@ const VALID_PLATFORMS: MarketingPlatform[] = ["x", "instagram", "pinterest"];
  * GET /api/admin/marketing/accounts
  * Returns all marketing accounts (without credentials)
  */
-export async function GET() {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+export async function GET(request: NextRequest) {
+  return withAdmin(async (supabase) => {
+    try {
+      const { data, error } = await supabase
+        .from("marketing_accounts")
+        .select("*")
+        .order("platform");
 
-  try {
-    const supabase = createAdminClient();
+      if (error) {
+        logger.error("[MARKETING_ACCOUNTS_FETCH_FAILED]", { error });
+        return NextResponse.json(
+          { error: "Failed to fetch accounts" },
+          { status: 500 }
+        );
+      }
 
-    const { data, error } = await supabase
-      .from("marketing_accounts")
-      .select("*")
-      .order("platform");
+      // Convert to public format (no credentials)
+      const accounts = (data as MarketingAccountRow[]).map(
+        rowToMarketingAccountPublic
+      );
 
-    if (error) {
-      logger.error("[MARKETING_ACCOUNTS_FETCH_FAILED]", { error });
+      return NextResponse.json({ data: accounts });
+    } catch (error) {
+      logger.error("[MARKETING_ACCOUNTS_GET_UNHANDLED_ERROR]", { error });
       return NextResponse.json(
-        { error: "Failed to fetch accounts" },
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
-
-    // Convert to public format (no credentials)
-    const accounts = (data as MarketingAccountRow[]).map(
-      rowToMarketingAccountPublic
-    );
-
-    return NextResponse.json({ data: accounts });
-  } catch (error) {
-    logger.error("[MARKETING_ACCOUNTS_GET_UNHANDLED_ERROR]", { error });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }
 
 /**
@@ -58,92 +52,87 @@ export async function GET() {
  * Create or update a marketing account with credentials
  */
 export async function POST(request: NextRequest) {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+  return withAdmin(async (supabase) => {
+    try {
+      const body: UpdateAccountCredentialsRequest = await request.json();
 
-  try {
-    const body: UpdateAccountCredentialsRequest = await request.json();
+      // Validate required fields
+      if (!body.platform || !body.accountName || !body.credentials) {
+        return NextResponse.json(
+          { error: "Missing required fields: platform, accountName, credentials" },
+          { status: 400 }
+        );
+      }
 
-    // Validate required fields
-    if (!body.platform || !body.accountName || !body.credentials) {
-      return NextResponse.json(
-        { error: "Missing required fields: platform, accountName, credentials" },
-        { status: 400 }
-      );
-    }
+      // Validate platform
+      if (!VALID_PLATFORMS.includes(body.platform)) {
+        return NextResponse.json(
+          { error: `Invalid platform. Must be one of: ${VALID_PLATFORMS.join(", ")}` },
+          { status: 400 }
+        );
+      }
 
-    // Validate platform
-    if (!VALID_PLATFORMS.includes(body.platform)) {
-      return NextResponse.json(
-        { error: `Invalid platform. Must be one of: ${VALID_PLATFORMS.join(", ")}` },
-        { status: 400 }
-      );
-    }
+      // Validate credentials have at least accessToken
+      if (!body.credentials.accessToken) {
+        return NextResponse.json(
+          { error: "Credentials must include accessToken" },
+          { status: 400 }
+        );
+      }
 
-    // Validate credentials have at least accessToken
-    if (!body.credentials.accessToken) {
-      return NextResponse.json(
-        { error: "Credentials must include accessToken" },
-        { status: 400 }
-      );
-    }
+      // Verify encryption is configured
+      if (!isEncryptionConfigured()) {
+        logger.error("[MARKETING_ACCOUNTS_ENCRYPTION_KEY_MISSING]");
+        return NextResponse.json(
+          { error: "Server encryption not configured. Contact administrator." },
+          { status: 500 }
+        );
+      }
 
-    // Verify encryption is configured
-    if (!isEncryptionConfigured()) {
-      logger.error("[MARKETING_ACCOUNTS_ENCRYPTION_KEY_MISSING]");
-      return NextResponse.json(
-        { error: "Server encryption not configured. Contact administrator." },
-        { status: 500 }
-      );
-    }
+      // Encrypt credentials before storing
+      const encryptedCredentials = encryptJson(body.credentials);
 
-    // Encrypt credentials before storing
-    const encryptedCredentials = encryptJson(body.credentials);
+      // Upsert account (unique constraint on platform)
+      // Store encrypted credentials as a JSON object with the encrypted string
+      const { data, error } = await supabase
+        .from("marketing_accounts")
+        .upsert(
+          {
+            platform: body.platform,
+            account_name: body.accountName,
+            account_handle: body.accountHandle || null,
+            credentials: { encrypted: encryptedCredentials },
+            is_active: true,
+            last_sync_at: new Date().toISOString(),
+          },
+          { onConflict: "platform" }
+        )
+        .select()
+        .single();
 
-    const supabase = createAdminClient();
-
-    // Upsert account (unique constraint on platform)
-    // Store encrypted credentials as a JSON object with the encrypted string
-    const { data, error } = await supabase
-      .from("marketing_accounts")
-      .upsert(
-        {
+      if (error) {
+        logger.error("[MARKETING_ACCOUNTS_SAVE_FAILED]", {
           platform: body.platform,
-          account_name: body.accountName,
-          account_handle: body.accountHandle || null,
-          credentials: { encrypted: encryptedCredentials },
-          is_active: true,
-          last_sync_at: new Date().toISOString(),
-        },
-        { onConflict: "platform" }
-      )
-      .select()
-      .single();
+          error,
+        });
+        return NextResponse.json(
+          { error: "Failed to save account" },
+          { status: 500 }
+        );
+      }
 
-    if (error) {
-      logger.error("[MARKETING_ACCOUNTS_SAVE_FAILED]", {
-        platform: body.platform,
-        error,
-      });
+      // Return public version (no credentials in response)
+      const account = rowToMarketingAccountPublic(data as MarketingAccountRow);
+
+      return NextResponse.json({ data: account }, { status: 201 });
+    } catch (error) {
+      logger.error("[MARKETING_ACCOUNTS_POST_UNHANDLED_ERROR]", { error });
       return NextResponse.json(
-        { error: "Failed to save account" },
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
-
-    // Return public version (no credentials in response)
-    const account = rowToMarketingAccountPublic(data as MarketingAccountRow);
-
-    return NextResponse.json({ data: account }, { status: 201 });
-  } catch (error) {
-    logger.error("[MARKETING_ACCOUNTS_POST_UNHANDLED_ERROR]", { error });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }
 
 /**
@@ -151,56 +140,51 @@ export async function POST(request: NextRequest) {
  * Toggle account active state without clearing credentials
  */
 export async function PATCH(request: NextRequest) {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+  return withAdmin(async (supabase) => {
+    try {
+      const { searchParams } = new URL(request.url);
+      const platform = searchParams.get("platform") as MarketingPlatform | null;
+      const action = searchParams.get("action") as "pause" | "resume" | null;
 
-  try {
-    const { searchParams } = new URL(request.url);
-    const platform = searchParams.get("platform") as MarketingPlatform | null;
-    const action = searchParams.get("action") as "pause" | "resume" | null;
+      if (!platform || !VALID_PLATFORMS.includes(platform)) {
+        return NextResponse.json(
+          { error: "Valid platform query parameter required" },
+          { status: 400 }
+        );
+      }
 
-    if (!platform || !VALID_PLATFORMS.includes(platform)) {
+      if (!action || !["pause", "resume"].includes(action)) {
+        return NextResponse.json(
+          { error: "Valid action query parameter required (pause or resume)" },
+          { status: 400 }
+        );
+      }
+
+      const { data, error } = await supabase
+        .from("marketing_accounts")
+        .update({ is_active: action === "resume" })
+        .eq("platform", platform)
+        .select()
+        .single();
+
+      if (error) {
+        logger.error("[MARKETING_ACCOUNTS_TOGGLE_FAILED]", { platform, error });
+        return NextResponse.json(
+          { error: "Failed to update account" },
+          { status: 500 }
+        );
+      }
+
+      const account = rowToMarketingAccountPublic(data as MarketingAccountRow);
+      return NextResponse.json({ data: account });
+    } catch (error) {
+      logger.error("[MARKETING_ACCOUNTS_PATCH_UNHANDLED_ERROR]", { error });
       return NextResponse.json(
-        { error: "Valid platform query parameter required" },
-        { status: 400 }
-      );
-    }
-
-    if (!action || !["pause", "resume"].includes(action)) {
-      return NextResponse.json(
-        { error: "Valid action query parameter required (pause or resume)" },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createAdminClient();
-
-    const { data, error } = await supabase
-      .from("marketing_accounts")
-      .update({ is_active: action === "resume" })
-      .eq("platform", platform)
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("[MARKETING_ACCOUNTS_TOGGLE_FAILED]", { platform, error });
-      return NextResponse.json(
-        { error: "Failed to update account" },
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
-
-    const account = rowToMarketingAccountPublic(data as MarketingAccountRow);
-    return NextResponse.json({ data: account });
-  } catch (error) {
-    logger.error("[MARKETING_ACCOUNTS_PATCH_UNHANDLED_ERROR]", { error });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }
 
 /**
@@ -208,47 +192,42 @@ export async function PATCH(request: NextRequest) {
  * Permanently disconnect account and clear credentials
  */
 export async function DELETE(request: NextRequest) {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+  return withAdmin(async (supabase) => {
+    try {
+      const { searchParams } = new URL(request.url);
+      const platform = searchParams.get("platform") as MarketingPlatform | null;
 
-  try {
-    const { searchParams } = new URL(request.url);
-    const platform = searchParams.get("platform") as MarketingPlatform | null;
+      if (!platform || !VALID_PLATFORMS.includes(platform)) {
+        return NextResponse.json(
+          { error: "Valid platform query parameter required" },
+          { status: 400 }
+        );
+      }
 
-    if (!platform || !VALID_PLATFORMS.includes(platform)) {
+      // Full disconnect - deactivate AND clear credentials
+      const { error } = await supabase
+        .from("marketing_accounts")
+        .update({
+          is_active: false,
+          credentials: null,
+        })
+        .eq("platform", platform);
+
+      if (error) {
+        logger.error("[MARKETING_ACCOUNTS_DISCONNECT_FAILED]", { platform, error });
+        return NextResponse.json(
+          { error: "Failed to disconnect account" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      logger.error("[MARKETING_ACCOUNTS_DELETE_UNHANDLED_ERROR]", { error });
       return NextResponse.json(
-        { error: "Valid platform query parameter required" },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createAdminClient();
-
-    // Full disconnect - deactivate AND clear credentials
-    const { error } = await supabase
-      .from("marketing_accounts")
-      .update({
-        is_active: false,
-        credentials: null,
-      })
-      .eq("platform", platform);
-
-    if (error) {
-      logger.error("[MARKETING_ACCOUNTS_DISCONNECT_FAILED]", { platform, error });
-      return NextResponse.json(
-        { error: "Failed to disconnect account" },
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    logger.error("[MARKETING_ACCOUNTS_DELETE_UNHANDLED_ERROR]", { error });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }

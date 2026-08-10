@@ -31,6 +31,9 @@ Request
 5. CSRF protection
    src/lib/proxy/csrf-proxy.ts — double-submit cookie validation for
    state-mutating requests (POST/PUT/PATCH/DELETE to /api/*)
+   │   Note (PE-M2): for /api/* responses the proxy skips CSP-header and
+   │   CSRF-cookie *decoration* (a hot-path fast-path); CSRF *validation*
+   │   above still runs on every mutating request.
    │
   ▼
 6. Auth session refresh

@@ -85,6 +85,14 @@ describe("admin-api/stories", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await createStory({ title: "T" } as never);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── updateStory ─────────────────────────────────────────────────
@@ -128,6 +136,14 @@ describe("admin-api/stories", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await updateStory("s1", {} as never);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── fetchStories ────────────────────────────────────────────────
@@ -166,6 +182,38 @@ describe("admin-api/stories", () => {
       expect(parsedUrl.searchParams.has("filter")).toBe(false);
     });
 
+    it("appends page query param when provided (line 101)", async () => {
+      global.fetch = vi.fn().mockResolvedValue(mockResponse({ data: [] }));
+
+      await fetchStories({ page: 2 });
+
+      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const parsedUrl = new URL(String(url));
+      expect(parsedUrl.searchParams.get("page")).toBe("2");
+    });
+
+    it("appends pageSize query param when provided (line 104)", async () => {
+      global.fetch = vi.fn().mockResolvedValue(mockResponse({ data: [] }));
+
+      await fetchStories({ pageSize: 50 });
+
+      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const parsedUrl = new URL(String(url));
+      expect(parsedUrl.searchParams.get("pageSize")).toBe("50");
+    });
+
+    it("appends all params together when filter, page, and pageSize provided", async () => {
+      global.fetch = vi.fn().mockResolvedValue(mockResponse({ data: [] }));
+
+      await fetchStories({ filter: "approved", page: 1, pageSize: 25 });
+
+      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const parsedUrl = new URL(String(url));
+      expect(parsedUrl.searchParams.get("filter")).toBe("approved");
+      expect(parsedUrl.searchParams.get("page")).toBe("1");
+      expect(parsedUrl.searchParams.get("pageSize")).toBe("25");
+    });
+
     it("returns error from response body on non-ok response", async () => {
       global.fetch = vi.fn().mockResolvedValue(
         mockResponse({ error: "Unauthorized" }, false)
@@ -186,6 +234,14 @@ describe("admin-api/stories", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
+
+      const result = await fetchStories();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await fetchStories();
 
@@ -244,6 +300,14 @@ describe("admin-api/stories", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
+
+      const result = await updateStoryImageUrl(storyId, imageUrl);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateStoryImageUrl(storyId, imageUrl);
 
@@ -325,6 +389,15 @@ describe("admin-api/stories", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      const file = new File(["pixels"], "photo.png", { type: "image/png" });
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await uploadStoryImage(storyId, file);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── updateStoryImageSource ──────────────────────────────────────
@@ -353,6 +426,14 @@ describe("admin-api/stories", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
+
+      const result = await updateStoryImageSource("s1", "src");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateStoryImageSource("s1", "src");
 
@@ -391,6 +472,14 @@ describe("admin-api/stories", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await updateStoryStatus("s1", "approved");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── bulkUpdateStoryStatus ───────────────────────────────────────
@@ -424,6 +513,14 @@ describe("admin-api/stories", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await bulkUpdateStoryStatus(["a"], "approved");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── bulkDeleteStories ───────────────────────────────────────────
@@ -452,6 +549,14 @@ describe("admin-api/stories", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
+
+      const result = await bulkDeleteStories(["a"]);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await bulkDeleteStories(["a"]);
 
@@ -513,6 +618,14 @@ describe("admin-api/stories", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await approveAllPendingStories();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── searchContentImages ─────────────────────────────────────────
@@ -553,6 +666,14 @@ describe("admin-api/stories", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await searchContentImages("s1");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── fetchStoryTranslations ──────────────────────────────────────
@@ -577,6 +698,14 @@ describe("admin-api/stories", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
+
+      const result = await fetchStoryTranslations("s1");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await fetchStoryTranslations("s1");
 
@@ -610,6 +739,14 @@ describe("admin-api/stories", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
+
+      const result = await updateStoryTranslation("s1", "es" as never, {} as never);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateStoryTranslation("s1", "es" as never, {} as never);
 
@@ -655,6 +792,34 @@ describe("admin-api/stories", () => {
 
       const result = await generateStoryTranslations("s1");
 
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("logs String(error) when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("non-error string");
+
+      const result = await generateStoryTranslations("s1");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  describe("non-Error throw coverage for instanceof ternary", () => {
+    it("searchContentImages logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(42);
+      const result = await searchContentImages("s1");
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("fetchStoryTranslations logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue({ code: "ETIMEDOUT" });
+      const result = await fetchStoryTranslations("s1");
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("updateStoryTranslation logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(null);
+      const result = await updateStoryTranslation("s1", "es" as never, {} as never);
       expect(result).toEqual({ error: "Network error" });
     });
   });

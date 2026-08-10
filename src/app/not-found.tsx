@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
+import { Logo } from "@/components/ui/logo";
 
 export default function NotFound() {
   const { t } = useTranslation();
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-950 px-4 text-center">
+      <div className="mb-6 h-16 w-16 text-primary">
+        <Logo />
+      </div>
       <h1 className="text-6xl font-bold text-white">404</h1>
       <h2 className="mt-4 text-2xl font-semibold text-white">
         {t("errors.not_found_title")}
@@ -17,7 +21,7 @@ export default function NotFound() {
       </p>
       <Link
         href="/"
-        className="mt-8 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors"
+        className="mt-8 bg-primary hover:bg-primary/90 rounded-full px-6 py-3 text-white font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
       >
         {t("errors.go_home")}
       </Link>

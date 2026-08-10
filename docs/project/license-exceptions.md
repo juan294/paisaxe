@@ -41,18 +41,29 @@ This exception should be revisited if:
 
 ---
 
-## Exception 2: `@vercel/analytics` (MPL-2.0)
+## Resolved Exception 2: `@vercel/analytics` (formerly MPL-2.0)
 
 | Field | Value |
 |-------|-------|
 | Package | `@vercel/analytics@2.0.1` |
-| License | MPL-2.0 (Mozilla Public License 2.0) |
+| Current license | MIT |
+| Previous license | MPL-2.0 (Mozilla Public License 2.0) |
 | Added | 2026-04-12 |
 | Identified by | Security agent license scan (2026-04-12) |
+| Resolved | 2026-06-11 — upstream package now ships under MIT |
 
-### Why this is acceptable
+### Resolution
 
-The MPL-2.0 is a **file-level weak copyleft** license. Its obligations apply only to modifications made to the MPL-licensed files themselves — not to the consuming application.
+This is no longer an active exception. The installed `@vercel/analytics@2.0.1`
+package now declares an MIT license, so it fits the standard permissive-only
+policy and no longer requires weak-copyleft review.
+
+### Historical assessment
+
+When this package was MPL-2.0, the license was acceptable because MPL-2.0 is a
+**file-level weak copyleft** license. Its obligations applied only to
+modifications made to the MPL-licensed files themselves, not to the consuming
+application.
 
 Neither condition that would trigger copyleft obligations applies here:
 
@@ -60,18 +71,106 @@ Neither condition that would trigger copyleft obligations applies here:
 - **File-level scope** — MPL-2.0 copyleft does not extend to files in the consuming project, only to changes within the MPL-licensed files.
 - **SaaS deployment** — Paisaxe is deployed as a hosted web service. No binary distribution occurs.
 
-Under these conditions, the MPL-2.0 imposes **no copyleft obligations** on Paisaxe's application code.
+Under those conditions, the MPL-2.0 imposed **no copyleft obligations** on Paisaxe's application code.
 
 ### CI enforcement
 
-The CI license-check workflow (`license-check.yml`) blocks strong copyleft (GPL/AGPL/SSPL) but permits weak copyleft (LGPL, MPL) with a warning, consistent with this policy exception.
+The CI license-check workflow (`license-check.yml`) blocks strong copyleft
+(GPL/AGPL/SSPL). `@vercel/analytics` should no longer appear in weak-copyleft
+warnings while it remains MIT-licensed.
+
+---
+
+## Exception 3: `lightningcss` + platform binaries (MPL-2.0)
+
+| Field | Value |
+|-------|-------|
+| Packages | `lightningcss@1.32.0` and its platform binaries (`lightningcss-darwin-arm64`, `-linux-x64-gnu`, `-win32-x64-msvc`, and the ~9 other `lightningcss-<platform>` variants) |
+| License | MPL-2.0 (Mozilla Public License 2.0) |
+| Parent dependency | `@tailwindcss/postcss` → `@tailwindcss/node` (Tailwind CSS v4 build tooling) and `vite` (via `@vitejs/plugin-react`) |
+| Dependency type | **devDependency / build-time only** — not shipped to clients |
+| Added | 2026-06-19 |
+| Identified by | Pre-launch security audit (2026-06-12, SE-L1) |
+
+### Why this is acceptable
+
+MPL-2.0 is a **file-level weak copyleft** license. Its copyleft obligations apply only to modifications made to the MPL-licensed files themselves, never to the consuming application.
+
+None of the triggering conditions apply here:
+
+- **No modifications** are made to `lightningcss` or its source.
+- **File-level scope** — MPL-2.0 copyleft does not extend to Paisaxe's own files, only to changes within the MPL-licensed files.
+- **Build-time only** — `lightningcss` is the CSS transformer used by Tailwind CSS v4 and Vite during the build. It runs on the build machine and its code is **not bundled into the shipped client output**. End users never receive a copy of it.
+- **SaaS deployment** — Paisaxe is a hosted web service (Vercel). MPL-2.0 imposes no source-distribution obligation for SaaS usage.
+
+Under these conditions, MPL-2.0 imposes **no copyleft obligations** on Paisaxe's application code.
+
+### CI enforcement
+
+The CI license-check workflow (`license-check.yml`) blocks strong copyleft (GPL/AGPL/SSPL). MPL-2.0 is weak copyleft and is allowed under this policy exception. Because `lightningcss` is a devDependency, it is only visible to the **dev-dependency** license scan (see "Dev-dependency scanning" below), not to a `--production`-only scan.
 
 ### Review schedule
 
-This exception should be revisited if:
+Revisit this exception if Tailwind CSS or Vite drop `lightningcss`, if `lightningcss` changes its license, or if it ever becomes a runtime/bundled dependency.
 
-- `@vercel/analytics` source files are modified directly
-- The application is redistributed as a binary
+---
+
+## Exception 4: `@sentry/cli` + `@sentry/cli-darwin` (FSL-1.1-MIT)
+
+| Field | Value |
+|-------|-------|
+| Packages | `@sentry/cli@2.58.5`, `@sentry/cli-darwin@2.58.5` |
+| License | FSL-1.1-MIT (Functional Source License) |
+| Parent dependency | `@sentry/nextjs` build tooling |
+| Dependency type | **devDependency / build-time only** — not shipped to clients |
+| Added | 2026-07-08 |
+| Identified by | Security agent license scan (2026-07-03) |
+
+### Why this is acceptable
+
+FSL-1.1-MIT is a source-available license that converts to plain MIT two years after each version's release. Its only restriction during that window is against offering the licensed software itself as a competing product or service.
+
+None of the triggering conditions apply here:
+
+- **Paisaxe does not compete with Sentry CLI** — it is used internally as a build-time tool to upload source maps and release metadata to Sentry, not resold or re-offered as a service.
+- **Build-time only** — `@sentry/cli` runs during the build to upload source maps; its code is never bundled into the shipped client or server output.
+- **Time-limited restriction** — the license converts to MIT after two years regardless, so the restriction is not permanent.
+
+Under these conditions, FSL-1.1-MIT imposes no obligations relevant to Paisaxe's use.
+
+### CI enforcement
+
+The CI license-check workflow (`license-check.yml`) blocks strong copyleft (GPL/AGPL/SSPL) on production deps and reports (non-blocking) on dev deps. `@sentry/cli` is dev-only and is not a copyleft license, so it does not trigger either path — it is recorded here purely for policy transparency.
+
+### Review schedule
+
+Revisit if `@sentry/cli` is ever added as a production dependency, or if Sentry changes the license terms in a future release.
+
+---
+
+## Dual-licensed dependencies (permissive branch selected)
+
+Some dependencies are published under an "OR" dual license where one branch is permissive and satisfies the policy directly. These are **not exceptions** — Paisaxe elects the permissive branch — but they are recorded here because license scanners repeatedly surface the copyleft branch of the "OR" expression.
+
+| Package | Declared license | Permissive branch elected | Parent dependency | Notes |
+|---------|------------------|---------------------------|-------------------|-------|
+| `dompurify@3.4.11` | `(MPL-2.0 OR Apache-2.0)` | Apache-2.0 | `posthog-js` | Used internally by PostHog analytics; no application code calls DOMPurify directly. |
+| `expand-template@2.0.3` | `(MIT OR WTFPL)` | MIT | `canvas` → `prebuild-install` | Build-time only (native binary prebuild install); not shipped to clients. |
+
+Because a permissive branch is available and elected, no weak-copyleft review is required. Identified by the security agent license scan (2026-07-01).
+
+---
+
+## Dev-dependency scanning (policy decision)
+
+Historically the CI license check (`license-check.yml`) and the weekly security agent (`scripts/security-agent.sh`) ran `license-checker --production` only, so weak-copyleft devDependencies such as `lightningcss` (MPL-2.0) were invisible (gap noted in #576 / #623).
+
+**Decision:** both surfaces now also scan **dev dependencies**, but with different enforcement levels matching their risk:
+
+- **Production deps** — strong copyleft (`GPL`, `AGPL`, `SSPL`, `EUPL`, `BSL`, `CPAL`, `OSL`, `CPOL`) **blocks** the build. These licenses would impose obligations on shipped code.
+- **Dev/build deps** — scanned and **reported** (non-blocking). Build-time-only tooling that never ships to clients (like `lightningcss`) does not impose copyleft obligations on Paisaxe, so a strong-copyleft *dev* dep is surfaced for review rather than hard-failing CI. Any new weak-copyleft dev dep that is acceptable should be recorded here as an exception.
+
+This keeps the strict permissive-only guarantee for everything we ship while giving visibility into the build toolchain.
 
 ---
 

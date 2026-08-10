@@ -13,6 +13,8 @@
  */
 
 import { z } from "zod";
+import { STORY_SOURCE_TYPES } from "@/types/immersive";
+import { sanitizeInput } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -52,11 +54,61 @@ const makeBookingSchema = z.object({
   language: z.enum(["es", "en"]).optional(),
 });
 
-/** Wraps flat and MCP-nested payloads. */
-export const makeBookingRequestSchema = z.union([
-  makeBookingSchema,
-  z.object({ arguments: makeBookingSchema }).transform((v) => v.arguments),
-]);
+/**
+ * camelCase → snake_case aliases for the make-booking body.
+ *
+ * ElevenLabs camelCases tool property keys when a tool is pushed, so the live
+ * voice agent posts `venueName`, `phoneNumber`, etc. (#34). The internal schema
+ * and route still use snake_case, so we normalize the incoming body here and
+ * keep accepting the legacy snake_case keys for backward compatibility — the
+ * make_booking webhook is LIVE, so both styles must work during the release
+ * window before the ElevenLabs tool is re-pushed.
+ */
+const MAKE_BOOKING_KEY_ALIASES: Record<string, string> = {
+  venueName: "venue_name",
+  phoneNumber: "phone_number",
+  partySize: "party_size",
+  customerName: "customer_name",
+  customerPhone: "customer_phone",
+  specialRequests: "special_requests",
+};
+
+/**
+ * Normalize a make-booking payload to snake_case keys, accepting either key
+ * style. snake_case keys win when both are present. `date`, `time`, and
+ * `language` are already single-word and need no aliasing.
+ */
+function normalizeMakeBookingKeys(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return input;
+  }
+
+  const source = input as Record<string, unknown>;
+  const normalized: Record<string, unknown> = { ...source };
+
+  for (const [camel, snake] of Object.entries(MAKE_BOOKING_KEY_ALIASES)) {
+    if (normalized[snake] === undefined && source[camel] !== undefined) {
+      normalized[snake] = source[camel];
+    }
+    delete normalized[camel];
+  }
+
+  return normalized;
+}
+
+/**
+ * Wraps flat and MCP-nested payloads, tolerating both camelCase and snake_case
+ * keys (ElevenLabs camelCases tool params on push). The preprocess unwraps an
+ * optional `arguments` envelope and aliases camelCase keys to snake_case before
+ * validation.
+ */
+export const makeBookingRequestSchema = z.preprocess((body) => {
+  const unwrapped =
+    body && typeof body === "object" && !Array.isArray(body) && "arguments" in body
+      ? (body as { arguments?: unknown }).arguments
+      : body;
+  return normalizeMakeBookingKeys(unwrapped);
+}, makeBookingSchema);
 
 // ---------------------------------------------------------------------------
 // favorites
@@ -65,7 +117,8 @@ export const makeBookingRequestSchema = z.union([
 export const favoritesPostSchema = z.object({
   storyIds: z
     .array(uuidSchema)
-    .min(1, "storyIds array must not be empty"),
+    .min(1, "storyIds array must not be empty")
+    .max(200, "storyIds array must not exceed 200 items"),
 });
 
 // ---------------------------------------------------------------------------
@@ -84,7 +137,7 @@ export const createStorySchema = z.object({
   bestMonths: z.array(z.number().int().min(1).max(12)).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   displayOrder: z.number().int().min(0).optional(),
-  sourceType: z.enum(["curated", "ai-generated", "user-suggested"]).optional(),
+  sourceType: z.enum(STORY_SOURCE_TYPES).optional(),
   suggestionId: uuidSchema.optional(),
 });
 
@@ -218,11 +271,64 @@ export const updateFeatureFlagSchema = z
 // chat POST (shared by /api/chat and /api/chat/stream)
 // ---------------------------------------------------------------------------
 
-export const chatRequestSchema = z.object({
-  message: z.string().min(1, "Message is required").max(500, "Message exceeds maximum length of 500 characters"),
-  context: z.string().max(600, "Context exceeds maximum length of 600 characters").optional(),
-  messageIndex: z.number().int().min(0).optional(),
-});
+const CHAT_MAX_MESSAGE_LENGTH = 500;
+const CHAT_MAX_CONTEXT_LENGTH = 600;
+
+/**
+ * Chat request schema (shared by /api/chat and /api/chat/stream).
+ *
+ * BE-L3 (#524): this schema now subsumes the former `validateChatRequest`
+ * helper. It sanitizes message/context via `.transform()` and enforces length
+ * limits AFTER sanitization, so a single parse path produces the sanitized
+ * values the route consumes. `messageIndex` is coerced to 0 when absent or
+ * invalid (matching the prior lenient behaviour).
+ */
+export const chatRequestSchema = z
+  .object({
+    message: z
+      .string()
+      .transform((value) => sanitizeInput(value))
+      .pipe(
+        z
+          .string()
+          .min(1, "Message cannot be empty")
+          .max(
+            CHAT_MAX_MESSAGE_LENGTH,
+            `Message exceeds maximum length of ${CHAT_MAX_MESSAGE_LENGTH} characters`
+          )
+      ),
+    context: z
+      .string()
+      .transform((value) => sanitizeInput(value))
+      .pipe(
+        z
+          .string()
+          .max(
+            CHAT_MAX_CONTEXT_LENGTH,
+            `Context exceeds maximum length of ${CHAT_MAX_CONTEXT_LENGTH} characters`
+          )
+      )
+      .optional(),
+    messageIndex: z.unknown().optional(),
+  })
+  .transform((parsed) => {
+    const rawIndex = parsed.messageIndex;
+    const messageIndex =
+      typeof rawIndex === "number" &&
+      Number.isInteger(rawIndex) &&
+      rawIndex >= 0
+        ? rawIndex
+        : 0;
+    return {
+      message: parsed.message,
+      context: parsed.context,
+      messageIndex,
+    };
+  });
+
+// AR-L1: ChatRequest type removed — was an unused export (Knip). The inferred
+// type of chatRequestSchema is available via z.infer<typeof chatRequestSchema>
+// at call sites if needed.
 
 // ---------------------------------------------------------------------------
 // admin/agent-config PUT
@@ -274,6 +380,41 @@ export const placesQuerySchema = z.object({
   city: z.string().max(200).optional(),
 });
 
+function unwrapMcpArguments(body: unknown): unknown {
+  if (body && typeof body === "object" && !Array.isArray(body) && "arguments" in body) {
+    return (body as { arguments?: unknown }).arguments;
+  }
+
+  return body;
+}
+
+function normalizeMcpParams(
+  body: unknown,
+  requiredField: string,
+  optionalFields: string[] = []
+): Record<string, unknown> {
+  const input = unwrapMcpArguments(body);
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { [requiredField]: "" };
+  }
+
+  const params = input as Record<string, unknown>;
+  const normalized: Record<string, unknown> = {
+    [requiredField]: params[requiredField] ?? "",
+  };
+
+  for (const field of optionalFields) {
+    normalized[field] = params[field] ?? undefined;
+  }
+
+  return normalized;
+}
+
+export const placesPostRequestSchema = z.preprocess(
+  (body) => normalizeMcpParams(body, "query", ["type", "city"]),
+  placesQuerySchema
+);
+
 // ---------------------------------------------------------------------------
 // mcp/weather GET query params
 // ---------------------------------------------------------------------------
@@ -285,3 +426,8 @@ export const weatherQuerySchema = z.object({
     .max(200)
     .describe("city"),
 });
+
+export const weatherPostRequestSchema = z.preprocess(
+  (body) => normalizeMcpParams(body, "city"),
+  weatherQuerySchema
+);

@@ -7,15 +7,19 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }));
 
+vi.mock("next/server", () => ({
+  connection: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock stories-data
 vi.mock("@/lib/stories-data", () => ({
-  getStoryBySlugFromDB: vi.fn(),
+  getStoryMetadataBySlug: vi.fn(),
   getStoriesFromDB: vi.fn(),
 }));
 
-import { getStoryBySlugFromDB, getStoriesFromDB } from "@/lib/stories-data";
+import { getStoryMetadataBySlug, getStoriesFromDB } from "@/lib/stories-data";
 
-const mockGetStoryBySlugFromDB = vi.mocked(getStoryBySlugFromDB);
+const mockGetStoryMetadataBySlug = vi.mocked(getStoryMetadataBySlug);
 const mockGetStoriesFromDB = vi.mocked(getStoriesFromDB);
 const mockRedirect = vi.mocked(redirect);
 
@@ -88,7 +92,7 @@ describe("StoryPage", () => {
 
   describe("generateMetadata", () => {
     it("should return default metadata when story not found", async () => {
-      mockGetStoryBySlugFromDB.mockResolvedValue(null);
+      mockGetStoryMetadataBySlug.mockResolvedValue(null);
 
       const metadata = await generateMetadata({
         params: Promise.resolve({ slug: "non-existent" }),
@@ -97,16 +101,23 @@ describe("StoryPage", () => {
       expect(metadata.title).toBe("Paisaxe | Descubre Asturias");
     });
 
-    it("should return story metadata when story exists", async () => {
-      mockGetStoryBySlugFromDB.mockResolvedValue({
-        id: "story-1",
+    it("uses the slim metadata query (not the full story row)", async () => {
+      mockGetStoryMetadataBySlug.mockResolvedValue({
         slug: "test-story",
         title: "Test Story",
-        subtitle: "Test Location",
         description: "A test description",
-        image: "/images/test.jpg",
-        category: "nature",
-        sourcePdf: "test.pdf",
+      });
+
+      await generateMetadata({ params: Promise.resolve({ slug: "test-story" }) });
+
+      expect(mockGetStoryMetadataBySlug).toHaveBeenCalledWith("test-story");
+    });
+
+    it("should return story metadata when story exists", async () => {
+      mockGetStoryMetadataBySlug.mockResolvedValue({
+        slug: "test-story",
+        title: "Test Story",
+        description: "A test description",
       });
 
       const metadata = await generateMetadata({
@@ -126,6 +137,25 @@ describe("StoryPage", () => {
       const twitter = metadata.twitter as { card?: string; title?: string };
       expect(twitter?.card).toBe("summary_large_image");
       expect(twitter?.title).toBe("Test Story");
+    });
+
+    it("falls back to undefined description when story.description is null (line 31)", async () => {
+      // const description = story.description ?? undefined; -- exercise the ??
+      // fallback for a story whose description column is null.
+      mockGetStoryMetadataBySlug.mockResolvedValue({
+        slug: "no-description-story",
+        title: "No Description Story",
+        description: null,
+      });
+
+      const metadata = await generateMetadata({
+        params: Promise.resolve({ slug: "no-description-story" }),
+      });
+
+      expect(metadata.description).toBeUndefined();
+      expect(metadata.openGraph?.description).toBeUndefined();
+      const twitter = metadata.twitter as { description?: string };
+      expect(twitter?.description).toBeUndefined();
     });
   });
 

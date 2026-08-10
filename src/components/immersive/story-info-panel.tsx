@@ -1,7 +1,7 @@
 "use client";
 
-import { type RefObject } from "react";
-import { Camera, Bookmark } from "lucide-react";
+import { memo, type RefObject } from "react";
+import { Camera, Bookmark, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Story } from "@/types/immersive";
 import type { FeatureFlagKey } from "@/types/feature-flags";
@@ -32,15 +32,17 @@ interface StoryInfoPanelProps {
   onAuthRequired: (() => void) | undefined;
   onFavoritesNav: (() => void) | undefined;
   isFavorite: boolean;
-  onToggleFavorite: (() => void) | undefined;
   chatTriggerRef?: RefObject<HTMLButtonElement | null>;
 }
 
 /**
  * Overlay panel that displays story title, description, badges, and action buttons.
  * Slides in/out based on `showInfo` state.
+ *
+ * FE-L1: memoized — all callback props passed by StoryViewer are stabilized with
+ * useCallback so this component doesn't re-render on every index change.
  */
-export function StoryInfoPanel({
+export const StoryInfoPanel = memo(function StoryInfoPanel({
   story,
   localizedStory,
   showInfo,
@@ -58,15 +60,33 @@ export function StoryInfoPanel({
   return (
     <article
       data-testid="story-info-panel"
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggleInfo?.();
-      }}
+      aria-hidden={showInfo ? undefined : true}
+      inert={showInfo ? undefined : true}
       className={cn(
         "absolute bottom-0 left-0 right-0 p-8 pb-[max(2rem,env(safe-area-inset-bottom))] md:p-12 z-10 transition-all duration-500 motion-reduce:transition-none",
-        showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 motion-reduce:translate-y-0"
+        showInfo
+          ? "opacity-100 translate-y-0"
+          : "pointer-events-none opacity-0 translate-y-8 motion-reduce:translate-y-0"
       )}
     >
+      {/* Dedicated hide affordance — only this element dismisses the panel (#634).
+          Clicking the description text no longer toggles the panel, so reading
+          long descriptions is no longer fragile. */}
+      {onToggleInfo && (
+        <button
+          type="button"
+          data-testid="hide-info-button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleInfo();
+          }}
+          aria-label={t("accessibility.hide_info")}
+          className="absolute top-3 right-3 md:top-4 md:right-4 p-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+        >
+          <ChevronDown className="h-5 w-5" aria-hidden="true" />
+        </button>
+      )}
+
       {/* Badges */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         {isEnabled("story_freshness") && (
@@ -140,4 +160,4 @@ export function StoryInfoPanel({
       </div>
     </article>
   );
-}
+});

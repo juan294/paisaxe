@@ -7,20 +7,12 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { StoryLocale, StoryTranslation, TranslationStatus, StoryMetadata } from "@/types/immersive";
+import { CHAT_MODEL } from "./models";
 import { callAnthropicAPI } from "./claude";
-import { createAdminClient } from "./supabase";
+import { createAdminClient } from "./supabase-admin";
+import { TRANSLATION_LOCALES } from "./translation-locales";
 
-/** All supported translation locales */
-export const TRANSLATION_LOCALES: StoryLocale[] = ["en", "fr", "de", "pt", "ast"];
-
-/** Locale display names for UI */
-export const LOCALE_NAMES: Record<StoryLocale, string> = {
-  en: "English",
-  fr: "Français",
-  de: "Deutsch",
-  pt: "Português",
-  ast: "Asturianu",
-};
+export { TRANSLATION_LOCALES };
 
 interface TranslationOptions {
   /** Specific locales to translate. If omitted, translates all 5 locales */
@@ -47,6 +39,26 @@ interface StoryContent {
   title: string;
   subtitle: string;
   description: string;
+}
+
+interface TranslationMetadataPatch {
+  translations?: Partial<Record<StoryLocale, StoryTranslation>>;
+  translationStatus?: Partial<Record<StoryLocale, TranslationStatus>>;
+  lastTranslatedAt?: string;
+}
+
+async function patchStoryTranslationMetadata(
+  supabase: ReturnType<typeof createAdminClient>,
+  storyId: string,
+  patch: TranslationMetadataPatch
+) {
+  return supabase.rpc("patch_story_translation_metadata", {
+    p_story_id: storyId,
+    p_translations: patch.translations || {},
+    p_translation_status: patch.translationStatus,
+    p_last_translated_at: patch.lastTranslatedAt || null,
+    p_set_last_translated_at: patch.lastTranslatedAt !== undefined,
+  });
 }
 
 /**
@@ -190,24 +202,18 @@ export async function translateStory(
     };
   }
 
-  // Mark locales as translating
-  const updatedStatus: Partial<Record<StoryLocale, TranslationStatus>> = { ...existingStatus };
+  // Mark locales as translating.
+  const translatingStatus: Partial<Record<StoryLocale, TranslationStatus>> = {};
   for (const locale of localesToTranslate) {
-    updatedStatus[locale] = {
+    translatingStatus[locale] = {
       status: "translating",
       updatedAt: new Date().toISOString(),
     };
   }
 
-  await supabase
-    .from("stories")
-    .update({
-      metadata: {
-        ...metadata,
-        translation_status: updatedStatus,
-      },
-    })
-    .eq("id", storyId);
+  await patchStoryTranslationMetadata(supabase, storyId, {
+    translationStatus: translatingStatus,
+  });
 
   // Call Claude API
   try {
@@ -223,7 +229,7 @@ export async function translateStory(
     const response = await callAnthropicAPI(
       "You are a professional translator. Return only valid JSON, no other text.",
       [{ role: "user", content: prompt }],
-      "claude-sonnet-4-20250514",
+      CHAT_MODEL,
       2048
     );
 
@@ -241,26 +247,22 @@ export async function translateStory(
       throw new Error(parseResult.error || "Failed to parse translations");
     }
 
-    // Update translations in database
-    const newTranslations: Partial<Record<StoryLocale, StoryTranslation>> = {
-      ...existingTranslations,
-      ...parseResult.translations,
-    };
-
-    const newStatus: Partial<Record<StoryLocale, TranslationStatus>> = { ...existingStatus };
+    const completedTranslations: Partial<Record<StoryLocale, StoryTranslation>> = {};
+    const completedStatus: Partial<Record<StoryLocale, TranslationStatus>> = {};
     let successCount = 0;
     let failedCount = 0;
 
     for (const locale of localesToTranslate) {
       if (parseResult.translations[locale]) {
-        newStatus[locale] = {
+        completedTranslations[locale] = parseResult.translations[locale];
+        completedStatus[locale] = {
           status: "complete",
           updatedAt: new Date().toISOString(),
         };
         results[locale] = { success: true };
         successCount++;
       } else {
-        newStatus[locale] = {
+        completedStatus[locale] = {
           status: "failed",
           error: "Translation not returned by API",
           updatedAt: new Date().toISOString(),
@@ -277,17 +279,11 @@ export async function translateStory(
       }
     }
 
-    const { error: updateError } = await supabase
-      .from("stories")
-      .update({
-        metadata: {
-          ...metadata,
-          translations: newTranslations,
-          translation_status: newStatus,
-          last_translated_at: new Date().toISOString(),
-        },
-      })
-      .eq("id", storyId);
+    const { error: updateError } = await patchStoryTranslationMetadata(supabase, storyId, {
+      translations: completedTranslations,
+      translationStatus: completedStatus,
+      lastTranslatedAt: new Date().toISOString(),
+    });
 
     if (updateError) {
       return {
@@ -307,7 +303,7 @@ export async function translateStory(
     };
   } catch (error) {
     // Mark all pending locales as failed
-    const failedStatus: Partial<Record<StoryLocale, TranslationStatus>> = { ...existingStatus };
+    const failedStatus: Partial<Record<StoryLocale, TranslationStatus>> = {};
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
     for (const locale of localesToTranslate) {
@@ -319,15 +315,9 @@ export async function translateStory(
       results[locale] = { success: false, error: errorMessage };
     }
 
-    await supabase
-      .from("stories")
-      .update({
-        metadata: {
-          ...metadata,
-          translation_status: failedStatus,
-        },
-      })
-      .eq("id", storyId);
+    await patchStoryTranslationMetadata(supabase, storyId, {
+      translationStatus: failedStatus,
+    });
 
     return {
       success: false,
@@ -363,27 +353,15 @@ export async function updateStoryTranslation(
     };
   }
 
-  const metadata = (story.metadata || {}) as StoryMetadata;
-  const translations = metadata.translations || {};
-  const status = metadata.translation_status || {};
-
-  // Update the specific translation
-  translations[locale] = translation;
-  status[locale] = {
+  const status: TranslationStatus = {
     status: "complete",
     updatedAt: new Date().toISOString(),
   };
 
-  const { error: updateError } = await supabase
-    .from("stories")
-    .update({
-      metadata: {
-        ...metadata,
-        translations,
-        translation_status: status,
-      },
-    })
-    .eq("id", storyId);
+  const { error: updateError } = await patchStoryTranslationMetadata(supabase, storyId, {
+    translations: { [locale]: translation },
+    translationStatus: { [locale]: status },
+  });
 
   if (updateError) {
     return {
