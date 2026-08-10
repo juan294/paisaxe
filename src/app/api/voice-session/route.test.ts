@@ -33,27 +33,34 @@ function request(body: unknown = { agentKey: "pelayo" }) {
   });
 }
 
-describe("POST /api/voice-session", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.getUserFromRequest.mockResolvedValue({ id: "visitor-1" });
-    mocks.getSupabaseClient.mockResolvedValue({
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            gt: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: vi.fn(() => ({
-                  maybeSingle: vi.fn().mockResolvedValue({
-                    data: { id: "purchase-1" },
-                    error: null,
-                  }),
-                })),
+function mockVoicePurchaseResult(result: {
+  data: { id: string } | null;
+  error: { code: string } | null;
+}) {
+  mocks.getSupabaseClient.mockResolvedValue({
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          gt: vi.fn(() => ({
+            order: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue(result),
               })),
             })),
           })),
         })),
       })),
+    })),
+  });
+}
+
+describe("POST /api/voice-session", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getUserFromRequest.mockResolvedValue({ id: "visitor-1" });
+    mockVoicePurchaseResult({
+      data: { id: "purchase-1" },
+      error: null,
     });
     mocks.getElevenLabsSignedUrl.mockResolvedValue(
       "wss://signed.example/visitor"
@@ -68,23 +75,9 @@ describe("POST /api/voice-session", () => {
   });
 
   it("rejects visitors without current paid voice access", async () => {
-    mocks.getSupabaseClient.mockResolvedValue({
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            gt: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: vi.fn(() => ({
-                  maybeSingle: vi.fn().mockResolvedValue({
-                    data: null,
-                    error: null,
-                  }),
-                })),
-              })),
-            })),
-          })),
-        })),
-      })),
+    mockVoicePurchaseResult({
+      data: null,
+      error: null,
     });
 
     const response = await POST(request());
@@ -122,5 +115,28 @@ describe("POST /api/voice-session", () => {
     const response = await POST(request());
     expect(response.status).toBe(status);
     await expect(response.json()).resolves.toEqual({ error: code });
+  });
+
+  it("returns 500 when voice purchase query fails", async () => {
+    mockVoicePurchaseResult({
+      data: null,
+      error: { code: "PGRST116" },
+    });
+
+    const response = await POST(request());
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to check access",
+    });
+    expect(mocks.getElevenLabsSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 when getElevenLabsSignedUrl throws a non-ElevenLabsSignedSessionError", async () => {
+    mocks.getElevenLabsSignedUrl.mockRejectedValue(new Error("Network error"));
+    const response = await POST(request());
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "upstream_unavailable",
+    });
   });
 });

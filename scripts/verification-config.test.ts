@@ -111,10 +111,37 @@ describe("verification coverage config", () => {
     expect(qaAgent).toContain('VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE" npm run dev');
   });
 
+  it("preflights Anthropic before running QA LLM tests", () => {
+    const qaAgent = readText("scripts/qa-agent.sh");
+
+    expect(qaAgent).toContain("ANTHROPIC_API_KEY_VALUE");
+    expect(qaAgent).toContain("Checking Anthropic generation availability");
+    expect(qaAgent).toContain("https://api.anthropic.com/v1/messages");
+    expect(qaAgent).toContain("ANTHROPIC_HEALTH_STATUS");
+    expect(qaAgent).toContain("QA PREFLIGHT: Anthropic generation availability failed");
+    expect(qaAgent).toContain(
+      '"$VOYAGE_HEALTH_STATUS" == "PASS" && "$ANTHROPIC_HEALTH_STATUS" == "PASS"'
+    );
+  });
+
+  it("writes a report and shared-context entry when the QA wrapper aborts", () => {
+    const qaAgent = readText("scripts/qa-agent.sh");
+
+    expect(qaAgent).toContain("write_abnormal_exit_report");
+    expect(qaAgent).toContain("RUN_COMPLETED=false");
+    expect(qaAgent).toContain("RUN_COMPLETED=true");
+    expect(qaAgent).toContain("write_shared_context");
+    expect(qaAgent).toContain("handle_exit");
+    expect(qaAgent).toContain('CURRENT_PHASE="phase 5 report generation"');
+  });
+
   it("includes chat API response bodies in QA LLM failures", () => {
     const llmQualityTest = readText("src/tests/qa/llm-quality.test.ts");
+    const llmQualityHelpers = readText("src/tests/qa/llm-quality-helpers.ts");
 
     expect(llmQualityTest).toContain("formatChatApiError");
-    expect(llmQualityTest).toContain("errorBody.error");
+    expect(llmQualityHelpers).toContain("errorBody.error");
+    expect(llmQualityHelpers).toContain("errorBody.debug");
+    expect(llmQualityTest).toContain("RepeatedServerFailureCircuit");
   });
 });

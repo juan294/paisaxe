@@ -10,6 +10,7 @@ describe("ElevenLabs signed sessions", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+    vi.stubEnv("ELEVENLABS_API_KEY", "server-secret");
   });
 
   it("uses a fixed Paisaxe allowlist instead of accepting arbitrary agent IDs", () => {
@@ -31,7 +32,6 @@ describe("ElevenLabs signed sessions", () => {
   });
 
   it("requests a signed URL without exposing the API key in the URL", async () => {
-    vi.stubEnv("ELEVENLABS_API_KEY", "server-secret");
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ signed_url: "wss://signed.example/session" }), {
         status: 200,
@@ -58,7 +58,6 @@ describe("ElevenLabs signed sessions", () => {
   ] as const)(
     "maps ElevenLabs %s without forwarding provider response bodies",
     async (providerStatus, code, status) => {
-      vi.stubEnv("ELEVENLABS_API_KEY", "server-secret");
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue(
@@ -74,6 +73,54 @@ describe("ElevenLabs signed sessions", () => {
       expect(error).toBeInstanceOf(ElevenLabsSignedSessionError);
       expect(error).toMatchObject({ code, status });
       expect(String(error)).not.toContain("provider detail");
+    }
+  );
+
+  it("handles fetch network errors by throwing upstream_unavailable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network timeout")));
+
+    const error = await getElevenLabsSignedUrl("pelayo").catch(
+      (caught: unknown) => caught
+    );
+    expect(error).toBeInstanceOf(ElevenLabsSignedSessionError);
+    expect(error).toMatchObject({
+      code: "upstream_unavailable",
+      status: 502,
+    });
+  });
+
+  it.each([
+    ["missing signed_url field", { name: "Alice" }],
+    ["signed_url is not a string", { signed_url: 123 }],
+    ["signed_url does not start with wss://", { signed_url: "https://insecure.example" }],
+    ["response JSON is invalid", "not-json"],
+    ["response is null", null],
+  ] as const)(
+    "rejects %s from ElevenLabs API",
+    async (_desc, payload) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(
+            typeof payload === "string" || payload === null
+              ? payload || ""
+              : JSON.stringify(payload),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          )
+        )
+      );
+
+      const error = await getElevenLabsSignedUrl("pelayo").catch(
+        (caught: unknown) => caught
+      );
+      expect(error).toBeInstanceOf(ElevenLabsSignedSessionError);
+      expect(error).toMatchObject({
+        code: "invalid_upstream_response",
+        status: 502,
+      });
     }
   );
 });
