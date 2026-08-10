@@ -14,6 +14,9 @@ JOURNEY_METRICS_FILE="$PROJECT_DIR/.qa-journey-metrics.tmp"
 SERVER_PID=""
 SERVER_LOG="$LOG_DIR/qa-agent-server.log"
 VOYAGE_API_KEY_VALUE=""
+ANTHROPIC_API_KEY_VALUE=""
+RUN_COMPLETED=false
+CURRENT_PHASE="startup"
 
 # Test user configuration (for authenticated journey tests)
 QA_TEST_USER_EMAIL="${QA_TEST_USER_EMAIL:-}"
@@ -98,8 +101,39 @@ cleanup() {
   rm -f "$JOURNEY_METRICS_FILE"
   rm -f "$PROJECT_DIR/.qa-health-metrics.tmp"
   rm -f "$PROJECT_DIR/.qa-gap-metrics.tmp"
+  rm -f "${REPORT_FILE}.aborted.tmp"
 }
-trap cleanup EXIT
+
+write_abnormal_exit_report() {
+  local exit_status="$1"
+  local aborted_report="${REPORT_FILE}.aborted.tmp"
+  local context="QA agent aborted during ${CURRENT_PHASE} with exit status ${exit_status}. See ${REPORT_FILE} for the preserved failure report."
+
+  mkdir -p "$(dirname "$REPORT_FILE")"
+  {
+    echo "# QA Agent Report"
+    echo ""
+    echo "**Status:** ABORTED"
+    echo "**Date:** $(date '+%Y-%m-%d %H:%M:%S %Z')"
+    echo "**Exit status:** $exit_status"
+    echo "**Last phase:** $CURRENT_PHASE"
+    echo ""
+    echo "The QA wrapper exited before its normal report-generation step. Review $LOG_FILE for the underlying failure."
+  } > "$aborted_report"
+  mv "$aborted_report" "$REPORT_FILE"
+  write_shared_context "qa_agent_enabled" "$context" || true
+}
+
+handle_exit() {
+  local exit_status="$1"
+  set +e
+  if [[ "$exit_status" -ne 0 && "$RUN_COMPLETED" != "true" ]]; then
+    write_abnormal_exit_report "$exit_status"
+  fi
+  cleanup
+}
+
+trap 'handle_exit $?' EXIT
 
 # Check if agent is enabled via feature flags
 log_info "=== QA Agent starting ===" | tee -a "$LOG_FILE"
@@ -124,7 +158,13 @@ if [[ -n "$VOYAGE_API_KEY_VALUE" ]]; then
   export VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE"
 fi
 
+ANTHROPIC_API_KEY_VALUE="$(get_config_value "ANTHROPIC_API_KEY")"
+if [[ -n "$ANTHROPIC_API_KEY_VALUE" ]]; then
+  export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY_VALUE"
+fi
+
 # Check if server is already running (any HTTP response = server is up)
+CURRENT_PHASE="server startup"
 PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3006/api/health 2>/dev/null || true)
 [[ -z "$PRECHECK_CODE" ]] && PRECHECK_CODE="000"
 if [[ "$PRECHECK_CODE" != "000" ]]; then
@@ -168,12 +208,15 @@ fi
 # PHASE 0: Integration Health Checks
 # =============================================================================
 log_info "=== Phase 0: Integration Health Checks ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 0 integration health checks"
 
 HEALTH_CHECKS_PASSED=0
 HEALTH_CHECKS_FAILED=0
 HEALTH_CHECK_DETAILS=""
 VOYAGE_HEALTH_STATUS="unknown"
 VOYAGE_HEALTH_DETAILS=""
+ANTHROPIC_HEALTH_STATUS="unknown"
+ANTHROPIC_HEALTH_DETAILS=""
 # Declare CI_E2E_STATUS/RUN_ID early so they are never unbound under set -u
 # (Phase 0.5 re-assigns them after Phase 0 health metrics are written)
 CI_E2E_STATUS="unknown"
@@ -281,6 +324,54 @@ NODE
   fi
 fi
 
+# Check 5: Anthropic Generation Availability
+log_info "Checking Anthropic generation availability..." | tee -a "$LOG_FILE"
+if [[ -z "$ANTHROPIC_API_KEY_VALUE" ]]; then
+  ANTHROPIC_HEALTH_STATUS="FAIL"
+  ANTHROPIC_HEALTH_DETAILS="ANTHROPIC_API_KEY is not set in the shell environment or .env.local"
+  log_error "Anthropic: FAILED - ANTHROPIC_API_KEY missing" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Anthropic check failed: $ANTHROPIC_HEALTH_DETAILS"
+else
+  ANTHROPIC_HTTP_CODE=$(
+    node <<'NODE' 2>/dev/null || true
+const key = process.env.ANTHROPIC_API_KEY;
+const body = {
+  model: "claude-sonnet-5",
+  max_tokens: 1,
+  messages: [{ role: "user", content: "Reply with OK" }],
+};
+
+fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "x-api-key": key,
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(body),
+  signal: AbortSignal.timeout(15_000),
+})
+  .then((response) => console.log(response.status))
+  .catch(() => console.log("000"));
+NODE
+  )
+  [[ -z "$ANTHROPIC_HTTP_CODE" ]] && ANTHROPIC_HTTP_CODE="000"
+
+  if [[ "$ANTHROPIC_HTTP_CODE" == "200" ]]; then
+    ANTHROPIC_HEALTH_STATUS="PASS"
+    ANTHROPIC_HEALTH_DETAILS="Anthropic messages endpoint accepted a minimal generation"
+    log_success "Anthropic: OK" | tee -a "$LOG_FILE"
+    HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
+  else
+    ANTHROPIC_HEALTH_STATUS="FAIL"
+    ANTHROPIC_HEALTH_DETAILS="Anthropic messages endpoint returned HTTP $ANTHROPIC_HTTP_CODE"
+    log_error "Anthropic: FAILED - HTTP $ANTHROPIC_HTTP_CODE" | tee -a "$LOG_FILE"
+    HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+    HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Anthropic check failed: $ANTHROPIC_HEALTH_DETAILS"
+  fi
+fi
+
 log_info "Health checks complete: $HEALTH_CHECKS_PASSED passed, $HEALTH_CHECKS_FAILED failed" | tee -a "$LOG_FILE"
 
 # Send SMS alert for critical health check failures
@@ -304,6 +395,10 @@ if [[ $HEALTH_CHECKS_FAILED -gt 0 ]]; then
     [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
     FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Voyage AI"
   fi
+  if [[ "$ANTHROPIC_HEALTH_STATUS" != "PASS" ]]; then
+    [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
+    FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Anthropic"
+  fi
 
   send_health_summary_alert "$HEALTH_CHECKS_FAILED" "$FAILED_CHECK_NAMES" 2>&1 | tee -a "$LOG_FILE" || {
     log_warn "SMS alert failed (Twilio may not be configured)" | tee -a "$LOG_FILE"
@@ -317,6 +412,7 @@ HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
   echo "- Passed: $HEALTH_CHECKS_PASSED"
   echo "- Failed: $HEALTH_CHECKS_FAILED"
   echo "- Voyage AI Status: $VOYAGE_HEALTH_STATUS"
+  echo "- Anthropic Status: $ANTHROPIC_HEALTH_STATUS"
   echo "- CI E2E Status: ${CI_E2E_STATUS:-unknown}"
   if [[ -n "$HEALTH_CHECK_DETAILS" ]]; then
     echo ""
@@ -335,6 +431,7 @@ HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
 # PHASE 0.5: CI E2E Status Check
 # =============================================================================
 log_info "=== Phase 0.5: CI E2E Status Check ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 0.5 CI E2E status check"
 
 CI_E2E_STATUS="unknown"
 CI_E2E_CONCLUSION=""
@@ -364,6 +461,7 @@ fi
 # PHASE 1: LLM Quality Tests
 # =============================================================================
 log_info "=== Phase 1: LLM Quality Tests ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 1 LLM quality tests"
 
 export QA_TESTS_PER_CATEGORY="$TESTS_PER_CATEGORY"
 export NEXT_PUBLIC_SITE_URL="http://localhost:3006"
@@ -372,6 +470,9 @@ export NEXT_PUBLIC_SITE_URL="http://localhost:3006"
 TEST_EXIT_CODE=0
 if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
   TEST_OUTPUT="QA PREFLIGHT: Voyage AI embedding availability failed - ${VOYAGE_HEALTH_DETAILS}. Set VOYAGE_API_KEY in the QA environment or .env.local before running npm run test:qa."
+  TEST_EXIT_CODE=1
+elif [[ "$ANTHROPIC_HEALTH_STATUS" != "PASS" ]]; then
+  TEST_OUTPUT="QA PREFLIGHT: Anthropic generation availability failed - ${ANTHROPIC_HEALTH_DETAILS}. Set ANTHROPIC_API_KEY in the QA environment or .env.local before running npm run test:qa."
   TEST_EXIT_CODE=1
 else
   TEST_OUTPUT=$(NO_COLOR=1 npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
@@ -400,7 +501,7 @@ TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
 # nothing ran — flag it distinctly so a 0% pass rate never masquerades as a
 # real measurement.
 PARSE_FAILURE=false
-if [[ $TOTAL_TESTS -eq 0 && $TEST_EXIT_CODE -ne 0 && "$VOYAGE_HEALTH_STATUS" == "PASS" ]]; then
+if [[ $TOTAL_TESTS -eq 0 && $TEST_EXIT_CODE -ne 0 && "$VOYAGE_HEALTH_STATUS" == "PASS" && "$ANTHROPIC_HEALTH_STATUS" == "PASS" ]]; then
   PARSE_FAILURE=true
   log_error "Parsed 0 tests from a failed run (exit $TEST_EXIT_CODE) — likely a test-count parser failure, not a real 0-test result" | tee -a "$LOG_FILE"
 fi
@@ -451,6 +552,7 @@ FAILED_DETAILS=$(echo "$TEST_OUTPUT_PLAIN" | grep -A 20 "FAIL\|AssertionError\|E
 # =============================================================================
 # PHASE 2: Browser Journey Tests (Playwright)
 # =============================================================================
+CURRENT_PHASE="phase 2 browser journey tests"
 JOURNEY_PASSED=0
 JOURNEY_FAILED=0
 JOURNEY_OUTPUT=""
@@ -487,6 +589,7 @@ fi
 # PHASE 3: Test User Cleanup
 # =============================================================================
 log_info "=== Phase 3: Test User Cleanup ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 3 test user cleanup"
 
 if [[ -n "$QA_TEST_USER_EMAIL" ]]; then
   # Validate email pattern before calling cleanup
@@ -515,6 +618,7 @@ fi
 # PHASE 4: GitHub Issue Filing
 # =============================================================================
 log_info "=== Phase 4: GitHub Issue Filing ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 4 GitHub issue filing"
 
 TOTAL_FAILURES=$((FAILED_TESTS + JOURNEY_FAILED + HEALTH_CHECKS_FAILED))
 
@@ -565,6 +669,7 @@ fi
 # =============================================================================
 # PHASE 6: Test Gap Analysis
 # =============================================================================
+CURRENT_PHASE="phase 6 test gap analysis"
 GAP_METRICS_FILE="$PROJECT_DIR/.qa-gap-metrics.tmp"
 
 if [[ "$ENABLE_GAP_ANALYSIS" == "true" ]]; then
@@ -698,6 +803,7 @@ fi
 # PHASE 5: Claude Analysis & Report Generation
 # =============================================================================
 log_info "=== Phase 5: Claude Analysis & Report ===" | tee -a "$LOG_FILE"
+CURRENT_PHASE="phase 5 report generation"
 log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FILE"
 
 # Load the agent prompt from shared TypeScript config
@@ -769,5 +875,7 @@ else
 fi
 
 # Cleanup handled by trap
+CURRENT_PHASE="complete"
+RUN_COMPLETED=true
 log_success "QA report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== QA Agent finished ===" | tee -a "$LOG_FILE"

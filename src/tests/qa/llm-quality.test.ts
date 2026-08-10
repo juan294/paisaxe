@@ -11,6 +11,10 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appendFileSync, existsSync } from 'fs';
+import {
+  RepeatedServerFailureCircuit,
+  formatChatApiError,
+} from './llm-quality-helpers';
 
 const API_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3006';
 const TESTS_PER_CATEGORY = parseInt(process.env.QA_TESTS_PER_CATEGORY || '3', 10);
@@ -18,6 +22,7 @@ const REPORT_FILE = process.env.QA_REPORT_FILE;
 // Wide enough for the 3-attempt retry loop in sendChatMessage (each attempt
 // bounded by its own 20s AbortSignal.timeout) to fit within the test timeout.
 const QUALITY_TEST_TIMEOUT_MS = 60000;
+const serverFailureCircuit = new RepeatedServerFailureCircuit(4);
 
 interface ChatResponse {
   content: string;
@@ -53,33 +58,9 @@ async function getCsrfToken(): Promise<string> {
   return match[1];
 }
 
-async function formatChatApiError(response: Response): Promise<string> {
-  const bodyText = await response.text().catch(() => '');
-  if (!bodyText) {
-    return `Chat API error: ${response.status}`;
-  }
-
-  try {
-    const errorBody = JSON.parse(bodyText) as { error?: unknown; message?: unknown };
-    const reason =
-      typeof errorBody.error === 'string'
-        ? errorBody.error
-        : typeof errorBody.message === 'string'
-          ? errorBody.message
-          : undefined;
-
-    if (reason) {
-      return `Chat API error: ${response.status} (${reason})`;
-    }
-  } catch {
-    // Fall through to a bounded raw-body preview for non-JSON errors.
-  }
-
-  return `Chat API error: ${response.status} (${bodyText.slice(0, 200)})`;
-}
-
 // Helper to call the chat API with retry for rate limiting and transient network errors
 async function sendChatMessage(message: string, retries = 3): Promise<ChatResponse> {
+  serverFailureCircuit.assertRequestAllowed();
   const csrfToken = await getCsrfToken();
 
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -119,9 +100,14 @@ async function sendChatMessage(message: string, retries = 3): Promise<ChatRespon
     }
 
     if (!response.ok) {
-      throw new Error(await formatChatApiError(response));
+      const detail = await formatChatApiError(response);
+      if (response.status >= 500) {
+        throw serverFailureCircuit.recordFailure(response.status, detail);
+      }
+      throw new Error(detail);
     }
 
+    serverFailureCircuit.recordSuccess();
     const data = await response.json();
     // Normalize response - API returns 'message' field
     return {

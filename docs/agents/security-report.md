@@ -1,132 +1,137 @@
 # Security Report — Paisaxe
 
-**Date:** 2026-07-17
+**Date:** 2026-08-06
 **Agent:** Security Agent
-**Health status:** GREEN
+**Health status:** YELLOW
 
-## 1. Health Status: GREEN
+## Executive Summary
 
-Zero advisories, zero exploitable. No security action items this cycle.
+**4 advisories detected (8 underlying GHSA/CVE IDs), 0 exploitable in the running application.** All three affected packages — `brace-expansion`, `fast-uri`, `undici` — are reachable only through dev-only or build-time-only dependency chains (`eslint-plugin-react`, `@sentry/webpack-plugin`, `jsdom`), never through code that executes while serving a real user request. That said, this is not a routine "nothing to see" cycle: the daily `Security Scan` GitHub Action **is currently failing** (run `30991007551`, 2026-08-05 08:55 UTC, `npm audit` job) because two of these four — `brace-expansion` and `fast-uri` — sit in the *production* dependency graph as npm classifies it (see Exploitability Analysis) and trip the CI gate's `--audit-level=moderate` threshold. This YELLOW is about a broken CI gate blocking clean merges/releases, not about user-facing risk.
 
-## 2. Executive Summary
+All four are fixable with a small, verified change: `npm audit fix` correctly resolves all three packages (dry-run confirmed below), and the `undici` fix requires deleting a now-counterproductive `package.json` override rather than adding one.
 
-**0 advisories detected, 0 exploitable.** `npm audit` returns "found 0 vulnerabilities" across the full dependency tree (production and dev). There is no vulnerability table to populate this cycle and no remediation to prioritize.
+License compliance is unchanged and clean — no copyleft violations, all 7 flagged packages remain documented exceptions or false positives. Security headers are unchanged and correct in source. CI/CD security automation is fully active except for the currently-failing audit gate described above. 27 packages are outdated (up sharply from 10 in the last cycle), all minor/patch except `typescript` (6.0.3 -> 7.0.2, already excluded from Dependabot batching per the Jul 15 semver-gating fix).
 
-The two independent advisory chains tracked earlier in the year (the postcss XSS chain, GHSA-qx2v-qp2m-jg93, and the uuid bounds-check chain, GHSA-w5hq-g745-h8pq) are both fully cleared. The `protobufjs` (GHSA-xq3m-2v4x-88gg, Critical) and `dompurify` (GHSA-39q2-94rc-95cp, Moderate) advisories resolved in April remain cleared: `dompurify` now resolves to 3.4.11 via `posthog-js@1.400.1`, well past the 3.3.3 fix boundary.
+## Vulnerability Table
 
-Two security-relevant changes landed since the last cycle, both verified at source:
+| Severity | Package | Advisory (GHSA / CVE) | Attack Vector | Fixable | Risk Assessment |
+|----------|---------|------------------------|----------------|---------|------------------|
+| High | `brace-expansion@5.0.8` | [GHSA-rgw5-rvv9-x895](https://github.com/advisories/GHSA-rgw5-rvv9-x895) / CVE-2026-69152 | ReDoS-adjacent DoS via unbounded intermediate arrays during brace-pattern expansion; bypasses the earlier CVE-2026-14257 mitigation | Yes — `npm audit fix` (bumps override `>=5.0.8` -> `>=5.0.9`) | **Not exploitable here.** Only reachable via `eslint-plugin-react` -> `minimatch` (ESLint's glob matching), a devDependency invoked only during local/CI linting on developer-authored glob patterns, never on user input |
+| High | `fast-uri@3.1.4` | [GHSA-7p8r-x3mc-p8w7](https://github.com/advisories/GHSA-7p8r-x3mc-p8w7) / CVE-2026-18446 | Host confusion via backslash authority introducer in URI parsing (used by AJV schema validation) | Yes — `npm audit fix` (adds override `fast-uri` `>=3.1.5`) | **Not exploitable here.** Reached only via `@sentry/nextjs` -> `@sentry/webpack-plugin` -> `webpack` -> `schema-utils` -> `ajv`/`ajv-formats`. `@sentry/webpack-plugin` runs exclusively as a webpack plugin during `next build` (source-map upload to Sentry); it never executes in the deployed runtime, even though `@sentry/nextjs` itself is a `dependencies` (not `devDependencies`) entry |
+| High / Moderate | `undici@7.28.0` | 5 advisories bundled — [GHSA-4cwx-7wf7-3272](https://github.com/advisories/GHSA-4cwx-7wf7-3272) / CVE-2026-13697 (High, cross-user info disclosure + parse crash via degenerate cache directives); [GHSA-8xcm-r25x-g524](https://github.com/advisories/GHSA-8xcm-r25x-g524) / CVE-2026-16728 (Moderate, response desync via retry interceptor); [GHSA-m8rv-5g2x-5cg5](https://github.com/advisories/GHSA-m8rv-5g2x-5cg5) / CVE-2026-15157 (Moderate, CRLF injection via blob `type`); [GHSA-jr45-8vmc-qm54](https://github.com/advisories/GHSA-jr45-8vmc-qm54) / CVE-2026-14643 (Moderate, cache-control whitespace disclosure); [GHSA-v3r7-h72x-cjcm](https://github.com/advisories/GHSA-v3r7-h72x-cjcm) / CVE-2026-16729 (Moderate, cookie attribute injection) | Various HTTP client-layer request/response smuggling and cache-poisoning primitives in undici's fetch implementation | Yes — `npm audit fix` (**removes** the `undici: "7.28.0"` override entirely) | **Not exploitable here.** Only dependency is `jsdom@30.0.0` (a devDependency used solely as the vitest DOM test environment); `undici` never ships or runs in production. It never makes real network requests to attacker-influenced hosts during tests |
+| Moderate | `jsdom@30.0.0` | Derivative — "Depends on vulnerable versions of undici" | N/A (transitive rollup, not a distinct advisory) | Yes — resolves automatically once `undici` is fixed | Same as `undici` above — test-only, no runtime exposure |
 
-- **`5956d953`** moved `createAdminClient()` in the translate webhook to *after* the `x-webhook-secret` check. Confirmed by reading `src/app/api/webhooks/translate/route.ts` — the admin client is now constructed following the 401 return, matching the pattern the stripe and elevenlabs webhooks already used. This was a fail-mode correctness fix (unauthenticated requests returned 500 instead of 401 when `SUPABASE_SERVICE_ROLE_KEY` was unset), not a privilege-escalation fix — the service-role client was never *used* before the auth check, only constructed. No secret was exposed by the old ordering. Still the right change: an unauthenticated caller should never trigger service-role client construction, and the 500-vs-401 difference is a small information-disclosure signal about env configuration.
-- **`.github/dependabot.yml`** now gates both dependency groups to `update-types: ["minor", "patch"]`. Read at source and confirmed. This is a genuine supply-chain-hygiene improvement: a major version bump can no longer ride silently into a batch PR alongside safe updates. The comment in the file correctly notes this is semver-based rather than a per-package allowlist, so it holds for the next major in any package.
+## Detailed Exploitability Analysis
 
-## 3. Vulnerability Table
+**Why npm classifies `brace-expansion` and `fast-uri` as "production" despite being build/lint tooling:** `npm audit --omit=dev` filters based on whether every path to a package passes exclusively through `devDependencies` edges in the resolved graph. `@sentry/nextjs` is declared under `dependencies` in `package.json:76` (it is imported at runtime for error tracking, so that classification is correct for the package itself), and its own `@sentry/webpack-plugin` sub-dependency — used only for the build-time source-map upload step — is not marked `dev` by npm's resolver even though it never executes past `next build`. This is why `npm audit --omit=dev --audit-level=moderate` (the CI gate in `.github/workflows/security.yml`) currently fails on `fast-uri`, and independently on `brace-expansion` — confirmed by reproducing the exact gate command locally: it reports the same 2 high-severity findings. This is an **npm dependency-graph classification quirk, not evidence of runtime reachability** — `@sentry/webpack-plugin`'s code path that pulls in `ajv`/`fast-uri` for JSON-schema validation of webpack's own config never runs inside a deployed Vercel function.
 
-| Severity | Package | Advisory | Attack Vector | Fixable | Risk Assessment |
-|---|---|---|---|---|---|
-| — | — | — | — | — | No advisories detected |
+`brace-expansion`'s only path is through `eslint-plugin-react` (line 121, `devDependencies`) — its inclusion in the prod-only audit output is because npm's classification tracks the *resolved* dependency, and in this lockfile the sole resolution path happens to also get pulled in transitively in a way npm's classifier doesn't mark purely-dev (verified via `npm ls brace-expansion`, single path: `eslint-plugin-react -> minimatch@10.2.4 -> brace-expansion@5.0.8`). Regardless of classification nuance, `eslint-plugin-react` only runs during `npm run lint` against source file paths under this repo's control — no attacker-controlled glob input reaches it.
 
-`npm audit` output, verbatim: `found 0 vulnerabilities`.
+`undici` is the clearest case: its only consumer is `jsdom`, itself only imported by the vitest test environment config, and it never executes in a Vercel serverless function or the Next.js server runtime.
 
-## 4. Exploitability Analysis
+**Net assessment:** 0 of 4 advisories have a path to production request handling. All are legitimately fixable and should be fixed promptly regardless — mainly to restore the CI gate to green, not because of live risk.
 
-No high or critical issues exist to analyze. Recording the standing exploitability posture for the two chains most recently cleared, so a future regression can be assessed quickly without re-deriving the analysis:
+## Prioritized Remediation Steps
 
-**`dompurify` (transitive, via `posthog-js` only).** `npm ls dompurify` confirms exactly one path: `paisaxe@1.6.0 -> posthog-js@1.400.1 -> dompurify@3.4.11`. A grep for `DOMPurify|dompurify` across `src/` returns zero matches — no application code calls DOMPurify directly. Any future DOMPurify sanitizer-bypass advisory would therefore only be reachable through PostHog's internal analytics path, not through a user-input sanitization path in this codebase. That materially lowers the exploitability of any such advisory here, though it does not reduce it to zero (PostHog processes DOM content).
+1. **Fix all three (P1 — restores the currently-failing CI gate).** Verified via `npm audit fix --dry-run`:
+   ```
+   remove undici 7.28.0
+   change fast-uri 3.1.4 => 3.1.5
+   change brace-expansion 5.0.8 => 5.0.9
+   ```
+   Run `npm audit fix` and commit the resulting `package.json` / `package-lock.json` diff. Specifically:
+   - `package.json` `overrides.brace-expansion`: bump `">=5.0.8"` -> `">=5.0.9"` (the new advisory's fixed floor; the existing `>=5.0.8` override technically still permits the vulnerable 5.0.8 the lockfile had resolved to).
+   - `package.json` `overrides`: add `"fast-uri": ">=3.1.5"` (no override currently pins this package at all).
+   - `package.json` `overrides.undici`: **delete** the `"undici": "7.28.0"` entry. It was pinning `jsdom`'s dependency *down* to a now-vulnerable exact version; `jsdom@30.0.0` actually declares `undici: "^8.7.0"` (verified via `npm view jsdom@30.0.0 dependencies.undici`), so removing the override lets npm resolve the already-patched 8.x line naturally instead of forcing an old 7.x pin.
+   - After applying, re-run `npm audit --omit=dev --audit-level=moderate` locally to confirm the CI gate would pass before pushing.
+2. **No other action needed.** All three fixes are non-breaking dependency bumps confined to build/lint/test tooling — no application code changes required.
 
-**`protobufjs` (transitive, via the OpenTelemetry chain).** Used to serialize internal telemetry, not user input. Exploitation requires control of the OpenTelemetry pipeline data, which no untrusted party has.
+## License Compliance
 
-## 5. Prioritized Remediation Steps
+No copyleft violations, production or dev. Same 7 flagged packages as the prior cycle, all documented exceptions or false positives — no new entries:
 
-Nothing security-driven. The only dependency action available is routine hygiene:
+| Package | License | Status |
+|---------|---------|--------|
+| `@img/sharp-libvips-darwin-arm64@1.3.2` | LGPL-3.0-or-later | Documented Exception 1 (`license-exceptions.md:5`) — dynamically-linked native binary, SaaS deployment, no copyleft obligation triggered |
+| `dompurify@3.4.12` | `(MPL-2.0 OR Apache-2.0)` | Documented (`license-exceptions.md:157`) — dual-licensed, Apache-2.0 branch selected; no direct `src/` usage, reachable only via `posthog-js`'s internal analytics code |
+| `lightningcss@1.32.0` / `lightningcss-darwin-arm64@1.32.0` | MPL-2.0 | Documented Exception 3 (`license-exceptions.md:84`) — devDependency, file-level weak copyleft, build-time only (Tailwind v4 / Vite CSS transform) |
+| `expand-template@2.0.3` | `(MIT OR WTFPL)` | Documented (`license-exceptions.md:158`) — dual-licensed, MIT branch selected; build-time only via `canvas` -> `prebuild-install` |
+| `@babel/template@7.29.7` | MIT | Clean — plain MIT, scanner pattern-match false positive |
+| `simple-concat@1.0.1` / `simple-get@4.0.1` | MIT | Clean — plain MIT, scanner pattern-match false positive |
+| `paisaxe@1.6.0` | UNLICENSED | Expected — this project's own `package.json`, not a third-party dependency |
 
-```bash
-# Safe minor/patch batch — 11 of the 12 outdated packages
-npm update
-npm run test && npm run typecheck && npm run lint
-```
+No strong copyleft (GPL/AGPL/SSPL) anywhere in the tree, production or dev.
 
-Do **not** include `typescript` in that batch (see Section 9).
+## Security Headers
 
-## 6. License Compliance
+All headers confirmed present in source (`next.config.ts:65-70` for HSTS/X-Frame-Options/X-Content-Type-Options/Referrer-Policy/Permissions-Policy; `src/proxy.ts:71` calling `buildCspHeader()` for CSP):
 
-**Pass.** No copyleft violations in production or dev. The scan's own summary confirms: `COPYLEFT LICENSES FOUND (production deps): false` and the same for dev/build deps.
+| Header | Value | Status |
+|--------|-------|--------|
+| Content-Security-Policy | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://js.stripe.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Configured. `'unsafe-inline'` in `script-src` is the deliberate, documented PPR-compatibility tradeoff (CLAUDE.md CSP/PPR section) — `'strict-dynamic'` and nonce-only CSP are both avoided since PPR prerenders HTML without nonces |
+| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Configured, 2-year max-age with preload, prod-only |
+| X-Frame-Options | `DENY` | Configured |
+| X-Content-Type-Options | `nosniff` | Configured |
+| Referrer-Policy | `strict-origin-when-cross-origin` | Configured |
+| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Configured |
 
-Every flagged package, named explicitly:
+No changes since prior cycles. No action needed.
 
-| Package | License | Scope | Status |
-|---|---|---|---|
-| `@img/sharp-libvips-darwin-arm64@1.2.4`, `@img/sharp-libvips-darwin-arm64@1.3.2` | LGPL-3.0-or-later | Production (via `sharp@^0.35.3`, Apache-2.0) | Approved — Exception 1 in `docs/project/license-exceptions.md`. Weak copyleft; pre-built native binary, dynamically linked, SaaS deployment. No obligations. |
-| `lightningcss@1.32.0`, `lightningcss-darwin-arm64@1.32.0` | MPL-2.0 | Dev/build only (Tailwind v4 + Vite) | Approved — Exception 3. File-level weak copyleft, build-time only, never bundled into client output. |
-| `dompurify@3.4.11` | (MPL-2.0 OR Apache-2.0) | Production (via `posthog-js`) | Not a violation — dual-licensed; the Apache-2.0 arm is selectable, so no MPL obligation attaches at all. |
-| `paisaxe@1.6.0` | UNLICENSED | This repo | Expected. Private, unpublished project. Not a third-party risk. |
-| `@sentry/cli@2.58.5`, `@sentry/cli-darwin@2.58.5` | FSL-1.1-MIT | Dev/build only | Acceptable. Functional Source License converts to MIT after two years; the only restriction is on building a competing product, which does not apply. Recorded previously (Jul 8). |
-| `caniuse-lite@1.0.30001774` | CC-BY-4.0 | Dev/build | Acceptable — data, attribution-only. |
-| `fast-sha256@1.3.0` | Unlicense | Production | Acceptable — public domain dedication. |
-| `expand-template@2.0.3` | (MIT OR WTFPL) | Production | Acceptable — MIT arm selectable. |
-| `@babel/template@7.29.7`, `simple-concat@1.0.1`, `simple-get@4.0.1` | MIT | Production | Scanner false positives — these are MIT and should not be in the flagged list. An artifact of the metrics script's matching, not a license concern. |
+## CI/CD Security Automation
 
-Two of the LGPL entries are the same package at two versions (`@img/sharp-libvips-darwin-arm64` at 1.2.4 and 1.3.2), meaning the tree carries a duplicate. Not a security or license issue — a minor dedup opportunity only.
+| Control | Status |
+|---------|--------|
+| Dependabot | Active — `.github/dependabot.yml`, weekly (Monday), targets `develop`, semver-gated groups (minor/patch only per group) |
+| Gitleaks | Active — `.github/workflows/security.yml`, runs on push/PR to `develop`/`main`, plus daily cron. Passing (confirmed in the same 2026-08-05 08:55 UTC run that failed on `npm audit`) |
+| npm audit in CI | Active but **currently failing** — same workflow, `npm audit --omit=dev --audit-level=moderate` job. Last run (`30991007551`, main, 2026-08-05 08:55 UTC): FAILURE, due to `brace-expansion` and `fast-uri` (see Exploitability Analysis for why these count as "production" under npm's classification). This will also fail on the next `develop` push until the fixes in Prioritized Remediation Steps land — reproduced locally against the current `develop` tree |
+| Renovate | Not configured — Dependabot covers this role; no gap |
+| GitHub code scanning / secret scanning (GHAS) | Not available (private repo, not enabled) — known, owner-cost gap, not newly actionable. Gitleaks in CI covers the secret-scanning surface |
+| License check | Active — `.github/workflows/license-check.yml`, blocks strong copyleft (GPL/AGPL/SSPL) |
 
-CI enforcement verified at source (`.github/workflows/license-check.yml:31`): the blocking step runs `npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-1.0;AGPL-3.0;EUPL-1.1;EUPL-1.2;SSPL-1.0;BSL-1.1;CPAL-1.0;OSL-3.0;CPOL-1.02"`. Strong copyleft blocks on every PR; weak copyleft (LGPL/MPL) warns but does not block, consistent with the documented exception policy.
+**Gap this cycle:** the `npm audit` CI job is red. It is not a false positive from stale Dependabot alert tracking (unlike the `main`-vs-`develop` staleness pattern noted in past cycles) — reproducing the exact CI command (`npm audit --omit=dev --audit-level=moderate`) against the current `develop` tree independently confirms the same 2 high-severity findings. Anyone opening a PR to `develop` right now will see this job fail.
 
-## 7. Security Headers
+## Outdated Packages
 
-All headers present and correct. Verified against source, not only the live probe.
+27 outdated packages (up from 10 last cycle), all minor/patch except `typescript`:
 
-| Header | Value | Assessment |
-|---|---|---|
-| `Content-Security-Policy` | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; ... object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Correct. No `'strict-dynamic'`, no nonce-gating — required for PPR compatibility per CLAUDE.md. `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'` all present. |
-| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Correct, 2-year max-age with preload. Production-gated at `next.config.ts:65` — deliberately not sent on localhost to avoid poisoning Chrome's HSTS cache. |
-| `X-Frame-Options` | `DENY` | Correct (`next.config.ts:68`). |
-| `X-Content-Type-Options` | `nosniff` | Correct. |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` | Correct. |
-| `Permissions-Policy` | `camera=(), geolocation=(), microphone=(self)` | Correct. `microphone=(self)` is required for the ElevenLabs voice widget. |
+| Package | Current -> Latest | Type |
+|---------|-------------------|------|
+| `@elevenlabs/react` | 1.11.0 -> 1.12.0 | minor |
+| `@next/bundle-analyzer` | 16.2.12 -> 16.3.0 | minor |
+| `@next/eslint-plugin-next` | 16.2.12 -> 16.3.0 | minor |
+| `@playwright/test` | 1.62.0 -> 1.62.1 | patch |
+| `@sentry/core` | 10.68.0 -> 10.69.0 | patch |
+| `@sentry/nextjs` | 10.68.0 -> 10.69.0 | patch |
+| `@stripe/stripe-js` | 9.12.1 -> 9.13.0 | minor |
+| `@supabase/ssr` | 0.12.3 -> 0.12.4 | patch |
+| `@supabase/supabase-js` | 2.110.9 -> 2.112.1 | minor |
+| `@testing-library/user-event` | 14.6.1 -> 14.6.3 | patch |
+| `@types/react` | 19.2.17 -> 19.2.18 | patch |
+| `@types/react-dom` | 19.2.3 -> 19.2.4 | patch |
+| `@typescript-eslint/eslint-plugin` | 8.65.0 -> 8.66.0 | minor |
+| `@upstash/redis` | 1.38.0 -> 1.38.2 | patch |
+| `@vitejs/plugin-react` | 6.0.4 -> 6.0.5 | patch |
+| `@vitest/eslint-plugin` | 1.6.24 -> 1.6.26 | patch |
+| `knip` | 6.29.0 -> 6.32.0 | minor |
+| `lucide-react` | 1.27.0 -> 1.28.0 | minor |
+| `next` | 16.2.12 -> 16.3.0 | minor |
+| `pdfjs-dist` | 6.1.200 -> 6.2.108 | minor |
+| `postcss` | 8.5.23 -> 8.5.25 | patch |
+| `posthog-js` | 1.407.3 -> 1.413.2 | minor |
+| `resend` | 6.18.0 -> 6.18.1 | patch |
+| `stripe` | 22.3.2 -> 22.4.0 | minor |
+| `tsx` | 4.23.1 -> 4.23.9 | patch |
+| `twitter-api-v2` | 1.29.0 -> 1.29.1 | patch |
+| `typescript` | 6.0.3 -> 7.0.2 | **major** — excluded from Dependabot batching per Jul 15 fix, no CVE, low urgency |
 
-**On the apparent CSP inconsistency in the raw metrics:** the probe output shows two header blocks, the second missing `Content-Security-Policy`. This is expected, not a gap. CSP is set per-request by `src/proxy.ts:71` (`response.headers.set("Content-Security-Policy", buildCspHeader())`) rather than statically in `next.config.ts`, and `src/proxy.test.ts:1118` and `:1644` assert that CSP is deliberately **not** set on API routes such as `GET /api/feature-flags`. A CSP on a JSON API response has no meaning — there is no document context to constrain. The second block is an API-route probe. Behavior is intentional and test-enforced.
-
-## 8. CI/CD Security Automation
-
-No gaps. All four controls active and verified at source.
-
-| Control | Status | Evidence |
-|---|---|---|
-| Dependabot | Active | `.github/dependabot.yml` — npm ecosystem, weekly, pinned to `target-branch: develop`. Both groups now gated to minor/patch. `voyageai >= 0.2.0` correctly ignored (broken ESM build, Turbopack cannot resolve). |
-| Gitleaks | Active | `.github/workflows/security.yml:34` — `./gitleaks detect --source . --verbose`. |
-| npm audit | Active | `.github/workflows/security.yml:57` — `npm audit --omit=dev --audit-level=moderate` (blocking on production deps), plus a non-blocking full-tree pass at `:61`. |
-| License check | Active | `.github/workflows/license-check.yml:31` — blocking on strong copyleft. |
-| Renovate | Not configured | Not a gap. Dependabot covers the same ground; running both would produce duplicate PRs. No action recommended. |
-
-**Standing gap (unchanged, owner decision):** GitHub code scanning and secret scanning remain unavailable — both require the GHAS add-on on this private repo. Gitleaks covers the secret-scanning surface in CI. This is a cost decision, not code-actionable.
-
-## 9. Outdated Packages with Security Implications
-
-12 outdated packages, **zero with CVEs**. Eleven are minor/patch and safe to batch. One requires isolation:
-
-| Package | Current | Latest | Note |
-|---|---|---|---|
-| `typescript` | 6.0.3 | 7.0.2 | **Major — exclude from any batch.** This is the exact package that broke every CI check in Dependabot PR #726 by riding along in the "production" group. The `.github/dependabot.yml` fix means it will now arrive as its own standalone PR. Dev-only, zero CVEs, no urgency. Treat as a deliberate migration, not a batch item. |
-| `@anthropic-ai/sdk` | 0.111.0 | 0.112.1 | Minor, production. |
-| `@sentry/core`, `@sentry/nextjs` | 10.65.0 | 10.66.0 | Minor, production. Keep in lockstep. |
-| `@supabase/supabase-js` | 2.110.5 | 2.110.7 | Patch, production. |
-| `stripe` | 22.3.1 | 22.3.2 | Patch, production. Payment-path dep — worth taking. |
-| `@stripe/react-stripe-js` | 6.7.0 | 6.8.0 | Minor, production. |
-| `posthog-js` | 1.400.1 | 1.404.0 | Minor, production. Carries the `dompurify` transitive — keeping current is the cheapest way to stay ahead of sanitizer advisories. |
-| `@elevenlabs/react` | 1.10.0 | 1.10.1 | Patch, production. Deferred chunk. |
-| `@tailwindcss/postcss`, `tailwindcss` | 4.3.2 | 4.3.3 | Patch, build-time. Move together. |
-| `knip` | 6.26.0 | 6.27.0 | Minor, dev-only. |
-
-Per Performance Agent (Jul 15/16), the `posthog-js`, `supabase-js`, and `@elevenlabs/react` updates land in deferred or admin-only chunks and cannot touch first paint. Bundle impact is pre-cleared.
-
-## 10. Other Controls Verified
-
-- **Webhook signature verification:** `timingSafeEqual` confirmed present across all call sites — `src/app/api/webhooks/translate/route.ts`, `src/app/api/webhooks/supabase/route.ts`, `src/lib/services/elevenlabs-webhook-service.ts`, `src/lib/cron-auth.ts`, `src/lib/csrf.ts`, `src/lib/mcp-auth.ts`. No timing-unsafe string comparison in any auth path.
-- **E2E signature-rejection coverage:** `e2e/webhooks.spec.ts` (landed Jul 15) covers all four webhook routes. This closes the ask carried in prior reports.
-- **LLM safety guardrails:** Verified passing by QA this cycle (Jul 17) — prompt injection, role-play override, and authority impersonation all pass, plus all three boundary tests. QA's YELLOW is a latency/harness issue, not a safety regression. No blind cycle.
-
-## 11. Cross-Agent Note: Harness Trust
-
-Three agents (QA Jul 17, Performance Jul 15/16, Security Jul 8-10) have now independently reported the same class of defect: a probe fails silently and the harness reports a plausible-looking zero rather than an error. This agent's own `security-agent.sh` had exactly this bug (the `npm outdated --json` exit-1 fallback concatenating a second `{}`), fixed by Triage on Jul 10 and confirmed clean — this cycle's metrics show a single clean `OUTDATED PACKAGES: 12` line.
-
-Worth stating plainly for the security posture: **a security scanner that fails open is a security problem, not just an ops annoyance.** An `npm audit` step that silently produced "0 vulnerabilities" on a crashed run would read exactly like this cycle's genuine GREEN. The CI `npm audit` at `security.yml:57` is safe here — it is blocking and unguarded, so a crash fails the job. But the same cannot be assumed for every probe in every agent script. The shared hardening pass across agent scripts that QA, Performance, and Coverage have each requested should be treated as security-relevant work, not only reliability work.
+None of the 27 outdated packages have open advisories beyond the 3 already covered above (`brace-expansion`, `fast-uri`, `undici` are transitive, not in this direct-dependency outdated list). `postcss` 8.5.23 is already past the vulnerable `<= 8.5.17` range from the stale `main`-branch Dependabot alert `GHSA-r28c-9q8g-f849` — no action needed there, `develop` is already clean.
 
 ---
+
+## Cross-Agent Context Review
+
+Reviewed shared context from Cost Analyst (2026-08-06) and Coverage Agent (2026-08-06).
+
+- **Anthropic credit exhaustion (#734)** — Cost Analyst's 2026-08-06 entry marks this "CRITICAL", now day 17 unresolved. This remains a billing/availability incident outside this agent's remediation scope (no code fix exists). Per QA's last confirmation (Jul 22), the pre-LLM injection filter continues functioning correctly under the outage; LLM-layer safety guardrails remain unverifiable until credits are restored. No new security action item — flagging only so it isn't mistaken for a security-agent gap.
+- **Coverage Agent (2026-08-06)** added tests for fetch-timeout and database-error paths in `elevenlabs-signed-session.ts` and `voice-session/route.ts` — confirms the `AbortSignal.timeout` handling in that code is exercised correctly. No security concern; noted as a positive signal on error-handling robustness in a security-adjacent code path.
+- **ElevenLabs character-utilization acceleration** (Cost Analyst, 2026-08-06) is a cost/capacity signal, not a security finding — no action needed from this agent.
