@@ -65,7 +65,7 @@ The final local dependency gate reports zero vulnerabilities. A later REST refre
 
 | PR | Update type | Disposition | Notes |
 |----|-------------|-------------|-------|
-| #750 | patch group | Defer/comment after triage CI | Targets protected `main`, is blocked by its `npm audit` check, and is superseded by the verified `develop` lockfile. It will not be merged. |
+| #750 | patch group | Deferred and commented | Targets protected `main`, is blocked by its `npm audit` check, and is superseded by the verified `develop` lockfile. A review comment records the exact green candidate; it was not merged. |
 
 Release PR #751 is not a Dependabot triage item and remains untouched; merging or releasing to `main` requires separate authorization.
 
@@ -78,7 +78,7 @@ Release PR #751 is not a Dependabot triage item and remains untouched; merging o
 - [x] Lint clean twice: src and scripts, zero warnings
 - [x] `bash -n scripts/qa-agent.sh`
 - [x] `npm audit`: 0 vulnerabilities
-- [ ] Exact-SHA push CI (pending candidate commit)
+- [x] Exact-SHA push CI green for `a41e3efd30502ebaaa6e73f430b3d0342aa8c7e9`: 14/14 Actions runs terminal success (push runs 31363078848, 31363078860, 31363078864, 31363078865; pull-request runs 31363081251, 31363081252, 31363081253, 31363081267, 31363081279, 31363081280, 31363081288, 31363081308, 31363081330, 31363081374)
 
 ## Carried Items
 
