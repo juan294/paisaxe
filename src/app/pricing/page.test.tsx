@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import PricingPage from "./page";
+import PricingLoading from "./loading";
+import { Suspense, type ReactElement } from "react";
 
 // Mock hooks
 const mockSignInWithGoogle = vi.fn();
@@ -54,8 +56,9 @@ vi.mock("next/link", () => ({
 
 // Mock next/navigation
 const mockPush = vi.fn();
+const mockUseSearchParams = vi.fn(() => new URLSearchParams());
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockUseSearchParams(),
   useRouter: () => ({
     push: mockPush,
     replace: vi.fn(),
@@ -70,6 +73,7 @@ describe("PricingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPush.mockReset();
+    mockUseSearchParams.mockReturnValue(new URLSearchParams());
     mockUseAuth.mockReturnValue({
       user: null,
       session: null,
@@ -111,6 +115,24 @@ describe("PricingPage", () => {
     expect(screen.getByText("€1.99")).toBeInTheDocument();
     expect(screen.getByText("premium.faq_title")).toBeInTheDocument();
     expect(screen.getByText("premium.feature_24h")).toBeInTheDocument();
+  });
+
+  it("isolates search params behind a route shell when they suspend", () => {
+    expect((PricingPage() as ReactElement).type).toBe(Suspense);
+
+    mockUseSearchParams.mockImplementation(() => {
+      throw new Promise(() => {});
+    });
+
+    expect(() => render(<PricingPage />)).not.toThrow();
+  });
+
+  it("uses the pricing loading skeleton as the Suspense fallback", () => {
+    const routeShell = PricingPage() as ReactElement;
+
+    expect(routeShell.type).toBe(Suspense);
+    const fallback = (routeShell.props as { fallback: ReactElement }).fallback;
+    expect(fallback.type).toBe(PricingLoading);
   });
 
   it("should show disabled button with spinner during loading", () => {
@@ -209,6 +231,22 @@ describe("PricingPage", () => {
     fireEvent.click(button);
 
     expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing");
+  });
+
+  it("preserves returnTo when starting sign-in from pricing", () => {
+    mockUseSearchParams.mockReturnValue(
+      new URLSearchParams([["returnTo", "oviedo-walking-tour"]])
+    );
+
+    render(<PricingPage />);
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "premium.sign_in_to_purchase",
+    }));
+
+    expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+      "/pricing?returnTo=oviedo-walking-tour"
+    );
   });
 
   it("should show purchase button when user is authenticated", () => {
@@ -339,7 +377,44 @@ describe("PricingPage", () => {
     const button = screen.getByRole("button", { name: "premium.pricing_cta" });
     fireEvent.click(button);
 
-    expect(mockPush).toHaveBeenCalledWith("/pricing/checkout");
+    expect(mockPush).toHaveBeenCalledWith("/pricing/checkout?tier=day_pass");
+  });
+
+  it("preserves returnTo when authenticated users continue to checkout", () => {
+    mockUseSearchParams.mockReturnValue(
+      new URLSearchParams([["returnTo", "oviedo-walking-tour"]])
+    );
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
+
+    render(<PricingPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "premium.pricing_cta" }));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      "/pricing/checkout?returnTo=oviedo-walking-tour&tier=day_pass"
+    );
+  });
+
+  it("forwards the selected tier when continuing to checkout", () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
+
+    render(<PricingPage />);
+
+    // Select the weekly tier, then continue.
+    fireEvent.click(screen.getByRole("radio", { name: /4\.99/ }));
+    fireEvent.click(screen.getByRole("button", { name: "premium.pricing_cta" }));
+
+    expect(mockPush).toHaveBeenCalledWith("/pricing/checkout?tier=weekly_pass");
   });
 
   it("should show Premium Access text when isWhitelisted is true with no expiresAt", () => {
@@ -401,6 +476,14 @@ describe("PricingPage", () => {
       // Spinner should be inside the button
       const spinner = button.querySelector(".animate-spin");
       expect(spinner).toBeInTheDocument();
+    });
+
+    it("should have visible focus styles on the primary CTA", () => {
+      render(<PricingPage />);
+
+      const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
+      expect(button.className).toContain("focus-visible:ring-2");
+      expect(button.className).toContain("focus-visible:ring-green-300");
     });
   });
 
@@ -494,6 +577,32 @@ describe("PricingPage", () => {
       // opacity-50 alone is insufficient for WCAG AA; the button must use
       // the gray gradient instead of (or in addition to replacing) opacity-50
       expect(button.className).not.toContain("disabled:opacity-50");
+    });
+  });
+
+  describe("tier duration label translation fallback (line 151)", () => {
+    it("uses the real translation when t(tier.durationKey) differs from the key itself", async () => {
+      // The default mock `t: (key) => key` always makes
+      // `t(tier.durationKey) === tier.durationKey` true, so the fallbackLabel
+      // branch is the only one exercised elsewhere in this file. Override the
+      // i18n mock so `t()` returns an actual translated string, exercising the
+      // `: t(tier.durationKey)` branch instead.
+      vi.doMock("@/lib/i18n", () => ({
+        useTranslation: () => ({
+          t: (key: string) =>
+            key === "premium.tier_day" ? "24 hours (translated)" : key,
+        }),
+      }));
+      vi.resetModules();
+      const { default: FreshPricingPage } = await import("./page");
+
+      render(<FreshPricingPage />);
+
+      expect(screen.getByText("24 hours (translated)")).toBeInTheDocument();
+      expect(screen.queryByText("24 horas")).not.toBeInTheDocument();
+
+      vi.doUnmock("@/lib/i18n");
+      vi.resetModules();
     });
   });
 });

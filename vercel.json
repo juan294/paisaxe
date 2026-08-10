@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "test \"$VERCEL_ENV\" != \"production\" && test -z \"$VERCEL_GIT_PULL_REQUEST_ID\"",
   "regions": ["fra1"],
   "crons": [
     {
@@ -21,6 +22,10 @@
     {
       "path": "/api/cron/fail-stale-bookings",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/retry-booking-sms",
+      "schedule": "*/10 * * * *"
     }
   ],
   "redirects": [

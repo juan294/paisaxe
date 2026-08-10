@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVisitorVoiceAccess } from "@/hooks/use-visitor-voice-access";
 import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
+import { clientLogger } from "@/lib/client-logger";
 import type { VoiceAccessResponse } from "@/types/voice-access";
 
 interface UseVoiceAccessResult {
@@ -62,7 +63,9 @@ export function useVoiceAccess(): UseVoiceAccessResult {
         setPaidAccess(null);
       }
     } catch (error) {
-      console.error("[use-voice-access] Error fetching access:", error);
+      clientLogger.error("[use-voice-access] Error fetching access", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       setPaidAccess(null);
     } finally {
       setIsFetchingAccess(false);

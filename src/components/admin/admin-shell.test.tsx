@@ -44,6 +44,30 @@ vi.mock("@/hooks/use-admin-role", () => ({
   useAdminRole: () => mockUseAdminRole(),
 }));
 
+const adminTabsMockState = vi.hoisted(() => {
+  const allTabs = [
+    { value: "analytics", label: "Analytics" },
+    { value: "stories", label: "Stories" },
+    { value: "features", label: "Features" },
+    { value: "marketing", label: "Marketing" },
+    { value: "suggestions", label: "Suggestions" },
+    { value: "agents", label: "Agents" },
+  ];
+
+  return {
+    allTabs,
+    tabs: [...allTabs],
+  };
+});
+
+const resetAdminTabsMock = () => {
+  adminTabsMockState.tabs.splice(
+    0,
+    adminTabsMockState.tabs.length,
+    ...adminTabsMockState.allTabs
+  );
+};
+
 // Mock StoriesTabPanel — stories tab is now a self-contained sub-component
 vi.mock("@/components/admin/stories-tab-panel", () => ({
   StoriesTabPanel: () => <div data-testid="stories-tab-panel">Stories Panel</div>,
@@ -59,34 +83,18 @@ vi.mock("@/components/admin/admin-tabs", () => ({
     onTabChange: (tab: string) => void;
   }) => (
     <div data-testid="admin-tabs">
-      <button onClick={() => onTabChange("analytics")} data-active={activeTab === "analytics"}>
-        Analytics
-      </button>
-      <button onClick={() => onTabChange("stories")} data-active={activeTab === "stories"}>
-        Stories
-      </button>
-      <button onClick={() => onTabChange("features")} data-active={activeTab === "features"}>
-        Features
-      </button>
-      <button onClick={() => onTabChange("marketing")} data-active={activeTab === "marketing"}>
-        Marketing
-      </button>
-      <button onClick={() => onTabChange("suggestions")} data-active={activeTab === "suggestions"}>
-        Suggestions
-      </button>
-      <button onClick={() => onTabChange("agents")} data-active={activeTab === "agents"}>
-        Agents
-      </button>
+      {adminTabsMockState.tabs.map((tab) => (
+        <button
+          key={tab.value}
+          onClick={() => onTabChange(tab.value)}
+          data-active={activeTab === tab.value}
+        >
+          {tab.label}
+        </button>
+      ))}
     </div>
   ),
-  TABS: [
-    { value: "analytics", label: "Analytics" },
-    { value: "stories", label: "Stories" },
-    { value: "features", label: "Features" },
-    { value: "marketing", label: "Marketing" },
-    { value: "suggestions", label: "Suggestions" },
-    { value: "agents", label: "Agents" },
-  ],
+  TABS: adminTabsMockState.tabs,
 }));
 
 // Mock tab panel components
@@ -140,6 +148,7 @@ function setupAdminAuth() {
 describe("AdminShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAdminTabsMock();
     // Default: no tab param in URL → defaults to "analytics"
     mockSearchParamsGet.mockReturnValue(null);
   });
@@ -170,6 +179,25 @@ describe("AdminShell", () => {
       render(<AdminShell />);
       expect(screen.getByText("Paisaxe Admin")).toBeInTheDocument();
       expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
+    });
+
+    it("calls signInWithGoogle('/admin') when Sign in with Google is clicked", async () => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+      mockUseAdminRole.mockReturnValue({ isAdmin: false, isLoading: false });
+
+      render(<AdminShell />);
+
+      const signInButton = screen.getByText("Sign in with Google").closest("button")!;
+      await act(async () => {
+        fireEvent.click(signInButton);
+      });
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith("/admin");
     });
 
     it("shows access denied for non-admin users", () => {
@@ -362,6 +390,124 @@ describe("AdminShell", () => {
     });
   });
 
+  describe("Keyboard shortcuts (Cmd/Ctrl+1..N switches tabs)", () => {
+    beforeEach(() => {
+      setupAdminAuth();
+    });
+
+    it("ignores keydown events without metaKey or ctrlKey", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "2" }));
+      });
+
+      // No metaKey/ctrlKey → early return, no tab change, no router.push
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+    });
+
+    it("ignores metaKey keydown when key number is out of TABS range", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "9", metaKey: true })
+        );
+      });
+
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+    });
+
+    it("ignores metaKey keydown when key is not a number", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "k", metaKey: true })
+        );
+      });
+
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+    });
+
+    it("switches tab via Cmd+<N> matching a TABS index", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      // TABS[1] === "stories" (index 1 → key "2")
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "2", metaKey: true })
+        );
+      });
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.stringContaining("tab=stories"),
+        expect.anything()
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId("stories-tab-panel")).toBeInTheDocument();
+      });
+    });
+
+    it("switches tab via Ctrl+<N> as well as Cmd", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      // TABS[2] === "features" (index 2 → key "3")
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "3", ctrlKey: true })
+        );
+      });
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.stringContaining("tab=features"),
+        expect.anything()
+      );
+    });
+
+    it("removes the keydown listener on unmount", async () => {
+      const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+
+      const { unmount } = render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      unmount();
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        "keydown",
+        expect.any(Function)
+      );
+
+      removeEventListenerSpy.mockRestore();
+    });
+  });
+
   describe("FE-H5: activeTab derived from searchParams, tab change only calls router.push", () => {
     beforeEach(() => {
       setupAdminAuth();
@@ -386,6 +532,33 @@ describe("AdminShell", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+    });
+
+    it("normalizes invalid tab query values to the default analytics tab", async () => {
+      mockSearchParamsGet.mockReturnValue("not-a-real-tab");
+
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+        expect(screen.queryByTestId("agents-dashboard")).not.toBeInTheDocument();
+      });
+    });
+
+    it("does not render the production-hidden agents panel from a deep link", async () => {
+      adminTabsMockState.tabs.splice(
+        0,
+        adminTabsMockState.tabs.length,
+        ...adminTabsMockState.allTabs.filter((tab) => tab.value !== "agents")
+      );
+      mockSearchParamsGet.mockReturnValue("agents");
+
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+        expect(screen.queryByTestId("agents-dashboard")).not.toBeInTheDocument();
       });
     });
 

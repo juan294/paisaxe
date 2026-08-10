@@ -4,11 +4,10 @@ import Image from "next/image";
 import { ImageIcon, Pencil, Check } from "lucide-react";
 import type { AdminStory } from "@/types/admin";
 import { CATEGORY_LABELS } from "@/types/immersive";
-import type { StoryMetadata, StoryLocale, TranslationStatus } from "@/types/immersive";
+import type { StoryMetadata, TranslationStatus } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
-
-const TRANSLATION_LOCALES: StoryLocale[] = ["en", "fr", "de", "pt", "ast"];
+import { TRANSLATION_LOCALES } from "@/lib/translation-locales";
 
 /**
  * Check if a story is missing any translations.

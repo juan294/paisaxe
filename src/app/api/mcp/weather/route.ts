@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
-import { weatherQuerySchema } from "@/lib/schemas";
+import { weatherPostRequestSchema, weatherQuerySchema } from "@/lib/schemas";
 
 /**
  * MCP-compatible Weather API endpoint for ElevenLabs voice agents.
@@ -204,36 +204,34 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!process.env.OPENWEATHERMAP_API_KEY) {
-    return NextResponse.json(
-      { error: "Weather API not configured" },
-      { status: 500 }
-    );
-  }
-
   try {
     const body = await request.json();
+    const paramsParsed = weatherPostRequestSchema.safeParse(body);
 
-    // Support both flat format { city: "..." } and MCP format { tool, arguments: { city } }
-    let city: string | undefined;
-
-    if (body.city) {
-      // Flat format from ElevenLabs webhook
-      city = body.city;
-    } else if (body.arguments?.city) {
-      // MCP tool call format
-      city = body.arguments.city;
-    }
-
-    if (!city) {
+    // Validate before checking upstream configuration, matching GET above: a
+    // malformed request is a 400 whether or not the server holds a weather key.
+    if (!paramsParsed.success) {
+      const firstIssue = paramsParsed.error.issues[0];
       return NextResponse.json(
-        { error: "City parameter is required" },
+        { error: firstIssue?.message ?? "Invalid query parameters" },
         { status: 400 }
       );
     }
 
+    if (!process.env.OPENWEATHERMAP_API_KEY) {
+      return NextResponse.json(
+        { error: "Weather API not configured" },
+        { status: 500 }
+      );
+    }
+
+    const { city } = paramsParsed.data;
     const weather = await fetchWeather(city);
-    return NextResponse.json(weather);
+    return NextResponse.json(weather, {
+      headers: {
+        "Cache-Control": "public, max-age=300", // Cache for 5 minutes (matches GET)
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
 

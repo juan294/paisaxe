@@ -14,9 +14,21 @@ updates:
       # cannot resolve). Pin to 0.1.x until upstream fixes it.
       - dependency-name: "voyageai"
         versions: [">= 0.2.0"]
+      # TypeScript 7 is outside the peer range supported by the current
+      # @typescript-eslint stack. Keep major upgrades isolated until the
+      # lint toolchain advertises support.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
+      # Both groups are restricted to minor/patch so a major version bump
+      # (e.g. typescript 6->7) always arrives as its own standalone PR
+      # instead of silently riding along with unrelated safe updates and
+      # failing every downstream CI check. This is semver-based, not a
+      # per-package allowlist — it holds for the next major bump in any
+      # package, not just the one that broke a batch this cycle.
       production:
         applies-to: version-updates
+        update-types: ["minor", "patch"]
         patterns:
           - "*"
         exclude-patterns:
@@ -27,6 +39,7 @@ updates:
           - "@testing-library/*"
       dev-and-types:
         applies-to: version-updates
+        update-types: ["minor", "patch"]
         patterns:
           - "@types/*"
           - "eslint*"

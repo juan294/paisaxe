@@ -100,6 +100,22 @@ describe("GET /api/admin/costs-analytics/[id]", () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to fetch cost entry");
   });
+
+  it("should return 500 when getManualCost rejects with a non-Error value", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+    // Reject with a non-Error value to exercise the String(error) fallback branch
+    vi.mocked(getManualCost).mockRejectedValue("connection reset");
+
+    const request = new NextRequest("http://localhost/api/admin/costs-analytics/entry-1");
+    const response = await GET(request, makeRouteParams("entry-1"));
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to fetch cost entry");
+  });
 });
 
 describe("PUT /api/admin/costs-analytics/[id]", () => {
@@ -184,6 +200,26 @@ describe("PUT /api/admin/costs-analytics/[id]", () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to update cost entry");
   });
+
+  it("should return 500 when updateManualCost rejects with a non-Error value", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+    // Reject with a non-Error value to exercise the String(error) fallback branch
+    vi.mocked(updateManualCost).mockRejectedValue({ code: "ETIMEDOUT" });
+
+    const request = new NextRequest("http://localhost/api/admin/costs-analytics/entry-1", {
+      method: "PUT",
+      body: JSON.stringify({ costUsd: 30 }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PUT(request, makeRouteParams("entry-1"));
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to update cost entry");
+  });
 });
 
 describe("DELETE /api/admin/costs-analytics/[id]", () => {
@@ -249,6 +285,24 @@ describe("DELETE /api/admin/costs-analytics/[id]", () => {
       userId: "user-1",
     });
     vi.mocked(deleteManualCost).mockRejectedValue(new Error("DB error"));
+
+    const request = new NextRequest("http://localhost/api/admin/costs-analytics/entry-1", {
+      method: "DELETE",
+    });
+    const response = await DELETE(request, makeRouteParams("entry-1"));
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to delete cost entry");
+  });
+
+  it("should return 500 when deleteManualCost rejects with a non-Error value", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+    // Reject with a non-Error value to exercise the String(error) fallback branch
+    vi.mocked(deleteManualCost).mockRejectedValue("foreign key violation");
 
     const request = new NextRequest("http://localhost/api/admin/costs-analytics/entry-1", {
       method: "DELETE",

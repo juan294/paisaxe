@@ -32,6 +32,7 @@ vi.mock("child_process", async (importOriginal) => {
 
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { POST, GET, DELETE } from "./route";
+import { resetRunningAgentsForTests } from "./state";
 
 const LEGACY_RUNNER_OVERRIDE = ["ALLOW", "AGENT", "RUN"].join("_");
 const originalVercelEnv = process.env.VERCEL_ENV;
@@ -55,10 +56,12 @@ function resetToLocalRuntime() {
   restoreAgentRunnerEnv();
   delete process.env.VERCEL_ENV;
   delete process.env[LEGACY_RUNNER_OVERRIDE];
+  resetRunningAgentsForTests();
+  vi.useRealTimers();
 }
 
 function makeRequest(body: unknown): NextRequest {
-  return new NextRequest("http://localhost:3000/api/admin/agents/run", {
+  return new NextRequest("http://localhost:3006/api/admin/agents/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -66,7 +69,7 @@ function makeRequest(body: unknown): NextRequest {
 }
 
 function makeGetRequest(params?: Record<string, string>): NextRequest {
-  const url = new URL("http://localhost:3000/api/admin/agents/run");
+  const url = new URL("http://localhost:3006/api/admin/agents/run");
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       url.searchParams.set(k, v);
@@ -76,7 +79,7 @@ function makeGetRequest(params?: Record<string, string>): NextRequest {
 }
 
 function makeDeleteRequest(body: unknown): NextRequest {
-  return new NextRequest("http://localhost:3000/api/admin/agents/run", {
+  return new NextRequest("http://localhost:3006/api/admin/agents/run", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -127,7 +130,7 @@ describe("POST /api/admin/agents/run", () => {
     });
 
     const request = new NextRequest(
-      "http://localhost:3000/api/admin/agents/run",
+      "http://localhost:3006/api/admin/agents/run",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -394,18 +397,71 @@ describe("POST /api/admin/agents/run", () => {
     const mockChild = createMockChild(33333);
     mockSpawn.mockReturnValue(mockChild);
 
-    await POST(makeRequest({ agentKey: "performance_agent_enabled" }));
+    // Use cost_analyst_agent_enabled — not shared with any other test in this describe block
+    await POST(makeRequest({ agentKey: "cost_analyst_agent_enabled" }));
 
     const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
     // Emit text with ANSI color codes
     stdout.emit("data", Buffer.from("\x1b[32mSuccess\x1b[0m: all tests passed\n"));
 
     const response = await GET(
-      makeGetRequest({ agentKey: "performance_agent_enabled" })
+      makeGetRequest({ agentKey: "cost_analyst_agent_enabled" })
     );
     const data = await response.json();
 
     expect(data.logs[0].text).toBe("Success: all tests passed");
+  });
+
+  // --- SE-L1 (#542): env allowlist + output sanitization ---
+
+  it("spawns the child with an allowlisted env, not the whole process env", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    // A secret that must NOT be forwarded to the child process.
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "super-secret-service-key";
+    process.env.PATH = process.env.PATH || "/usr/bin";
+
+    const mockChild = createMockChild(55001);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "qa_agent_enabled" }));
+
+    expect(mockSpawn).toHaveBeenCalled();
+    const spawnOptions = mockSpawn.mock.calls[0][2] as { env: NodeJS.ProcessEnv };
+    expect(spawnOptions.env).toBeDefined();
+    // Allowlisted vars pass through…
+    expect(spawnOptions.env.PATH).toBeDefined();
+    // …but arbitrary secrets do not.
+    expect(spawnOptions.env.SUPABASE_SERVICE_ROLE_KEY).toBeUndefined();
+
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  });
+
+  it("sanitizes secrets in captured subprocess output", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(55002);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "coverage_agent_enabled" }));
+
+    const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
+    // An email address in the output must be redacted before it reaches the log buffer.
+    stdout.emit("data", Buffer.from("Notifying admin@example.com of results\n"));
+
+    const response = await GET(
+      makeGetRequest({ agentKey: "coverage_agent_enabled" })
+    );
+    const data = await response.json();
+
+    expect(data.logs[0].text).not.toContain("admin@example.com");
+    expect(data.logs[0].text).toContain("[REDACTED]");
   });
 
   it("handles exit event and flushes remaining buffers", async () => {
@@ -749,6 +805,29 @@ describe("GET /api/admin/agents/run", () => {
     expect(data.running).toHaveProperty("performance_agent_enabled");
     expect(data.running.performance_agent_enabled.startedAt).toBeDefined();
   });
+
+  it("skips recently-finished agents in the running status list", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(10099);
+    mockSpawn.mockReturnValue(mockChild);
+
+    // Start an agent
+    await POST(makeRequest({ agentKey: "coverage_agent_enabled" }));
+
+    // Emit exit to mark the agent finished (stays in map within the 1-hour TTL)
+    (mockChild as EventEmitter).emit("exit", 0);
+
+    // GET without agentKey lists all running agents
+    const response = await GET(makeGetRequest());
+    const data = await response.json();
+
+    // Finished agent should be skipped (line 284: `if (agent.finished) continue;`)
+    expect(data.running).not.toHaveProperty("coverage_agent_enabled");
+  });
 });
 
 describe("DELETE /api/admin/agents/run", () => {
@@ -796,7 +875,7 @@ describe("DELETE /api/admin/agents/run", () => {
     });
 
     const request = new NextRequest(
-      "http://localhost:3000/api/admin/agents/run",
+      "http://localhost:3006/api/admin/agents/run",
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },

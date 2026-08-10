@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useConversation } from "@elevenlabs/react";
+import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { Mic, MicOff, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
-import { useVoiceSession } from "@/hooks/use-voice-session";
+import {
+  getElevenLabsLanguage,
+  getPreferredLanguage,
+  useVoiceSession,
+} from "@/hooks/use-voice-session";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { clientLogger } from "@/lib/client-logger";
+import { csrfHeaders } from "@/lib/csrf-client";
 import type { Story } from "@/types/immersive";
 
 interface Message {
@@ -23,6 +29,9 @@ interface VoiceChatElevenLabsProps {
   onFallbackToText: () => void;
   userAccessToken?: string | null;
 }
+
+// Stable identifiers for the 5 fixed sound-visualizer bars (#479: avoid index-as-key).
+const SOUND_BARS = ["bar-far-left", "bar-left", "bar-center", "bar-right", "bar-far-right"] as const;
 
 // Animated orb component for voice visualization
 function VoiceOrb({
@@ -82,9 +91,9 @@ function VoiceOrb({
       >
         {/* Animated sound bars */}
         <div className="flex items-center justify-center gap-[3px]">
-          {[0, 1, 2, 3, 4].map((i) => (
+          {SOUND_BARS.map((barId, i) => (
             <div
-              key={i}
+              key={barId}
               className={cn(
                 "w-[3px] rounded-full bg-current transition-all",
                 isConnecting && "animate-pulse",
@@ -110,11 +119,34 @@ export function VoiceChatElevenLabs({
   onFallbackToText,
   userAccessToken,
 }: VoiceChatElevenLabsProps) {
+  // @elevenlabs/react 1.12 scopes callback registration and conversation state
+  // to this provider. Calling useConversation without it crashes as soon as
+  // the paid voice chunk mounts.
+  return (
+    <ConversationProvider>
+      <VoiceChatElevenLabsContent
+        story={story}
+        agentId={agentId}
+        onFallbackToText={onFallbackToText}
+        userAccessToken={userAccessToken}
+      />
+    </ConversationProvider>
+  );
+}
+
+function VoiceChatElevenLabsContent({
+  story,
+  agentId,
+  onFallbackToText,
+  userAccessToken,
+}: VoiceChatElevenLabsProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // FE-H1: retain mic stream so unmount cleanup can stop tracks
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
   const prefersReducedMotion = useReducedMotion();
@@ -144,7 +176,9 @@ export function VoiceChatElevenLabs({
       }
     },
     onError: (err) => {
-      console.error("Voice conversation error:", err);
+      clientLogger.error("[VOICE_CONVERSATION_ERROR]", {
+        error: String(err),
+      });
       setError(t("voice.error"));
       onFallbackToText();
     },
@@ -163,6 +197,24 @@ export function VoiceChatElevenLabs({
     },
     []
   );
+
+  // FE-H1: cleanup on unmount — end WebSocket session and stop mic tracks so
+  // closing the dialog does not leave a live connection and mic indicator running.
+  useEffect(() => {
+    return () => {
+      // End the ElevenLabs WebSocket session if still active.
+      void Promise.resolve(conversation.endSession()).catch(() => {
+        // Ignore errors during cleanup — component is already unmounting
+      });
+      // Stop any captured mic tracks so the browser mic indicator clears.
+      // Guard getTracks in case the MediaStream mock is incomplete.
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks?.().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-scroll to bottom — respects prefers-reduced-motion
   useEffect(() => {
@@ -183,18 +235,39 @@ export function VoiceChatElevenLabs({
 
       // Request mic permission on click — not on mount (UX-H1)
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // FE-H1: store the stream so unmount cleanup can stop the mic tracks
+        mediaStreamRef.current = stream;
         setHasPermission(true);
       } catch {
         setHasPermission(false);
         return;
       }
 
-      // Determine language override based on user's locale
-      const languageOverride = voiceSession.preferredLanguage === "Spanish" ? "es" : "en";
+      // The in-app language switcher is authoritative. Browser locale remains
+      // session metadata only and must not override an explicit visitor choice.
+      const languageOverride = getElevenLabsLanguage(locale);
+      const preferredLanguage = getPreferredLanguage(locale);
+      const signedSessionResponse = await fetch("/api/voice-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...csrfHeaders(),
+        },
+        body: JSON.stringify({ agentKey: "pelayo" }),
+      });
+      const signedSession = (await signedSessionResponse.json()) as {
+        signedUrl?: unknown;
+      };
+      if (
+        !signedSessionResponse.ok ||
+        typeof signedSession.signedUrl !== "string"
+      ) {
+        throw new Error("Signed voice session unavailable");
+      }
 
       await conversation.startSession({
-        agentId,
+        signedUrl: signedSession.signedUrl,
         connectionType: "websocket",
         dynamicVariables: {
           // Story context
@@ -209,8 +282,8 @@ export function VoiceChatElevenLabs({
           is_returning: voiceSession.isReturning ? "true" : "false",
 
           // Language/locale
-          user_locale: voiceSession.userLocale,
-          preferred_language: voiceSession.preferredLanguage,
+          user_locale: locale,
+          preferred_language: preferredLanguage,
 
           // Time context
           time_of_day: voiceSession.timeOfDay,
@@ -229,7 +302,9 @@ export function VoiceChatElevenLabs({
         },
       });
     } catch (err) {
-      console.error("Failed to start voice conversation:", err);
+      clientLogger.error("[VOICE_START_FAILURE]", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       setError(t("voice.error"));
       onFallbackToText();
     }
@@ -239,12 +314,16 @@ export function VoiceChatElevenLabs({
     try {
       await conversation.endSession();
     } catch (err) {
-      console.error("Failed to end conversation:", err);
+      clientLogger.error("[VOICE_END_FAILURE]", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
+    const nextMuted = !isMuted;
+    conversation.setMuted(nextMuted);
+    setIsMuted(nextMuted);
   };
 
   // Get status text

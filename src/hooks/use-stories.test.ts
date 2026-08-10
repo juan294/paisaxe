@@ -249,6 +249,41 @@ describe("useStories", () => {
     consoleSpy.mockRestore();
   });
 
+  it("keeps cached data and stringifies a non-Error refresh rejection (String(err) false branch, line 205)", async () => {
+    // The refresh failure test above rejects with `new Error(...)`, exercising the
+    // `err.message` (true) branch of the STORIES_REFRESH warn. This test rejects with a
+    // NON-Error value while cache.data is already populated, so fetchStories catches,
+    // takes the `if (cache.data)` path, and hits the `String(err)` false branch.
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { result } = renderHook(() => useStories(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Cache is now populated with the successful initial fetch.
+    expect(result.current.stories).toEqual(mockStories);
+
+    // Next fetch rejects with a plain string (non-Error) — cache.data still exists,
+    // so fetchStories returns the cached data and warns via String(err).
+    mockGetStoriesFromDB.mockRejectedValue("refresh string error");
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Cached stories are retained (no throw, no error state).
+    expect(result.current.stories).toEqual(mockStories);
+    expect(result.current.error).toBeNull();
+
+    consoleSpy.mockRestore();
+  });
+
   it("should set error on refresh failure when no cached data", async () => {
     // Start with a fetch that fails immediately - no cache will be populated
     mockGetStoriesFromDB.mockRejectedValue(new Error("Initial error"));
@@ -534,6 +569,40 @@ describe("useStories", () => {
     });
   });
 
+  it("should log an error when focus revalidation fetch fails (line 267)", async () => {
+    // Arrange: populate cache with valid data
+    const { result } = renderHook(() => useStories(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.stories).toEqual(mockStories);
+
+    // Make the cache stale
+    const realDateNow = Date.now;
+    const futureTime = realDateNow() + 6 * 60 * 1000;
+    vi.spyOn(Date, "now").mockReturnValue(futureTime);
+
+    // Make the next fetch fail so the .catch in handleFocus fires (line 266-270)
+    const fetchError = new Error("Focus revalidation failed");
+    mockGetStoriesFromDB.mockRejectedValueOnce(fetchError);
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Act: dispatch focus event — triggers handleFocus, which calls fetchStories().catch(...)
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      // Allow the async .catch callback to settle
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    vi.spyOn(Date, "now").mockRestore();
+    errorSpy.mockRestore();
+
+    // Stories remain unchanged (catch silently logs, does not update state)
+    expect(result.current.stories).toEqual(mockStories);
+  });
+
 });
 
 describe("useStories with initialStories", () => {
@@ -666,8 +735,59 @@ describe("useStories localStorage persistence", () => {
     // Parse the stored data and verify structure
     const stored = JSON.parse(storiesCall![1]);
     expect(stored.version).toBe(1);
-    expect(stored.data).toEqual(mockStories);
+    expect(stored.data).toEqual(mockStories.map(({ sourcePdf: _sourcePdf, ...story }) => story));
     expect(stored.timestamp).toBeDefined();
+  });
+
+  // Coverage note (line 157): `if (localStorageBootstrapped.current) return;` in the
+  // bootstrap effect guards against React StrictMode's dev-only double effect
+  // invocation. The effect has [] deps, so on production React (which vitest resolves
+  // — verified empirically: a StrictMode-wrapped probe effect fires exactly once)
+  // it runs once per mount and the guard is unreachable. Untestable in this
+  // environment; documented rather than forced.
+
+  it("persists only the slim public story payload to localStorage", async () => {
+    mockGetStoriesFromDB.mockResolvedValue([
+      {
+        ...mockStories[0],
+        sourcePdf: "private-guide.pdf",
+        suggestionId: "suggestion-1",
+        metadata: {
+          question_prompts: ["Ask this"],
+          mood_tags: ["relajante"],
+          translation_status: { en: { status: "failed", error: "private" } },
+          last_translated_at: "2026-01-01T00:00:00Z",
+          discovery_source: "admin-only",
+        },
+      },
+    ]);
+
+    const { result } = renderHook(() => useStories(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    const storiesCall = localStorageMock.setItem.mock.calls.find(
+      (call: [string, string]) => call[0] === "paisaxe-stories-cache"
+    );
+    const stored = JSON.parse(storiesCall![1]);
+
+    expect(stored.data).toEqual([
+      expect.objectContaining({
+        id: "db-story-1",
+        title: "DB Story 1",
+        metadata: {
+          question_prompts: ["Ask this"],
+          mood_tags: ["relajante"],
+        },
+      }),
+    ]);
+    expect(stored.data[0]).not.toHaveProperty("sourcePdf");
+    expect(stored.data[0]).not.toHaveProperty("suggestionId");
+    expect(stored.data[0].metadata).not.toHaveProperty("translation_status");
+    expect(stored.data[0].metadata).not.toHaveProperty("last_translated_at");
+    expect(stored.data[0].metadata).not.toHaveProperty("discovery_source");
   });
 
   it("should restore stories from localStorage on mount", async () => {
@@ -686,8 +806,10 @@ describe("useStories localStorage persistence", () => {
 
     const { result } = renderHook(() => useStories(), { wrapper });
 
-    // Should immediately have stories from localStorage, not loading
-    expect(result.current.stories).toEqual(mockStories);
+    // Should immediately have stories from localStorage, mapped back to Story compatibility
+    expect(result.current.stories).toEqual(
+      mockStories.map((story) => ({ ...story, sourcePdf: "" }))
+    );
     expect(result.current.isLoading).toBe(false);
   });
 
@@ -753,7 +875,9 @@ describe("useStories localStorage persistence", () => {
 
     // Should still have stories despite localStorage error
     expect(result.current.stories).toEqual(mockStories);
-    expect(consoleSpy).toHaveBeenCalledWith("Failed to persist stories to localStorage");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to persist stories to localStorage")
+    );
 
     consoleSpy.mockRestore();
   });
@@ -855,6 +979,23 @@ describe("prefetchStories", () => {
     mockGetStoriesFromDB.mockRejectedValue(new Error("Prefetch error"));
 
     // Should not throw
+    prefetchStories();
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalled();
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("stringifies a non-Error prefetch rejection (String(err) false branch, line 326)", async () => {
+    // The graceful-error test above rejects with `new Error(...)`, hitting the
+    // `err.message` (true) branch of the STORIES_PREFETCH_FAILURE log. This one rejects
+    // with a NON-Error value so the `String(err)` false branch executes.
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetStoriesFromDB.mockRejectedValue("prefetch string error");
+
+    // Should not throw despite the non-Error rejection.
     prefetchStories();
 
     await waitFor(() => {

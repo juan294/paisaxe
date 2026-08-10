@@ -15,14 +15,37 @@ vi.mock("@/lib/feature-flags-server", () => ({
 const mockInsert = vi.fn();
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
-vi.mock("@/lib/supabase", () => ({
+const mockDbSelect = vi.fn();
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(() => ({
     from: vi.fn(() => ({
       insert: mockInsert,
       update: mockUpdate,
+      select: mockDbSelect,
     })),
   })),
 }));
+
+// Partial mock of the ElevenLabs call service: delegates to the real
+// implementation by default (so all fetch-based tests below are unaffected),
+// but lets one test override initiateCall's return value directly. This is
+// needed to reach the `result.error ?? "Unknown error"` fallback on a failed,
+// non-timed-out call — the real initiateCall() always sets a truthy `error`
+// string on every failure path (missing config / non-ok response / caught
+// exception), so that fallback is otherwise unreachable via fetch mocking alone.
+const mockInitiateCallOverride = vi.hoisted(
+  () => ({ current: null as null | (() => Promise<{ success: boolean; error?: string; timedOut?: true }>) })
+);
+vi.mock("@/lib/services/elevenlabs-call-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/elevenlabs-call-service")>();
+  return {
+    ...actual,
+    initiateCall: (...args: Parameters<typeof actual.initiateCall>) =>
+      mockInitiateCallOverride.current
+        ? mockInitiateCallOverride.current()
+        : actual.initiateCall(...args),
+  };
+});
 
 // Mock environment variable
 const originalEnv = process.env;
@@ -45,11 +68,19 @@ describe("/api/mcp/make-booking", () => {
     mockUpdate.mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     });
+    mockDbSelect.mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+    });
     process.env = { ...originalEnv };
     process.env.MCP_API_SECRET = MCP_SECRET;
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_PHONE_NUMBER_ID;
     delete process.env.ELEVENLABS_BOOKING_AGENT_ID;
+    // Reset the initiateCall override so each test defaults to the real
+    // implementation (driven by mockFetch) unless it opts in explicitly.
+    mockInitiateCallOverride.current = null;
   });
 
   afterEach(() => {
@@ -252,6 +283,140 @@ describe("/api/mcp/make-booking", () => {
       expect(data.fallback_action).toContain("Casa Gerardo");
     });
 
+    it("should accept camelCase body keys (ElevenLabs camelCases tool params on push)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_camel" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "camel-key",
+        },
+        body: JSON.stringify({
+          venueName: "Casa Gerardo",
+          phoneNumber: "+34 985 88 77 97",
+          partySize: 4,
+          date: "hoy",
+          time: "21:00",
+          customerName: "Juan García López",
+          customerPhone: "+34612345678",
+          specialRequests: "Trona para bebé",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("initiated");
+
+      // Booking persisted with the camelCase values mapped to snake_case DB columns
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          venue_name: "Casa Gerardo",
+          venue_phone: "+34985887797",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+          party_size: 4,
+          booking_date: "hoy",
+          booking_time: "21:00",
+          special_requests: "Trona para bebé",
+        })
+      );
+    });
+
+    it("should still accept snake_case body keys for backward compatibility", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_snake" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "snake-key",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+          special_requests: "Trona para bebé",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("initiated");
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          venue_name: "Casa Gerardo",
+          customer_name: "Juan García López",
+          special_requests: "Trona para bebé",
+        })
+      );
+    });
+
+    it("should support MCP arguments wrapper with camelCase keys", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_camel_mcp" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "camel-mcp-key",
+        },
+        body: JSON.stringify({
+          tool: "make_booking",
+          arguments: {
+            venueName: "Casa Gerardo",
+            phoneNumber: "+34985887797",
+            partySize: 4,
+            date: "hoy",
+            time: "21:00",
+            customerName: "Juan García López",
+            customerPhone: "612345678",
+          },
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("initiated");
+    });
+
     it("should initiate ElevenLabs call when configured", async () => {
       // Configure ElevenLabs
       process.env.ELEVENLABS_API_KEY = "test-api-key";
@@ -344,6 +509,167 @@ describe("/api/mcp/make-booking", () => {
           "Content-Type": "application/json",
           "x-mcp-secret": MCP_SECRET,
           "idempotency-key": "booking-dup-1",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("already being processed");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("#605 BE-H1: duplicate idempotency key returns the prior pending booking state", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      });
+      mockDbSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValueOnce({
+          maybeSingle: vi.fn().mockResolvedValueOnce({
+            data: {
+              id: "existing-pending-row",
+              conversation_id: "conv_existing_pending",
+              status: "pending",
+              venue_name: "Casa Gerardo",
+              outcome_message: null,
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "booking-dup-pending",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("pending");
+      expect(data.call_sid).toBe("conv_existing_pending");
+      expect(data.message).toContain("already in progress");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("falls back to defaults when the prior pending booking row has null status/venue_name/conversation_id", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      });
+      mockDbSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValueOnce({
+          maybeSingle: vi.fn().mockResolvedValueOnce({
+            data: {
+              id: "existing-pending-row-null-fields",
+              conversation_id: null,
+              status: null,
+              venue_name: null,
+              outcome_message: null,
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "booking-dup-pending-null-fields",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // null status defaults to "pending", which is an ACTIVE_BOOKING_STATUSES member
+      expect(data.status).toBe("pending");
+      expect(data.success).toBe(true);
+      // null venue_name defaults to "the venue" in the generated message
+      expect(data.message).toContain("the venue");
+      expect(data.message).toContain("already in progress");
+      // null conversation_id means call_sid is omitted from the response body
+      expect(data.call_sid).toBeUndefined();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("treats a duplicate as in-progress when the prior-booking lookup itself errors", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      });
+      mockDbSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValueOnce({
+          maybeSingle: vi.fn().mockResolvedValueOnce({
+            data: null,
+            error: { message: "idempotency lookup failed" },
+          }),
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "booking-dup-lookup-error",
         },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
@@ -734,6 +1060,145 @@ describe("/api/mcp/make-booking", () => {
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
       expect(data.status).toBe("failed");
+    });
+
+    it("#455 BE-H1: should mark the pending booking failed immediately when ElevenLabs initiation fails", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockRejectedValueOnce(new Error("Network error: connection refused"));
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "initiation-fails-row-failed",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.status).toBe("failed");
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          outcome_message: expect.stringContaining("Network error"),
+        })
+      );
+    });
+
+    it("#456 BE-H2: should degrade when conversation_id persistence fails after the call is accepted", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_persist_failure" }),
+      });
+
+      const mockEq = vi
+        .fn()
+        .mockResolvedValueOnce({ error: { message: "conversation_id unique violation" } })
+        .mockResolvedValueOnce({ error: null });
+      mockUpdate.mockReturnValue({ eq: mockEq });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "conversation-id-update-fails",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(202);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("degraded");
+      expect(data.recovery_action).toContain("manual");
+      expect(mockUpdate).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          conversation_id: "conv_persist_failure",
+          status: "pending",
+        })
+      );
+      expect(mockUpdate).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          status: "failed",
+          outcome_message: expect.stringContaining("conv_persist_failure"),
+        })
+      );
+    });
+
+    it("#628 QA-H1: accepted ElevenLabs response without an identifier is not reported as initiated", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ status: "ok" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "accepted-without-identifier",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("failed");
+      expect(data.status).not.toBe("initiated");
+      expect(data.call_sid).toBeUndefined();
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          outcome_message: expect.stringContaining("missing conversation_id"),
+        })
+      );
     });
 
     it("should handle ElevenLabs API error with message field (not detail)", async () => {
@@ -1173,7 +1638,7 @@ describe("/api/mcp/make-booking", () => {
       );
     });
 
-    it("should skip pending booking insert when no conversationId or callSid", async () => {
+    it("should fail pending booking when no conversationId or callSid is returned", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
@@ -1204,14 +1669,19 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("failed");
       // BE-B6: insert is always called before the call (with status=initiating)
       expect(mockInsert).toHaveBeenCalledWith(
         expect.objectContaining({ status: "initiating" })
       );
-      // update should NOT be called since there was no conversationId or callSid to set
-      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          outcome_message: expect.stringContaining("missing conversation_id"),
+        })
+      );
     });
 
     it("should return 400 with Zod errors when venue_name and phone_number are missing (Zod validates before feature flag check)", async () => {
@@ -1275,6 +1745,47 @@ describe("/api/mcp/make-booking", () => {
       expect(data.success).toBe(false);
       // Should fall back to "ElevenLabs API error: 502"
       expect(data.message).toContain("ElevenLabs API error: 502");
+    });
+
+    it("falls back to 'Unknown error' when a failed, non-timed-out call result has no error string", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // The real initiateCall() always sets a truthy `error` string on every
+      // failure path, so `result.error ?? "Unknown error"` (route.ts:326) can
+      // only be reached by simulating a call result the real implementation
+      // could never actually produce (defensive fallback for future callers).
+      mockInitiateCallOverride.current = () =>
+        Promise.resolve({ success: false, error: undefined });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "no-error-string-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("failed");
+      // markPendingBookingFailed is called with the "Unknown error" fallback text
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          outcome_message: expect.stringContaining("Unknown error"),
+        })
+      );
     });
 
     it("should handle midnight time (0:00) correctly", async () => {
@@ -1794,6 +2305,84 @@ describe("/api/mcp/make-booking", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it("BE-B6: should fail when pre-call insert returns empty data array (missing pendingRowId, lines 472-476)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // Insert succeeds but returns an empty array — no row id available
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: [], error: null }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Could not persist");
+      // ElevenLabs must NOT be called since no row ID was obtained
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("BE-B6: should degrade gracefully when conversation_id update throws a DB exception (lines 523-535)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // Pre-call insert succeeds with a valid row id
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: [{ id: "pending-row-id" }], error: null }),
+      });
+
+      // ElevenLabs call succeeds with a conversation_id
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_update_throw" }),
+      });
+
+      // The conversation_id update throws (network/connection failure, not just an error object)
+      mockUpdate.mockReturnValue({
+        eq: vi.fn().mockRejectedValue(new Error("DB connection lost during update")),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Call was initiated but conversation_id could not be persisted — degraded 202 response
+      expect(response.status).toBe(202);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("degraded");
+    });
+
     // -----------------------------------------------------------------------
     // Zod validation tests (issue #270)
     // -----------------------------------------------------------------------
@@ -1936,6 +2525,52 @@ describe("/api/mcp/make-booking", () => {
       expect(data.errors).toBeDefined();
     });
 
+    it("line 98 — markPendingBookingFailed logs when its own DB update errors", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_mark_fail_test" }),
+      });
+
+      // First eq() call: conversation_id update fails → markPendingBookingFailed is called
+      // Second eq() call: the update inside markPendingBookingFailed also returns an error → line 98
+      const mockEq = vi
+        .fn()
+        .mockResolvedValueOnce({ error: { message: "conv_id persistence failed" } })
+        .mockResolvedValueOnce({ error: { message: "marking failed also failed" } });
+      mockUpdate.mockReturnValue({ eq: mockEq });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "line-98-coverage-key",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 2,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Still returns the degraded response — line 98 logged the error internally
+      expect(response.status).toBe(202);
+      expect(data.status).toBe("degraded");
+      // Both update calls were made
+      expect(mockEq).toHaveBeenCalledTimes(2);
+    });
+
     // === BE-H4: AbortSignal.timeout on ElevenLabs fetch ===
 
     it("BE-H4: should pass AbortSignal.timeout(15000) to the ElevenLabs fetch call", async () => {
@@ -1975,21 +2610,28 @@ describe("/api/mcp/make-booking", () => {
       expect(options.signal).toBeInstanceOf(AbortSignal);
     });
 
-    it("BE-H4: should return 500 with failed status when ElevenLabs fetch times out (AbortError)", async () => {
+    // BE-H2 regression: a timeout/abort must NOT produce a terminal 'failed' row.
+    // The pending_bookings row must stay in 'initiating' so the stale-bookings cron
+    // or a late webhook can reconcile.  The response must NOT be 500.
+    it("BE-H2: timeout leaves pending_bookings row in 'initiating' (does not call markPendingBookingFailed)", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
 
-      // Simulate a timeout by throwing a DOMException with name "TimeoutError"
-      const abortError = new DOMException("The operation was aborted due to timeout", "TimeoutError");
-      mockFetch.mockRejectedValueOnce(abortError);
+      // Simulate AbortSignal.timeout() firing — name is "TimeoutError"
+      const timeoutError = new DOMException("The operation timed out", "TimeoutError");
+      mockFetch.mockRejectedValueOnce(timeoutError);
+
+      // Track whether markPendingBookingFailed is called (it calls update().eq())
+      const mockEq = vi.fn().mockResolvedValue({ error: null });
+      mockUpdate.mockReturnValue({ eq: mockEq });
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-mcp-secret": MCP_SECRET,
-          "idempotency-key": "be-h4-timeout-key",
+          "idempotency-key": "be-h2-timeout-key",
         },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
@@ -2005,9 +2647,48 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.success).toBe(false);
-      expect(data.status).toBe("failed");
+      // Must NOT be 500 (that would imply terminal failure)
+      expect(response.status).not.toBe(500);
+      // Must NOT mark the booking as definitively failed
+      expect(data.status).not.toBe("failed");
+      // markPendingBookingFailed calls update().eq() — verify it was NOT called
+      expect(mockEq).not.toHaveBeenCalled();
+    });
+
+    it("BE-H2: late webhook can still match booking row after a timeout (row stays in initiating)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // AbortError variant (e.g., AbortController fires)
+      const abortError = new DOMException("The operation was aborted", "AbortError");
+      mockFetch.mockRejectedValueOnce(abortError);
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "be-h2-abort-key",
+        },
+        body: JSON.stringify({
+          venue_name: "El Molino",
+          phone_number: "+34985123456",
+          party_size: 3,
+          date: "mañana",
+          time: "14:00",
+          customer_name: "María González",
+          customer_phone: "612987654",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Response must be non-terminal: 202 (accepted but outcome unknown)
+      expect(response.status).toBe(202);
+      // Status must communicate that reconciliation is pending
+      expect(data.status).toBe("timed_out");
     });
   });
 });

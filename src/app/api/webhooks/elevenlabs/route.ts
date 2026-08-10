@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { logger } from "@/lib/logger";
+import { sendSMS, type PendingBooking } from "@/lib/twilio-sms";
 import {
-  sendSMS,
-  buildConfirmationSMS,
-  buildDeniedSMS,
-  buildNoAnswerSMS,
-  buildFailedSMS,
-  type PendingBooking,
-} from "@/lib/twilio-sms";
+  analyzeOutcome,
+  buildElevenLabsEventKey,
+  getSMSMessage,
+  verifySignature,
+} from "@/lib/services/elevenlabs-webhook-service";
 
 /**
  * POST /api/webhooks/elevenlabs
@@ -22,54 +20,13 @@ import {
  * - Analyzes call outcome from transcript/analysis
  * - Sends SMS confirmation to customer
  * - Updates booking status in database
+ *
+ * Signature verification, transcript/outcome analysis, and SMS-message
+ * selection live in `src/lib/services/elevenlabs-webhook-service.ts` (#625).
+ * This handler keeps the request orchestration: verify → look up booking →
+ * run the idempotent RPC → claim/send the SMS job.
  */
 
-// Outcome types for booking calls
-type BookingOutcome = "confirmed" | "denied" | "no_answer" | "failed";
-
-// Keywords to detect booking outcome from transcript
-const CONFIRMED_PATTERNS = [
-  "confirmad",
-  "reservad",
-  "perfecto",
-  "apuntado",
-  "esperamos",
-  "le esperamos",
-  "anotado",
-  "confirmamos",
-  "sin problema",
-  "de acuerdo",
-  "muy bien",
-  "estupendo",
-];
-
-const DENIED_PATTERNS = [
-  "completo",
-  "no tenemos",
-  "no hay",
-  "lleno",
-  "sin disponibilidad",
-  "no podemos",
-  "imposible",
-  "no queda",
-  "agotado",
-  "cerrado",
-  "no abrimos",
-];
-
-const NO_ANSWER_PATTERNS = [
-  "buzón",
-  "voicemail",
-  "no contesta",
-  "ocupado",
-  "no disponible",
-  "mensaje",
-  "después del tono",
-  "no ha sido posible",
-];
-
-// 30-minute tolerance for timestamp validation (matches ElevenLabs SDK)
-const TIMESTAMP_TOLERANCE_SECONDS = 30 * 60;
 const SMS_JOB_LEASE_SECONDS = 15 * 60;
 
 /**
@@ -111,218 +68,11 @@ const ElevenLabsWebhookSchema = z
   })
   .strict();
 
-/**
- * Parse ElevenLabs signature header format: "t=timestamp,v0=signature"
- */
-function parseSignatureHeader(
-  header: string
-): { timestamp: number; signature: string } | null {
-  const parts: Record<string, string> = {};
-  for (const part of header.split(",")) {
-    const [key, ...rest] = part.split("=");
-    if (key && rest.length > 0) {
-      parts[key] = rest.join("=");
-    }
-  }
-
-  const timestamp = parts["t"] ? parseInt(parts["t"], 10) : NaN;
-  const signature = parts["v0"];
-
-  if (isNaN(timestamp) || !signature) {
-    return null;
-  }
-
-  return { timestamp, signature };
-}
-
-/**
- * Verify ElevenLabs webhook signature using HMAC-SHA256.
- *
- * ElevenLabs signs webhooks with: HMAC-SHA256("${timestamp}.${rawBody}", secret)
- * The signature header format is: "t=timestamp,v0=hex_digest"
- */
-function verifySignature(
-  payload: string,
-  sigHeader: string
-): "valid" | "invalid" | "expired" | "missing_secret" {
-  const secret = process.env.ELEVENLABS_WEBHOOK_SECRET?.trim();
-
-  if (!secret) {
-    logger.error("[ELEVENLABS_WEBHOOK_SECRET_MISSING]");
-    return "missing_secret";
-  }
-
-  const parsed = parseSignatureHeader(sigHeader);
-  if (!parsed) {
-    return "invalid";
-  }
-
-  const { timestamp, signature } = parsed;
-
-  // Validate timestamp freshness (reject replays older than 30 minutes)
-  const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - timestamp) > TIMESTAMP_TOLERANCE_SECONDS) {
-    return "expired";
-  }
-
-  try {
-    // ElevenLabs signs "${timestamp}.${rawBody}"
-    const message = `${timestamp}.${payload}`;
-    const hmac = createHmac("sha256", secret);
-    hmac.update(message);
-    const expectedSignature = hmac.digest("hex");
-
-    // Use timing-safe comparison to prevent timing attacks
-    const sigBuffer = Buffer.from(signature, "hex");
-    const expectedBuffer = Buffer.from(expectedSignature, "hex");
-
-    if (sigBuffer.length !== expectedBuffer.length) {
-      return "invalid";
-    }
-
-    return timingSafeEqual(sigBuffer, expectedBuffer) ? "valid" : "invalid";
-  } catch {
-    return "invalid";
-  }
-}
-
-// ElevenLabs transcript entry format
-interface TranscriptEntry {
-  role: "user" | "agent";
-  message: string;
-  time_in_call_secs?: number;
-}
-
 interface ClaimedSMSJob {
   booking_id: string;
   event_key: string;
   to_phone: string;
   message: string;
-}
-
-/**
- * Extract plain text from ElevenLabs transcript array.
- * Transcript is an array of {role, message} objects, not a plain string.
- */
-function extractTranscriptText(
-  transcript: TranscriptEntry[] | string | undefined
-): string {
-  if (!transcript) return "";
-  // Handle legacy string format (backwards compatibility)
-  if (typeof transcript === "string") return transcript;
-  // Handle array format (actual ElevenLabs payload)
-  if (Array.isArray(transcript)) {
-    return transcript
-      .map((entry) => entry.message || "")
-      .join(" ");
-  }
-  return "";
-}
-
-/**
- * Normalize the call_successful field from ElevenLabs webhook analysis.
- *
- * ElevenLabs has delivered this field in multiple formats across API versions:
- * - Boolean: true / false
- * - String enum: "success" / "failure" / "unknown"
- * - String boolean: "true" / "false"
- * - Missing / null / undefined → treat as unsuccessful
- *
- * Returns:
- *  "success"  → call connected and succeeded
- *  "failure"  → call explicitly failed (no answer, network error, etc.)
- *  "unknown"  → ambiguous — fall through to transcript keyword analysis
- */
-export function isCallSuccessful(value: unknown): "success" | "failure" | "unknown" {
-  if (value === true || value === "success" || value === "true") return "success";
-  if (value === false || value === "failure" || value === "false") return "failure";
-  // null, undefined, "unknown", or any other value → unknown
-  return "unknown";
-}
-
-/**
- * Analyze call transcript/analysis to determine booking outcome.
- *
- * ElevenLabs payload format:
- * - transcript: array of {role, message, time_in_call_secs} objects
- * - analysis.call_successful: "success" | "failure" | "unknown" (string enum, NOT boolean)
- * - analysis.transcript_summary: string
- */
-function analyzeOutcome(webhookData: {
-  analysis?: {
-    call_successful?: string | boolean;
-    transcript_summary?: string;
-  };
-  transcript?: TranscriptEntry[] | string;
-}): BookingOutcome {
-  const { analysis, transcript } = webhookData;
-
-  // Normalize call_successful to handle all field variants
-  const callResult = isCallSuccessful(analysis?.call_successful);
-
-  // Explicit failure → no_answer (call didn't connect)
-  if (callResult === "failure") {
-    return "no_answer";
-  }
-
-  // null/undefined/missing also means no successful call → no_answer
-  if (callResult === "unknown" && analysis?.call_successful == null) {
-    return "no_answer";
-  }
-
-  // Extract text from transcript array and combine with summary
-  const transcriptText = extractTranscriptText(transcript);
-  const textToAnalyze = [
-    transcriptText,
-    analysis?.transcript_summary || "",
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  // Check for no answer patterns first (voicemail, etc.)
-  for (const pattern of NO_ANSWER_PATTERNS) {
-    if (textToAnalyze.includes(pattern)) {
-      return "no_answer";
-    }
-  }
-
-  // Check for denied patterns (no availability)
-  for (const pattern of DENIED_PATTERNS) {
-    if (textToAnalyze.includes(pattern)) {
-      return "denied";
-    }
-  }
-
-  // Check for confirmed patterns
-  for (const pattern of CONFIRMED_PATTERNS) {
-    if (textToAnalyze.includes(pattern)) {
-      return "confirmed";
-    }
-  }
-
-  // Default to failed if we can't determine outcome
-  return "failed";
-}
-
-/**
- * Get the appropriate SMS message based on outcome.
- */
-function getSMSMessage(booking: PendingBooking, outcome: BookingOutcome): string {
-  switch (outcome) {
-    case "confirmed":
-      return buildConfirmationSMS(booking);
-    case "denied":
-      return buildDeniedSMS(booking);
-    case "no_answer":
-      return buildNoAnswerSMS(booking);
-    case "failed":
-    default:
-      return buildFailedSMS(booking);
-  }
-}
-
-function buildElevenLabsEventKey(conversationId: string) {
-  return `post_call_transcription:${conversationId}`;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -335,10 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (!sigHeader) {
       logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_MISSING]");
-      return NextResponse.json(
-        { error: "Missing signature" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Missing signature" }, { status: 401 });
     }
 
     // Verify signature (format: "t=timestamp,v0=hmac_hex")
@@ -346,20 +93,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (verifyResult === "expired") {
       logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_EXPIRED]");
-      return NextResponse.json(
-        { error: "Signature expired" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Signature expired" }, { status: 401 });
     }
 
     if (verifyResult !== "valid") {
       logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_INVALID]", {
         verify_result: verifyResult,
       });
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     // Parse payload
@@ -588,21 +329,36 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // A separate pending_bookings UPDATE after this point would risk being lost
         // forever — the idempotency key prevents re-attempt, so a failure here
         // leaves outcome_message NULL with no recovery path.
-        const { error: completeSMSError } = await supabase.rpc(
-          "complete_booking_sms_job",
-          {
-            p_event_key: eventKey,
-            p_provider_sid: smsResult.sid ?? null,
-            p_outcome_message: smsMessage,
+        //
+        // BE-M2: retry complete_booking_sms_job up to 2 attempts with a short
+        // backoff to avoid leaving the job in 'processing' state (re-claimable
+        // → duplicate SMS).  After all retries, log prominently for ops.
+        {
+          const MAX_COMPLETE_ATTEMPTS = 2;
+          let completeSMSError: { message: string } | null = null;
+          for (let attempt = 1; attempt <= MAX_COMPLETE_ATTEMPTS; attempt++) {
+            const result = await supabase.rpc("complete_booking_sms_job", {
+              p_event_key: eventKey,
+              p_provider_sid: smsResult.sid ?? null,
+              p_outcome_message: smsMessage,
+            });
+            if (!result.error) {
+              completeSMSError = null;
+              break;
+            }
+            completeSMSError = result.error;
+            if (attempt < MAX_COMPLETE_ATTEMPTS) {
+              await new Promise((resolve) => setTimeout(resolve, 200));
+            }
           }
-        );
-
-        if (completeSMSError) {
-          logger.error("[ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED]", {
-            booking_id: booking.id,
-            event_key: eventKey,
-            error: completeSMSError.message,
-          });
+          if (completeSMSError) {
+            logger.error("[ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED]", {
+              booking_id: booking.id,
+              event_key: eventKey,
+              error: completeSMSError.message,
+              attempts: MAX_COMPLETE_ATTEMPTS,
+            });
+          }
         }
       }
     }

@@ -24,6 +24,7 @@ A complete catalog of everything Paisaxe can do, organized by audience.
     - [Visitors Analytics](#visitors-analytics)
     - [Revenue Analytics](#revenue-analytics)
     - [Voice Analytics](#voice-analytics)
+    - [GitHub Analytics](#github-analytics)
   - [Agents Dashboard](#agents-dashboard)
     - [Agent Toggles](#agent-toggles)
     - [Agent Status Grid](#agent-status-grid)
@@ -130,6 +131,7 @@ RAG settings: Multilingual embeddings, 5 chunks max, 15K character limit, 0.40 d
 - `get_weather`: Current weather for Asturian cities and towns
 - `make_booking`: Initiate outbound voice call to make restaurant/hotel reservations (gated by `booking_system` flag)
 - `check_booking_status`: Check status of a pending booking request
+- `save_favorite`: Bookmark a place mid-conversation, stored in the visitor's saved places keyed by ElevenLabs conversation ID
 
 See `docs/operations/elevenlabs-pelayo-config.md` for full configuration details.
 
@@ -354,16 +356,17 @@ See [Feature Flags Reference](#feature-flags-reference) below for the full list.
 
 ### Analytics Dashboard
 
-The Analytics tab organizes metrics into four sub-tabs, each focused on a specific data source. Switch between sub-tabs using the pill buttons or keyboard shortcuts.
+The Analytics tab organizes metrics into five sub-tabs, each focused on a specific data source. Switch between sub-tabs using the pill buttons or keyboard shortcuts.
 
 | Sub-tab | Shortcut | Data Source | Default Date Range |
 |---------|----------|-------------|-------------------|
-| Visitors | `v` | PostHog | Last 7 days |
-| Revenue | `r` | Stripe | Last 30 days |
-| Voice | `e` | ElevenLabs | Last 30 days |
-| Costs | `c` | Anthropic, Twilio, ElevenLabs, manual | Current month |
+| Visitors | `Cmd+U` | PostHog | Last 7 days |
+| Voice | `Cmd+I` | ElevenLabs | Last 30 days |
+| GitHub | `Cmd+O` | GitHub Traffic API | Last 30 days |
+| Costs | `Cmd+P` | Anthropic, Twilio, ElevenLabs, manual | Current month |
+| Revenue | `Cmd+L` | Stripe | Last 30 days |
 
-**Caching architecture** — All four panels are mounted simultaneously (CSS `display:none` for inactive tabs) so they fetch data in parallel on first load. An in-memory stale-while-revalidate cache (`AnalyticsCacheProvider`) ensures tab switches are instant. Data becomes stale after 2 minutes, triggering a background refresh that shows a subtle blue indicator bar. API routes also set `Cache-Control: private, max-age=120, stale-while-revalidate=300` for browser-level caching.
+**Caching architecture** — Panels are lazy-mounted on first visit — only rendered when their tab is first clicked. Once mounted, a panel stays in the DOM (CSS `display:none` when inactive) so its state and data survive tab switches. An in-memory stale-while-revalidate cache (`AnalyticsCacheProvider`) ensures tab switches are instant. Data becomes stale after 2 minutes, triggering a background refresh that shows a subtle blue indicator bar. API routes also set `Cache-Control: private, max-age=120, stale-while-revalidate=300` for browser-level caching.
 
 #### Visitors Analytics
 
@@ -448,6 +451,32 @@ Voice agent metrics from ElevenLabs Conversational AI.
 | Recent Conversations | Last 10 conversations with timestamp, status, and duration |
 
 **Configuration** — Requires `ELEVENLABS_API_KEY` environment variable. Only shows data for agents with names starting with "Paisaxe".
+
+#### GitHub Analytics
+
+Repository traffic metrics from the GitHub Traffic API.
+
+**Summary cards:**
+
+| Metric | Description |
+|--------|-------------|
+| Total Views | All repository page views in the date range |
+| Unique Visitors | Count of distinct visitors |
+| Total Clones | All repository clones |
+| Unique Cloners | Count of distinct cloners |
+| Days Tracked | Number of days with recorded traffic data |
+
+**Breakdown sections:**
+
+| Section | Description |
+|---------|-------------|
+| Traffic Over Time | Chart of views and clones by day |
+| Top Referrers | Sites sending traffic to the repository |
+| Popular Paths | Most visited repository paths |
+
+**Sync** — `/api/cron/github-traffic-sync` snapshots GitHub traffic into the database every 6 hours, so history is retained beyond the API's own rolling window. A manual sync button in the panel header triggers the same sync on demand and refreshes the view. An empty state ("No traffic data yet") shows until the first sync lands.
+
+**Configuration** — Requires the `GITHUB_TOKEN` environment variable; returns an error if unset.
 
 ### Agents Dashboard
 
@@ -602,7 +631,7 @@ Both produce 1200x630 PNG images. The root image cascades to child routes that d
 **Health checks:**
 
 - `GET /api/health/live` — Liveness probe. Always returns HTTP 200 with `{ "status": "ok" }`. Used by Upptime and develop-smoke CI.
-- `GET /api/health` — Diagnostics endpoint. Returns service status (healthy/degraded), Supabase connectivity with latency, database storage usage, and cron auth state. Returns HTTP 200 when healthy, HTTP 503 when degraded. Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 8 GB Pro tier limit. Monitored every 5 minutes by [Upptime](https://juan294.github.io/paisaxe-upptime/).
+- `GET /api/health` — Diagnostics endpoint. Always returns HTTP 200. The JSON body signals health state: `status: "healthy"|"degraded"`, plus Supabase connectivity with latency, database storage usage, cron auth state, and rate limit backend (`rate_limit.status: "ok"|"degraded"`). Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 8 GB Pro tier limit. Used by the preview smoke CI; diagnostics only (not the Upptime liveness probe).
 
 **Database size monitoring** — The health endpoint reports `database.size_mb`, `database.limit_mb` (8192), and `database.usage_percent`. Useful for tracking storage growth as content expands.
 

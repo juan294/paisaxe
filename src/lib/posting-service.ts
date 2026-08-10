@@ -6,8 +6,9 @@
  * API access is available) and manual posting workflow (copy/paste).
  */
 
-import { createAdminClient } from "./supabase";
+import { createAdminClient } from "./supabase-admin";
 import { validateContent } from "./platforms";
+import { logger } from "./logger";
 import type {
   MarketingPlatform,
   MarketingPost,
@@ -98,7 +99,9 @@ export async function createDraft(
     .single();
 
   if (error) {
-    console.error("Failed to create draft:", error);
+    logger.error("Failed to create draft", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       success: false,
       error: "Failed to save draft to database",
@@ -132,7 +135,9 @@ export async function getDrafts(
   const { data, error } = await query;
 
   if (error) {
-    console.error("Failed to fetch drafts:", error);
+    logger.error("Failed to fetch drafts", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 
@@ -159,7 +164,9 @@ export async function markAsPosted(
     .eq("id", input.postId);
 
   if (error) {
-    console.error("Failed to mark post as posted:", error);
+    logger.error("Failed to mark post as posted", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return { success: false, error: "Failed to update post status" };
   }
 
@@ -182,7 +189,9 @@ export async function deleteDraft(
     .in("status", ["draft", "scheduled", "failed"]);
 
   if (error) {
-    console.error("Failed to delete draft:", error);
+    logger.error("Failed to delete draft", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return { success: false, error: "Failed to delete draft" };
   }
 
@@ -224,7 +233,9 @@ export async function updateDraft(
     .in("status", ["draft", "scheduled"]);
 
   if (error) {
-    console.error("Failed to update draft:", error);
+    logger.error("Failed to update draft", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return { success: false, error: "Failed to update draft" };
   }
 

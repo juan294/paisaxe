@@ -51,7 +51,9 @@ content/images/
 
 # Testing
 coverage/
+coverage-*/
 .coverage-*/
+.vitest-reports/
 test-results/
 playwright-report/
 blob-report/
@@ -70,6 +72,9 @@ supabase/.branches/
 .agent-context.json
 .agent-alerts.json
 scripts/agent-config.json
+
+# QA agent scratch files (scripts/qa-agent.sh)
+.qa-*.tmp
 
 # ElevenLabs CLI (test configs are local-only; agent/tool configs are tracked)
 test_configs/

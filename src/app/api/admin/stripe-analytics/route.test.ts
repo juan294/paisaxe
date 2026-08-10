@@ -128,6 +128,23 @@ describe("Stripe Analytics API Route", () => {
     expect(logger.error).toHaveBeenCalled();
   });
 
+  it("stringifies a non-Error thrown value in the catch block", async () => {
+    vi.mocked(isStripeConfigured).mockReturnValue(true);
+    // Reject with a non-Error value to exercise the String(error) fallback branch
+    mockPaymentIntentsList.mockRejectedValue("rate limited");
+
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.error).toBe("Failed to fetch Stripe data");
+    expect(logger.error).toHaveBeenCalledWith(
+      "Stripe analytics API error:",
+      { error: "rate limited" },
+    );
+  });
+
   it("calculates summary statistics correctly", async () => {
     vi.mocked(isStripeConfigured).mockReturnValue(true);
 

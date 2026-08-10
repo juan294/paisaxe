@@ -61,6 +61,14 @@ describe("admin-api/feature-flags", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchFeatureFlags();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── updateFeatureFlag ───────────────────────────────────────────
@@ -126,6 +134,14 @@ describe("admin-api/feature-flags", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await updateFeatureFlag("visitor_voice_agent", true);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── updateFeatureFlagConfig ─────────────────────────────────────
@@ -183,6 +199,28 @@ describe("admin-api/feature-flags", () => {
 
       const result = await updateFeatureFlagConfig("visitor_voice_agent", mockConfig);
 
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("logs String(error) when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("non-error string");
+
+      const result = await updateFeatureFlagConfig("visitor_voice_agent", mockConfig);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  describe("non-Error throw coverage for instanceof ternary", () => {
+    it("fetchFeatureFlags logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(42);
+      const result = await fetchFeatureFlags();
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("updateFeatureFlag logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue({ code: "ETIMEDOUT" });
+      const result = await updateFeatureFlag("visitor_voice_agent", true);
       expect(result).toEqual({ error: "Network error" });
     });
   });

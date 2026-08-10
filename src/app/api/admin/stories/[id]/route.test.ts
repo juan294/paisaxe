@@ -12,7 +12,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 // Mock dependencies
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -20,7 +20,7 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
 describe("PATCH /api/admin/stories/[id]", () => {
@@ -38,9 +38,26 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ title: "Updated Title" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
 
     expect(response.status).toBe(401);
+  });
+
+  it("should return 400 when body is not valid JSON", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "not-valid-json",
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Invalid JSON body");
   });
 
   it("should return 400 when category is invalid", async () => {
@@ -50,7 +67,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ category: "invalid" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -64,7 +81,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ location: "invalid" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -78,7 +95,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ duration: "invalid" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -104,7 +121,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ slug: "existing-slug" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(409);
@@ -163,7 +180,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
         sourcePdf: "guide.pdf",
       }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -209,7 +226,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
         duration: null,
       }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -236,12 +253,12 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ slug: "some-slug" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(500);
     expect(logger.error).toHaveBeenCalledWith("[ADMIN_STORY_SLUG_CHECK_FAILED]", {
-      story_id: "story-1",
+      story_id: "11111111-1111-4111-8111-111111111111",
       slug: "some-slug",
       error: { code: "UNEXPECTED_ERROR", message: "Something went wrong" },
     });
@@ -269,7 +286,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ title: "Updated" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(404);
@@ -279,14 +296,18 @@ describe("PATCH /api/admin/stories/[id]", () => {
   it("should return 500 on unexpected error (catch block)", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-    // Make request.json() throw to trigger the outer catch block
+    // After BE-M2 (#570) a malformed body is a 400, so trigger the outer catch
+    // via an unexpected error deeper in the handler (Supabase client throws).
+    vi.mocked(createAdminClient).mockImplementation(() => {
+      throw new Error("Unexpected client error");
+    });
+
     const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
       method: "PATCH",
-      body: "not valid json",
+      body: JSON.stringify({ title: "Valid title" }),
     });
-    vi.spyOn(request, "json").mockRejectedValue(new Error("Unexpected parse error"));
 
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -294,6 +315,22 @@ describe("PATCH /api/admin/stories/[id]", () => {
       error: expect.any(Error),
     });
     expect(data.error).toBe("Internal server error");
+  });
+
+  it("returns 400 when the route id is not a UUID (BE-M2 #570)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/not-a-uuid", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Valid title" }),
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: "not-a-uuid" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain("UUID");
+    expect(createAdminClient).not.toHaveBeenCalled();
   });
 
   it("should handle empty string subtitle/description/sourcePdf by converting to null (lines 96-97,101)", async () => {
@@ -335,7 +372,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
         metadata: { custom: "value" },
       }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
 
     expect(response.status).toBe(200);
 
@@ -369,12 +406,12 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ title: "Updated" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(500);
     expect(logger.error).toHaveBeenCalledWith("[ADMIN_STORY_UPDATE_FAILED]", {
-      story_id: "story-1",
+      story_id: "11111111-1111-4111-8111-111111111111",
       error: { message: "Update failed" },
     });
     expect(data.error).toBe("Failed to update story");
@@ -391,7 +428,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ title: "A".repeat(301) }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -405,7 +442,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ category: "invalid-category" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -421,7 +458,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ title: "Valid", description: "D".repeat(5001) }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -465,13 +502,13 @@ describe("PATCH /api/admin/stories/[id]", () => {
       method: "PATCH",
       body: JSON.stringify({ title: "Updated Story" }),
     });
-    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }) });
 
     expect(response.status).toBe(200);
     expect(logger.info).toHaveBeenCalledWith("[ADMIN_AUDIT]", {
       event: "story.update",
       actor: "admin-user-id",
-      story_id: "story-1",
+      story_id: "11111111-1111-4111-8111-111111111111",
     });
   });
 });

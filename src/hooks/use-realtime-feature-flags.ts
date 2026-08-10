@@ -30,7 +30,10 @@ export function useRealtimeFeatureFlags(
   }, [initialFlags]);
 
   useEffect(() => {
-    const cleanup = subscribeToFeatureFlags((row: FeatureFlagRow) => {
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+
+    subscribeToFeatureFlags((row: FeatureFlagRow) => {
       const updatedFlag = rowToFeatureFlag(row);
 
       setFlags((currentFlags) => {
@@ -48,9 +51,21 @@ export function useRealtimeFeatureFlags(
         // New flag not yet in the array -- append it
         return [...currentFlags, updatedFlag];
       });
+    }).then((fn) => {
+      // The dynamic import behind subscribeToFeatureFlags resolves after
+      // this effect may have already been cleaned up (fast unmount/remount).
+      // If so, tear down immediately instead of leaking the subscription.
+      if (cancelled) {
+        fn();
+      } else {
+        cleanup = fn;
+      }
     });
 
-    return cleanup;
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
   }, []);
 
   return flags;

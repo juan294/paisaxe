@@ -30,8 +30,7 @@ export function FullscreenButton() {
 
     // Check if running as standalone PWA
     const standalone = window.matchMedia("(display-mode: standalone)").matches ||
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (navigator as any).standalone === true;
+      navigator.standalone === true;
     setIsStandalone(standalone);
 
     // Check fullscreen API support

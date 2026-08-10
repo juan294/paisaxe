@@ -6,10 +6,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
+import { clientLogger } from "@/lib/client-logger";
 
 interface FlagsCache {
   data: FeatureFlag[] | null;
@@ -112,10 +114,10 @@ function useFeatureFlagsState(
       .catch((err) => {
         cache.promise = null;
         if (cache.data) {
-          console.warn("Failed to refresh feature flags, using cached:", err);
+          clientLogger.warn("Failed to refresh feature flags, using cached", { error: err instanceof Error ? err.message : String(err) });
           return cache.data;
         }
-        console.warn("Failed to fetch feature flags, defaulting all to false:", err);
+        clientLogger.warn("Failed to fetch feature flags, defaulting all to false", { error: err instanceof Error ? err.message : String(err) });
         return [];
       });
 
@@ -183,27 +185,34 @@ function useFeatureFlagsState(
     [flags, isReady]
   );
 
-  return {
-    flags,
-    /** Whether flags have been loaded from server */
-    isReady,
-    /** Check if a flag is enabled (returns false while loading) */
-    isEnabled,
-    /** Check if a flag is enabled with a default value while loading */
-    isEnabledWithDefault,
-  };
+  // FE-M1: memoize the returned value so that FeatureFlagsProvider consumers
+  // only re-render when flags, readiness, or the stable callbacks actually change.
+  return useMemo(
+    () => ({
+      flags,
+      /** Whether flags have been loaded from server */
+      isReady,
+      /** Check if a flag is enabled (returns false while loading) */
+      isEnabled,
+      /** Check if a flag is enabled with a default value while loading */
+      isEnabledWithDefault,
+    }),
+    [flags, isReady, isEnabled, isEnabledWithDefault],
+  );
 }
 
 interface FeatureFlagsProviderProps {
   children?: ReactNode;
   initialFlags?: Partial<Record<FeatureFlagKey, boolean>>;
+  enabled?: boolean;
 }
 
 export function FeatureFlagsProvider({
   children,
   initialFlags,
+  enabled = true,
 }: FeatureFlagsProviderProps) {
-  const value = useFeatureFlagsState(initialFlags);
+  const value = useFeatureFlagsState(initialFlags, enabled);
 
   return createElement(FeatureFlagsContext.Provider, { value }, children);
 }

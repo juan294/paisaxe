@@ -13,7 +13,7 @@ if (
   !_cronAuthWarningEmitted
 ) {
   _cronAuthWarningEmitted = true;
-  console.error(
+  logger.error(
     "[CRON_AUTH_MISSING] No CRON_SECRET or WEBHOOK_SECRET configured — all cron jobs will return 401"
   );
 }

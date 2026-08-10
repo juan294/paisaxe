@@ -51,7 +51,7 @@ describe("Auth Callback Route", () => {
   });
 
   const createRequest = (searchParams: Record<string, string> = {}) => {
-    const url = new URL("http://localhost:3000/auth/callback");
+    const url = new URL("http://localhost:3006/auth/callback");
     Object.entries(searchParams).forEach(([key, value]) => {
       url.searchParams.set(key, value);
     });
@@ -121,6 +121,21 @@ describe("Auth Callback Route", () => {
       expect(response.headers.get("location")).toContain("/favorites");
     });
 
+    it("should preserve query parameters in a safe next path", async () => {
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({
+        code: "valid-auth-code",
+        next: "/pricing/checkout?returnTo=oviedo-walking-tour",
+      });
+      const response = await GET(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3006/pricing/checkout?returnTo=oviedo-walking-tour"
+      );
+    });
+
     it("should reject open redirect via //evil.com in next param", async () => {
       mockExchangeCodeForSession.mockResolvedValue({ error: null });
 
@@ -171,7 +186,7 @@ describe("Auth Callback Route", () => {
 
       expect(response.status).toBe(307);
       expect(response.headers.get("location")).toBe(
-        "http://localhost:3000/login?error=session_exchange_failed"
+        "http://localhost:3006/login?error=session_exchange_failed"
       );
       expect(logger.error).toHaveBeenCalledWith(
         "[AUTH_CALLBACK_FAILURE]",
@@ -189,7 +204,7 @@ describe("Auth Callback Route", () => {
       expect(response.status).toBe(307);
       // Should redirect to exactly /immersive (the fallback)
       const location = response.headers.get("location") || "";
-      expect(location).toBe("http://localhost:3000/immersive");
+      expect(location).toBe("http://localhost:3006/immersive");
       expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
     });
 
@@ -201,6 +216,27 @@ describe("Auth Callback Route", () => {
       await GET(request);
 
       expect(createServerClient).toHaveBeenCalled();
+    });
+
+    it("falls back to empty strings when Supabase env vars are unset", async () => {
+      const { createServerClient } = await import("@supabase/ssr");
+      const mockCreate = vi.mocked(createServerClient);
+
+      const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({ code: "some-code" });
+      await GET(request);
+
+      const [url, anonKey] = mockCreate.mock.calls[0];
+      expect(url).toBe("");
+      expect(anonKey).toBe("");
+
+      if (savedUrl !== undefined) process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+      if (savedKey !== undefined) process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
     });
   });
 

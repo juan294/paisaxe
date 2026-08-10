@@ -5,6 +5,36 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// Node 24+ (and 26) sets global.localStorage = undefined (experimental Web Storage
+// API, needs --localstorage-file). In jsdom, window === global, so this instance-
+// level undefined shadows jsdom's prototype getter, breaking any test that uses bare
+// `localStorage`. Provide an in-memory Storage implementation when undefined.
+if (typeof window !== "undefined" && global.localStorage === undefined) {
+  let _store: Record<string, string> = {};
+  const _mockStorage: Storage = {
+    getItem: (key: string) =>
+      Object.prototype.hasOwnProperty.call(_store, key) ? _store[key] : null,
+    setItem: (key: string, value: string) => {
+      _store[key] = String(value);
+    },
+    removeItem: (key: string) => {
+      delete _store[key];
+    },
+    clear: () => {
+      _store = {};
+    },
+    get length() {
+      return Object.keys(_store).length;
+    },
+    key: (i: number) => Object.keys(_store)[i] ?? null,
+  };
+  Object.defineProperty(global, "localStorage", {
+    value: _mockStorage,
+    configurable: true,
+    writable: true,
+  });
+}
+
 // Mock environment variables for tests
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";

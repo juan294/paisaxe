@@ -6,18 +6,14 @@
     "src/app/**/route.ts",
     "src/app/**/loading.tsx",
     "src/app/**/error.tsx",
-    "src/app/providers.tsx"
+    "src/app/providers.tsx",
+    "scripts/**/*.ts"
   ],
-  "project": ["src/**/*.{ts,tsx}"],
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"],
   "ignore": [
-    "src/test/**",
-    "**/*.test.{ts,tsx}",
-    "**/__tests__/**",
-    "src/components/ui/**"
+    "src/test/**"
   ],
-  "ignoreDependencies": [
-    "@types/*"
-  ],
+  "ignoreExportsUsedInFile": true,
   "ignoreBinaries": [
     "license-checker",
     "GPL-3.0",
@@ -31,7 +27,8 @@
     "OSL-3.0",
     "CPOL-1.02",
     "du",
-    "elevenlabs"
+    "elevenlabs",
+    "cloudflared"
   ],
   "paths": {
     "@/*": ["./src/*"]

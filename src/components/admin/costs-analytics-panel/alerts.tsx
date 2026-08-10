@@ -5,7 +5,7 @@ import { ChevronDown, ExternalLink, ShieldAlert } from "lucide-react";
 import { fetchCostsAnalytics } from "@/lib/admin-api";
 import type { UsageMetrics } from "@/types/costs-analytics";
 import { PLATFORM_SERVICES } from "@/types/costs-analytics";
-import { computeTierAlerts } from "@/lib/costs";
+import { computeTierAlerts } from "@/lib/costs/tier-alerts";
 import { SERVICE_TIERS } from "@/config/service-tiers";
 import type { TierAlertsSectionProps, TierAlert, AlertLevel } from "./types";
 import { formatDateShort } from "./chart";

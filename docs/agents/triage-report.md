@@ -1,78 +1,89 @@
 # Triage Report
-> Generated on 2026-04-25 | 10 reports processed | 2 action items resolved
+> Generated on 2026-08-10 | 12 reports processed | 9 completed code/report actions | 1 Dependabot PR
 
 ## Agent Failures
-None — all agents ran successfully.
+
+None — no `.error.log` files modified in the prior 24 hours.
 
 ## Reports Reviewed
-| # | Report | Agent | Status | Action Items |
-|---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report | cc-rpi | GREEN | None — v1.17.2 up to date |
-| 2 | coverage-report | coverage | GREEN | None — 98.16% statements, 5996 tests |
-| 3 | update-docs-report | update-docs | GREEN | Architecture diagram needs Draw.io update (manual) |
-| 4 | localization-report | localization | GREEN | None — 100% for 41 consecutive days |
-| 5 | documentation-report | documentation | GREEN | None — 20th consecutive clean run |
-| 6 | cost-analyst-report | cost-analyst | WATCH | Manual only (Anthropic billing, Twilio anomaly, production verification) |
-| 7 | qa-report | qa | YELLOW→fixed | Chat API 500 already fixed by voyageai pin commits (post-report) |
-| 8 | security-report | security | YELLOW (persistent) | postcss advisory unfixable via overrides; resend pin already synced |
-| 9 | performance-report | performance | YELLOW (persistent) | Prod build run — P4 officially activated |
-| 10 | pre-launch-report | pre-launch | NOT READY | Out of scope — needs /remediate session |
+
+| # | Report | Status | Triage result |
+|---|--------|--------|---------------|
+| 1 | cc-rpi-update-report.md | GREEN | Sync was already completed in the pre-existing local checkout; no duplicate code change made. |
+| 2 | cost-analyst-report.md | CRITICAL | Owner/billing and production decisions retained as authorization-gated carried items. |
+| 3 | coverage-report.md | GREEN | Integrated the pending voice-session and ElevenLabs error-path tests; corrected the report's test-count inconsistency. |
+| 4 | documentation-report.md | GREEN | No code action. |
+| 5 | localization-report.md | GREEN | No code action. |
+| 6 | performance-report.md | GREEN | Previously resolved; no duplicate code action. |
+| 7 | pre-launch-report.md | Historical | No release or production action authorized. |
+| 8 | qa-report.md | RED | Implemented all four code-addressable P1–P4 harness actions. The Anthropic credit incident remains owner-controlled. |
+| 9 | remediation-report.md | Historical | No new code action. |
+| 10 | security-report.md | YELLOW | Applied current non-breaking audit fixes; local audit is clean. |
+| 11 | triage-report.md | Historical | Replaced by this run. |
+| 12 | update-docs-report.md | Historical | No new code action. |
 
 ## Overall Status: YELLOW
 
-Security and Performance remain YELLOW. QA's chat API 500 was already fixed.
+All approved repository code actions are implemented and locally verified. YELLOW remains because GitHub code/secret scanning is unavailable on this private repository, Dependabot alerts key off the unreleased `main` branch, and the Anthropic billing/production incident requires separate owner authorization.
 
 ## Action Items Completed
+
 | # | Item | Source | Tests | Status |
 |---|------|--------|-------|--------|
-| 1 | Raise node_modules budget to 1,100 MB in `scripts/performance-agent.sh` | performance-report | n/a (config) | ✅ Committed `972a2ecb`, pushed |
-| 2 | Run production build to confirm P8 savings and initial load | performance-report | n/a (verification) | ✅ Done — Total 2,941 KB ✓, initial load ~2,067 KB ✗ |
+| 1 | Integrated the pending Supabase purchase-query and unexpected ElevenLabs failure coverage in `voice-session/route.test.ts` | coverage-report.md | 2 | Done |
+| 2 | Integrated network and malformed-response coverage in `elevenlabs-signed-session.test.ts` | coverage-report.md | 6 | Done |
+| 3 | Added an Anthropic minimal-generation preflight and Phase 1 gate to the QA wrapper | qa-report.md P1 | Static contract + full suite | Done |
+| 4 | Included nested `debug.message` provider detail in QA chat errors | qa-report.md P2 | Unit test | Done |
+| 5 | Added a four-identical-5xx circuit breaker that blocks further LLM requests until a success/reset | qa-report.md P3 | 2 unit tests | Done |
+| 6 | Added an EXIT trap that writes an atomic ABORTED report and shared-context entry on abnormal wrapper exit | qa-report.md P4 | Static contract + `bash -n` | Done |
+| 7 | Applied non-breaking lockfile fixes for DOMPurify 3.4.13, js-yaml 4.3.1, and nanoid 3.3.18 | GitHub/npm audit | `npm audit`: 0 | Done |
+| 8 | `/simplify`: fixed Anthropic preflight misclassification, made later abnormal-exit phase labels accurate, and deduplicated test setup | simplify review | Focused + full suite | Done |
+| 9 | Reconciled the coverage report from an incorrect “12 new tests” claim to the 8 executable cases in the pending diff | report reconciliation | Diff/test count | Done |
 
-## Action Items NOT Completed (with reason)
-| # | Item | Reason |
-|---|------|--------|
-| 3 | Add postcss override to clear 5 advisories | npm override doesn't penetrate Next.js's isolated `node_modules/next/node_modules/postcss`. Not fixable from consumer side. Upstream Next.js issue. |
-| 4 | Fix `/api/chat` 500 regression | Already fixed by user in commits `8f53cd29`, `d0b5576e`, `1344e58d` (voyageai v0.2.x ESM build issue). No action needed. |
-| 5 | npm install for resend pin sync | resend@6.12.2 already synced in a prior commit. No drift remaining. |
+## GitHub Security & Quality Alerts
 
-## Key Findings
+| Alert | Severity | Package / surface | Advisory | Candidate status |
+|-------|----------|-------------------|----------|------------------|
+| #93 | HIGH | brace-expansion | GHSA-mh99-v99m-4gvg | Patched on `develop` (5.0.9); alert awaits `main`. |
+| #94 | HIGH | postcss | GHSA-r28c-9q8g-f849 | Patched on `develop` (8.5.25); alert awaits `main`. |
+| #95 | MODERATE | undici | GHSA-8xcm-r25x-g524 | Patched on `develop` (7.29.0); alert awaits `main`. |
+| #96 | HIGH | undici | GHSA-4cwx-7wf7-3272 | Patched on `develop` (7.29.0); alert awaits `main`. |
+| #97 | MODERATE | undici | GHSA-jr45-8vmc-qm54 | Patched on `develop` (7.29.0); alert awaits `main`. |
+| #98 | MODERATE | undici | GHSA-v3r7-h72x-cjcm | Patched on `develop` (7.29.0); alert awaits `main`. |
+| #99 | MODERATE | undici | GHSA-m8rv-5g2x-5cg5 | Patched on `develop` (7.29.0); alert awaits `main`. |
+| #100 | HIGH | brace-expansion | GHSA-rgw5-rvv9-x895 | Patched on `develop` (5.0.9); alert awaits `main`. |
+| #101 | HIGH | fast-uri | GHSA-7p8r-x3mc-p8w7 | Patched on `develop` (4.1.2); alert awaits `main`. |
+| #102 | HIGH | pdfjs-dist | GHSA-hq66-cqwq-w95j | Patched on `develop` (6.2.108); alert awaits `main`. |
+| #103 | HIGH | pdfjs-dist | GHSA-hq66-cqwq-w95j | Patched on `develop` (6.2.108); alert awaits `main`. |
+| #104 | MODERATE | dompurify | GHSA-55q2-fjhq-7xh7 | Patched by this candidate (3.4.13); alert awaits `main`. |
+| Query failure | — | Code scanning | GHAS API 403 | YELLOW — feature unavailable / owner cost decision. |
+| Query failure | — | Secret scanning | GHAS API 404 | YELLOW — feature unavailable; Gitleaks remains the CI control. |
 
-### Chat API 500 (QA YELLOW → already fixed)
-Root cause confirmed: `voyageai` v0.2.x had a broken ESM build that caused the dynamic `import("@/lib/embeddings")` in the chat route to fail with a fast 500 (124-321ms). Fixed by pinning `voyageai` to `0.1.0` (CJS-compatible). Safety tests passed because injection prompts triggered early returns before reaching the dynamic imports.
+The final local dependency gate reports zero vulnerabilities. A later REST refresh hit GitHub's core API rate limit; the complete alert list above was retained from the successful discovery query and cross-checked through GraphQL.
 
-### Production Build Results
-- **Total JS**: 2,941 KB (budget: 3,000 KB ✓, +59 KB headroom)
-- **Initial load JS**: ~2,067 KB (budget: 2,000 KB ✗, -67 KB over)
-- **P8 actual savings**: 0 KB — Sentry Replay was never loaded as an integration (only config options were removed). No bundle savings.
-- **P4 status**: Officially activated. Tree-shaking Supabase realtime (~20-30 KB) is now required. Even with P4, initial load will be ~2,040-2,047 KB — still over budget. Budget may need to be raised to 2,100 KB to reflect structural additions.
+## Dependabot PRs
 
-### postcss Advisory (Security YELLOW — persistent)
-The `"postcss": ">=8.5.10"` npm override approach fails because `next` bundles its own isolated copy in `node_modules/next/node_modules/postcss@8.4.31`. npm overrides don't penetrate nested isolated copies. Advisory is build-time only and not exploitable. Monitoring for upstream Next.js fix only.
+| PR | Update type | Disposition | Notes |
+|----|-------------|-------------|-------|
+| #750 | patch group | Deferred and commented | Targets protected `main`, is blocked by its `npm audit` check, and is superseded by the verified `develop` lockfile. A review comment records the exact green candidate; it was not merged. |
 
-### Pre-Launch Audit (NOT READY — flagged, not resolved)
-Two hard blockers remain: `BE-B1` (booking creation incompatible with live schema) and `QA-B1` (44 E2E failures in public paths). Needs a dedicated `/remediate` session. Not actionable in triage.
+Release PR #751 is not a Dependabot triage item and remains untouched; merging or releasing to `main` requires separate authorization.
 
 ## Verification
-- [x] Tests passing: 5996/5996 (pre-commit hook verified)
-- [x] Typecheck clean
-- [x] Lint clean
-- [x] CI push: 972a2ecb pushed to develop
-- [ ] CI green (monitoring — push just completed)
+
+- [x] Focused tests: 4 files / 37 tests
+- [x] Full tests after implementation: 393 files / 7402 tests
+- [x] Full tests after `/simplify`: 393 files / 7402 tests
+- [x] Typecheck clean twice: app, scripts, E2E, edge
+- [x] Lint clean twice: src and scripts, zero warnings
+- [x] `bash -n scripts/qa-agent.sh`
+- [x] `npm audit`: 0 vulnerabilities
+- [x] Exact-SHA push CI green for `a41e3efd30502ebaaa6e73f430b3d0342aa8c7e9`: 14/14 Actions runs terminal success (push runs 31363078848, 31363078860, 31363078864, 31363078865; pull-request runs 31363081251, 31363081252, 31363081253, 31363081267, 31363081279, 31363081280, 31363081288, 31363081308, 31363081330, 31363081374)
 
 ## Carried Items
-| Item | Cycles | Escalation |
-|------|--------|------------|
-| voice-agent-chat.tsx (46%), agents-dashboard/index.tsx (49%) need Playwright E2E | 15+ | Low — structural |
-| MCP routes `/api/mcp/*` at 0% E2E coverage | 10 | Medium — external-facing APIs |
-| Performance initial load over 2,000 KB budget | 5+ | Medium — P4 now activated |
-| Revenue drought (71 days) + voice silence (67 days) | — | HIGH — business/manual action |
-| Twilio $0.24 anomaly (Apr 3-4) | 22 days | Low — likely regulatory surcharge |
-| Pre-launch hard blockers (BE-B1, QA-B1) | 1 | HIGH — blocks any release |
 
-## Manual Actions Required (user only)
-1. **Check Anthropic billing**: [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing) — daily agents may push above $10/mo estimate.
-2. **Verify Pelayo voice widget on production** — 67-day silence needs explanation.
-3. **Verify Day Pass purchase flow on production** — 71-day revenue drought.
-4. **Check Twilio billing console** for Apr 3-4 $0.24 anomaly (22 days unresolved).
-5. **Update architecture diagram** in Draw.io desktop per `update-docs-report` [NEEDS REVIEW] flag.
-6. **Schedule /remediate session** for pre-launch hard blockers before any production release.
+- Anthropic credits/top-up and any production chat probe are owner-controlled, production-affecting actions and were not executed.
+- GHAS code scanning and secret scanning remain an owner/cost decision.
+- Authenticated journeys 9–12 remain the principal E2E coverage unlock; this was not part of the approved code plan.
+- Release PR #751, `main`, Vercel production environment changes, Twilio/ElevenLabs outward actions, and financial actions remain out of scope.
+- The original dirty/diverged `develop` checkout and its two pre-existing local cc-rpi sync commits were preserved without mutation.

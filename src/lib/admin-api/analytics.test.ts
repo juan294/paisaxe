@@ -122,6 +122,14 @@ describe("admin-api/analytics", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchAnalytics();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -195,6 +203,14 @@ describe("admin-api/analytics", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+
+      const result = await fetchElevenLabsAnalytics();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await fetchElevenLabsAnalytics();
 
@@ -297,6 +313,14 @@ describe("admin-api/analytics", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchStripeAnalytics();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -375,6 +399,14 @@ describe("admin-api/analytics", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchGithubAnalytics();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -440,6 +472,40 @@ describe("admin-api/analytics", () => {
 
       const result = await syncGithubTraffic();
 
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("logs String(error) when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("non-error string");
+
+      const result = await syncGithubTraffic();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  describe("non-Error throw coverage for instanceof ternary", () => {
+    it("fetchAnalytics logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(42);
+      const result = await fetchAnalytics();
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("fetchElevenLabsAnalytics logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue({ code: "ETIMEDOUT" });
+      const result = await fetchElevenLabsAnalytics();
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("fetchStripeAnalytics logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(null);
+      const result = await fetchStripeAnalytics();
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("fetchGithubAnalytics logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue("abort");
+      const result = await fetchGithubAnalytics();
       expect(result).toEqual({ error: "Network error" });
     });
   });

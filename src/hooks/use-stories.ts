@@ -6,12 +6,15 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
-import type { Story } from "@/types/immersive";
+import { clientLogger } from "@/lib/client-logger";
+import type { PublicStory, Story } from "@/types/immersive";
+import { publicStoryToStory, toPublicStory } from "@/types/immersive";
 
 // LocalStorage key for persistent cache
 const STORAGE_KEY = "paisaxe-stories-cache";
@@ -27,7 +30,7 @@ interface StoriesCache {
 // LocalStorage cache structure
 interface PersistedCache {
   version: number;
-  data: Story[];
+  data: PublicStory[];
   timestamp: number;
 }
 
@@ -75,7 +78,7 @@ function loadFromStorage(): Story[] | null {
       return null;
     }
 
-    return parsed.data;
+    return parsed.data.map(publicStoryToStory);
   } catch {
     // Invalid JSON or other error - clear it
     try {
@@ -96,13 +99,13 @@ function saveToStorage(data: Story[]): void {
   try {
     const toStore: PersistedCache = {
       version: STORAGE_VERSION,
-      data,
+      data: data.map(toPublicStory),
       timestamp: Date.now(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
   } catch {
     // Storage full or other error - ignore
-    console.warn("Failed to persist stories to localStorage");
+    clientLogger.warn("[STORIES_CACHE] Failed to persist stories to localStorage");
   }
 }
 
@@ -123,7 +126,6 @@ function saveToStorage(data: Story[]): void {
  */
 function useStoriesState(
   initialStories?: Story[],
-  enabled: boolean = true
 ): UseStoriesResult {
   // Seed in-memory cache from server-provided stories during render.
   // localStorage is intentionally NOT read here — that happens in useEffect
@@ -199,7 +201,9 @@ function useStoriesState(
         cache.promise = null;
         // Keep stale data on error
         if (cache.data) {
-          console.warn("Failed to refresh stories, using cached data:", err);
+          clientLogger.warn("[STORIES_REFRESH] Failed to refresh stories, using cached data", {
+            error: err instanceof Error ? err.message : String(err),
+          });
           return cache.data;
         }
         throw err;
@@ -210,10 +214,6 @@ function useStoriesState(
 
   // Initial load
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
     let mounted = true;
 
     async function load() {
@@ -254,24 +254,20 @@ function useStoriesState(
     return () => {
       mounted = false;
     };
-  }, [enabled, fetchStories]);
+  }, [fetchStories]);
 
   // Revalidate on window focus (like SWR)
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
     function handleFocus() {
       const isStale = Date.now() - cache.timestamp > CACHE_TTL;
       if (isStale && cache.data) {
-        fetchStories().then(setStories).catch(console.error);
+        fetchStories().then(setStories);
       }
     }
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [enabled, fetchStories]);
+  }, [fetchStories]);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -285,12 +281,12 @@ function useStoriesState(
     }
   }, [fetchStories]);
 
-  return {
-    stories,
-    isLoading,
-    error,
-    refresh,
-  };
+  // FE-M1: memoize the returned value so that StoriesProvider consumers
+  // only re-render when stories, isLoading, error, or refresh actually change.
+  return useMemo(
+    () => ({ stories, isLoading, error, refresh }),
+    [stories, isLoading, error, refresh],
+  );
 }
 
 interface StoriesProviderProps {
@@ -325,7 +321,11 @@ export function prefetchStories(): void {
         cache.timestamp = Date.now();
         saveToStorage(data);
       })
-      .catch(console.error);
+      .catch((err: unknown) =>
+        clientLogger.error("[STORIES_PREFETCH_FAILURE]", {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
   }
 }
 

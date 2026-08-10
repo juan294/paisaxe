@@ -1,5 +1,6 @@
 import type { ServiceCost } from "@/types/costs-analytics";
 import { PLATFORM_SERVICES } from "@/types/costs-analytics";
+import { logger } from "@/lib/logger";
 
 interface TwilioUsageRecord {
   category: string;
@@ -61,11 +62,10 @@ export async function fetchTwilioCosts(
     );
 
     if (!response.ok) {
-      console.error(
-        "Twilio usage API error:",
-        response.status,
-        await response.text()
-      );
+      logger.error("Twilio usage API error", {
+        status: response.status,
+        body: await response.text(),
+      });
       return null;
     }
 
@@ -89,7 +89,9 @@ export async function fetchTwilioCosts(
       dashboardUrl: PLATFORM_SERVICES.twilio.dashboardUrl,
     };
   } catch (error) {
-    console.error("Error fetching Twilio costs:", error);
+    logger.error("Error fetching Twilio costs", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }

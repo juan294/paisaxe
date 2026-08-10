@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 type TFunction = (key: string) => string;
 
@@ -13,8 +14,11 @@ interface StoryToolbarProps {
  * Navigation arrow buttons for the StoryViewer.
  * Renders as invisible 20-wide tap zones on mobile and visible rounded buttons on
  * tablets/desktop (sm: breakpoint and up).
+ *
+ * FE-L1: memoized — onPrev/onNext are stabilized with useCallback in StoryViewer
+ * so this component doesn't re-render on every index change.
  */
-export function StoryToolbar({ onPrev, onNext, t }: StoryToolbarProps) {
+export const StoryToolbar = memo(function StoryToolbar({ onPrev, onNext, t }: StoryToolbarProps) {
   return (
     <>
       {/* Previous — invisible tap zone on mobile, visible button on sm+ */}
@@ -44,4 +48,4 @@ export function StoryToolbar({ onPrev, onNext, t }: StoryToolbarProps) {
       </button>
     </>
   );
-}
+});

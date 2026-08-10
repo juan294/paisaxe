@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 interface HogQLResult {
   results: unknown[][];
 }
@@ -66,9 +68,11 @@ export async function queryPostHog(
         error.message.includes("ECONNRESET"));
 
     if (isRetryable && retryCount < POSTHOG_MAX_RETRIES) {
-      console.warn(
-        `PostHog query retry ${retryCount + 1}/${POSTHOG_MAX_RETRIES} after ${error instanceof Error ? error.message : "unknown error"}`
-      );
+      logger.warn("PostHog query retry", {
+        attempt: retryCount + 1,
+        maxRetries: POSTHOG_MAX_RETRIES,
+        error: error instanceof Error ? error.message : "unknown error",
+      });
       await new Promise((resolve) =>
         setTimeout(resolve, POSTHOG_RETRY_DELAY_MS * (retryCount + 1))
       );

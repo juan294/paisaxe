@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { getEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 /**
  * Timeout for auth session refresh in milliseconds.
@@ -147,7 +148,7 @@ export async function refreshAuthSession(
   } catch (error) {
     if (error instanceof Error && error.message === "Auth refresh timeout") {
       // DO-M3: structured log + PostHog event for rate-tracking auth-refresh failures
-      console.error("[AUTH_REFRESH_TIMEOUT]", {
+      logger.error("[AUTH_REFRESH_TIMEOUT]", {
         message: error.message,
         timeout_ms: AUTH_REFRESH_TIMEOUT_MS,
         timestamp: new Date().toISOString(),
@@ -155,7 +156,9 @@ export async function refreshAuthSession(
       emitAuthRefreshTimeoutEvent();
     } else if (error instanceof Error) {
       // Unexpected real error (not a timeout) — log for debugging
-      console.error("Error refreshing auth session:", error);
+      logger.error("Error refreshing auth session", {
+        error: error.message,
+      });
     }
     // Non-Error thrown values are silently swallowed (e.g., strings, numbers)
   }

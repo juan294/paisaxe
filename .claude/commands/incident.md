@@ -57,12 +57,20 @@ After all specialists complete, present findings to the user:
 [What to do next — fix forward or rollback]
 
 ### Rollback Commands (if needed)
+
+Roll back first, investigate second. See `docs/operations/rollback.md`.
+
 ```bash
-# Revert to last known-good commit
+# Preferred: promote the last known-good BUILD (no rebuild, seconds to recover)
+vercel rollback [deployment-id]
+
+# Code-level revert — on develop, then through the normal release PR. Never on main directly.
 git revert [commit-hash]
-# Or force-deploy a specific commit via Vercel
-vercel deploy --prod [deployment-url]
 ```
+
+NEVER use `vercel deploy --prod` during an incident. It triggers a fresh build rather than
+restoring a known-good artifact, and doing so prolonged the 2026-03-24 outage twice
+(`docs/coe/2026-03-24-dependabot-production-incident.md:85-90`).
 
 ### Timeline
 [Chronological list of relevant events]

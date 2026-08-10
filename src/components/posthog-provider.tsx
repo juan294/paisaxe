@@ -8,7 +8,7 @@ import type { PostHog } from "posthog-js";
 const PostHogContext = createContext<PostHog | null>(null);
 
 // Hook to access PostHog instance (may be null if not yet loaded)
-function usePostHog(): PostHog | null {
+export function usePaisaxePostHog(): PostHog | null {
   return useContext(PostHogContext);
 }
 
@@ -23,7 +23,7 @@ function shouldInitializePostHog(): boolean {
 
 // Component that tracks page views on route changes
 function PostHogPageViewTracker() {
-  const posthog = usePostHog();
+  const posthog = usePaisaxePostHog();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -71,40 +71,47 @@ export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps
     // Only load PostHog in production
     if (!shouldInitializePostHog()) return;
 
-    // Lazy load PostHog after hydration.
+    // PE-M3: Defer PostHog initialization until the browser is idle to avoid
+    // blocking first paint. requestIdleCallback (with setTimeout fallback for
+    // environments that don't support it) ensures analytics do not compete
+    // with critical rendering work.
+    //
     // IMPORTANT: After dynamic import, we use window.posthog (the global singleton)
     // instead of posthogModule.default. Turbopack may create separate module instances
     // for dynamic imports vs static bundles. Using window.posthog ensures we always
     // reference the single canonical instance that the posthog-js library registers
     // on the window object, avoiding silent event capture failures.
-    Promise.all([
-      import("posthog-js"),
-      import("posthog-js/react"),
-    ]).then(([posthogModule, reactModule]) => {
-      // Prefer the global singleton; fall back to the module default
-      const ph = (window as { posthog?: PostHog }).posthog ?? posthogModule.default;
+    const initPostHog = () => {
+      Promise.all([
+        import("posthog-js"),
+        import("posthog-js/react"),
+      ]).then(([posthogModule, reactModule]) => {
+        // Prefer the global singleton; fall back to the module default
+        const ph = (window as { posthog?: PostHog }).posthog ?? posthogModule.default;
 
-      // Initialize if not already initialized
-      if (!ph.__loaded) {
-        ph.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-          api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "/a",
-          person_profiles: "never", // Cookieless mode - no user identification
-          persistence: "memory", // No cookies or localStorage
-          capture_pageview: false, // We handle this manually for Next.js routing
-          capture_pageleave: true,
-          autocapture: true,
-          // Core Web Vitals (LCP, FID, CLS, FCP) are captured automatically
-          // when enabled in the PostHog dashboard:
-          //   Project Settings > Autocapture > Web vitals autocapture > Enable
-          // The SDK reads this setting via remote config — no client-side
-          // code change needed. Requires posthog-js >= 1.141.2 (we have 1.342.1).
-          // Metrics appear under the $web_vitals event in PostHog.
-        });
-      }
+        // Initialize if not already initialized
+        if (!ph.__loaded) {
+          ph.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+            api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "/a",
+            person_profiles: "never", // Cookieless mode - no user identification
+            persistence: "memory", // No cookies or localStorage
+            capture_pageview: false, // We handle this manually for Next.js routing
+            capture_pageleave: false,
+            autocapture: false,
+          });
+        }
 
-      setPosthog(ph);
-      setPostHogReactProvider(() => reactModule.PostHogProvider);
-    });
+        setPosthog(ph);
+        setPostHogReactProvider(() => reactModule.PostHogProvider);
+      });
+    };
+
+    // Use requestIdleCallback when available; fall back to setTimeout(0)
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(initPostHog);
+    } else {
+      setTimeout(initPostHog, 0);
+    }
   }, []);
 
   // FE-M5: Always render PostHogContext.Provider with children directly inside —

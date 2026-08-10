@@ -3,7 +3,7 @@
 ## `main` Branch Requirements
 
 - **1 pull request approval** (solo dev self-approves — forces a deliberate click before any production merge)
-- **All status checks must pass**: Lint & Typecheck, Test, Build, Playwright E2E, Smoke test Vercel preview
+- **All status checks must pass**: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Smoke test Vercel preview`
 - **Strict mode**: branch must be up to date with `main` before merge
 - **dismiss_stale_reviews**: true — stale approvals are dismissed when new commits are pushed
 - **enforce_admins**: true — rules apply to repository admins as well

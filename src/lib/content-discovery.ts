@@ -11,6 +11,7 @@
 import type { StoryCategory } from "@/types/immersive";
 import { getPlaceholderForStory } from "@/lib/unsplash-placeholders";
 import { logger } from "@/lib/logger";
+import { CHAT_MODEL } from "@/lib/models";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -260,7 +261,7 @@ export async function generateDescription(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: CHAT_MODEL,
         max_tokens: 300,
         messages: [
           {

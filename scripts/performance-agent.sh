@@ -5,6 +5,7 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
+MODEL="sonnet"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/performance-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/performance-report.md"
@@ -12,6 +13,7 @@ HISTORY_FILE="$PROJECT_DIR/.performance-history.json"
 METRICS_FILE="$PROJECT_DIR/.performance-metrics.tmp"
 
 mkdir -p "$LOG_DIR"
+trap 'rm -f "$METRICS_FILE"' EXIT
 
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
@@ -27,10 +29,22 @@ log_success "Feature flags enabled — proceeding with Performance Agent" | tee 
 
 cd "$PROJECT_DIR"
 
+restart_dev_server_if_needed() {
+  if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
+    log_info "Restarting dev server..." | tee -a "$LOG_FILE"
+    cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
+    log_success "Dev server restarted" | tee -a "$LOG_FILE"
+  fi
+}
+
 # Performance budgets (split budget adopted 2026-04-04 — single 2,500 KB budget retired)
-BUDGET_INITIAL_JS_KB=2000    # 2 MB initial load JS (static chunks only, excl. deferred)
-BUDGET_TOTAL_JS_KB=3000      # 3 MB total JS (including deferred dynamic chunks)
-BUDGET_LARGEST_CHUNK_KB=500  # 500 KB per chunk
+# Raised 2026-05-02 to reflect structural growth since Apr 4 baseline (Wave 1+2 + dep bumps)
+# Raised 2026-06-10: ElevenLabs ConvAI SDK (~605 KB deferred, click-to-mount) is a hard
+# dependency and already fully lazy-loaded — no further reduction possible. Total budget
+# raised to 3,500 KB (100 KB headroom over current 3,398 KB). Initial-load budget unchanged.
+BUDGET_INITIAL_JS_KB=2100    # 2.1 MB initial load JS (static chunks only, excl. deferred)
+BUDGET_TOTAL_JS_KB=3500      # 3.5 MB total JS (including deferred dynamic chunks)
+BUDGET_LARGEST_CHUNK_KB=650  # 650 KB per chunk (ElevenLabs deferred chunk is 605 KB)
 BUDGET_NODE_MODULES_MB=1100  # 1.1 GB node_modules (@sentry/nextjs 67 MB is permanent)
 BUDGET_PROD_DEPS=40          # Max production dependencies
 
@@ -44,10 +58,13 @@ BUILD_OUTPUT=""
 DEV_SERVER_PID=""
 RESTART_DEV_SERVER=false
 
-# Detect if the dev server is running on port 3000
-DEV_SERVER_PID=$(timeout 5 lsof -ti :3000 2>/dev/null | head -1 || true)
+# Detect if THIS project's dev server is running on its pinned port (3006,
+# per commit 01079491). Port-based check is immune to sibling Next.js projects
+# running on other ports triggering false positives.
+DEV_SERVER_PORT=3006
+DEV_SERVER_PID=$(lsof -ti :${DEV_SERVER_PORT} -sTCP:LISTEN 2>/dev/null | head -1 || true)
 if [[ -n "$DEV_SERVER_PID" ]]; then
-  log_info "Dev server detected (PID $DEV_SERVER_PID) — stopping for production build..." | tee -a "$LOG_FILE"
+  log_info "Dev server detected on port ${DEV_SERVER_PORT} (PID $DEV_SERVER_PID) — stopping for production build..." | tee -a "$LOG_FILE"
   kill "$DEV_SERVER_PID" 2>/dev/null
   # Wait for the process to exit (up to 10 seconds)
   for i in $(seq 1 20); do
@@ -65,22 +82,24 @@ if [[ -n "$DEV_SERVER_PID" ]]; then
   log_success "Dev server stopped" | tee -a "$LOG_FILE"
 fi
 
-log_info "Building application (timeout: 300s)..." | tee -a "$LOG_FILE"
-if BUILD_OUTPUT=$(timeout 300 npm run build 2>&1); then
+log_info "Building application..." | tee -a "$LOG_FILE"
+# macOS has no `timeout` binary — do not wrap this in `timeout N ...`.
+# It silently exits 127, so the build step never actually runs and every
+# cycle falls through to the (previously unguarded) cached-data branch below.
+if BUILD_OUTPUT=$(npm run build 2>&1); then
   log_success "Build completed" | tee -a "$LOG_FILE"
 else
   FRESH_BUILD=false
-  if [[ -d ".next/static" ]]; then
+  # A cached .next tree is only a valid production build if BUILD_ID and a
+  # non-empty static/chunks directory both exist. Directory mtime is NOT a
+  # reliable signal — the dev server touches .next on every run, so a
+  # dev-only tree always looks "fresh" even with zero production chunks.
+  if [[ -f ".next/BUILD_ID" ]] && [[ -n "$(find .next/static/chunks -name '*.js' -type f 2>/dev/null | head -1)" ]]; then
     log_warn "Build failed. Using existing .next data for analysis." | tee -a "$LOG_FILE"
   else
-    log_error "Build failed and no existing .next/static data to analyze" | tee -a "$LOG_FILE"
+    log_error "Build failed and no valid production build in .next to analyze (missing BUILD_ID or static/chunks)" | tee -a "$LOG_FILE"
     echo "$BUILD_OUTPUT" >> "$LOG_FILE"
-    # Still try to restart dev server before exiting
-    if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
-      log_info "Restarting dev server..." | tee -a "$LOG_FILE"
-      cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
-      log_success "Dev server restarted" | tee -a "$LOG_FILE"
-    fi
+    restart_dev_server_if_needed
     exit 1
   fi
 fi
@@ -91,6 +110,14 @@ log_info "Analyzing bundle sizes..." | tee -a "$LOG_FILE"
 # Get JS bundle sizes
 TOTAL_JS_BYTES=$(find .next/static -name "*.js" -type f -exec stat -f%z {} + 2>/dev/null | awk '{s+=$1} END {print s}')
 TOTAL_JS_KB=$((TOTAL_JS_BYTES / 1024))
+
+# A 0 KB bundle is physically impossible for a built Next app — treat it as a
+# harness error, never as a real measurement, and never write it to history.
+if [[ "${TOTAL_JS_KB:-0}" -eq 0 ]]; then
+  log_error "Measured 0 KB total JS — refusing to report or record this as a real reading" | tee -a "$LOG_FILE"
+  restart_dev_server_if_needed
+  exit 1
+fi
 
 # Get largest chunks with their sizes
 LARGEST_CHUNKS=$(find .next/static -name "*.js" -type f -exec stat -f "%z %N" {} \; 2>/dev/null | sort -rn | head -10)
@@ -128,6 +155,17 @@ fi
 JS_CHANGE_KB=$((TOTAL_JS_KB - PREV_TOTAL_JS_KB))
 DEPS_CHANGE=$((PROD_DEPS - PREV_PROD_DEPS))
 
+# Build provenance — record .next mtime and last commit touching src/ or package.json
+# so Claude can verify bundle authority without manual git archaeology.
+NEXT_MTIME=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" .next 2>/dev/null || echo "unknown")
+NEXT_MTIME_EPOCH=$(stat -f "%m" .next 2>/dev/null || echo "0")
+LAST_SOURCE_COMMIT=$(git log -1 --format="%H %ai %s" -- src/ package.json package-lock.json 2>/dev/null || echo "unknown")
+LAST_SOURCE_COMMIT_EPOCH=$(git log -1 --format="%ct" -- src/ package.json package-lock.json 2>/dev/null || echo "0")
+BUILD_IS_STALE="false"
+if [[ "$FRESH_BUILD" == "false" && "$NEXT_MTIME_EPOCH" -lt "$LAST_SOURCE_COMMIT_EPOCH" ]]; then
+  BUILD_IS_STALE="true"
+fi
+
 # Determine budget violations
 VIOLATIONS=""
 if [[ $TOTAL_JS_KB -gt $BUDGET_TOTAL_JS_KB ]]; then
@@ -145,10 +183,26 @@ fi
   echo "PERFORMANCE METRICS ($(date '+%Y-%m-%d'))"
   echo "========================================="
   echo ""
-  if [[ "$FRESH_BUILD" == "false" ]]; then
-    echo "NOTE: Production build was skipped (dev server was running)."
-    echo "Bundle sizes below are from the dev server's .next cache — they may"
-    echo "differ from a production build. Dependency and disk metrics are still accurate."
+  echo "BUILD PROVENANCE:"
+  echo "- .next directory mtime: ${NEXT_MTIME}"
+  echo "- Last commit touching src/ or package.json: ${LAST_SOURCE_COMMIT}"
+  if [[ "$FRESH_BUILD" == "true" ]]; then
+    echo "- Build status: FRESH (produced this run — bundle numbers are authoritative)"
+  elif [[ "$BUILD_IS_STALE" == "true" ]]; then
+    echo "- Build status: STALE — .next predates last source/dep commit. Bundle numbers are NOT authoritative."
+    echo "  BUDGET VERDICT SUPPRESSED: cached build is older than the source tree."
+    echo "  Base the overall status verdict on dependency and disk metrics only."
+  else
+    echo "- Build status: CACHED — .next postdates last source/dep commit. Bundle numbers are authoritative for current source tree."
+  fi
+  echo ""
+  if [[ "$FRESH_BUILD" == "false" && "$BUILD_IS_STALE" == "true" ]]; then
+    echo "NOTE: Production build was skipped or failed — cached .next is older than source."
+    echo "Bundle sizes below are informational only."
+    echo ""
+  elif [[ "$FRESH_BUILD" == "false" ]]; then
+    echo "NOTE: Production build was skipped (used existing .next). Bundle sizes are authoritative"
+    echo "for the current source tree (build postdates all source/dep changes)."
     echo ""
   fi
   echo "BUNDLE SIZES:"
@@ -156,6 +210,11 @@ fi
   echo "- Total CSS: ${TOTAL_CSS_KB} KB"
   echo "- Budget (split, since 2026-04-04): initial ${BUDGET_INITIAL_JS_KB} KB / total ${BUDGET_TOTAL_JS_KB} KB"
   echo ""
+  if [[ "$FRESH_BUILD" == "true" ]]; then
+    echo "FIRST LOAD JS (per-route split, from next build):"
+    echo "$BUILD_OUTPUT" | grep -E "First Load JS" | head -10
+    echo ""
+  fi
   echo "LARGEST JS CHUNKS:"
   echo "$LARGEST_CHUNKS"
   echo ""
@@ -176,7 +235,7 @@ fi
     echo "$HEAVY_DEPS"
     echo ""
   fi
-  if [[ -n "$VIOLATIONS" ]]; then
+  if [[ -n "$VIOLATIONS" ]] && [[ "$FRESH_BUILD" == "true" || "$BUILD_IS_STALE" == "false" ]]; then
     echo "BUDGET VIOLATIONS:"
     echo -e "$VIOLATIONS"
     echo ""
@@ -199,6 +258,7 @@ SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-in
 
 # Run Claude to analyze and write report
 "$CLAUDE_BIN" -p \
+  --model "$MODEL" \
   --allowedTools 'Read,Edit,Write,Glob,Grep' \
   >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
@@ -212,7 +272,7 @@ Current metrics:
 $(cat "$METRICS_FILE")
 
 Build output summary:
-$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30; else echo "(No build output — dev server was running, used cached .next data)"; fi)
+$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30; else echo "(No build output — build was skipped or failed, used cached .next data)"; fi)
 
 $SHARED_CONTEXT_READ
 
@@ -262,15 +322,7 @@ else
   echo "[$NEW_ENTRY]" > "$HISTORY_FILE"
 fi
 
-# Cleanup
-rm -f "$METRICS_FILE"
-
-# Restart dev server if we stopped it
-if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
-  log_info "Restarting dev server..." | tee -a "$LOG_FILE"
-  cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
-  log_success "Dev server restarted" | tee -a "$LOG_FILE"
-fi
+restart_dev_server_if_needed
 
 log_success "Performance report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== Performance Agent finished ===" | tee -a "$LOG_FILE"

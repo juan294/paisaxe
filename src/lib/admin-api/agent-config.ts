@@ -1,6 +1,7 @@
 import type { AdminApiResponse } from "@/types/admin";
 import type { AgentConfigFile } from "@/types/agent-config";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const API_URL = "/api/admin/agent-config";
 
@@ -18,7 +19,7 @@ export async function fetchAgentConfig(): Promise<
     }
     return await response.json();
   } catch (error) {
-    console.error("Error fetching agent config:", error);
+    clientLogger.error("Error fetching agent config", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -41,7 +42,7 @@ export async function updateAgentMaster(
     }
     return await response.json();
   } catch (error) {
-    console.error("Error updating agent master:", error);
+    clientLogger.error("Error updating agent master", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -65,7 +66,7 @@ export async function updateAgentEnabled(
     }
     return await response.json();
   } catch (error) {
-    console.error("Error updating agent enabled:", error);
+    clientLogger.error("Error updating agent enabled", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -90,7 +91,7 @@ export async function updateAgentConfigValue(
     }
     return await response.json();
   } catch (error) {
-    console.error("Error updating agent config value:", error);
+    clientLogger.error("Error updating agent config value", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }

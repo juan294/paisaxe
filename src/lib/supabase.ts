@@ -1,8 +1,17 @@
+/**
+ * Public Supabase client (browser + server safe).
+ *
+ * This module only exposes the anon-key public client. It is intentionally
+ * browser-capable so that SSR pages and client components can share it.
+ *
+ * For server-only service-role (admin) operations, import from:
+ *   @/lib/supabase-admin
+ *
+ * Do NOT add server-only secrets or the admin client back to this file.
+ */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   getSupabaseAnonKey,
-  getSupabaseServiceKey,
-  getSupabaseServiceRoleKey,
   getSupabaseUrl,
 } from "@/lib/env";
 
@@ -47,30 +56,3 @@ export const supabase = new Proxy({} as PublicSupabaseClient, {
     return typeof value === "function" ? value.bind(client) : value;
   },
 });
-
-// Admin client for server-side operations (seeding, etc.)
-export function createAdminClient() {
-  const supabaseUrl = getRequiredSupabaseUrl();
-  const serviceKey = getSupabaseServiceRoleKey() ?? getSupabaseServiceKey();
-  if (!serviceKey) {
-    throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY) is required for admin operations"
-    );
-  }
-  return createClient(supabaseUrl, serviceKey);
-}
-
-/** BE-M3: Singleton admin client — lazy-initialised, reused across requests. */
-let _adminClient: ReturnType<typeof createAdminClient> | null = null;
-
-/**
- * Returns a singleton Supabase admin (service-role) client.
- * Constructs the client on first call and reuses it on subsequent calls,
- * avoiding repeated construction overhead on hot paths.
- */
-export function getAdminClient(): ReturnType<typeof createAdminClient> {
-  if (!_adminClient) {
-    _adminClient = createAdminClient();
-  }
-  return _adminClient;
-}

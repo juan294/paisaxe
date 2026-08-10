@@ -1,7 +1,7 @@
 # Testing Guide
 
 > Complete reference for Paisaxe's testing infrastructure.
-> Last updated: 2026-04-24
+> Last updated: 2026-05-03
 
 ---
 
@@ -11,8 +11,8 @@ Paisaxe uses a two-layer testing strategy:
 
 | Layer | Tool | Scope | Files | Tests |
 |-------|------|-------|-------|-------|
-| **Unit & Component** | Vitest + React Testing Library | Functions, components, hooks, API routes | 332 | 6,059 |
-| **End-to-End** | Playwright | Full browser journeys across pages | 16 | 32 (16 desktop + 16 mobile) |
+| **Unit & Component** | Vitest + React Testing Library | Functions, components, hooks, API routes | 353 | 6,496 |
+| **End-to-End** | Playwright | Full browser journeys across pages | 18 | 36 (18 desktop + 18 mobile) |
 
 Both layers run in CI on every push and pull request to `develop` and `main`.
 
@@ -127,7 +127,7 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 
 ### Unit Test File Inventory
 
-**341 files, 6,347 tests** organized by area (representative sample — the inventory below covers the original core files; the full test suite has grown significantly as new features were added):
+**353 files, 6,496 tests** organized by area (representative sample — the inventory below covers the original core files; the full test suite has grown significantly as new features were added):
 
 #### Pages & Layouts (15 files)
 
@@ -349,7 +349,7 @@ expect(response.status).toBe(200);
 | `desktop` | Desktop Chrome | 1280 x 720 |
 | `mobile` | Pixel 7 | 393 x 851 |
 
-Every test file runs twice — once per project — giving 32 test configurations from 16 spec files.
+Every test file runs twice — once per project — giving 36 test configurations from 18 spec files.
 
 **Artifacts on failure:**
 - Screenshots (PNG)
@@ -373,7 +373,7 @@ Provides shared mock responses used by route interception across test files:
 
 ### E2E Test Files
 
-The E2E suite has grown to 16 spec files. Key specs:
+The E2E suite has grown to 18 spec files. Key specs:
 
 #### `smoke.spec.ts` — App Basics + CSP Canary
 
@@ -429,6 +429,14 @@ Playwright screenshots of key UI states compared against committed baselines.
 
 End-to-end Stripe test mode checkout. Runs in dedicated `e2e-stripe-integration.yml` workflow with real Stripe test credentials.
 
+#### `voice-agents.spec.ts` — Voice Agent Chat
+
+ElevenLabs voice-agent chat flow: widget open/close, session start, stream handling, and error states.
+
+#### `mcp.spec.ts` — MCP Tool Endpoints
+
+Exercises the MCP tool endpoints (`/api/mcp/places`, `/api/mcp/make-booking`, `/api/mcp/weather`) used by the ElevenLabs voice agent.
+
 #### Other specs
 
 `admin.spec.ts`, `favorites.spec.ts`, `api.spec.ts`, `suggestions.spec.ts` — cover admin dashboard login, favorites page, API smoke tests, and place suggestions respectively.
@@ -465,7 +473,9 @@ e2e/
 ├── pre-launch.spec.ts        # Feature flags + i18n smoke
 ├── qa-journey.spec.ts        # Authenticated user journey
 ├── interactive-controls.spec.ts  # Keyboard + touch
+├── mcp.spec.ts               # MCP tool endpoints
 ├── visual-regression.spec.ts # Screenshot baselines
+├── voice-agents.spec.ts      # ElevenLabs voice agent chat
 ├── stripe-real-checkout.spec.ts  # Stripe test mode (separate CI)
 ├── admin.spec.ts
 ├── favorites.spec.ts
@@ -530,7 +540,7 @@ Runs on every push and PR to `develop` and `main`:
          All five must pass to merge to main              └───────────────┘
 ```
 
-The `develop-smoke` job runs only on direct pushes to `develop` (not on PRs) and probes `/api/health/live` + `/api/health` on the Vercel preview. It uses `continue-on-error: true` so it never blocks the push, but a failure signals a runtime regression not caught by unit or E2E tests.
+The `develop-smoke` job runs only on direct pushes to `develop` (not on PRs). It probes `/api/health/live` for liveness, then runs `scripts/check-health-readiness.mjs` against `/api/health` so degraded JSON bodies fail the smoke even though the endpoint returns HTTP 200. It uses `continue-on-error: true` so it never blocks the push, but a failure signals a runtime regression not caught by unit or E2E tests.
 
 ### E2E CI (`e2e.yml`)
 
@@ -569,7 +579,7 @@ Every `git commit` runs these checks sequentially:
 ```
 1. npm run typecheck    → TypeScript compilation
 2. npm run lint         → ESLint
-3. npm run test         → Full Vitest suite (~6,347 tests)
+3. npm run test         → Full Vitest suite (6,496 tests)
 ```
 
 If any step fails, the commit is rejected. This ensures no broken code reaches the repository.

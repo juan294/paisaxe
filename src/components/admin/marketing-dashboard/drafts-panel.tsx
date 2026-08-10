@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Copy, Check, Trash2, Plus } from "lucide-react";
 import type { MarketingPost } from "@/types/marketing";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 import { PLATFORM_BADGES } from "./constants";
 import { CreateDraftDialog } from "./create-draft-dialog";
 
@@ -22,7 +23,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
         setDrafts(result.data || []);
       }
     } catch (error) {
-      console.error("Failed to load drafts:", error);
+      clientLogger.error("Failed to load drafts", { error: error instanceof Error ? error.message : String(error) });
     } finally {
       setIsLoading(false);
     }
@@ -38,7 +39,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch (error) {
-      console.error("Failed to copy:", error);
+      clientLogger.error("Failed to copy", { error: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -53,7 +54,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
         onDraftPosted();
       }
     } catch (error) {
-      console.error("Failed to mark as posted:", error);
+      clientLogger.error("Failed to mark as posted", { error: error instanceof Error ? error.message : String(error) });
     }
   };
 
@@ -68,7 +69,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
         loadDrafts();
       }
     } catch (error) {
-      console.error("Failed to delete draft:", error);
+      clientLogger.error("Failed to delete draft", { error: error instanceof Error ? error.message : String(error) });
     }
   };
 

@@ -50,12 +50,17 @@ let mockDeleteEqResult: { error: { message: string; code?: string } | null } = {
 
 // Flag to make createAdminClient throw (for catch block coverage)
 let mockCreateAdminClientThrows = false;
+// Optional override for the thrown value — lets tests exercise the
+// `error instanceof Error ? error.message : String(error)` false branch.
+let mockCreateAdminClientThrowValue: unknown = undefined;
 
 // Mock Supabase
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => {
     if (mockCreateAdminClientThrows) {
-      throw new Error("Supabase client creation failed");
+      throw mockCreateAdminClientThrowValue !== undefined
+        ? mockCreateAdminClientThrowValue
+        : new Error("Supabase client creation failed");
     }
     return {
       from: () => ({
@@ -106,6 +111,7 @@ describe("/api/admin/suggestions/[id]", () => {
     };
     mockDeleteEqResult = { error: null };
     mockCreateAdminClientThrows = false;
+    mockCreateAdminClientThrowValue = undefined;
   });
 
   describe("PUT", () => {
@@ -268,6 +274,23 @@ describe("/api/admin/suggestions/[id]", () => {
       expect(data.error).toBe("Internal server error");
     });
 
+    it("should stringify a non-Error thrown value during update", async () => {
+      mockCreateAdminClientThrows = true;
+      mockCreateAdminClientThrowValue = "raw string failure";
+
+      const request = createRequest({ status: "reviewed" });
+
+      const response = await PUT(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+      expect(logger.error).toHaveBeenCalledWith(
+        "Admin suggestion update error:",
+        { error: "raw string failure" }
+      );
+    });
+
     describe("Zod validation", () => {
       it("should return 400 for invalid status value (Zod catches it)", async () => {
         const request = createRequest({ status: "invalid-status-value" });
@@ -377,6 +400,25 @@ describe("/api/admin/suggestions/[id]", () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
+    });
+
+    it("should stringify a non-Error thrown value during delete", async () => {
+      mockCreateAdminClientThrows = true;
+      mockCreateAdminClientThrowValue = "raw string failure";
+
+      const request = new NextRequest("http://localhost/api/admin/suggestions/suggestion-1", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+      expect(logger.error).toHaveBeenCalledWith(
+        "Admin suggestion delete error:",
+        { error: "raw string failure" }
+      );
     });
   });
 

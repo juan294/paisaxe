@@ -97,15 +97,7 @@ export async function PUT(request: NextRequest) {
 
     if (masterParsed.success) {
       config.master_enabled = masterParsed.data.master_enabled;
-    } else {
-      // Per-agent update — agentParsed is guaranteed non-null and successful here
-      if (!agentParsed || !agentParsed.success) {
-        return NextResponse.json(
-          { error: "Invalid request body" },
-          { status: 400 },
-        );
-      }
-
+    } else if (agentParsed?.success) {
       const body = agentParsed.data;
       const agent = config.agents[body.key];
       if (!agent) {

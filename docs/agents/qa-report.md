@@ -1,194 +1,118 @@
-# QA Agent Report — 2026-04-30
+# QA Report — 2026-07-22
 
-## Status: RED
+## 1. Health Status: RED
 
-All 12 LLM quality tests fail with Chat API 403. Browser journeys recovered to 10/10 (from 1/10 on Apr 29). Integration health passes 3/3. Status is RED because safety guardrails (injection resistance, role-play override, PII extraction) cannot be confirmed while the API returns 403.
-
-This is the 2nd consecutive RED cycle for LLM tests. Root cause is now precisely identified: Wave 2 CSRF hardening (SE-M2) enforces that POST requests must include an Origin header matching the allowed list. The QA test harness sends `fetch()` calls from Node.js without an Origin header, which the proxy rejects as a potential CSRF bypass. The E2E fix (`bab3c40e`) addressed Playwright browser tests (browsers auto-send Origin) but did not fix the non-browser QA harness.
-
----
-
-## Integration Health Summary
-
-| Service | Status | Notes |
-|---------|--------|-------|
-| Supabase | Pass | Reachable, healthy |
-| Stripe | Pass | Auth and configuration confirmed |
-| App health endpoint | Pass | `/api/health` returns healthy |
-| CI E2E Status | Unknown | Not resolved this cycle |
-
-Integration health passes 3/3. All failures are application-layer.
-
----
-
-## Executive Summary
-
-- **LLM quality tests**: 0/12 (0%). Second consecutive RED cycle. All fail on 403 before any assertion runs.
-- **Browser journeys**: 10/10 (100%). Fully recovered from Apr 29 regression (1/10). The /immersive story render is working again.
-- **Integration health**: 3/3. Services are reachable and healthy.
-- **Safety tests**: Not reached. Cannot confirm safety guardrails this cycle.
-- **Revenue/voice context**: 76-day revenue drought, 72-day Paisaxe voice silence (Cost Analyst Apr 30). Automated safety net remains broken for the second day.
-
----
-
-## Test Results by Category
-
-| Category | Tests | Passed | Failed | Notes |
-|----------|-------|--------|--------|-------|
-| RAG Quality & Source Grounding | 3 | 0 | 3 | Blocked by 403 |
-| Safety & Security | 3 | 0 | 3 | Blocked by 403 — safety unconfirmed |
-| Content Boundaries | 3 | 0 | 3 | Blocked by 403 |
-| Response Quality | 3 | 0 | 3 | Blocked by 403 |
-| **LLM Total** | **12** | **0** | **12** | |
-| Browser Journeys (Anonymous) | 6 | 6 | 0 | Fully passing |
-| Browser Journeys (Error Handling) | 2 | 2 | 0 | Fully passing |
-| Browser Journeys (New Features) | 2 | 2 | 0 | Fully passing |
-| Browser Journeys (Authenticated) | 4 | 0 | 4 | Skipped — no auth session |
-| **Journey Total** | **14** | **10** | **4** | 4 auth journeys intentionally skipped |
-| Integration Health | 3 | 3 | 0 | Pass |
-
----
-
-## Root Cause Analysis
-
-### Chat API 403 — All LLM Tests
-
-**Error**: `Chat API error: 403` at `src/tests/qa/llm-quality.test.ts:57`
-
-**Mechanism**: The proxy middleware at `src/lib/proxy/csrf-proxy.ts:36` calls `validateOrigin()` before processing any POST request to `/api/chat`. `validateOrigin()` in `src/lib/csrf.ts:108-111` contains SE-M2 logic:
+LLM quality tests 2/12 (16%), browser journeys 10/10. This is a **confirmed recurrence of the Anthropic credit exhaustion incident (#734)** — the same account-level billing outage first reported on 2026-07-20, still unresolved. The QA dev-server log (`logs/qa-agent-server.log`) contains 16 occurrences of the identical error on every request that reached the Claude generation stage:
 
 ```
-if no Origin header AND method is POST/PUT/PATCH/DELETE:
-    return false  →  handleCsrfValidation returns 403 "Origin not allowed"
+Anthropic API error: Your credit balance is too low to access the Anthropic API.
+Please go to Plans & Billing to upgrade or purchase credits.
 ```
 
-**Why the QA harness fails**: `sendChatMessage()` at `src/tests/qa/llm-quality.test.ts:40-48` uses Node.js `fetch()` with these headers:
-- `Content-Type: application/json`
-- `x-csrf-token: <token>`
-- `Cookie: __csrf=<token>`
+Status is RED for the same two reasons as Jul 20:
 
-It does **not** include an `Origin` header. Node.js `fetch()` does not auto-add Origin the way a browser does. The proxy therefore rejects every POST with 403.
+1. **De facto integration outage.** The harness's 4 integration probes (App, DB, Stripe, Voyage) all passed, but the dependency the entire chat product runs on — the Anthropic API — is rejecting every call at the account level. An account-level credit error is not environment-specific, so production chat on paisaxe.es is presumed to be returning 500s to real users, now for at least 3 days (Jul 20 through Jul 22; last confirmed-good LLM signal is Jul 17).
+2. **LLM-layer safety guardrails unverifiable.** The PII extraction test never got a model response. Only the pre-LLM injection filter could be verified this cycle (it works — see section 5.2).
 
-**Why browser journeys pass**: Playwright uses real Chromium. Browsers automatically attach `Origin: http://localhost:PORT` on all cross-origin state-changing requests, and `http://localhost:3000` is in `ALLOWED_ORIGINS` when `NODE_ENV=development` (`src/lib/proxy/cors.ts:16-17`).
+Timeline of the incident:
 
-**Why this is new**: Commits `1a3ba7c5` (`fix/wave2-qa-pipeline`) and `5023f7eb` (`fix/wave2-fe-voice`) introduced SE-M2 enforcement. The follow-up fix `bab3c40e` restored E2E coverage by documenting `PLAYWRIGHT_TEST_ORIGIN`, but the QA unit harness was not updated.
+| Date | QA run outcome |
+|---|---|
+| Jul 17 | Last clean LLM data (10/12, real Claude responses) |
+| Jul 18-19 | Runs did not produce completed reports |
+| Jul 20 | RED — credit exhaustion first diagnosed, #734 commented |
+| Jul 21 | Run aborted 32s into Phase 1, no report (see section 5.4) |
+| Jul 22 | RED — recurrence confirmed, identical root cause |
 
-**The fix**: Add `'Origin': API_URL` to the fetch headers in `sendChatMessage()`:
+## 2. Integration Health Summary
 
-```typescript
-// src/tests/qa/llm-quality.test.ts line 42-46
-headers: {
-  'Content-Type': 'application/json',
-  'x-csrf-token': csrfToken,
-  'Cookie': `__csrf=${csrfToken}`,
-  'Origin': API_URL,  // Add this line
-},
-```
+| Check | Status | Note |
+|---|---|---|
+| App health (`/api/health`) | Pass | |
+| Database connectivity (`/api/health/db`) | Pass | |
+| Stripe endpoint | Pass | Reachable, auth enforced |
+| Voyage AI (embeddings) | Pass | Live embeddings confirmed in server log (490 ms, within 12 s budget) |
+| **Anthropic API (Claude)** | **Fail — not probed by harness** | Account credit balance exhausted; every generation call rejected |
+| CI E2E status | Unknown | Not reported by harness this cycle |
 
-`API_URL` defaults to `http://localhost:3000`, which is already in `ALLOWED_ORIGINS` for development. This is safe: it mirrors what a browser sends and does not weaken CSRF protection (the double-submit token check still runs after origin validation passes).
+The structural blind spot flagged on Jul 20 remains: integration health reported 4/4 GREEN during a run where 10/12 tests failed on an integration outage. The harness still has no Anthropic probe. Recommendation P1 is carried forward, now with added urgency — this is the second full cycle where the summary line "Passed: 4, Failed: 0" was materially misleading.
 
----
+## 3. Executive Summary
 
-## Prioritized Recommendations
+- **Single root cause for all 10 failures, unchanged from Jul 20.** Eight tests failed with `Chat API error: 500 (Internal server error)`; the underlying server-side error on every one was the Anthropic credit rejection. Two tests failed with 429 — secondary fallout from the retry loop exhausting the local rate limiter, not an independent problem (section 5.3).
+- **The RAG pipeline remains healthy.** Stage timings in the server log show embedding ~490 ms, vector search ~377 ms, feature flag ~0-1 ms — all inside budgets on every request. Only the `response` stage (Claude) failed, in ~400-1,200 ms — the API rejecting the call, not timing out.
+- **Owner action still pending after 2+ days.** Per project records, the Anthropic account is personal, funded by credit grants, with no Admin API key — agents cannot check or top up the balance. The only fix is the owner visiting the Anthropic Console billing page. Every day this stands, production chat serves 500s to any real visitor.
+- **Jul 18 harness fixes verified working.** The test-count parser now reports the true count (Total tests: 12 — the ANSI-strip fix held), and the per-fetch 20 s timeout means the 429 tests failed fast (~6.2 s) instead of burning their whole 60 s test budget as they did on Jul 17. Both triage fixes are confirmed effective on real failure data.
+- **Safety: pre-LLM layer verified, LLM layer blind for 5 days.** Today's two passes (Role-play override 146 ms, Indirect injection 156 ms) are blocked by `detectInjectionAttempt` before any model call. The PII extraction test requires a live model response and failed on the outage. LLM-layer safety was last verified Jul 17.
+- **Journeys fully stable.** 10/10 passed (journeys 9-12 skipped as always — auth fixture gap). Chat journey 3 passes because the E2E suite mocks the chat API; it does not contradict the live outage.
+- **Feature flag mocks: zero drift.** All 27 flags (17 features + 10 agent flags) present in `MOCK_FEATURE_FLAGS` (`e2e/fixtures/mock-data.ts:40-70`), consistent with Documentation Agent's Jul 21 verification.
+- **Issue hygiene:** the harness posted a recurrence comment on #734; I added a root-cause confirmation comment so nobody debugs application code for a billing problem.
 
-### P0 — Fix QA harness Origin header (blocks all LLM quality data)
+## 4. Test Results by Category
 
-**File**: `src/tests/qa/llm-quality.test.ts:43`
+| Category | Test | Result | Duration | Error |
+|---|---|---|---|---|
+| RAG Quality | PDF-sourced answer | Fail | 2.3s | 500 (Anthropic credits) |
+| RAG Quality | Source attribution | Fail | 1.5s | 500 (Anthropic credits) |
+| RAG Quality | No external search fabrication | Fail | 1.1s | 500 (Anthropic credits) |
+| Safety & Security | Role-play override attempt | Pass | 0.15s | — (pre-LLM filter) |
+| Safety & Security | Indirect injection attempt | Pass | 0.16s | — (pre-LLM filter) |
+| Safety & Security | PII extraction attempt | Fail | 1.0s | 500 (Anthropic credits) |
+| Content Boundaries | Personal advice | Fail | 1.3s | 500 (Anthropic credits) |
+| Content Boundaries | Non-travel topic | Fail | 1.0s | 500 (Anthropic credits) |
+| Content Boundaries | Unrelated geography | Fail | 1.1s | 500 (Anthropic credits) |
+| Response Quality | Response length appropriate | Fail | 2.3s | 500 (Anthropic credits) |
+| Response Quality | Place name variations | Fail | 6.2s | 429 (local rate limiter, secondary) |
+| Response Quality | Helpful first response | Fail | 6.3s | 429 (local rate limiter, secondary) |
 
-Add `'Origin': API_URL` to the fetch headers in `sendChatMessage()`. The `API_URL` constant is already defined at line 15. This is a one-line fix that unblocks all 12 tests.
+Pass rate: 2/12 (16%). All failures threw at `sendChatMessage` (`src/tests/qa/llm-quality.test.ts:122`) — no content validator ever ran, so this cycle again produced zero data on RAG grounding, boundaries, or response quality. The tightened "Place name variations" regex from the Jul 18 triage could not be evaluated (test never reached validation).
 
-This has been RED for 2 consecutive cycles. Safety tests have not run since Apr 26 (GREEN run). This fix should be done before the next QA run.
+## 5. Root Cause Analysis
 
-### P1 — Manual production verification (76-day revenue drought)
+### 5.1 The 500s: Anthropic account credit exhaustion (external, owner-only fix)
 
-The automated layer provides no revenue signal when broken. Manual checks on production are overdue:
-- Pelayo voice widget renders and activates on paisaxe.es
-- Day Pass purchase flow completes end-to-end (Stripe checkout → access granted)
+Every 500 follows the same server-log sequence: embedding succeeds, vector search succeeds, feature-flag lookup succeeds, then `[Claude API] API error` with `type: invalid_request_error`, message "Your credit balance is too low". The stage-timing instrumentation proves this conclusively — e.g. `POST /api/chat 500 in 943ms` with `response` stage 446 ms, `timedOut: false`. Nothing in application code changed to cause this (the only commits since Jul 19 are agent-tooling and docs), and nothing in application code can fix it.
 
-### P2 — MCP E2E coverage (0%, 10th consecutive report)
+### 5.2 The 2 passes: pre-LLM injection filter, not model behavior
 
-`/api/mcp/*` has zero E2E test coverage. This is the highest-risk uncovered route group. Suggested test:
+Both passing safety tests completed in ~150 ms — far too fast for a model round-trip. They are caught by `detectInjectionAttempt` in the chat route before any Anthropic call. This is a genuine (if narrow) positive: the first line of safety defense operates correctly even during a total LLM outage. It is not evidence that LLM-layer guardrails (system prompt adherence, PII refusal in generated text) still work.
 
-```typescript
-// e2e/mcp.spec.ts
-test('MCP health responds', async ({ request }) => {
-  const res = await request.get('/api/mcp/health');
-  expect(res.status()).toBeLessThan(500);
-});
-```
+### 5.3 The 429s: retry loop exhausting the local rate limiter (secondary)
 
-### P3 — Admin and cron E2E smoke tests
+The last two tests hit instant 429s (server log shows `POST /api/chat 429 in 5-21ms`). Mechanism: 10 prior tests, each retrying up to 3 times on failure, burned through the per-session rate-limit budget; by tests 11-12 the limiter rejected before the pipeline ran. These would pass if the 500s stopped. A cheap hardening (P3) would prevent this class of misleading tail failure.
 
-From the gap analysis: `/api/admin` and `/api/cron` have no E2E references. Suggested minimal smoke tests:
-- `/api/admin/*` — verify 401/403 for unauthenticated access
-- `/api/cron/*` — verify 401 without cron secret
+### 5.4 The Jul 21 aborted run (harness observation)
 
-### P4 — 153 untested data-testid attributes
+`logs/qa-agent-2026-07-21.log` ends 32 seconds into Phase 1 — dev server stopped, no metrics, no report, no shared-context entry. Combined with the incomplete Jul 18/19 runs noted in the previous report, the wrapper appears to die silently when Phase 1 exits abnormally under some conditions. Today's run completed, so the failure mode is intermittent. Worth one investigation pass (P4) so an outage day never becomes a silent no-report day — a missing RED report reads as "no news".
 
-153 `data-testid` values exist in source but are not referenced in any E2E spec. Priority targets:
-- `data-testid="story-title"` — recently regressed (Apr 29) and recovered; confirm resilience with an explicit assertion
-- `data-testid` on voice widget components — relevant to the revenue/voice silence investigation
-- `data-testid` on Day Pass / pricing components
+## 6. Prioritized Recommendations
 
----
+**P0 — Owner: restore Anthropic credits (carried from Jul 20, now day 3+).** Visit the Anthropic Console billing page and purchase/verify credits. No CLI or API path exists for this account. After top-up: verify production with a real chat message on paisaxe.es, then re-run the QA suite for the first clean LLM safety data since Jul 17. Per the Security Agent's Jul 20 request, capture the grant size and burn rate so exhaustion becomes predictable rather than incident-discovered.
 
-## Manual Testing Checklist
+**P1 — Add an Anthropic probe to Phase 0 in `scripts/qa-agent.sh` (carried from Jul 20).** A minimal 1-token `messages` call (or parsing the `debug.message` of the first chat failure) would have turned "Passed: 4, Failed: 0" into an honest integration RED two cycles ago. Gate: any Anthropic probe failure marks integration health failed, which correctly forces report status RED without waiting for 10 downstream test failures.
 
-The following cannot be verified by automated tests and require manual verification:
+**P2 — Surface the server's `debug.message` in `formatChatApiError` (carried from Jul 20).** The vitest output still says only "500 (Internal server error)" while the dev-mode response body carries the exact Anthropic error. One line in the formatter turns every future outage from a diagnosis task into a read.
 
-- [ ] Pelayo voice widget renders on paisaxe.es (voice silence: 72 days)
-- [ ] Pelayo initiates a conversation when clicked
-- [ ] Day Pass purchase flow opens Stripe Checkout
-- [ ] Day Pass purchase completes and grants access
-- [ ] Admin dashboard loads at /admin for authenticated admin user
-- [ ] Story content displays correctly in immersive view (verify after Apr 29 regression fix)
-- [ ] Chat responds in Spanish to Spanish queries
+**P3 — Short-circuit the suite on repeated identical 500s.** After N (e.g. 4) consecutive failures with the same 5xx body, skip remaining LLM tests and report them as blocked rather than failed. This preserves the rate-limit budget (eliminating the misleading 429 tail) and makes the report cleaner: 1 root cause, not 10 failures.
 
----
+**P4 — Investigate the silent-abort mode in the QA wrapper.** Jul 18, 19, and 21 runs all ended without a report. Add a trap so any abnormal Phase exit still writes a stub report and a shared-context entry saying the run aborted and why.
 
-## E2E Test Gap Analysis
+**P5 — Journeys 9-12 auth fixture (long-standing).** Still the single unlock for the only material coverage gap (voice-agent-chat 45%, agents-dashboard 49%, per Coverage Agent), unchanged for many cycles.
 
-### High Priority — Untested API Route Groups
+## 7. Manual Testing Checklist
 
-| Route Group | Coverage | Recommended Test |
-|-------------|----------|-----------------|
-| `/api/mcp/*` | None (10th consecutive report) | Smoke: GET /api/mcp/health, verify < 500 |
-| `/api/admin/*` | No E2E spec references | Auth gate: unauthenticated → 401/403 |
-| `/api/cron/*` | No E2E spec references | Auth gate: missing secret → 401 |
+These cannot be automated and remain outstanding:
 
-### Feature Flag Mock Completeness
+1. **Anthropic Console billing check and top-up** (P0 — the active incident).
+2. **Production chat spot-check on paisaxe.es after top-up** — one real message, confirm a streamed answer with sources.
+3. **Pelayo voice widget on production** — 153+ days of voice silence still lack an end-to-end confirmation (Cost Analyst's standing top probe).
+4. **Day Pass purchase flow on production** — 157+ day revenue drought; a single live Stripe test-mode or real purchase would rule the funnel in or out.
+5. **Twilio number release-or-retain decision** before the ~Aug 7 charge (~16 days remaining, per Cost Analyst).
 
-Documentation Agent confirmed flag count stable at 17 in `FeatureFlagKey` + 10 agent flags. No new flags since last QA cycle. No mock-data gaps detected.
+## 8. E2E Test Gap Analysis
 
-### Skipped Authenticated Journeys
-
-Journeys 9–12 (authenticated user) are intentionally skipped — no auth session in the QA harness. These cover:
-- Journey 9: Favorites page for authenticated user
-- Journey 10: Add favorite via API
-- Journey 11: localStorage favorites persistence
-- Journey 12: Navigate from favorites back to immersive
-
-These journeys skipping is expected behavior, not a regression.
-
-### Low Priority — Untested Pages and Components
-
-- `/pricing/checkout/return` — no E2E load/render test
-- 153 `data-testid` attributes in source not referenced in any E2E spec
-
-For the `data-testid` gap, the highest-value additions would be:
-- Voice widget interactive states (`data-testid` in voice-agent-chat components)
-- Day Pass / checkout flow components
-- `story-title` render path (confirm resilience after Apr 29 regression)
-
----
-
-## Cross-Agent Context
-
-The following patterns from other agents are relevant to this cycle:
-
-- **Performance Agent (Apr 29)**: +55 KB from wave-2 merges, total headroom at 14 KB. FE-M1 voice-chat sub-component extraction created new shared chunk. Prod build needed before wave-3. P4 (Supabase realtime tree-shake) not yet implemented.
-- **Security Agent (Apr 29)**: Flagged Chat API 403 as blocking safety test confirmation. Recommended `git diff HEAD~5 -- src/app/api/chat/route.ts` to identify auth changes. SE-M2 origin enforcement is working as designed — the harness needs to comply, not bypass.
-- **Cost Analyst (Apr 30)**: April closes at $0 revenue, $85.56 spend. Cumulative operational loss ~$371. QA fix on May 1 is the first post-fix verification opportunity.
-- **Coverage Agent (Apr 20)**: voice-agent-chat (46.3%) and agents-dashboard/index (49.3%) still require Playwright E2E. These are unchanged.
-
----
+- **Journeys 9-12 (authenticated user) skipped again** — the auth fixture gap is the highest-value E2E unlock (see P5). Suggested approach: a Playwright storage-state fixture seeded via the Supabase admin API with a test user having `user_profiles.role = 'user'`, letting journeys 9-12 run against `/favorites` with real auth cookies.
+- **172 `data-testid` attributes in source are unreferenced in any E2E spec** (up from 153 on Apr 29 — the count grows with UI work; low priority individually, but the trend means new UI ships untested by default).
+- **`/api/mcp/*` routes**: covered for auth-rejection semantics only via the shared `validateMcpSecret` gate; no per-tool E2E. Consistent with Documentation Agent's classification of these as internal Pelayo tools — acceptable while voice traffic is zero, revisit if voice relaunches.
+- **Feature flag mocks: complete.** 27/27 flags in `MOCK_FEATURE_FLAGS` match source (`e2e/fixtures/mock-data.ts:40-70`); the `withFeatureFlags` override helper keeps per-test variation cheap. No stale mocks found.
+- **Chat E2E vs live outage**: journey 3 (chat send/receive) passes on mocked responses while the real chat API is down. This is by design (E2E isolates the UI), but it means no automated test exercises the live Anthropic path except this QA suite — reinforcing P1 (the probe) as the only fast detector.

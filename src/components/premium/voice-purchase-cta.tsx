@@ -5,6 +5,7 @@ import { useTranslation } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { Mic, Clock, Sparkles, MapPin, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEFAULT_TIER, buildCheckoutUrl } from "@/lib/pricing";
 
 interface VoicePurchaseCTAProps {
   /** Show compact version (for inline use) */
@@ -17,22 +18,22 @@ interface VoicePurchaseCTAProps {
 /**
  * Call-to-action component for voice pass purchase.
  * Navigates to embedded checkout page on paisaxe.es.
+ * Always includes an explicit ?tier= param (defaults to day_pass).
  */
 export function VoicePurchaseCTA({ compact = false, returnTo, className }: VoicePurchaseCTAProps) {
   const { user, session, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
   const router = useRouter();
 
+  // buildCheckoutUrl always includes ?tier= so the checkout page never has to guess
+  const checkoutUrl = buildCheckoutUrl(DEFAULT_TIER.id, returnTo);
+
   const handlePurchase = () => {
     if (!user || !session) {
-      signInWithGoogle();
+      signInWithGoogle(checkoutUrl);
       return;
     }
 
-    // Navigate to embedded checkout page
-    const checkoutUrl = returnTo
-      ? `/pricing/checkout?returnTo=${returnTo}`
-      : "/pricing/checkout";
     router.push(checkoutUrl);
   };
 
@@ -45,9 +46,9 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
         </div>
         <button
           onClick={handlePurchase}
-          className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 text-black font-medium rounded-full hover:from-green-400 hover:to-green-300 transition-all text-sm flex items-center gap-2"
+          className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 text-black font-medium rounded-full hover:from-green-400 hover:to-green-300 transition-all text-sm flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
         >
-          {t("premium.get_day_pass")} - €1.99
+          {t("premium.get_day_pass")} - {DEFAULT_TIER.price}
         </button>
       </div>
     );
@@ -96,16 +97,16 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
         </div>
       </div>
 
-      {/* Price */}
+      {/* Price — sourced from DEFAULT_TIER (day_pass) via shared constant */}
       <div className="mb-4">
-        <span className="text-3xl font-bold text-white">€1.99</span>
+        <span className="text-3xl font-bold text-white">{DEFAULT_TIER.price}</span>
         <span className="text-white/60 ml-2">{t("premium.per_day")}</span>
       </div>
 
       {/* CTA Button */}
       <button
         onClick={handlePurchase}
-        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black font-semibold rounded-full hover:from-green-400 hover:to-green-300 transition-all shadow-lg shadow-green-500/25 flex items-center justify-center gap-2"
+        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black font-semibold rounded-full hover:from-green-400 hover:to-green-300 transition-all shadow-lg shadow-green-500/25 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
       >
         {user ? t("premium.get_day_pass") : t("premium.sign_in_to_purchase")}
       </button>

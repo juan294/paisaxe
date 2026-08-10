@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import pathModule from "path";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { SERVICE_REGISTRY } from "@/config/service-registry";
 import {
   analyzeSubscriptions,
@@ -12,9 +12,10 @@ import {
 } from "@/lib/subscription-optimizer";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
+import { acquireCronJobLease, releaseCronJobLease } from "@/lib/cron-job-lock";
 
-/** Postgres advisory lock ID — unique per cron route. */
-const LOCK_ID = 1002;
+const LOCK_KEY = "subscription-optimizer";
+const LOCK_LEASE_SECONDS = 20 * 60;
 
 /**
  * Default usage metrics when none are provided.
@@ -35,18 +36,19 @@ const DEFAULT_USAGE_METRICS: UsageMetricsInput = {
 async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextResponse> {
   const start = Date.now();
   const supabase = createAdminClient();
+  let lockToken: string | null = null;
 
-  // Acquire advisory lock to prevent concurrent runs
-  const { data: locked, error: lockError } = await supabase.rpc(
-    "pg_try_advisory_lock",
-    { lockid: LOCK_ID }
-  );
-  if (lockError || !locked) {
+  const lease = await acquireCronJobLease(supabase, LOCK_KEY, LOCK_LEASE_SECONDS);
+  if (!lease.acquired) {
+    if (lease.error) {
+      logger.error("[SUBSCRIPTION_OPTIMIZER_LOCK_FAILED]", { error: lease.error });
+    }
     return NextResponse.json(
       { status: "skipped", reason: "concurrent run in progress" },
       { status: 409 }
     );
   }
+  lockToken = lease.token;
 
   try {
     const result = analyzeSubscriptions({
@@ -57,20 +59,26 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
 
     const markdownReport = generateReport(result);
 
-    // Persist report to disk so the agents-summary API can read it
+    // Persist report to disk so the agents-summary API can read it.
+    // BE-M4: Use atomic write (write to .tmp + rename) to prevent partial reads
+    // from concurrent cron runs. The cron lease provides mutual exclusion but
+    // atomic rename eliminates any read-torn-write window within a single run.
     const projectRoot = process.cwd();
     const reportPath = pathModule.join(
       projectRoot,
       "docs/agents/subscription-optimizer-report.md"
     );
+    const reportTmpPath = `${reportPath}.tmp`;
     try {
-      await fs.writeFile(reportPath, markdownReport, "utf-8");
+      await fs.writeFile(reportTmpPath, markdownReport, "utf-8");
+      await fs.rename(reportTmpPath, reportPath);
     } catch {
       // Serverless environments may not have write access — continue gracefully
     }
 
     // Append shared context entry for cross-agent insights
     const sharedContextPath = pathModule.join(projectRoot, "docs/agents/shared-context.md");
+    const sharedContextTmpPath = `${sharedContextPath}.tmp`;
     try {
       const contextEntry = generateSharedContextEntry(result);
       let existing = "";
@@ -84,11 +92,13 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
       const headerEnd = existing.indexOf("\n\n");
       const header = headerEnd >= 0 ? existing.slice(0, headerEnd) : existing;
       const body = headerEnd >= 0 ? existing.slice(headerEnd + 2) : "";
+      // BE-M4: atomic write via tmp + rename
       await fs.writeFile(
-        sharedContextPath,
+        sharedContextTmpPath,
         `${header}\n\n${contextEntry}\n\n${body}`,
         "utf-8"
       );
+      await fs.rename(sharedContextTmpPath, sharedContextPath);
     } catch {
       // Non-critical — don't fail the run if shared context write fails
     }
@@ -123,7 +133,11 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
       { status: 500 }
     );
   } finally {
-    await supabase.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
+    try {
+      await releaseCronJobLease(supabase, LOCK_KEY, lockToken);
+    } catch (error) {
+      logger.error("[SUBSCRIPTION_OPTIMIZER_LOCK_RELEASE_FAILED]", { error });
+    }
   }
 }
 
@@ -142,6 +156,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!auth.valid) {
       return auth.error;
     }
+    // BE-M1: webhook secret was absent/wrong but admin auth succeeded — log for ops visibility
+    logger.warn("[CRON_AUTH_FALLBACK]", { source: "webhook", fellBackTo: "admin_auth" });
   }
 
   // Use provided usage metrics or fall back to defaults

@@ -5,6 +5,7 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
+MODEL="claude-haiku-4-5-20251001"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/coverage-agent-$(date +%Y-%m-%d).log"
 DOC_FILE="$PROJECT_DIR/docs/agents/coverage-report.md"
@@ -40,8 +41,26 @@ SHARED_CONTEXT=$(read_shared_context "coverage_agent_enabled")
 SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" read 2>/dev/null || echo "")
 SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
-# Run the coverage agent via Claude CLI in non-interactive mode
+# Run the coverage agent via Claude CLI in non-interactive mode.
+# mkdir-based lock serializes concurrent coverage runs across all projects on
+# this host to prevent vitest worker-pool starvation (38 concurrent vitest
+# processes from 3 projects corrupted coverage artifacts — observed May 2026).
+# mkdir is atomic on macOS and Linux; flock is Linux-only and unavailable on macOS.
+LOCK_DIR="/tmp/paisaxe-vitest-coverage.lock"
+LOCK_ACQUIRED=false
+if [[ -e "$LOCK_DIR" || -L "$LOCK_DIR" ]] && [[ ! -d "$LOCK_DIR" ]]; then
+  log_warn "Removing invalid vitest lock path at $LOCK_DIR" | tee -a "$LOG_FILE"
+  rm -f "$LOCK_DIR"
+fi
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+  log_info "Waiting for vitest lock (another coverage agent is running)..." | tee -a "$LOG_FILE"
+  sleep 5
+done
+LOCK_ACQUIRED=true
+trap 'if [[ "$LOCK_ACQUIRED" == "true" ]]; then rmdir "$LOCK_DIR" 2>/dev/null || true; fi' EXIT
+
 "$CLAUDE_BIN" -p \
+  --model "$MODEL" \
   --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' \
   >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
@@ -57,6 +76,9 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
+
+rmdir "$LOCK_DIR" 2>/dev/null || true
+LOCK_ACQUIRED=false
 
 # Extract and write shared context
 REPORT_CONTENT=$(cat "$DOC_FILE")

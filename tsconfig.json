@@ -15,6 +15,9 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
@@ -43,6 +46,7 @@
     "node_modules.nosync",
     "scripts",
     "e2e",
-    "supabase/functions"
+    "supabase/functions",
+    "content/processed"
   ]
 }

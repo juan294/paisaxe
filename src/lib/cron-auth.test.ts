@@ -3,9 +3,26 @@ import { NextRequest } from "next/server";
 import { verifyVercelCron, verifyWebhookSecret } from "./cron-auth";
 import { logger } from "./logger";
 
+// The logger uses pino in production (NODE_ENV=production), which writes to
+// stdout rather than console.error. The [CRON_AUTH_MISSING] warning fires at
+// module-eval under production env, so we spy on logger.error directly via a
+// shared mock that survives vi.resetModules() + dynamic re-import.
+const mockLoggerError = vi.fn();
+vi.mock("./logger", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./logger")>();
+  return {
+    ...actual,
+    logger: {
+      ...actual.logger,
+      error: (...args: unknown[]) => mockLoggerError(...args),
+    },
+  };
+});
+
 describe("checkCronSecretsConfigured (DO-H3)", () => {
   beforeEach(() => {
     vi.resetModules();
+    mockLoggerError.mockClear();
   });
 
   afterEach(() => {
@@ -17,15 +34,11 @@ describe("checkCronSecretsConfigured (DO-H3)", () => {
     vi.stubEnv("CRON_SECRET", "");
     vi.stubEnv("WEBHOOK_SECRET", "");
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     await import("./cron-auth");
 
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(mockLoggerError).toHaveBeenCalledWith(
       expect.stringContaining("[CRON_AUTH_MISSING]")
     );
-
-    consoleSpy.mockRestore();
   });
 
   it("does not log when CRON_SECRET is set", async () => {
@@ -81,8 +94,6 @@ describe("checkCronSecretsConfigured (DO-H3)", () => {
     vi.stubEnv("CRON_SECRET", "");
     vi.stubEnv("WEBHOOK_SECRET", "");
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     const mod = await import("./cron-auth");
 
     // Call functions multiple times — warning should only have fired once (at module load)
@@ -90,12 +101,10 @@ describe("checkCronSecretsConfigured (DO-H3)", () => {
     mod.verifyVercelCron({ headers: { get: () => null } } as never);
     mod.verifyWebhookSecret({ headers: { get: () => null } } as never);
 
-    const missingCalls = consoleSpy.mock.calls.filter((args) =>
+    const missingCalls = mockLoggerError.mock.calls.filter((args) =>
       String(args[0]).includes("[CRON_AUTH_MISSING]")
     );
     expect(missingCalls).toHaveLength(1);
-
-    consoleSpy.mockRestore();
   });
 });
 

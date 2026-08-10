@@ -5,10 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function generateId(): string {
-  return crypto.randomUUID();
-}
-
 export function formatTimestamp(date: Date): string {
   return new Intl.DateTimeFormat("es-ES", {
     hour: "2-digit",

@@ -1,6 +1,7 @@
 import type { AdminApiResponse } from "@/types/admin";
 import type { AgentsDashboardData, AgentRunStatus, AgentLogsResponse } from "@/types/agents-dashboard";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const API_BASE = "/api/admin";
 
@@ -18,7 +19,7 @@ export async function fetchAgentsSummary(): Promise<AdminApiResponse<AgentsDashb
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching agents summary:", error);
+    clientLogger.error("Error fetching agents summary", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -43,7 +44,7 @@ export async function triggerAgentRun(
 
     return { data: await response.json() };
   } catch (error) {
-    console.error("Error triggering agent run:", error);
+    clientLogger.error("Error triggering agent run", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -62,7 +63,7 @@ export async function fetchRunningAgents(): Promise<AdminApiResponse<AgentRunSta
 
     return { data: await response.json() };
   } catch (error) {
-    console.error("Error fetching running agents:", error);
+    clientLogger.error("Error fetching running agents", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -85,7 +86,7 @@ export async function stopAgent(agentKey: string): Promise<AdminApiResponse<{ st
 
     return { data: await response.json() };
   } catch (error) {
-    console.error("Error stopping agent:", error);
+    clientLogger.error("Error stopping agent", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -111,7 +112,7 @@ export async function fetchAgentLogs(
 
     return { data: await response.json() };
   } catch (error) {
-    console.error("Error fetching agent logs:", error);
+    clientLogger.error("Error fetching agent logs", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }

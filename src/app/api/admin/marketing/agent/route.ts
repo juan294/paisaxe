@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { agentChatRequestSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
+import { CHAT_MODEL } from "@/lib/models";
 
 // Agent chat response
 interface AgentChatResponse {
@@ -159,7 +160,7 @@ export async function POST(
     // Call Claude API
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CHAT_MODEL,
       max_tokens: 2048,
       system: systemPrompt,
       messages,

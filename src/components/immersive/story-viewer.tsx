@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo, RefObject } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
@@ -14,14 +15,33 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { getRelatedStories } from "@/lib/related-stories";
-import { RelatedStories } from "./related-stories";
-import { SurpriseMeButton } from "./surprise-me-button";
-import { ShareButton } from "./share-button";
 import { LanguageSwitcher } from "./language-switcher";
-import { SuggestPlaceButton } from "./suggest-place-button";
 import { SuggestPlaceDialog } from "./suggest-place-dialog";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
-import { FullscreenButton } from "./fullscreen-button";
+
+// #569: Flag-gated tools are dynamically imported so their code only loads when
+// the corresponding feature flag is enabled (keeps them out of the initial bundle).
+// ssr: false — these are interactive, client-only controls (matches VoiceChat).
+const RelatedStories = dynamic(
+  () => import("./related-stories").then((m) => m.RelatedStories),
+  { ssr: false, loading: () => null }
+);
+const SurpriseMeButton = dynamic(
+  () => import("./surprise-me-button").then((m) => m.SurpriseMeButton),
+  { ssr: false, loading: () => null }
+);
+const ShareButton = dynamic(
+  () => import("./share-button").then((m) => m.ShareButton),
+  { ssr: false, loading: () => null }
+);
+const SuggestPlaceButton = dynamic(
+  () => import("./suggest-place-button").then((m) => m.SuggestPlaceButton),
+  { ssr: false, loading: () => null }
+);
+const FullscreenButton = dynamic(
+  () => import("./fullscreen-button").then((m) => m.FullscreenButton),
+  { ssr: false, loading: () => null }
+);
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { NavigationHint } from "./navigation-hint";
@@ -189,11 +209,33 @@ export function StoryViewer({
     [stories]
   );
 
+  // PE-M4 (#615): prefetch the adjacent (next & prev) story images so navigation
+  // shows the next photo instantly instead of waiting on a cold fetch. Wraps
+  // around at both ends and never re-preloads the current image.
+  const adjacentImages = useMemo(() => {
+    const len = stories.length;
+    if (len <= 1) return [];
+    const nextIndex = currentIndex < len - 1 ? currentIndex + 1 : 0;
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : len - 1;
+    const urls = new Set<string>();
+    for (const idx of [nextIndex, prevIndex]) {
+      const img = stories[idx]?.image;
+      if (img && idx !== currentIndex) urls.add(img);
+    }
+    return Array.from(urls);
+  }, [stories, currentIndex]);
+
   // Asturianu labels
   const ast = isEnabled("asturianu_touches");
 
   // Get localized story text based on current locale (falls back to Spanish)
   const localizedStory = story ? getLocalizedStory(story, locale) : null;
+
+  // FE-L1: Stable callback for StoryInfoPanel props — prevents re-renders when
+  // only the index changes (story/id change is reflected via the story prop itself).
+  // Must be declared BEFORE the early return so hooks are always called in
+  // the same order (React rules-of-hooks).
+  const handleFavoritesNav = useCallback(() => router.push("/favorites"), [router]);
 
   if (!story || !localizedStory) return null;
 
@@ -205,6 +247,12 @@ export function StoryViewer({
       className="relative h-dvh w-screen overflow-hidden bg-black"
       aria-hidden={chatOpen ? "true" : undefined}
     >
+      {/* PE-M4 (#615): preload adjacent story images for instant navigation.
+          React hoists these <link> tags into <head>. */}
+      {adjacentImages.map((src) => (
+        <link key={src} rel="preload" as="image" href={src} />
+      ))}
+
       {/* Screen reader announcement for story changes */}
       <div
         role="status"
@@ -240,7 +288,7 @@ export function StoryViewer({
       >
         <Image
           src={story.image}
-          alt=""
+          alt={localizedStory.title}
           fill
           sizes="100vw"
           className={cn("object-cover", zoomClass)}
@@ -301,9 +349,8 @@ export function StoryViewer({
         questionPrompts={questionPrompts}
         requiresAuth={requiresAuth}
         onAuthRequired={signInWithGoogle}
-        onFavoritesNav={() => router.push("/favorites")}
+        onFavoritesNav={handleFavoritesNav}
         isFavorite={isFavorite(story.id)}
-        onToggleFavorite={() => toggleFavorite(story.id)}
         chatTriggerRef={chatTriggerRef}
       />
 
@@ -321,49 +368,42 @@ export function StoryViewer({
         {/* Language Switcher - always visible */}
         <LanguageSwitcher />
 
-        {/* Desktop: Show all controls inline */}
-        {/* Ambient / Auto-play toggle - hidden on mobile */}
+        {/* UX-M1: Ambient/Auto-play toggle — always visible on all viewports.
+            This is the signature "lean back" control; promoting it to a top-level
+            button makes it reachable without opening the overflow menu on mobile. */}
         {isEnabled("autoplay_button") && (
-          isEnabled("ambient_discovery") ? (
-            <Button
-              variant="glassIcon"
-              onClick={(e) => {
-                e.stopPropagation();
+          <Button
+            variant="glassIcon"
+            data-testid="ambient-toggle"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isEnabled("ambient_discovery")) {
                 toggleAmbient();
-              }}
-              className={cn(
-                "hidden md:flex p-2",
-                ambientMode && "ring-1 ring-white/30"
-              )}
-              aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-              title={ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")}
-            >
-              {autoPlay ? (
-                <Pause className="h-5 w-5 text-white" />
-              ) : (
-                <Play className="h-5 w-5 text-white" />
-              )}
-            </Button>
-          ) : (
-            <Button
-              variant="glassIcon"
-              onClick={(e) => {
-                e.stopPropagation();
+              } else {
                 setAutoPlay((prev) => !prev);
-              }}
-              aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-              className="hidden md:flex p-2"
-            >
-              {autoPlay ? (
-                <Pause className="h-5 w-5 text-white" />
-              ) : (
-                <Play className="h-5 w-5 text-white" />
-              )}
-            </Button>
-          )
+              }
+            }}
+            className={cn(
+              "flex p-2",
+              ambientMode && "ring-1 ring-white/30"
+            )}
+            aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
+            title={
+              isEnabled("ambient_discovery")
+                ? ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")
+                : undefined
+            }
+            aria-pressed={autoPlay}
+          >
+            {autoPlay ? (
+              <Pause className="h-5 w-5 text-white" />
+            ) : (
+              <Play className="h-5 w-5 text-white" />
+            )}
+          </Button>
         )}
 
-        {/* Surprise Me button - hidden on mobile */}
+        {/* Surprise Me button - secondary: desktop only */}
         {isEnabled("surprise_me") && viewedIndices && (
           <div className="hidden md:block">
             <SurpriseMeButton
@@ -375,36 +415,22 @@ export function StoryViewer({
           </div>
         )}
 
-        {/* Share button - hidden on mobile */}
+        {/* Share button - secondary: desktop only */}
         {isEnabled("story_sharing") && (
           <div className="hidden md:block">
             <ShareButton story={story} />
           </div>
         )}
 
-        {/* Suggest Place button - hidden on mobile */}
+        {/* Suggest Place button - secondary: desktop only */}
         {isEnabled("user_story_suggestions") && (
           <div className="hidden md:block">
             <SuggestPlaceButton onOpen={() => setIsSuggestDialogOpen(true)} />
           </div>
         )}
 
-        {/* Mobile overflow menu */}
+        {/* Mobile overflow menu — secondary controls only (ambient is promoted above) */}
         <ToolbarOverflowMenu>
-          {isEnabled("autoplay_button") && (
-            <ToolbarOverflowItem
-              icon={autoPlay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              label={autoPlay ? t("accessibility.pause_short") : t("accessibility.play_short")}
-              onClick={() => {
-                if (isEnabled("ambient_discovery")) {
-                  toggleAmbient();
-                } else {
-                  setAutoPlay((prev) => !prev);
-                }
-              }}
-              active={autoPlay}
-            />
-          )}
           {isEnabled("surprise_me") && viewedIndices && (
             <ToolbarOverflowItem
               icon={<Shuffle className="h-4 w-4" />}

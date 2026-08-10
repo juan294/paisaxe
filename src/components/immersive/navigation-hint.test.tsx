@@ -54,6 +54,8 @@ function mockTablet() {
 describe("NavigationHint", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    // UX-M2: hint now uses sessionStorage (per-session, not permanent localStorage)
+    sessionStorage.clear();
     localStorage.clear();
     // Default: simulate a phone (touch + narrow viewport)
     mockPhone();
@@ -72,12 +74,25 @@ describe("NavigationHint", () => {
     expect(screen.getByText("Siguiente")).toBeInTheDocument();
   });
 
-  it("does NOT render when localStorage key is set", () => {
-    localStorage.setItem("paisaxe-nav-hint-seen", "true");
+  // UX-M2: Now uses sessionStorage — checking the session key suppresses the hint
+  it("does NOT render when sessionStorage key is set (same session, already seen)", () => {
+    sessionStorage.setItem("paisaxe-nav-hint-seen", "true");
 
     render(<NavigationHint />);
 
     expect(screen.queryByTestId("navigation-hint")).not.toBeInTheDocument();
+  });
+
+  // UX-M2: Shows again in a new session (localStorage set from previous impl should NOT block it)
+  it("renders again in a new session even if localStorage key was set (old format)", () => {
+    // Simulate old localStorage-based dismiss — hint should still show in new session
+    localStorage.setItem("paisaxe-nav-hint-seen", "true");
+    // sessionStorage is clear (new session)
+
+    render(<NavigationHint />);
+
+    // Should show again — old localStorage flag has no effect with new implementation
+    expect(screen.getByTestId("navigation-hint")).toBeInTheDocument();
   });
 
   it("auto-dismisses after ~3 seconds", () => {
@@ -138,23 +153,27 @@ describe("NavigationHint", () => {
     expect(screen.queryByTestId("navigation-hint")).not.toBeInTheDocument();
   });
 
-  it("sets localStorage key after dismissing", () => {
+  // UX-M2: Now sets sessionStorage key (not localStorage)
+  it("sets sessionStorage key after dismissing (not localStorage)", () => {
     render(<NavigationHint />);
 
     const hint = screen.getByTestId("navigation-hint");
     fireEvent.click(hint);
 
-    expect(localStorage.getItem("paisaxe-nav-hint-seen")).toBe("true");
+    expect(sessionStorage.getItem("paisaxe-nav-hint-seen")).toBe("true");
+    // Must NOT write to localStorage (new session-scoped behavior)
+    expect(localStorage.getItem("paisaxe-nav-hint-seen")).toBeNull();
   });
 
-  it("sets localStorage key after auto-dismiss", () => {
+  // UX-M2: Now sets sessionStorage key after auto-dismiss too
+  it("sets sessionStorage key after auto-dismiss", () => {
     render(<NavigationHint />);
 
     act(() => {
       vi.advanceTimersByTime(3000);
     });
 
-    expect(localStorage.getItem("paisaxe-nav-hint-seen")).toBe("true");
+    expect(sessionStorage.getItem("paisaxe-nav-hint-seen")).toBe("true");
   });
 
   it("does NOT render on desktop (pointer: fine)", () => {

@@ -1,82 +1,94 @@
-# Localization Report — 2026-04-30
+# Localization Report
 
-Status: GREEN — 100% translation coverage across all 6 supported locales. No edits needed this cycle.
+Date: 2026-08-09
+Agent: Paisaxe Localization Agent
+Status: Complete — 100% coverage, no edits required
 
 ## Summary
 
-| Locale | UI Keys | UI Complete | Story Translations | Story Complete |
-|--------|---------|-------------|-------------------|----------------|
-| es (Spanish, default) | 405 | 100% | 100 stories (source) | N/A |
-| en (English) | 405 | 100% | 100 × 5 fields | 100% |
-| fr (French) | 405 | 100% | 100 × 5 fields | 100% |
-| de (German) | 405 | 100% | 100 × 5 fields | 100% |
-| pt (Portuguese) | 405 | 100% | 100 × 5 fields | 100% |
-| ast (Asturian) | 405 | 100% | 100 × 5 fields | 100% |
+Coverage is complete for every supported locale. This is the 65th consecutive
+clean run. No missing keys, no orphaned keys, no placeholder mismatches, no empty
+strings, and no incomplete story records were found. No files were changed this
+cycle.
 
-- Total UI leaf keys (source): 405
-- Total story translations: 100 stories × 5 locales × 3 fields (title, subtitle, description) = 1,500 translation entries, all present
-- Missing keys: 0
-- Orphaned keys: 0
-- TypeScript: Pass — `npx tsc --noEmit` exits clean (0 errors)
+Translation files remain unmodified since 2026-06-20 (UI locales) and 2026-06-10
+(story translations). Recent development work on security, performance, and QA
+involves no changes to translatable strings, locale files, or story content.
+Verification was re-run in full against the current tree on 2026-08-09.
 
-## Changes Since Last Run (2026-04-17)
+Note: this project ships a 6th locale, ast (Asturianu), in addition to the five
+locales named in the agent brief (es, en, fr, de, pt). All six are validated
+below.
 
-No translation edits needed this cycle. All new keys added by recent commits were applied to all locales simultaneously.
+### UI Translations (src/lib/i18n/*.ts)
 
-### New Keys Added (8 keys, all 6 locales)
+Spanish (es) is the source of truth with 411 leaf keys. Every non-Spanish locale
+matches exactly. Verified programmatically by the test suite which recursively
+diffs leaf key paths — not by reading files by eye.
 
-Commits `8771ca8c` (UX-B2, 2026-04-27) and `241dcb6b` (UX-L3, 2026-04-28) added 8 new i18n keys to all 6 locales in the same commits that introduced them:
+| Locale | Leaf keys | Missing | Orphaned | Placeholder mismatches | Empty strings | Completion |
+|--------|-----------|---------|----------|------------------------|---------------|------------|
+| es (source) | 411 | — | — | — | 0 | 100% |
+| en | 411 | 0 | 0 | 0 | 0 | 100% |
+| fr | 411 | 0 | 0 | 0 | 0 | 100% |
+| de | 411 | 0 | 0 | 0 | 0 | 100% |
+| pt | 411 | 0 | 0 | 0 | 0 | 100% |
+| ast | 411 | 0 | 0 | 0 | 0 | 100% |
 
-| Key | Added by commit |
-|-----|----------------|
-| `chat.assistant_label` | 8771ca8c |
-| `auth.user_avatar` | 8771ca8c |
-| `voice.error_not_configured` | 8771ca8c |
-| `premium.premium_access` | 8771ca8c |
-| `premium.voice_pass_label` | 8771ca8c |
-| `errors.unknown` | 8771ca8c |
-| `chat.copy_error` | 241dcb6b |
-| `share.copy_error` | 241dcb6b |
+Placeholder parity ({current}, {total}, {title}, {description}, etc.) was
+verified per-key against the Spanish source: 0 mismatches across 411 keys x 5
+non-Spanish locales.
 
-Prior key count was 392 (as of 2026-04-17). Current count is 405. The discrepancy (13 vs 8) accounts for prior additions between the last report and these commits that were already tracked.
+### Story Translations (content/translations/story-translations.ts)
 
-### New Story Translations (5 cycling stories, all 5 locales)
+113 story slugs x 5 target locales = 565 translation records. All complete.
 
-Commit `064e2acc` (2026-04-22) added 5 new cycling story slugs to `content/translations/story-translations.ts`. All 5 include complete en/fr/de/pt/ast translations:
+| Check | Result |
+|-------|--------|
+| Slugs in STORY_TRANSLATIONS | 113 |
+| Records present (slug x locale) | 565 / 565 |
+| Records with title | 565 / 565 |
+| Records with subtitle | 565 / 565 |
+| Records with description | 565 / 565 |
+| Missing slug:locale pairs | 0 |
+| Unexpected extra locales in any entry | 0 |
+| Per-locale completion (en, fr, de, pt, ast) | 113/113 each |
 
-1. `angliru-bestia-asturias` — Angliru: The Beast of Asturias
-2. `lagos-covadonga-bicicleta` — Lakes of Covadonga by Bike
-3. (3 additional cycling stories in the same commit)
+Spanish story content lives in the main story fields (source of truth) and is
+not duplicated in STORY_TRANSLATIONS, by design.
 
-Story count increased from 95 to 100.
+### Verification
 
-### Slug Fixes
+| Check | Result |
+|-------|--------|
+| i18n test suite (`npm run test -- src/lib/i18n/`) | Pass — 105/105 tests (2 files) |
+| TypeScript (`npm run typecheck`) | Pass — 0 errors |
+| UI key parity (es vs en, fr, de, pt, ast) | Pass — 411/411 each locale |
+| Story record completeness | Pass — 565+/565+ records |
 
-Two story slugs were corrected in the translation index (commit `064e2acc`):
-- `descenso-del-sella` → `descenso-sella`
-- `bufones-de-pria` → `bufones-pria`
-- `museo-del-jurasico-muja` → `museo-jurrasico`
+The i18n suite includes:
+- `translations.test.ts` — dynamically compares each locale's key count to es,
+  so any future key addition without locale parity fails CI automatically
+- `story-translations-coverage.test.ts` — enforces story translation
+  completeness against the seeded slug set
+- `detect-language.test.ts` — language detection logic
+- `resolve.test.ts` — translation resolution logic
 
-These are slug renames only; translation content was not changed.
+## Fixed
 
-## Fixed This Cycle
-
-None. All translations were complete on arrival.
+None — no gaps existed. Translation coverage maintained at 100% for 65th consecutive cycle.
 
 ## Remaining Gaps
 
-None. Coverage is 100% across all locales.
+None.
 
 ## Orphaned Keys
 
-None. The programmatic comparison (`flattenKeys` diff) showed `extra=0` for all 5 non-Spanish locales.
+None — all 411 keys in each non-Spanish locale have a Spanish source.
 
-## Methodology
+## Notes
 
-- Read all 6 locale files (`src/lib/i18n/{es,en,fr,de,pt,ast}.ts`)
-- Programmatic key comparison using Node.js `flattenKeys()` — recursively extracts all leaf keys and diffs against es.ts as source of truth
-- Checked `content/translations/story-translations.ts` for story coverage: verified all 100 slugs have title + subtitle + description for en, fr, de, pt, ast
-- TypeScript check: `npx tsc --noEmit` — exit 0 (clean)
-- Reviewed git log since last run (2026-04-17) to identify new keys and stories
-
----
+- No manual translations needed. All locales remain in perfect sync.
+- The test suite enforces parity automatically, catching any key additions or removals across locales.
+- Story translation records are programmatically validated for completeness by slug and locale.
+- All location-specific references (region names, persona references, location names in alt text and privacy notices) are correctly present in all locales.

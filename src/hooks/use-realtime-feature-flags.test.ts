@@ -46,7 +46,7 @@ describe("useRealtimeFeatureFlags", () => {
     capturedCallback = null;
     mockCleanup = vi.fn<() => void>();
 
-    vi.mocked(subscribeToFeatureFlags).mockImplementation((cb) => {
+    vi.mocked(subscribeToFeatureFlags).mockImplementation(async (cb) => {
       capturedCallback = cb;
       return mockCleanup;
     });
@@ -92,6 +92,9 @@ describe("useRealtimeFeatureFlags", () => {
       useRealtimeFeatureFlags(initialFlags)
     );
 
+    // Let the subscribe promise resolve before the update fires
+    await act(async () => {});
+
     // Simulate a realtime update: related_stories toggled to true
     const updatedRow = makeFlagRow("related_stories", true);
     act(() => {
@@ -120,6 +123,8 @@ describe("useRealtimeFeatureFlags", () => {
     const { result } = renderHook(() =>
       useRealtimeFeatureFlags(initialFlags)
     );
+
+    await act(async () => {});
 
     const updatedRow = makeFlagRow("surprise_me", true);
     updatedRow.updated_at = "2025-06-15T12:00:00Z";
@@ -152,6 +157,8 @@ describe("useRealtimeFeatureFlags", () => {
       useRealtimeFeatureFlags(initialFlags)
     );
 
+    await act(async () => {});
+
     // A new flag arrives that wasn't in the initial array
     const newRow = makeFlagRow("story_sharing", true);
     act(() => {
@@ -163,6 +170,37 @@ describe("useRealtimeFeatureFlags", () => {
     expect(newFlag?.enabled).toBe(true);
   });
 
+  it("should tear down immediately when the subscription resolves after unmount", async () => {
+    const { useRealtimeFeatureFlags } = await import(
+      "./use-realtime-feature-flags"
+    );
+    // Hold the subscription promise open so we can resolve it after unmount,
+    // simulating the dynamic import behind subscribeToFeatureFlags landing
+    // after a fast unmount/remount.
+    let resolveSubscription: ((fn: () => void) => void) | undefined;
+    vi.mocked(subscribeToFeatureFlags).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSubscription = resolve;
+        })
+    );
+
+    const { unmount } = renderHook(() =>
+      useRealtimeFeatureFlags([makeFlag("contextual_prompts", true)])
+    );
+
+    unmount();
+    expect(mockCleanup).not.toHaveBeenCalled();
+
+    // The late resolution must not leak the subscription — the cancelled
+    // branch calls the cleanup function immediately.
+    await act(async () => {
+      resolveSubscription!(mockCleanup);
+    });
+
+    expect(mockCleanup).toHaveBeenCalledTimes(1);
+  });
+
   it("should clean up the subscription on unmount", async () => {
     const { useRealtimeFeatureFlags } = await import(
       "./use-realtime-feature-flags"
@@ -172,6 +210,8 @@ describe("useRealtimeFeatureFlags", () => {
     const { unmount } = renderHook(() =>
       useRealtimeFeatureFlags(initialFlags)
     );
+
+    await act(async () => {});
 
     unmount();
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import CheckoutPage from "./page";
+import { Suspense, type ReactElement } from "react";
 
 // --- Mocks ---
 
@@ -70,8 +71,9 @@ vi.mock("next/link", () => ({
 
 // Mock next/navigation
 const mockSearchParams = new URLSearchParams();
+const mockUseSearchParams = vi.fn(() => mockSearchParams);
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => mockSearchParams,
+  useSearchParams: () => mockUseSearchParams(),
 }));
 
 // Mock fetch for fetchClientSecret
@@ -84,6 +86,7 @@ describe("CheckoutPage", () => {
     capturedFetchClientSecret = null;
     capturedStripePromise = null;
     mockSearchParams.delete("returnTo");
+    mockUseSearchParams.mockReturnValue(mockSearchParams);
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({
       ok: true,
@@ -98,6 +101,16 @@ describe("CheckoutPage", () => {
   });
 
   describe("unauthenticated state", () => {
+    it("isolates search params behind a route shell when they suspend", () => {
+      expect((CheckoutPage() as ReactElement).type).toBe(Suspense);
+
+      mockUseSearchParams.mockImplementation(() => {
+        throw new Promise(() => {});
+      });
+
+      expect(() => render(<CheckoutPage />)).not.toThrow();
+    });
+
     it("should show sign-in prompt when user is not authenticated", () => {
       render(<CheckoutPage />);
 
@@ -124,6 +137,19 @@ describe("CheckoutPage", () => {
       fireEvent.click(button);
 
       expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing/checkout");
+    });
+
+    it("should preserve returnTo in Google sign-in redirect", () => {
+      mockSearchParams.set("returnTo", "oviedo-walking-tour");
+      render(<CheckoutPage />);
+
+      fireEvent.click(screen.getByRole("button", {
+        name: "auth.continue_with_google",
+      }));
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing/checkout?returnTo=oviedo-walking-tour"
+      );
     });
 
     it("should not render Stripe checkout when unauthenticated", () => {
@@ -215,7 +241,7 @@ describe("CheckoutPage", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/checkout/embedded", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ purchaseType: "day_pass" }),
       });
       expect(secret).toBe("cs_test_123");
     });
@@ -231,10 +257,27 @@ describe("CheckoutPage", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/checkout/embedded", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ returnTo: "oviedo-walking-tour" }),
+        body: JSON.stringify({ returnTo: "oviedo-walking-tour", purchaseType: "day_pass" }),
       });
 
       mockSearchParams.delete("returnTo");
+    });
+
+    it("should forward the selected tier as purchaseType", async () => {
+      mockSearchParams.set("tier", "weekly_pass");
+
+      render(<CheckoutPage />);
+
+      expect(capturedFetchClientSecret).toBeDefined();
+      await capturedFetchClientSecret!();
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/checkout/embedded", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purchaseType: "weekly_pass" }),
+      });
+
+      mockSearchParams.delete("tier");
     });
 
     it("should show error state when fetch returns non-ok response with error body", async () => {
@@ -298,6 +341,28 @@ describe("CheckoutPage", () => {
         }
       });
 
+      await waitFor(() => {
+        expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
+      });
+    });
+
+    it("falls back to the errors.unknown translation when a non-Error value is thrown (line 69)", async () => {
+      // err instanceof Error ? err.message : t("errors.unknown") -- exercise the
+      // else branch by rejecting with a plain string instead of an Error instance.
+      mockFetch.mockRejectedValue("network down");
+
+      render(<CheckoutPage />);
+
+      let caught: unknown;
+      await act(async () => {
+        try {
+          await capturedFetchClientSecret!();
+        } catch (err) {
+          caught = err;
+        }
+      });
+
+      expect(caught).toBe("network down");
       await waitFor(() => {
         expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
       });
@@ -380,7 +445,7 @@ describe("CheckoutPage", () => {
   });
 
   describe("returnTo parameter", () => {
-    it("should not include returnTo in sign-in redirect (always goes to /pricing/checkout)", () => {
+    it("should include returnTo in sign-in redirect", () => {
       mockSearchParams.set("returnTo", "oviedo-walking-tour");
 
       render(<CheckoutPage />);
@@ -390,8 +455,9 @@ describe("CheckoutPage", () => {
       });
       fireEvent.click(button);
 
-      // signInWithGoogle is called with the checkout path, not with returnTo
-      expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing/checkout");
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing/checkout?returnTo=oviedo-walking-tour"
+      );
 
       mockSearchParams.delete("returnTo");
     });

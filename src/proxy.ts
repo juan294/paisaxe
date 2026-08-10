@@ -61,12 +61,22 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // 5. Refresh auth session if needed (handles expired tokens)
   const response = await refreshAuthSession(request, forwardedHeaders);
 
-  // 6. Set static CSP header (unsafe-inline is intentional; see csp.ts)
-  response.headers.set("Content-Security-Policy", buildCspHeader());
-  response.headers.set("X-Request-ID", requestId);
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
 
-  // 7. Set CSRF cookie on page requests (if not already set)
-  setCsrfCookie(request, response);
+  // 6. Set static CSP header on page responses only.
+  //    API responses (incl. high-frequency /api/chat/stream, /api/feature-flags) do not
+  //    need CSP — it is a browser page protection header. Skipping the string-build on
+  //    every API call avoids pointless work on hot paths (PE-M2).
+  if (!isApiRoute) {
+    response.headers.set("Content-Security-Policy", buildCspHeader());
+
+    // 7. Set CSRF cookie on page requests (if not already set).
+    //    setCsrfCookie already guards against API paths internally, but hoisting the
+    //    check here avoids the function-call overhead on API routes entirely.
+    setCsrfCookie(request, response);
+  }
+
+  response.headers.set("X-Request-ID", requestId);
 
   // 8. Add CORS headers to the response
   addCORSHeaders(request, response);

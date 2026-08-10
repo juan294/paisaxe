@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockFrom = vi.fn();
 
-vi.mock("./supabase", () => ({
+vi.mock("./supabase-admin", () => ({
   createAdminClient: () => ({
     from: mockFrom,
   }),
@@ -178,6 +178,32 @@ describe("posting-service", () => {
       expect(result.error).toBe("Failed to save draft to database");
     });
 
+    it("should return error when database insert fails with an Error instance", async () => {
+      mockValidateContent.mockReturnValue({ valid: true, errors: [] });
+
+      let callCount = 0;
+      mockFrom.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            select: () => ({ eq: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { id: "acc-1" }, error: null }) }) }) }),
+          };
+        }
+        return {
+          insert: () => ({
+            select: () => ({
+              single: () => Promise.resolve({ data: null, error: new Error("unique constraint") }),
+            }),
+          }),
+        };
+      });
+
+      const result = await createDraft({ platform: "x", content: "Hello" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Failed to save draft to database");
+    });
+
     it("should set status to scheduled when scheduledFor is provided", async () => {
       mockValidateContent.mockReturnValue({ valid: true, errors: [] });
 
@@ -294,6 +320,18 @@ describe("posting-service", () => {
       const result = await getDrafts();
       expect(result).toEqual([]);
     });
+
+    it("should return empty array when database error is an Error instance", async () => {
+      const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+      chain.select = vi.fn(() => chain);
+      chain.eq = vi.fn(() => chain);
+      chain.order = vi.fn(() => Promise.resolve({ data: null, error: new Error("connection lost") }));
+
+      mockFrom.mockReturnValue(chain);
+
+      const result = await getDrafts();
+      expect(result).toEqual([]);
+    });
   });
 
   // ─── markAsPosted ────────────────────────────────────────────────
@@ -339,6 +377,19 @@ describe("posting-service", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe("Failed to update post status");
     });
+
+    it("should return error when database error is an Error instance", async () => {
+      mockFrom.mockReturnValue({
+        update: () => ({
+          eq: () => Promise.resolve({ error: new Error("row level security") }),
+        }),
+      });
+
+      const result = await markAsPosted({ postId: "post-1" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Failed to update post status");
+    });
   });
 
   // ─── deleteDraft ─────────────────────────────────────────────────
@@ -363,6 +414,21 @@ describe("posting-service", () => {
         delete: () => ({
           eq: () => ({
             in: () => Promise.resolve({ error: { message: "DB error" } }),
+          }),
+        }),
+      });
+
+      const result = await deleteDraft("post-1");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Failed to delete draft");
+    });
+
+    it("should return error when database error is an Error instance", async () => {
+      mockFrom.mockReturnValue({
+        delete: () => ({
+          eq: () => ({
+            in: () => Promise.resolve({ error: new Error("permission denied") }),
           }),
         }),
       });
@@ -460,6 +526,21 @@ describe("posting-service", () => {
         update: () => ({
           eq: () => ({
             in: () => Promise.resolve({ error: { message: "DB error" } }),
+          }),
+        }),
+      });
+
+      const result = await updateDraft("post-1", { content: "Fail" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Failed to update draft");
+    });
+
+    it("should return error when database error is an Error instance", async () => {
+      mockFrom.mockReturnValue({
+        update: () => ({
+          eq: () => ({
+            in: () => Promise.resolve({ error: new Error("deadlock detected") }),
           }),
         }),
       });

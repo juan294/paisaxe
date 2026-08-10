@@ -45,8 +45,10 @@ export async function readSseStream(
       buffer += decoder.decode(value, { stream: true });
 
       const lines = buffer.split("\n\n");
-      // Keep the last (potentially incomplete) chunk in the buffer
-      buffer = lines.pop() ?? "";
+      // Keep the last (potentially incomplete) chunk in the buffer.
+      // String.split always returns an array of length >= 1, so pop() here
+      // is never undefined.
+      buffer = lines.pop()!;
 
       for (const line of lines) {
         if (line.trim()) {
@@ -77,5 +79,14 @@ export async function readSseStream(
     } else {
       onError(new Error(String(err)));
     }
+  } finally {
+    // FE-M2: always release the reader lock so the stream is not left in a
+    // locked state on abort or error exit paths.
+    try {
+      await reader.cancel();
+    } catch {
+      // cancel() may throw if the stream is already errored/closed — ignore.
+    }
+    reader.releaseLock();
   }
 }

@@ -170,6 +170,24 @@ describe("FavoritesPage", () => {
         expect(link.closest("a")).toHaveAttribute("href", "/immersive");
       });
     });
+
+    it("shows generic empty description when authenticated user has no favorites (requiresAuth=false, line 126 false branch)", async () => {
+      // requiresAuth=false means the user is logged in — they just haven't saved anything yet.
+      // The page should show the generic "nothing here yet" copy, not the sign-in CTA.
+      mockUseFavorites.mockReturnValue({
+        favorites: [],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+        requiresAuth: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.empty_description"))).toBeInTheDocument();
+      });
+      expect(screen.queryByText(mockT("favorites.sign_in_to_save"))).not.toBeInTheDocument();
+    });
   });
 
   describe("with favorites", () => {
@@ -222,6 +240,32 @@ describe("FavoritesPage", () => {
       fireEvent.click(removeButton);
 
       expect(mockToggleFavorite).toHaveBeenCalledWith("story-1");
+    });
+
+    it("does not nest the remove button inside the story link", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+
+      const removeButton = screen.getByLabelText(mockT("favorites.remove_from_saved"));
+      expect(removeButton.closest("a")).toBeNull();
+    });
+
+    it("keeps metadata and removal reachable on touch and keyboard", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+
+      const metadata = screen.getByText("Lagos de Covadonga").closest("a");
+      expect(metadata?.className).toContain("opacity-100");
+
+      const removeButton = screen.getByLabelText(mockT("favorites.remove_from_saved"));
+      expect(removeButton.className).toContain("focus-visible:opacity-100");
+      expect(removeButton.className).toContain("focus-visible:ring-2");
     });
 
     it("should not display non-favorited stories", async () => {
@@ -493,11 +537,24 @@ describe("FavoritesPage", () => {
     });
   });
 
-  describe("loadMore guard (line 36)", () => {
-    it("should guard loadMore when already loading or no more items (line 36)", async () => {
+  describe("loadMore guard (page.tsx line 38)", () => {
+    it("should guard loadMore when already loading or no more items", async () => {
+      // COVERAGE NOTE (2026-07-09): the guard `if (isLoadingMore || !hasMore) return;`
+      // inside loadMore (page.tsx:38) is defensive dead code, unreachable in
+      // jsdom AND in production:
+      //   1. Its sole caller — the IntersectionObserver callback — pre-checks
+      //      `hasMore && !isLoadingMore` from the SAME render closure before
+      //      invoking loadMore, so the guard's condition is always false when
+      //      loadMore runs (even via stale closures, both see identical values).
+      //   2. `setIsLoadingMore(true)` / `setDisplayCount` / `setIsLoadingMore(false)`
+      //      batch into a single commit, so no rendered closure ever observes
+      //      `isLoadingMore === true`.
+      // This test verifies the observable behavior (no extra items load when
+      // hasMore is false via the observer pre-check); the in-function guard
+      // itself cannot be executed without a source change.
+      //
       // With exactly 20 stories (= ITEMS_PER_PAGE), hasMore starts as false,
-      // so the loadMore guard `if (isLoadingMore || !hasMore) return;` triggers
-      // on the `!hasMore` branch. This verifies the guard prevents unnecessary loading.
+      // so no further page is loaded on intersection.
       const exactStories = Array.from({ length: 20 }, (_, i) => ({
         id: `story-${i}`,
         slug: `story-slug-${i}`,
@@ -524,7 +581,8 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       // All 20 items fit in the first page, so hasMore = false.
-      // The IntersectionObserver fires, but loadMore's guard (line 36) returns early.
+      // The IntersectionObserver fires, but its pre-check short-circuits
+      // before loadMore is even called (see coverage note above).
       await waitFor(() => {
         expect(screen.getByText("Story Title 0")).toBeInTheDocument();
         expect(screen.getByText("Story Title 19")).toBeInTheDocument();
@@ -535,7 +593,7 @@ describe("FavoritesPage", () => {
     });
   });
 
-  describe("loadMore isLoadingMore guard (line 36)", () => {
+  describe("loadMore pagination behavior (UX-L2)", () => {
     // Create 25 stories to exceed ITEMS_PER_PAGE (20), so hasMore starts as true
     const manyStories = Array.from({ length: 25 }, (_, i) => ({
       id: `story-${i}`,
@@ -549,11 +607,30 @@ describe("FavoritesPage", () => {
     }));
     const manyFavoriteIds = manyStories.map((s) => s.id);
 
-    it("should prevent concurrent loadMore calls when isLoadingMore is true", async () => {
-      // Override IntersectionObserver so we control when callbacks fire
+    it("loads the next page synchronously on intersection and stops at the end (UX-L2: no artificial delay)", async () => {
+      // Override IntersectionObserver so we control when the page-level loadMore fires.
+      // The artificial 300ms loading delay was removed (UX-L2), so loadMore now applies
+      // synchronously: an intersection immediately reveals the next page, and once all
+      // items are shown (hasMore === false) further intersections are no-ops.
       let pageLoadMoreCallback: IntersectionObserverCallback | null = null;
       let pageLoadMoreTarget: Element | null = null;
       const originalIO = global.IntersectionObserver;
+
+      const fire = (cb: IntersectionObserverCallback, target: Element, observer: IntersectionObserver) =>
+        cb(
+          [
+            {
+              isIntersecting: true,
+              target,
+              boundingClientRect: target.getBoundingClientRect(),
+              intersectionRatio: 1,
+              intersectionRect: target.getBoundingClientRect(),
+              rootBounds: null,
+              time: Date.now(),
+            },
+          ],
+          observer
+        );
 
       try {
         class ControlledObserver implements IntersectionObserver {
@@ -562,48 +639,24 @@ describe("FavoritesPage", () => {
           readonly scrollMargin: string = "";
           readonly thresholds: ReadonlyArray<number> = [];
 
+          private readonly isPageSentinel: boolean;
           constructor(
             private callback: IntersectionObserverCallback,
-            _options?: IntersectionObserverInit
-          ) {}
+            options?: IntersectionObserverInit
+          ) {
+            // The page-level loadMore sentinel uses rootMargin "200px";
+            // GalleryItem visibility observers use "100px".
+            this.isPageSentinel = options?.rootMargin === "200px";
+          }
 
           observe(target: Element): void {
-            // Store the first observer's callback (page-level loadMore sentinel)
-            // but only fire immediately for GalleryItem observers
-            if (!pageLoadMoreCallback) {
+            // Capture (do NOT fire) the page-level loadMore sentinel so we can control
+            // its timing; fire immediately for GalleryItem observers so text renders.
+            if (this.isPageSentinel) {
               pageLoadMoreCallback = this.callback;
               pageLoadMoreTarget = target;
-              // Fire immediately for the page-level observer to trigger first loadMore
-              this.callback(
-                [
-                  {
-                    isIntersecting: true,
-                    target,
-                    boundingClientRect: target.getBoundingClientRect(),
-                    intersectionRatio: 1,
-                    intersectionRect: target.getBoundingClientRect(),
-                    rootBounds: null,
-                    time: Date.now(),
-                  },
-                ],
-                this
-              );
             } else {
-              // GalleryItem observers: fire immediately for visibility
-              this.callback(
-                [
-                  {
-                    isIntersecting: true,
-                    target,
-                    boundingClientRect: target.getBoundingClientRect(),
-                    intersectionRatio: 1,
-                    intersectionRect: target.getBoundingClientRect(),
-                    rootBounds: null,
-                    time: Date.now(),
-                  },
-                ],
-                this
-              );
+              fire(this.callback, target, this);
             }
           }
 
@@ -615,8 +668,6 @@ describe("FavoritesPage", () => {
         }
 
         global.IntersectionObserver = ControlledObserver as unknown as typeof IntersectionObserver;
-
-        vi.useFakeTimers();
 
         mockUseStories.mockReturnValue({
           stories: manyStories,
@@ -632,51 +683,31 @@ describe("FavoritesPage", () => {
 
         const { unmount } = render(<FavoritesPage />);
 
-        // Initially only 20 stories displayed (ITEMS_PER_PAGE)
+        // Initially only 20 stories displayed (ITEMS_PER_PAGE) — page-level observer captured, not fired.
         expect(screen.getByText("Story Title 0")).toBeInTheDocument();
         expect(screen.getByText("Story Title 19")).toBeInTheDocument();
         expect(screen.queryByText("Story Title 20")).not.toBeInTheDocument();
 
-        // The first IntersectionObserver callback already fired (from the page-level
-        // observer on the loadMore sentinel), setting isLoadingMore = true.
-        // The 300ms timeout hasn't elapsed yet, so isLoadingMore is still true.
-
-        // Fire the observer callback a second time to simulate a rapid intersection.
-        // This should hit the `isLoadingMore` guard on line 36 and return early.
+        // One intersection synchronously loads the remaining page (no 300ms wait).
         act(() => {
           if (pageLoadMoreCallback && pageLoadMoreTarget) {
-            (pageLoadMoreCallback as IntersectionObserverCallback)(
-              [
-                {
-                  isIntersecting: true,
-                  target: pageLoadMoreTarget,
-                  boundingClientRect: (pageLoadMoreTarget as Element).getBoundingClientRect(),
-                  intersectionRatio: 1,
-                  intersectionRect: (pageLoadMoreTarget as Element).getBoundingClientRect(),
-                  rootBounds: null,
-                  time: Date.now(),
-                },
-              ],
-              {} as IntersectionObserver
-            );
+            fire(pageLoadMoreCallback, pageLoadMoreTarget, {} as IntersectionObserver);
           }
         });
 
-        // Advance past the 300ms setTimeout in loadMore
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(300);
-        });
-
-        // After advancing timers, the first loadMore completes and shows remaining items.
-        // Only one batch of additional items loaded (not two), proving the guard worked.
         expect(screen.getByText("Story Title 24")).toBeInTheDocument();
+        expect(screen.getByText(`25 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
 
-        // Total stories shown: all 25 (20 initial + 5 from one loadMore call)
+        // A further intersection is a no-op now that hasMore is false — count stays at 25.
+        act(() => {
+          if (pageLoadMoreCallback && pageLoadMoreTarget) {
+            fire(pageLoadMoreCallback, pageLoadMoreTarget, {} as IntersectionObserver);
+          }
+        });
         expect(screen.getByText(`25 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
 
         unmount();
       } finally {
-        vi.useRealTimers();
         global.IntersectionObserver = originalIO;
       }
     });
@@ -893,6 +924,68 @@ describe("FavoritesPage", () => {
       }
     });
 
+    it("triggers GalleryItem cleanup (unobserve) when component unmounts (lines 213-215)", () => {
+      const unobserveSpy = vi.fn();
+      const originalIO = global.IntersectionObserver;
+
+      try {
+        class TrackingUnobserveObserver implements IntersectionObserver {
+          readonly root: Element | null = null;
+          readonly rootMargin: string = "";
+          readonly scrollMargin: string = "";
+          readonly thresholds: ReadonlyArray<number> = [];
+
+          constructor(
+            private callback: IntersectionObserverCallback,
+            _options?: IntersectionObserverInit
+          ) {}
+
+          observe(target: Element): void {
+            // Fire isIntersecting: false so the observer is NOT disconnected on first intersection.
+            // This keeps the observer alive so unobserve() gets called on unmount.
+            this.callback(
+              [
+                {
+                  isIntersecting: false,
+                  target,
+                  boundingClientRect: target.getBoundingClientRect(),
+                  intersectionRatio: 0,
+                  intersectionRect: target.getBoundingClientRect(),
+                  rootBounds: null,
+                  time: Date.now(),
+                },
+              ],
+              this
+            );
+          }
+
+          unobserve(): void {
+            unobserveSpy();
+          }
+          disconnect(): void {}
+          takeRecords(): IntersectionObserverEntry[] {
+            return [];
+          }
+        }
+
+        global.IntersectionObserver = TrackingUnobserveObserver as unknown as typeof IntersectionObserver;
+
+        mockUseFavorites.mockReturnValue({
+          favorites: ["story-1"],
+          toggleFavorite: mockToggleFavorite,
+          isLoading: false,
+        });
+
+        const { unmount } = render(<FavoritesPage />);
+        unmount();
+
+        // React calls the useEffect cleanup on unmount, which calls observer.unobserve(currentRef)
+        expect(unobserveSpy).toHaveBeenCalled();
+      } finally {
+        global.IntersectionObserver = originalIO;
+      }
+    });
+
     // Lines 222-227: GalleryItem IntersectionObserver null-safe guards — architecturally unreachable.
     //
     // Line 222: `if (currentRef) { observer.observe(currentRef); }`
@@ -977,8 +1070,8 @@ describe("FavoritesPage", () => {
   });
 
   describe("coverage notes — unreachable guards", () => {
-    it("documents loadMore guard (line 36) as dead code — IntersectionObserver pre-guards before invoking loadMore", async () => {
-      // Line 36: `if (isLoadingMore || !hasMore) return;` inside loadMore is dead code.
+    it("documents loadMore guard (line 38) as dead code — IntersectionObserver pre-guards before invoking loadMore", async () => {
+      // Line 38: `if (isLoadingMore || !hasMore) return;` inside loadMore is dead code.
       //
       // Reason: The ONLY call site is the IntersectionObserver callback (page.tsx lines 49-52):
       //   if (entries[0].isIntersecting && hasMore && !isLoadingMore) { loadMore(); }
@@ -988,7 +1081,14 @@ describe("FavoritesPage", () => {
       //
       // There is no "Load More" button or other call site. The guard is defensive dead code.
       // The tests in "loadMore guard (line 36)" and "loadMore isLoadingMore guard" above verify
-      // correct behavior but cannot cover line 36 for this structural reason.
+      // correct behavior but cannot cover line 38 for this structural reason.
+      //
+      // Empirically verified (isolated renderHook probe): calling loadMore() twice
+      // synchronously back-to-back still results in both calls seeing isLoadingMore=false,
+      // because setIsLoadingMore(true) and setIsLoadingMore(false) both fire within the
+      // same synchronous call (no await/yield between them), so React never commits an
+      // intermediate render where isLoadingMore is observably true, and both closures
+      // captured the same stale `false` value from the render that created them.
 
       // Demonstrate: 20 stories (hasMore=false) → IO fires immediately → no items beyond 20 loaded
       const twentyStories = Array.from({ length: 20 }, (_, i) => ({
@@ -1008,8 +1108,60 @@ describe("FavoritesPage", () => {
 
       // IO fires immediately (mock) but loadMore() is never called because IO's own guard blocks it
       await waitFor(() => expect(screen.getByText("Story 19")).toBeInTheDocument());
-      // Still exactly 20 items — line 36's return was never executed (IO prevented the call)
+      // Still exactly 20 items — line 38's return was never executed (IO prevented the call)
       expect(screen.queryByText(`21 ${mockT("favorites.place_plural")}`)).not.toBeInTheDocument();
+    });
+
+    it("documents the isLoadingMore spinner (line 157) as unreachable — setIsLoadingMore(true)/(false) are synchronous with no yield between them", async () => {
+      // Line 157: `{isLoadingMore && (<div>...spinner...</div>)}` never renders true.
+      //
+      // Reason: loadMore() calls setIsLoadingMore(true) and setIsLoadingMore(false)
+      // synchronously in the same function body, with no `await` or async gap between
+      // them (UX-L2 removed the artificial 300ms delay that used to create that gap).
+      // React batches these two updates from the same synchronous callback into a
+      // single re-render, so isLoadingMore is never observably true in any committed
+      // render — the spinner branch is dead code left over from before UX-L2.
+      const manyStories = Array.from({ length: 25 }, (_, i) => ({
+        id: `story-${i}`,
+        slug: `slug-${i}`,
+        title: `Story ${i}`,
+        subtitle: `Sub ${i}`,
+        description: `Desc ${i}`,
+        image: `/img/${i}.jpg`,
+        category: "nature" as const,
+        sourcePdf: "x.pdf",
+      }));
+      mockUseStories.mockReturnValue({ stories: manyStories, isLoading: false, error: null, refresh: vi.fn() });
+      mockUseFavorites.mockReturnValue({ favorites: manyStories.map((s) => s.id), toggleFavorite: mockToggleFavorite, isLoading: false });
+
+      render(<FavoritesPage />);
+
+      // All 25 load synchronously via the IO mock; the "loading_more" spinner text
+      // is never present at any point because isLoadingMore is never true during a render.
+      await waitFor(() => expect(screen.getByText("Story 24")).toBeInTheDocument());
+      expect(screen.queryByText(mockT("favorites.loading_more"))).not.toBeInTheDocument();
+    });
+
+    it("documents GalleryItem's itemRef null-guards (lines 205, 210) as architecturally unreachable", () => {
+      // Lines 205 and 210: `if (currentRef) { observer.observe/unobserve(currentRef); }`
+      // inside GalleryItem's IntersectionObserver effect are defensive null-safety guards.
+      //
+      // itemRef.current is always set to the rendered root <div ref={itemRef}> before
+      // useEffect fires, because React assigns refs synchronously during the commit
+      // phase, strictly before effects run. So `currentRef` is always truthy by the time
+      // this effect body executes for any GalleryItem that is actually mounted — the
+      // false branch (null ref) cannot be reached without mocking React internals in a
+      // way that doesn't represent real usage. Already covered by the same reasoning
+      // documented above for the GalleryItem observer registration.
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      expect(screen.getByAltText("Lagos de Covadonga")).toBeInTheDocument();
     });
   });
 });

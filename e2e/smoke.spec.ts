@@ -42,4 +42,25 @@ test.describe("Smoke tests", () => {
     expect(body).toHaveProperty("timestamp");
     expect(["healthy", "degraded"]).toContain(body.status);
   });
+
+  test("health/db probe is reachable and well-formed", async ({
+    request,
+  }) => {
+    // The e2e webServer runs against a dummy Supabase URL (playwright.config.ts),
+    // so this asserts the probe's response contract, not live DB connectivity —
+    // catching probe regressions (wrong status, malformed JSON, leaked error
+    // detail) independent of whichever backend it's pointed at.
+    const response = await request.get("/api/health/db");
+    expect([200, 500]).toContain(response.status());
+
+    const body = await response.json();
+    expect(typeof body.success).toBe("boolean");
+    if (body.success) {
+      expect(body.tablesAccessible).toBe(true);
+      expect(typeof body.latencyMs).toBe("number");
+    } else {
+      expect(typeof body.error).toBe("string");
+      expect(body.error.length).toBeGreaterThan(0);
+    }
+  });
 });

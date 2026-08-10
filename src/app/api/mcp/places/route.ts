@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
-import { placesQuerySchema } from "@/lib/schemas";
+import { placesPostRequestSchema, placesQuerySchema } from "@/lib/schemas";
 
 /**
  * MCP-compatible Places API endpoint for ElevenLabs voice agents.
@@ -181,6 +181,13 @@ async function searchPlaces(
   }
 
   // Build request for Places API (New)
+  //
+  // SE-L1 (SSRF guard): baseUrl MUST remain a hardcoded constant pointing to the
+  // official Google Places API. It MUST NOT be derived from, influenced by, or
+  // interpolated with any value sourced from the incoming request (query params,
+  // body, headers). All user-supplied input goes into the JSON body (textQuery,
+  // locationBias) which is sent to this fixed endpoint — never into the URL itself.
+  // Any future refactor that parameterises this URL MUST undergo security review.
   const baseUrl = "https://places.googleapis.com/v1/places:searchText";
 
   // Build the request body
@@ -354,42 +361,37 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!process.env.GOOGLE_PLACES_API_KEY) {
-    return NextResponse.json(
-      { error: "Places API not configured" },
-      { status: 500 }
-    );
-  }
-
   try {
     const body = await request.json();
+    const paramsParsed = placesPostRequestSchema.safeParse(body);
 
-    // Support both flat format and MCP format
-    let query: string | undefined;
-    let type: string | undefined;
-    let city: string | undefined;
-
-    if (body.query) {
-      // Flat format from ElevenLabs webhook
-      query = body.query;
-      type = body.type;
-      city = body.city;
-    } else if (body.arguments?.query) {
-      // MCP tool call format
-      query = body.arguments.query;
-      type = body.arguments.type;
-      city = body.arguments.city;
-    }
-
-    if (!query) {
+    // Validate the request before checking upstream configuration, matching GET
+    // above. A malformed request is the caller's error whatever the server's
+    // Google credentials look like; answering 500 hid this from the probe that
+    // asserts the contract — a probe that had never run.
+    if (!paramsParsed.success) {
+      const firstIssue = paramsParsed.error.issues[0];
       return NextResponse.json(
-        { error: "Query parameter is required" },
+        { error: firstIssue?.message ?? "Invalid query parameters" },
         { status: 400 }
       );
     }
 
+    if (!process.env.GOOGLE_PLACES_API_KEY) {
+      return NextResponse.json(
+        { error: "Places API not configured" },
+        { status: 500 }
+      );
+    }
+
+    const { query, type, city } = paramsParsed.data;
+
     const results = await searchPlaces(query, type, city);
-    return NextResponse.json(results);
+    return NextResponse.json(results, {
+      headers: {
+        "Cache-Control": "public, max-age=3600", // Cache for 1 hour (matches GET)
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

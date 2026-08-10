@@ -504,6 +504,29 @@ describe("useAnalyticsData", () => {
     vi.spyOn(Date, "now").mockRestore();
   });
 
+  it("does not update data or cache when result.data is undefined and no error", async () => {
+    // Covers line 124 false branch: `if (result.data !== undefined)` when the
+    // fetch resolves with neither `data` nor `error` set.
+    const fetchFn = vi
+      .fn<() => Promise<AdminApiResponse<string>>>()
+      .mockResolvedValue({});
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(
+      () => useAnalyticsData("no-data-response", fetchFn, "{}"),
+      { wrapper }
+    );
+
+    expect(result.current.isLoading).toBe(true);
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // No data was ever set, no error was set either
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBe("");
+    expect(result.current.isRefreshing).toBe(false);
+  });
+
   it("switching back to previously cached params uses cache", async () => {
     let callCount = 0;
     const fetchFn = vi

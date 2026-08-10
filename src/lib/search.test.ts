@@ -29,7 +29,7 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
-import { searchChunks, getRelatedImages, search, keywordSearch } from "./search";
+import { RERANK_TIMEOUT_MS, searchChunks, getRelatedImages, search, keywordSearch } from "./search";
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
 import { logger } from "@/lib/logger";
@@ -429,6 +429,61 @@ describe("search", () => {
       expect(returnedPaths).not.toContain("img9.jpg");
     });
 
+    it("PE-H2: falls back to vector order when rerank exceeds its timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        const mockDbChunks = Array.from({ length: 10 }, (_, i) => ({
+          id: `chunk-${i}`,
+          content: `Content ${i}`,
+          source_pdf: `guide-${i}.pdf`,
+          page_number: i + 1,
+          section_title: null,
+          image_refs: [`img${i}.jpg`],
+          similarity: 0.9 - i * 0.02,
+        }));
+
+        vi.mocked(supabase.rpc).mockResolvedValueOnce({
+          data: mockDbChunks,
+          error: null,
+        } as never);
+        vi.mocked(rerankChunks).mockReturnValue(new Promise(() => {}));
+
+        const mockSelect = vi.fn().mockReturnValue({
+          in: vi.fn().mockResolvedValueOnce({
+            data: [
+              { id: "img-0", path: "img0.jpg", caption: null, source_pdf: "guide-0.pdf" },
+              { id: "img-1", path: "img1.jpg", caption: null, source_pdf: "guide-1.pdf" },
+              { id: "img-2", path: "img2.jpg", caption: null, source_pdf: "guide-2.pdf" },
+              { id: "img-9", path: "img9.jpg", caption: null, source_pdf: "guide-9.pdf" },
+            ],
+            error: null,
+          }),
+        });
+        vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+        const pendingSearch = search(new Array(512).fill(0.1), 3, "slow rerank");
+        await vi.advanceTimersByTimeAsync(RERANK_TIMEOUT_MS + 1);
+        const result = await pendingSearch;
+
+        expect(result.chunks.map((chunk) => chunk.id)).toEqual([
+          "chunk-0",
+          "chunk-1",
+          "chunk-2",
+        ]);
+        expect(result.images.map((image) => image.path)).toEqual([
+          "img0.jpg",
+          "img1.jpg",
+          "img2.jpg",
+        ]);
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[SEARCH_RERANK_TIMEOUT]",
+          expect.objectContaining({ timeoutMs: RERANK_TIMEOUT_MS })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("should use limit directly when no query text is provided", async () => {
       vi.mocked(supabase.rpc).mockResolvedValueOnce({
         data: [],
@@ -522,6 +577,125 @@ describe("search", () => {
         "[TABLE_FALLBACK]",
         expect.objectContaining({ table: "chunks" })
       );
+    });
+
+    it("uses String(error) fallback when keywordSearch error has no message field", async () => {
+      vi.mocked(logger.error).mockClear();
+
+      const mockTextSearch = vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: "raw error string",
+        }),
+      });
+      const mockSelect = vi.fn().mockReturnValue({ textSearch: mockTextSearch });
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      const results = await keywordSearch("test");
+      expect(results).toEqual([]);
+      expect(logger.error).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "chunks", error: "raw error string" })
+      );
+    });
+  });
+
+  describe("error message fallbacks (branch coverage)", () => {
+    it("searchChunks uses String(error) when RPC error has no message field", async () => {
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: null,
+        error: "rpc-failed-no-message",
+      } as never);
+
+      const embedding = new Array(512).fill(0.1);
+      await expect(searchChunks(embedding)).rejects.toThrow(/rpc-failed-no-message/);
+    });
+
+    it("getRelatedImages logs String(error) when error has no message field", async () => {
+      vi.mocked(logger.error).mockClear();
+
+      const mockSelect = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: "no-message-string-error",
+        }),
+      });
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      const results = await getRelatedImages(["x.jpg"]);
+      expect(results).toEqual([]);
+      expect(logger.error).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "images", error: "no-message-string-error" })
+      );
+    });
+  });
+
+  describe("imageRefs null fallback (branch coverage)", () => {
+    it("search() handles chunks with null imageRefs in no-query path", async () => {
+      // Vector-only path (queryText undefined) - candidates have null imageRefs
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: [
+          {
+            id: "c1",
+            content: "Asturias",
+            source_pdf: "guide.pdf",
+            page_number: 1,
+            section_title: null,
+            image_refs: null,
+            similarity: 0.9,
+          },
+        ],
+        error: null,
+      } as never);
+
+      const mockSelect = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
+      });
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      const result = await search(new Array(512).fill(0.1), 3);
+      expect(result.chunks).toHaveLength(1);
+      expect(result.images).toEqual([]);
+    });
+
+    it("search() handles chunks with null imageRefs in rerank path", async () => {
+      const candidatesWithNullRefs = Array.from({ length: 10 }, (_, i) => ({
+        id: `c${i}`,
+        content: `content ${i}`,
+        source_pdf: "guide.pdf",
+        page_number: i,
+        section_title: null,
+        image_refs: null,
+        similarity: 0.9 - i * 0.01,
+      }));
+
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: candidatesWithNullRefs,
+        error: null,
+      } as never);
+
+      // Reranker returns top 3 with null imageRefs as well
+      vi.mocked(rerankChunks).mockResolvedValueOnce(
+        candidatesWithNullRefs.slice(0, 3).map((c) => ({
+          id: c.id,
+          content: c.content,
+          sourcePdf: c.source_pdf,
+          pageNumber: c.page_number,
+          sectionTitle: c.section_title ?? undefined,
+          imageRefs: undefined,
+          similarity: c.similarity,
+        })),
+      );
+
+      const mockSelect = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
+      });
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      const result = await search(new Array(512).fill(0.1), 3, "query text");
+      expect(result.chunks).toHaveLength(3);
+      expect(result.images).toEqual([]);
     });
   });
 });

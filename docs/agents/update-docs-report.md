@@ -1,91 +1,51 @@
 # Documentation Update Report
-> Generated on 2026-04-29 | Branch: `develop` | Changes since `v1.4.0`
+> Generated on 2026-06-20 | Branch: `develop` | Changes since `v1.5.0`
 
 ## Summary
+- 2 documents updated (CHANGELOG.md, docs/operations/proxy-architecture.md)
+- 0 diagrams refreshed (no Mermaid/architecture diagram depicted changed flows)
+- 0 version references corrected (version bump handled by `/release`)
+- 0 inline doc blocks updated (remediation changes were behavioural/test, not signature changes to documented APIs)
+- 0 items flagged [NEEDS REVIEW]
 
-- **12 documents updated**
-- **1 diagram updated** (ASCII CI flow in testing-guide.md)
-- **9 version references corrected** (test counts, migration count, dates, Last Updated)
-- **0 inline doc blocks updated** (project has no JSDoc/docstrings in scope)
-- **1 item flagged [NEEDS REVIEW]** — `docs/paisaxe-architecture.drawio`
+Scope: this update reflects the pre-launch remediation (audit 2026-06-20) of 50 findings
+across all 8 domains, merged into `develop`. Point-in-time snapshots under
+`docs/plans/`, `docs/research/`, and `docs/agents/` were intentionally left unchanged
+(historical records, not living docs). New living docs created during remediation
+(`docs/operations/pre-launch-security-checklist.md`, `docs/decisions/0023-*.md`) were
+authored by the remediation agents and need no further refresh.
 
 ## Changes by File
 
-### `CHANGELOG.md`
-- Added `[1.5.0] - 2026-04-29` section covering all 99 post-v1.4.0 commits (Wave 1 + Wave 2 remediation): Added, Fixed, Security, Performance, Changed, Removed, Testing subsections
-- Fixed 4 date placeholders: `[1.3.0] 2026-04-20`, `[1.2.0] 2026-02-03`, `[1.1.0] 2026-01-31`, `[1.0.0] 2026-01-31`
+### CHANGELOG.md
+Added pre-launch remediation entries to the `[Unreleased]` section, grouped per Keep-a-Changelog:
+- **Added** — tiered pricing module (`src/lib/pricing.ts`), `supabase-admin.ts`, Sentry
+  `onRequestError`, `SUPABASE_STORAGE_LIMIT_MB`, `lint:deps` madge CI guard,
+  pre-launch security checklist, ADR-0023, locale-coverage gating, branded error/404,
+  new chat-resilience + checkout tests.
+- **Fixed** — BE-B1 Stripe tier fulfilment, FE-H1 voice/mic teardown, FE-H2 failure UX,
+  BE-H1 rate-limit bucket, BE-H2 booking-timeout reconciliation, UX-H2 upsell tiers,
+  UX-M5 image alt text, BE-M2 SMS retry, FE-M2/FE-M3 SSE + chat-list hygiene,
+  BE-M1 cron auth logging, BE-L1/BE-L2 bounds + RPC timeout, UX-L2 favorites delay,
+  DO-L2 health cron degrade, AR-L1/BE-M4 cleanup.
+- **Changed** — UX-H1/UX-S1 green brand token, UX-M1/UX-M2 mobile controls + tap zones,
+  FE-M1/PE-M3 provider memoization + deferred analytics, PE-M2 proxy API fast-path,
+  PE-L2 narrowed select, DO-M2 smoke visibility, FE-L1/FE-L2 memoization.
+- **Security** — server-only secret boundary (AR-M1/AR-M2), documented SSRF/CSP
+  compensating controls + checklist (SE-L1/SE-L2/SE-S1).
 
-### `ROADMAP.md`
-- Updated `Last Updated` from April 24 → April 29, 2026
-- Updated test count `~6,000 (324 files)` → `6,347 (341 files)` in two places
-- Added `v1.5.0` row to release history table
-
-### `README.md`
-- Fixed migration count `17 migrations` → `83 migrations` in two places (setup instructions + directory tree)
-- Added `Pino (structured JSON) + Sentry` and `Upstash Redis` rows to tech stack table
-
-### `CLAUDE.md`
-- Added `Pino (structured JSON) + Sentry` and `Upstash Redis` rows to tech stack table
-
-### `docs/operations/operations.md`
-- Replaced single "Health Check Endpoint" section with two-endpoint description (`/api/health/live` + `/api/health`)
-- Updated test count `~6,000` → `~6,347`
-- Updated pre-launch checklist "Health Endpoint" step to probe both endpoints
-
-### `docs/operations/logging.md`
-- Added 8 new event codes to the Key Conventions table:
-  - `[RATE_LIMIT_DEGRADED]` — Redis fallback warning
-  - `[CRON_SUCCESS]` — cron job completion with `job` + `duration_ms`
-  - `[CRON_FAILURE]` — cron job error with `job` + `error`
-  - `[CRON_AUTH_REJECTED]` — cron secret verification failure with `reason`
-  - `[HONEYPOT_TRIGGERED]` — bot-triggered suggestion field
-  - `[ADMIN_AUDIT]` — admin write action audit log
-  - `[ADMIN_PROFILE_LOOKUP_FAILED]` — non-PGRST116 admin role lookup error
-
-### `docs/operations/alerting-runbook.md`
-- Added "Cron Auth Rejected" section with steps for `[CRON_AUTH_REJECTED]` events
-- Added "Honeypot Triggered" section for `[HONEYPOT_TRIGGERED]` events
-
-### `docs/operations/database-backup.md`
-- Added HNSW index note to post-restore checklist: migration 086 dropped IVFFlat for HNSW and must be re-run if restoring to a pre-086 point
-
-### `docs/engineering/testing-guide.md`
-- Updated test counts: `332 files / 6,059 tests` → `341 files / 6,347 tests` in two places
-- Updated CI flow ASCII diagram: added `E2E` and `develop-smoke` boxes; updated "All three must pass" → "All five must pass"
-- Added `withAdminRead` HOF mock pattern code example
-- Added `admin-auth.test.ts` and `use-sse-stream.test.ts` to test file inventory
-
-### `docs/project/features.md`
-- Updated Infrastructure health check entry to document both `/api/health/live` and `/api/health`
-- Added `withAdminRead` / `withAdmin` + LRU role cache description to Admin Access section
-
-### `docs/project/markdown-render-sinks.md`
-- Updated react-markdown sink path: `voice-chat.tsx` → `voice-chat/chat-message-list.tsx` (FE-M1 monolith split)
-
-### `docs/decisions/0015-service-layer.md`
-- Updated consequences note: `src/services/.gitkeep` was removed during AR-M2; ADR remains Proposed
+### docs/operations/proxy-architecture.md
+Added a note to the CSRF step documenting the PE-M2 hot-path optimization: `/api/*`
+responses skip CSP-header and CSRF-cookie decoration, while CSRF validation on mutating
+requests is still enforced.
 
 ## Flagged for Review
+None.
 
-### `docs/paisaxe-architecture.drawio` — [NEEDS REVIEW]
-
-The DrawIO XML diagram has 7 stale elements that cannot be confidently auto-updated from text edits:
-
-1. `/api/health` node — needs split into `/api/health` (diagnostics) and `/api/health/live` (liveness)
-2. `lib-embed` → `ext-upstash` edge — embedding cache now Upstash Redis (not in-process LRU)
-3. Parallel `feature-flags ‖ embedding` annotation on `api-chat` path
-4. Admin path — add `withAdminRead` distinction (GET vs mutation)
-5. Observability layer — Pino + Sentry + `x-request-id` correlation
-6. ElevenLabs lane — Agents-as-Code workflow (`agent_configs/` in git)
-7. Proxy lane — add `Canonical Domain Redirect` and `Story URL Rewrite` nodes
-
-**Action:** Open `docs/paisaxe-architecture.drawio` in draw.io, apply changes, re-export PNG.
-
-## What Was Not Updated
-
-- `AGENTS.md` — Codex compatibility guide, no tech stack table
-- `docs/operations/branch-protection.md` — Already correct; develop-smoke is not a required check for main merges
-- Historical snapshots: `docs/research/`, `docs/plans/`, `docs/operations/pre-launch-audit.md` (immutable)
-- `docs/agents/*-report.md` — Gitignored operational history (Rule #70)
-- `content/prompts/` — No prompt changes since v1.4.0
-- ADR-0016 (claude.ts modularization) — Still correctly Proposed
+## Notes
+- Markdown line-length (MD013) warnings from default `markdownlint` are pre-existing
+  CHANGELOG style (long single-line entries); markdown is not part of the project's
+  `npm run lint` gate or CI, so no change was made to line wrapping.
+- The orphaned `src/lib/i18n/resolve-server-locale.ts` was removed (not a doc change)
+  when FE-M4's server-side locale resolution was reverted for PPR static-shell
+  compatibility — see CLAUDE.md "CSP and PPR Compatibility".

@@ -31,6 +31,35 @@ describe("useStoryKeyboardNav", () => {
     expect(onPrev).not.toHaveBeenCalled();
   });
 
+  it("should handle document capture events once when they also bubble to window", () => {
+    renderHook(() =>
+      useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })
+    );
+
+    const button = document.createElement("button");
+    document.body.appendChild(button);
+
+    fireEvent.keyDown(button, { key: "ArrowRight" });
+
+    document.body.removeChild(button);
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("should handle shortcuts before focused child controls can stop propagation", () => {
+    renderHook(() =>
+      useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })
+    );
+
+    const button = document.createElement("button");
+    button.addEventListener("keydown", (event) => event.stopPropagation());
+    document.body.appendChild(button);
+
+    fireEvent.keyDown(button, { key: "i" });
+
+    document.body.removeChild(button);
+    expect(onToggleInfo).toHaveBeenCalledTimes(1);
+  });
+
   it("should call onNext when Space is pressed", () => {
     renderHook(() =>
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })

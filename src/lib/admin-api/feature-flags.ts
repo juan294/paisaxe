@@ -1,6 +1,7 @@
 import type { AdminApiResponse } from "@/types/admin";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const API_BASE = "/api/admin";
 
@@ -20,7 +21,7 @@ export async function fetchFeatureFlags(): Promise<AdminApiResponse<FeatureFlag[
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching feature flags:", error);
+    clientLogger.error("Error fetching feature flags", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -46,7 +47,7 @@ export async function updateFeatureFlag(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating feature flag:", error);
+    clientLogger.error("Error updating feature flag", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -72,7 +73,7 @@ export async function updateFeatureFlagConfig(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating feature flag config:", error);
+    clientLogger.error("Error updating feature flag config", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }

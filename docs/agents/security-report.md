@@ -1,143 +1,137 @@
-# Security Report — 2026-04-30
+# Security Report — Paisaxe
 
-## Health Status: GREEN
-
-1 advisory detected. **0 exploitable.** The single moderate advisory affects the Anthropic SDK's Local Filesystem Memory Tool — a feature architecturally irrelevant in this Vercel serverless deployment. Vulnerability posture is clean. CSRF enforcement confirmed working; QA RED is a test harness gap (missing Origin header), not a security flaw.
+**Date:** 2026-08-06
+**Agent:** Security Agent
+**Health status:** YELLOW
 
 ## Executive Summary
 
-- **1 advisory detected, 0 exploitable.** One moderate advisory in `@anthropic-ai/sdk` (GHSA-p7fg-763f-g4gf) — insecure file permissions in the Local Filesystem Memory Tool. This tool is not used in this codebase and has no exploit path on Vercel's ephemeral serverless filesystem.
-- **0 critical, 0 high.** No remote code execution, auth bypass, or data-exfiltration vectors.
-- **CSRF enforcement confirmed correct.** QA agent (Apr 30) identified the Chat API 403 as a test harness gap — Node.js fetch omits the Origin header required by SE-M2 hardening. Adding `'Origin': API_URL` to the QA harness headers fixes it. The CSRF gate itself is working as designed.
-- **Safety tests blocked (2nd cycle).** LLM safety, prompt-injection, and PII-extraction tests remain unconfirmed while the QA harness bug is unfixed. Journeys and integration health recovered to 10/10 and 3/3.
-- **19 outdated packages.** One has an advisory (@anthropic-ai/sdk). The rest have zero CVEs. Batch-upgrade candidate for next triage cycle.
-- **License compliance: Pass.** Three flagged licenses (LGPL, MPL, UNLICENSED) remain documented approved exceptions. Four scanner false positives unchanged.
-- **Security headers: Partial live verification.** 4 of 6 expected headers confirmed in live check. CSP and HSTS absent from live output — HSTS is production-only (expected); CSP requires production endpoint confirmation.
-- **CI/CD security automation: Solid.** Dependabot, Gitleaks, npm audit, license-check all active.
+**4 advisories detected (8 underlying GHSA/CVE IDs), 0 exploitable in the running application.** All three affected packages — `brace-expansion`, `fast-uri`, `undici` — are reachable only through dev-only or build-time-only dependency chains (`eslint-plugin-react`, `@sentry/webpack-plugin`, `jsdom`), never through code that executes while serving a real user request. That said, this is not a routine "nothing to see" cycle: the daily `Security Scan` GitHub Action **is currently failing** (run `30991007551`, 2026-08-05 08:55 UTC, `npm audit` job) because two of these four — `brace-expansion` and `fast-uri` — sit in the *production* dependency graph as npm classifies it (see Exploitability Analysis) and trip the CI gate's `--audit-level=moderate` threshold. This YELLOW is about a broken CI gate blocking clean merges/releases, not about user-facing risk.
+
+All four are fixable with a small, verified change: `npm audit fix` correctly resolves all three packages (dry-run confirmed below), and the `undici` fix requires deleting a now-counterproductive `package.json` override rather than adding one.
+
+License compliance is unchanged and clean — no copyleft violations, all 7 flagged packages remain documented exceptions or false positives. Security headers are unchanged and correct in source. CI/CD security automation is fully active except for the currently-failing audit gate described above. 27 packages are outdated (up sharply from 10 in the last cycle), all minor/patch except `typescript` (6.0.3 -> 7.0.2, already excluded from Dependabot batching per the Jul 15 semver-gating fix).
 
 ## Vulnerability Table
 
-| Severity | Package | Advisory | CVE | Attack Vector | Fixable | Risk Assessment |
-|----------|---------|----------|-----|---------------|---------|-----------------|
-| Moderate | `@anthropic-ai/sdk@0.90.0` | GHSA-p7fg-763f-g4gf | Pending assignment | Local filesystem — requires use of Memory Tool feature | Yes (breaking change: 0.91.1) | NOT EXPLOITABLE — feature not used; Vercel filesystem is ephemeral |
+| Severity | Package | Advisory (GHSA / CVE) | Attack Vector | Fixable | Risk Assessment |
+|----------|---------|------------------------|----------------|---------|------------------|
+| High | `brace-expansion@5.0.8` | [GHSA-rgw5-rvv9-x895](https://github.com/advisories/GHSA-rgw5-rvv9-x895) / CVE-2026-69152 | ReDoS-adjacent DoS via unbounded intermediate arrays during brace-pattern expansion; bypasses the earlier CVE-2026-14257 mitigation | Yes — `npm audit fix` (bumps override `>=5.0.8` -> `>=5.0.9`) | **Not exploitable here.** Only reachable via `eslint-plugin-react` -> `minimatch` (ESLint's glob matching), a devDependency invoked only during local/CI linting on developer-authored glob patterns, never on user input |
+| High | `fast-uri@3.1.4` | [GHSA-7p8r-x3mc-p8w7](https://github.com/advisories/GHSA-7p8r-x3mc-p8w7) / CVE-2026-18446 | Host confusion via backslash authority introducer in URI parsing (used by AJV schema validation) | Yes — `npm audit fix` (adds override `fast-uri` `>=3.1.5`) | **Not exploitable here.** Reached only via `@sentry/nextjs` -> `@sentry/webpack-plugin` -> `webpack` -> `schema-utils` -> `ajv`/`ajv-formats`. `@sentry/webpack-plugin` runs exclusively as a webpack plugin during `next build` (source-map upload to Sentry); it never executes in the deployed runtime, even though `@sentry/nextjs` itself is a `dependencies` (not `devDependencies`) entry |
+| High / Moderate | `undici@7.28.0` | 5 advisories bundled — [GHSA-4cwx-7wf7-3272](https://github.com/advisories/GHSA-4cwx-7wf7-3272) / CVE-2026-13697 (High, cross-user info disclosure + parse crash via degenerate cache directives); [GHSA-8xcm-r25x-g524](https://github.com/advisories/GHSA-8xcm-r25x-g524) / CVE-2026-16728 (Moderate, response desync via retry interceptor); [GHSA-m8rv-5g2x-5cg5](https://github.com/advisories/GHSA-m8rv-5g2x-5cg5) / CVE-2026-15157 (Moderate, CRLF injection via blob `type`); [GHSA-jr45-8vmc-qm54](https://github.com/advisories/GHSA-jr45-8vmc-qm54) / CVE-2026-14643 (Moderate, cache-control whitespace disclosure); [GHSA-v3r7-h72x-cjcm](https://github.com/advisories/GHSA-v3r7-h72x-cjcm) / CVE-2026-16729 (Moderate, cookie attribute injection) | Various HTTP client-layer request/response smuggling and cache-poisoning primitives in undici's fetch implementation | Yes — `npm audit fix` (**removes** the `undici: "7.28.0"` override entirely) | **Not exploitable here.** Only dependency is `jsdom@30.0.0` (a devDependency used solely as the vitest DOM test environment); `undici` never ships or runs in production. It never makes real network requests to attacker-influenced hosts during tests |
+| Moderate | `jsdom@30.0.0` | Derivative — "Depends on vulnerable versions of undici" | N/A (transitive rollup, not a distinct advisory) | Yes — resolves automatically once `undici` is fixed | Same as `undici` above — test-only, no runtime exposure |
 
 ## Detailed Exploitability Analysis
 
-### GHSA-p7fg-763f-g4gf — @anthropic-ai/sdk Local Filesystem Memory Tool (Moderate)
+**Why npm classifies `brace-expansion` and `fast-uri` as "production" despite being build/lint tooling:** `npm audit --omit=dev` filters based on whether every path to a package passes exclusively through `devDependencies` edges in the resolved graph. `@sentry/nextjs` is declared under `dependencies` in `package.json:76` (it is imported at runtime for error tracking, so that classification is correct for the package itself), and its own `@sentry/webpack-plugin` sub-dependency — used only for the build-time source-map upload step — is not marked `dev` by npm's resolver even though it never executes past `next build`. This is why `npm audit --omit=dev --audit-level=moderate` (the CI gate in `.github/workflows/security.yml`) currently fails on `fast-uri`, and independently on `brace-expansion` — confirmed by reproducing the exact gate command locally: it reports the same 2 high-severity findings. This is an **npm dependency-graph classification quirk, not evidence of runtime reachability** — `@sentry/webpack-plugin`'s code path that pulls in `ajv`/`fast-uri` for JSON-schema validation of webpack's own config never runs inside a deployed Vercel function.
 
-**Advisory summary**: The Anthropic SDK's Local Filesystem Memory Tool creates files with world-readable default permissions (0o644) instead of user-only permissions (0o600). On a multi-user system, other local users could read sensitive agent memory files.
+`brace-expansion`'s only path is through `eslint-plugin-react` (line 121, `devDependencies`) — its inclusion in the prod-only audit output is because npm's classification tracks the *resolved* dependency, and in this lockfile the sole resolution path happens to also get pulled in transitively in a way npm's classifier doesn't mark purely-dev (verified via `npm ls brace-expansion`, single path: `eslint-plugin-react -> minimatch@10.2.4 -> brace-expansion@5.0.8`). Regardless of classification nuance, `eslint-plugin-react` only runs during `npm run lint` against source file paths under this repo's control — no attacker-controlled glob input reaches it.
 
-**Attack requirements**:
-1. Application must actively use the Local Filesystem Memory Tool feature of the SDK
-2. Application must be deployed on a shared, multi-user system where other principals can read the filesystem
-3. The tool must write sensitive data to disk
+`undici` is the clearest case: its only consumer is `jsdom`, itself only imported by the vitest test environment config, and it never executes in a Vercel serverless function or the Next.js server runtime.
 
-**Why this is NOT exploitable here**:
-
-1. **Feature not used.** The Local Filesystem Memory Tool is a developer/agent workflow feature for persistent memory across Claude sessions. This codebase uses `@anthropic-ai/sdk` exclusively for the streaming chat completions API (`/api/chat/route.ts`) — the Memory Tool is never instantiated or called.
-
-2. **Vercel serverless filesystem is ephemeral.** Even if the tool were accidentally used in a route handler, Vercel Lambda functions run in isolated ephemeral containers. No persistent filesystem exists between invocations. No other process can access the transient `/tmp` space of a different Lambda invocation.
-
-3. **No multi-user server context.** The vulnerability requires local filesystem access from a second principal. This is a traditional server concern, not applicable to a stateless serverless architecture.
-
-**Fix available but breaking**: `npm audit fix --force` installs `@anthropic-ai/sdk@0.91.1`. This is a major semver bump within the 0.x range that may include API-incompatible changes. Evaluate the 0.91.x changelog before upgrading — the chat streaming API surface used by this project may or may not be affected.
-
-**Recommended action**: Schedule the upgrade as part of the next routine batch dep upgrade. No urgency — the advisory is not exploitable in this deployment.
-
-### CSRF Hardening (SE-M2) — Confirmed Working
-
-**QA agent (Apr 30)** identified the Chat API 403 root cause: the QA harness `sendChatMessage()` in `src/tests/qa/llm-quality.test.ts:43` omits the `Origin` header. SE-M2 enforces Origin validation on all POST requests; Node.js `fetch()` does not auto-inject Origin when called from a Node process (not a browser).
-
-**Security assessment**: The CSRF gate is functioning correctly. The 403 is the expected response when Origin is missing. One-line fix: add `'Origin': API_URL` to the harness request headers. This does not weaken CSRF protection — the double-submit token check still applies, and the Origin check remains in force for all production requests.
-
-**Safety tests**: Once the harness is fixed, next cycle should recover to 12/12 LLM tests. Safety guardrails are presumed intact based on (a) correct CSRF enforcement and (b) no code changes to the system prompt or safety logic since the last confirmed GREEN (Apr 26).
+**Net assessment:** 0 of 4 advisories have a path to production request handling. All are legitimately fixable and should be fixed promptly regardless — mainly to restore the CI gate to green, not because of live risk.
 
 ## Prioritized Remediation Steps
 
-1. **Fix QA harness Origin header** — `src/tests/qa/llm-quality.test.ts:43`: add `'Origin': process.env.API_URL ?? 'http://localhost:3000'` to the fetch headers. One-line change. Unblocks LLM safety confirmation next cycle. Priority: HIGH.
-2. **Evaluate @anthropic-ai/sdk 0.91.1 upgrade** — Review changelog for breaking changes affecting streaming chat completions API. If safe, upgrade in next batch cycle. The vulnerability is non-exploitable here but keeping the SDK current is good hygiene. Priority: MEDIUM.
-3. **Live CSP production verification** — `curl -sI https://paisaxe.es | grep -i 'content-security-policy'` to confirm CSP is served from production. Priority: LOW (source-verified correct).
-4. **Batch production minor/patch upgrades** — All other 18 outdated production packages (excluding `voyageai`, which is intentionally pinned at 0.1.0). Zero CVEs. Routine maintenance. Priority: LOW.
+1. **Fix all three (P1 — restores the currently-failing CI gate).** Verified via `npm audit fix --dry-run`:
+   ```
+   remove undici 7.28.0
+   change fast-uri 3.1.4 => 3.1.5
+   change brace-expansion 5.0.8 => 5.0.9
+   ```
+   Run `npm audit fix` and commit the resulting `package.json` / `package-lock.json` diff. Specifically:
+   - `package.json` `overrides.brace-expansion`: bump `">=5.0.8"` -> `">=5.0.9"` (the new advisory's fixed floor; the existing `>=5.0.8` override technically still permits the vulnerable 5.0.8 the lockfile had resolved to).
+   - `package.json` `overrides`: add `"fast-uri": ">=3.1.5"` (no override currently pins this package at all).
+   - `package.json` `overrides.undici`: **delete** the `"undici": "7.28.0"` entry. It was pinning `jsdom`'s dependency *down* to a now-vulnerable exact version; `jsdom@30.0.0` actually declares `undici: "^8.7.0"` (verified via `npm view jsdom@30.0.0 dependencies.undici`), so removing the override lets npm resolve the already-patched 8.x line naturally instead of forcing an old 7.x pin.
+   - After applying, re-run `npm audit --omit=dev --audit-level=moderate` locally to confirm the CI gate would pass before pushing.
+2. **No other action needed.** All three fixes are non-breaking dependency bumps confined to build/lint/test tooling — no application code changes required.
 
 ## License Compliance
 
-**Status: Pass.** Three non-permissive licenses appear in the dep tree, all approved exceptions:
+No copyleft violations, production or dev. Same 7 flagged packages as the prior cycle, all documented exceptions or false positives — no new entries:
 
 | Package | License | Status |
 |---------|---------|--------|
-| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved exception. Documented in `docs/project/license-exceptions.md`. Native shared library dynamically linked by `sharp`; LGPL dynamic-linking exemption applies. No modifications. SaaS deployment — no distribution obligations. |
-| `dompurify@3.4.0` | MPL-2.0 OR Apache-2.0 | Approved exception. Apache-2.0 elected under dual license. Transitively pulled by `@vercel/analytics`. Documented in `docs/project/license-exceptions.md`. No MPL-covered file modifications. |
-| `paisaxe@1.4.0` | UNLICENSED | The project itself — intentionally closed-source. Not a dependency violation. |
+| `@img/sharp-libvips-darwin-arm64@1.3.2` | LGPL-3.0-or-later | Documented Exception 1 (`license-exceptions.md:5`) — dynamically-linked native binary, SaaS deployment, no copyleft obligation triggered |
+| `dompurify@3.4.12` | `(MPL-2.0 OR Apache-2.0)` | Documented (`license-exceptions.md:157`) — dual-licensed, Apache-2.0 branch selected; no direct `src/` usage, reachable only via `posthog-js`'s internal analytics code |
+| `lightningcss@1.32.0` / `lightningcss-darwin-arm64@1.32.0` | MPL-2.0 | Documented Exception 3 (`license-exceptions.md:84`) — devDependency, file-level weak copyleft, build-time only (Tailwind v4 / Vite CSS transform) |
+| `expand-template@2.0.3` | `(MIT OR WTFPL)` | Documented (`license-exceptions.md:158`) — dual-licensed, MIT branch selected; build-time only via `canvas` -> `prebuild-install` |
+| `@babel/template@7.29.7` | MIT | Clean — plain MIT, scanner pattern-match false positive |
+| `simple-concat@1.0.1` / `simple-get@4.0.1` | MIT | Clean — plain MIT, scanner pattern-match false positive |
+| `paisaxe@1.6.0` | UNLICENSED | Expected — this project's own `package.json`, not a third-party dependency |
 
-**Scanner false positives** (plain MIT, mis-grouped by scanner):
-- `simple-concat@1.0.1` — MIT
-- `simple-get@4.0.1` — MIT
-- `expand-template@2.0.3` — MIT OR WTFPL (MIT elected)
-- `@babel/template@7.28.6` — MIT (grouping artifact)
+No strong copyleft (GPL/AGPL/SSPL) anywhere in the tree, production or dev.
 
-**No copyleft violations.** No GPL, AGPL, or SSPL in the dependency tree.
+## Security Headers
 
-## Security Headers Status
+All headers confirmed present in source (`next.config.ts:65-70` for HSTS/X-Frame-Options/X-Content-Type-Options/Referrer-Policy/Permissions-Policy; `src/proxy.ts:71` calling `buildCspHeader()` for CSP):
 
-Live header check captured 4 of 6 expected headers. CSP and HSTS absent from live output (HSTS expected absent on dev server — production-only; CSP requires production verification).
+| Header | Value | Status |
+|--------|-------|--------|
+| Content-Security-Policy | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://js.stripe.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Configured. `'unsafe-inline'` in `script-src` is the deliberate, documented PPR-compatibility tradeoff (CLAUDE.md CSP/PPR section) — `'strict-dynamic'` and nonce-only CSP are both avoided since PPR prerenders HTML without nonces |
+| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Configured, 2-year max-age with preload, prod-only |
+| X-Frame-Options | `DENY` | Configured |
+| X-Content-Type-Options | `nosniff` | Configured |
+| Referrer-Policy | `strict-origin-when-cross-origin` | Configured |
+| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Configured |
 
-| Header | Live Check | Source Verified | Status |
-|--------|-----------|----------------|--------|
-| Content-Security-Policy | Not captured | Yes (`src/proxy.ts`) | Verify via production curl |
-| Strict-Transport-Security | Not captured | Yes (`src/proxy.ts`, prod-only) | Expected absent on dev; production-only |
-| X-Frame-Options | DENY | Yes | Pass |
-| X-Content-Type-Options | nosniff | Yes | Pass |
-| Referrer-Policy | strict-origin-when-cross-origin | Yes | Pass |
-| Permissions-Policy | camera=(), geolocation=(), microphone=(self) | Yes | Pass |
-| frame-ancestors (CSP) | Not captured (see CSP row) | Yes (`'none'`) | Verify via production curl |
-| object-src (CSP) | Not captured (see CSP row) | Yes (`'none'`) | Verify via production curl |
+No changes since prior cycles. No action needed.
 
-**Recommended verification**: `curl -sI https://paisaxe.es | grep -iE 'content-security|strict-transport'`
+## CI/CD Security Automation
 
-## CI/CD Security Automation Status
+| Control | Status |
+|---------|--------|
+| Dependabot | Active — `.github/dependabot.yml`, weekly (Monday), targets `develop`, semver-gated groups (minor/patch only per group) |
+| Gitleaks | Active — `.github/workflows/security.yml`, runs on push/PR to `develop`/`main`, plus daily cron. Passing (confirmed in the same 2026-08-05 08:55 UTC run that failed on `npm audit`) |
+| npm audit in CI | Active but **currently failing** — same workflow, `npm audit --omit=dev --audit-level=moderate` job. Last run (`30991007551`, main, 2026-08-05 08:55 UTC): FAILURE, due to `brace-expansion` and `fast-uri` (see Exploitability Analysis for why these count as "production" under npm's classification). This will also fail on the next `develop` push until the fixes in Prioritized Remediation Steps land — reproduced locally against the current `develop` tree |
+| Renovate | Not configured — Dependabot covers this role; no gap |
+| GitHub code scanning / secret scanning (GHAS) | Not available (private repo, not enabled) — known, owner-cost gap, not newly actionable. Gitleaks in CI covers the secret-scanning surface |
+| License check | Active — `.github/workflows/license-check.yml`, blocks strong copyleft (GPL/AGPL/SSPL) |
 
-| Mechanism | Status | Notes |
-|-----------|--------|-------|
-| Dependabot | Configured | Pinned to `develop` branch (commit `f118597`). Weekly schedule. |
-| Renovate | Not configured | Intentional — Dependabot covers the same surface. |
-| Gitleaks in CI | Configured | Runs on every push; blocks merge on findings. |
-| npm audit in CI | Configured | Runs in security-scan and lint-and-typecheck jobs. |
-| License check in CI | Configured | Validates against allowlist; blocks merge on copyleft introductions. |
-| CSRF protection | Configured | SE-M2 Origin + double-submit token enforcement confirmed working (QA 403 = correct gate behavior). |
-| Webhook signature validation | Configured | All 4 endpoints use `crypto.timingSafeEqual` (7 call sites). Unchanged. |
-| Pre-commit hooks | Configured | Push accountability + dirty-pull guard. |
+**Gap this cycle:** the `npm audit` CI job is red. It is not a false positive from stale Dependabot alert tracking (unlike the `main`-vs-`develop` staleness pattern noted in past cycles) — reproducing the exact CI command (`npm audit --omit=dev --audit-level=moderate`) against the current `develop` tree independently confirms the same 2 high-severity findings. Anyone opening a PR to `develop` right now will see this job fail.
 
-**No CI/CD automation gaps.**
+## Outdated Packages
 
-## Outdated Packages with Security Implications
+27 outdated packages (up from 10 last cycle), all minor/patch except `typescript`:
 
-19 outdated packages. 1 has an advisory (non-exploitable). Notable items:
+| Package | Current -> Latest | Type |
+|---------|-------------------|------|
+| `@elevenlabs/react` | 1.11.0 -> 1.12.0 | minor |
+| `@next/bundle-analyzer` | 16.2.12 -> 16.3.0 | minor |
+| `@next/eslint-plugin-next` | 16.2.12 -> 16.3.0 | minor |
+| `@playwright/test` | 1.62.0 -> 1.62.1 | patch |
+| `@sentry/core` | 10.68.0 -> 10.69.0 | patch |
+| `@sentry/nextjs` | 10.68.0 -> 10.69.0 | patch |
+| `@stripe/stripe-js` | 9.12.1 -> 9.13.0 | minor |
+| `@supabase/ssr` | 0.12.3 -> 0.12.4 | patch |
+| `@supabase/supabase-js` | 2.110.9 -> 2.112.1 | minor |
+| `@testing-library/user-event` | 14.6.1 -> 14.6.3 | patch |
+| `@types/react` | 19.2.17 -> 19.2.18 | patch |
+| `@types/react-dom` | 19.2.3 -> 19.2.4 | patch |
+| `@typescript-eslint/eslint-plugin` | 8.65.0 -> 8.66.0 | minor |
+| `@upstash/redis` | 1.38.0 -> 1.38.2 | patch |
+| `@vitejs/plugin-react` | 6.0.4 -> 6.0.5 | patch |
+| `@vitest/eslint-plugin` | 1.6.24 -> 1.6.26 | patch |
+| `knip` | 6.29.0 -> 6.32.0 | minor |
+| `lucide-react` | 1.27.0 -> 1.28.0 | minor |
+| `next` | 16.2.12 -> 16.3.0 | minor |
+| `pdfjs-dist` | 6.1.200 -> 6.2.108 | minor |
+| `postcss` | 8.5.23 -> 8.5.25 | patch |
+| `posthog-js` | 1.407.3 -> 1.413.2 | minor |
+| `resend` | 6.18.0 -> 6.18.1 | patch |
+| `stripe` | 22.3.2 -> 22.4.0 | minor |
+| `tsx` | 4.23.1 -> 4.23.9 | patch |
+| `twitter-api-v2` | 1.29.0 -> 1.29.1 | patch |
+| `typescript` | 6.0.3 -> 7.0.2 | **major** — excluded from Dependabot batching per Jul 15 fix, no CVE, low urgency |
 
-| Package | Current | Latest | Security Note |
-|---------|---------|--------|---------------|
-| `@anthropic-ai/sdk` | 0.90.0 | 0.91.1 | **Advisory GHSA-p7fg-763f-g4gf** — not exploitable here. Evaluate changelog before upgrading (breaking change). |
-| `@supabase/supabase-js` | 2.104.0 | 2.105.1 | Minor — auth + database client. Check changelog for auth-related fixes. |
-| `@stripe/stripe-js` | 9.2.0 | 9.3.1 | Patch + minor — client-side payment SDK. |
-| `@stripe/react-stripe-js` | 6.2.0 | 6.3.0 | Minor — React wrapper for Stripe. Safe to batch. |
-| `stripe` | 22.0.2 | 22.1.0 | Minor — server-side Stripe. No CVEs. |
-| `@elevenlabs/react` | 1.1.1 | 1.3.0 | Minor — voice SDK. |
-| `posthog-js` | 1.369.5 | 1.372.5 | Minor — analytics. Previously carried advisories (now clean). |
-| `@sentry/core` | 10.49.0 | 10.51.0 | Minor — error reporting. |
-| `@sentry/nextjs` | 10.49.0 | 10.51.0 | Minor — same. |
-| `pdfjs-dist` | 5.6.205 | 5.7.284 | Minor — PDF processing. Content-handling dep worth keeping current. |
-| `voyageai` | 0.1.0 | 0.2.1 | **Do not upgrade.** Intentionally pinned — 0.2.x ESM build breaks `@/lib/embeddings` (commit 8f53cd29). |
-| `jsdom` | 29.0.2 | 27.0.1 | Scanner artifact — on pre-release channel; current version > "latest". Ignore. |
-| `vitest` | 4.1.5 | 3.2.4 | Same pre-release channel artifact. Ignore. |
-
-**Dev-only outdated** (no production security impact): `@typescript-eslint/eslint-plugin`, `@tailwindcss/postcss`, `tailwindcss`, `knip`, `lucide-react`.
-
-## Cross-Agent Findings
-
-- **QA Agent** (Apr 30 RED): LLM tests 0/12 — 403 regression root cause confirmed as harness missing Origin header (not a CSRF bypass). Browser journeys recovered 10/10. CSRF enforcement is correct. One-line fix to `src/tests/qa/llm-quality.test.ts:43` restores safety test coverage next cycle.
-- **Coverage Agent** (Apr 23): Stripe webhook at 100% branch coverage including all error paths. CSRF origin-not-allowed branch covered (from Apr 20). All webhook and auth paths verified at code level.
-- **Localization Agent** (Apr 30): 405 UI keys per locale (up from 404), 0 PII or tokens in translation files. Security-neutral.
-- **Performance Agent** (Apr 29): Bundle headroom critical at 14 KB total. P4 (Supabase realtime tree-shake) urgently needed before wave-3. No security implications from headroom pressure.
-- **Cost Analyst Agent** (Apr 30): 76-day revenue drought, 72-day voice silence. Twilio $0.24 anomaly (Apr 3-4) now 27 days unresolved — operational concern, not a security event.
-- **Documentation Agent** (Apr 30): CLAUDE.md current (2026-04-29). No security documentation gaps.
+None of the 27 outdated packages have open advisories beyond the 3 already covered above (`brace-expansion`, `fast-uri`, `undici` are transitive, not in this direct-dependency outdated list). `postcss` 8.5.23 is already past the vulnerable `<= 8.5.17` range from the stale `main`-branch Dependabot alert `GHSA-r28c-9q8g-f849` — no action needed there, `develop` is already clean.
 
 ---
+
+## Cross-Agent Context Review
+
+Reviewed shared context from Cost Analyst (2026-08-06) and Coverage Agent (2026-08-06).
+
+- **Anthropic credit exhaustion (#734)** — Cost Analyst's 2026-08-06 entry marks this "CRITICAL", now day 17 unresolved. This remains a billing/availability incident outside this agent's remediation scope (no code fix exists). Per QA's last confirmation (Jul 22), the pre-LLM injection filter continues functioning correctly under the outage; LLM-layer safety guardrails remain unverifiable until credits are restored. No new security action item — flagging only so it isn't mistaken for a security-agent gap.
+- **Coverage Agent (2026-08-06)** added tests for fetch-timeout and database-error paths in `elevenlabs-signed-session.ts` and `voice-session/route.ts` — confirms the `AbortSignal.timeout` handling in that code is exercised correctly. No security concern; noted as a positive signal on error-handling robustness in a security-adjacent code path.
+- **ElevenLabs character-utilization acceleration** (Cost Analyst, 2026-08-06) is a cost/capacity signal, not a security finding — no action needed from this agent.

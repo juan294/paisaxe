@@ -20,7 +20,7 @@ const mockOrder = vi.fn();
 const mockEq = vi.fn();
 const mockRange = vi.fn();
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => ({
     from: () => ({
       select: (...args: unknown[]) => {
@@ -159,7 +159,7 @@ describe("/api/admin/marketing/agent-logs", () => {
 
     it("should convert database rows to log objects", async () => {
       // Override the mock to return actual data
-      vi.doMock("@/lib/supabase", () => ({
+      vi.doMock("@/lib/supabase-admin", () => ({
         createAdminClient: () => ({
           from: () => ({
             select: () => ({
@@ -207,7 +207,7 @@ describe("/api/admin/marketing/agent-logs", () => {
         validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
       }));
 
-      vi.doMock("@/lib/supabase", () => ({
+      vi.doMock("@/lib/supabase-admin", () => ({
         createAdminClient: () => ({
           from: () => ({
             select: () => ({
@@ -241,7 +241,7 @@ describe("/api/admin/marketing/agent-logs", () => {
         validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
       }));
 
-      vi.doMock("@/lib/supabase", () => ({
+      vi.doMock("@/lib/supabase-admin", () => ({
         createAdminClient: () => {
           throw new Error("Connection refused");
         },
@@ -256,10 +256,33 @@ describe("/api/admin/marketing/agent-logs", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+
+    it("should return 500 when a non-Error value is thrown (line 70)", async () => {
+      vi.resetModules();
+
+      vi.doMock("@/lib/admin-auth", () => ({
+        validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
+      }));
+
+      vi.doMock("@/lib/supabase-admin", () => ({
+        createAdminClient: () => {
+          throw "string error without Error class";
+        },
+      }));
+
+      const { GET: GET6 } = await import("./route");
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
+
+      const response = await GET6(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
   });
 
   it("should use logger.error (not console.error) on unhandled GET error", async () => {
-    vi.doMock("@/lib/supabase", () => ({
+    vi.doMock("@/lib/supabase-admin", () => ({
       createAdminClient: () => {
         throw new Error("Connection refused");
       },

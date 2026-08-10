@@ -12,7 +12,7 @@ import { useStreamChat } from "@/hooks/use-stream-chat";
 import { useChatMode } from "@/hooks/use-chat-mode";
 import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
-import { usePostHog } from "posthog-js/react";
+import { usePaisaxePostHog } from "@/components/posthog-provider";
 
 import { ChatHeader } from "./voice-chat/chat-header";
 import { ChatMessageList } from "./voice-chat/chat-message-list";
@@ -68,7 +68,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
   const dialogRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
-  const posthog = usePostHog();
+  const posthog = usePaisaxePostHog();
   const stableOnClose = useMemo(() => onClose, [onClose]);
   useFocusTrap(dialogRef, open, stableOnClose);
 

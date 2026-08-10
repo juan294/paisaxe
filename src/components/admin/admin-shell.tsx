@@ -75,6 +75,16 @@ const AgentsDashboard = dynamic(
   { ssr: false, loading: TabPanelFallback }
 );
 
+const DEFAULT_ADMIN_TAB: AdminTab = "analytics";
+
+function isAllowedAdminTab(tab: string | null): tab is AdminTab {
+  return TABS.some((allowedTab) => allowedTab.value === tab);
+}
+
+function normalizeAdminTab(tab: string | null): AdminTab {
+  return isAllowedAdminTab(tab) ? tab : DEFAULT_ADMIN_TAB;
+}
+
 export function AdminShell() {
   const {
     user,
@@ -87,7 +97,7 @@ export function AdminShell() {
   const searchParams = useSearchParams();
 
   // FE-H5: URL is the canonical source of truth; local state for instant responsiveness
-  const urlTab = (searchParams.get("tab") ?? "analytics") as AdminTab;
+  const urlTab = normalizeAdminTab(searchParams.get("tab"));
   const [activeTab, setActiveTab] = useState<AdminTab>(urlTab);
 
   useEffect(() => {

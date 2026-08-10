@@ -20,12 +20,22 @@ async function getCsrfHeaders(request: APIRequestContext) {
 }
 
 test.describe("API route smoke tests", () => {
-  test("GET /api/health returns valid JSON", async ({ request }) => {
+  test("GET /api/health/live returns liveness JSON", async ({ request }) => {
+    const response = await request.get("/api/health/live");
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.status).toBe("live");
+    expect(body.timestamp).toBeTruthy();
+  });
+
+  test("GET /api/health returns diagnostics JSON", async ({ request }) => {
     test.slow();
 
     const response = await request.get("/api/health", { timeout: 45_000 });
-    // Health endpoint returns 200 (healthy) or 503 (degraded) — both are valid
-    expect([200, 503]).toContain(response.status());
+    // This dummy-key E2E suite validates the diagnostics contract. Launch
+    // readiness is enforced by scripts/check-health-readiness.mjs in CI.
+    expect(response.status()).toBe(200);
 
     const body = await response.json();
     expect(body.timestamp).toBeTruthy();
@@ -65,6 +75,22 @@ test.describe("API route smoke tests", () => {
 
     const body = await response.json();
     expect(body.error).toBe("Unauthorized");
+  });
+
+  test("GET /api/admin/* returns 401 without auth", async ({ request }) => {
+    const response = await request.get("/api/admin/agent-reports");
+    expect(response.status()).toBe(401);
+
+    const body = await response.json();
+    expect(body.error).toBe("Authentication required");
+  });
+
+  test("GET /api/cron/* rejects unauthenticated calls", async ({ request }) => {
+    const response = await request.get("/api/cron/retry-booking-sms");
+    expect([401, 403]).toContain(response.status());
+
+    const body = await response.json();
+    expect(body).toHaveProperty("error");
   });
 
   test("POST /api/favorites returns 401 without auth", async ({ request }) => {

@@ -3,7 +3,7 @@
 > Comprehensive guide to the automation, security, and quality infrastructure for Paisaxe.
 > Designed to be replicable by other teams on any Next.js + GitHub + Vercel + Supabase stack.
 
-**Last Updated**: April 24, 2026
+**Last Updated**: May 3, 2026
 **Scope**: CI/CD workflows, local agents, security measures, monitoring, and admin controls
 
 ---
@@ -30,20 +30,20 @@
 ```
 GitHub Actions (Push/PR)
   +-- ci.yml .............. Lint, Typecheck, Tests, Build
-  +-- e2e.yml ............. Playwright E2E tests (16 spec files)
+  +-- e2e.yml ............. Playwright E2E tests (20 spec files)
   +-- e2e-stripe-integration.yml .. Stripe test-mode E2E
   +-- preview-smoke.yml ... Smoke test on Vercel preview deploy
-  +-- gitleaks.yml ........ Secret scanning
+  +-- (gitleaks is a job inside security.yml)
   +-- license-check.yml ... Dependency license compliance
   +-- lighthouse.yml ...... Performance & accessibility audit
   +-- bundle-size.yml ..... JS bundle size tracking
   +-- knip.yml ............ Dead code detection
   +-- claude-review.yml ... AI-powered code review
-  +-- security.yml ........ npm audit (also weekly cron)
+  +-- security.yml ........ npm audit (also daily cron)
 
 GitHub Actions (Scheduled)
-  +-- gitleaks.yml ........ Daily 04:00 UTC - full history scan
-  +-- security.yml ........ Weekly Monday 08:00 UTC - npm audit
+  +-- security.yml ........ Daily 08:00 UTC - gitleaks full history scan
+  +-- security.yml ........ Daily 08:00 UTC - npm audit
 
 Local Agents (macOS launchd)
   +-- coverage-agent ...... Daily 02:00 AM - test coverage analysis
@@ -276,7 +276,7 @@ Runs on every push and PR to `develop` or `main`.
 
 | Job | Description |
 |-----|-------------|
-| lint-and-typecheck | `npm run typecheck` + `npm run lint` |
+| lint-and-typecheck | `npm run typecheck` + `npm run check-verification-coverage` + `npm run lint` + `npm run check-env` + `npm run check-migrations` |
 | test | `npm run test` (Vitest) |
 | build | `npm run build` (production build) |
 
@@ -303,7 +303,7 @@ These run on PRs but don't block merges:
 
 ### Gitleaks (Secret Scanning)
 
-**File**: `.github/workflows/gitleaks.yml`
+**File**: `.github/workflows/security.yml` (job `gitleaks`)
 
 **Triggers**:
 - Every push to `develop` or `main`
@@ -334,7 +334,7 @@ npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
 
 **File**: `.github/workflows/security.yml`
 
-Runs `npm audit --audit-level=critical` on every push/PR and weekly on Mondays.
+Runs `npm audit --omit=dev --audit-level=moderate` on every push/PR and daily at 08:00 UTC.
 
 ### Dependabot
 
@@ -416,9 +416,11 @@ AI code review on every PR. Also responds to `@claude` mentions.
 
 ### Health Check Endpoint
 
-**Endpoint**: `GET /api/health` — returns `{ "status": "healthy"|"degraded", "timestamp": "..." }`.
+**Endpoints**:
+- `GET /api/health/live` — liveness probe; always returns HTTP 200 with `{ "status": "live", "timestamp": "..." }`. Used by Upptime for uptime monitoring.
+- `GET /api/health` — diagnostics endpoint; always returns HTTP 200. The JSON body signals health state: `{ "status": "healthy"|"degraded", "timestamp": "...", "sentry": { "status": "configured"|"unconfigured" }, "rate_limit": { "status": "ok"|"degraded", "backend": "upstash"|"memory"|"blocked" }, ... }`. Reports "degraded" if Supabase connection fails, approved stories are unavailable, database usage exceeds 80% of the Pro tier limit, Sentry is missing in production, or the production rate-limit backend is degraded. Used by readiness smoke CI as the diagnostics gate.
 
-Returns HTTP 200 when healthy; HTTP 503 when Supabase connectivity fails, approved stories are unavailable, or database usage reaches the 80% warning threshold. Used by Upptime and the preview smoke CI as the machine health gate.
+**Readiness monitor**: `node scripts/check-health-readiness.mjs <base-url>` parses `/api/health` and fails on non-200 HTTP status or any JSON body where `status !== "healthy"`. The release preview gate passes `--require-sentry`, which also fails when `sentry.status !== "configured"`. `/api/health/live` must not be used as a readiness gate because it only proves the process can answer requests.
 
 **Sub-endpoint**: `GET /api/health/db` — database connectivity only (used internally by health checks and preview smoke tests).
 
@@ -453,7 +455,7 @@ Use the correlation ID to trace a single user request across distributed logs.
 
 Monitors every 5 minutes:
 - `paisaxe.es` — main site
-- `paisaxe.es/api/health` — API health
+- `paisaxe.es/api/health/live` — API liveness
 
 Auto-creates GitHub Issues on downtime.
 

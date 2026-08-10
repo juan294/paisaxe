@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextRequest } from "next/server";
 import {
   shouldBypassMaintenanceMode,
   resetMaintenanceModeCache,
   isMaintenanceModeEnabled,
+  handleMaintenanceMode,
 } from "./maintenance";
 
 vi.mock("@/lib/environment", () => ({
@@ -124,8 +126,10 @@ describe("isMaintenanceModeEnabled", () => {
     const result = await isMaintenanceModeEnabled();
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "Failed to fetch maintenance mode flag:",
-      503
+      expect.stringContaining("Failed to fetch maintenance mode flag")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"status":503')
     );
   });
 
@@ -136,8 +140,21 @@ describe("isMaintenanceModeEnabled", () => {
     const result = await isMaintenanceModeEnabled();
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "Error checking maintenance mode:",
-      expect.any(Error)
+      expect.stringContaining("Error checking maintenance mode")
+    );
+  });
+
+  it("returns false and stringifies a non-Error thrown value", async () => {
+    delete process.env.MAINTENANCE_MODE;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockRejectedValue("a plain string failure");
+    const result = await isMaintenanceModeEnabled();
+    expect(result).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("Error checking maintenance mode")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("a plain string failure")
     );
   });
 
@@ -231,5 +248,48 @@ describe("isMaintenanceModeEnabled", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
       consoleError.mockRestore();
     });
+  });
+});
+
+describe("handleMaintenanceMode", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    process.env = {
+      ...originalEnv,
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-key",
+    };
+    resetMaintenanceModeCache();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+    resetMaintenanceModeCache();
+  });
+
+  it("returns null when the pathname bypasses maintenance mode", async () => {
+    const req = new NextRequest("https://paisaxe.es/api/health");
+    const res = await handleMaintenanceMode(req);
+    expect(res).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("returns null when maintenance mode is not enabled", async () => {
+    process.env.MAINTENANCE_MODE = "false";
+    const req = new NextRequest("https://paisaxe.es/");
+    const res = await handleMaintenanceMode(req);
+    expect(res).toBeNull();
+  });
+
+  it("redirects to /coming-soon when maintenance mode is enabled", async () => {
+    process.env.MAINTENANCE_MODE = "true";
+    const req = new NextRequest("https://paisaxe.es/some-page");
+    const res = await handleMaintenanceMode(req);
+    expect(res).not.toBeNull();
+    expect(res?.status).toBe(307);
+    expect(res?.headers.get("location")).toContain("/coming-soon");
   });
 });

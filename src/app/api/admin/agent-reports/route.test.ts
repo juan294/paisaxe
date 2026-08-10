@@ -62,6 +62,24 @@ describe("Agent Reports API", () => {
       expect(json.lastRuns).toEqual({});
     });
 
+    it("should short-circuit with empty lastRuns in production", async () => {
+      mockValidateAdminAuth.mockResolvedValue({
+        valid: true,
+        userId: "admin-123",
+      });
+      vi.stubEnv("NODE_ENV", "production");
+      const statSpy = vi.spyOn(fsPromises, "stat");
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json.lastRuns).toEqual({});
+      expect(statSpy).not.toHaveBeenCalled();
+
+      vi.unstubAllEnvs();
+    });
+
     it("should return lastRuns with ISO dates when report files exist", async () => {
       mockValidateAdminAuth.mockResolvedValue({
         valid: true,

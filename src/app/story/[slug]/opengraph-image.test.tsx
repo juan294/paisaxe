@@ -24,6 +24,30 @@ vi.mock("@/lib/stories-data", () => ({
         sourcePdf: "naturaleza.pdf",
       });
     }
+    if (slug === "story-without-subtitle") {
+      return Promise.resolve({
+        id: "story-no-sub",
+        slug: "story-without-subtitle",
+        title: "Sin subtítulo",
+        subtitle: "",
+        description: "Story missing a subtitle",
+        image: "/images/stories/x.webp",
+        category: "nature",
+        sourcePdf: "x.pdf",
+      });
+    }
+    if (slug === "story-unknown-category") {
+      return Promise.resolve({
+        id: "story-cat",
+        slug: "story-unknown-category",
+        title: "Categoría desconocida",
+        subtitle: "Test",
+        description: "Story with category not in CATEGORY_LABELS",
+        image: "/images/stories/x.webp",
+        category: "totally-unknown-category",
+        sourcePdf: "x.pdf",
+      });
+    }
     return Promise.resolve(null);
   }),
 }));
@@ -65,5 +89,19 @@ describe("story opengraph-image", () => {
 
   it("does not export generateImageMetadata", () => {
     expect("generateImageMetadata" in ogModule).toBe(false);
+  });
+
+  it("renders without subtitle when story has empty subtitle", async () => {
+    const response = await Image({
+      params: Promise.resolve({ slug: "story-without-subtitle" }),
+    });
+    expect(response).toBeInstanceOf(Response);
+  });
+
+  it("falls back to raw category when category is not in CATEGORY_LABELS", async () => {
+    const response = await Image({
+      params: Promise.resolve({ slug: "story-unknown-category" }),
+    });
+    expect(response).toBeInstanceOf(Response);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import RootLoading from "./loading";
 
 describe("RootLoading", () => {
@@ -19,5 +19,16 @@ describe("RootLoading", () => {
     const { container } = render(<RootLoading />);
     const spinner = container.querySelector(".animate-spin");
     expect(spinner?.tagName).toBe("DIV");
+  });
+
+  it("exposes accessible status text", () => {
+    render(<RootLoading />);
+    expect(screen.getByRole("status")).toHaveTextContent("Cargando...");
+  });
+
+  it("does not rely on motion alone", () => {
+    const { container } = render(<RootLoading />);
+    const spinner = container.querySelector(".animate-spin");
+    expect(spinner?.className).toContain("motion-reduce:animate-none");
   });
 });

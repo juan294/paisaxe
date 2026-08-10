@@ -11,6 +11,23 @@ import {
   MOCK_SUGGESTION_RESPONSE,
   withFeatureFlags,
 } from "./fixtures/mock-data";
+import type { Locator } from "@playwright/test";
+
+/**
+ * /immersive is PPR-prerendered: the static shell can render a nav button
+ * visible+enabled before React attaches its click handler, so an early click
+ * is swallowed. Retry click+assert as a unit until the title actually changes.
+ */
+async function clickAndAwaitTitleChange(
+  button: Locator,
+  title: Locator,
+  previousTitle: string
+) {
+  await expect(async () => {
+    await button.click();
+    await expect(title).not.toHaveText(previousTitle, { timeout: 1000 });
+  }).toPass({ timeout: 15000 });
+}
 
 /**
  * QA Journey Tests — End-to-end user journey testing for QA Agent
@@ -63,12 +80,9 @@ test.describe("QA Journey: Anonymous User", () => {
     // Use .first() to avoid strict mode violations during i18n hydration overlap
     const nextButton = page.getByTestId("next-story-button").first();
     await expect(nextButton).toBeVisible();
-    await nextButton.click();
+    await expect(nextButton).toBeEnabled();
 
-    // Wait for the title to change (story transition)
-    await expect(title).not.toHaveText(firstTitle!, {
-      timeout: 3000,
-    });
+    await clickAndAwaitTitleChange(nextButton, title, firstTitle!);
 
     // Step 3: Verify story changed
     const secondTitle = await title.textContent();
@@ -76,12 +90,7 @@ test.describe("QA Journey: Anonymous User", () => {
 
     // Step 4: Navigate back with previous arrow
     const prevButton = page.getByTestId("prev-story-button").first();
-    await prevButton.click();
-
-    // Wait for the title to change back
-    await expect(title).not.toHaveText(secondTitle!, {
-      timeout: 3000,
-    });
+    await clickAndAwaitTitleChange(prevButton, title, secondTitle!);
 
     // Step 5: Verify we're back to first story
     const returnedTitle = await title.textContent();
@@ -97,8 +106,12 @@ test.describe("QA Journey: Anonymous User", () => {
 
     const firstTitle = await title.textContent();
 
+    // Click story-title to establish keyboard focus — it sits at z-10 (info panel),
+    // above the full-screen toggle button at z-[5], so no panel-toggle side effect.
+    await expect(title).toBeVisible({ timeout: 5000 });
+    await title.click();
+
     // Navigate with right arrow key
-    await page.evaluate(() => window.focus());
     await page.keyboard.press("ArrowRight");
     await expect(title).not.toHaveText(firstTitle!, {
       timeout: 3000,
@@ -107,8 +120,7 @@ test.describe("QA Journey: Anonymous User", () => {
     const secondTitle = await title.textContent();
     expect(secondTitle).not.toBe(firstTitle);
 
-    // Navigate with left arrow key
-    await page.evaluate(() => window.focus());
+    // Navigate with left arrow key — window retains focus from the click above
     await page.keyboard.press("ArrowLeft");
     await expect(title).not.toHaveText(secondTitle!, {
       timeout: 3000,
@@ -126,6 +138,7 @@ test.describe("QA Journey: Anonymous User", () => {
 
     // Step 1: Open chat panel
     const askButton = page.locator('[data-testid="ask-button"]').first();
+    await expect(askButton).toBeVisible({ timeout: 5000 });
     await askButton.click();
 
     const chatPanel = page.locator(".fixed.inset-0.z-50");
@@ -192,15 +205,17 @@ test.describe("QA Journey: Anonymous User", () => {
     const bottomPanel = page.getByTestId("story-info-panel").first();
     await expect(bottomPanel).toHaveClass(/opacity-100/);
 
+    // Click story-title to establish keyboard focus while the panel is visible
+    // (z-10 > z-[5] full-screen toggle button — no panel-toggle side effect)
+    await page.getByTestId("story-title").first().click();
+
     // Press 'i' to hide info
-    await page.evaluate(() => window.focus());
     await page.keyboard.press("i");
 
     // Bottom panel should be hidden (wait for CSS transition to complete)
     await expect(bottomPanel).toHaveClass(/opacity-0/, { timeout: 5000 });
 
-    // Press 'i' again to show info
-    await page.evaluate(() => window.focus());
+    // Press 'i' again to show info — window retains focus from the click above
     await page.keyboard.press("i");
 
     // Bottom panel should be visible again
@@ -219,10 +234,15 @@ test.describe("QA Journey: Anonymous User", () => {
     const titleText = await title.textContent();
     if (titleText) titles.push(titleText);
 
+    // Establish keyboard focus once — story-title is at z-10 (info panel),
+    // above the full-screen toggle button at z-[5], no panel-toggle side effect.
+    // Window retains focus for all subsequent key presses in this loop.
+    await expect(title).toBeVisible({ timeout: 5000 });
+    await title.click();
+
     // Navigate through 3 more stories, waiting for title to actually change
     for (let i = 0; i < 3; i++) {
       const prevTitle = titles[titles.length - 1];
-      await page.evaluate(() => window.focus());
       await page.keyboard.press("ArrowRight");
       await expect(title).not.toHaveText(prevTitle!, { timeout: 5000 });
       const currentTitle = await title.textContent();
@@ -405,12 +425,12 @@ test.describe("QA Journey: New Features", () => {
     await expect(chatPanel).toBeVisible();
 
     // Dismiss privacy notice if shown
-    const privacyButton = chatPanel
-      .locator("button")
-      .filter({ hasText: /entend|understood|got it|ok|compris/i });
-    if (await privacyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await privacyButton.click();
-    }
+    await chatPanel
+      .getByRole("button", {
+        name: /^(entendido|entendío|got it|compris|verstanden)$/i,
+      })
+      .click({ timeout: 2000 })
+      .catch(() => {});
 
     // Step 3: Send first message
     await chatPanel.locator("input").fill("Tell me about the lakes");
@@ -492,7 +512,7 @@ authTest.describe("QA Journey: Authenticated User", () => {
 
   authTest(
     "Journey 10: Add favorite via API and verify on favorites page",
-    async ({ authenticatedPage, request }) => {
+    async ({ authenticatedPage }) => {
       const page = authenticatedPage;
 
       // First, get the first story ID from the stories API

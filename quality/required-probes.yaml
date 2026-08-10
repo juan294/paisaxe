@@ -1,0 +1,134 @@
+# Release-required probes — the machine-readable manifest (plan Phase 3, template A3/D05).
+#
+# This file is the source of truth for what "required" means at release time.
+# scripts/release/analyze-release-run.ts fails a release when any probe listed
+# here is missing, failed, or skipped, and scripts/release/required-probes.ts
+# asserts that the Playwright projects select exactly the probes named here —
+# so a probe cannot be quietly dropped by editing one side only.
+#
+# tier:
+#   deployed-readonly — runs against the deployed origin. MUST NOT mutate.
+#                       Preview shares the production Supabase project and holds
+#                       live-mode Stripe keys (plan D-B).
+#   local-docker      — mutating. Runs only against the local Docker stack.
+#   local             — static/offline check. No environment needed.
+#
+# oracles: what counts as evidence the probe actually observed something.
+#   http | ui | datastore | cleanup | static | identity
+#
+# safety: read-only | mutating-local
+#
+# Every probe must fail closed when its prerequisites are absent. A required
+# probe that skips is a vacuous pass — the exact failure this wave removes.
+
+version: 1
+
+probes:
+  - id: candidate-identity
+    title: Deployed candidate identity matches the expected tree
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: script
+      command: npx tsx scripts/release/candidate-identity.ts --verify
+    oracles: [identity]
+    notes: >-
+      Binds the release to a tree hash rather than a commit SHA, because
+      squash merges do not preserve the tested SHA (plan D-A).
+
+  - id: health-status
+    title: "/api/health returns 200 and status healthy"
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required health-status"
+    oracles: [http]
+
+  - id: health-db
+    title: "/api/health/db is reachable and well-formed"
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required health-db"
+    oracles: [http]
+
+  - id: csp-canary
+    title: Homepage renders and client JS executes
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required csp-canary"
+    oracles: [ui]
+    notes: >-
+      Catches a CSP regression that blocks hydration — see the PPR/nonce
+      constraints in CLAUDE.md.
+
+  - id: story-read-path
+    title: The story page serves real content
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required story-read-path"
+    oracles: [http, ui]
+
+  - id: admin-denial
+    title: Admin route denies an unauthenticated caller
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required admin-denial"
+    oracles: [http]
+
+  - id: webhook-unsigned
+    title: Webhook rejects an unsigned payload
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required webhook-unsigned"
+    oracles: [http]
+    notes: >-
+      Read-only in effect: the payload is rejected before any handler side
+      effect.
+
+  - id: favorite-roundtrip
+    title: Favorite create, datastore read-back, cleanup
+    owner: release
+    tier: local-docker
+    safety: mutating-local
+    runner:
+      kind: playwright
+      project: release-required-local
+      selector: "@release-required @local-docker favorite-roundtrip"
+    oracles: [ui, datastore, cleanup]
+    notes: >-
+      The only mutating required probe. The spec refuses to run unless
+      NEXT_PUBLIC_SUPABASE_URL points at localhost.
+
+  - id: migration-posture
+    title: Migration posture lint
+    owner: release
+    tier: local
+    safety: read-only
+    runner:
+      kind: script
+      command: npm run check-migrations
+    oracles: [static]

@@ -96,12 +96,18 @@ describe("CSP header via buildCspHeader (proxy.ts)", () => {
   it("should include Stripe domains for embedded checkout", () => {
     const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
     expect(scriptSrc).toContain("https://js.stripe.com");
+    expect(scriptSrc).toContain("https://checkout.stripe.com");
 
     const frameSrc = csp.split(";").find((d) => d.trim().startsWith("frame-src"))!;
     expect(frameSrc).toContain("https://js.stripe.com");
+    expect(frameSrc).toContain("https://checkout.stripe.com");
 
     const connectSrc = csp.split(";").find((d) => d.trim().startsWith("connect-src"))!;
     expect(connectSrc).toContain("https://api.stripe.com");
+    expect(connectSrc).toContain("https://checkout.stripe.com");
+
+    const imgSrc = csp.split(";").find((d) => d.trim().startsWith("img-src"))!;
+    expect(imgSrc).toContain("https://*.stripe.com");
   });
 
   it("should keep unsafe-inline in style-src for Tailwind/Next.js CSS", () => {

@@ -4,8 +4,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import GlobalError from "./global-error";
 
 // Mock resolveLocale to return 'es' (jsdom defaults to 'en-US')
+const mockResolveLocale = vi.fn((..._args: unknown[]) => "es");
 vi.mock("@/lib/i18n/detect-language", () => ({
-  resolveLocale: vi.fn(() => "es"),
+  resolveLocale: (...args: unknown[]) => mockResolveLocale(...args),
+}));
+
+const mockCaptureException = vi.fn();
+vi.mock("@sentry/nextjs", () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 describe("GlobalError", () => {
@@ -15,6 +21,8 @@ describe("GlobalError", () => {
 
   afterEach(() => {
     consoleSpy.mockClear();
+    mockCaptureException.mockClear();
+    mockResolveLocale.mockReturnValue("es");
   });
 
   const defaultProps = {
@@ -72,5 +80,33 @@ describe("GlobalError", () => {
     const link = screen.getByRole("link", { name: "Volver al inicio" });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/");
+  });
+
+  // DO-M3: Sentry.captureException must be called on mount with the error
+  it("DO-M3: calls Sentry.captureException on mount with the error", () => {
+    const error = new Error("Global layout error for Sentry");
+    render(<GlobalError error={error} reset={vi.fn()} />);
+    expect(mockCaptureException).toHaveBeenCalledOnce();
+    expect(mockCaptureException).toHaveBeenCalledWith(error);
+  });
+
+  it("DO-M3: calls Sentry.captureException again when error prop changes", () => {
+    const error1 = new Error("First error");
+    const error2 = new Error("Second error");
+    const { rerender } = render(<GlobalError error={error1} reset={vi.fn()} />);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    rerender(<GlobalError error={error2} reset={vi.fn()} />);
+    expect(mockCaptureException).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).toHaveBeenLastCalledWith(error2);
+  });
+
+  it("falls back to Spanish copy when resolveLocale returns an unsupported locale", () => {
+    // errorCopy[locale] ?? errorCopy.es -- exercise the ?? fallback for a
+    // locale string that isn't a key in errorCopy (defensive guard).
+    mockResolveLocale.mockReturnValue("xx" as unknown as ReturnType<typeof mockResolveLocale>);
+    render(<GlobalError {...defaultProps} />);
+    expect(screen.getByText("Algo salió mal")).toBeInTheDocument();
+    const html = document.documentElement;
+    expect(html.getAttribute("lang")).toBe("xx");
   });
 });

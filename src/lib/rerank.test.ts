@@ -91,8 +91,7 @@ describe("rerank", () => {
       expect(result[2].id).toBe("chunk-2");
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[Voyage AI] Rerank failed"),
-        expect.any(Error)
+        expect.stringContaining("[Voyage AI] Rerank failed")
       );
       consoleSpy.mockRestore();
     });
@@ -124,7 +123,7 @@ describe("rerank", () => {
     });
 
     it("should log token usage when available", async () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
       const chunks = makeChunks(4);
       mockRerank.mockResolvedValue({
         data: [
@@ -139,7 +138,7 @@ describe("rerank", () => {
       await rerankChunks("query", chunks, 3);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("150 tokens")
+        expect.stringContaining('"total_tokens":150')
       );
       consoleSpy.mockRestore();
     });

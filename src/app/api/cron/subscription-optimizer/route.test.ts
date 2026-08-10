@@ -12,7 +12,7 @@ vi.mock("@/lib/logger", () => ({ logger }));
 vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
     headers: Map<string, string>;
-    constructor(url: string, init?: { headers?: Record<string, string> }) {
+    constructor(_url: string, init?: { headers?: Record<string, string> }) {
       this.headers = new Map(Object.entries(init?.headers || {}));
     }
   },
@@ -30,22 +30,23 @@ vi.mock("@/lib/admin-auth", () => ({
     Promise.resolve({ valid: false, error: { status: 401 } }),
 }));
 
-// Mock fs.promises.writeFile and readFile
+// Mock fs.promises.writeFile, readFile, and rename
 const mockWriteFile = vi.fn();
 const mockReadFile = vi.fn();
+const mockRename = vi.fn();
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
   return {
     ...actual,
     default: {
       ...actual,
-      promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile },
+      promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile, rename: mockRename },
     },
-    promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile },
+    promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile, rename: mockRename },
   };
 });
 
-// Mock Supabase client (for advisory lock)
+// Mock Supabase client (for durable cron lease)
 const mockRpc = vi.fn();
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({ rpc: mockRpc }),
@@ -81,14 +82,16 @@ describe("POST /api/cron/subscription-optimizer", () => {
     mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
     mockReadFile.mockReset();
+    mockRename.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockRename.mockResolvedValue(undefined);
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
-    // Default: advisory lock succeeds
+    // Default: durable cron lease succeeds
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -181,7 +184,8 @@ describe("POST /api/cron/subscription-optimizer", () => {
     expect((response as any).body.report).toBe("# Subscription Optimizer Report");
   });
 
-  it("writes the report to docs/agents/subscription-optimizer-report.md", async () => {
+  // BE-M4: writes use a temp-file + rename pattern for atomicity
+  it("BE-M4: writes the report atomically via tmp file + rename", async () => {
     const reportContent = "# Subscription Optimizer Report\nContent here.";
     const mockReport = {
       recommendations: [],
@@ -199,13 +203,20 @@ describe("POST /api/cron/subscription-optimizer", () => {
     );
 
     await POST(request as never);
-    // writeFile is called twice: once for the report, once for shared context
-    expect(mockWriteFile).toHaveBeenCalledTimes(2);
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining("docs/agents/subscription-optimizer-report.md"),
-      reportContent,
-      "utf-8"
+    // Must write to a .tmp file first
+    const tmpWriteCall = mockWriteFile.mock.calls.find(
+      (call: string[]) => String(call[0]).includes("subscription-optimizer-report") && String(call[0]).endsWith(".tmp")
     );
+    expect(tmpWriteCall).toBeDefined();
+    expect(tmpWriteCall![1]).toBe(reportContent);
+    // Then rename the tmp file to the final path atomically
+    const renameCall = mockRename.mock.calls.find(
+      (call: string[]) => String(call[1]).includes("subscription-optimizer-report.md")
+    );
+    expect(renameCall).toBeDefined();
+    // The source must be the same .tmp file that was written
+    expect(String(renameCall![0])).toContain("subscription-optimizer-report");
+    expect(String(renameCall![0])).toMatch(/\.tmp$/);
   });
 
   it("does not fail if report file write fails", async () => {
@@ -295,14 +306,19 @@ describe("POST /api/cron/subscription-optimizer", () => {
 
     const response = await POST(request as never);
     expect(response.status).toBe(200);
-    // writeFile should be called twice: once for the report, once for shared context
+    // BE-M4: both writes use tmp+rename; writeFile calls should use .tmp paths
     expect(mockWriteFile).toHaveBeenCalledTimes(2);
-    // The shared context write should include the default header
-    const sharedContextCall = mockWriteFile.mock.calls.find(
-      (call: string[]) => String(call[0]).includes("shared-context.md")
+    // The shared context write should use a .tmp path containing the file stem
+    const sharedContextTmpCall = mockWriteFile.mock.calls.find(
+      (call: string[]) => String(call[0]).includes("shared-context") && String(call[0]).endsWith(".tmp")
     );
-    expect(sharedContextCall).toBeDefined();
-    expect(sharedContextCall![1]).toContain("Agent Shared Context");
+    expect(sharedContextTmpCall).toBeDefined();
+    expect(sharedContextTmpCall![1]).toContain("Agent Shared Context");
+    // And rename should have been called to finalize the shared-context.md
+    const renameToSharedContext = mockRename.mock.calls.find(
+      (call: string[]) => String(call[1]).includes("shared-context.md")
+    );
+    expect(renameToSharedContext).toBeDefined();
   });
 
   it("prepends context entry to existing shared-context.md when readFile succeeds", async () => {
@@ -327,15 +343,20 @@ describe("POST /api/cron/subscription-optimizer", () => {
 
     const response = await POST(request as never);
     expect(response.status).toBe(200);
-    // The shared context write should prepend the new entry after the header
-    const sharedContextCall = mockWriteFile.mock.calls.find(
-      (call: string[]) => String(call[0]).includes("shared-context.md")
+    // BE-M4: atomic write — check the .tmp write and the rename
+    const sharedContextTmpCall = mockWriteFile.mock.calls.find(
+      (call: string[]) => String(call[0]).includes("shared-context") && String(call[0]).endsWith(".tmp")
     );
-    expect(sharedContextCall).toBeDefined();
+    expect(sharedContextTmpCall).toBeDefined();
     // Should contain the header, new context entry, and old body
-    expect(sharedContextCall![1]).toContain("Agent Shared Context");
-    expect(sharedContextCall![1]).toContain("Subscription Optimizer");
-    expect(sharedContextCall![1]).toContain("Old Entry");
+    expect(sharedContextTmpCall![1]).toContain("Agent Shared Context");
+    expect(sharedContextTmpCall![1]).toContain("Subscription Optimizer");
+    expect(sharedContextTmpCall![1]).toContain("Old Entry");
+    // Rename should finalize the file
+    const renameToSharedContext = mockRename.mock.calls.find(
+      (call: string[]) => String(call[1]).includes("shared-context.md")
+    );
+    expect(renameToSharedContext).toBeDefined();
   });
 
   it("returns 500 with 'Unknown error' when a non-Error value is thrown", async () => {
@@ -519,13 +540,15 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
     mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
     mockReadFile.mockReset();
+    mockRename.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockRename.mockResolvedValue(undefined);
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -585,7 +608,7 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
   });
 });
 
-describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
+describe("Cron lease (DO-M2) — subscription-optimizer", () => {
   const originalEnv = process.env;
   const WEBHOOK_SECRET = "test-webhook-secret-123";
 
@@ -603,8 +626,10 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
     mockReadFile.mockReset();
+    mockRename.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockRename.mockResolvedValue(undefined);
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
   });
@@ -613,9 +638,9 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     process.env = originalEnv;
   });
 
-  it("returns 409 when advisory lock is already held (concurrent run)", async () => {
+  it("returns 409 when durable cron lease is already held (concurrent run)", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: false, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: false, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -633,9 +658,9 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     );
   });
 
-  it("returns 409 when pg_try_advisory_lock returns an error", async () => {
+  it("returns 409 when try_acquire_cron_job_lease returns an error", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock")
+      if (fn === "try_acquire_cron_job_lock")
         return Promise.resolve({ data: null, error: { message: "DB error" } });
       return Promise.resolve({ data: null, error: null });
     });
@@ -650,10 +675,10 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     expect(response.status).toBe(409);
   });
 
-  it("executes optimizer and calls pg_advisory_unlock when lock is acquired", async () => {
+  it("executes optimizer and calls release_cron_job_lock when lease is acquired", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -676,15 +701,49 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     expect(response.status).toBe(200);
 
     const unlockCalls = mockRpc.mock.calls.filter(
-      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+      (args: unknown[]) => args[0] === "release_cron_job_lock"
     );
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("calls pg_advisory_unlock in finally block even when optimizer throws", async () => {
+  it("#439 QA-H1: uses durable cron lease RPCs instead of session durable cron lease RPCs", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock")
+        return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock")
+        return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+
+    const rpcNames = mockRpc.mock.calls.map((args: unknown[]) => args[0]);
+    expect(rpcNames).toContain("try_acquire_cron_job_lock");
+    expect(rpcNames).toContain("release_cron_job_lock");
+    expect(rpcNames).not.toContain("pg_try_advisory_lock");
+    expect(rpcNames).not.toContain("pg_advisory_unlock");
+  });
+
+  it("calls release_cron_job_lock in finally block even when optimizer throws", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -704,7 +763,7 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     expect(response.status).toBe(500);
 
     const unlockCalls = mockRpc.mock.calls.filter(
-      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+      (args: unknown[]) => args[0] === "release_cron_job_lock"
     );
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
@@ -732,16 +791,18 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — subscription-optimizer", () =>
     mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
     mockReadFile.mockReset();
+    mockRename.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockRename.mockResolvedValue(undefined);
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
     logger.info.mockClear();
     logger.error.mockClear();
     logger.warn.mockClear();
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -798,6 +859,35 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — subscription-optimizer", () =>
         job: "subscription-optimizer",
         error: expect.stringContaining("Analysis crashed"),
       })
+    );
+  });
+
+  it("logs [SUBSCRIPTION_OPTIMIZER_LOCK_RELEASE_FAILED] when lock release RPC errors", async () => {
+    // Covers subscription-optimizer/route.ts:131 — the catch inside the finally block
+    // when releaseCronJobLease throws because the RPC returns an error
+    const mockReport = { recommendations: [], totalMonthlySpend: 50, analyzedAt: "2026-02-09T10:00:00.000Z", dismissedFeatures: [] };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-abc", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: null, error: { message: "Lock release DB error" } });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    // Main body succeeds (200) even though lock release failed
+    expect(response.status).toBe(200);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[SUBSCRIPTION_OPTIMIZER_LOCK_RELEASE_FAILED]",
+      expect.objectContaining({ error: expect.any(Error) })
     );
   });
 });

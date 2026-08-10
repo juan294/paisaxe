@@ -39,13 +39,14 @@ async function getCsrfHeaders(request: APIRequestContext) {
 
 /** Dismiss the privacy notice in the chat panel if it appears. */
 async function dismissPrivacyNotice(chatPanel: import("@playwright/test").Locator) {
-  // The privacy notice button text varies by locale: "Entendido" (ES), "Got it" (EN), etc.
-  const privacyButton = chatPanel
-    .locator("button")
-    .filter({ hasText: /entend|understood|got it|ok|compris/i });
-  if (await privacyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await privacyButton.click();
-  }
+  // The notice can disappear during hydration, so use one bounded action rather
+  // than racing an isVisible() check against a later click().
+  await chatPanel
+    .getByRole("button", {
+      name: /^(entendido|entendío|got it|compris|verstanden)$/i,
+    })
+    .click({ timeout: 2000 })
+    .catch(() => {});
 }
 
 async function openChatPanel(page: import("@playwright/test").Page) {

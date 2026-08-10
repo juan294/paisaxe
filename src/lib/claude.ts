@@ -1,11 +1,40 @@
 // PE-H4: Static import for production SDK path (avoids per-request dynamic import overhead).
-// Note: claude.ts uses curl in development/test (Turbopack workaround) and the SDK only in
-// production. The dynamic-import deferral that remains in route.ts is a separate concern
-// (documented in docs/engineering/turbopack-fix.md) and is intentionally left as-is there.
+//
+// PARITY GAP (PE-M2, issue #534): claude.ts uses curl in development/test and the
+// Anthropic SDK only in production. This dev/prod split exists because the Anthropic
+// SDK's HTTP layer hit a process-level ECONNRESET under the Next.js 16 Turbopack dev
+// server (see docs/engineering/turbopack-fix.md for the full investigation). The curl
+// subprocess sidesteps the corrupted Node HTTP stack.
+//
+// The gap was NOT closed in #534 because we could not verify, in CI/headless, that the
+// SDK streams reliably under the current Turbopack dev server without risking the live
+// chat path. Per the issue's conservative guidance, the curl path is retained but the
+// former `setTimeout(resolve, 100)` polling handoff in streamWithCurl has been replaced
+// with a fully event-driven promise (no fixed-interval polling, no added latency).
+// Re-test the SDK in dev after future Next.js patches; if it streams cleanly, delete the
+// curl branches and the USE_CURL flag and route all environments through the SDK.
 import AnthropicSDK from "@anthropic-ai/sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";
 import { CHAT_MODEL } from "@/lib/models";
+import { logger } from "@/lib/logger";
+import { recordAnthropicUsage } from "@/lib/costs/anthropic-usage";
+
+/** Raw Anthropic usage block as it appears on streaming SSE events. */
+interface RawUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}
+
+/**
+ * Fire-and-forget usage recording (#138). Never awaited on the hot path and
+ * never throws — recordAnthropicUsage swallows its own errors.
+ */
+function trackUsage(model: string, usage: RawUsage | null | undefined, source: string): void {
+  void recordAnthropicUsage({ model, usage, source });
+}
 
 interface AnthropicMessage {
   role: "user" | "assistant";
@@ -78,11 +107,21 @@ async function* streamWithSDK(
           yield event.delta.text;
         }
       }
+      // #138: record usage from the completed stream (best-effort, non-blocking).
+      try {
+        const finalMessage = await stream.finalMessage();
+        trackUsage(model, finalMessage.usage as RawUsage | undefined, "chat_stream");
+      } catch {
+        // finalMessage() can throw if the stream errored after we drained text;
+        // usage tracking must never affect the response.
+      }
       return; // success
     } catch (err) {
       if (attempt < 2) {
         // Single retry
-        console.warn("[Claude Streaming] SDK stream failed on first attempt, retrying...", err);
+        logger.warn("[Claude Streaming] SDK stream failed on first attempt, retrying", {
+          error: err instanceof Error ? err.message : String(err),
+        });
         continue;
       }
       throw err;
@@ -131,19 +170,42 @@ async function* streamWithCurl(
 
   let buffer = "";
 
-  // Create an async iterator from the stdout stream
+  // Create an async iterator from the stdout stream.
+  //
+  // Event-driven handoff (PE-M2): producers (stdout/close/error/abort) call
+  // `wake()` whenever new work is available; the consumer loop below awaits a
+  // promise that resolves on the next `wake()`. This replaces the previous
+  // 100ms `setTimeout` poll, which added up to 100ms of latency per gap.
+  // No lost-wakeup guard is needed: the single call site always constructs
+  // this promise synchronously (no `await` in between) right after checking
+  // there's no pending work, and Node's single-threaded event loop cannot run
+  // a producer callback in that synchronous gap.
   const chunks: string[] = [];
   let resolveNext: (() => void) | null = null;
   let done = false;
   let error: Error | null = null;
+
+  const wake = () => {
+    if (resolveNext) {
+      const resolve = resolveNext;
+      resolveNext = null;
+      resolve();
+    }
+  };
+
+  const waitForWork = () =>
+    new Promise<void>((resolve) => {
+      resolveNext = resolve;
+    });
+
+  // #138: accumulate usage from message_start (input/cache) + message_delta (output).
+  const streamUsage: RawUsage = {};
+
   const handleAbort = () => {
     error = createAbortError();
     done = true;
     curlProcess.kill?.();
-    if (resolveNext) {
-      resolveNext();
-      resolveNext = null;
-    }
+    wake();
   };
 
   options.signal?.addEventListener("abort", handleAbort, { once: true });
@@ -166,10 +228,18 @@ async function* streamWithCurl(
           // Handle content_block_delta events (streaming text)
           if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
             chunks.push(event.delta.text);
-            if (resolveNext) {
-              resolveNext();
-              resolveNext = null;
-            }
+            wake();
+          }
+
+          // Capture usage as it streams (#138).
+          if (event.type === "message_start" && event.message?.usage) {
+            const u = event.message.usage;
+            streamUsage.input_tokens = u.input_tokens;
+            streamUsage.cache_creation_input_tokens = u.cache_creation_input_tokens;
+            streamUsage.cache_read_input_tokens = u.cache_read_input_tokens;
+          }
+          if (event.type === "message_delta" && event.usage) {
+            streamUsage.output_tokens = event.usage.output_tokens;
           }
 
           // Handle error events
@@ -184,24 +254,18 @@ async function* streamWithCurl(
   });
 
   curlProcess.stderr.on("data", (data: Buffer) => {
-    console.error("[Claude Streaming] curl stderr:", data.toString());
+    logger.error("[Claude Streaming] curl stderr", { stderr: data.toString() });
   });
 
   curlProcess.on("close", () => {
     done = true;
-    if (resolveNext) {
-      resolveNext();
-      resolveNext = null;
-    }
+    wake();
   });
 
   curlProcess.on("error", (err) => {
     error = err;
     done = true;
-    if (resolveNext) {
-      resolveNext();
-      resolveNext = null;
-    }
+    wake();
   });
 
   // Yield chunks as they arrive
@@ -215,13 +279,13 @@ async function* streamWithCurl(
 
       if (done) break;
 
-      // Wait for more data
-      await new Promise<void>((resolve) => {
-        resolveNext = resolve;
-        // Also resolve after a short timeout to check for completion
-        setTimeout(resolve, 100);
-      });
+      // Wait for the next wake() (new chunk, close, error, or abort).
+      if (chunks.length === 0 && !done && !error) {
+        await waitForWork();
+      }
     }
+    // #138: record usage once the stream has drained cleanly.
+    trackUsage(model, streamUsage, "chat_stream");
   } finally {
     options.signal?.removeEventListener("abort", handleAbort);
   }
@@ -241,11 +305,14 @@ export async function callAnthropicAPI(
   model: string,
   maxTokens: number
 ): Promise<Anthropic.Message> {
-  if (USE_CURL) {
-    return callWithCurl(system, messages, model, maxTokens);
-  } else {
-    return callWithSDK(system, messages, model, maxTokens);
-  }
+  const response = USE_CURL
+    ? await callWithCurl(system, messages, model, maxTokens)
+    : await callWithSDK(system, messages, model, maxTokens);
+
+  // #138: record token usage + estimated cost (best-effort, non-blocking).
+  trackUsage(model, response.usage as RawUsage | undefined, "chat");
+
+  return response;
 }
 
 /**
@@ -325,13 +392,18 @@ async function callWithCurl(
       const isRetryable = [56, 7, 28].includes(exitCode) || isNaN(exitCode);
 
       if (isRetryable && attempt < MAX_RETRIES) {
-        console.warn(`[Claude API] curl failed (attempt ${attempt}/${MAX_RETRIES}, code ${err.code}), retrying in ${RETRY_DELAY_MS}ms...`);
+        logger.warn("[Claude API] curl failed, retrying", {
+          attempt,
+          max_retries: MAX_RETRIES,
+          code: err.code,
+          retry_delay_ms: RETRY_DELAY_MS,
+        });
         await sleep(RETRY_DELAY_MS * attempt); // Exponential backoff
         lastError = new Error(`curl failed: ${err.code}`);
         continue;
       }
 
-      console.error("[Claude API] curl execution failed:", {
+      logger.error("[Claude API] curl execution failed", {
         code: err.code,
         stderr: err.stderr,
         killed: err.killed,
@@ -342,17 +414,20 @@ async function callWithCurl(
     }
 
     if (stderr) {
-      console.error("[Claude API] curl stderr:", stderr);
+      logger.error("[Claude API] curl stderr", { stderr });
     }
 
     if (!stdout || stdout.trim() === "") {
       if (attempt < MAX_RETRIES) {
-        console.warn(`[Claude API] Empty response (attempt ${attempt}/${MAX_RETRIES}), retrying...`);
+        logger.warn("[Claude API] Empty response, retrying", {
+          attempt,
+          max_retries: MAX_RETRIES,
+        });
         await sleep(RETRY_DELAY_MS * attempt);
         lastError = new Error("Empty response from Anthropic API");
         continue;
       }
-      console.error("[Claude API] Empty response from curl after all retries");
+      logger.error("[Claude API] Empty response from curl after all retries");
       throw new Error("Empty response from Anthropic API");
     }
 
@@ -360,19 +435,21 @@ async function callWithCurl(
     try {
       parsed = JSON.parse(stdout);
     } catch {
-      console.error("[Claude API] Failed to parse response:", stdout.slice(0, 500));
+      logger.error("[Claude API] Failed to parse response", {
+        response_preview: stdout.slice(0, 500),
+      });
       throw new Error(`Invalid JSON response: ${stdout.slice(0, 100)}`);
     }
 
     if (parsed.error) {
       // Don't retry API-level errors (rate limits, auth, etc.)
-      console.error("[Claude API] API error:", parsed.error);
+      logger.error("[Claude API] API error", { error: parsed.error });
       throw new Error(`Anthropic API error: ${parsed.error.message}`);
     }
 
     // Success
     if (attempt > 1) {
-      console.info(`[Claude API] Succeeded on attempt ${attempt}`);
+      logger.info("[Claude API] Succeeded on retry", { attempt });
     }
     return parsed as Anthropic.Message;
   }

@@ -97,6 +97,38 @@ describe("chat-action-detection", () => {
       expect(result[0].number).toBe("+34612345678");
       expect(result[0].display).toBe("612 34 56 78");
     });
+
+    it("ignores +34 numbers whose digit groups do not total 9 digits (line 54 false arm)", () => {
+      // "+34 985 12 34" matches the international regex shape but only has 7 digits
+      const text = "Llama al +34 985 12 34 para confirmar.";
+      const result = detectPhoneNumbers(text);
+
+      expect(result).toEqual([]);
+    });
+
+    it("deduplicates repeated +34 international numbers (line 56 seen dedup)", () => {
+      const text = "Reserva en el +34 985 123 456 o en el +34 985 123 456.";
+      const result = detectPhoneNumbers(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].number).toBe("+34985123456");
+    });
+
+    it("deduplicates repeated 3-2-2-2 numbers (line 85 seen dedup)", () => {
+      const text = "Turismo: 985 10 55 00. Insisto: 985 10 55 00.";
+      const result = detectPhoneNumbers(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].number).toBe("+34985105500");
+    });
+
+    it("deduplicates repeated 9-digit numbers without spaces (line 99 seen dedup)", () => {
+      const text = "Llama al 985123456 o al 985123456 para reservar.";
+      const result = detectPhoneNumbers(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].number).toBe("+34985123456");
+    });
   });
 
   describe("detectAddresses", () => {
@@ -156,6 +188,21 @@ describe("chat-action-detection", () => {
       expect(result).toHaveLength(1);
       expect(result[0].text).toContain("33001");
       expect(result[0].text).toContain("Oviedo");
+    });
+
+    it("ignores postal codes outside Asturias (non-33 prefix)", () => {
+      const text = "28001 Madrid es la capital.";
+      const result = detectAddresses(text);
+
+      expect(result).toEqual([]);
+    });
+
+    it("keeps only the Asturian postal code when both are present", () => {
+      const text = "Desde 28001 Madrid hasta 33001 Oviedo hay seis horas.";
+      const result = detectAddresses(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toContain("33001");
     });
 
     it("generates correct Google Maps URL", () => {
@@ -342,6 +389,41 @@ describe("chat-action-detection", () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].text).toBe("Playa de Rodiles");
+    });
+
+    it("documents place-name sort tie-breaker (line 247) as unreachable with the current landmark list", () => {
+      // Line 247: `candidates.sort((a, b) => a.start - b.start || b.text.length - a.text.length)`.
+      // The `|| b.text.length - a.text.length` tie-break only runs when two candidates
+      // share the same start index. Candidates are found via case-insensitive indexOf,
+      // so two candidates at the same index would require one landmark to be a
+      // lowercase-prefix of another landmark. No such pair exists in ASTURIAN_LANDMARKS
+      // (e.g. "Covadonga" appears INSIDE "Basílica de Covadonga" at offset 12, never at
+      // the same start). The tie-break is defensive dead code for the current data.
+      //
+      // This test exercises the sort with overlapping (different-start) candidates.
+      const text = "La Basílica de Covadonga está cerca de Covadonga.";
+      const result = detectPlaceNames(text);
+
+      const texts = result.map((r) => r.text);
+      expect(texts).toContain("Basílica de Covadonga");
+      expect(texts).toContain("Covadonga");
+    });
+
+    it("documents place-name third overlap condition (line 260) as unreachable", () => {
+      // Line 260: `(candidate.start <= range.start && candidate.end >= range.end)` —
+      // candidate fully containing a used range. Candidates are sorted start-ascending,
+      // so every used range starts at or before the current candidate; equality of
+      // starts is impossible (no landmark is a lowercase-prefix of another), and even
+      // with equal starts, condition 1 at line 258 (candidate.start >= range.start &&
+      // candidate.start < range.end) would evaluate true and short-circuit the `some()`
+      // before line 260 is reached. Defensive dead code.
+      //
+      // This test exercises overlap filtering via conditions 1/2 (contained landmark).
+      const text = "Visita la Santa Cueva de Covadonga con calma.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Santa Cueva de Covadonga");
     });
   });
 

@@ -104,7 +104,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 5. Set up the database:
    - Create a Supabase project
    - Enable the pgvector extension
-   - Run the migrations in `supabase/migrations/` (83 migration files)
+   - Run the migrations in `supabase/migrations/` (96 migration files)
 
 6. Seed the database with tourism content:
    ```bash
@@ -128,9 +128,12 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 |---------|-------------|
 | `npm run dev` | Start development server |
 | `npm run build` | Create production build |
+| `npm run build:analyze` | Create a webpack analyzer build and write bundle reports under `.next/analyze/` |
 | `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Run TypeScript checks |
+| `npm run lint` | Run ESLint for `src/` and TypeScript scripts |
+| `npm run lint:scripts` | Run ESLint for `scripts/` |
+| `npm run typecheck` | Run TypeScript checks for app, scripts, E2E, and Edge functions |
+| `npm run check-verification-coverage` | Verify CI/package wiring for non-src and live-gate coverage |
 
 ### Testing
 
@@ -144,6 +147,8 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 | `npm run test:e2e:ui` | Playwright UI mode |
 | `npm run test:e2e:headed` | Run with visible browser |
 | `npm run test:e2e:debug` | Debug mode with inspector |
+| `npm run test:e2e:stripe` | Run real Stripe test-mode checkout integration (requires Stripe/Supabase QA env vars) |
+| `npm run prelaunch:live` | Run launch-critical live integration gate; fails instead of skipping missing credentials |
 
 ### Data Pipeline
 
@@ -197,10 +202,10 @@ paisaxe/
 ├── scripts/                    # Data processing & automation
 ├── supabase/
 │   ├── functions/              # Edge Functions (Deno)
-│   └── migrations/             # Database schema (83 migrations)
+│   └── migrations/             # Database schema (96 migrations)
 ├── docs/                       # Project documentation
 └── .github/
-    └── workflows/              # CI/CD (9 workflows)
+    └── workflows/              # CI/CD (11 workflows)
 ```
 
 ## CI/CD
@@ -209,9 +214,10 @@ Automated quality checks run on every push and pull request via GitHub Actions.
 
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
-| **CI** | Push/PR | Lint, typecheck, test, build |
+| **CI** | Push/PR | Lint, typecheck, verification wiring, test, build |
 | **E2E** | Push/PR | Playwright end-to-end tests |
-| **Security Audit** | Push/PR + weekly | `npm audit` for vulnerabilities |
+| **Stripe E2E Integration** | Stripe-touching PR paths, nightly, manual dispatch | Real Stripe test-mode checkout; manual live gate fails if required secrets are missing |
+| **Security Audit** | Push/PR + daily 08:00 UTC | `npm audit --omit=dev --audit-level=moderate` |
 | **Gitleaks** | Push/PR + daily | Scans for secrets in git history |
 | **License Check** | PRs | Blocks copyleft/GPL dependencies |
 | **Lighthouse CI** | PRs | Performance & accessibility auditing |

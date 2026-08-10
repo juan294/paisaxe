@@ -71,7 +71,7 @@ describe('resolveTranslation', () => {
   it('resolves correctly with actual Spanish locale keys', () => {
     expect(resolveTranslation('common.loading', es)).toBe('Cargando...');
     expect(resolveTranslation('chat.placeholder', es)).toBe('Escribe tu pregunta...');
-    expect(resolveTranslation('stories.filters.category', es)).toBe('Categoria');
+    expect(resolveTranslation('stories.filters.category', es)).toBe('Categoría');
   });
 
   it('resolves correctly with actual English locale keys', () => {

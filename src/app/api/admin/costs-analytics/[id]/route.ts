@@ -16,7 +16,7 @@ interface RouteParams {
  * GET /api/admin/costs-analytics/[id]
  * Gets a single manual cost entry.
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   const auth = await validateAdminAuth();
   if (!auth.valid) {
     return auth.error;
@@ -82,7 +82,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  * DELETE /api/admin/costs-analytics/[id]
  * Deletes a manual cost entry.
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const auth = await validateAdminAuth();
   if (!auth.valid) {
     return auth.error;

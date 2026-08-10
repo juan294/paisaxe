@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 
@@ -45,7 +45,7 @@ function scoreImage(pageNumber: number, url: string): number {
  * Returns images from Supabase Storage that are related to the story's source PDF.
  * Images are scored and sorted by suitability for use as hero images.
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   // Validate admin auth
   const auth = await validateAdminAuth();
   if (!auth.valid) {

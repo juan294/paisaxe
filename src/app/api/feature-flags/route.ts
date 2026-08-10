@@ -45,9 +45,11 @@ export async function GET() {
   try {
     const environment = getEnvironment();
 
+    // PE-L2: select only the columns that rowToFeatureFlag + scrubSensitiveConfig actually
+    // consume, avoiding unnecessary wire transfer of any future wide columns.
     const { data, error } = await supabase
       .from("feature_flags")
-      .select("*")
+      .select("id, flag_key, enabled, label, description, config, environment, created_at, updated_at")
       .eq("environment", environment)
       .order("flag_key", { ascending: true });
 

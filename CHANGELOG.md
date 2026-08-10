@@ -7,6 +7,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-04
+
+### Added
+
+- Fail-closed E2E Pro release verification: deployed build identity and
+  tree-hash readback, a declared release-required probe set, candidate-bound
+  evidence, an authenticated local-datastore oracle with a deterministic seed,
+  and a release analyzer that rejects missing, stale, or mismatched proof.
+- A single authoritative release checklist covering rehearsal, preview
+  verification, production promotion, rollback, and tag-last publication.
+- `retry-booking-sms` Vercel Cron job — retries failed SMS booking confirmations every 10 minutes (`/api/cron/retry-booking-sms`)
+- Durable cron job locking via `cron_job_locks` DB table and `src/lib/cron-job-lock.ts` (`acquireCronJobLease` / `releaseCronJobLease` helpers backed by DB RPC)
+- `/api/health` response now includes `rate_limit` field reporting backend status (`upstash`, `memory`, or `blocked`)
+- `check-verification-coverage` CI gate — verifies TypeScript surfaces (scripts, e2e, edge) and live integration gate are wired in CI
+- `prelaunch:live` npm script — real Stripe/Supabase E2E gate that fails (not skips) when credentials are absent
+- `FeatureFlagsProvider` `enabled` prop for disabling background polling in SSR/test contexts
+- ADR-0017: decision not to migrate client hooks to SWR/TanStack Query
+- ADR-0018: Edge Runtime not feasible for chat stream endpoint
+- Playwright E2E specs for voice-agent chat (`e2e/voice-agents.spec.ts`) and MCP tool endpoints (`e2e/mcp.spec.ts`)
+- `require_live_gate` dispatch input for Stripe E2E workflow
+- Preview smoke CI: Sentry DSN gate — fails if `sentry.status` is not `"configured"` on preview deployments
+- DB migration 087: RLS + service-role-only access on sensitive operational tables (`booking_sms_jobs`, `elevenlabs_webhook_events`, `translate_webhook_events`, `stripe_webhook_events`, `marketing_accounts`)
+- DB migration 088: `cron_job_locks` table and `try_acquire_cron_job_lock` / `release_cron_job_lock` DB functions for durable cron exclusion
+- `PublicStory` / `PublicStoryRow` types and `PUBLIC_STORY_SELECT` constant — strips private fields (`sourcePdf`, `suggestionId`) from client-side cache
+- `src/lib/chat-route-utils.ts` — shared `buildEnrichedChatMessage` and `buildRateLimitHeaders` helpers extracted from chat routes
+- 30+ Spanish i18n keys added and diacritics corrected (`src/lib/i18n/es.ts`)
+- Tiered pricing model: `src/lib/pricing.ts` (`PRICING_TIERS`, `buildCheckoutUrl`) — day/weekly/monthly passes sourced from one shared constant (UX-H2)
+- `src/lib/supabase-admin.ts` — service-role admin client extracted from `supabase.ts` and guarded with `server-only` (AR-M1)
+- Sentry `onRequestError` hook in `instrumentation.ts` — unhandled server-side route/RSC/server-action errors now reach Sentry (DO-H1)
+- `SUPABASE_STORAGE_LIMIT_MB` env var for the `/api/health` storage-usage threshold (DO-L1)
+- `lint:deps` npm script + CI step (`madge --circular`) guarding against circular dependencies (AR-S1)
+- `docs/operations/pre-launch-security-checklist.md` — manual pre-launch security gates (Gitleaks history, dynamic auth-bypass probes) (SE-S1)
+- ADR-0023: voice-chat lazy-load chunk-split intentionally deferred post-launch (PE-L1)
+- Locale-coverage gating in the language switcher — locales below the translation-coverage threshold are gated (UX-M3)
+- Branded global error and 404 pages (logo + brand accent) (UX-M4)
+- Direct unit tests for `withChatStreamStageTiming` and `chat-route-utils`; authenticated happy-path checkout E2E assertion (QA-L1, QA-L2, QA-M2)
+
+### Fixed
+
+- Required CI checks can no longer pass vacuously when their test discovery,
+  preview deployment, or probe execution produced no meaningful evidence.
+- Bearer-authenticated favorites requests now propagate the validated token to
+  PostgREST, so RLS evaluates the caller instead of an anonymous cookie client.
+- Compatible dependency updates close the current production security
+  advisories while preserving the existing Next.js release line.
+- Voice-agent configuration uses the supported ElevenLabs Flash model and
+  webhook admin-client construction now occurs only after authentication.
+- Rate-limit production detection now uses `VERCEL_ENV === "production"` instead of `NODE_ENV` — fixes false 429s in CI and Vercel preview deployments
+- `NEXT_PUBLIC_*` env getters use literal `process.env.X` access — fixes undefined values in client bundle caused by Turbopack dynamic bracket-notation inlining (#556)
+- Auth provider: null-safe state updates + `deferInitialAuth` correctly defers loading state and calls `setIsLoading(false)` synchronously (#556)
+- Checkout return URL: `returnTo` parameter is `encodeURIComponent`-encoded; `useSearchParams` wrapped in `<Suspense>` to prevent hydration errors
+- Voice Purchase CTA: `returnTo` encoded; `signInWithGoogle(checkoutUrl)` ensures post-OAuth redirect lands at checkout
+- SSRF hardening: admin image ingestion resolves DNS and rejects resolved private IP ranges (not just parse-time hostname check)
+- Chat stream: per-stage timeouts (embedding 8s, search 5s, feature flag 2s) prevent indefinite hangs on slow upstream calls
+- Search rerank: 2.5s timeout with fallback to top-N candidates if Voyage reranking times out
+- Immersive deep-link guard keyed on `${slug}:${voice}` — allows re-triggering on genuine URL changes without repeating for filter-only re-renders
+- Story progress bar replaced `<div role="progressbar">` with `<nav>` + `<button>` per segment for proper keyboard navigation
+- Favorites page: mobile overlay always visible (not hover-only); focus-visible rings added to interactive elements
+- `loading.tsx`, `error.tsx`, `not-found.tsx`: `role="status"`, `aria-live="polite"`, and focus-visible rings added
+- Marketing credentials: `getDecryptedCredentials` now throws on plain-format credentials; `isPlainCredentials` type guard removed
+- Health endpoint always returns HTTP 200 (was HTTP 503 on degraded state); degraded condition signalled in JSON body only
+- Translate webhook removed session-scoped `pg_advisory_lock`; uses row-level lease claims exclusively (safe across pooled connections)
+- MCP `make-booking` degrades gracefully when conversation ID cannot be persisted — returns 202 with `recovery_action` instead of 500
+- Cron routes: unified dual-auth (`verifyVercelCron` + `verifyWebhookSecret`) across all handlers
+- Health DB route: structured error logging; generic external error message (no Supabase error codes exposed publicly)
+- `.env.example` comment for `NEXT_PUBLIC_SENTRY_DSN` fixed to prevent false positive in `check-env` script
+- `voyageai` package pinned to `0.1.0` — v0.2.x ESM build is broken (CJS interop failure)
+- QA harness: `Origin` header added to all HTTP requests; performance budget thresholds updated to match current Lighthouse scores
+- Anthropic monthly cost estimate updated to $25/mo; billing URL corrected in recurring costs config
+- Stripe webhook honours `purchase_type` — weekly/monthly passes grant the correct 7/30-day access (was always 24h) (BE-B1)
+- Voice (ElevenLabs) session and microphone are torn down on chat unmount — no abandoned billable sessions or stuck mic indicator (FE-H1)
+- Chat/voice surfaces show an actionable error on timeout/connection loss instead of a silent stalled spinner (FE-H2)
+- Chat rate limiting: requests without a trusted forwarded IP no longer share one bucket — closes a self-DoS / billing-amplification path (BE-H1)
+- Voice booking is no longer marked failed on an ElevenLabs timeout — the row is left recoverable for webhook/cron reconciliation (BE-H2)
+- Upsell CTAs carry an explicit tier (or show a price range) instead of a hardcoded €1.99 that bypassed tier selection (UX-H2)
+- Hero and related-story images use meaningful `alt` text instead of `alt=""` (UX-M5)
+- SMS-completion RPC retries after a successful send to prevent duplicate confirmation SMS (BE-M2)
+- SSE reader lock released on abort/error; chat-list rows memoized and auto-scroll guarded; 20-turn cap enforced client-side (FE-M2, FE-M3)
+- Cron auth fallback to an admin session is now logged (`[CRON_AUTH_FALLBACK]`) (BE-M1)
+- `favoritesPostSchema` bounded to 200 ids; Stripe webhook grant RPC wrapped in a 10s timeout (BE-L1, BE-L2)
+- Removed the artificial 300ms favorites loading delay (UX-L2)
+- `/api/health` degrades overall status in production when cron auth is misconfigured (still HTTP 200) (DO-L2)
+- Removed unused `ChatRequest` export; `subscription-optimizer` writes its context file atomically (AR-L1, BE-M4)
+
+### Changed
+
+- The default Claude model moves to Sonnet 5, and routine production,
+  development, and GitHub Action dependencies are refreshed.
+- `npm run typecheck` now runs 4 sub-commands: `typecheck:app`, `typecheck:scripts`, `typecheck:e2e`, `typecheck:edge`
+- `npm run lint` now includes `lint:scripts` sub-command
+- `npm run check-migrations` is now an npm script (replaces inline `npx tsx scripts/check-migrations.ts` in CI)
+- Stories localStorage cache stores `PublicStory[]` (excludes `sourcePdf` and `suggestionId` from client-side cache)
+- Upptime monitor for liveness uses `/api/health/live`; `/api/health` is used for diagnostics and release gates
+- Single brand accent (green `#22c55e`) tokenized via `--primary`; conversion surfaces use the token instead of raw `green-*` literals (UX-H1, UX-S1)
+- Mobile immersive controls: ambient/autoplay promoted to a visible affordance; navigation tap zones changed to a symmetric 50/50 split (UX-M1, UX-M2)
+- Context provider values (`auth`, `feature-flags`, `stories`) memoized; PostHog analytics init deferred to browser idle (FE-M1, PE-M3)
+- Proxy skips CSP-header and CSRF-cookie decoration on `/api/*` responses (CSRF validation is still enforced on mutating requests) (PE-M2)
+- `feature-flags` route selects only the columns it returns instead of `select("*")` (PE-L2)
+- `develop-smoke` CI surfaces failed/timed-out preview deploys via warning annotations + a job summary (DO-M2)
+- Component memoization for heavy immersive presentational children; lazy `useRef` seed instead of per-render `Math.random()` (FE-L1, FE-L2)
+
+### Security
+
+- Service-role admin client and the `costs` barrel are marked `server-only`, making the secret boundary compiler-enforced (AR-M1, AR-M2)
+- MCP Places egress and the CSP `'unsafe-inline'` PPR tradeoff documented with their compensating controls; pre-launch security checklist added (SE-L1, SE-L2, SE-S1)
+
 ## [1.5.1] - 2026-05-01
 
 Single-bug-fix patch release. Restores the author-pill typewriter animation

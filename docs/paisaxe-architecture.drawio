@@ -1,114 +1,149 @@
-<mxGraphModel adaptiveColors="auto" dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200">
+<mxGraphModel adaptiveColors="auto" dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1400">
   <root>
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
     <mxCell id="title" value="Paisaxe Architecture" style="text;html=1;fontSize=24;fontStyle=1;align=center;whiteSpace=wrap;fillColor=none;strokeColor=none;" vertex="1" parent="1">
-      <mxGeometry x="500" y="20" width="600" height="40" as="geometry"/>
+      <mxGeometry x="550" y="20" width="600" height="40" as="geometry"/>
     </mxCell>
     <mxCell id="subtitle" value="AI-powered tourism experience platform for Asturias, Spain" style="text;html=1;fontSize=13;fontStyle=2;align=center;whiteSpace=wrap;fillColor=none;strokeColor=none;" vertex="1" parent="1">
-      <mxGeometry x="500" y="55" width="600" height="30" as="geometry"/>
+      <mxGeometry x="550" y="55" width="600" height="30" as="geometry"/>
     </mxCell>
+
     <mxCell id="swim-frontend" value="Frontend (Next.js 16 App Router)" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="100" width="1520" height="140" as="geometry"/>
+      <mxGeometry x="40" y="100" width="1620" height="140" as="geometry"/>
     </mxCell>
     <mxCell id="fe-stories" value="Immersive Stories" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
-      <mxGeometry x="40" y="50" width="150" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="fe-admin" value="Admin Panel" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
-      <mxGeometry x="230" y="50" width="140" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="fe-favorites" value="Favorites" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
-      <mxGeometry x="410" y="50" width="120" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="fe-pricing" value="Pricing &amp; Checkout" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
-      <mxGeometry x="570" y="50" width="150" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="fe-auth" value="Auth (Google OAuth)" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
-      <mxGeometry x="760" y="50" width="160" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="fe-voice" value="Voice Chat UI&#xa;(ElevenLabs Widget)" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
-      <mxGeometry x="960" y="50" width="170" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="fe-chat" value="AI Chat Interface" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
-      <mxGeometry x="1170" y="50" width="150" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="swim-proxy" value="Proxy Layer (src/proxy.ts) — all requests intercepted here" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="260" width="1520" height="100" as="geometry"/>
-    </mxCell>
-    <mxCell id="proxy-maintenance" value="Maintenance Mode&#xa;Redirect" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
-      <mxGeometry x="40" y="33" width="165" height="45" as="geometry"/>
-    </mxCell>
-    <mxCell id="proxy-auth" value="Auth Session&#xa;Refresh" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
-      <mxGeometry x="230" y="33" width="155" height="45" as="geometry"/>
-    </mxCell>
-    <mxCell id="proxy-csrf" value="CSRF Double-Submit&#xa;Cookie" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
-      <mxGeometry x="420" y="33" width="165" height="45" as="geometry"/>
-    </mxCell>
-    <mxCell id="proxy-csp" value="CSP / Security&#xa;Headers" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
-      <mxGeometry x="620" y="33" width="155" height="45" as="geometry"/>
-    </mxCell>
-    <mxCell id="proxy-reqid" value="Request Correlation&#xa;ID (x-request-id)" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
-      <mxGeometry x="810" y="33" width="175" height="45" as="geometry"/>
-    </mxCell>
-    <mxCell id="proxy-cors" value="CORS Headers" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
-      <mxGeometry x="1020" y="33" width="140" height="45" as="geometry"/>
-    </mxCell>
-    <mxCell id="swim-api" value="API Layer (Next.js Route Handlers)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="380" width="1520" height="130" as="geometry"/>
-    </mxCell>
-    <mxCell id="api-chat" value="/api/chat&#xa;(RAG Pipeline)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="30" y="45" width="145" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="api-admin" value="/api/admin&#xa;(Content Mgmt)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="195" y="45" width="150" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="api-webhooks" value="/api/webhooks&#xa;(ElevenLabs/Translate)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="365" y="45" width="170" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="api-health" value="/api/health" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="555" y="45" width="125" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="api-stripe-wh" value="/api/webhooks/stripe" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="700" y="45" width="165" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="api-auth-cb" value="/api/auth/callback" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="885" y="45" width="155" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="api-agentrun" value="/api/agent-run" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="1060" y="45" width="145" height="60" as="geometry"/>
-    </mxCell>
-    <mxCell id="swim-logic" value="Business Logic (src/lib/)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="530" width="1520" height="150" as="geometry"/>
-    </mxCell>
-    <mxCell id="lib-chat" value="Chat Orchestration&#xa;(Claude RAG)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
       <mxGeometry x="30" y="50" width="150" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="lib-embed" value="Embedding &amp;&#xa;Reranking" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
+    <mxCell id="fe-admin" value="Admin Panel" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
       <mxGeometry x="200" y="50" width="140" height="60" as="geometry"/>
     </mxCell>
+    <mxCell id="fe-favorites" value="Favorites" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
+      <mxGeometry x="360" y="50" width="120" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe-pricing" value="Pricing &amp; Checkout" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
+      <mxGeometry x="500" y="50" width="150" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe-auth" value="Auth (Google OAuth)" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
+      <mxGeometry x="670" y="50" width="160" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe-voice" value="Voice Chat UI&#xa;(ElevenLabs Widget)" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
+      <mxGeometry x="850" y="50" width="170" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe-chat" value="AI Chat Interface" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
+      <mxGeometry x="1040" y="50" width="150" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe-suggestions" value="Suggestions" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="swim-frontend">
+      <mxGeometry x="1210" y="50" width="130" height="60" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="swim-proxy" value="Proxy Layer (src/proxy.ts) — all requests intercepted here" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="40" y="260" width="1620" height="100" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-maintenance" value="Maintenance Mode&#xa;Redirect" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="30" y="33" width="155" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-auth" value="Auth Session&#xa;Refresh" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="205" y="33" width="145" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-csrf" value="CSRF Double-Submit&#xa;Cookie" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="370" y="33" width="155" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-csp" value="CSP / Security&#xa;Headers" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="545" y="33" width="145" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-reqid" value="Request Correlation&#xa;ID (x-request-id)" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="710" y="33" width="165" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-cors" value="CORS Headers" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="895" y="33" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-canonical" value="Canonical Domain&#xa;Redirect" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="1045" y="33" width="145" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-storyrewrite" value="Story URL&#xa;Rewrite" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="1210" y="33" width="130" height="45" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="swim-api" value="API Layer (Next.js Route Handlers)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="40" y="380" width="1620" height="175" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-chat" value="/api/chat&#xa;(embed ‖ flags&#xa;→ Claude RAG)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="20" y="40" width="140" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-admin" value="/api/admin&#xa;GET: withAdminRead&#xa;mutations: withAdmin" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="175" y="40" width="150" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-webhooks" value="/api/webhooks&#xa;(ElevenLabs / Stripe&#xa;/ Supabase / Translate)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="340" y="40" width="165" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-health" value="/api/health/live&#xa;(liveness · Upptime)&#xa;/api/health&#xa;(diagnostics · rate_limit)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="swim-api">
+      <mxGeometry x="520" y="30" width="125" height="85" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-stripe-wh" value="/api/checkout&#xa;(Stripe)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="660" y="40" width="120" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-auth-cb" value="/api/auth/callback" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="795" y="40" width="140" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-voice-access" value="/api/voice-access&#xa;(feature flag gate)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="950" y="40" width="150" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-cron" value="/api/cron&#xa;(6 Cron Jobs)&#xa;+retry-booking-sms" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="1115" y="40" width="130" height="65" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-mcp-label" value="MCP Tool Endpoints (x-mcp-secret auth)" style="text;html=1;fontStyle=1;fontSize=10;align=left;fillColor=none;strokeColor=none;" vertex="1" parent="swim-api">
+      <mxGeometry x="1260" y="35" width="330" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-mcp-places" value="/api/mcp/places&#xa;(Google Places)" style="rounded=1;whiteSpace=wrap;fillColor=#cce5ff;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="1260" y="58" width="130" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-mcp-booking" value="/api/mcp/make-booking&#xa;(Twilio outbound call)" style="rounded=1;whiteSpace=wrap;fillColor=#cce5ff;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="1400" y="58" width="155" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-mcp-weather" value="/api/mcp/weather" style="rounded=1;whiteSpace=wrap;fillColor=#cce5ff;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="1265" y="118" width="120" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-mcp-status" value="/api/mcp/make-booking/status&#xa;(Twilio callback, no auth)" style="rounded=1;whiteSpace=wrap;fillColor=#cce5ff;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="1395" y="118" width="195" height="40" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="swim-logic" value="Business Logic (src/lib/)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="40" y="575" width="1620" height="150" as="geometry"/>
+    </mxCell>
+    <mxCell id="lib-chat" value="Chat Orchestration&#xa;(Claude RAG)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
+      <mxGeometry x="20" y="50" width="150" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="lib-embed" value="Embedding &amp;&#xa;Reranking" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
+      <mxGeometry x="185" y="50" width="140" height="60" as="geometry"/>
+    </mxCell>
     <mxCell id="lib-discovery" value="Content Discovery" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
-      <mxGeometry x="360" y="50" width="140" height="60" as="geometry"/>
+      <mxGeometry x="340" y="50" width="140" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="lib-admin" value="Admin APIs" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
-      <mxGeometry x="520" y="50" width="120" height="60" as="geometry"/>
+      <mxGeometry x="495" y="50" width="115" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="lib-stripe" value="Stripe Integration" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
-      <mxGeometry x="660" y="50" width="140" height="60" as="geometry"/>
+      <mxGeometry x="625" y="50" width="140" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="lib-flags" value="Feature Flags" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
-      <mxGeometry x="820" y="50" width="120" height="60" as="geometry"/>
+      <mxGeometry x="780" y="50" width="120" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="lib-ratelimit" value="Rate Limiting&#xa;(Upstash)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
-      <mxGeometry x="960" y="50" width="130" height="60" as="geometry"/>
+      <mxGeometry x="915" y="50" width="125" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="lib-csrf" value="CSRF Validation&#xa;(csrf.ts)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
-      <mxGeometry x="1110" y="50" width="140" height="60" as="geometry"/>
+      <mxGeometry x="1055" y="50" width="135" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="lib-mcp-auth" value="MCP Auth &amp; Tools&#xa;(mcp-auth.ts)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
+      <mxGeometry x="1205" y="50" width="150" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="lib-reqid" value="Request Correlation&#xa;(request-context.ts)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
-      <mxGeometry x="1270" y="50" width="185" height="60" as="geometry"/>
+      <mxGeometry x="1370" y="50" width="185" height="60" as="geometry"/>
     </mxCell>
+
     <mxCell id="swim-data" value="Data Layer" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="700" width="900" height="150" as="geometry"/>
+      <mxGeometry x="40" y="745" width="900" height="150" as="geometry"/>
     </mxCell>
     <mxCell id="db-postgres" value="Supabase&#xa;PostgreSQL" style="shape=cylinder3;whiteSpace=wrap;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-data">
       <mxGeometry x="40" y="45" width="140" height="80" as="geometry"/>
@@ -122,8 +157,9 @@
     <mxCell id="db-storage" value="Supabase&#xa;Storage" style="shape=cylinder3;whiteSpace=wrap;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-data">
       <mxGeometry x="640" y="45" width="140" height="80" as="geometry"/>
     </mxCell>
-    <mxCell id="swim-edge" value="Edge Functions (Deno)" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="980" y="700" width="580" height="150" as="geometry"/>
+
+    <mxCell id="swim-edge" value="Edge Functions (Deno / Supabase)" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
+      <mxGeometry x="980" y="745" width="680" height="150" as="geometry"/>
     </mxCell>
     <mxCell id="edge-keepalive" value="keep-alive" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-edge">
       <mxGeometry x="40" y="55" width="140" height="60" as="geometry"/>
@@ -131,39 +167,56 @@
     <mxCell id="edge-cleanup" value="cleanup-analytics" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-edge">
       <mxGeometry x="230" y="55" width="160" height="60" as="geometry"/>
     </mxCell>
+
     <mxCell id="swim-external" value="External Services" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="870" width="1520" height="160" as="geometry"/>
+      <mxGeometry x="40" y="915" width="1620" height="260" as="geometry"/>
     </mxCell>
     <mxCell id="ext-claude" value="Claude API&#xa;(Anthropic)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="30" y="55" width="130" height="60" as="geometry"/>
+      <mxGeometry x="20" y="50" width="130" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="ext-voyage" value="Voyage AI&#xa;(Embeddings &amp;&#xa;Reranking)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="178" y="55" width="140" height="60" as="geometry"/>
+    <mxCell id="ext-voyage" value="Voyage AI&#xa;(voyage-3.5 embed&#xa;+ rerank-2.5)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="165" y="50" width="145" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="ext-eleven-guide" value="ElevenLabs&#xa;Pelayo Guide" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="336" y="55" width="148" height="60" as="geometry"/>
+    <mxCell id="ext-eleven-voice" value="ElevenLabs&#xa;Pelayo Guide&#xa;Pelayo Booking" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="325" y="50" width="145" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="ext-eleven-booking" value="ElevenLabs&#xa;Pelayo Booking" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="502" y="55" width="148" height="60" as="geometry"/>
+    <mxCell id="ext-eleven-marketing" value="ElevenLabs&#xa;Penny / Iris / Xander&#xa;(Marketing Agents)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="485" y="50" width="155" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext-eleven-aac" value="Agents-as-Code: agent_configs/ tracked in git · elevenlabs push/pull (5 agents, 3 MCP tools)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;" vertex="1" parent="swim-external">
+      <mxGeometry x="325" y="130" width="315" height="40" as="geometry"/>
     </mxCell>
     <mxCell id="ext-stripe" value="Stripe&#xa;(Payments)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="668" y="55" width="120" height="60" as="geometry"/>
+      <mxGeometry x="655" y="50" width="120" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="ext-supabase" value="Supabase&#xa;(Auth + DB)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="806" y="55" width="130" height="60" as="geometry"/>
+      <mxGeometry x="790" y="50" width="130" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="ext-google" value="Google OAuth" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="954" y="55" width="125" height="60" as="geometry"/>
+    <mxCell id="ext-google-oauth" value="Google OAuth" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="935" y="50" width="125" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext-google-places" value="Google Places API&#xa;(New)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="935" y="130" width="125" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext-twilio" value="Twilio&#xa;(Outbound Calls)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="1075" y="50" width="130" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="ext-posthog" value="PostHog&#xa;(Analytics)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="1097" y="55" width="125" height="60" as="geometry"/>
+      <mxGeometry x="1220" y="50" width="120" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="ext-upstash" value="Upstash&#xa;(Rate Limiting)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
-      <mxGeometry x="1240" y="55" width="130" height="60" as="geometry"/>
+    <mxCell id="ext-upstash" value="Upstash Redis&#xa;(Rate Limit +&#xa;Embed Cache)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="1355" y="50" width="130" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext-pino" value="Pino&#xa;(Structured Logs)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="655" y="130" width="125" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext-sentry" value="Sentry&#xa;(Error Tracking)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="795" y="130" width="125" height="50" as="geometry"/>
     </mxCell>
     <mxCell id="ext-vercel" value="Vercel&#xa;(Edge Hosting)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;" vertex="1" parent="swim-external">
-      <mxGeometry x="1388" y="-30" width="110" height="60" as="geometry"/>
+      <mxGeometry x="1500" y="50" width="100" height="60" as="geometry"/>
     </mxCell>
+
     <mxCell id="e-fe-api-1" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;" edge="1" source="fe-stories" target="api-chat" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
@@ -179,6 +232,10 @@
     <mxCell id="e-fe-api-5" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;" edge="1" source="fe-chat" target="api-chat" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
+    <mxCell id="e-fe-voice-access" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;" edge="1" source="fe-voice" target="api-voice-access" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
     <mxCell id="e-api-lib-1" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;" edge="1" source="api-chat" target="lib-chat" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
@@ -188,6 +245,13 @@
     <mxCell id="e-api-lib-3" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;" edge="1" source="api-stripe-wh" target="lib-stripe" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
+    <mxCell id="e-api-mcp-auth" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;" edge="1" source="api-mcp-places" target="lib-mcp-auth" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-api-health-ratelimit" value="probe" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;dashed=1;" edge="1" source="api-health" target="lib-ratelimit" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
     <mxCell id="e-lib-chat-embed" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;dashed=1;" edge="1" source="lib-chat" target="lib-embed" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
@@ -218,22 +282,35 @@
     <mxCell id="e-edge-db-2" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;dashed=1;" edge="1" source="edge-cleanup" target="db-postgres" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
+
     <mxCell id="e-lib-claude" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="lib-chat" target="ext-claude" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
     <mxCell id="e-lib-voyage" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="lib-embed" target="ext-voyage" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
-    <mxCell id="e-fe-eleven" value="WebSocket" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;dashed=1;" edge="1" source="fe-voice" target="ext-eleven-guide" parent="1">
+    <mxCell id="e-lib-embed-upstash" value="embed cache" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;dashed=1;" edge="1" source="lib-embed" target="ext-upstash" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
-    <mxCell id="e-agentrun-eleven-booking" value="webhook" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;dashed=1;" edge="1" source="api-agentrun" target="ext-eleven-booking" parent="1">
+    <mxCell id="e-fe-eleven" value="WebSocket" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;dashed=1;" edge="1" source="fe-voice" target="ext-eleven-voice" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-eleven-mcp-places" value="tool call" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;dashed=1;" edge="1" source="ext-eleven-voice" target="api-mcp-places" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-eleven-mcp-booking" value="tool call" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;dashed=1;" edge="1" source="ext-eleven-voice" target="api-mcp-booking" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-mcp-places-google" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="api-mcp-places" target="ext-google-places" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-mcp-booking-twilio" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="api-mcp-booking" target="ext-twilio" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
     <mxCell id="e-lib-stripe-ext" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="lib-stripe" target="ext-stripe" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
-    <mxCell id="e-auth-google" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="api-auth-cb" target="ext-google" parent="1">
+    <mxCell id="e-auth-google" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="api-auth-cb" target="ext-google-oauth" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
     <mxCell id="e-auth-supabase" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="api-auth-cb" target="ext-supabase" parent="1">
