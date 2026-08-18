@@ -96,14 +96,16 @@ function checkForDuplicates(migrations: MigrationFile[]): string[] {
 function checkForUnexpectedGaps(migrations: MigrationFile[]): string[] {
   if (migrations.length === 0) return [];
 
-  // Walk the sorted, de-duplicated numbers pairwise instead of iterating the full
-  // integer range from min to max. This is behaviorally identical for legitimate
-  // input (every integer strictly between two consecutive present numbers is
-  // exactly the set of "missing" numbers), but bounds each individual gap
-  // independently — so a single pathological outlier (e.g. a timestamp-prefixed
-  // filename parsed as ~2e13) fails fast with a clear error instead of forcing
-  // the scanner to iterate — and potentially crash on — an astronomical range.
-  const numbers = [...new Set(migrations.map((m) => m.number))].sort((a, b) => a - b);
+  // Walk the sorted numbers pairwise instead of iterating the full integer range
+  // from min to max. This is behaviorally identical for legitimate input (every
+  // integer strictly between two consecutive present numbers is exactly the set
+  // of "missing" numbers — duplicates naturally produce a non-positive gapSize
+  // below and are skipped, since checkForDuplicates already reports them), but
+  // bounds each individual gap independently — so a single pathological outlier
+  // (e.g. a timestamp-prefixed filename parsed as ~2e13) fails fast with a clear
+  // error instead of forcing the scanner to iterate — and potentially crash on —
+  // an astronomical range.
+  const numbers = migrations.map((m) => m.number).sort((a, b) => a - b);
   const errors: string[] = [];
 
   for (let i = 1; i < numbers.length; i++) {
