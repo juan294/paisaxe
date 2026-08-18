@@ -18,7 +18,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
-      required-checks: '["Gitleaks secret scan","npm audit","Vercel env safety"]'
+      required_checks: '["Gitleaks secret scan","npm audit","Vercel env safety"]'
 
   gitleaks:
     name: Gitleaks secret scan
