@@ -230,7 +230,7 @@ describe("PricingPage", () => {
     });
     fireEvent.click(button);
 
-    expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing");
+    expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing?tier=day_pass");
   });
 
   it("preserves returnTo when starting sign-in from pricing", () => {
@@ -245,8 +245,63 @@ describe("PricingPage", () => {
     }));
 
     expect(mockSignInWithGoogle).toHaveBeenCalledWith(
-      "/pricing?returnTo=oviedo-walking-tour"
+      "/pricing?returnTo=oviedo-walking-tour&tier=day_pass"
     );
+  });
+
+  describe("UX-H4 (#890): selected tier survives the sign-in round trip", () => {
+    it("carries the selected (non-default) tier into the sign-in redirect URL", () => {
+      render(<PricingPage />);
+
+      // Select the monthly tier, then attempt to purchase while signed out.
+      fireEvent.click(screen.getByRole("radio", { name: /9\.99/ }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "premium.sign_in_to_purchase" })
+      );
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing?tier=monthly_pass"
+      );
+    });
+
+    it("re-selects the tier carried in the URL after the OAuth round trip", () => {
+      // Simulates landing back on /pricing?tier=monthly_pass after Google
+      // OAuth redirects the user back — the tier must not silently reset to
+      // the (cheaper) Day Pass default.
+      mockUseSearchParams.mockReturnValue(
+        new URLSearchParams([["tier", "monthly_pass"]])
+      );
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-123", email: "test@example.com" },
+        session: { access_token: "token" },
+        signInWithGoogle: mockSignInWithGoogle,
+        isLoading: false,
+      });
+
+      render(<PricingPage />);
+
+      const monthlyRadio = screen.getByRole("radio", { name: /9\.99/ });
+      expect(monthlyRadio).toHaveAttribute("aria-checked", "true");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "premium.pricing_cta" })
+      );
+
+      expect(mockPush).toHaveBeenCalledWith(
+        "/pricing/checkout?tier=monthly_pass"
+      );
+    });
+
+    it("ignores an invalid tier query param and falls back to the Day Pass", () => {
+      mockUseSearchParams.mockReturnValue(
+        new URLSearchParams([["tier", "not-a-real-tier"]])
+      );
+
+      render(<PricingPage />);
+
+      const dayPassRadio = screen.getByRole("radio", { name: /1\.99/ });
+      expect(dayPassRadio).toHaveAttribute("aria-checked", "true");
+    });
   });
 
   it("should show purchase button when user is authenticated", () => {
