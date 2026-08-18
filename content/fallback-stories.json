@@ -1,5 +1,5 @@
 {
-  "_comment": "LOCATION-SPECIFIC: Fallback stories for when database is unavailable. Replace all entries for new locations.",
+  "_comment": "LOCATION-SPECIFIC: Fallback stories for when database is unavailable. Replace all entries for new locations. Expanded (PE-H4, #807) from 8 to 25 entries — all 20 ALL_STORIES slugs from scripts/seed-database.ts plus all 5 cycling slugs from scripts/seed-cycling-stories.ts, so Lighthouse (which builds with dummy Supabase credentials and hits this fallback) measures a payload shape closer to the real ~71-story app instead of 1/9th of it. Limited to these 25 because every slug here is already required to carry full 5-locale coverage in content/translations/story-translations.ts by src/lib/i18n/story-translations-coverage.test.ts regardless of this file's contents — reusing them adds zero new translation debt. Fabricating additional synthetic slugs to reach 71 would require adding matching entries to story-translations.ts (out of scope for this fix) and was deliberately not done.",
   "stories": [
     {
       "id": "lagos-covadonga",
@@ -96,6 +96,210 @@
       "sourcePdf": "Asturias-en-familia-ES.pdf",
       "location": "central",
       "duration": "weekend"
+    },
+    {
+      "id": "aviles",
+      "slug": "aviles",
+      "title": "Avilés",
+      "subtitle": "Villa del Adelantado",
+      "description": "El casco antiguo mejor conservado de Asturias, con sus soportales medievales y el moderno Centro Niemeyer que mira al futuro.",
+      "image": "/images/stories/aviles.webp",
+      "category": "cities",
+      "sourcePdf": "Guia-visitar-Aviles-ES.pdf",
+      "location": "central",
+      "duration": "day-trip"
+    },
+    {
+      "id": "camino-santiago",
+      "slug": "camino-santiago",
+      "title": "Camino de Santiago",
+      "subtitle": "Ruta Primitiva",
+      "description": "El camino original que trazó el Rey Alfonso II desde Oviedo. Senderos históricos entre montañas y valles asturianos.",
+      "image": "https://images.unsplash.com/photo-1541623089466-8e777dd05db2?w=1920",
+      "category": "activities",
+      "sourcePdf": "Planificador-Camino-ES.pdf",
+      "location": "central",
+      "duration": "week"
+    },
+    {
+      "id": "llanes",
+      "slug": "llanes",
+      "title": "Llanes",
+      "subtitle": "Entre playas y montañas",
+      "description": "Más de 30 playas, acantilados espectaculares y un casco histórico encantador. La esencia del oriente asturiano.",
+      "image": "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=1920",
+      "category": "nature",
+      "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+      "location": "eastern",
+      "duration": "weekend"
+    },
+    {
+      "id": "cangas-onis",
+      "slug": "cangas-onis",
+      "title": "Cangas de Onís",
+      "subtitle": "Primera capital del reino",
+      "description": "El puente romano sobre el Sella, la Basílica de Covadonga y la puerta de entrada a los Picos de Europa.",
+      "image": "/images/stories/cangas-onis.webp",
+      "category": "culture",
+      "sourcePdf": "Guia-cultura-ES.pdf",
+      "location": "eastern",
+      "duration": "day-trip"
+    },
+    {
+      "id": "descenso-sella",
+      "slug": "descenso-sella",
+      "title": "Descenso del Sella",
+      "subtitle": "Las Piraguas",
+      "description": "La fiesta deportiva más emblemática de Asturias. Cada agosto, miles de palistas descienden el río desde Arriondas hasta Ribadesella.",
+      "image": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1920",
+      "category": "activities",
+      "sourcePdf": "Asturias-en-familia-ES.pdf",
+      "location": "eastern",
+      "duration": "day-trip"
+    },
+    {
+      "id": "quesos-asturianos",
+      "slug": "quesos-asturianos",
+      "title": "Quesos Asturianos",
+      "subtitle": "Más de 40 variedades",
+      "description": "Cabrales, Gamonéu, Afuega'l Pitu... Una tradición quesera única en Europa, con sabores que van de lo suave a lo intenso.",
+      "image": "/images/stories/quesos-asturianos.webp",
+      "category": "food",
+      "sourcePdf": "Guia-cultura-ES.pdf",
+      "location": "eastern",
+      "duration": "day-trip"
+    },
+    {
+      "id": "museo-jurrasico",
+      "slug": "museo-jurrasico",
+      "title": "Museo del Jurásico",
+      "subtitle": "MUJA - Colunga",
+      "description": "Una huella de dinosaurio real, esqueletos gigantes y la historia de cuando Asturias era tierra de gigantes prehistóricos.",
+      "image": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1920",
+      "category": "culture",
+      "sourcePdf": "Asturias-en-familia-ES.pdf",
+      "location": "eastern",
+      "duration": "day-trip"
+    },
+    {
+      "id": "senda-oso",
+      "slug": "senda-oso",
+      "title": "Senda del Oso",
+      "subtitle": "Ruta verde del valle",
+      "description": "30 kilómetros de antiguo trazado ferroviario reconvertidos en sendero. Ideal para familias, entre bosques y el hábitat del oso pardo.",
+      "image": "https://images.unsplash.com/photo-1474511320723-9a56873571b7?w=1920",
+      "category": "activities",
+      "sourcePdf": "Asturias-en-familia-ES.pdf",
+      "location": "central",
+      "duration": "day-trip"
+    },
+    {
+      "id": "cudillero",
+      "slug": "cudillero",
+      "title": "Cudillero",
+      "subtitle": "El anfiteatro del mar",
+      "description": "Casas de colores que trepan por la ladera hasta formar un pintoresco anfiteatro que mira al Cantábrico. Un pueblo de pescadores único.",
+      "image": "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=1920",
+      "category": "cities",
+      "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+      "location": "western",
+      "duration": "day-trip"
+    },
+    {
+      "id": "taramundi",
+      "slug": "taramundi",
+      "title": "Taramundi",
+      "subtitle": "Tradición cuchillera",
+      "description": "El pueblo que revitalizó el turismo rural en España. Cuchillos artesanos, ferreiros y la magia del interior occidental asturiano.",
+      "image": "https://images.unsplash.com/photo-1500049242364-5f500807cdd7?w=1920",
+      "category": "culture",
+      "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+      "location": "western",
+      "duration": "weekend"
+    },
+    {
+      "id": "bufones-pria",
+      "slug": "bufones-pria",
+      "title": "Bufones de Pría",
+      "subtitle": "El rugido del mar",
+      "description": "Chimeneas naturales por las que el mar lanza chorros de agua y espuma con un sonido atronador. La fuerza del Cantábrico en estado puro.",
+      "image": "https://images.unsplash.com/photo-1509233725247-49e657c54213?w=1920",
+      "category": "nature",
+      "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+      "location": "eastern",
+      "duration": "day-trip"
+    },
+    {
+      "id": "luarca",
+      "slug": "luarca",
+      "title": "Luarca",
+      "subtitle": "La villa blanca de la costa",
+      "description": "Puerto pesquero, cementerio con vistas al mar y calles empedradas. La elegancia marinera del occidente asturiano.",
+      "image": "https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=1920",
+      "category": "cities",
+      "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+      "location": "western",
+      "duration": "day-trip"
+    },
+    {
+      "id": "angliru-bestia-asturias",
+      "slug": "angliru-bestia-asturias",
+      "title": "Angliru: La Bestia de Asturias",
+      "subtitle": "Sierra del Aramo, Riosa",
+      "description": "El Alto del Angliru es el puerto más temido de La Vuelta a España. Con rampas que superan el 23% de pendiente, esta ascensión mítica ha sido escenario de hazañas épicas del ciclismo mundial. La carretera serpentea por la solitaria Sierra del Aramo, independiente del resto de la Cordillera Cantábrica, donde lobos y liebres del piornal encuentran refugio.",
+      "image": "https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=1920&q=80&auto=format&fit=crop",
+      "category": "activities",
+      "sourcePdf": "7a0b1395-6aca-5b9d-fb73-41ec3cd34525.pdf",
+      "location": "central",
+      "duration": "day-trip"
+    },
+    {
+      "id": "lagos-covadonga-bicicleta",
+      "slug": "lagos-covadonga-bicicleta",
+      "title": "Lagos de Covadonga en Bicicleta",
+      "subtitle": "Picos de Europa",
+      "description": "La subida a los Lagos de Covadonga es una de las ascensiones más icónicas del ciclismo español. Esta ruta épica atraviesa el corazón de los Picos de Europa hasta alcanzar los lagos glaciares de Enol y Ercina, rodeados de las cumbres más imponentes del macizo.",
+      "image": "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?w=1920&q=80&auto=format&fit=crop",
+      "category": "activities",
+      "sourcePdf": "7a0b1395-6aca-5b9d-fb73-41ec3cd34525.pdf",
+      "location": "eastern",
+      "duration": "day-trip"
+    },
+    {
+      "id": "vias-verdes-asturias",
+      "slug": "vias-verdes-asturias",
+      "title": "Vías Verdes: De Raíles a Senderos",
+      "subtitle": "Rutas ciclistas para todos",
+      "description": "Las antiguas vías del ferrocarril minero de Asturias se han transformado en sendas verdes perfectas para recorrer en bicicleta. La Vía Verde de Fuso la Reina, cerca de Oviedo, nos invita a sumergirnos en la tranquilidad de los paisajes naturales asturianos.",
+      "image": "https://images.unsplash.com/photo-1544191696-102dbdaeeaa0?w=1920&q=80&auto=format&fit=crop",
+      "category": "activities",
+      "sourcePdf": "7a0b1395-6aca-5b9d-fb73-41ec3cd34525.pdf",
+      "location": "central",
+      "duration": "day-trip"
+    },
+    {
+      "id": "ruta-costera-llanes-niembro",
+      "slug": "ruta-costera-llanes-niembro",
+      "title": "Pedaleando entre Playas: Llanes a Niembro",
+      "subtitle": "Costa oriental de Asturias",
+      "description": "Una ruta de 9 kilómetros que conecta algunas de las playas más hermosas de la costa asturiana. Partiendo de la playa de Poo, el recorrido serpentea junto al mar pasando por las playas de San Martín, Celoriu, Borizu, Troenzo, Sorraos y Barro.",
+      "image": "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=1920&q=80&auto=format&fit=crop",
+      "category": "activities",
+      "sourcePdf": "Asturias-en-familia-ES.pdf",
+      "location": "eastern",
+      "duration": "day-trip"
+    },
+    {
+      "id": "camino-santiago-bicicleta",
+      "slug": "camino-santiago-bicicleta",
+      "title": "El Camino de Santiago sobre Dos Ruedas",
+      "subtitle": "200 km de peregrinación ciclista",
+      "description": "Recorrer el Camino de Santiago en bicicleta es una forma única de vivir esta experiencia milenaria. Desde Asturias parten dos rutas históricas: el Camino Primitivo, la ruta jacobea más antigua que nace en la Catedral de Oviedo, y el Camino del Norte, que recorre la espectacular costa cantábrica.",
+      "image": "https://images.unsplash.com/photo-1501147830916-ce44a6359892?w=1920&q=80&auto=format&fit=crop",
+      "category": "culture",
+      "sourcePdf": "Planificador-Camino-ES.pdf",
+      "location": "central",
+      "duration": "week"
     }
   ]
 }
