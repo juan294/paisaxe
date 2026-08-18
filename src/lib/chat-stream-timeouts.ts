@@ -1,6 +1,12 @@
 import { logger } from "@/lib/logger";
 
 export const CHAT_STREAM_STAGE_TIMEOUTS_MS = {
+  // PE-M3 (#811): the Upstash rate-limit check is the first I/O on this path
+  // and previously had no timeout at all — a slow (not failing) Upstash region
+  // added unbounded, invisible latency ahead of every other stage. A single
+  // Redis round-trip is normally well under a few hundred ms, so this budget
+  // is generous while still bounding the worst case.
+  rateLimit: 3_000,
   embedding: 12_000,
   search: 5_000,
   featureFlag: 2_000,

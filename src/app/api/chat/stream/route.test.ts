@@ -120,6 +120,79 @@ describe("POST /api/chat/stream", () => {
     expect(response.headers.get("Retry-After")).toBe("30");
   });
 
+  // PE-M3 (#811): the Upstash rate-limit call had no timeout and is the first
+  // I/O in the handler — a slow (not failing) Upstash added unbounded,
+  // invisible latency ahead of every other stage timeout. It must now be
+  // bounded, and a timeout must fail CLOSED (deny), never open (allow), or the
+  // timeout itself becomes a rate-limit bypass.
+  describe("rate-limit stage timeout (PE-M3)", () => {
+    it("fails CLOSED with 429 when the Upstash rate-limit check hangs past its stage timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        // Simulates a slow-but-not-erroring Upstash region: the promise never
+        // settles on its own, unlike the "fails closed on Upstash error"
+        // behavior already covered inside checkRateLimit's own tests.
+        vi.mocked(checkRateLimit).mockReturnValue(new Promise(() => {}));
+
+        const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+          method: "POST",
+          body: JSON.stringify({ message: "Test" }),
+        });
+
+        const pendingResponse = POST(request);
+        await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.rateLimit + 1);
+        const response = await pendingResponse;
+        const data = await response.json();
+
+        // Fail-closed: the request must be DENIED, not allowed through.
+        expect(response.status).toBe(429);
+        expect(data.error).toBe("Too many requests. Please try again later.");
+
+        // And it must never reach the heavy pipeline — a bypass would show up
+        // here as these having been invoked.
+        expect(generateEmbedding).not.toHaveBeenCalled();
+        expect(search).not.toHaveBeenCalled();
+        expect(streamChatResponse).not.toHaveBeenCalled();
+
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[CHAT_STREAM_RATE_LIMIT_TIMEOUT]",
+          expect.objectContaining({ stage: "rateLimit" })
+        );
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[CHAT_STREAM_STAGE_TIMEOUT]",
+          expect.objectContaining({ stage: "rateLimit" })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not time out and proceeds normally when Upstash responds well within budget", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValue({
+        allowed: true,
+        limit: 10,
+        remaining: 9,
+        resetAt: Date.now() + 60000,
+      });
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+      vi.mocked(streamChatResponse).mockImplementation(async function* () {
+        yield "Response";
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: "Test" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(checkRateLimit).toHaveBeenCalled();
+    });
+  });
+
   it("should return 400 when validation fails (Zod catches missing message)", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat/stream", {
       method: "POST",
