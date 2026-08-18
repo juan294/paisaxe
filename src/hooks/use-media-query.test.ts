@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { createElement } from "react";
+import { render, renderHook, act } from "@testing-library/react";
 import { useMediaQuery, useIsFinePointer } from "./use-media-query";
 
 // Build a controllable MediaQueryList mock
@@ -73,6 +74,29 @@ describe("useMediaQuery", () => {
   it("calls window.matchMedia with the provided query string", () => {
     renderHook(() => useMediaQuery("(max-width: 768px)"));
     expect(window.matchMedia).toHaveBeenCalledWith("(max-width: 768px)");
+  });
+
+  it("returns false on the client's very first render, matching the SSR value, even when the query already matches (FE-M6 hydration parity)", () => {
+    // Simulate a client where the query already matches before mount
+    // (e.g. `(prefers-reduced-motion: reduce)` on a reduced-motion visitor).
+    mql.matches = true;
+
+    const renderedValues: boolean[] = [];
+    function Probe() {
+      const value = useMediaQuery("(pointer: fine)");
+      renderedValues.push(value);
+      return null;
+    }
+
+    render(createElement(Probe));
+
+    // The server always renders `false` (no window). The hook's first
+    // client render must return the same value, or React discards the
+    // server-rendered markup for this subtree (hydration mismatch).
+    expect(renderedValues[0]).toBe(false);
+
+    // The effect then corrects state to the real media query value.
+    expect(renderedValues[renderedValues.length - 1]).toBe(true);
   });
 });
 
