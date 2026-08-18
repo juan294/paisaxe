@@ -8,7 +8,10 @@ import {
   csrfCookieOptions,
   validateOrigin,
   isSecureRuntime,
+  validateCsrfForAdminFallback,
 } from "./csrf";
+
+const ALLOWED_ORIGINS = ["https://paisaxe.es", "https://www.paisaxe.es"];
 
 describe("generateCsrfToken", () => {
   it("returns a 64-character hex string (32 bytes)", () => {
@@ -298,5 +301,64 @@ describe("isSecureRuntime", () => {
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("VERCEL_ENV", "");
     expect(isSecureRuntime()).toBe(false);
+  });
+});
+
+// BE-H5 / SE-M1: cron admin-cookie fallback must require CSRF + Origin
+describe("validateCsrfForAdminFallback", () => {
+  it("returns true when Origin is allowed and CSRF token matches the cookie", () => {
+    const token = "matching-token-123";
+    const request = new Request("https://paisaxe.es/api/cron/subscription-optimizer", {
+      method: "POST",
+      headers: {
+        origin: "https://paisaxe.es",
+        [CSRF_HEADER_NAME]: token,
+        cookie: `${CSRF_COOKIE_NAME}=${token}`,
+      },
+    });
+    expect(validateCsrfForAdminFallback(request, ALLOWED_ORIGINS)).toBe(true);
+  });
+
+  it("returns false when Origin and CSRF are both absent (the BE-H5/SE-M1 attack request)", () => {
+    // Simulates a hostile cross-site page riding an admin's session cookie:
+    // no Origin header (browsers omit it inconsistently), no CSRF token.
+    const request = new Request("https://paisaxe.es/api/cron/subscription-optimizer", {
+      method: "POST",
+      headers: {},
+    });
+    expect(validateCsrfForAdminFallback(request, ALLOWED_ORIGINS)).toBe(false);
+  });
+
+  it("returns false when Origin is disallowed even with a matching CSRF token", () => {
+    const token = "matching-token-123";
+    const request = new Request("https://paisaxe.es/api/cron/subscription-optimizer", {
+      method: "POST",
+      headers: {
+        origin: "https://evil.example",
+        [CSRF_HEADER_NAME]: token,
+        cookie: `${CSRF_COOKIE_NAME}=${token}`,
+      },
+    });
+    expect(validateCsrfForAdminFallback(request, ALLOWED_ORIGINS)).toBe(false);
+  });
+
+  it("returns false when Origin is allowed but the CSRF token is missing", () => {
+    const request = new Request("https://paisaxe.es/api/cron/subscription-optimizer", {
+      method: "POST",
+      headers: { origin: "https://paisaxe.es" },
+    });
+    expect(validateCsrfForAdminFallback(request, ALLOWED_ORIGINS)).toBe(false);
+  });
+
+  it("returns false when Origin is allowed but the CSRF token doesn't match the cookie", () => {
+    const request = new Request("https://paisaxe.es/api/cron/subscription-optimizer", {
+      method: "POST",
+      headers: {
+        origin: "https://paisaxe.es",
+        [CSRF_HEADER_NAME]: "attacker-guess",
+        cookie: `${CSRF_COOKIE_NAME}=real-token`,
+      },
+    });
+    expect(validateCsrfForAdminFallback(request, ALLOWED_ORIGINS)).toBe(false);
   });
 });

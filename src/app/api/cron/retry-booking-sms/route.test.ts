@@ -141,7 +141,32 @@ describe("/api/cron/retry-booking-sms", () => {
     expect(validateAdminAuth).not.toHaveBeenCalled();
   });
 
-  it("accepts POST with webhook secret or admin auth fallback", async () => {
+  it("accepts POST with admin auth fallback when CSRF token + Origin are valid", async () => {
+    vi.mocked(verifyWebhookSecret).mockReturnValue(false);
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "admin-1",
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "POST",
+        headers: {
+          origin: "https://paisaxe.es",
+          "x-csrf-token": "test-csrf-token",
+          cookie: "__csrf=test-csrf-token",
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  // BE-H5/SE-M1: the admin-cookie fallback is exactly the CSRF attack
+  // surface — a hostile cross-site page riding a logged-in admin's session
+  // cookie must NOT be able to trigger SMS retries without a valid CSRF
+  // token and Origin.
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with no CSRF token or Origin", async () => {
     vi.mocked(verifyWebhookSecret).mockReturnValue(false);
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,
@@ -154,7 +179,8 @@ describe("/api/cron/retry-booking-sms", () => {
       })
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
+    expect(sendSMS).not.toHaveBeenCalled();
   });
 
   it("returns 401 when POST has no webhook secret and admin auth fails (line 139)", async () => {
