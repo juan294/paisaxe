@@ -207,14 +207,19 @@ describe("Maintenance mode", () => {
       process.env.MAINTENANCE_MODE = "true";
     });
 
-    it("redirects root path to /coming-soon", async () => {
+    // PE-H2 (#805): see the ordering comment in proxy.ts. This intentionally
+    // changes the previous "redirects root path to /coming-soon" behavior
+    // for the env-var-forced case: / now always redirects to /immersive
+    // without consulting maintenance mode at all.
+    it("redirects root path to /immersive without checking maintenance mode", async () => {
       const request = new NextRequest("http://localhost:3006/");
       const response = await proxy(request);
 
-      expect(response.status).toBe(307);
+      expect(response.status).toBe(308);
       expect(response.headers.get("location")).toBe(
-        "http://localhost:3006/coming-soon"
+        "http://localhost:3006/immersive"
       );
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("redirects /immersive to /coming-soon (DO-H3: maintenance mode must gate the main app)", async () => {
@@ -350,20 +355,29 @@ describe("Maintenance mode", () => {
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
-    it("redirects when database flag is true", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve([{ enabled: true }]),
-      });
+    // PE-H2 (#805): root no longer queries the database flag at all — the
+    // root redirect is checked before the maintenance-mode lookup runs, so
+    // the mocked fetch below is set up but never called, regardless of what
+    // it would have resolved to (this is the primary regression test: the
+    // common "off" case must not pay a Supabase round-trip either).
+    it.each([{ enabled: true }, { enabled: false }])(
+      "redirects root to /immersive without querying the database flag (mocked as %j)",
+      async (flagRow) => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve([flagRow]),
+        });
 
-      const request = new NextRequest("http://localhost:3006/");
-      const response = await proxy(request);
+        const request = new NextRequest("http://localhost:3006/");
+        const response = await proxy(request);
 
-      expect(response.status).toBe(307);
-      expect(response.headers.get("location")).toBe(
-        "http://localhost:3006/coming-soon"
-      );
-    });
+        expect(response.status).toBe(308);
+        expect(response.headers.get("location")).toBe(
+          "http://localhost:3006/immersive"
+        );
+        expect(mockFetch).not.toHaveBeenCalled();
+      }
+    );
 
     it("allows requests when database query fails", async () => {
       mockFetch.mockResolvedValueOnce({
@@ -687,6 +701,15 @@ describe("Root path redirect", () => {
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  // PE-H2 (#805): the root redirect must fire without ever awaiting the
+  // maintenance-mode Supabase check.
+  it("does not call fetch when redirecting root to /immersive", async () => {
+    const request = new NextRequest("https://paisaxe.es/");
+    await proxy(request);
+
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
