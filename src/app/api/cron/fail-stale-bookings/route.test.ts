@@ -135,7 +135,31 @@ describe("POST /api/cron/fail-stale-bookings", () => {
     expect(data.status).toBe("ok");
   });
 
-  it("accepts authenticated admin requests without webhook secret", async () => {
+  it("accepts authenticated admin requests without webhook secret when CSRF token + Origin are valid", async () => {
+    vi.mocked(verifyWebhookSecret).mockReturnValue(false);
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-bookings", {
+      method: "POST",
+      headers: {
+        origin: "https://paisaxe.es",
+        "x-csrf-token": "test-csrf-token",
+        cookie: "__csrf=test-csrf-token",
+      },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+  });
+
+  // BE-H5/SE-M1: the admin-cookie fallback is exactly the CSRF attack
+  // surface — a hostile cross-site page riding a logged-in admin's session
+  // cookie must NOT be able to trigger this job without a valid CSRF token
+  // and Origin.
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with no CSRF token or Origin", async () => {
     vi.mocked(verifyWebhookSecret).mockReturnValue(false);
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,
@@ -147,7 +171,8 @@ describe("POST /api/cron/fail-stale-bookings", () => {
     });
 
     const response = await POST(request);
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   // BE-M1: When webhook secret is missing/wrong but admin auth succeeds, emit a warn
@@ -160,6 +185,11 @@ describe("POST /api/cron/fail-stale-bookings", () => {
 
     const request = new NextRequest("http://localhost/api/cron/fail-stale-bookings", {
       method: "POST",
+      headers: {
+        origin: "https://paisaxe.es",
+        "x-csrf-token": "test-csrf-token",
+        cookie: "__csrf=test-csrf-token",
+      },
     });
 
     await POST(request);

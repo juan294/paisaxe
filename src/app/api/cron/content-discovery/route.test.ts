@@ -143,7 +143,7 @@ describe("POST /api/cron/content-discovery", () => {
     expect(body.created).toBe(0);
   });
 
-  it("runs discovery when admin auth succeeds (no webhook secret)", async () => {
+  it("runs discovery when admin auth succeeds with valid CSRF token + Origin (no webhook secret)", async () => {
     (validateAdminAuth as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       valid: true,
     });
@@ -155,11 +155,52 @@ describe("POST /api/cron/content-discovery", () => {
       stories: [{ id: "uuid-1", title: "Place 1", slug: "place-1", category: "nature" }],
     });
 
-    // No webhook secret — falls through to admin auth which is valid
-    const res = await POST(makeRequest());
+    // No webhook secret — falls through to admin auth which is valid, and
+    // carries a matching Origin + CSRF token (the admin dashboard's shape).
+    const res = await POST(
+      makeRequest({
+        origin: "https://paisaxe.es",
+        "x-csrf-token": "test-csrf-token",
+        cookie: "__csrf=test-csrf-token",
+      })
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
+  });
+
+  // BE-H5/SE-M1: the admin-cookie fallback is exactly the CSRF attack
+  // surface — a hostile cross-site page riding a logged-in admin's session
+  // cookie must NOT be able to trigger discovery without a valid CSRF token
+  // and Origin.
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with no CSRF token or Origin", async () => {
+    (validateAdminAuth as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      valid: true,
+    });
+
+    // No webhook secret, no Origin, no CSRF token — simulates a cross-site
+    // POST riding the victim admin's session cookie.
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/csrf/i);
+    expect(runDiscovery).not.toHaveBeenCalled();
+  });
+
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with a disallowed Origin", async () => {
+    (validateAdminAuth as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      valid: true,
+    });
+
+    const res = await POST(
+      makeRequest({
+        origin: "https://evil.example",
+        "x-csrf-token": "test-csrf-token",
+        cookie: "__csrf=test-csrf-token",
+      })
+    );
+    expect(res.status).toBe(403);
+    expect(runDiscovery).not.toHaveBeenCalled();
   });
 
   it("returns 500 with error details when runDiscovery throws an Error", async () => {
