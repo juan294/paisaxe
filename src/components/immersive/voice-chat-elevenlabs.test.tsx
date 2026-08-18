@@ -67,8 +67,11 @@ vi.mock("@/lib/i18n", () => ({
         "voice.error": "Error de conexión",
         "voice.error_not_configured": "Agente de voz no configurado",
         "voice.no_permission": "Necesito acceso al micrófono",
+        "voice.no_permission_retry":
+          "Si tu navegador bloqueó el acceso, habilítalo en su configuración de sitio y vuelve a intentarlo.",
         "voice.you": "Tú",
         "voice.welcome_message": "Bienvenido a {title}",
+        "chat.retry": "Reintentar",
       };
       return translations[key] || key;
     },
@@ -1146,6 +1149,200 @@ describe("VoiceChatElevenLabs", () => {
           dispatchEvent: vi.fn(),
         })),
       });
+    });
+  });
+
+  // FE-H4: initialMessage from a prompt chip must reach the agent as a dynamic
+  // variable so a suggested question isn't silently discarded in voice mode.
+  describe("FE-H4: initialMessage forwarding", () => {
+    it("should pass initialMessage as opening_question dynamic variable when provided", async () => {
+      mockStartSession.mockResolvedValue(undefined);
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent-123"
+          onFallbackToText={() => {}}
+          initialMessage="Cuales son las mejores rutas de senderismo?"
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            dynamicVariables: expect.objectContaining({
+              opening_question: "Cuales son las mejores rutas de senderismo?",
+            }),
+          })
+        );
+      });
+    });
+
+    it("should not include opening_question when initialMessage is not provided", async () => {
+      mockStartSession.mockResolvedValue(undefined);
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent-123"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalled();
+        const callArgs = mockStartSession.mock.calls[0][0];
+        expect(callArgs.dynamicVariables).not.toHaveProperty("opening_question");
+      });
+    });
+  });
+
+  // UX-H7: the voice-state text must be announced to assistive tech.
+  describe("UX-H7: status text aria-live", () => {
+    it("should have role=status and aria-live=polite on the status text", () => {
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const status = screen.getByText(/Toca para hablar/i);
+      expect(status).toHaveAttribute("role", "status");
+      expect(status).toHaveAttribute("aria-live", "polite");
+    });
+  });
+
+  // UX-H7: a denied microphone must not permanently disable the retry path.
+  describe("UX-H7: denied microphone recovery", () => {
+    it("should keep the orb button enabled after permission is denied so the user can retry", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: {
+          getUserMedia: vi.fn().mockRejectedValue(new Error("Permission denied")),
+        },
+        writable: true,
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/acceso al micrófono/i)).toBeInTheDocument();
+      });
+
+      expect(orbButton).not.toBeDisabled();
+    });
+
+    it("should show recovery copy explaining the browser permission control", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: {
+          getUserMedia: vi.fn().mockRejectedValue(new Error("Permission denied")),
+        },
+        writable: true,
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /Háblame/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/habilítalo en su configuración de sitio/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("should retry getUserMedia when the user clicks the orb again after denial", async () => {
+      const getUserMediaMock = vi.fn().mockRejectedValueOnce(new Error("Permission denied"));
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getUserMedia: getUserMediaMock },
+        writable: true,
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(getUserMediaMock).toHaveBeenCalledTimes(1);
+      });
+
+      getUserMediaMock.mockResolvedValueOnce({});
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(getUserMediaMock).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  // UX-H7: mute/stop controls need visible focus for keyboard users.
+  describe("UX-H7: focus-visible styling on controls", () => {
+    beforeEach(() => {
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+          setMuted: mockSetMuted,
+        };
+      });
+    });
+
+    it("should have focus-visible ring classes on the mute button", () => {
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const muteButton = screen.getByRole("button", { name: /Silenciar/i });
+      expect(muteButton.className).toMatch(/focus-visible:ring/);
+    });
+
+    it("should have focus-visible ring classes on the stop button", () => {
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const stopButton = screen.getByRole("button", { name: /Parar/i });
+      expect(stopButton.className).toMatch(/focus-visible:ring/);
     });
   });
 });
