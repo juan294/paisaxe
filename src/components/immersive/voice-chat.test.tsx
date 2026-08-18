@@ -16,6 +16,20 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
+// Mutable mock state for useAuth (FE-H4: userAccessToken forwarding)
+const mockAuthState: { session: { access_token: string } | null } = {
+  session: null,
+};
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({
+    user: mockAuthState.session ? { id: "user-1" } : null,
+    session: mockAuthState.session,
+    isLoading: false,
+    signInWithGoogle: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
+
 // Mutable mock state for useVoiceAccess
 const mockVoiceAccess = {
   canUseVoice: false,
@@ -120,11 +134,23 @@ vi.mock("next/dynamic", async () => {
 });
 
 // Mock VoiceChatElevenLabs component (to avoid navigator.mediaDevices issues in tests)
-// Store onFallbackToText so tests can invoke it
+// Store onFallbackToText and forwarded props so tests can invoke/assert them
 let capturedOnFallbackToText: (() => void) | undefined;
+let capturedVoiceChatProps: { userAccessToken?: string | null; initialMessage?: string } = {};
 vi.mock("./voice-chat-elevenlabs", () => ({
-  VoiceChatElevenLabs: ({ story, onFallbackToText }: { story: { title: string }; onFallbackToText?: () => void }) => {
+  VoiceChatElevenLabs: ({
+    story,
+    onFallbackToText,
+    userAccessToken,
+    initialMessage,
+  }: {
+    story: { title: string };
+    onFallbackToText?: () => void;
+    userAccessToken?: string | null;
+    initialMessage?: string;
+  }) => {
     capturedOnFallbackToText = onFallbackToText;
+    capturedVoiceChatProps = { userAccessToken, initialMessage };
     return (
       <div data-testid="elevenlabs-voice-chat">
         Voice chat active for {story.title}
@@ -220,6 +246,7 @@ vi.mock("@/components/premium/voice-purchase-cta", () => ({
 
 // Helper to reset mock voice access state
 const resetMockVoiceAccess = () => {
+  mockAuthState.session = null;
   mockVoiceAccess.canUseVoice = false;
   mockVoiceAccess.needsSignIn = false;
   mockVoiceAccess.needsPurchase = false;
@@ -1334,6 +1361,71 @@ describe("VoiceChat initialMessage", () => {
     // VoiceChatElevenLabs is responsible for forwarding the prompt in voice
     // mode (see FE-H4/UX-H7's `opening_question` dynamic variable).
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+// FE-H4: the ElevenLabs voice agent never received the user's access token or
+// the prompt-chip question. VoiceChat must forward both down to
+// VoiceChatElevenLabs so voice-mode MCP tool calls can authenticate and a
+// tapped prompt chip is not silently discarded in voice mode.
+describe("VoiceChat FE-H4: userAccessToken and initialMessage forwarding", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCapture.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.isWhitelisted = true;
+    mockVoiceAccess.hasAccess = true;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    resetMockVoiceAccess();
+  });
+
+  it("should forward the session access_token as userAccessToken when signed in", async () => {
+    mockAuthState.session = { access_token: "test-supabase-token-abc" };
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    expect(capturedVoiceChatProps.userAccessToken).toBe("test-supabase-token-abc");
+  });
+
+  it("should not forward a userAccessToken when there is no session", async () => {
+    mockAuthState.session = null;
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    expect(capturedVoiceChatProps.userAccessToken).toBeFalsy();
+  });
+
+  it("should forward a prompt-chip initialMessage into voice mode instead of discarding it", async () => {
+    render(
+      <VoiceChat
+        story={mockStory}
+        open={true}
+        onClose={() => {}}
+        initialMessage="Cuales son las mejores rutas de senderismo?"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    expect(capturedVoiceChatProps.initialMessage).toBe(
+      "Cuales son las mejores rutas de senderismo?"
+    );
   });
 });
 

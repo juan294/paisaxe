@@ -428,7 +428,9 @@ describe("Accessibility: VoiceChat", () => {
 
   describe("aria-live region for chat messages", () => {
     it("should have an aria-live region for chat messages", () => {
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
+        wrapper: TestWrapper,
+      });
 
       const liveRegion = screen.getByRole("log");
       expect(liveRegion).toBeInTheDocument();
@@ -438,7 +440,9 @@ describe("Accessibility: VoiceChat", () => {
     it("should announce new messages to screen readers", async () => {
       mockFetch.mockResolvedValueOnce(createStreamingResponse("AI response about the lakes"));
 
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
+        wrapper: TestWrapper,
+      });
 
       const input = screen.getByPlaceholderText("Escribe tu pregunta...");
       await userEvent.type(input, "Tell me about this");
@@ -455,14 +459,18 @@ describe("Accessibility: VoiceChat", () => {
 
   describe("dialog semantics", () => {
     it("should have role='dialog' on the chat panel", () => {
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
+        wrapper: TestWrapper,
+      });
 
       const dialog = screen.getByRole("dialog");
       expect(dialog).toBeInTheDocument();
     });
 
     it("should have aria-label on the chat dialog", () => {
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
+        wrapper: TestWrapper,
+      });
 
       const dialog = screen.getByRole("dialog");
       expect(dialog).toHaveAttribute("aria-label");
@@ -471,14 +479,18 @@ describe("Accessibility: VoiceChat", () => {
 
   describe("button aria-labels", () => {
     it("should have aria-label on the close button", () => {
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
+        wrapper: TestWrapper,
+      });
 
       const closeButton = screen.getByRole("button", { name: /cerrar/i });
       expect(closeButton).toBeInTheDocument();
     });
 
     it("should have aria-label on the submit button", () => {
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
+        wrapper: TestWrapper,
+      });
 
       const submitButton = screen.getByRole("button", { name: /enviar/i });
       expect(submitButton).toBeInTheDocument();
@@ -487,7 +499,9 @@ describe("Accessibility: VoiceChat", () => {
 
   describe("focus-visible styles on chat buttons", () => {
     it("should have focus-visible ring on the close button", () => {
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
+        wrapper: TestWrapper,
+      });
 
       const closeButton = screen.getByRole("button", { name: /cerrar/i });
       expect(closeButton.className).toMatch(/focus-visible:/);
@@ -496,7 +510,9 @@ describe("Accessibility: VoiceChat", () => {
 
   describe("reduced motion in chat", () => {
     it("should have motion-reduce class on the chat panel slide-in", () => {
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
+        wrapper: TestWrapper,
+      });
 
       const chatPanel = screen.getByRole("dialog");
       const panelInner = chatPanel.querySelector("[class*='animate-in']") || chatPanel;
