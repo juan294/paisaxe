@@ -151,7 +151,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function normalizeSql(sql: string): string {
+export function normalizeSql(sql: string): string {
   return sql
     .replace(/--.*$/gm, " ")
     .replace(/\/\*[\s\S]*?\*\//g, " ")
@@ -365,7 +365,7 @@ function checkMarketingCredentialShape(sql: string): string[] {
   ];
 }
 
-function getFunctionHeader(sql: string, functionName: string): string | null {
+export function getFunctionHeader(sql: string, functionName: string): string | null {
   const match = new RegExp(
     `create\\s+(?:or\\s+replace\\s+)?function\\s+public\\.${escapeRegExp(functionName)}\\s*\\(`
   ).exec(sql);
