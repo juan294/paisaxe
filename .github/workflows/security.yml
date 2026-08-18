@@ -16,6 +16,10 @@ concurrency:
 jobs:
   develop_push_source:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
       required_checks: '["Gitleaks secret scan","npm audit","Vercel env safety"]'
