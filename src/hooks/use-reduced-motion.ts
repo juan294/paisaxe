@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMediaQuery } from "./use-media-query";
 
 const QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -8,23 +8,12 @@ const QUERY = "(prefers-reduced-motion: reduce)";
  * Hook that detects whether the user prefers reduced motion.
  * Listens to OS-level `prefers-reduced-motion` media query
  * and updates reactively when the preference changes.
+ *
+ * FE-M6 (#768): delegates to useMediaQuery, which already initializes to
+ * `false` — matching what the server renders (no `window`) — and sets the
+ * real value in an effect, avoiding a hydration mismatch for reduced-motion
+ * visitors.
  */
 export function useReducedMotion(): boolean {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia(QUERY).matches;
-  });
-
-  useEffect(() => {
-    const mql = window.matchMedia(QUERY);
-
-    const handleChange = (event: MediaQueryListEvent) => {
-      setPrefersReducedMotion(event.matches);
-    };
-
-    mql.addEventListener("change", handleChange);
-    return () => mql.removeEventListener("change", handleChange);
-  }, []);
-
-  return prefersReducedMotion;
+  return useMediaQuery(QUERY);
 }

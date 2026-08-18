@@ -74,6 +74,31 @@ describe("useMediaQuery", () => {
     renderHook(() => useMediaQuery("(max-width: 768px)"));
     expect(window.matchMedia).toHaveBeenCalledWith("(max-width: 768px)");
   });
+
+  it("returns false on the client's very first render, matching the SSR value, even when the query already matches (FE-M6 hydration parity)", () => {
+    // Simulate a client where the query already matches before mount
+    // (e.g. `(prefers-reduced-motion: reduce)` on a reduced-motion visitor).
+    mql.matches = true;
+
+    // Capture the value from the first synchronous render pass, before any
+    // effect runs — same idiom as src/hooks/use-stories.hydration.test.ts.
+    let capturedFirstRender: boolean | undefined;
+    const { result } = renderHook(() => {
+      const value = useMediaQuery("(pointer: fine)");
+      if (capturedFirstRender === undefined) {
+        capturedFirstRender = value;
+      }
+      return value;
+    });
+
+    // The server always renders `false` (no window). The hook's first
+    // client render must return the same value, or React discards the
+    // server-rendered markup for this subtree (hydration mismatch).
+    expect(capturedFirstRender).toBe(false);
+
+    // The effect then corrects state to the real media query value.
+    expect(result.current).toBe(true);
+  });
 });
 
 describe("useIsFinePointer", () => {
