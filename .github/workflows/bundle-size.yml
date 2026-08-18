@@ -73,13 +73,23 @@ jobs:
           echo "server_size=${SERVER_SIZE:-N/A}" >> "$GITHUB_OUTPUT"
           echo "total_size=${TOTAL_SIZE}" >> "$GITHUB_OUTPUT"
 
+      # PE-H3: du -sh above is informational only and can never fail. This step is the
+      # actual hard gate — it sums real gzip bytes per route from the Turbopack output
+      # (the bundler that ships to production) and fails the job if any route exceeds
+      # its committed budget in scripts/check-bundle-budget.ts.
+      - name: Enforce per-route bundle budget
+        id: budget
+        run: npm run check-bundle-budget
+
       - name: Comment on PR
+        if: always()
         uses: actions/github-script@v9
         with:
           script: |
             const staticSize = '${{ steps.bundle.outputs.static_size }}';
             const serverSize = '${{ steps.bundle.outputs.server_size }}';
             const totalSize = '${{ steps.bundle.outputs.total_size }}';
+            const budgetOutcome = '${{ steps.budget.outcome }}' === 'success' ? '✅ within budget' : '❌ budget exceeded — see job logs';
 
             const body = [
               '## Bundle Size Report',
@@ -89,6 +99,8 @@ jobs:
               `| \`.next/static\` | ${staticSize} |`,
               `| \`.next/server\` | ${serverSize} |`,
               `| **Total \`.next\`** | **${totalSize}** |`,
+              '',
+              `**Per-route gzip budget:** ${budgetOutcome}`,
               '',
               `> Measured at commit ${context.sha.substring(0, 7)}`,
             ].join('\n');
