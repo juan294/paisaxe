@@ -79,7 +79,16 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
   const [lastMessage, setLastMessage] = useState<string>("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
-  const localizedStory = getLocalizedStory(story, locale);
+  // FE-M1: getLocalizedStory returns a brand-new object every call. Without
+  // memoizing on [story, locale], `localizedStory` got a new identity on
+  // every render (including every streamed token) and fed straight into
+  // buildStoryContext's deps below, recreating it — and therefore
+  // submitMessage/handleSubmit/handleRetry — every token too, which defeated
+  // the ChatComposer memoization this fix depends on.
+  const localizedStory = useMemo(
+    () => getLocalizedStory(story, locale),
+    [story, locale]
+  );
   const posthog = usePaisaxePostHog();
   const stableOnClose = useMemo(() => onClose, [onClose]);
   useFocusTrap(dialogRef, open, stableOnClose);
@@ -107,19 +116,12 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     sendMessage,
     resetMessages,
     dismissUpsell: handleUpsellDismiss,
+    // FE-M1: kept in sync by useStreamChat itself (synchronously, inside the
+    // same setState updater as every message mutation) — read this instead
+    // of `messages` in submitMessage/handleRetry below so those callbacks'
+    // identity doesn't change on every streamed token.
+    messagesRef,
   } = useStreamChat({ canUseVoice });
-
-  // FE-M1: mirrors `messages` for reads inside submitMessage/handleRetry that
-  // must not force those callbacks to be recreated on every streamed token.
-  // Synced via effect: unlike use-stream-chat.ts's internal turn-cap check
-  // (which must never be one setState behind, since it gates a network
-  // call from data mutated in the same updater), these reads only run from
-  // user-triggered actions (Send/Retry/initial auto-send), which always
-  // happen after the previous render — and its effects — have committed.
-  const messagesRef = useRef(messages);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
 
   // Voice/text mode state — extracted to useChatMode hook
   const { useElevenLabs, setUseElevenLabs, toggle: handleToggleMode } = useChatMode(false);
@@ -179,7 +181,9 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
       posthog?.capture("chat_message_sent", { story_id: story.id, message_index: messageIndex });
       await sendMessage(message, { context: buildStoryContext(), locale, messageIndex });
     },
-    [posthog, story, sendMessage, buildStoryContext, locale]
+    // messagesRef is a stable ref object (its identity never changes across
+    // renders), so including it doesn't affect how often this is recreated.
+    [posthog, story, sendMessage, buildStoryContext, locale, messagesRef]
   );
 
   // Auto-send initial message (e.g. a suggested-question chip) — one-shot,
@@ -235,7 +239,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
       locale,
       messageIndex: messagesRef.current.filter((m) => m.role === "user").length,
     });
-  }, [lastMessage, isLoading, sendMessage, buildStoryContext, locale]);
+  }, [lastMessage, isLoading, sendMessage, buildStoryContext, locale, messagesRef]);
 
   if (!open) return null;
 

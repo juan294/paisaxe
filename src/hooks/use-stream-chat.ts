@@ -367,5 +367,11 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
     sendMessage,
     resetMessages,
     dismissUpsell,
+    // FE-M1: exposes the same ref sendMessage's turn-cap check reads from, so
+    // callers that need the live message count (e.g. VoiceChat's
+    // submitMessage/handleRetry) don't have to re-derive their own
+    // ref-sync boilerplate — and get the same synchronous-with-updates
+    // guarantee instead of a plain useEffect sync that lags a render behind.
+    messagesRef,
   };
 }
