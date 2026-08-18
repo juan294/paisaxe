@@ -13,6 +13,15 @@ export const CHAT_STREAM_STAGE_TIMEOUTS_MS = {
   response: 30_000,
 } as const;
 
+// PE-H5 (#808): `response` above is an IDLE window that the chat stream
+// route resets on every chunk, so a slow-but-alive trickle could reset it
+// forever and never trip. This is a separate, non-resetting ceiling on the
+// TOTAL generation duration, armed once and unaffected by chunk arrival.
+// Sized at 3x the idle window so a legitimately long streaming response has
+// room to complete, while a stream making no real progress is still capped.
+export const CHAT_STREAM_RESPONSE_TOTAL_CAP_MS =
+  CHAT_STREAM_STAGE_TIMEOUTS_MS.response * 3;
+
 export type ChatStreamStage = keyof typeof CHAT_STREAM_STAGE_TIMEOUTS_MS;
 
 export class ChatStreamStageTimeoutError extends Error {
