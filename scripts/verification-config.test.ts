@@ -147,17 +147,20 @@ describe("verification coverage config", () => {
     expect(workflow).toContain("Fail when Vercel credentials are unavailable (not a fork PR)");
     expect(workflow).toContain("Skip when Vercel credentials are unavailable (fork PR)");
 
-    const failStepMatch = workflow.match(
-      /Fail when Vercel credentials are unavailable \(not a fork PR\)[\s\S]*?run: \|\n([\s\S]*?)\n\n {6}- name:/
+    // The fail step's run body ends in `exit 1` right after its distinctive
+    // error line — proves the missing-secret/non-fork-PR path actually fails.
+    expect(workflow).toContain(
+      '          echo "::error::This is the only automated check on deployed Vercel environment state in this repo (DO-M2 / issue #829) — it must fail rather than silently report success while checking nothing."\n' +
+        "          exit 1"
     );
-    expect(failStepMatch).not.toBeNull();
-    expect(failStepMatch![0]).toContain("exit 1");
 
-    const skipStepMatch = workflow.match(
-      /Skip when Vercel credentials are unavailable \(fork PR\)[\s\S]*?run: \|\n([\s\S]*?)\n\n {6}- name:/
+    // The skip step's last echo line is immediately followed by the next
+    // step (no `exit 1` in between) — proves the fork-PR path still passes.
+    expect(workflow).toContain(
+      '          echo "Skipping the Vercel env safety assertion — this is expected sandboxing, not a missing-secret gap."\n' +
+        "\n" +
+        "      - name: Assert legacy agent override is absent from Vercel env"
     );
-    expect(skipStepMatch).not.toBeNull();
-    expect(skipStepMatch![0]).not.toContain("exit 1");
 
     // The fail path must be gated on NOT being a fork PR; the skip path
     // must be gated on genuinely being one. If these conditions were ever
