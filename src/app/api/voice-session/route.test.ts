@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getUserFromRequest: vi.fn(),
   getSupabaseClient: vi.fn(),
   getElevenLabsSignedUrl: vi.fn(),
+  loggerError: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase-auth", () => ({
@@ -21,6 +22,12 @@ vi.mock("@/lib/elevenlabs-signed-session", async (importOriginal) => {
     getElevenLabsSignedUrl: mocks.getElevenLabsSignedUrl,
   };
 });
+
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    error: mocks.loggerError,
+  },
+}));
 
 import { POST } from "./route";
 import { ElevenLabsSignedSessionError } from "@/lib/elevenlabs-signed-session";
@@ -129,6 +136,22 @@ describe("POST /api/voice-session", () => {
       error: "Failed to check access",
     });
     expect(mocks.getElevenLabsSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("logs error details when voice purchase query fails", async () => {
+    mockVoicePurchaseResult({
+      data: null,
+      error: { code: "PGRST116" },
+    });
+
+    await POST(request());
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      "[VOICE_SESSION_ACCESS_CHECK_FAILED]",
+      {
+        user_id: "visitor-1",
+        code: "PGRST116",
+      }
+    );
   });
 
   it("returns 502 when getElevenLabsSignedUrl throws a non-ElevenLabsSignedSessionError", async () => {
