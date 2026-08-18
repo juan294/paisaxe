@@ -5,6 +5,7 @@ import { Share2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { getLocalizedStory } from "@/lib/localize-story";
 import type { Story } from "@/types/immersive";
 
 interface ShareButtonProps {
@@ -12,7 +13,7 @@ interface ShareButtonProps {
 }
 
 export function ShareButton({ story }: ShareButtonProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,10 +26,13 @@ export function ShareButton({ story }: ShareButtonProps) {
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
+    // UX-H6 (#892): route through getLocalizedStory so a non-Spanish visitor
+    // shares their own language's title/subtitle, not the raw Spanish text.
+    const { title, subtitle } = getLocalizedStory(story, locale);
     const shareUrl = `${window.location.origin}/story/${story.slug || story.id}`;
     const shareData = {
-      title: story.title,
-      text: `${story.title} - ${story.subtitle}`,
+      title,
+      text: `${title} - ${subtitle}`,
       url: shareUrl,
     };
 
