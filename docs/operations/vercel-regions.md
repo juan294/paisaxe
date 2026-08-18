@@ -46,20 +46,28 @@ The Supabase project region determines the round-trip time for every database qu
 
 ## Checking Supabase RTT in Production
 
-The health endpoint reports Supabase connection latency in real time:
+The public `/api/health` response no longer reports a per-service latency figure (the
+`services.supabase.latency_ms` field was removed — see SE-M1's response minimization).
+`checkSupabase()` in `src/app/api/health/route.ts` still performs a live `chunks` query
+on every call, so timing the overall request is a genuine (if slightly padded, since it
+also includes Vercel function overhead) proxy for Supabase RTT from `fra1`:
 
 ```bash
-curl -s https://paisaxe.es/api/health | jq '.services.supabase.latency_ms'
+curl -s -o /dev/null -w '%{time_total}\n' https://paisaxe.es/api/health
+# time_total is in seconds — multiply by 1000 for ms, e.g. 0.045 -> 45 ms
 ```
 
-**Thresholds:**
+**Thresholds** (these now include HTTP + Vercel function overhead on top of the raw
+Supabase round trip, so treat them as directional rather than precise — a consistent
+increase across repeated runs is the actionable signal, not a single reading near a
+boundary):
 
-| Latency | Diagnosis |
+| Total request time | Diagnosis |
 |---------|-----------|
-| < 25 ms | Supabase colocated in same or adjacent AWS region |
-| 25–60 ms | Supabase in nearby European region |
-| > 80 ms | Supabase likely in a non-European region — investigate |
-| > 500 ms | Connection degraded — check Supabase status page |
+| < 60 ms | Supabase colocated in same or adjacent AWS region |
+| 60–150 ms | Supabase in nearby European region |
+| > 200 ms | Supabase likely in a non-European region — investigate |
+| > 800 ms | Connection degraded — check Supabase status page |
 
 If latency is consistently > 80 ms, see the [migration guidance](#supabase-migration-guidance) below.
 
@@ -138,10 +146,11 @@ curl -s https://paisaxe.es/api/health | jq '.status'
 
 ### If Supabase is down (but Vercel is healthy)
 
-The health endpoint will report `degraded` with Supabase status as `error`:
+The health endpoint will report top-level `status: "degraded"` (no `.services.supabase`
+field to break this out per-service — see the RTT section above):
 
 ```bash
-curl -s https://paisaxe.es/api/health | jq '.services.supabase'
+curl -s https://paisaxe.es/api/health | jq '.status'
 ```
 
 1. Check [https://status.supabase.com/](https://status.supabase.com/).
