@@ -30,18 +30,25 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return storyRewrite;
   }
 
-  // 1. Check maintenance mode (applies to all routes)
-  const maintenanceResponse = await handleMaintenanceMode(request);
-  if (maintenanceResponse) {
-    maintenanceResponse.headers.set("X-Request-ID", requestId);
-    return maintenanceResponse;
-  }
-
-  // 2. Redirect root path to /immersive
+  // 1. Redirect root path to /immersive. Checked ahead of the
+  //    maintenance-mode lookup (PE-H2, #805): / always forwards to
+  //    /immersive, which itself bypasses maintenance mode
+  //    (MAINTENANCE_BYPASS_PREFIXES in lib/proxy/maintenance.ts), so
+  //    evaluating maintenance status for / before redirecting was a wasted
+  //    Supabase round-trip (60-330ms) on every first-time visit. The
+  //    maintenance-mode check below still applies, unchanged, to every
+  //    other route.
   const rootRedirect = handleRootRedirect(request);
   if (rootRedirect) {
     rootRedirect.headers.set("X-Request-ID", requestId);
     return rootRedirect;
+  }
+
+  // 2. Check maintenance mode (applies to all other routes)
+  const maintenanceResponse = await handleMaintenanceMode(request);
+  if (maintenanceResponse) {
+    maintenanceResponse.headers.set("X-Request-ID", requestId);
+    return maintenanceResponse;
   }
 
   // 3. Handle CORS preflight for API routes
