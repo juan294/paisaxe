@@ -37,14 +37,19 @@ function createCheckoutSessionEvent(
   paymentIntentId: string | null,
   eventId: string = "evt_test123",
   amountTotal: number = 199,
-  purchaseType?: string
+  purchaseType?: string,
+  options: {
+    paymentStatus?: Stripe.Checkout.Session.PaymentStatus;
+    eventType?: string;
+  } = {}
 ): Stripe.Event {
+  const { paymentStatus = "paid", eventType = "checkout.session.completed" } = options;
   return {
     id: eventId,
     object: "event",
     api_version: "2024-12-18.acacia",
     created: 1234567890,
-    type: "checkout.session.completed",
+    type: eventType,
     livemode: false,
     pending_webhooks: 0,
     request: { id: "req_123", idempotency_key: null },
@@ -59,7 +64,7 @@ function createCheckoutSessionEvent(
         customer_email: "test@example.com",
         mode: "payment",
         payment_intent: paymentIntentId,
-        payment_status: "paid",
+        payment_status: paymentStatus,
         status: "complete",
         metadata: userId
           ? { user_id: userId, ...(purchaseType ? { purchase_type: purchaseType } : {}) }
@@ -696,5 +701,168 @@ describe("POST /api/webhooks/stripe", () => {
         vi.useRealTimers();
       }
     }, 15000);
+  });
+
+  // ─── BE-M5/SE-M2: gate the grant on payment_status ────────────────────────
+  describe("BE-M5/SE-M2: payment_status guard", () => {
+    it("does NOT grant access when checkout.session.completed has payment_status 'unpaid'", async () => {
+      // Delayed-settlement methods (SEPA, Bizum, Klarna) complete the checkout
+      // session before funds actually clear. The webhook must not grant access
+      // until payment_status confirms "paid".
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent(
+          "user-unpaid",
+          "pi_unpaid",
+          "evt_unpaid",
+          199,
+          undefined,
+          { paymentStatus: "unpaid" }
+        )
+      );
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("payment_not_settled");
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it("still grants access when checkout.session.completed has payment_status 'paid' (no regression on card path)", async () => {
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent(
+          "user-paid",
+          "pi_paid",
+          "evt_paid",
+          199,
+          undefined,
+          { paymentStatus: "paid" }
+        )
+      );
+      mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ status: "granted" });
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
+        p_event_id: "evt_paid",
+        p_event_type: "checkout.session.completed",
+        p_user_id: "user-paid",
+        p_payment_provider_id: "pi_paid",
+        p_expires_at: "2024-01-02T00:00:00.000Z",
+        p_amount_paid: 199,
+        p_purchase_type: "day_pass",
+      });
+    });
+
+    it("grants access on checkout.session.async_payment_succeeded once payment_status is 'paid'", async () => {
+      // Async payment methods send checkout.session.completed with payment_status
+      // "unpaid" first (no grant, see above), then follow up with
+      // checkout.session.async_payment_succeeded once payment_status flips to "paid".
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent(
+          "user-async",
+          "pi_async",
+          "evt_async_succeeded",
+          199,
+          undefined,
+          { paymentStatus: "paid", eventType: "checkout.session.async_payment_succeeded" }
+        )
+      );
+      mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ status: "granted" });
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
+        p_event_id: "evt_async_succeeded",
+        p_event_type: "checkout.session.async_payment_succeeded",
+        p_user_id: "user-async",
+        p_payment_provider_id: "pi_async",
+        p_expires_at: "2024-01-02T00:00:00.000Z",
+        p_amount_paid: 199,
+        p_purchase_type: "day_pass",
+      });
+    });
+
+    it("does not grant on checkout.session.async_payment_succeeded if payment_status is somehow not 'paid'", async () => {
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent(
+          "user-async-unpaid",
+          "pi_async_unpaid",
+          "evt_async_unpaid",
+          199,
+          undefined,
+          { paymentStatus: "unpaid", eventType: "checkout.session.async_payment_succeeded" }
+        )
+      );
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("payment_not_settled");
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it("does not double-grant: the unpaid checkout.session.completed event and the later async_payment_succeeded event use different event IDs, and only the settled one reaches the RPC", async () => {
+      // Simulate the real Stripe sequence for a delayed-settlement purchase:
+      // 1. checkout.session.completed fires with payment_status "unpaid" (no RPC call).
+      // 2. checkout.session.async_payment_succeeded fires later with payment_status
+      //    "paid" and a DIFFERENT event id (no shared idempotency key with step 1).
+      // The RPC must be called exactly once for the whole purchase.
+      vi.mocked(verifyWebhookSignature).mockReturnValueOnce(
+        createCheckoutSessionEvent(
+          "user-sequence",
+          "pi_sequence",
+          "evt_sequence_completed",
+          199,
+          undefined,
+          { paymentStatus: "unpaid" }
+        )
+      );
+
+      const completedResponse = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      expect(completedResponse.status).toBe(200);
+      expect(mockRpc).not.toHaveBeenCalled();
+
+      vi.mocked(verifyWebhookSignature).mockReturnValueOnce(
+        createCheckoutSessionEvent(
+          "user-sequence",
+          "pi_sequence",
+          "evt_sequence_async_succeeded",
+          199,
+          undefined,
+          { paymentStatus: "paid", eventType: "checkout.session.async_payment_succeeded" }
+        )
+      );
+      mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+      const asyncResponse = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const asyncData = await asyncResponse.json();
+
+      expect(asyncResponse.status).toBe(200);
+      expect(asyncData).toEqual({ status: "granted" });
+      expect(mockRpc).toHaveBeenCalledTimes(1);
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", expect.objectContaining({
+        p_event_id: "evt_sequence_async_succeeded",
+      }));
+    });
   });
 });
