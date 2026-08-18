@@ -8,12 +8,38 @@ import { translateStory } from "@/lib/translate-story";
 import type { StoryLocale } from "@/types/immersive";
 
 // BE-H6: Reduced lease to 3 minutes (180s). Each job takes ~5-15s so a
-// 3-job batch fits in ~45s, well within Vercel's 60s function timeout.
-// Shorter lease means crashed handlers are reclaimed faster than the old 10min.
+// 3-job batch fits in ~45s, well within the 60s budget this route assumes
+// (see `maxDuration` below). Shorter lease means crashed handlers are
+// reclaimed faster than the old 10min.
 const TRANSLATE_JOB_LEASE_SECONDS = 3 * 60; // 180 seconds
-// BE-H6: Reduced from 10 to 3. Three jobs at up to 15s each = 45s max,
-// leaving 15s margin before Vercel's 60s function timeout.
-const TRANSLATE_JOB_BATCH_SIZE = 3;
+// BE-H6: Reduced from 10 to 3. Exported so tests can verify `maxDuration`
+// (below) stays ahead of the worst-case batch duration it implies.
+export const TRANSLATE_JOB_BATCH_SIZE = 3;
+// BE-M3 (#784): worst observed per-job translation time, used below to
+// derive the batch's worst-case wall-clock duration. Exported so tests can
+// verify `maxDuration` stays ahead of this assumption instead of drifting
+// from it silently.
+export const TRANSLATE_JOB_PER_JOB_MAX_SECONDS = 15;
+
+// BE-M3 (#784): explicit ceiling for this route, replacing Vercel's implicit
+// project default. The batch-size/lease-second tuning above was already
+// assuming a 60s budget ("well within Vercel's 60s function timeout") but
+// nothing declared or enforced that assumption — this makes it explicit.
+// Worst-case batch duration = TRANSLATE_JOB_BATCH_SIZE (3) *
+// TRANSLATE_JOB_PER_JOB_MAX_SECONDS (15s) = 45s, so 60s keeps a 15s margin
+// and remains the binding constraint that the batch size was tuned against,
+// not a new, looser ceiling.
+//
+// Per PE-H5 (#808), Vercel's currently documented default (Fluid Compute, on
+// by default) is 300s across all plan tiers — so 60s here is a deliberately
+// LOWER, explicit ceiling than that implicit default, consistent with the
+// existing tuning, rather than a relaxation of it. This could not be
+// confirmed against this project's actual dashboard setting (`vercel project
+// inspect` does not surface Function Max Duration); flagging for human
+// confirmation via Settings > Functions > Function Max Duration. If that
+// setting differs from 60s, TRANSLATE_JOB_BATCH_SIZE should be reconfirmed
+// against it, not just this constant.
+export const maxDuration = 60;
 
 const StrictTranslateWebhookSchema = z
   .object({
