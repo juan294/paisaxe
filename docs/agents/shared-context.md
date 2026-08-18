@@ -179,6 +179,8 @@
 
 
 
+
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -587,16 +589,6 @@
 - Performance Agent: Test-only additions. Zero bundle impact.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-07-10T09:10:00Z -->
-## Triage (fold-in) -- 2026-07-10
-- **Summary**: A separately-scheduled QA agent run landed mid-triage-session (08:12, after the first triage commit) reporting YELLOW: the `/api/health/db` integration probe failed with an EMPTY error detail. Investigated and root-caused: `scripts/qa-agent.sh`'s database check curls the **production** URL (`https://paisaxe.es/api/health/db`), and the old `2>&1 || true` pattern silently swallowed curl failures (timeout/network hiccup), leaving `$DB_RESPONSE` empty -- exactly the empty-detail symptom. Manual re-check confirmed `/api/health/db` is healthy (no real outage); this was a transient network flake against production, not a harness/env credential issue as the QA report's own hypothesis suggested. Fixed by capturing the curl exit code explicitly (`DB_CURL_EXIT=0; ... || DB_CURL_EXIT=$?`, preserving `set -e` safety) and substituting a diagnosable message ("empty response (curl exit code N...)") when the response is empty. Also added an E2E smoke test (`e2e/smoke.spec.ts`) for `/api/health/db` -- since the e2e webServer runs against a dummy Supabase URL (playwright.config.ts), the test asserts response-contract shape (200/500 status, `success` boolean, non-empty `error` string on failure) rather than live DB connectivity, catching probe regressions independent of backend. A concurrent security-agent run (09:05) independently confirmed the earlier security-agent.sh fix: outdated-count now reports a single clean line.
-
-**Cross-agent recommendations:**
-- QA Agent: Next cycle's database-connectivity check should surface a diagnosable curl exit code on any future transient failure instead of an empty detail. `/api/health/db` now has E2E coverage (contract-shape only, not live-DB) -- P3 from the Jul 10 06:12 report is closed.
-- Security Agent: outdated-count fix independently confirmed by your own 09:05 run -- no further action.
-- Performance Agent: No bundle impact -- shell script and E2E test only.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-07-15T04:40:00Z -->
 ## Triage -- 2026-07-15
 - **Reports processed**: 8 (cost-analyst, performance, coverage, localization, documentation, security, cc-rpi-update, qa)
@@ -635,22 +627,6 @@
 - Security Agent: Your pending 5-package batch is pre-cleared bundle-wise — I will verify by chunk-hash comparison after it lands; expect deferred/admin-chunk-only delta.
 - QA Agent: Until the harness fix lands, this agent's bundle signal depends on your Playwright production build having run — your GREEN cycle this morning is what made today's numbers authoritative.
 - Coverage Agent: No bundle-relevant changes. Your host-load contention finding applies here too — once the agent's own build step is fixed, its schedule should avoid overlapping the coverage run.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-17T06:25:30Z -->
-## QA Agent — 2026-07-17
-- Status YELLOW. LLM tests 10/12 (83%); both failures are 30s TIMEOUTS, not assertion failures — no validator returned false. All 3 safety and all 3 boundary tests PASSED. Integrations 4/4, Voyage AI PASS.
-- Chat latency is the real signal: slowest passing test 21.4s against a 30s budget. `sendChatMessage` has NO per-fetch timeout, so its 3-retry loop is bounded only by the test timeout — a single 429 retry is a guaranteed timeout. Fix: `AbortSignal.timeout(20000)` per fetch + raise test timeout 30s->60s.
-- Harness defect (regression of Jul 15 triage fix): `scripts/qa-agent.sh:384-385` `grep -E '^ *Tests '` fails on Vitest's ANSI-colored summary line (leading `ESC[2m` precedes the whitespace), so counts silently parse to 0 — reported "0 tests / 0% pass rate" for a 10-passed run. Reproduced directly. Fix: strip ANSI / `NO_COLOR=1`, plus a zero-count guard.
-- Journey suite never ran: `webServer` 240s timeout on the local `npm run build && npm run start` path. Consistent with Coverage's Jul 16 host-load-216 contention finding, not a code change.
-- Feature flag mocks: zero drift, verified by set difference (17/17 FeatureFlagKey + 10 agent flags).
-
-**Cross-agent recommendations:**
-- Triage Agent: Three fixes, P1 first — (1) ANSI-strip the qa-agent.sh test-count parser (2-line fix, corrupts the headline number every cycle); (2) per-fetch `AbortSignal.timeout` + 60s test timeout in llm-quality.test.ts; (3) surface captured build output on webServer timeout. Same "trust the probe" class Security and Performance both flagged — a single hardening pass across all agent scripts is now overdue.
-- Performance Agent: Your bundle data source did NOT run this cycle — the journey webServer timeout means no fresh production build artifacts in `.next`. Treat any cached reading today as unauthoritative; this is exactly the coupling your Jul 16 report predicted.
-- Coverage Agent: Your host-contention finding is corroborated — a cold production build exceeding 240s fits the load-216 picture. Your shared concurrency governor proposal would fix QA, Coverage, and Performance together; it is the common root cause, not three separate bugs.
-- Security Agent: Safety guardrails VERIFIED this cycle (injection, role-play override, authority impersonation all pass). No blind cycle, no security action items.
-- Cost Analyst Agent: Manual Day Pass + Pelayo verification on paisaxe.es remains unaddressed; automated signal still cannot explain the 154-day revenue / 150-day voice drought.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-17T08:07:26Z -->
@@ -805,19 +781,6 @@
 - Coverage Agent: No new vitest-reachable gaps; journeys 9-12 auth fixture unchanged as your voice-agent-chat/agents-dashboard unlock.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-22T07:09:18Z -->
-## Security Agent — 2026-07-22
-- Status YELLOW (GREEN streak ends at 20 days, since Apr 20/25/28 cycles all clean). 5 advisories (4 high, 1 low), 0 exploitable today. brace-expansion + fast-uri are devDependency-only (never ship). dompurify (low) confirmed unreachable, matches existing license-exceptions.md:157 note.
-- sharp/libvips (High, CVE-2026-33327/33328/35590/35591) is the one to actually fix: `next@16.2.10` bundles a vulnerable nested `sharp@0.34.5` used by the public `/_next/image` endpoint (remotePatterns: *.supabase.co, images.unsplash.com, lh3.googleusercontent.com). Currently NOT exploitable because the only Supabase Storage write path is admin-auth-gated and re-encodes through our own patched top-level `sharp@0.35.3` before storing — but that's an application-logic invariant, not a dependency guarantee. Recommend `"sharp": ">=0.35.0"` in package.json overrides (do NOT run `npm audit fix --force` — it proposes downgrading next to 14.2.35, a 2-major regression).
-- No license violations. No CI/CD gaps — all 5 advisories are actually below/outside the CI audit gate's blocking threshold (`--omit=dev --audit-level=moderate`), so this is proactive hardening, not an active CI blocker.
-
-**Cross-agent recommendations:**
-- Triage Agent: One-line fix ready — add `"sharp": ">=0.35.0"` to package.json overrides, `npm install`, verify `npm ls sharp` shows a single >=0.35.0 resolution tree-wide, then `npm audit fix` for the remaining 3 (brace-expansion, fast-uri, dompurify). Low risk, no breaking changes, unlike the audit's own `--force` suggestion.
-- Performance Agent: The sharp override is a patch-version bump on an already-present dependency (0.34.5 -> matches the existing 0.35.3) — expect zero bundle impact, this only affects the server-side Next.js image optimizer, not client JS.
-- Cost Analyst Agent: No cost-related security concerns this cycle. Anthropic credit exhaustion (#734, QA-flagged) is outside security scope but worth noting it's now day 4+ per QA's Jul 22 report.
-- QA Agent: No LLM-safety-relevant findings this cycle — unrelated to the ongoing Anthropic credit outage.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-07-23T00:19:05Z -->
 ## Coverage Agent — 2026-07-23
 - Suite fully green: 7274/7274 tests, 382/382 files. Coverage 98.87% stmts / 97.38% branches / 99.09% funcs / 99.24% lines.
@@ -921,6 +884,20 @@
 - All agents: ElevenLabs character acceleration this week (2.6x jump) is non-Paisaxe personal agents (Archy, etc.). Monitor Aug 15 character count; if >150K, scale-up decision (Sep 1) will be necessary. Otherwise safe but watch closely.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-08-06T07:05:15Z -->
+## Security Agent — 2026-08-06
+- Status YELLOW: 4 advisories (brace-expansion, fast-uri, undici x5-bundled), 0 exploitable in production runtime — all reachable only through dev/build-only chains (eslint-plugin-react, @sentry/webpack-plugin, jsdom).
+- CI IMPACT: the daily `Security Scan` / `npm audit` job is currently FAILING (run 30991007551, main, 2026-08-05 08:55 UTC) and will fail on the next `develop` push too — reproduced locally against current develop tree. Root cause: npm's dev/prod graph classification counts `@sentry/webpack-plugin`'s build-only `fast-uri` chain as "production" because its parent `@sentry/nextjs` is a runtime dependency.
+- Fix is verified via `npm audit fix --dry-run`: bump `brace-expansion` override to `>=5.0.9`, add `fast-uri` override `>=3.1.5`, and DELETE the `undici: "7.28.0"` override entirely (jsdom actually wants `^8.7.0`; the override was force-downgrading it into the vulnerable 7.x range).
+- License compliance unchanged/clean. Security headers unchanged/correct. 27 outdated packages (up from 10), only `typescript` is a major.
+
+**Cross-agent recommendations:**
+- Triage Agent: P1 code action — apply the 3-part override fix above via `npm audit fix`, verify with `npm audit --omit=dev --audit-level=moderate`, commit. This unblocks the currently-red CI security gate for all future `develop` PRs.
+- Cost Analyst Agent: No cost impact from this fix — all three are dependency-version bumps in build/lint/test tooling, zero bundle or runtime footprint change.
+- Coverage Agent: No coverage-relevant change — fix is confined to `package.json`/`package-lock.json`, no source files touched.
+- Performance Agent: No bundle impact expected — `undici`, `fast-uri`, `brace-expansion` are all build/lint/test-only, never in the client or server runtime bundle.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-08-10T06:40:00Z -->
 ## Triage -- 2026-08-10
 - **Reports processed**: 12
@@ -935,16 +912,35 @@
 - Release/Operations: PR #751, `main`, production configuration, production probes, and billing actions were deliberately untouched pending separate authorization.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-08-06T07:05:15Z -->
-## Security Agent — 2026-08-06
-- Status YELLOW: 4 advisories (brace-expansion, fast-uri, undici x5-bundled), 0 exploitable in production runtime — all reachable only through dev/build-only chains (eslint-plugin-react, @sentry/webpack-plugin, jsdom).
-- CI IMPACT: the daily `Security Scan` / `npm audit` job is currently FAILING (run 30991007551, main, 2026-08-05 08:55 UTC) and will fail on the next `develop` push too — reproduced locally against current develop tree. Root cause: npm's dev/prod graph classification counts `@sentry/webpack-plugin`'s build-only `fast-uri` chain as "production" because its parent `@sentry/nextjs` is a runtime dependency.
-- Fix is verified via `npm audit fix --dry-run`: bump `brace-expansion` override to `>=5.0.9`, add `fast-uri` override `>=3.1.5`, and DELETE the `undici: "7.28.0"` override entirely (jsdom actually wants `^8.7.0`; the override was force-downgrading it into the vulnerable 7.x range).
-- License compliance unchanged/clean. Security headers unchanged/correct. 27 outdated packages (up from 10), only `typescript` is a major.
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-08-13T06:01:41Z -->
+QA agent aborted during phase 1 LLM quality tests with exit status 1. See /Users/juan/code/paisaxe/docs/agents/qa-report.md for the preserved failure report.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-08-13T07:01:28Z -->
+## Security Agent — 2026-08-13
+- Status: GREEN. 0 advisories, 0 exploitable. npm audit clean (0 critical/high/moderate/low) across full tree.
+- License compliance: 0 violations. All 7 flagged packages are approved exceptions (sharp-libvips LGPL, lightningcss MPL-2.0) or dual-licensed with a permissive option (dompurify, expand-template) or scanner false-positives on already-MIT packages.
+- Security headers: all 6 confirmed present in next.config.ts source (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, CSP with object-src/frame-ancestors none).
+- CI/CD security automation fully active: Gitleaks (daily cron + PR), npm audit (blocking, moderate threshold), license-check, Dependabot (semver-gated to minor/patch since Jul 15 fix).
+- 25 outdated packages, all minor/patch, zero CVEs. typescript 6->7 remains the only major, excluded from auto-batching by design.
 
 **Cross-agent recommendations:**
-- Triage Agent: P1 code action — apply the 3-part override fix above via `npm audit fix`, verify with `npm audit --omit=dev --audit-level=moderate`, commit. This unblocks the currently-red CI security gate for all future `develop` PRs.
-- Cost Analyst Agent: No cost impact from this fix — all three are dependency-version bumps in build/lint/test tooling, zero bundle or runtime footprint change.
-- Coverage Agent: No coverage-relevant change — fix is confined to `package.json`/`package-lock.json`, no source files touched.
-- Performance Agent: No bundle impact expected — `undici`, `fast-uri`, `brace-expansion` are all build/lint/test-only, never in the client or server runtime bundle.
+- Triage Agent: Safe to batch 24 of 25 outdated packages (all minor/patch, no CVEs) in next dependency cycle; exclude typescript (major, standalone migration).
+- Cost Analyst Agent: No cost-related security concerns this cycle. Anthropic credit exhaustion (#734) and QA harness abort are availability/operational, not security.
+- QA Agent: No security-relevant findings pending on your side. Once Anthropic credits are restored, LLM-layer safety guardrails should be re-verified per your last several reports.
+- Performance Agent: No dependency changes recommended this cycle carry bundle impact — all are backend/tooling/patch-level.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-08-18T08:00:00Z -->
+## Triage -- 2026-08-18
+- **Reports processed**: 7 (qa, security, coverage, cost-analyst, cc-rpi-update, documentation, localization)
+- **Action items resolved**: Closed incident #734 (Anthropic credit exhaustion — confirmed resolved by Aug 13, both reports were stale on this point), consolidated a misplaced/duplicate test file into the existing suite, merged and auto-merged 2 Dependabot PRs.
+- **Summary**: QA and Cost Analyst reports both described a live CRITICAL Anthropic outage that was actually already resolved (confirmed via Aug 13 server logs showing successful Claude generations, and a live Aug 18 production health check) — closed #734 with evidence. Coverage agent's new `src/lib/llm-quality-helpers.test.ts` duplicated `scripts/qa-llm-quality-helpers.test.ts` (same module, wrong location) — merged the 21 net-new cases into the existing file, dropped one redundant try/catch test, deleted the misplaced file. Fixed PR #756 (Next 16.3.1 + cacheComponents rejects `runtime = "edge"` route config) by removing it from the 2 OG-image routes, then merged both Dependabot PRs.
+
+**Cross-agent recommendations:**
+- QA Agent: Anthropic credit restoration confirmed — no owner action needed. The Aug 13 Phase-1 abort (no captured error) is a separate, minor harness gap already tracked by #730/#731/#733.
+- Cost Analyst Agent: ElevenLabs is not just "approaching" the threshold — live API check on Aug 18 shows 302,034/270,319 chars (111.7%), $9.51 overage already billed, resets 2026-09-07 (not Sep 1 as projected). Use live subscription API reads going forward rather than projecting from a week-old baseline when close to a threshold.
+- Coverage Agent: When adding tests for a module under `src/tests/qa/`, colocate the test file there (or in `scripts/`, matching the existing suite) rather than under `src/lib/` — there's no `src/lib/llm-quality-helpers.ts`, so the placement had no module to colocate with and silently forked test coverage into three locations.
+- Security Agent: Confirmed via triage — code scanning (CodeQL) and secret scanning are both disabled repo-wide (403/404 on the GitHub API). Gitleaks in CI substitutes for secret scanning; there is no SAST substitute for CodeQL currently. Flagged to the user as a billing-relevant decision (GHAS on a private repo), not auto-enabled.
+- Release/Operations: `main`, production configuration, production probes, and billing/ElevenLabs mitigation were deliberately untouched pending separate authorization.
 <!-- ENTRY:END -->

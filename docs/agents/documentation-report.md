@@ -1,9 +1,9 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-08-06
+> Auto-generated on 2026-08-13 06:00:04
 
 ## CLAUDE.md Status
 
-Last modified: **2026-07-28**
+Last modified: **2026-08-10**
 
 ## Files Modified Since Documentation Update
 
@@ -12,32 +12,27 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/app/api/admin/voice-session/route.test.ts
-src/app/api/admin/voice-session/route.ts
 src/app/api/voice-session/route.test.ts
-src/app/api/voice-session/route.ts
-src/components/admin/voice-agent-chat.test.tsx
-src/components/admin/voice-agent-chat.tsx
-src/components/immersive/voice-chat-elevenlabs.test.tsx
-src/components/immersive/voice-chat-elevenlabs.tsx
-src/config/elevenlabs-agents.ts
-src/hooks/use-voice-session.test.ts
-src/hooks/use-voice-session.ts
-src/lib/elevenlabs-signed-session.test.ts
-src/lib/elevenlabs-signed-session.ts
+src/lib/llm-quality-helpers.test.ts
 ```
 
 No new migrations since documentation update.
 
-### Scripts
+## Changes Made This Run
 
-```
-scripts/check-verification-coverage.ts
-scripts/elevenlabs-scoped-ops.test.ts
-scripts/elevenlabs-scoped-ops.ts
-scripts/modernize-paisaxe-agent-config.test.ts
-scripts/modernize-paisaxe-agent-config.ts
-```
+**Status: GREEN** — No documentation updates required.
+
+- **Feature Flags**: All 17 feature flags (Features tab) and 10 agent flags (Agents tab) are fully documented in `docs/project/features.md`. Zero undocumented flags identified.
+- **API Routes**: All 51 flagged routes confirmed internal (admin dashboards, cron endpoints, webhook receivers, MCP voice-agent tools). No external-consumption routes require separate API documentation. Routes are implicitly documented through feature narrative:
+  - Chat API: documented under "Voice & Text Chat"
+  - Webhooks: documented under "Infrastructure"
+  - Health probes: documented under "Infrastructure"
+  - Voice routes: documented under "Premium Voice Agent"
+  - Favorites: documented under "Favorites"
+  - Payment routes: documented under "Revenue Analytics"
+- **docs/project/features.md**: Current and complete (last review: 2026-06-21, no gaps found across 31+ consecutive clean runs).
+
+**Consecutive clean runs: 32**
 
 ## Documentation Gaps
 
@@ -111,20 +106,8 @@ webhooks/translate
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-07-28 |
+| CLAUDE.md | 2026-08-10 |
 | README.md | 2026-07-28 |
-
-## Changes Made This Run
-
-**None.** All documentation is current and complete (32nd consecutive clean run).
-
-- Feature flags: All 17 documented with accurate descriptions and categories in features.md
-- API routes: All 57 confirmed internal (admin, cron, webhooks, MCP, health, internal access)
-- CLAUDE.md: Current, comprehensive coverage of all user-facing features and admin capabilities
-- No external-consumption API routes require documentation
-- No undocumented feature flags identified
-
-Documentation update cycle is operating at 100% completeness.
 
 ---
 

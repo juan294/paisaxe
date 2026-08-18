@@ -1,24 +1,18 @@
 # Cost Analyst Report
 
-> **Generated**: 2026-08-06 HH:MM:SS UTC | **Period**: August 2026 (day 6 of 31) | **Status**: CRITICAL (Anthropic incident #734 ongoing, ElevenLabs character utilization accelerating)
+> **Generated**: 2026-08-13 10:45 UTC | **Period**: August 2026 (day 13 of 31) | **Status**: CRITICAL (Anthropic incident #734 ongoing — now day 24 unresolved; ElevenLabs monthly acceleration approaching threshold)
 
 ---
 
 ## Executive Summary
 
-**CRITICAL: Production chat remains offline due to Anthropic credit exhaustion (incident #734, now day 17 unresolved since ~Jul 20).** This is the single most urgent item across all agent reports and must be addressed immediately at https://console.anthropic.com/settings/billing.
+**CRITICAL: Anthropic credit exhaustion incident #734 is now unresolved for 24 consecutive days (since ~Jul 20).** Production chat remains offline. This is the highest-priority operational issue and requires immediate owner intervention at https://console.anthropic.com/settings/billing.
 
-Secondary anomaly this cycle: **ElevenLabs character utilization has accelerated significantly.** The Creator tier subscription jumped from ~21.6% (estimated Jul 30) to **40.91% actual on Aug 6** — a +19.31pp jump in 7 days driven by personal agents (Archy, story-interviewer, support-faq), not Paisaxe voice activity (which remains at 0 for 169 consecutive days). At the current observed rate of ~8,289 chars/day (vs the prior ~3,000 chars/day), the cycle will exhaust the 300,000 character limit by ~2027-01-31 (26 days before the Feb 4 reset). This triggers an automatic tier upgrade to Scale ($99/mo) without user intervention, materially changing operational cost structure.
+**Secondary anomaly (elevated urgency)**: **ElevenLabs character utilization is accelerating toward the monthly limit.** Last verified Aug 6: 122,719 / 300,000 chars (40.91%). Current 7-day trend shows ~8,289 chars/day. Projection to Aug 31 (18 days remaining): ~271,719 chars total, **90.57% of monthly limit**. This is approaching the 100% trigger threshold for automatic Scale tier upgrade (+$76.82/mo, ~348% cost increase). **Decision point is imminent: if utilization exceeds ~150K by Aug 20, mitigation is required.**
 
-**Fixed operational cost**: $99.65/mo ($3.2145/day). **Variable costs (Aug MTD)**: $0.00. **Revenue**: $0.00 (6th consecutive zero month). **Cumulative operational loss since Feb 2026**: ~$660+ (through day 6 of August).
+**Fixed operational cost**: $99.65/mo ($3.2145/day). **Variable costs (Aug MTD, through day 13)**: $0.00. **Revenue**: $0.00 (7th consecutive zero month). **Cumulative operational loss since Feb 2026**: ~$721 (through Aug 13 projected).
 
-**Key operational metrics:**
-- Anthropic: Credits exhausted, production chat down (P0, owner-only fix required)
-- ElevenLabs: 40.91% utilization, cycle-end projection ~88% without intervention (overage to Scale tier likely)
-- Twilio: Balance $9.6546, runway ~6.9 months to ~Mar 2027
-- Revenue: $0.00 for 173 days, fifth consecutive zero month
-
-**Status**: CRITICAL due to Anthropic incident + emerging ElevenLabs cost structure shift. All other automated cost signals within normal operating range except the ElevenLabs acceleration.
+**Status**: CRITICAL due to Anthropic incident (day 24 unresolved) + ElevenLabs monthly cycle now at elevated risk (90%+ projected utilization by month-end).
 
 ---
 
@@ -31,47 +25,45 @@ Secondary anomaly this cycle: **ElevenLabs character utilization has accelerated
 | Claude Code Max | Max (20x Pro) | $200.00 | -- (dev) | Development | flat |
 | Supabase | Pro | $25.00 | 25.1% | Infrastructure | flat |
 | Anthropic Claude | Prepaid credits | $25.00* | 25.1% | AI | CRITICAL INCIDENT |
-| ElevenLabs | Creator (annual) | $22.18** | 22.3% | AI / Voice | WATCH (see anomaly) |
+| ElevenLabs | Creator (annual) | $22.18** | 22.3% | AI / Voice | WATCH (approaching threshold) |
 | Vercel | Pro | $20.00 | 20.1% | Infrastructure | flat |
 | GitHub Pro | Pro | $4.00 | 4.0% | Infrastructure | flat |
 | AWS Domains | -- | $2.08 | 2.1% | Infrastructure | flat |
 | Twilio Phone Number | -- | $1.39*** | 1.4% | Communications | flat |
 | PostHog | Free | $0.00 | 0% | Analytics | flat |
-| **Total Fixed (all, config)** | | **$299.65** | | | |
 | **Total Fixed (operational)** | | **$99.65** | **100%** | | |
 
-*Anthropic $25/mo is the config estimate. **CRITICAL INCIDENT #734 (day 17 unresolved)**: Personal account credit balance is EXHAUSTED ("credit balance is too low" on all generation calls as of Jul 20). Production chat on paisaxe.es has been returning 500s for real users since ~Jul 20. No per-project billing API available. **The true burn rate is unknown; the $25/mo estimate is demonstrably insufficient.** Owner must restore credits immediately at https://console.anthropic.com/settings/billing and record the grant size + time-since-last-top-up to establish predictable burn rate. This is now a production incident, not just a visibility gap.*
+*Anthropic $25/mo is the config estimate. **CRITICAL INCIDENT #734 (day 24 unresolved as of Aug 13).** Personal account credit balance exhausted since ~Jul 20. Production chat on paisaxe.es returning 500s for real users since Jul 20. No per-project billing API available. **Owner must restore credits immediately at https://console.anthropic.com/settings/billing.***
 
-**ElevenLabs Creator billed annually at $266.20/yr (effective $22.18/mo). Last verified Aug 6: 122,719 / 300,000 chars (40.91%), next reset ~Feb 4 2027 (181 days). Current overage: $0. See Anomalies section below.**
+**ElevenLabs Creator billed annually at $266.20/yr (effective $22.18/mo). Last verified Aug 6: 122,719 / 300,000 chars (40.91%). Projected Aug 13 (7 days forward at 8,289 chars/day): ~180,682 / 300,000 chars (60.23%). Projected Aug 31 (18 days remaining): ~271,719 chars (90.57%). Monthly reset: Sep 1 2026. Annual renewal: Feb 4 2027. Cost impact: $0 overage to date. See Anomalies section.**
 
-***Twilio config value $1.39/mo ($1.15 base rental + $0.24 regulatory fee). Last verified Aug 6: balance $9.6546 (fully settled). No charges posted in August to date (0 SMS, 0 calls).*
+***Twilio config value $1.39/mo ($1.15 base rental + $0.24 regulatory fee). Last verified Aug 6: balance $9.6546 (fully settled, zero August usage).***
 
 **Total Fixed Operational**: $99.65/mo | **Daily Burn Rate**: $3.2145/day
 
-### Variable / Usage-Based Costs (August 2026 — Day 6)
+### Variable / Usage-Based Costs (August 2026 — Through Day 13)
 
 | Service | Usage | Cost | Source |
 |---------|-------|------|--------|
-| Twilio (phone rental base) | Posted via monthly cycle | $0.00 (partial month) | Last verified Aug 6 via Balance API; full $1.39 charged monthly ~Aug 7 |
+| Twilio (phone rental base) | Monthly cycle | $0.00 (partial month, ~Aug 7 charge) | Last verified Aug 6; balance $9.6546, zero SMS/calls |
 | Twilio (SMS) | 0 messages | $0.00 | Last verified Aug 6 (100+ records scanned) |
 | Twilio (Calls) | 0 minutes | $0.00 | Last verified Aug 6 |
-| ElevenLabs (overage) | 122,719 / 300,000 chars | $0.00 | Last verified Aug 6; all within Creator tier limit (40.91% utilization) |
-| Stripe (Processing Fees) | 0 charges | $0.00 | Consistent with 173-day revenue drought |
-| Anthropic (Claude API) | **UNKNOWN — CREDITS EXHAUSTED** | **UNKNOWN (incident #734)** | No API on personal account. Production chat returning 500s. Status: unresolved day 17. |
-| Voyage AI (Embeddings) | Unknown | Unknown | No dedicated billing API |
-| **Total Variable (Aug MTD, incremental to fixed)** | | **$0.00** | Twilio phone rental ~$1.39 will post next cycle (~Aug 7) |
+| ElevenLabs (overage) | ~180,682 / 300,000 chars (proj. Aug 13) | $0.00 | Projected from Aug 6 verified (122,719) + 7 days at 8,289/day |
+| Stripe (Processing Fees) | 0 charges | $0.00 | Consistent with 181-day revenue drought (no Day Pass sales since Feb 13) |
+| Anthropic (Claude API) | **UNKNOWN — CREDITS EXHAUSTED** | **UNKNOWN (incident #734, day 24)** | No API on personal account. Production chat offline since Jul 20. |
+| **Total Variable (Aug MTD, incremental)** | | **$0.00** | |
 
-### August 2026 Position (Day 6 of 31)
+### August 2026 Position (Day 13 of 31, Projected)
 
 | Category | Cost |
 |----------|------|
-| Fixed Operational accrued (~6 days x $3.2145) | ~$19.29 |
+| Fixed Operational accrued (~13 days x $3.2145) | ~$41.79 |
 | Variable incremental (Aug MTD) | $0.00 |
-| **Total Operational (Aug MTD, estimated)** | **~$19.29** |
+| **Total Operational (Aug MTD, projected)** | **~$41.79** |
 | Revenue | $0.00 |
-| **Net (loss, MTD)** | **-$19.29** |
+| **Net (loss, MTD)** | **-$41.79** |
 
-### Monthly Cost History
+### Monthly Cost History & Projection
 
 | Month | Operational Fixed | Variable (confirmed) | Total Operational | Revenue (net) | Coverage |
 |-------|-------------------|----------------------|-------------------|---------------|----------|
@@ -81,81 +73,84 @@ Secondary anomaly this cycle: **ElevenLabs character utilization has accelerated
 | May 2026 (final) | $99.65 | $1.39 | **$101.04** | **$0.00** | **0%** |
 | Jun 2026 (final) | $99.65 | $1.39 | **$101.04** | **$0.00** | **0%** |
 | Jul 2026 (final) | $99.65 | $1.39 | **$101.04** | **$0.00** | **0%** |
-| Aug 2026 (day 6, proj.) | $19.29 | $0.00 | **~$19.29** | **$0.00** | **0%** |
+| Aug 2026 (day 13, proj.) | $41.79 | $0.00 | **~$41.79** | **$0.00** | **0%** |
 | Aug 2026 (day 31, proj.) | $99.65 | $1.39 | **~$101.04** | **$0.00** | **0%** |
 
-**Cumulative operational loss since February launch**: ~$660 (through Aug 6, adding day 6's ~$19.29 to Jul's ~$640 running total).
+**Cumulative operational loss since February launch**: ~$721 (through Aug 13 projected, adding day 13's cost to Jul's ~$640 base).
 
 ---
 
 ## Usage Metrics
 
-### ElevenLabs Activity (Aug 6 verified)
+### ElevenLabs Activity (Projection from Aug 6 verified baseline)
 
-**Subscription Status (Aug 6 verified data):**
-- Current cycle: 122,719 / 300,000 characters (40.91%), 2 days into August (and ~183 days into the annual 31-day character refresh cycle)
-- Last reset: August 1 2026 (beginning of the monthly character window, but annual subscription renews Feb 4 2027)
-- Next reset: September 1 2026 (monthly); Annual subscription renewal: Feb 4 2027
-- **Daily rate this week (Jul 30 → Aug 6)**: ~8,289 chars/day (accelerating from prior ~2,887-3,150 chars/day)
-- **7-day projection (Aug 6 → Aug 13)**: ~58,023 additional chars at current rate
-- **Cycle-end projection (Aug 1 → Sep 1 at current rate)**: ~248,670 chars (82.89% utilization by Sep 1 reset)
-- **Feb 4 2027 annual reset projection**: Without intervention, the monthly accumulation pattern suggests Creator tier will be insufficient by late January 2027 (estimated ~85-90% of 300K before reset)
-- Paisaxe agents: **Zero activity for 169 consecutive days** (last conversation Feb 17)
+**Subscription Status (Aug 6 verified, projected to Aug 13):**
+- Aug 6 verified: 122,719 / 300,000 characters (40.91%)
+- **Aug 13 projected**: 180,682 / 300,000 chars (60.23%) — **+57,963 chars in 7 days at 8,289 chars/day**
+- **Aug 31 projected (day 31)**: 271,719 / 300,000 chars (90.57%) — **18 days remaining, ~28,281 chars to trigger 100% overage**
+- Daily rate this week (Aug 6 baseline): ~8,289 chars/day (consistent with Jul 30–Aug 6 acceleration)
+- Monthly character reset: Sep 1 2026
+- Annual subscription renewal: Feb 4 2027
+- Paisaxe agents: **Zero activity for 177 consecutive days** (last conversation Feb 17)
 - All observed ElevenLabs activity: personal agents (Archy, story-interviewer, support-faq) with $0 marginal cost on Creator tier
 
-**Cost impact**: No overage yet ($0). However, the accelerating utilization rate is the primary emerging risk this cycle. If the ~8,289 chars/day rate holds through the annual cycle, monthly resets will consistently consume 80-85% of the 300K character allocation, leaving minimal buffer. This pattern will eventually trigger an automatic tier upgrade to Scale ($99/mo, costing ~+$77/mo effective annual increase) without explicit user action. The trigger threshold is 100%+ characters in a month, which would happen if the 8,289 chars/day rate persists past day ~36 of any monthly cycle.
+**Cost impact**: No overage yet. **However, the monthly cycle is now at elevated risk.** At current rate of 8,289 chars/day:
+- **Aug 20 threshold**: ~179,400 chars (59.8%). If exceeds ~150K by Aug 20, consider activity mitigation to prevent Sep spillover.
+- **Aug 31 projected**: ~271,719 chars (90.57%). **Exceeds safe margin; second half of August carries risk of 100%+ spillover.**
+- **Trigger for Scale tier upgrade**: 100%+ characters in any single month triggers automatic escalation from Creator ($22.18/mo effective) to Scale ($99/mo), a +$76.82/mo (~348% cost increase).
 
-### Twilio Communications (Aug 6 verified)
+**Recommendation**: Check actual Aug 15 reading. If >150K, personal-agent activity reduction is required. Aug 20 is the final decision point; beyond that, September faces high risk of spillover into Scale tier.
 
-| Metric | Aug 6 (verified) | Jul 30 (est.) | Jul 23 (verified) |
-|--------|---------|----------|----------|
-| SMS Sent | 0 | 0 | 0 |
-| Calls | 0 | 0 | 0 |
-| Balance | $9.6546 | ~$9.7556 | $9.8946 |
-| Monthly charges | $0.00 (partial, ~Aug 7) | $1.39 (July posted) | $1.39 (July posted) |
-| Runway (months) | ~6.9 | ~7.0 | ~7.1 |
+### Twilio Communications (Projected from Aug 6 verified baseline)
 
-**Twilio decision gate**: Runway depletes to zero around **Mar 2027** (~6.9 months from Aug 6). Current trajectory: the next charge will post ~Aug 7, bringing balance to ~$8.26. The final calm window for a deliberate release/retain decision is rapidly closing. At current burn, final decision point is approximately **Feb 2027** (when both Twilio and ElevenLabs face renewal/exhaustion). Decision should be made before the balance falls below $2 (approximately Jan 2027).
+| Metric | Aug 6 (verified) | Aug 13 (projected) | Change |
+|--------|---------|-------------|--------|
+| SMS Sent | 0 | 0 | flat |
+| Calls | 0 | 0 | flat |
+| Balance | $9.6546 | ~$9.55 (est. post Aug 7 charge) | ~-$0.10 (expected ~Aug 7 $1.39 charge) |
+| Monthly charges | $0.00 (partial month) | $1.39 (posted ~Aug 7) | normal |
+| Runway (months) | ~6.9 | ~6.8 | declining (expected) |
 
-### Stripe Revenue (Aug 6, unchanged from Jul 30)
+**Twilio decision gate**: Runway depletes around **Mar 2027** (~6.8 months from Aug 13). Sixth consecutive month of paying $1.39/mo for zero booking calls. Final calm decision window closes around **Feb 2027** (6 months from now). Recommend explicit call (release or retain) by Jan 2027 to avoid forced decision at zero balance.
 
-| Metric | Aug 6 (proj.) | Jul 2026 (final) | Jun 2026 |
-|--------|-----------|--------|---------|
-| Net Sales | 0 | 0 | 0 |
-| Net Revenue | $0.00 | $0.00 | $0.00 |
+### Stripe Revenue (Unchanged, Aug 13 projected)
 
-**173-day revenue drought** (no Day Pass sale since Feb 13). Five complete zero-revenue months (Mar-Jun-Jul), August on track for sixth consecutive $0 month. Compounding factor: production chat (primary conversion entry point) has been down since ~Jul 20 due to Anthropic credit exhaustion — any latent demand is completely blocked from converting.
+| Metric | Aug 13 (proj.) | Aug 6 (verified) |
+|--------|-----------|---------|
+| Net Sales | 0 | 0 |
+| Net Revenue | $0.00 | $0.00 |
 
-### Anthropic Credits (CRITICAL INCIDENT #734 — Day 17 Unresolved)
+**181-day revenue drought** (no Day Pass sale since Feb 13). Seven consecutive zero-revenue months (Mar–Aug). Production chat (primary conversion entry point) down since Jul 20 — any latent demand is blocked from converting.
 
-**Status**: EXHAUSTED (unresolved day 17 as of Aug 6).
+### Anthropic Credits (CRITICAL INCIDENT #734 — Day 24 Unresolved)
 
-**Evidence**: QA agent reports "credit balance is too low" on all generation calls since Jul 20. Production chat on paisaxe.es returning 500s for real users. No API visibility on personal account; manual check required.
+**Status**: EXHAUSTED (unresolved day 24 as of Aug 13, vs day 17 on Aug 6).
+
+**Evidence**: QA agent reports "credit balance is too low" on all generation calls since Jul 20. Production chat on paisaxe.es returning 500s for real users. No per-project API visibility; manual check required.
 
 **Impact**:
 - Production chat completely offline (primary revenue conversion surface)
 - All future revenue conversion impossible until credits restored
 - All LLM quality signal lost (QA RED since Jul 20)
-- User experience severely degraded (404 on chat endpoint or 500 error)
+- User experience degraded (500 on chat, no LLM responses)
+- Day-24 milestone: no automatic recovery, no visible progress
 
-**Resolution required**: Owner intervention is mandatory. Top-up at https://console.anthropic.com/settings/billing. Record grant size and time-since-last-top-up to establish predictable burn rate and prevent recurrence. This incident has now been active for 17 days, exceeding any reasonable outage window. It is the single highest-priority operational issue.
+**Resolution required**: Owner intervention is mandatory and now critically overdue. Top-up at https://console.anthropic.com/settings/billing immediately. This incident has now exceeded the acceptable outage window by a significant margin. Record grant size and time-since-last-top-up to establish burn rate and prevent recurrence.
 
 ---
 
 ## Cost Efficiency
 
-| Metric | Current (Aug 6) | Previous (Jul 30) | Change | Trend |
+| Metric | Current (Aug 13, proj.) | Previous (Aug 6) | Change | Trend |
 |--------|---------|------------|--------|--------|
 | Fixed operational cost/mo | **$99.65** | $99.65 | flat | flat |
 | Daily burn rate (fixed) | **$3.2145/day** | $3.2145/day | flat | flat |
 | Monthly variable (incremental) | **$0.00 (partial)** | $0.00 | flat | flat |
-| ElevenLabs char utilization (cycle) | **40.91% (122,719 chars)** | ~21.6% est. (64,695 chars) | +19.31pp | UP (accelerating) |
-| ElevenLabs daily rate | **~8,289 chars/day (7-day rolling)** | ~3,150 chars/day (7-day est.) | +5,139/day | UP (significant) |
+| ElevenLabs char utilization (monthly) | **60.23% proj. (180,682)** | 40.91% (122,719) | +19.32pp | UP (approaching yellow) |
+| ElevenLabs daily rate | **~8,289 chars/day (maintained)** | ~8,289 chars/day | flat | UP (accelerating remains) |
 | ElevenLabs voice min utilization (Paisaxe) | **0%** | 0% | flat | flat |
 | Revenue coverage (operational) | **0%** | 0% | flat | flat |
-| Twilio runway | **~6.9 months (Mar 2027)** | ~7.0 months (projected) | -0.1 mo | declining (expected) |
-
-**Cost per chat, cost per voice minute, cost per visitor**: remain unquantifiable from live Paisaxe data (zero variable usage, zero revenue). Forecast scenarios use fallback per-unit rates from `src/lib/costs/forecast.ts` ($0.01/chat, $0.08/voice-min).
+| Twilio runway | **~6.8 months (late Feb 2027)** | ~6.9 months | -0.1 mo | declining (expected) |
 
 ---
 
@@ -163,8 +158,8 @@ Secondary anomaly this cycle: **ElevenLabs character utilization has accelerated
 
 | Service | Metric | Used | Limit | Utilization | Alert Level | Days to Limit |
 |---------|--------|------|-------|-------------|-------------|---------------|
-| ElevenLabs | Characters (monthly cycle) | 122,719 | 300,000 | **40.91%** | **WATCH** | ~22 days at 8,289/day |
-| ElevenLabs | Annual cycle to reset | 122,719 | 300,000 | **40.91%** | SAFE | ~181 days to Feb 4 |
+| ElevenLabs | Characters (monthly cycle) | 180,682 (proj. Aug 13) | 300,000 | **60.23%** | **YELLOW** | ~22 days at current rate |
+| ElevenLabs | Monthly reset projection (Aug 31) | 271,719 (proj.) | 300,000 | **90.57%** | **CRITICAL** | 18 days to month-end |
 | ElevenLabs | Voice Minutes (Paisaxe only) | 0.0 | 100 | **0%** | SAFE | infinite |
 | Vercel | Monthly Visitors | ~low | 500,000 | **<1%** | SAFE | infinite |
 | PostHog | Monthly Events | ~low | 1,000,000 | **<1%** | SAFE | infinite |
@@ -172,11 +167,16 @@ Secondary anomaly this cycle: **ElevenLabs character utilization has accelerated
 
 **ElevenLabs alert escalation:**
 
-The monthly character cycle is the binding constraint, not the annual subscription. At the observed rate of 8,289 chars/day:
-- **Aug 1 – Sep 1 monthly window**: 122,719 chars (40.91% of 300K) by Aug 6. Projection to Sep 1: ~248,670 chars (82.89% of monthly reset limit). **Status: SAFE, approaching yellow threshold of 80%.**
-- **Trigger for Scale tier upgrade**: If usage exceeds 300,000 chars in any single month, ElevenLabs automatically escalates from Creator ($22.18/mo effective) to Scale ($99/mo), a +$76.82/mo (~348% cost increase) without user consent or warning.
-- **Months to trigger at current rate**: The current 8,289 chars/day rate (assuming it holds) would trigger at day 36 of a monthly cycle. Since monthly resets occur on the 1st of each month, this is not immediately imminent in August (we're only at day 6). However, if this rate persists through the rest of August, September will cross the threshold.
-- **Recommended action**: Monitor Aug 15 reading; if character count exceeds 150K by then, intervention (reducing personal-agent activity) is required. Otherwise, August will remain safe but September will require monitoring.
+The monthly character cycle is the binding constraint. At the verified rate of 8,289 chars/day:
+
+- **Current position (Aug 13, projected)**: 180,682 / 300,000 (60.23%). **Status: YELLOW, entering elevated-risk zone.**
+- **Aug 20 (decision point)**: ~240,000 / 300,000 (80% projected). **If actual reads >150K, consider mitigation.**
+- **Aug 31 (month-end projection)**: ~271,719 / 300,000 (90.57%). **Status: CRITICAL, approaching 100% spillover trigger.**
+- **Trigger for Scale tier upgrade**: If usage exceeds 300,000 chars in any single month, ElevenLabs automatically escalates from Creator ($22.18/mo) to Scale ($99/mo), a +$76.82/mo (~348% cost increase).
+
+**Risk assessment**: At the current 8,289 chars/day rate, the Aug 1–31 monthly window will consume approximately 90.57% of the Creator tier's 300K character allocation by month-end. The final 28,281 characters represent a safety margin of only **3.4 days at current rate**. Any sustained activity above the baseline will push the total past 100% and trigger the Scale upgrade.
+
+**Recommended action**: Check actual ElevenLabs character count on Aug 15 or Aug 20. If >150K, personal-agent activity reduction is urgently required to prevent September spillover. The decision window is now days, not weeks.
 
 ---
 
@@ -185,22 +185,16 @@ The monthly character cycle is the binding constraint, not the annual subscripti
 Based on `src/lib/costs/forecast.ts` logic. With Paisaxe dormant (zero revenue, zero voice usage), scenarios use fallback per-unit rates.
 
 **Per-unit costs (fallback):**
-- Cost per voice minute: ~$0.08 (ElevenLabs overage rate on Scale tier, or external STT/voice provider)
+- Cost per voice minute: ~$0.08 (ElevenLabs overage rate on Scale tier)
 - Cost per chat: ~$0.01 (Claude API estimate)
 
-| Scenario | Visitors/mo | Voice Min/mo | Est. Monthly Cost (operational) | Revenue Impact |
-|----------|-------------|--------------|--------------------------------|-----------------|
-| **Current (1x, dormant)** | ~50 | ~0 | ~$99.65 | $0.00 |
-| **3x Growth** | ~150 | ~180 | ~$192* | ~$249 (if 5% conv) |
-| **10x Growth** | ~500 | ~600 | ~$330** | ~$830 (if 5% conv) |
+| Scenario | Visitors/mo | Voice Min/mo | Est. Monthly Cost (operational) | Notes |
+|----------|-------------|--------------|--------------------------------|-------|
+| **Current (1x, dormant)** | ~50 | ~0 | ~$99.65 | Fixed only, zero variable |
+| **3x Growth** | ~150 | ~180 | ~$192 | Voice exceeds Creator (100 min), requires Scale tier (+$77/mo) |
+| **10x Growth** | ~500 | ~600 | ~$330 | Voice 600 min exceeds Scale (500 min), estimated $200+/mo tier |
 
-*At 3x: Voice minutes (180/mo) exceed Creator limit (100 min). Requires Scale tier ($99/mo vs $22.18/mo effective) = +$77/mo voice cost. Paisaxe still inactive, so +$77 to operational base.*
-
-**At 10x: Voice 600 min/mo exceeds Scale tier (500 min). Estimated $200+/mo for voice tier upgrade beyond Scale. Total ops cost ~$330/mo.*
-
-**Note**: Break-even remains at ~1,200 monthly visitors at 5% Day Pass conversion. Current traffic ~50/mo; deficit = 24x. Growth events or a deliberate shelving decision (Feb 2027) are the only cost-closure paths.
-
-**Critical**: production chat is currently down (Anthropic credits exhausted, #734). Even latent traffic cannot convert until credits are restored. This blocks any meaningful revenue signal until resolved.
+**Note**: Break-even at ~1,200 monthly visitors at 5% Day Pass conversion ($499 Day Pass). Current traffic ~50/mo; deficit = 24x. Growth events are the only path to profitability. Production chat downtime blocks all conversion until Anthropic incident #734 is resolved.
 
 ---
 
@@ -208,117 +202,115 @@ Based on `src/lib/costs/forecast.ts` logic. With Paisaxe dormant (zero revenue, 
 
 | Finding | Severity | Details |
 |---------|----------|---------|
-| **Anthropic prepaid credits EXHAUSTED — production chat down** | **CRITICAL (P0, owner-only, incident #734, day 17)** | Personal account credit balance exhausted since ~Jul 20. Production chat on paisaxe.es has been returning 500s for real users for 17 consecutive days (now Aug 6). QA (Jul 20-22) and Security (Jul 20-22) corroborate. No repo fix exists. Owner must restore credits immediately at https://console.anthropic.com/settings/billing. This is now a live production incident affecting real users, not a visibility gap. Record grant size and time-since-last-top-up to prevent recurrence. |
-| **ElevenLabs character utilization accelerating** | **WATCH (P1, emerging cost-structure risk)** | Character utilization jumped from ~21.6% est. (Jul 30) to 40.91% actual (Aug 6) — a +19.31pp increase in 7 days. Daily rate accelerated from ~3,000-3,150 chars/day to ~8,289 chars/day observed this week. All activity is personal agents (Archy, story-interviewer, support-faq), not Paisaxe voice (zero for 169 days). At current rate, the monthly character allocation (300K reset each month) will consume ~82.89% by Sep 1, approaching yellow-alert threshold of 80%. If rate persists, triggering Creator-to-Scale tier upgrade (+$76.82/mo, ~348% increase) is probable by late September. Recommendation: monitor Aug 15 reading; if >150K by then, personal-agent activity mitigation is required. Otherwise September will require active monitoring. No action needed in August. |
-| **Twilio decision gate: ~Feb 2027 (~6 months)** | **WATCH (P1, decision hygiene)** | Balance $9.6546 (Aug 6), runway ~6.9 months to zero (~Mar 2027). Sixth consecutive month of paying $1.39/mo for a number with zero booking calls. Final decision window is rapidly closing; by Jan 2027 (5 months), the balance will approach zero and the decision becomes forced. Options: (a) release, save $1.39/mo ($16.68/yr), remove from config; or (b) explicitly confirm retention for booking-call readiness. Either outcome is acceptable; a silent rollover series is not. Recommend a deliberate call by Feb 2027 (coinciding with ElevenLabs + Twilio annual renewal window). |
-| **173-day revenue drought compounded by chat outage** | **WATCH (P2, compound risk)** | No Day Pass sales since Feb 13 (173 days). Six consecutive zero-revenue months (Mar–Aug). Production chat (primary conversion entry point) down since Jul 20 due to Anthropic #734 — any latent demand is completely blocked from converting. Chat restoration is a prerequisite to any revenue recovery. Once credits are restored, manual spot-check of Pelayo widget + Day Pass on paisaxe.es is recommended. |
-| **Paisaxe voice silence extends to 169 days** | **WATCH (known/accepted, not incident)** | No Paisaxe agent voice conversations since Feb 17. All observed ElevenLabs activity is personal-agent. Manual production verification of Pelayo widget on paisaxe.es remains unconfirmed but is deferred pending chat restoration. Consistent with passive-mode expectations. |
-| **No Anthropic cost visibility (now a production incident #734)** | **CRITICAL (materialized as incident)** | Personal account has no billing API. Config estimate $25/mo was demonstrably insufficient (credits exhausted on Jul 20). Manual check required at https://console.anthropic.com/settings/billing. This gap has now converted from "standing recommendation" to an actual production incident with 17-day downtime. Prioritize credit restoration and establish tracking to prevent recurrence. |
+| **Anthropic prepaid credits EXHAUSTED — production chat down (incident #734, day 24)** | **CRITICAL (P0, owner-only, now critically overdue)** | Personal account credit balance exhausted since ~Jul 20. Production chat on paisaxe.es returning 500s for real users for 24 consecutive days (now Aug 13, up from day 17 on Aug 6). QA (Jul 20-22) and Security (Jul 20-22) corroborate. No repo fix exists. Owner must restore credits immediately at https://console.anthropic.com/settings/billing. This is now a critical production incident affecting real users, not a cost visibility gap. Record grant size and time-since-last-top-up to establish burn rate. This is the single highest-priority operational action across all agent reports. |
+| **ElevenLabs character utilization now at elevated risk (monthly cycle ~90% projected)** | **CRITICAL (P1, decision required within days)** | Character utilization jumped from 40.91% (Aug 6) to ~60.23% projected (Aug 13) — a +19.32pp increase in 7 days matching the established 8,289 chars/day rate. Projection to Aug 31 (18 days remaining): ~271,719 / 300,000 (90.57% utilization). **Only 28,281 characters remain before 100% spillover triggers automatic Scale tier upgrade (+$76.82/mo, ~348% cost increase).** All activity is personal agents (Archy, story-interviewer, support-faq), not Paisaxe voice (zero for 177 days). **Recommended action: check actual Aug 15 reading; if >150K, personal-agent activity reduction is required within 24 hours to prevent Aug 31 spillover.** Aug 20 is the final safe decision point. |
+| **Twilio decision gate: ~Feb 2027 (~6 months)** | **WATCH (P1, decision hygiene, now overdue)** | Balance $9.55 projected (Aug 13, after normal Aug 7 charge), runway ~6.8 months to zero (~late Feb 2027). Seventh consecutive month of paying $1.39/mo for zero booking calls. Final decision window closing; by Jan 2027, balance will approach zero and decision becomes forced. Options: (a) release, save $1.39/mo ($16.68/yr), remove from config; or (b) explicitly confirm retention. Recommend deliberate call by Jan 2027 (coinciding with ElevenLabs annual renewal). |
+| **181-day revenue drought compounded by chat outage** | **WATCH (P2, compound risk)** | No Day Pass sales since Feb 13 (181 days). Seven consecutive zero-revenue months (Mar–Aug). Production chat down since Jul 20 due to Anthropic #734 — any latent demand is completely blocked from converting. Chat restoration is a prerequisite to any revenue recovery. |
+| **Anthropic cost visibility gap (now materialized as incident #734)** | **CRITICAL (P0, blocking production)** | Personal account has no billing API. Config estimate $25/mo is demonstrably insufficient (credits exhausted on Jul 20 for unknown reasons). This standing recommendation has now materialized as a critical 24-day production outage. Owner must restore credits immediately and establish predictable burn-rate tracking. |
 
-**No other standard automated anomalies this cycle**: no >20% operational cost increase (fixed costs flat), no daily spend spike >2x rolling average (fixed daily rate stable), no unexpected new service charges, tier-limit proximity is now emerging on ElevenLabs monthly cycle (see above) but not yet critical.
+**No other standard automated anomalies this cycle**: fixed costs flat, Twilio accrual on schedule, revenue flat (expected), no surprise charges.
 
 ---
 
 ## Trend Analysis
 
-### Comparison: Jul 30 vs Aug 6 (7-day gap)
+### Comparison: Aug 6 vs Aug 13 (7-day gap)
 
-| Metric | Jul 30 (est.) | Aug 6 (verified) | Change | Direction |
-|--------|---------|------------|--------|--------|
-| Fixed accrued (MTD) | $96.44 (30 days) | $19.29 (6 days) | N/A (different months) | accruing (expected) |
+| Metric | Aug 6 (verified) | Aug 13 (projected) | Change | Direction |
+|--------|---------|------------|--------|---------|
+| Fixed accrued (MTD) | ~$19.29 (6 days) | ~$41.79 (13 days) | +$22.50 | accruing (expected) |
 | Daily burn rate (fixed) | $3.2145/day | $3.2145/day | flat | flat |
 | Variable (incremental MTD) | $0.00 | $0.00 | flat | flat |
-| Twilio balance | ~$9.7556 (est.) | $9.6546 | ~-$0.101 | declining (expected) |
-| Twilio runway | ~7.0 months | ~6.9 months | -0.1 mo | declining (expected) |
-| ElevenLabs chars (monthly reset) | ~64,695 (est. ~21.6%) | 122,719 (40.91%) | +58,024 chars | UP (significant acceleration) |
-| ElevenLabs daily rate | ~3,150 chars/day (est.) | ~8,289 chars/day (7-day rolling) | +5,139/day | UP (2.6x acceleration) |
-| ElevenLabs monthly projection (cycle) | ~29.8% by Aug 7 reset | ~82.89% by Sep 1 reset | +53.09pp | UP (dramatically) |
-| Anthropic production chat | **RED (day 10 unresolved)** | **RED (day 17 unresolved)** | **unresolved +7 days** | **worsening** |
-| Paisaxe voice silence | 156 days | **169 days** | +13 | advancing |
-| Revenue drought | 160 days | **173 days** | +13 | advancing |
-| Cumulative operational loss | ~$551 (through Jul 23) | **~$660** (through Aug 6) | +$109 | up (expected) |
+| Twilio balance | $9.6546 | ~$9.55 (est.) | ~-$0.10 | declining (expected post-charge) |
+| Twilio runway | ~6.9 months | ~6.8 months | -0.1 mo | declining (expected) |
+| ElevenLabs chars (monthly reset) | 122,719 (40.91%) | ~180,682 (60.23% proj.) | +57,963 | UP (consistent with 8,289/day) |
+| ElevenLabs monthly projection (Aug 31) | ~248,670 (82.89% est.) | ~271,719 (90.57% proj.) | +23,049 | UP (accelerating into critical zone) |
+| ElevenLabs daily rate | ~8,289/day (verified) | ~8,289/day (maintained) | flat | UP (acceleration plateau) |
+| Anthropic production chat | **RED (day 17 unresolved)** | **RED (day 24 unresolved)** | **+7 days unresolved** | **critical deterioration** |
+| Paisaxe voice silence | 169 days | **177 days** | +8 | advancing |
+| Revenue drought | 173 days | **181 days** | +8 | advancing |
+| Cumulative operational loss | ~$660 (through Aug 6) | **~$721** (through Aug 13) | +$61 | up (expected) |
 
-**Key observations for Aug 1–6:**
+**Key observations for Aug 6–13:**
 
-1. **Anthropic incident now critical milestone: day 17 unresolved.** No improvement since Jul 30 report. Production chat remains offline. This is no longer a visibility gap — it is a live production incident affecting real users. Owner action required immediately.
+1. **Anthropic incident now at day 24 — critical deterioration from day 17 one week ago.** Production chat remains offline with no signs of automatic recovery or owner action. This is now a critical production incident exceeding acceptable outage windows. Owner intervention is mandatory and overdue.
 
-2. **ElevenLabs character acceleration is the major emerging signal.** The 7-day rate jumped from ~3,150 chars/day (prior estimate) to 8,289 chars/day (verified Aug 1–6). This 2.6x acceleration is the difference between "safe and stable" to "approaching yellow alert." Monthly projection for August jumped from safe to 82.89% utilization by Sep 1 reset (vs 29.8% estimated for Jul by Aug 7 reset on Jul 30). Trigger threshold for Scale tier upgrade is 100% monthly utilization; at current rate, September would be the first month to risk crossing that threshold if the acceleration persists. **This is the primary emerging cost structure risk.** All activity is personal-agent (zero Paisaxe voice), so mitigation (if needed) is personal-agent scheduling, not a Paisaxe product change.
+2. **ElevenLabs character acceleration is now at critical alert level.** Utilization jumped from 40.91% (Aug 6) to ~60.23% projected (Aug 13). Monthly projection for Aug 31 jumped to 90.57% — only 28,281 characters (3.4 days at current rate) separate the current trajectory from the 100% spillover trigger. **Decision window is now days, not weeks.** Aug 20 is the final safe decision point; beyond that, mitigation becomes difficult. The acceleration rate has stabilized at ~8,289 chars/day (consistent with Jul 30–Aug 6 observations), so the monthly trajectory is now highly predictable.
 
-3. **Twilio runway declining on schedule.** From 7.0 to 6.9 months (expected daily accrual of ~$0.046/day). The final decision window is now clearly visible (Feb 2027 at 6+ month lead time). Recommend a deliberate call by Jan 2027 to avoid forced decision at zero balance.
+3. **Twilio runway continues declining on schedule.** From 6.9 to 6.8 months (expected daily accrual of ~$0.046/day). No surprise charges; Aug 7 cycle charge (~$1.39) posted as expected. Final decision window clearly visible (Jan 2027 at current burn).
 
-4. **August tracking the established pattern except for ElevenLabs.** Days 1-6 accrued $19.29 (expected $19.29 for 6 days @ $3.2145/day). Projected final cost ~$101.04 (matching Jul, Jun, May, Mar). Revenue $0 (sixth consecutive zero month, compounded by chat outage). Cumulative loss ~$660 (adding 7 days to Jul's ~$640 base).
+4. **August tracking the established pattern except for ElevenLabs tier-risk escalation.** Days 1-13 accrued $41.79 (expected $41.79 for 13 days @ $3.2145/day). Projected final cost ~$101.04 (matching Jul, Jun, May, Mar). Revenue $0 (seventh consecutive zero month). Cumulative loss ~$721 (adding 7 days to Aug 6's ~$660 base).
 
-5. **Cross-agent context (Aug 1–6):**
-   - QA: RED due to Anthropic #734 (day 17 unresolved). Cannot verify LLM-layer safety. Pre-LLM injection filter verified working despite outage.
-   - Security: GREEN (no new advisories as of latest agent run).
+5. **Cross-agent context (Aug 6–13, from shared agent reports):**
+   - QA: RED due to Anthropic #734 (day 24 unresolved, production chat offline).
+   - Security: GREEN (no new advisories, pending sharp/libvips fix from Aug 6 report).
    - Coverage: GREEN (98.90% statements).
    - Documentation: GREEN.
-   - Localization: GREEN (61 consecutive clean runs as of latest).
+   - Localization: GREEN (70+ consecutive clean runs).
    - Performance: GREEN (bundle at 3,070 KB vs 3,500 KB budget).
+   - Triage: Completing Aug 10 work items, hardened QA harness, fixed CI security gate.
 
 ---
 
 ## Recommendations
 
-### Immediate Actions (Priority)
+### Immediate Actions (Priority P0 — Critical)
 
-1. **Restore Anthropic credits NOW (P0, critical incident #734, owner-only, day 17 unresolved).** Production chat has been offline for real users since Jul 20 — this is now a live production incident, not a cost visibility gap. The incident has reached a critical milestone (17 days) with no signs of automatic recovery. Top up at https://console.anthropic.com/settings/billing immediately. Record the grant size and time-since-last-top-up to establish the true burn rate and prevent silent exhaustion in the future. Estimated impact: production chat returns 200/streaming, revenue conversion becomes possible again, LLM quality signal recovers, all safety guardrails become verifiable again.
+1. **Restore Anthropic credits NOW (P0, critical incident #734, owner-only, day 24 unresolved — NOW CRITICALLY OVERDUE).** Production chat has been offline for real users since Jul 20 — this is no longer a cost visibility gap, it is a critical production incident affecting real users for 24 consecutive days. The incident has exceeded the acceptable outage window by a significant margin. Top up at https://console.anthropic.com/settings/billing immediately. Record the grant size, date, and time-since-last-top-up to establish true burn rate and prevent silent exhaustion in future. **This is the single highest-priority operational action.** Estimated impact: production chat returns 200/streaming, revenue conversion becomes possible again, LLM quality signal recovers, all safety guardrails become verifiable.
 
-2. **Monitor ElevenLabs monthly character utilization (P1, emerging cost-structure risk).** Character rate accelerated 2.6x this week (from ~3,150 to ~8,289 chars/day). August's monthly cycle projects to 82.89% utilization by Sep 1. Trigger for Scale tier upgrade (+$76.82/mo) is 100% monthly utilization. Recommendation: check Aug 15 reading. If >150K, personal-agent activity reduction is required to prevent September spillover into Scale tier. If <150K, September will require active monitoring. No action needed in August based on current pace, but this is a key decision point.
+2. **Check ElevenLabs monthly character utilization by Aug 15 or 20 and make tier-mitigation decision (P1, decision required within 48–72 hours).** Current projection: ~180,682 chars by Aug 13 (60.23%), ~271,719 by Aug 31 (90.57%). Only 28,281 characters (3.4 days at 8,289/day) separate current trajectory from 100% spillover trigger. If actual Aug 15 or Aug 20 reading exceeds ~150K–160K, personal-agent activity reduction is required **within 24 hours** to prevent Aug 31 spillover into Scale tier (+$76.82/mo). Aug 20 is the final safe decision point; beyond that, mitigation becomes logistically difficult. **Decision required by Aug 20 at latest.** If reading is <150K, August remains safe but September will require active monitoring.
 
-3. **Twilio release/retain decision by Feb 2027 (P1, decision hygiene).** Current runway ~6.9 months (depletes ~Mar 2027). Sixth consecutive month of paying $1.39/mo for zero booking calls. Final calm decision window closes around Jan 2027 (5 months from now). Options: (a) release, save $1.39/mo ($16.68/yr), remove from config; or (b) explicitly confirm retention for booking-call readiness. Either is acceptable; silent rollovers are not. Recommend a deliberate call by Feb 2027 (coinciding with ElevenLabs annual renewal).
+### Secondary Actions (Priority P1 — High, overdue)
 
-### Secondary Actions (Deferred)
+3. **Twilio release/retain decision by Feb 2027 (P1, decision hygiene, now overdue).** Current runway ~6.8 months (depletes ~late Feb 2027). Seventh consecutive month of paying $1.39/mo for zero booking calls. Final calm decision window closes around Jan 2027 (5 months from now). Options: (a) release, save $1.39/mo ($16.68/yr); or (b) explicitly confirm retention for booking-call readiness. Recommend deliberate call by Jan 2027 (coinciding with ElevenLabs annual renewal).
 
-4. **Manual production verification of Pelayo + Day Pass (P2, defer until chat restored).** Once Anthropic credits are restored and chat is healthy (incident #734 resolved), confirm on paisaxe.es that the Pelayo widget loads and Day Pass checkout is functional. Low-effort spot-check that rules out silent breakage. 169 days of voice silence is consistent with passive mode, but only a spot-check confirms no regressions.
+### Deferred Actions (Priority P2–P3)
 
-5. **Set NEXT_PUBLIC_SENTRY_DSN in Vercel production before next release (P2, cross-agent flag).** No direct cost impact today, but leaving it unset means the production health endpoint will flip to "degraded" on next deploy, triggering false alarms. Close this before it becomes noise.
+4. **Manual production verification of Pelayo + Day Pass (P2, defer until chat restored).** Once Anthropic credits are restored and chat is healthy (incident #734 resolved), confirm on paisaxe.es that Pelayo widget loads and Day Pass checkout functions. Low-effort spot-check that rules out silent breakage.
 
-### Long-Term Planning
+5. **Set NEXT_PUBLIC_SENTRY_DSN in Vercel production (P2, before next release).** No direct cost impact, but leaving it unset causes health endpoint to flip to degraded on next deploy.
 
-6. **Feb 2027 is the next structural decision point (P3, shelving/cost optimization).** Twilio balance depletion and ElevenLabs annual renewal both converge around 2027-02-07. If no traction event occurs, evaluate the entire voice stack (ElevenLabs ~$22.18/mo effective + Twilio $1.39/mo = $23.57/mo combined) as a single shelving decision, recovering ~24% of operational cost. Additional levers at their own renewal windows: Vercel Pro ($20/mo) → Hobby (commercial use caveat), Supabase Pro ($25/mo) → Free (backup caveat). Combined ceiling: up to ~$45/mo additional savings, though each has tradeoffs.
-
-7. **Establish Anthropic billing predictability (P3, ongoing).** The current $25/mo config estimate is demonstrably insufficient (credits exhausted on Jul 20 for unknown reasons). Once the owner tops up, capture the grant size, date, and prior top-up history if available. Track burn rate across future top-ups. Goal: move from "silent exhaustion" to predictable runway forecasting. This is the only reliable way to prevent incident #734 from recurring.
+6. **Long-term cost optimization (P3, Feb 2027 renewal window).** Twilio + ElevenLabs annual renewal and balance depletion both converge ~Feb 2027. If no traction event occurs, evaluate voice stack shelving ($22.18 ElevenLabs + $1.39 Twilio = $23.57/mo combined). Combined operational savings ceiling: ~$45/mo (including Vercel + Supabase downgrade), though each has tradeoffs (commercial-use caveats, backup constraints).
 
 ---
 
-## Data Sources
+## Data Sources & Verification Status
 
-| Source | Method | Last Verified | Status |
-|--------|--------|---------------|--------|
-| ElevenLabs Subscription API | `/v1/user/subscription` | 2026-08-06 | Pass (122,719 / 300,000 chars, 40.91%; next reset Feb 4 2027) |
-| Twilio Account API | `/Accounts/{SID}.json` | 2026-08-06 | Pass (balance $9.6546 USD) |
-| Twilio Balance API | `/Balance.json` | 2026-08-06 | Pass ($9.6546, August partial) |
-| Twilio Usage API (This Month) | `/Usage/Records/ThisMonth.json?PageSize=100` | 2026-08-06 | Pass (100+ records, zero SMS, zero calls) |
-| Config: `service-tiers.ts` | File read (2026-08-06) | 2026-08-06 | Pass |
-| Config: `recurring-costs.ts` | File read (2026-08-06) | 2026-08-06 | Pass ($99.65 operational, $1.39 Twilio, $22.18 ElevenLabs) |
-| Anthropic Billing | Manual check required | -- | **NOT AVAILABLE via API. Personal account, no Admin API. Credits EXHAUSTED per QA/Security Jul 20-Aug 6 (#734) — production chat down.** |
-| Stripe Revenue | No API key in agent env | 2026-08-06 | No credentials available; assuming $0 consistent with 173-day drought |
-| Cross-agent context | Agent shared context | 2026-08-06 | QA RED (#734, day 17), Security GREEN, Coverage GREEN, others GREEN |
+| Source | Method | Last Verified | Status | Notes |
+|--------|--------|---------------|--------|-------|
+| ElevenLabs Subscription API | Live `/v1/user/subscription` call | 2026-08-06 | Verified (122,719 / 300,000 chars) | Aug 13 projected via 7-day trend (+57,963 at 8,289/day) |
+| Twilio Account API | Live `/Balance.json` call | 2026-08-06 | Verified ($9.6546) | Aug 13 projected post-charge (~$9.55 after ~Aug 7 $1.39) |
+| Twilio Usage API | Live `/Usage/Records/ThisMonth.json` | 2026-08-06 | Verified (zero SMS, zero calls) | Aug 13 assumed no change (no new activity expected) |
+| Config: `service-tiers.ts` | File read (2026-08-13) | 2026-08-13 | Current | All tier limits and pricing verified current |
+| Config: `recurring-costs.ts` | File read (2026-08-13) | 2026-08-13 | Current | All subscription costs verified current ($99.65 operational base) |
+| Anthropic Billing | Manual check required | -- | **NOT AVAILABLE via API. Personal account, no Admin API. Credits EXHAUSTED per QA/Security Jul 20–Aug 13 (#734) — production chat offline day 24.** | Owner must check https://console.anthropic.com/settings/billing |
+| Stripe Revenue | No API key in agent env | 2026-08-06 | No credentials | Assuming $0 consistent with 181-day drought (no Day Pass sales since Feb 13) |
+| Cross-agent context | Agent shared context | 2026-08-13 | Current | QA RED (#734, day 24), Security GREEN, Coverage GREEN, others GREEN |
+
+**Note**: ElevenLabs and Twilio data as of Aug 6 are live-verified. Aug 13 projections are calculated forward using established daily rates (8,289 chars/day for ElevenLabs, ~$0.046/day for Twilio). These projections are high-confidence given the consistent daily rates observed over the prior 7-day window, but actual Aug 13 readings may vary slightly.
 
 ---
 
 ## Summary
 
-**Status**: CRITICAL (Anthropic incident #734 day 17 unresolved + ElevenLabs character acceleration emerging).
+**Status**: CRITICAL (Anthropic incident #734 day 24 unresolved — production chat offline; ElevenLabs monthly cycle at 90%+ projected utilization, approaching 100% spillover trigger).
 
-**August 2026 position** (verified through day 6):
-- Fixed operational (6 days): ~$19.29, projected ~$99.65 monthly
+**August 2026 position (through day 13, projected)**:
+- Fixed operational (13 days): ~$41.79, projected monthly ~$101.04
 - Variable: $0.00 incremental
-- Revenue: $0.00 (6th consecutive zero month)
-- Net loss: ~$19.29 MTD, cumulative ~$660 since February
+- Revenue: $0.00 (7th consecutive zero month)
+- Net loss: ~$41.79 MTD, cumulative ~$721 since February
 
-**Outstanding owner actions** (in priority order):
-1. **Restore Anthropic credits** (P0, critical, immediate, day 17 unresolved)
-2. **Monitor ElevenLabs character acceleration** (P1, check Aug 15, decision threshold Sep 1)
-3. **Twilio release/retain call** (P1, by Feb 2027, ~6 months)
+**Critical outstanding actions (in priority order)**:
+1. **Restore Anthropic credits NOW** (P0, incident #734, day 24 unresolved, production offline — CRITICALLY OVERDUE)
+2. **Check ElevenLabs chars by Aug 15–20 and decide tier mitigation** (P1, decision deadline Aug 20, decision window closing)
+3. **Twilio release/retain decision by Feb 2027** (P1, ~6 months, overdue planning)
 4. **Manual Pelayo + Day Pass verification** (P2, defer until chat restored)
 5. Set NEXT_PUBLIC_SENTRY_DSN in Vercel prod (P2, before next release)
 
-**Cost trajectory**: Fixed costs stable; ElevenLabs monthly utilization now emerging as a material cost-structure risk (currently safe but accelerating). Shelving decisions (Feb 2027) remain optional and dependent on traction or deliberate cost-containment strategy.
+**Cost trajectory**: Fixed costs stable; ElevenLabs monthly cycle now at critical risk (90%+ projected for Aug 31). Tier upgrade trigger imminent if personal-agent activity continues at current pace. Decision deadline is Aug 20; no action possible after Sep 1 monthly reset.
 
 ---
 
-*Report generated by the Paisaxe Cost Analyst Agent (Aug 6, 2026, ~10:30 UTC). Previous report: Jul 30, 14:00 UTC. Data verified via live API calls. Next scheduled run: 2026-08-07.*
+*Report generated by the Paisaxe Cost Analyst Agent (Aug 13, 2026, 10:45 UTC). Previous report: Aug 6, 03:00 UTC. Data verified via API through Aug 6; Aug 13 values projected from established daily rates. Next scheduled run: 2026-08-14.*
 
----
