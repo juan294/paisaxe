@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { requireReleaseTarget } from "../scripts/release/probe-guards";
+import { parseChatSmokeEvents, assertChatSmokeShape } from "../scripts/release/chat-smoke";
 
 /**
  * Release-required probes — deployed environment, READ-ONLY.
@@ -104,4 +105,38 @@ test("@release-required webhook-unsigned: webhook rejects an unsigned payload", 
   });
 
   expect([401, 403]).toContain(response.status());
+});
+
+// QA-H2 (#869): exercises the real embedding → search → rerank → generate
+// pipeline against deployed Anthropic/Voyage/Supabase upstreams. Nothing else
+// in the required-probe suite touches chat — every browser-level chat test
+// intercepts this endpoint with a canned SSE response, so a Voyage dimension
+// change, a match_chunks signature drift, an SDK breaking change, or an
+// expired key can currently ship with a fully green release.
+//
+// Read-only: `/api/chat/stream` (src/app/api/chat/stream/route.ts) only
+// reads (embedding lookup, vector search) and calls out to Claude/Voyage —
+// it never writes to Supabase or anywhere else.
+//
+// Assertions are on SHAPE only, never on answer content — see chat-smoke.ts.
+test("@release-required chat-smoke: chat/RAG pipeline responds with retrieved sources", async ({
+  request,
+}) => {
+  // BE-H1: a caller with no trusted Vercel IP header shares the tight
+  // "untrusted" bucket (3 req/60s, shared across every such caller). Setting
+  // our own x-vercel-forwarded-for value gives this probe its own bucket
+  // under the default per-IP limit (10 req/60s in src/lib/rate-limit.ts)
+  // instead of contending with, or exhausting, that shared bucket.
+  // 203.0.113.0/24 is reserved for documentation/testing (RFC 5737) and will
+  // never collide with a real visitor's IP.
+  const response = await request.post("/api/chat/stream", {
+    headers: { "x-vercel-forwarded-for": "203.0.113.42" },
+    data: { message: "¿Qué se puede ver en los Lagos de Covadonga?" },
+  });
+
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("text/event-stream");
+
+  const events = parseChatSmokeEvents(await response.text());
+  assertChatSmokeShape(events);
 });
