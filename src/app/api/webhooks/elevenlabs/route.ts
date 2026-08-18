@@ -77,11 +77,22 @@ function buildElevenLabsWebhookSchema(mode: "strict" | "passthrough") {
     mode === "strict" ? TranscriptEntryShape.strict() : TranscriptEntryShape.passthrough();
   const analysisSchema =
     mode === "strict" ? AnalysisShape.strict() : AnalysisShape.passthrough();
+  // BE-H2: dynamic_variables carries whatever we sent when placing the call
+  // (customer_name, party_size, ..., and our own `booking_id` correlation
+  // key) — always passthrough() regardless of mode, since we only care
+  // about reading `booking_id` back out and don't want to reject/warn on
+  // the other echoed variables.
+  const conversationInitiationClientDataSchema = z
+    .object({
+      dynamic_variables: z.record(z.string(), z.unknown()).optional(),
+    })
+    .passthrough();
 
   const dataShape = z.object({
     conversation_id: z.string().optional(),
     transcript: z.union([z.array(transcriptEntry), z.string()]).optional(),
     analysis: analysisSchema.optional(),
+    conversation_initiation_client_data: conversationInitiationClientDataSchema.optional(),
   });
 
   const topShape = z.object({
@@ -90,6 +101,7 @@ function buildElevenLabsWebhookSchema(mode: "strict" | "passthrough") {
     type: z.string().optional(),
     transcript: z.union([z.array(transcriptEntry), z.string()]).optional(),
     analysis: analysisSchema.optional(),
+    conversation_initiation_client_data: conversationInitiationClientDataSchema.optional(),
     data: (mode === "strict" ? dataShape.strict() : dataShape.passthrough()).optional(),
   });
 
@@ -98,6 +110,23 @@ function buildElevenLabsWebhookSchema(mode: "strict" | "passthrough") {
 
 const ElevenLabsWebhookSchema = buildElevenLabsWebhookSchema("passthrough");
 const StrictElevenLabsWebhookSchema = buildElevenLabsWebhookSchema("strict");
+
+/**
+ * BE-H2: Extract the `booking_id` correlation key we sent as an extra
+ * dynamic variable when placing the call (see elevenlabs-call-service.ts).
+ * Checks both the top-level and data-wrapped payload shapes, matching the
+ * pattern already used for conversation_id/transcript/analysis above.
+ */
+function extractBookingIdHint(body: {
+  conversation_initiation_client_data?: { dynamic_variables?: Record<string, unknown> };
+  data?: { conversation_initiation_client_data?: { dynamic_variables?: Record<string, unknown> } };
+}): string | null {
+  const dynamicVars =
+    body.conversation_initiation_client_data?.dynamic_variables ??
+    body.data?.conversation_initiation_client_data?.dynamic_variables;
+  const bookingId = dynamicVars?.booking_id;
+  return typeof bookingId === "string" && bookingId.trim() ? bookingId : null;
+}
 
 interface ClaimedSMSJob {
   booking_id: string;
@@ -183,7 +212,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const supabase = createAdminClient();
 
     // maybeSingle() returns {data: null, error: null} when no row is found
-    const { data: booking, error: fetchError } = await supabase
+    let { data: booking, error: fetchError } = await supabase
       .from("pending_bookings")
       .select("*")
       .eq("conversation_id", conversationId)
@@ -200,6 +229,70 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       logger.warn("[ELEVENLABS_WEBHOOK_BOOKING_NOT_FOUND]", {
         conversation_id: conversationId,
       });
+
+      // BE-H2: A call that timed out on our side before ElevenLabs responded
+      // never got a conversation_id persisted, so it's invisible to the
+      // lookup above even though the call may have actually happened. We
+      // sent our own pending_bookings.id as a `booking_id` dynamic variable
+      // when placing the call (see initiateCall/elevenlabs-call-service.ts)
+      // specifically so it comes back here — matching on our own primary
+      // key makes this fallback unambiguous by construction (it cannot let
+      // one webhook event resolve two different bookings, so the unique
+      // index on conversation_id is unaffected).
+      const bookingIdHint = extractBookingIdHint(body);
+
+      if (bookingIdHint) {
+        const { data: fallbackBooking, error: fallbackFetchError } = await supabase
+          .from("pending_bookings")
+          .select("*")
+          .eq("id", bookingIdHint)
+          .maybeSingle();
+
+        if (fallbackFetchError) {
+          logger.error("[ELEVENLABS_WEBHOOK_ORPHAN_LOOKUP_FAILED]", {
+            booking_id: bookingIdHint,
+            conversation_id: conversationId,
+            error: fallbackFetchError,
+          });
+        }
+
+        // Only reconcile rows that are actually still reconcilable: no
+        // conversation_id linked yet, and in a state that means "we don't
+        // know the outcome" ('initiating' or 'orphaned'). This guards
+        // against a stale/replayed booking_id resolving an already-settled
+        // or already-linked row.
+        const isReconcilable =
+          fallbackBooking &&
+          fallbackBooking.conversation_id == null &&
+          ["initiating", "orphaned"].includes(fallbackBooking.status);
+
+        if (isReconcilable) {
+          logger.warn("[ELEVENLABS_WEBHOOK_ORPHAN_RECONCILED]", {
+            booking_id: bookingIdHint,
+            conversation_id: conversationId,
+          });
+          booking = fallbackBooking;
+
+          // Best-effort: link conversation_id now so any later duplicate
+          // webhook for this conversation matches directly. Non-fatal on
+          // failure — elevenlabs_webhook_events.event_key is the actual
+          // source of truth for dedup, not this column.
+          const { error: linkError } = await supabase
+            .from("pending_bookings")
+            .update({ conversation_id: conversationId })
+            .eq("id", bookingIdHint);
+          if (linkError) {
+            logger.warn("[ELEVENLABS_WEBHOOK_ORPHAN_LINK_FAILED]", {
+              booking_id: bookingIdHint,
+              conversation_id: conversationId,
+              error: linkError,
+            });
+          }
+        }
+      }
+    }
+
+    if (!booking) {
       // Return 200 to acknowledge receipt - this might be a call we didn't initiate
       return NextResponse.json({
         success: true,

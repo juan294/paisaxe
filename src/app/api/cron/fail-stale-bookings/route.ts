@@ -9,11 +9,15 @@ import { ALLOWED_ORIGINS } from "@/lib/proxy/cors";
 /**
  * GET|POST /api/cron/fail-stale-bookings
  *
- * Fails pending_bookings rows stuck in 'initiating' status for longer than
- * STALE_INITIATING_MINUTES minutes. These rows are created before the
- * ElevenLabs outbound call is placed. A hung fetch (now guarded by a 15-second
- * AbortSignal.timeout) could previously leave them stuck indefinitely, causing
- * 409 Conflict errors on retry (BE-H4).
+ * Marks pending_bookings rows stuck in 'initiating' status for longer than
+ * STALE_INITIATING_MINUTES minutes as 'orphaned' (BE-H2) — NOT 'failed'. A
+ * hung fetch (now guarded by a 15-second AbortSignal.timeout) could
+ * previously leave them stuck indefinitely, causing 409 Conflict errors on
+ * retry (BE-H4). Stale rows may be from a timeout where the call actually
+ * reached the venue, so they're marked 'orphaned' (needs attention) rather
+ * than the terminal 'failed' (definitely didn't happen) — a late webhook can
+ * still reconcile an orphaned row via its booking_id fallback lookup (see
+ * src/app/api/webhooks/elevenlabs/route.ts).
  *
  * Runs every 5 minutes via Vercel Cron (see vercel.json).
  */
@@ -44,9 +48,12 @@ async function failStaleBookings(): Promise<NextResponse> {
   const failed_count = typeof data === "number" ? data : 0;
 
   if (failed_count > 0) {
-    logger.warn("[CRON_FAIL_STALE_BOOKINGS]", {
+    // BE-H2: ERROR, not WARN — these rows need an operator to look at them
+    // (the call may have actually reached the venue), so this must alert
+    // rather than blend into routine log noise.
+    logger.error("[CRON_ORPHAN_STALE_BOOKINGS]", {
       stale_minutes: STALE_INITIATING_MINUTES,
-      failed_count,
+      orphaned_count: failed_count,
     });
   }
 
