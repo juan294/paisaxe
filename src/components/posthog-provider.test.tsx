@@ -18,6 +18,14 @@ function ContextProbe() {
   );
 }
 
+// Shared by every test that renders <ContextProbe /> and waits for PostHog
+// to finish loading into context.
+async function waitForPostHogLoaded() {
+  await vi.waitFor(() => {
+    expect(screen.getByTestId("posthog-context-value")).toHaveTextContent("loaded");
+  });
+}
+
 // Mock next/navigation
 const mockUsePathname = vi.fn();
 const mockUseSearchParams = vi.fn();
@@ -365,9 +373,7 @@ describe("PostHog production initialization (non-localhost)", () => {
     );
 
     // After PostHog loads, usePaisaxePostHog() should return the instance.
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-context-value")).toHaveTextContent("loaded");
-    });
+    await waitForPostHogLoaded();
 
     expect(screen.getByTestId("app")).toBeInTheDocument();
   });
@@ -391,9 +397,7 @@ describe("PostHog production initialization (non-localhost)", () => {
     );
 
     // Wait for PostHog to fully initialise so the tree settles.
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-context-value")).toHaveTextContent("loaded");
-    });
+    await waitForPostHogLoaded();
 
     // Child must have been mounted exactly once — no remount from tree reshaping
     expect(mountCount).toBe(1);
@@ -412,9 +416,7 @@ describe("PostHog production initialization (non-localhost)", () => {
     );
 
     // Wait for dynamic import to resolve
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-context-value")).toHaveTextContent("loaded");
-    });
+    await waitForPostHogLoaded();
 
     // init should NOT be called because __loaded is true
     expect(mockInit).not.toHaveBeenCalled();
@@ -440,9 +442,7 @@ describe("PostHog production initialization (non-localhost)", () => {
       </PostHogProviderWrapper>
     );
 
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-context-value")).toHaveTextContent("loaded");
-    });
+    await waitForPostHogLoaded();
 
     // Should NOT have called init on either mock — window.posthog was already __loaded
     expect(mockInit).not.toHaveBeenCalled();
@@ -559,9 +559,7 @@ describe("PostHogPageViewTracker with loaded PostHog", () => {
     );
 
     // Wait for PostHog to load
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-context-value")).toHaveTextContent("loaded");
-    });
+    await waitForPostHogLoaded();
 
     // capture should NOT be called with null pathname
     expect(mockCapture).not.toHaveBeenCalled();

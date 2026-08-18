@@ -25,4 +25,12 @@ $ARCH_PREFIX npm run lint || exit 1
 echo "→ Running tests..."
 $ARCH_PREFIX npm run test || exit 1
 
+# Run dead-code detection (FE-M5, #767): CI's knip job only runs on
+# pull_request/push to develop, which can't block a commit that has
+# already landed. Gating here (like typecheck/lint/test above) is what
+# actually enforces "no dead code" for this repo's direct-to-develop,
+# no-PR workflow.
+echo "→ Knip dead-code check..."
+$ARCH_PREFIX npx knip || exit 1
+
 echo "✓ All checks passed!"
