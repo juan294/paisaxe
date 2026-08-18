@@ -210,6 +210,7 @@ export const fr: Translations = {
     error: 'Erreur de connexion',
     error_not_configured: 'Agent vocal non configuré',
     no_permission: 'Accès au micro requis',
+    no_permission_retry: "Si votre navigateur a bloqué l'accès, activez-le dans les paramètres du site et réessayez.",
     you: 'Vous',
     loading: "Chargement de l'assistant vocal...",
   },

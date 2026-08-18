@@ -210,6 +210,7 @@ export const en: Translations = {
     error: 'Connection error',
     error_not_configured: 'Voice agent not configured',
     no_permission: 'Microphone access needed',
+    no_permission_retry: "If your browser blocked access, enable it in the site's settings and try again.",
     you: 'You',
     loading: 'Loading voice assistant...',
   },
