@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
+import { withRouteContext } from "@/lib/request-validation";
+import { logger } from "@/lib/logger";
 import { placesPostRequestSchema, placesQuerySchema } from "@/lib/schemas";
 
 /**
@@ -13,12 +15,29 @@ import { placesPostRequestSchema, placesQuerySchema } from "@/lib/schemas";
  * POST /api/mcp/places (MCP tool call format)
  */
 
-// Rate limit: 20 requests per minute per IP (Google Places API is expensive)
+// Rate limit: 20 requests per minute per caller (Google Places API is expensive).
+// BE-M1 (#782): every caller here is ElevenLabs' own backend, not an individual
+// visitor device, so this bucket is keyed on a per-conversation identifier when
+// the request supplies one (falling back to IP) purely for fairness between
+// concurrent voice conversations. That identifier is caller-supplied and
+// unverified — see PLACES_GLOBAL_RATE_LIMIT below for the real abuse ceiling.
 const PLACES_RATE_LIMIT = {
   windowMs: 60_000,
   maxRequests: 20,
   maxEntries: 10_000,
 };
+
+// BE-M1 (#782): a single shared bucket that caps total tool-call volume across
+// every caller regardless of conversation/IP. This is the real cost/abuse
+// control — it cannot be bypassed by supplying a fresh conversationId — sized
+// well above PLACES_RATE_LIMIT so several concurrent voice conversations don't
+// starve each other while still bounding worst-case Google Places spend.
+const PLACES_GLOBAL_RATE_LIMIT = {
+  windowMs: 60_000,
+  maxRequests: 120,
+  maxEntries: 10,
+};
+const PLACES_GLOBAL_RATE_LIMIT_KEY = "mcp-places:global";
 
 // Places API (New) response types
 interface PlacesApiPlace {
@@ -283,7 +302,98 @@ async function searchPlaces(
 }
 
 
+// BE-M1 (#782): pull a caller-supplied conversation identifier out of a plain
+// object, tolerating both the camelCase and snake_case spellings ElevenLabs
+// uses elsewhere (see src/app/api/mcp/save-favorite/route.ts). Absence is
+// expected and safe — callers fall back to IP-keyed rate limiting.
+function extractConversationId(source: Record<string, unknown> | null | undefined): string | null {
+  if (!source) return null;
+  const raw = source.conversationId ?? source.conversation_id;
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length > 200) return null;
+  return trimmed;
+}
+
+function buildPerCallerRateLimitKey(conversationId: string | null, ip: string): string {
+  return conversationId
+    ? `mcp-places:conv:${conversationId}`
+    : `mcp-places:ip:${ip}`;
+}
+
+interface RateLimitDenied {
+  allowed: false;
+  retryAfter?: number;
+}
+interface RateLimitOk {
+  allowed: true;
+}
+
+// BE-M1 (#782): check the global cost-cap bucket first (the real ceiling,
+// immune to a spoofed conversationId), then the per-caller fairness bucket.
+async function checkPlacesRateLimits(
+  conversationId: string | null,
+  ip: string
+): Promise<RateLimitDenied | RateLimitOk> {
+  const globalCheck = await checkRateLimit(PLACES_GLOBAL_RATE_LIMIT_KEY, PLACES_GLOBAL_RATE_LIMIT);
+  if (!globalCheck.allowed) {
+    return { allowed: false, retryAfter: globalCheck.retryAfter };
+  }
+
+  const perCallerKey = buildPerCallerRateLimitKey(conversationId, ip);
+  const perCallerCheck = await checkRateLimit(perCallerKey, PLACES_RATE_LIMIT);
+  if (!perCallerCheck.allowed) {
+    return { allowed: false, retryAfter: perCallerCheck.retryAfter };
+  }
+
+  return { allowed: true };
+}
+
+function tooManyRequestsResponse(retryAfter?: number): NextResponse {
+  return NextResponse.json(
+    { error: "Too many requests" },
+    {
+      status: 429,
+      headers: { "Retry-After": String(retryAfter) },
+    }
+  );
+}
+
+// BE-M8 (#789): a safe, stable response for any failure inside searchPlaces().
+// The raw error (which can include upstream hostnames, quota detail, or other
+// internal information) is logged server-side and, in development only,
+// surfaced under `debug` — never spoken back to the visitor by Pelayo.
+function placesLookupFailedResponse(err: unknown): NextResponse {
+  const message = err instanceof Error ? err.message : "Unknown error";
+
+  // This is our own static, non-sensitive config message (also returned
+  // directly by the pre-flight env check above) — safe to pass through as-is.
+  if (message === "Places API not configured") {
+    return NextResponse.json(
+      { error: message, code: "PLACES_NOT_CONFIGURED" },
+      { status: 500 }
+    );
+  }
+
+  logger.error("[MCP_PLACES_LOOKUP_FAILED]", { error: message });
+
+  const body: { error: string; code: string; debug?: { message: string } } = {
+    error:
+      "No se pudo completar la búsqueda de lugares en este momento. Inténtalo de nuevo en unos segundos.",
+    code: "PLACES_LOOKUP_FAILED",
+  };
+  if (process.env.NODE_ENV === "development") {
+    body.debug = { message };
+  }
+
+  return NextResponse.json(body, { status: 500 });
+}
+
 export async function GET(request: Request): Promise<NextResponse> {
+  return withRouteContext(request, () => handleGet(request));
+}
+
+async function handleGet(request: Request): Promise<NextResponse> {
   if (!validateMcpSecret(request)) {
     return NextResponse.json(
       { error: "Unauthorized" },
@@ -291,19 +401,17 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
+  const { searchParams } = new URL(request.url);
+  const conversationId = extractConversationId({
+    conversationId: searchParams.get("conversationId") ?? undefined,
+    conversation_id: searchParams.get("conversation_id") ?? undefined,
+  });
   const ip = getClientIp(request);
-  const rateCheck = await checkRateLimit(`mcp-places:${ip}`, PLACES_RATE_LIMIT);
+  const rateCheck = await checkPlacesRateLimits(conversationId, ip);
   if (!rateCheck.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      {
-        status: 429,
-        headers: { "Retry-After": String(rateCheck.retryAfter) },
-      }
-    );
+    return tooManyRequestsResponse(rateCheck.retryAfter);
   }
 
-  const { searchParams } = new URL(request.url);
   // Normalise: absent params become empty string so Zod min(1) fires with
   // our custom message instead of "expected string, received undefined".
   const rawParams = {
@@ -336,12 +444,15 @@ export async function GET(request: Request): Promise<NextResponse> {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return placesLookupFailedResponse(err);
   }
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  return withRouteContext(request, () => handlePost(request));
+}
+
+async function handlePost(request: Request): Promise<NextResponse> {
   if (!validateMcpSecret(request)) {
     return NextResponse.json(
       { error: "Unauthorized" },
@@ -349,43 +460,49 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
+  let body: unknown = undefined;
+  try {
+    body = await request.json();
+  } catch {
+    // Malformed JSON falls through to schema validation below, which
+    // rejects it with a 400 rather than leaking a JSON-parser error message.
+  }
+
+  const bodyRecord =
+    body && typeof body === "object" && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : null;
+  const conversationId = extractConversationId(bodyRecord);
   const ip = getClientIp(request);
-  const rateCheck = await checkRateLimit(`mcp-places:${ip}`, PLACES_RATE_LIMIT);
+  const rateCheck = await checkPlacesRateLimits(conversationId, ip);
   if (!rateCheck.allowed) {
+    return tooManyRequestsResponse(rateCheck.retryAfter);
+  }
+
+  const paramsParsed = placesPostRequestSchema.safeParse(body);
+
+  // Validate the request before checking upstream configuration, matching GET
+  // above. A malformed request is the caller's error whatever the server's
+  // Google credentials look like; answering 500 hid this from the probe that
+  // asserts the contract — a probe that had never run.
+  if (!paramsParsed.success) {
+    const firstIssue = paramsParsed.error.issues[0];
     return NextResponse.json(
-      { error: "Too many requests" },
-      {
-        status: 429,
-        headers: { "Retry-After": String(rateCheck.retryAfter) },
-      }
+      { error: firstIssue?.message ?? "Invalid query parameters" },
+      { status: 400 }
     );
   }
 
+  if (!process.env.GOOGLE_PLACES_API_KEY) {
+    return NextResponse.json(
+      { error: "Places API not configured" },
+      { status: 500 }
+    );
+  }
+
+  const { query, type, city } = paramsParsed.data;
+
   try {
-    const body = await request.json();
-    const paramsParsed = placesPostRequestSchema.safeParse(body);
-
-    // Validate the request before checking upstream configuration, matching GET
-    // above. A malformed request is the caller's error whatever the server's
-    // Google credentials look like; answering 500 hid this from the probe that
-    // asserts the contract — a probe that had never run.
-    if (!paramsParsed.success) {
-      const firstIssue = paramsParsed.error.issues[0];
-      return NextResponse.json(
-        { error: firstIssue?.message ?? "Invalid query parameters" },
-        { status: 400 }
-      );
-    }
-
-    if (!process.env.GOOGLE_PLACES_API_KEY) {
-      return NextResponse.json(
-        { error: "Places API not configured" },
-        { status: 500 }
-      );
-    }
-
-    const { query, type, city } = paramsParsed.data;
-
     const results = await searchPlaces(query, type, city);
     return NextResponse.json(results, {
       headers: {
@@ -393,7 +510,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return placesLookupFailedResponse(err);
   }
 }
