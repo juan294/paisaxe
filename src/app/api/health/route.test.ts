@@ -17,16 +17,18 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
-  getRateLimitBackendStatus: vi.fn(() => ({
-    backend: "memory",
-    configured: false,
-    degraded: false,
-  })),
+  probeRateLimitBackend: vi.fn(() =>
+    Promise.resolve({
+      backend: "memory",
+      configured: false,
+      degraded: false,
+    })
+  ),
 }));
 
 import { supabase } from "@/lib/supabase";
 import { getAdminClient } from "@/lib/supabase-admin";
-import { getRateLimitBackendStatus } from "@/lib/rate-limit";
+import { probeRateLimitBackend } from "@/lib/rate-limit";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -124,7 +126,7 @@ describe("GET /api/health", () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     vi.stubEnv("CRON_SECRET", "test-secret");
-    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
       backend: "memory",
       configured: false,
       degraded: false,
@@ -483,7 +485,7 @@ describe("GET /api/health", () => {
   it("SE-M1: public response contains only allow-listed top-level fields", async () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
-    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
       backend: "blocked",
       configured: false,
       degraded: true,
@@ -620,7 +622,7 @@ describe("GET /api/health", () => {
 
   it("DO-H2: keeps deployed preview health healthy when only Upstash is missing", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
-    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
       backend: "blocked",
       configured: false,
       degraded: true,
@@ -657,7 +659,7 @@ describe("GET /api/health", () => {
 
   it("DO-H2: marks deployed production health degraded when Upstash is missing", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
       backend: "blocked",
       configured: false,
       degraded: true,
@@ -676,6 +678,77 @@ describe("GET /api/health", () => {
       backend: "blocked",
       reason: "upstash_missing",
     });
+  });
+
+  // DO-H2 (#823): the health probe must reflect a LIVE Upstash outage, not
+  // cross-process state. This is the regression test for the actual bug:
+  // previously /api/health only ever read a same-process flag and could never
+  // observe a failure from a different serverless isolate, so it always
+  // reported "ok" no matter what was happening to real chat traffic.
+  it("DO-H2: reports rate_limit degraded when the live Upstash probe fails, and stays HTTP 200", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
+      backend: "upstash",
+      configured: true,
+      degraded: true,
+      reason: "upstash_unavailable",
+    });
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    expect(data.rate_limit).toEqual({
+      status: "degraded",
+      backend: "upstash",
+      reason: "upstash_unavailable",
+    });
+  });
+
+  // DO-H2: a hung Redis PING must not hang the health endpoint. The probe is
+  // raced against PROBE_TIMEOUTS_MS.rateLimit and degrades on timeout, the same
+  // way the Supabase/stories/database probes already do.
+  it("DO-H2: degrades rate_limit and stays fast when the live Upstash probe hangs past its timeout", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.mocked(probeRateLimitBackend).mockReturnValue(new Promise(() => {}));
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const start = Date.now();
+    const response = await GET();
+    const elapsed = Date.now() - start;
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    expect(data.rate_limit).toEqual({
+      status: "degraded",
+      backend: "upstash",
+      reason: "upstash_unavailable",
+    });
+    expect(elapsed).toBeLessThan(PROBE_TIMEOUTS_MS.rateLimit + 400);
+  }, 10000);
+
+  it("DO-H2: health stays healthy when the live Upstash probe succeeds", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
+      backend: "upstash",
+      configured: true,
+      degraded: false,
+    });
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+    expect(data.rate_limit).toEqual({ status: "ok", backend: "upstash" });
   });
 
   it("DO-H2: health response includes sentry.status=configured when DSN is set", async () => {

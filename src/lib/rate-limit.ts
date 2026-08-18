@@ -204,6 +204,47 @@ export function getRateLimitBackendStatus(): RateLimitBackendStatus {
   };
 }
 
+// --- Live backend probe (DO-H2) ---
+
+/**
+ * DO-H2 (#823): `_rateLimitDegraded` above is per-process state — on Vercel,
+ * `/api/health` runs in a different isolate than `/api/chat/stream`, so it can
+ * never observe a flag set there. This performs a live, side-effect-free Redis
+ * PING so health reflects Upstash's CURRENT reachability instead of stale,
+ * cross-process state that can never surface a real outage.
+ *
+ * Bounded by the caller: `/api/health` races this behind its own timeout
+ * harness (see `PROBE_TIMEOUTS_MS.rateLimit` in health-timeouts.ts), passing an
+ * AbortSignal through so a hung Redis call is actually cancelled rather than
+ * left running after the timeout fallback resolves.
+ */
+export async function probeRateLimitBackend(
+  signal?: AbortSignal
+): Promise<RateLimitBackendStatus> {
+  if (!useUpstash) {
+    if (isProduction()) {
+      return { backend: "blocked", configured: false, degraded: true, reason: "upstash_missing" };
+    }
+    return { backend: "memory", configured: false, degraded: false };
+  }
+
+  try {
+    const redis = new Redis({ url: upstashUrl!, token: upstashToken!, signal });
+    await redis.ping();
+    return { backend: "upstash", configured: true, degraded: false };
+  } catch (err) {
+    logger.error("[RATE_LIMIT_HEALTH_PROBE_FAILED]", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      backend: "upstash",
+      configured: true,
+      degraded: true,
+      reason: "upstash_unavailable",
+    };
+  }
+}
+
 function failClosed(config: RateLimitConfig): RateLimitResult {
   return {
     allowed: false,

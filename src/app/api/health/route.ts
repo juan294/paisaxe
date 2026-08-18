@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { getEnv } from "@/lib/env";
-import { getRateLimitBackendStatus } from "@/lib/rate-limit";
+import { probeRateLimitBackend } from "@/lib/rate-limit";
 import { PROBE_TIMEOUTS_MS } from "@/lib/health-timeouts";
 import { safeEqual } from "@/lib/safe-equal";
 
@@ -65,13 +65,34 @@ function checkSentry(): SentryProbeResult {
   return { status: dsn ? "configured" : "unconfigured" };
 }
 
-function checkRateLimitBackend(): RateLimitProbeResult {
-  const backendStatus = getRateLimitBackendStatus();
-  return {
-    status: backendStatus.degraded ? "degraded" : "ok",
-    backend: backendStatus.backend,
-    ...(backendStatus.reason ? { reason: backendStatus.reason } : {}),
-  };
+/**
+ * DO-H2 (#823): actively probe Redis instead of reading `_rateLimitDegraded`,
+ * module-level state set only inside the process that experienced an Upstash
+ * failure. Vercel routes are separate isolates, so this endpoint could never
+ * observe a flag set by `/api/chat/stream` — meaning a total Upstash outage
+ * silently denying every chat request still reported `rate_limit: ok` here.
+ * Bounded by the same timeout harness as the other probes below so a Redis
+ * hang can't make `/api/health` itself slow or unresponsive.
+ */
+async function checkRateLimitBackend(): Promise<RateLimitProbeResult> {
+  return withTimeout(
+    async (signal): Promise<RateLimitProbeResult> => {
+      const backendStatus = await probeRateLimitBackend(signal);
+      return {
+        status: backendStatus.degraded ? "degraded" : "ok",
+        backend: backendStatus.backend,
+        ...(backendStatus.reason ? { reason: backendStatus.reason } : {}),
+      };
+    },
+    PROBE_TIMEOUTS_MS.rateLimit,
+    // A timeout only ever happens mid-PING, which only happens when Upstash is
+    // configured — so on timeout we know the backend is "upstash" and degraded.
+    (): RateLimitProbeResult => ({
+      status: "degraded",
+      backend: "upstash",
+      reason: "upstash_unavailable",
+    })
+  );
 }
 
 /**
@@ -315,21 +336,25 @@ export async function GET(
 ): Promise<NextResponse<PublicHealthResponse>> {
   const cronAuth = checkCronAuthConfigured();
   const sentryStatus = checkSentry();
-  const rateLimitStatus = checkRateLimitBackend();
   // DO-H6: default fail-closed (never expose build identity). The real
   // computation moves inside the try block below as defense in depth — if
   // isReleaseIdentityAuthorized ever throws, the route still returns a
   // well-formed degraded response instead of an unhandled 500.
   let includeBuildIdentity = false;
+  // Fallback only for the (effectively unreachable) outer catch below — every
+  // real failure/timeout path is handled inside checkRateLimitBackend itself.
+  let rateLimitStatus: RateLimitProbeResult = { status: "ok", backend: "memory" };
 
   try {
     includeBuildIdentity = isReleaseIdentityAuthorized(request);
 
-    const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
+    const [supabaseStatus, storiesStatus, databaseStatus, rateLimit] = await Promise.all([
       checkSupabase(),
       checkStories(),
       checkDatabaseSize(),
+      checkRateLimitBackend(),
     ]);
+    rateLimitStatus = rateLimit;
 
     const isSupabaseError = supabaseStatus.status !== "connected";
     const isStoriesFallback = storiesStatus.status !== "ok";
