@@ -177,6 +177,44 @@ describe("verification coverage config", () => {
     expect(qaAgent).toContain('CURRENT_PHASE="phase 5 report generation"');
   });
 
+  it("fails (not silently skips) the Vercel env safety job when its secret is missing outside fork PRs", () => {
+    const workflow = readText(".github/workflows/security.yml");
+
+    // DO-M2 (#829): the job used to skip its only assertion whenever
+    // VERCEL_TOKEN was unset and still report success on every push/
+    // schedule run — requiredness without evidence, the same pattern
+    // rejected for Dependabot in preview-smoke.yml. Skip-to-pass must now
+    // be scoped to fork PRs only (GitHub genuinely withholds secrets
+    // there); every other trigger with a missing secret must fail.
+    expect(workflow).toContain("Fail when Vercel credentials are unavailable (not a fork PR)");
+    expect(workflow).toContain("Skip when Vercel credentials are unavailable (fork PR)");
+
+    // The fail step's run body ends in `exit 1` right after its distinctive
+    // error line — proves the missing-secret/non-fork-PR path actually fails.
+    expect(workflow).toContain(
+      '          echo "::error::This is the only automated check on deployed Vercel environment state in this repo (DO-M2 / issue #829) — it must fail rather than silently report success while checking nothing."\n' +
+        "          exit 1"
+    );
+
+    // The skip step's last echo line is immediately followed by the next
+    // step (no `exit 1` in between) — proves the fork-PR path still passes.
+    expect(workflow).toContain(
+      '          echo "Skipping the Vercel env safety assertion — this is expected sandboxing, not a missing-secret gap."\n' +
+        "\n" +
+        "      - name: Assert legacy agent override is absent from Vercel env"
+    );
+
+    // The fail path must be gated on NOT being a fork PR; the skip path
+    // must be gated on genuinely being one. If these conditions were ever
+    // swapped, the job would go back to silently passing everywhere.
+    expect(workflow).toContain(
+      "!(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true)"
+    );
+    expect(workflow).toContain(
+      "github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true"
+    );
+  });
+
   it("includes chat API response bodies in QA LLM failures", () => {
     const llmQualityTest = readText("src/tests/qa/llm-quality.test.ts");
     const llmQualityHelpers = readText("src/tests/qa/llm-quality-helpers.ts");
