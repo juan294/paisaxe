@@ -123,17 +123,41 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     }
   }, []);
 
-  // Auto-send initial message — one-shot on mount.
+  // Auto-send initial message (e.g. a suggested-question chip) — one-shot,
+  // deferred until voice-access resolution settles so we know which mode will
+  // actually render:
+  //  - Voice mode: VoiceChatElevenLabs reads initialMessageRef.current directly
+  //    and forwards it as the `opening_question` dynamic variable (FE-H4/UX-H7).
+  //  - Text mode: auto-submit here so a chip tap produces an answer instead of
+  //    silently prefilling `inputValue` and waiting for a second tap on Send
+  //    that ChatComposer (unmounted in voice mode) may never offer (UX-H1).
   // Capture prop in a ref so the effect never re-runs when the prop changes later.
-  // messages.length and isLoading are always 0/false at mount, so not needed in deps.
   const initialMessageRef = useRef(initialMessage);
+  const initialMessageHandledRef = useRef(false);
   useEffect(() => {
-    if (initialMessageRef.current) {
-      setInputValue(initialMessageRef.current);
+    if (!initialMessageRef.current || initialMessageHandledRef.current || isInitializing) {
+      return;
     }
-    // Intentionally empty — one-shot on mount. (#330: replaced eslint-disable with ref guard)
+    initialMessageHandledRef.current = true;
 
-  }, []);
+    // Mirrors the mode-sync effect above (canUseVoice && agentId) rather than
+    // reading `useElevenLabs` state directly — that state update lands one
+    // render later, which would otherwise race this effect on first resolve.
+    const willUseVoice = canUseVoice && !!agentId;
+    if (willUseVoice) {
+      return;
+    }
+
+    const message = initialMessageRef.current;
+    setLastMessage(message);
+    posthog?.capture("chat_conversation_started", { story_id: story.id });
+    posthog?.capture("chat_message_sent", { story_id: story.id, message_index: 0 });
+    void sendMessage(message, {
+      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+      locale,
+      messageIndex: 0,
+    });
+  }, [isInitializing, canUseVoice, agentId, sendMessage, localizedStory, story, locale, posthog]);
 
   const handlePrivacyDismiss = useCallback(() => {
     setPrivacyAcknowledged(true);
