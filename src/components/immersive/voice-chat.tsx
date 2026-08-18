@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Story } from "@/types/immersive";
 import { PrivacyNotice } from "./privacy-notice";
 import { ChatActions } from "./chat-actions";
@@ -69,8 +69,10 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
   const posthog = usePaisaxePostHog();
-  const stableOnClose = useMemo(() => onClose, [onClose]);
-  useFocusTrap(dialogRef, open, stableOnClose);
+  // FE-H3: useFocusTrap holds onEscape in a ref internally, so passing
+  // onClose directly (rather than through a no-op stabilizing memo) is
+  // safe — the trap's install/teardown effect doesn't depend on it.
+  useFocusTrap(dialogRef, open, onClose);
 
   const handleClose = useCallback(() => {
     triggerRef?.current?.focus();
