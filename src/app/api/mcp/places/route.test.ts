@@ -499,9 +499,13 @@ describe("/api/mcp/places", () => {
 
       const response = await POST(request);
 
+      // BE-M8 (#789): the raw error ("Network error") must not reach the voice
+      // agent's context in production — only a safe, stable code + Spanish message.
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toContain("Network error");
+      expect(data.error).not.toContain("Network error");
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
+      expect(data.debug).toBeUndefined();
     });
   });
 
@@ -552,6 +556,117 @@ describe("/api/mcp/places", () => {
     });
   });
 
+  describe("BE-M1 (#782) - rate-limit key differentiation", () => {
+    it("keys the per-caller bucket on the conversationId when the request supplies one", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants", conversationId: "conv-alpha" }),
+      });
+      await POST(request);
+
+      const keys = vi.mocked(checkRateLimit).mock.calls.map((call) => call[0]);
+      expect(keys.some((key) => key.includes("conv-alpha"))).toBe(true);
+    });
+
+    it("keys two different conversations into two different per-caller buckets even from the same IP", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const makeRequest = (conversationId: string) =>
+        new Request("http://localhost:3000/api/mcp/places", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-mcp-secret": MCP_SECRET,
+            "x-vercel-forwarded-for": "1.2.3.4",
+          },
+          body: JSON.stringify({ query: "restaurants", conversationId }),
+        });
+
+      await POST(makeRequest("conv-a"));
+      await POST(makeRequest("conv-b"));
+
+      const keys = vi.mocked(checkRateLimit).mock.calls.map((call) => call[0]);
+      const convAKeys = keys.filter((key) => key.includes("conv-a") && !key.includes("conv-b"));
+      const convBKeys = keys.filter((key) => key.includes("conv-b"));
+      expect(convAKeys.length).toBeGreaterThan(0);
+      expect(convBKeys.length).toBeGreaterThan(0);
+      expect(convAKeys).not.toEqual(convBKeys);
+    });
+
+    it("falls back to the IP-keyed bucket when no conversationId is supplied", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "x-vercel-forwarded-for": "9.9.9.9",
+        },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+      await POST(request);
+
+      const keys = vi.mocked(checkRateLimit).mock.calls.map((call) => call[0]);
+      expect(keys.some((key) => key.includes("9.9.9.9"))).toBe(true);
+    });
+
+    it("checks a separate global cost-cap bucket independent of the per-caller key", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants", conversationId: "conv-global-check" }),
+      });
+      await POST(request);
+
+      const keys = vi.mocked(checkRateLimit).mock.calls.map((call) => call[0]);
+      expect(keys.some((key) => key.includes("global"))).toBe(true);
+      // The global bucket call must not itself be keyed by the spoofable conversationId.
+      const globalKey = keys.find((key) => key.includes("global"));
+      expect(globalKey).not.toContain("conv-global-check");
+    });
+
+    it("returns 429 when only the global bucket is exhausted, even with a fresh conversationId", async () => {
+      // First call (global bucket) denies; a real conversationId should not bypass it.
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 12,
+        limit: 120,
+        resetAt: Date.now() + 12000,
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants", conversationId: "conv-brand-new" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(429);
+      const data = await response.json();
+      expect(data.error).toBe("Too many requests");
+      expect(response.headers.get("Retry-After")).toBe("12");
+    });
+  });
+
   describe("GET - Places API HTTP errors", () => {
     it("should return 500 when Places API returns non-ok HTTP response", async () => {
       mockFetch.mockResolvedValueOnce({
@@ -566,10 +681,13 @@ describe("/api/mcp/places", () => {
       );
       const response = await GET(request);
 
+      // BE-M8 (#789): upstream error bodies (which can include hostnames or
+      // internal detail) must not be spoken back to the visitor verbatim.
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toContain("Places API error: 403");
-      expect(data.error).toContain("Forbidden");
+      expect(data.error).not.toContain("403");
+      expect(data.error).not.toContain("Forbidden");
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
     });
   });
 
@@ -628,7 +746,8 @@ describe("/api/mcp/places", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toContain("API quota exceeded");
+      expect(data.error).not.toContain("API quota exceeded");
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
     });
 
     it("should handle no results", async () => {
@@ -659,12 +778,13 @@ describe("/api/mcp/places", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toContain("Network error");
+      expect(data.error).not.toContain("Network error");
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
     });
   });
 
   describe("GET - non-Error throw coverage", () => {
-    it("should return 'Unknown error' when GET catch receives a non-Error object", async () => {
+    it("should return the safe generic message when GET catch receives a non-Error object", async () => {
       // Simulate a non-Error throw (e.g., a string or number)
       mockFetch.mockRejectedValueOnce("string error");
 
@@ -676,12 +796,12 @@ describe("/api/mcp/places", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toBe("Unknown error");
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
     });
   });
 
   describe("POST - non-Error throw coverage", () => {
-    it("should return 'Unknown error' when POST catch receives a non-Error object", async () => {
+    it("should return the safe generic message when POST catch receives a non-Error object", async () => {
       mockFetch.mockRejectedValueOnce(42);
 
       const request = new Request("http://localhost:3000/api/mcp/places", {
@@ -694,12 +814,12 @@ describe("/api/mcp/places", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toBe("Unknown error");
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
     });
   });
 
   describe("searchPlaces - API error without message", () => {
-    it("should fall back to 'API request denied' when error.message is empty", async () => {
+    it("should still return the safe generic message when error.message is empty", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -719,7 +839,47 @@ describe("/api/mcp/places", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toBe("API request denied");
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
+    });
+  });
+
+  describe("BE-M8 (#789) - safe error messages", () => {
+    const INTERNAL_DETAIL = "connect ECONNREFUSED internal-db-host.paisaxe.internal:5432";
+
+    it("does not leak internal error detail in production mode (GET)", async () => {
+      mockFetch.mockRejectedValueOnce(new Error(INTERNAL_DETAIL));
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(JSON.stringify(data)).not.toContain("internal-db-host");
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
+      expect(typeof data.error).toBe("string");
+      expect(data.debug).toBeUndefined();
+    });
+
+    it("reveals internal error detail only in development mode (POST)", async () => {
+      vi.stubEnv("NODE_ENV", "development");
+      mockFetch.mockRejectedValueOnce(new Error(INTERNAL_DETAIL));
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.code).toBe("PLACES_LOOKUP_FAILED");
+      expect(data.debug?.message).toContain("internal-db-host");
+      // The agent-facing field must stay safe even in development.
+      expect(data.error).not.toContain("internal-db-host");
     });
   });
 
