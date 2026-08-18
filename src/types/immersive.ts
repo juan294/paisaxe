@@ -62,6 +62,12 @@ export interface StoryTranslation {
   title: string;
   subtitle: string;
   description: string;
+  /**
+   * UX-H6 (#892): translated suggested-question chips for this locale.
+   * Optional — older/untranslated translation entries won't have it, and
+   * consumers must fall back to the story's Spanish question_prompts.
+   */
+  question_prompts?: string[];
 }
 
 /** Supported locales for story translations (matches Locale type from i18n) */
