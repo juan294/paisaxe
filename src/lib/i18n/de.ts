@@ -261,12 +261,13 @@ export const de: Translations = {
 
   premium: {
     premium_access: 'Premium-Zugang',
-    voice_pass_label: 'Sprachpass · 24h',
+    voice_pass_label: 'Sprachpass · {duration}',
     voice_locked: 'Sprachchat ist eine Premium-Funktion',
     get_day_pass: 'Tagespass Holen',
     voice_title: 'Sprich mit Deinem Guide',
     voice_description: 'Pelayo weiß mehr als auf dem Bildschirm steht. Frag einfach.',
     feature_24h: '24 Stunden unbegrenzte Gespräche',
+    feature_duration: '{duration} unbegrenzte Gespräche',
     feature_unlimited: 'Unbegrenzte Fragen',
     feature_realtime: 'Echtzeit-Wetter und Empfehlungen',
     feature_booking: 'Pelayo reserviert Restaurants und Hotels für dich',
@@ -289,8 +290,11 @@ export const de: Translations = {
     faq_what_included_answer: '24 Stunden mit Pelayo. Frag nach dem Wetter vor der Wanderung zu den Seen, wo die beste Fabada ist, welches Sidra-Haus du besuchen sollst —',
     faq_what_included_highlight: 'und er ruft an und reserviert für dich!',
     faq_how_long: 'Wie lange gilt es?',
-    faq_how_long_answer: '24 Stunden ab Kauf. Perfekt für einen Tag Reiseplanung oder Erkundung.',
+    faq_how_long_answer: '{duration} ab Kauf. Perfekt für einen Tag Reiseplanung oder Erkundung.',
     voice_pass_expiry: 'Dein Sprachpass läuft in {hours}h ab ({time})',
+    tier_day: '24 Stunden',
+    tier_week: '7 Tage',
+    tier_month: '30 Tage',
   },
 
   fullscreen: {
