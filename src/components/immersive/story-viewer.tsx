@@ -49,6 +49,7 @@ import { AuthorTypewriter } from "./author-typewriter";
 import { StoryProgressBar } from "./story-progress-bar";
 import { StoryToolbar } from "./story-toolbar";
 import { StoryInfoPanel } from "./story-info-panel";
+import { getLocalizedQuestionPrompts } from "./question-prompts";
 import { useStoryKeyboardNav } from "@/hooks/use-story-keyboard-nav";
 import { Button } from "@/components/ui/button";
 
@@ -203,10 +204,12 @@ export function StoryViewer({
     [story, allStories]
   );
 
-  // Story titles for progress bar screen reader announcements
+  // Story titles for progress bar screen reader announcements.
+  // UX-H6 (#892): route through getLocalizedStory so a non-Spanish visitor
+  // hears the translated title, not the raw Spanish one, for every segment.
   const storyTitles = useMemo(
-    () => stories.map((s) => s.title),
-    [stories]
+    () => stories.map((s) => getLocalizedStory(s, locale).title),
+    [stories, locale]
   );
 
   // PE-M4 (#615): prefetch the adjacent (next & prev) story images so navigation
@@ -239,8 +242,10 @@ export function StoryViewer({
 
   if (!story || !localizedStory) return null;
 
-  // Question prompts from metadata
-  const questionPrompts = story.metadata?.question_prompts || [];
+  // Question prompts from metadata.
+  // UX-H6 (#892): resolve the translated prompts for the active locale,
+  // falling back to Spanish when no translation exists (see getLocalizedQuestionPrompts).
+  const questionPrompts = getLocalizedQuestionPrompts(story, locale);
 
   return (
     <main

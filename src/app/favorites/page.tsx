@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useFavorites } from "@/hooks/use-favorites";
@@ -8,6 +8,7 @@ import { useStories } from "@/hooks/use-stories";
 import { Bookmark, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { getLocalizedStory, trimStoriesTranslations } from "@/lib/localize-story";
 import type { Story } from "@/types/immersive";
 
 const ITEMS_PER_PAGE = 20;
@@ -18,11 +19,19 @@ export default function FavoritesPage() {
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   // requiresAuth is true for anonymous users — they can never have saved favorites.
   const canWaitForStories = !requiresAuth || favorites.length > 0;
-  const stories = canWaitForStories ? allStories : [];
+  // UX-H6 (#892): favorites/layout.tsx's StoriesProvider (unlike the immersive
+  // page) doesn't trim story translations to the active locale — it fetches
+  // full untrimmed stories. Trim here, mirroring immersive-page-content.tsx's
+  // PE-M1 pattern, so the in-memory/localStorage-cached representation only
+  // carries the locale actually rendered below via getLocalizedStory.
+  const stories = useMemo(
+    () => trimStoriesTranslations(canWaitForStories ? allStories : [], locale),
+    [canWaitForStories, allStories, locale]
+  );
 
   // Filter to only favorited stories
   const favoriteStories = stories.filter((story) =>
@@ -183,8 +192,12 @@ interface GalleryItemProps {
 function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
   const [isVisible, setIsVisible] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const storyHref = `/immersive?story=${story.slug || story.id}`;
+  // UX-H6 (#892): route title/subtitle through getLocalizedStory so a
+  // non-Spanish visitor's saved gallery shows their own language, not the
+  // raw Spanish text stored on the story.
+  const localizedStory = getLocalizedStory(story, locale);
 
   // Intersection Observer for lazy rendering
   useEffect(() => {
@@ -230,7 +243,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
           <>
             <Image
               src={story.image}
-              alt={story.title}
+              alt={localizedStory.title}
               fill
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               sizes={isFeature
@@ -254,11 +267,11 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
                   {t(`stories.categories.${story.category}`)}
                 </p>
                 <h3 className="mt-1 text-base font-semibold text-white">
-                  {story.title}
+                  {localizedStory.title}
                 </h3>
-                {story.subtitle && (
+                {localizedStory.subtitle && (
                   <p className="mt-0.5 line-clamp-1 text-sm text-white/70">
-                    {story.subtitle}
+                    {localizedStory.subtitle}
                   </p>
                 )}
               </div>
@@ -277,7 +290,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
               <>
                 <Bookmark className="h-8 w-8 text-neutral-600" />
                 <p className="text-sm font-medium text-neutral-400">
-                  {story.title}
+                  {localizedStory.title}
                 </p>
               </>
             )}

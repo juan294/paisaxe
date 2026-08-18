@@ -1,12 +1,32 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, type Locale } from "@/lib/i18n";
+import type { Story, StoryLocale } from "@/types/immersive";
 
 interface QuestionPromptsProps {
   prompts: string[];
   storyId: string;
   onSelectPrompt: (prompt: string) => void;
+}
+
+/**
+ * UX-H6 (#892): resolve the suggested-question chips for the active locale.
+ *
+ * `StoryTranslation.question_prompts` is optional — a translation may exist
+ * for title/subtitle/description without ever having translated prompts (or
+ * the field may be missing entirely on older translation entries). This
+ * falls back gracefully to the story's Spanish `question_prompts` rather
+ * than rendering an empty/undefined list.
+ */
+export function getLocalizedQuestionPrompts(story: Story, locale: Locale): string[] {
+  const spanishPrompts = story.metadata?.question_prompts || [];
+
+  if (locale === "es") return spanishPrompts;
+
+  const translatedPrompts = story.metadata?.translations?.[locale as StoryLocale]?.question_prompts;
+
+  return translatedPrompts && translatedPrompts.length > 0 ? translatedPrompts : spanishPrompts;
 }
 
 export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: QuestionPromptsProps) {

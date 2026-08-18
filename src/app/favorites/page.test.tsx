@@ -4,11 +4,13 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import FavoritesPage from "./page";
 import { createMockT } from "@/test/i18n-mock";
 
-// Mock i18n
+// Mock i18n. UX-H6 (#892): mutable locale so tests can exercise a
+// non-Spanish visitor viewing the favorites gallery.
 const mockT = createMockT();
+let mockLocale = "es";
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
-    locale: "es",
+    locale: mockLocale,
     setLocale: vi.fn(),
     t: (key: string) => mockT(key),
   }),
@@ -94,6 +96,7 @@ vi.mock("@/hooks/use-stories", () => ({
 describe("FavoritesPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLocale = "es";
     mockUseAuth.mockReturnValue({
       user: null,
       session: null,
@@ -1162,6 +1165,88 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       expect(screen.getByAltText("Lagos de Covadonga")).toBeInTheDocument();
+    });
+  });
+
+  // UX-H6 (#892): getLocalizedStory was bypassed across the entire favorites
+  // gallery — a non-Spanish visitor's saved places always rendered raw
+  // Spanish title/subtitle/image-alt, reverting their chosen language.
+  describe("UX-H6 (#892): locale-aware gallery text", () => {
+    const storyWithTranslation = {
+      id: "story-1",
+      slug: "lagos-covadonga",
+      title: "Lagos de Covadonga",
+      subtitle: "Picos de Europa",
+      description: "Beautiful glacial lakes",
+      image: "/images/lagos.jpg",
+      category: "nature" as const,
+      sourcePdf: "nature.pdf",
+      metadata: {
+        translations: {
+          fr: {
+            title: "Lacs de Covadonga",
+            subtitle: "Pics d'Europe",
+            description: "De magnifiques lacs glaciaires",
+          },
+        },
+      },
+    };
+
+    beforeEach(() => {
+      mockUseStories.mockReturnValue({
+        stories: [storyWithTranslation],
+        isLoading: false,
+        error: null,
+        refresh: vi.fn(),
+      });
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+    });
+
+    it("renders the localized title/subtitle for a non-Spanish locale", async () => {
+      mockLocale = "fr";
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lacs de Covadonga")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Pics d'Europe")).toBeInTheDocument();
+      expect(screen.queryByText("Lagos de Covadonga")).not.toBeInTheDocument();
+      expect(screen.queryByText("Picos de Europa")).not.toBeInTheDocument();
+    });
+
+    it("uses the localized title as the image alt text for a non-Spanish locale", async () => {
+      mockLocale = "fr";
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByAltText("Lacs de Covadonga")).toBeInTheDocument();
+      });
+    });
+
+    it("falls back to Spanish text when no translation exists for the active locale", async () => {
+      mockLocale = "de";
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
+    });
+
+    it("still renders the raw title/subtitle for the default Spanish locale", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
     });
   });
 });
