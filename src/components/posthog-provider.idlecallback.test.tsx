@@ -21,11 +21,6 @@ const mockPosthog = {
 };
 
 vi.mock("posthog-js", () => ({ default: mockPosthog }));
-vi.mock("posthog-js/react", () => ({
-  PostHogProvider: ({ children }: { client: unknown; children: React.ReactNode }) => (
-    <div data-testid="posthog-react-provider">{children}</div>
-  ),
-}));
 
 describe("PostHogProviderWrapper — requestIdleCallback deferral (PE-M3)", () => {
   const originalLocation = window.location;
