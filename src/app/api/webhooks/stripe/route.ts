@@ -8,6 +8,18 @@ import type Stripe from "stripe";
 const VALID_PURCHASE_TYPES = new Set<string>(["day_pass", "weekly_pass", "monthly_pass"]);
 const RPC_TIMEOUT_MS = 10_000;
 
+// BE-M5/SE-M2: checkout.session.completed fires even for delayed-settlement
+// payment methods (SEPA, Bizum, Klarna) before funds actually clear — Stripe
+// reports payment_status "unpaid" at that point and follows up with
+// checkout.session.async_payment_succeeded once payment_status flips to
+// "paid". Card payments (the only method enabled today) settle synchronously,
+// so payment_status is already "paid" on checkout.session.completed and this
+// is a no-op for the existing path.
+const GRANTING_EVENT_TYPES = new Set<string>([
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+]);
+
 function resolvePurchaseType(raw: string | undefined): PurchaseType {
   if (raw && VALID_PURCHASE_TYPES.has(raw)) {
     return raw as PurchaseType;
@@ -32,10 +44,20 @@ function unrecoverableResponse(eventId: string, reason: StripeUnrecoverableReaso
  * POST /api/webhooks/stripe
  *
  * Handles Stripe webhook events:
- * - checkout.session.completed: Creates voice purchase record atomically
+ * - checkout.session.completed: Creates voice purchase record atomically,
+ *   but only when session.payment_status is already "paid" (synchronous
+ *   payment methods, e.g. card).
+ * - checkout.session.async_payment_succeeded: Same grant path, for delayed-
+ *   settlement payment methods where payment_status flips to "paid" after
+ *   checkout.session.completed already fired with "unpaid".
  *
- * Idempotency and grant creation are wrapped in a single Postgres RPC so the
- * webhook never records the dedup row without also granting access.
+ * Idempotency and grant creation are wrapped in a single Postgres RPC keyed
+ * on the Stripe event id, so the webhook never records the dedup row without
+ * also granting access. checkout.session.completed and
+ * checkout.session.async_payment_succeeded carry distinct event ids for the
+ * same purchase, but at most one of them ever has payment_status "paid" for
+ * a given checkout session — so exactly one grant call is ever made per
+ * purchase regardless of which event triggers it.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -65,11 +87,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    // Only handle checkout.session.completed events
-    if (event.type !== "checkout.session.completed") {
+    // Only handle events that can result in a grant.
+    if (!GRANTING_EVENT_TYPES.has(event.type)) {
       return NextResponse.json({ received: true });
     }
     const session = event.data.object as Stripe.Checkout.Session;
+
+    // BE-M5/SE-M2: never grant before Stripe confirms payment actually
+    // settled. See GRANTING_EVENT_TYPES comment above for why both event
+    // types are handled here with the same guard.
+    if (session.payment_status !== "paid") {
+      logger.info("[STRIPE_WEBHOOK_PAYMENT_NOT_SETTLED]", {
+        eventId: event.id,
+        eventType: event.type,
+        paymentStatus: session.payment_status,
+      });
+      return NextResponse.json(
+        { received: true, status: "payment_not_settled" },
+        { status: 200 }
+      );
+    }
+
     const userId = session.metadata?.user_id;
 
     if (!userId) {
