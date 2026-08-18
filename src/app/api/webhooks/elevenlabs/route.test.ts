@@ -965,7 +965,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
   });
 
   describe("Zod schema validation", () => {
-    it("should emit WEBHOOK_UNKNOWN_SHAPE warn when payload has unexpected top-level fields", async () => {
+    // BE-H3 (#778): the passthrough invariant — provider payload evolution
+    // (extra unknown fields, anywhere in the tree) must not silently break
+    // the webhook. The observability-only StrictElevenLabsWebhookSchema
+    // still logs a warning, but the enforced schema accepts the payload
+    // and the request succeeds using `parseResult.data`.
+    it("should emit WEBHOOK_UNKNOWN_SHAPE warn but still succeed (passthrough) when payload has unexpected top-level fields", async () => {
       const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const request = createSignedRequest({
@@ -979,8 +984,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
       });
 
       const response = await POST(request);
-      expect(response.status).toBe(200);
+      const data = await response.json();
 
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
       expect(loggerSpy).toHaveBeenCalledWith(
         "[WEBHOOK_UNKNOWN_SHAPE]",
         expect.objectContaining({ webhook: "elevenlabs" })
@@ -1015,13 +1022,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
       loggerSpy.mockRestore();
     });
 
-    it("should include the dotted field path when a known field has the wrong type (line 115 path.length > 0 branch)", async () => {
-      // A wrong-typed known field (conversation_id as number) produces an
-      // "invalid_type" issue with no `keys` array, so unknownFields falls
-      // through to `i.path.length > 0 ? [i.path.join(".")] : []` — exercising
-      // the `> 0` (true) side of the ternary at route.ts:115.
-      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-
+    // BE-H3 (#778): before this fix, a wrong-typed known field only
+    // triggered a warn-only Zod check whose result was discarded, and the
+    // handler proceeded to read the raw (unvalidated) body regardless —
+    // conversation_id (12345, a number) was truthy so the request sailed
+    // through. Now the enforced schema actually rejects it with a 400.
+    it("should return 400 when a known field has the wrong type (conversation_id as number)", async () => {
       const payload = JSON.stringify({ conversation_id: 12345 });
       const sigHeader = createSignatureHeader(payload);
       const request = new NextRequest(
@@ -1037,30 +1043,15 @@ describe("POST /api/webhooks/elevenlabs", () => {
       );
 
       const response = await POST(request);
-      // The zod schema only warns on unknown shape — it does not block the
-      // request. Since `body.conversation_id` (12345) is still truthy at
-      // runtime, the handler proceeds through the normal (mocked) booking
-      // lookup and succeeds after logging the shape warning.
-      expect(response.status).toBe(200);
+      const data = await response.json();
 
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "[WEBHOOK_UNKNOWN_SHAPE]",
-        expect.objectContaining({
-          webhook: "elevenlabs",
-          fields: ["conversation_id"],
-        })
-      );
-
-      loggerSpy.mockRestore();
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Bad request: invalid payload");
     });
 
-    it("should emit an empty fields list when the root payload is not an object (line 115 path.length === 0 branch)", async () => {
+    it("should return 400 when the root payload is not an object", async () => {
       // A root-level JSON primitive (e.g. a bare string) parses fine via
-      // JSON.parse but fails the object schema with a root issue whose
-      // `path` is `[]` — exercising the `=== 0` (false) side of the
-      // ternary at route.ts:115, falling through to the empty-array branch.
-      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-
+      // JSON.parse but fails the enforced object schema outright.
       const payload = JSON.stringify("just a string, not an object");
       const sigHeader = createSignatureHeader(payload);
       const request = new NextRequest(
@@ -1076,16 +1067,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
       );
 
       const response = await POST(request);
-      // No conversation_id can be derived from a string body, so it's
-      // reported missing after the shape warning is logged.
+      const data = await response.json();
+
       expect(response.status).toBe(400);
-
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "[WEBHOOK_UNKNOWN_SHAPE]",
-        expect.objectContaining({ webhook: "elevenlabs", fields: [] })
-      );
-
-      loggerSpy.mockRestore();
+      expect(data.error).toBe("Bad request: invalid payload");
     });
 
     it("should handle data-nested analysis path in Zod schema validation", async () => {
@@ -1172,7 +1157,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.outcome).toBe("confirmed");
   });
 
-  it("should handle transcript as non-array non-string type gracefully", async () => {
+  // BE-H3 (#778): before this fix, a `transcript` shaped like neither an
+  // array nor a string was only warned about (Zod result discarded) and
+  // the handler proceeded to read the raw body regardless, silently
+  // degrading to a "failed" outcome instead of surfacing the malformed
+  // payload. Now the enforced schema rejects it with a 400.
+  it("should return 400 when transcript is neither an array nor a string", async () => {
     const request = createSignedRequest({
       conversation_id: "conv_456",
       // transcript is an object (neither string nor array)
@@ -1183,9 +1173,8 @@ describe("POST /api/webhooks/elevenlabs", () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(200);
-    // With no matching keywords and unknown call status, should default to failed
-    expect(data.outcome).toBe("failed");
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Bad request: invalid payload");
   });
 
   // === BE-B4: call_successful field normalization ===
