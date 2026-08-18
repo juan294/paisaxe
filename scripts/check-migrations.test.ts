@@ -68,6 +68,66 @@ describe("validateMigrations", () => {
     expect(result.errors).toEqual([]);
   });
 
+  it("fails when pending_bookings (created without a public. prefix, like migration 053) lacks full service-role-only posture", () => {
+    const root = createMigrationFixture({
+      "001_pending_bookings.sql": `
+        CREATE TABLE pending_bookings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          customer_name TEXT NOT NULL,
+          customer_phone TEXT NOT NULL,
+          venue_phone TEXT NOT NULL,
+          special_requests TEXT
+        );
+
+        ALTER TABLE pending_bookings ENABLE ROW LEVEL SECURITY;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toContain(
+      "Sensitive table public.pending_bookings must revoke privileges from anon"
+    );
+    expect(result.errors).toContain(
+      "Sensitive table public.pending_bookings must revoke privileges from authenticated"
+    );
+    expect(result.errors).toContain(
+      "Sensitive table public.pending_bookings must grant service_role access explicitly"
+    );
+    expect(result.errors).toContain(
+      "Sensitive table public.pending_bookings must define a service_role RLS policy"
+    );
+  });
+
+  it("passes when pending_bookings (created without a public. prefix) is explicitly service-role-only", () => {
+    const root = createMigrationFixture({
+      "001_pending_bookings.sql": `
+        CREATE TABLE pending_bookings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          customer_name TEXT NOT NULL,
+          customer_phone TEXT NOT NULL,
+          venue_phone TEXT NOT NULL,
+          special_requests TEXT
+        );
+
+        ALTER TABLE pending_bookings ENABLE ROW LEVEL SECURITY;
+        REVOKE ALL ON TABLE public.pending_bookings FROM anon;
+        REVOKE ALL ON TABLE public.pending_bookings FROM authenticated;
+        GRANT ALL ON TABLE public.pending_bookings TO service_role;
+        CREATE POLICY "Service role can manage pending_bookings"
+          ON public.pending_bookings
+          FOR ALL
+          TO service_role
+          USING (auth.role() = 'service_role')
+          WITH CHECK (auth.role() = 'service_role');
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toEqual([]);
+  });
+
   it("fails when SMS completion revokes reference the dropped two-argument signature", () => {
     const root = createMigrationFixture({
       "001_create_complete_booking_sms_job.sql": `

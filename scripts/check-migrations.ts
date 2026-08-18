@@ -57,6 +57,9 @@ const SENSITIVE_SERVICE_ROLE_TABLES = [
   "elevenlabs_webhook_events",
   "translate_webhook_events",
   "stripe_webhook_events",
+  // Highest-PII table in the schema (customer names, phones, venue phones,
+  // special requests) -- see migration 101 for the posture-parity migration.
+  "pending_bookings",
 ];
 
 const TRANSLATION_SECURITY_DEFINER_FUNCTIONS = [
