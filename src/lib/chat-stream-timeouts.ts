@@ -27,7 +27,8 @@ export function isChatStreamStageTimeout(
 
 export async function withChatStreamStageTiming<T>(
   stage: ChatStreamStage,
-  promise: Promise<T>
+  promise: Promise<T>,
+  abortController?: AbortController
 ): Promise<T> {
   const startedAt = Date.now();
   const timeoutMs = CHAT_STREAM_STAGE_TIMEOUTS_MS[stage];
@@ -37,6 +38,11 @@ export async function withChatStreamStageTiming<T>(
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       timedOut = true;
+      // AR-H2 (#856): a bare Promise.race leaves the losing promise running
+      // (and, for an Anthropic call, billing) after the caller has moved on.
+      // Abort the controller the caller wired into `promise`'s construction
+      // so the underlying call is actually cancelled, not just abandoned.
+      abortController?.abort();
       reject(new ChatStreamStageTimeoutError(stage, timeoutMs));
     }, timeoutMs);
   });

@@ -106,9 +106,35 @@ describe("verification coverage config", () => {
     expect(qaAgent).toContain("Checking Voyage AI embedding availability");
     expect(qaAgent).toContain("QA PREFLIGHT: Voyage AI embedding availability failed");
     expect(qaAgent.indexOf("export VOYAGE_API_KEY")).toBeLessThan(
-      qaAgent.indexOf("npm run dev")
+      qaAgent.indexOf("npm run build")
     );
-    expect(qaAgent).toContain('VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE" npm run dev');
+  });
+
+  // QA-H3 (#870): the weekly QA gate now runs a production build instead of
+  // `npm run dev`, so it exercises the Anthropic SDK transport (the code
+  // path production traffic actually takes) instead of the curl-subprocess
+  // dev/test transport. See src/lib/claude.ts USE_CURL.
+  it("runs the QA suite against a production build, not the dev server", () => {
+    const qaAgent = readText("scripts/qa-agent.sh");
+
+    expect(qaAgent).toContain('npm run build > "$SERVER_LOG"');
+    expect(qaAgent).toContain('npm run start -- --port 3006');
+    // Build must complete (and be checked for failure) before start is launched.
+    expect(qaAgent.indexOf("npm run build")).toBeLessThan(
+      qaAgent.indexOf("npm run start -- --port 3006")
+    );
+    expect(qaAgent).toContain("Production build failed");
+  });
+
+  // QA-H3 (#870): the SSE endpoint real users hit, not the legacy
+  // non-streaming JSON endpoint.
+  it("targets the streaming chat endpoint real users hit", () => {
+    const llmQualityTest = readText("src/tests/qa/llm-quality.test.ts");
+    const llmQualityHelpers = readText("src/tests/qa/llm-quality-helpers.ts");
+
+    expect(llmQualityTest).toContain("`${API_URL}/api/chat/stream`");
+    expect(llmQualityHelpers).toContain("parseStreamResponse");
+    expect(llmQualityHelpers).toContain("text/event-stream");
   });
 
   it("preflights Anthropic before running QA LLM tests", () => {
