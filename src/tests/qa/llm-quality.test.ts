@@ -14,6 +14,7 @@ import { appendFileSync, existsSync } from 'fs';
 import {
   RepeatedServerFailureCircuit,
   formatChatApiError,
+  parseStreamResponse,
 } from './llm-quality-helpers';
 
 const API_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3006';
@@ -59,6 +60,14 @@ async function getCsrfToken(): Promise<string> {
 }
 
 // Helper to call the chat API with retry for rate limiting and transient network errors
+//
+// QA-H3 (#870): targets /api/chat/stream — the SSE endpoint real users
+// actually hit — instead of the legacy, non-streaming /api/chat endpoint
+// (different transport, retry semantics, and prompt structure; no
+// production traffic hits it). Response parsing is delegated to
+// parseStreamResponse, which also falls back to plain JSON for the
+// non-streaming short-circuit responses the route still returns for some
+// cases (e.g. detected prompt injection).
 async function sendChatMessage(message: string, retries = 3): Promise<ChatResponse> {
   serverFailureCircuit.assertRequestAllowed();
   const csrfToken = await getCsrfToken();
@@ -66,7 +75,7 @@ async function sendChatMessage(message: string, retries = 3): Promise<ChatRespon
   for (let attempt = 1; attempt <= retries; attempt++) {
     let response: Response;
     try {
-      response = await fetch(`${API_URL}/api/chat`, {
+      response = await fetch(`${API_URL}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,13 +116,9 @@ async function sendChatMessage(message: string, retries = 3): Promise<ChatRespon
       throw new Error(detail);
     }
 
+    const result = await parseStreamResponse(response);
     serverFailureCircuit.recordSuccess();
-    const data = await response.json();
-    // Normalize response - API returns 'message' field
-    return {
-      content: data.message || data.content || data.response || '',
-      sources: data.sources || [],
-    };
+    return result;
   }
   throw new Error('Max retries exceeded');
 }
