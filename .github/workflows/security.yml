@@ -11,11 +11,19 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required-checks: '["Gitleaks secret scan","npm audit","Vercel env safety"]'
+
   gitleaks:
     name: Gitleaks secret scan
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -35,6 +43,8 @@ jobs:
 
   audit:
     name: npm audit
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -62,6 +72,8 @@ jobs:
 
   vercel-env-safety:
     name: Vercel env safety
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

@@ -3,16 +3,28 @@ name: E2E Tests
 on:
   push:
     branches: [develop, main]
+    paths-ignore:
+      - "docs/research/**"
+      - "docs/plans/**"
+      - "docs/agents/**"
   pull_request:
     branches: [develop, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required-checks: '["Playwright E2E","Visual Regression"]'
+
   e2e:
     name: Playwright E2E
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -103,6 +115,8 @@ jobs:
   # meant visual diffs could never block a merge.
   visual-regression:
     name: Visual Regression
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 

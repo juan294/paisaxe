@@ -27,11 +27,19 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required-checks: '["Lint & Typecheck","Test","Build"]'
+
   lint-and-typecheck:
     name: Lint & Typecheck
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -85,6 +93,8 @@ jobs:
   # -----------------------------------------------------------------------
   coverage-shard:
     name: Coverage (shard ${{ matrix.shard }}/4)
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     strategy:
       # Don't cancel sibling shards when one fails — we want the full picture.
@@ -167,12 +177,16 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: [coverage-shard, coverage-merge]
+    needs: [develop_push_source, coverage-shard, coverage-merge]
     if: always()
 
     steps:
       - name: Verify test/coverage suite succeeded
         run: |
+          if [ "${{ needs.develop_push_source.outputs.validated_by_pr }}" = "true" ]; then
+            echo "Exact merge SHA already passed every required PR check."
+            exit 0
+          fi
           shards='${{ needs.coverage-shard.result }}'
           merge='${{ needs.coverage-merge.result }}'
           echo "coverage-shard=$shards coverage-merge=$merge"
@@ -184,6 +198,8 @@ jobs:
 
   build:
     name: Build
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -230,8 +246,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Only run on direct develop pushes — not PRs, not main.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    needs: [build]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' && (needs.develop_push_source.outputs.validated_by_pr == 'true' || needs.build.result == 'success')
+    needs: [develop_push_source, build]
     # Never block the push — surface failures visibly but don't fail the run.
     continue-on-error: true
 

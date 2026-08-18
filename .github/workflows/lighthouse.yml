@@ -3,16 +3,28 @@ name: Lighthouse CI
 on:
   push:
     branches: [develop, main]
+    paths-ignore:
+      - "docs/research/**"
+      - "docs/plans/**"
+      - "docs/agents/**"
   pull_request:
     branches: [develop, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required-checks: '["Lighthouse Audit"]'
+
   lighthouse:
     name: Lighthouse Audit
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
 
     steps:
