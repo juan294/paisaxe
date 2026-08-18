@@ -63,6 +63,17 @@ export function useFocusTrap(
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
 
+      // UX-H2: the listener is bound to `document` (not the container) so it
+      // still fires when focus has escaped the trap entirely — e.g. a click
+      // landed on a background element that stayed focusable. Recapture focus
+      // into the trap instead of letting Tab continue through the rest of
+      // the document.
+      if (!container.contains(document.activeElement)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+        return;
+      }
+
       if (e.shiftKey) {
         if (document.activeElement === first) {
           e.preventDefault();
@@ -76,11 +87,15 @@ export function useFocusTrap(
       }
     };
 
-    container.addEventListener('keydown', handleKeyDown);
+    // UX-H2: scoped to `document`, not `container` — a container-scoped
+    // listener only receives events that bubble through the container, so
+    // once focus escapes to an element outside it, Tab presses never reach
+    // this handler and focus is never recaptured.
+    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       cancelAnimationFrame(raf);
-      container.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
       // Restore focus when trap is deactivated
       previouslyFocused?.focus();
     };

@@ -246,11 +246,26 @@ export function StoryViewer({
     <main
       className="relative h-dvh w-screen overflow-hidden bg-black"
       aria-hidden={chatOpen ? "true" : undefined}
+      // UX-H2 (#888): aria-hidden alone doesn't stop keyboard focus — nav,
+      // toggles, and arrows inside stayed Tab-reachable while announced as
+      // non-existent to assistive tech. `inert` additionally removes the
+      // subtree from the tab order and blocks pointer interaction. The chat
+      // modal (VoiceChat) is rendered as a sibling of this <main>, not inside
+      // it, so its own backdrop/close controls are unaffected.
+      inert={chatOpen}
     >
-      {/* PE-M4 (#615): preload adjacent story images for instant navigation.
-          React hoists these <link> tags into <head>. */}
+      {/* PE-H1/FE-M3 (#804, #765): adjacent story images, rendered as hidden,
+          `priority` next/image elements so Next.js itself generates the
+          preload — a hand-built <link rel="preload" href={rawUrl}> pointed at
+          the raw origin URL while the real <Image> below requests the
+          optimizer URL, so nothing was ever actually warmed (~350KB wasted
+          per navigation). `sizes` must match the visible <Image> ("100vw")
+          so the computed optimizer URL/srcset is identical to what gets
+          requested once this image becomes current. */}
       {adjacentImages.map((src) => (
-        <link key={src} rel="preload" as="image" href={src} />
+        <div key={src} aria-hidden="true" className="sr-only pointer-events-none">
+          <Image src={src} alt="" fill sizes="100vw" priority />
+        </div>
       ))}
 
       {/* Screen reader announcement for story changes */}
