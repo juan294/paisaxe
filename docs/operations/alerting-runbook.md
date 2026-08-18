@@ -96,8 +96,13 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 4. Test the route manually:
    ```bash
    curl -X POST https://paisaxe.es/api/cron/<route> \
-     -H "Authorization: Bearer $CRON_SECRET"
+     -H "x-webhook-secret: $WEBHOOK_SECRET"
    ```
+   (`GET` is what Vercel Cron itself sends, authenticated via `Authorization: Bearer $CRON_SECRET` — see
+   `verifyVercelCron` in `src/lib/cron-auth.ts`. The `POST` handler used for manual/pg_cron recovery
+   checks `verifyWebhookSecret` instead, which reads the `x-webhook-secret` header against
+   `WEBHOOK_SECRET`, falling back to admin-cookie auth. A `POST` with an `Authorization: Bearer` header
+   returns 401.)
 5. Check for dependency issues: Supabase connectivity, external API rate limits (PostHog, ElevenLabs, etc.)
 6. If the job is idempotent, trigger it manually once the root cause is resolved.
 7. If it cannot be recovered, log the missed run and resume on the next scheduled interval.
@@ -116,10 +121,11 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 1. Check the `cron_auth` field in `/api/health` — it surfaces the current cron secret validation state.
 2. For `missing_secret`: verify `CRON_SECRET` is set in Vercel environment variables → Settings → Environment Variables.
 3. For `header_missing` or `mismatch`: verify the Vercel cron configuration (`vercel.json`) is sending the correct Authorization header, or that the secret wasn't rotated without updating all call sites.
-4. Once the secret is correctly configured, trigger the affected cron manually to confirm:
+4. Once the secret is correctly configured, trigger the affected cron manually to confirm (see the
+   `POST` auth note under [Cron Job Failure](#cron-job-failure) above):
    ```bash
    curl -X POST https://paisaxe.es/api/cron/<route> \
-     -H "Authorization: Bearer $CRON_SECRET"
+     -H "x-webhook-secret: $WEBHOOK_SECRET"
    ```
 
 ---
