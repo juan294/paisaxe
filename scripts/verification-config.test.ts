@@ -90,13 +90,19 @@ describe("verification coverage config", () => {
     expect(workflow).toContain("npm run check-verification-coverage");
   });
 
-  it("uses the body-parsing readiness monitor for Vercel health smoke checks", () => {
+  it("uses the body-parsing readiness monitor for Vercel health smoke checks, and does not run the dead develop-push smoke job (DO-H1)", () => {
     const ciWorkflow = readText(".github/workflows/ci.yml");
     const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
 
-    expect(ciWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
     expect(previewSmokeWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
     expect(previewSmokeWorkflow).not.toContain("--require-sentry");
+
+    // DO-H1: the develop-push smoke job waited on a Vercel preview that
+    // vercel.json's ignoreCommand ensures never exists, then always
+    // reported success via its timeout branch without probing anything.
+    // It was removed; assert it doesn't come back.
+    expect(ciWorkflow).not.toContain("Develop smoke check");
+    expect(ciWorkflow).not.toContain("develop-smoke");
   });
 
   it("preflights Voyage AI before running QA LLM tests", () => {

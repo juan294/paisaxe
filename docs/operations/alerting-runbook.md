@@ -185,21 +185,15 @@ This is informational only — the request was silently discarded with a fake 20
 
 ---
 
-## Develop Smoke Check Failure (DO-M5)
+## Develop Push Runtime Regressions (DO-H1)
 
-**Trigger:** The `Develop smoke check` job fails in CI on a direct `develop` push.
+**There is no smoke check on direct `develop` pushes.** A prior "Develop smoke check" job (DO-M5) was removed (DO-H1) because it could never probe anything — `vercel.json`'s `ignoreCommand` skips the Vercel build for direct `develop` pushes, so the job's wait loop always timed out, and its timeout branch always reported success anyway. Full rationale is in the comment header of `.github/workflows/ci.yml`. Building a real preview for `develop` pushes instead was rejected: Preview deployments share production Supabase and live Stripe keys, so a mutating probe there would be a production write.
 
-This job uses `continue-on-error: true` so it never blocks the push, but a failure indicates a runtime regression in the Vercel preview that was not caught by unit tests or the dummy-key build (e.g. a missing env var, a broken API route, or a Dependabot dependency bump with a breaking change).
+**What this means operationally:** a runtime regression introduced by a direct `develop` push (missing env var, broken API route, a Dependabot bump with a breaking change) is not caught until the next PR from `develop` to `main` runs `preview-smoke.yml` — the **"Smoke test Vercel preview"** required check, which has a genuine preview to probe. Until that PR runs:
 
-**Steps:**
-
-1. Check which step failed: `gh run list --branch develop --limit 3`, then `gh run view <run-id> --log-failed`
-2. Identify the failing probe:
-   - `Smoke check - liveness endpoint` (`/api/health/live`) — the process is not serving requests (startup crash, build error, or Vercel config issue)
-   - `Smoke check - health endpoint` (`/api/health`) — `scripts/check-health-readiness.mjs` parsed the body and found a non-200 response, invalid JSON, or `status != "healthy"`
-3. Check the Vercel preview URL from the workflow output and hit it manually to confirm the failure.
-4. Fix on `develop`, push, and verify the next smoke run passes before creating a release PR to `main`.
-5. If the failure is from a Dependabot dependency bump: check the dep changelog for breaking changes, then pin or revert as needed.
+1. Assume `develop` HEAD's runtime health is unverified beyond what the dummy-key CI build (`Lint & Typecheck`, `Test`, `Build`) catches.
+2. If you need runtime confidence sooner, open a PR from `develop` to `main` (without merging) to trigger `preview-smoke.yml` early, or verify manually against a local Docker stack.
+3. If `preview-smoke.yml` fails on a release PR, fix on `develop`, push, and let the PR re-run before merging (see `docs/runbooks/release-checklist.md`).
 
 ---
 
