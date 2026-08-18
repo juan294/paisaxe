@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration: 101_pending_bookings_rls_posture.sql
+-- Migration: 107_pending_bookings_rls_posture.sql
 -- Purpose: Bring pending_bookings to the same explicit service-role-only
 -- posture as the other sensitive operational tables (booking_sms_jobs,
 -- elevenlabs_webhook_events, translate_webhook_events, stripe_webhook_events;
