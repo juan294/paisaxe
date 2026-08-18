@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Story } from "@/types/immersive";
 import { PrivacyNotice } from "./privacy-notice";
 import { ChatActions } from "./chat-actions";
@@ -18,6 +18,18 @@ import { ChatHeader } from "./voice-chat/chat-header";
 import { ChatMessageList } from "./voice-chat/chat-message-list";
 import { ChatComposer } from "./voice-chat/chat-composer";
 import { ChatErrorBanner } from "./voice-chat/chat-error-banner";
+
+// FE-M1: the streaming hot path pushes a `messages` state update on every SSE
+// token, re-rendering VoiceChat every token. ChatComposer and ChatActions
+// don't need to re-render on every token (the composer's props are static
+// while streaming; ChatActions renders null while `isLoading`), so memoize
+// them here so React can bail out when their props are referentially
+// unchanged. This only pays off once VoiceChat itself stops handing them new
+// callback identities every render — see handleSubmit/submitMessage/
+// handleRetry below, which now read the live message count via `messagesRef`
+// instead of depending on `messages` directly.
+const MemoizedChatComposer = memo(ChatComposer);
+const MemoizedChatActions = memo(ChatActions);
 
 /**
  * Loading skeleton shown while the VoiceChatElevenLabs chunk is being fetched.
@@ -97,6 +109,18 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     dismissUpsell: handleUpsellDismiss,
   } = useStreamChat({ canUseVoice });
 
+  // FE-M1: mirrors `messages` for reads inside submitMessage/handleRetry that
+  // must not force those callbacks to be recreated on every streamed token.
+  // Synced via effect: unlike use-stream-chat.ts's internal turn-cap check
+  // (which must never be one setState behind, since it gates a network
+  // call from data mutated in the same updater), these reads only run from
+  // user-triggered actions (Send/Retry/initial auto-send), which always
+  // happen after the previous render — and its effects — have committed.
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   // Voice/text mode state — extracted to useChatMode hook
   const { useElevenLabs, setUseElevenLabs, toggle: handleToggleMode } = useChatMode(false);
 
@@ -141,8 +165,13 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
   // tracking/context logic lives in one place instead of being copy-pasted.
   const submitMessage = useCallback(
     async (message: string) => {
-      const isFirstMessage = messages.length === 0;
-      const messageIndex = messages.filter((m) => m.role === "user").length;
+      // FE-M1: read via messagesRef (not `messages`) so this callback's
+      // identity — and therefore handleSubmit's, and therefore
+      // ChatComposer's memoized props — stays stable while messages grows
+      // on every streamed token.
+      const currentMessages = messagesRef.current;
+      const isFirstMessage = currentMessages.length === 0;
+      const messageIndex = currentMessages.filter((m) => m.role === "user").length;
       setLastMessage(message);
       if (isFirstMessage) {
         posthog?.capture("chat_conversation_started", { story_id: story.id });
@@ -150,7 +179,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
       posthog?.capture("chat_message_sent", { story_id: story.id, message_index: messageIndex });
       await sendMessage(message, { context: buildStoryContext(), locale, messageIndex });
     },
-    [messages, posthog, story, sendMessage, buildStoryContext, locale]
+    [posthog, story, sendMessage, buildStoryContext, locale]
   );
 
   // Auto-send initial message (e.g. a suggested-question chip) — one-shot,
@@ -183,23 +212,30 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     setUseElevenLabs(false);
   }, [setUseElevenLabs]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+  // FE-M1: memoized so ChatComposer (wrapped in memo below) can bail out of
+  // re-rendering on every streamed token — its identity now only changes
+  // when inputValue/isLoading actually change (i.e. when the user types or a
+  // send starts/stops), not on every setMessages call from the SSE stream.
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (!inputValue.trim() || isLoading) return;
 
-    const userMessage = inputValue.trim();
-    setInputValue("");
-    await submitMessage(userMessage);
-  };
+      const userMessage = inputValue.trim();
+      setInputValue("");
+      await submitMessage(userMessage);
+    },
+    [inputValue, isLoading, submitMessage]
+  );
 
   const handleRetry = useCallback(async () => {
     if (!lastMessage || isLoading) return;
     await sendMessage(lastMessage, {
       context: buildStoryContext(),
       locale,
-      messageIndex: messages.filter((m) => m.role === "user").length,
+      messageIndex: messagesRef.current.filter((m) => m.role === "user").length,
     });
-  }, [lastMessage, isLoading, sendMessage, buildStoryContext, locale, messages]);
+  }, [lastMessage, isLoading, sendMessage, buildStoryContext, locale]);
 
   if (!open) return null;
 
@@ -282,9 +318,9 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
             )}
 
             {/* Context-aware action buttons */}
-            <ChatActions messages={messages} isLoading={isLoading} />
+            <MemoizedChatActions messages={messages} isLoading={isLoading} />
 
-            <ChatComposer
+            <MemoizedChatComposer
               value={inputValue}
               isLoading={isLoading}
               onChange={setInputValue}

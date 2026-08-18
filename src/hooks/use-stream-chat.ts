@@ -52,6 +52,27 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
   const { t } = useTranslation();
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // FE-M1: mirrors `messages` for reads that must not force `sendMessage` to
+  // be recreated on every token. Updated synchronously inside the SAME
+  // setState updater call below (never via a separate useEffect, which would
+  // lag a render behind and could let the turn-cap check below read a stale
+  // count).
+  const messagesRef = useRef<StreamChatMessage[]>([]);
+  const updateMessages = useCallback(
+    (
+      updater:
+        | StreamChatMessage[]
+        | ((prev: StreamChatMessage[]) => StreamChatMessage[])
+    ) => {
+      setMessages((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        messagesRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
@@ -59,22 +80,25 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
   }, []);
 
   const resetMessages = useCallback(() => {
-    setMessages([]);
-  }, []);
+    updateMessages([]);
+  }, [updateMessages]);
 
-  const dismissUpsell = useCallback((messageIndex: number) => {
-    recordUpsellDismissed(messageIndex);
-    setMessages((prev) => {
-      const updated = [...prev];
-      if (updated[messageIndex]) {
-        updated[messageIndex] = {
-          ...updated[messageIndex],
-          upsellDismissed: true,
-        };
-      }
-      return updated;
-    });
-  }, []);
+  const dismissUpsell = useCallback(
+    (messageIndex: number) => {
+      recordUpsellDismissed(messageIndex);
+      updateMessages((prev) => {
+        const updated = [...prev];
+        if (updated[messageIndex]) {
+          updated[messageIndex] = {
+            ...updated[messageIndex],
+            upsellDismissed: true,
+          };
+        }
+        return updated;
+      });
+    },
+    [updateMessages]
+  );
 
   const sendMessage = useCallback(
     async (message: string, options: SendMessageOptions) => {
@@ -82,8 +106,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
 
       // FE-M3: enforce 20-turn (40 message) cap client-side
       // Each turn = 1 user + 1 assistant message, so 20 turns = 40 messages.
-      if (messages.length >= MAX_CONVERSATION_TURNS * 2) {
-        setMessages((prev) => [
+      // FE-M1: read via messagesRef (not `messages`) so this stays correct
+      // without pulling `messages` into sendMessage's dep array.
+      if (messagesRef.current.length >= MAX_CONVERSATION_TURNS * 2) {
+        updateMessages((prev) => [
           ...prev,
           {
             id: crypto.randomUUID(),
@@ -105,7 +131,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
 
       // Add both messages atomically; capture the assistant index from actual prev state
       let assistantIndex = 0;
-      setMessages((prev) => {
+      updateMessages((prev) => {
         const updated: StreamChatMessage[] = [
           ...prev,
           { id: crypto.randomUUID(), role: "user", content: userMessage },
@@ -145,7 +171,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         const contentType = response.headers.get("content-type");
         if (contentType?.includes("application/json")) {
           const data = await response.json();
-          setMessages((prev) => {
+          updateMessages((prev) => {
             const updated = [...prev];
             updated[assistantIndex] = {
               ...updated[assistantIndex],
@@ -168,7 +194,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           }
 
           if (event.type === "text") {
-            setMessages((prev) => {
+            updateMessages((prev) => {
               const updated = [...prev];
               const current = updated[assistantIndex];
               updated[assistantIndex] = {
@@ -178,7 +204,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
               return updated;
             });
           } else if (event.type === "done") {
-            setMessages((prev) => {
+            updateMessages((prev) => {
               const updated = [...prev];
               const currentMsg = updated[assistantIndex];
               const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
@@ -207,7 +233,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             const isTimeout =
               event.message === "response_timeout" ||
               event.message === "search_unavailable";
-            setMessages((prev) => {
+            updateMessages((prev) => {
               const updated = [...prev];
               const current = updated[assistantIndex];
 
@@ -239,7 +265,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
               return;
             }
             setError(t("chat.error"));
-            setMessages((prev) => {
+            updateMessages((prev) => {
               const updated = [...prev];
               if (updated[assistantIndex]) {
                 updated[assistantIndex] = {
@@ -261,7 +287,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
       } catch (err) {
         // Error already handled (error state already set) — skip the generic handler
         if (err instanceof HandledError) {
-          setMessages((prev) => {
+          updateMessages((prev) => {
             const updated = [...prev];
             if (updated[assistantIndex]) {
               updated[assistantIndex] = {
@@ -283,7 +309,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           // controller.signal.aborted is true and the timeout has already fired.
           if (controller.signal.aborted) {
             setError(t("chat.connection_lost"));
-            setMessages((prev) => {
+            updateMessages((prev) => {
               const updated = [...prev];
               if (updated[assistantIndex]) {
                 updated[assistantIndex] = {
@@ -304,7 +330,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           return;
         }
         setError(t("chat.error"));
-        setMessages((prev) => {
+        updateMessages((prev) => {
           const updated = [...prev];
           if (updated[assistantIndex]) {
             updated[assistantIndex] = {
@@ -326,7 +352,12 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         setIsStreaming(false);
       }
     },
-    [isStreaming, canUseVoice, t, messages]
+    // FE-M1: `messages` deliberately excluded — the only read was the
+    // turn-cap length check above, which now reads `messagesRef.current`
+    // (kept in sync by `updateMessages`). Depending on `messages` directly
+    // made this callback's identity change on every streamed token, since
+    // every "text" SSE event calls updateMessages with a new array.
+    [isStreaming, canUseVoice, t, updateMessages]
   );
 
   return {

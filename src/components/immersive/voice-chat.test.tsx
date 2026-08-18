@@ -546,6 +546,45 @@ describe("VoiceChat", () => {
         expect(callBody.context).toContain("nature-guide.pdf");
       });
     });
+
+    it("FE-M1: memoized ChatComposer keeps the input fully controlled (no dropped keystrokes)", async () => {
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
+      await userEvent.type(input, "Hola, que tal?");
+
+      expect(input.value).toBe("Hola, que tal?");
+    });
+
+    it("FE-M1: composer accepts input again after a stream completes, unaffected by memoization", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("Streaming reply with several words in it")
+      );
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
+      await userEvent.type(input, "First question");
+
+      const form = input.closest("form");
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
+
+      // Cleared immediately on submit, then disabled while streaming.
+      await waitFor(() => {
+        expect(input.value).toBe("");
+      });
+
+      // Once the stream resolves, the (memoized) composer must still be
+      // wired to the live onChange/onSubmit handlers — not stuck on a stale
+      // closure from before the stream started.
+      await waitFor(() => {
+        expect(input).not.toBeDisabled();
+      });
+
+      await userEvent.type(input, "Second question");
+      expect(input.value).toBe("Second question");
+    });
   });
 
   describe("story change", () => {
