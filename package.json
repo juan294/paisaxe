@@ -11,6 +11,7 @@
     "build": "next build",
     "analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build --webpack",
     "build:analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build --webpack",
+    "check-bundle-budget": "tsx scripts/check-bundle-budget.ts",
     "start": "next start",
     "lint": "npm run lint:src && npm run lint:scripts",
     "lint:src": "eslint src/",
