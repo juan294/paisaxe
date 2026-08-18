@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { buildCheckoutUrl, PRICING_TIERS, type PricingTierId } from "@/lib/pricing";
 
 let stripePromise: ReturnType<typeof loadStripe> | null = null;
 function getStripe() {
@@ -37,14 +38,19 @@ function CheckoutPageContent() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   // #137: pass tier (day_pass | weekly_pass | monthly_pass) selected on the pricing page.
-  const VALID_TIERS = ["day_pass", "weekly_pass", "monthly_pass"] as const;
+  // The allowlist check against PRICING_TIERS is the safety net for a
+  // malformed/missing `tier` param — it must stay an allowlist, never a
+  // passthrough, even though the URL surface below now always carries `tier`.
   const tierParam = searchParams.get("tier");
-  const purchaseType = (VALID_TIERS as readonly string[]).includes(tierParam ?? "")
-    ? (tierParam as (typeof VALID_TIERS)[number])
+  const purchaseType: PricingTierId = PRICING_TIERS.some(
+    (tier) => tier.id === tierParam
+  )
+    ? (tierParam as PricingTierId)
     : "day_pass";
-  const checkoutPath = returnTo
-    ? `/pricing/checkout?returnTo=${encodeURIComponent(returnTo)}`
-    : "/pricing/checkout";
+  // UX-H4 (#890): use buildCheckoutUrl (not a hand-rolled string) so `tier`
+  // survives the sign-in redirect instead of silently defaulting to day_pass
+  // when the user returns from Google OAuth.
+  const checkoutPath = buildCheckoutUrl(purchaseType, returnTo ?? undefined);
   const [error, setError] = useState<string | null>(null);
 
   const fetchClientSecret = useCallback(async () => {
