@@ -12,6 +12,13 @@ const KNOWN_GAPS = new Set([
   5,  // 005 was never committed — schema at that point was managed via the Supabase dashboard
   23, // 023 was never committed — applied out-of-band during early development
   24, // 024 was never committed — applied out-of-band during early development
+  // 101 is RESERVED, not a permanent gap: remediate/se-h1 (#841) is a sibling
+  // Wave 1 worktree branched from the same develop base, adding
+  // 101_restrict_feature_flags_config_anon.sql, not yet merged into develop
+  // as of this branch (remediate/se-h2, #842, which adds 102). Harmless to
+  // leave once se-h1 merges (file 101 will exist, satisfying the check
+  // regardless of this entry) — remove this line at that point for hygiene.
+  101,
 ]);
 
 // The largest gap between two consecutive migration numbers we consider plausible.
