@@ -100,8 +100,33 @@ describe("Providers", () => {
     expect(container.querySelector("p[data-testid='nested-child']")).not.toBeNull();
   });
 
-  it("defers auth bootstrap on anonymous-first public routes", () => {
-    mockUsePathname.mockReturnValue("/pricing");
+  // FE-B1 (#757): /immersive, /favorites, and /pricing are the authenticated
+  // revenue path (favorites, paid voice access, purchase CTA) — auth must
+  // NOT be deferred there, or getSession()/getUser() never runs and every
+  // signed-in feature on those routes is silently dead.
+  it.each(["/immersive", "/favorites", "/pricing"])(
+    "does NOT defer auth bootstrap on the authenticated route %s (FE-B1 #757)",
+    (path) => {
+      mockUsePathname.mockReturnValue(path);
+      const { container } = render(
+        <Providers>
+          <p data-testid="page-content">Content</p>
+        </Providers>
+      );
+
+      expect(container.querySelector("[data-testid='auth-provider']")).toHaveAttribute(
+        "data-defer-initial-auth",
+        "false"
+      );
+      // Children must still render regardless of the auth-defer decision —
+      // guards against the FE-M4/#338 hydration regression this deferral
+      // was originally meant to prevent.
+      expect(container.querySelector("p[data-testid='page-content']")).not.toBeNull();
+    }
+  );
+
+  it("still defers auth bootstrap on genuinely static, anonymous-only routes", () => {
+    mockUsePathname.mockReturnValue("/about");
     const { container } = render(
       <Providers>
         <p>Content</p>
