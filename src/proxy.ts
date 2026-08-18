@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleCanonicalDomain } from "@/lib/proxy/canonical-domain";
-import { handleStoryRewrite } from "@/lib/proxy/story-rewrite";
 import { handleMaintenanceMode } from "@/lib/proxy/maintenance";
 import { handleRootRedirect } from "@/lib/proxy/root-redirect";
 import { handleCORS, addCORSHeaders } from "@/lib/proxy/cors";
@@ -23,14 +22,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return canonicalRedirect;
   }
 
-  // 0b. Rewrite /story/:slug → /immersive?story=:slug (before maintenance check)
-  const storyRewrite = handleStoryRewrite(request);
-  if (storyRewrite) {
-    storyRewrite.headers.set("X-Request-ID", requestId);
-    return storyRewrite;
-  }
-
   // 1. Check maintenance mode (applies to all routes)
+  // Note: /story/:slug is a real rendered App Router page (see src/app/story/[slug]/page.tsx,
+  // FE-H2 / #760) — it is NOT special-cased here, so it is subject to maintenance mode like
+  // any other visitor route.
   const maintenanceResponse = await handleMaintenanceMode(request);
   if (maintenanceResponse) {
     maintenanceResponse.headers.set("X-Request-ID", requestId);

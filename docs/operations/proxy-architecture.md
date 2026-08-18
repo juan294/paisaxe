@@ -46,12 +46,14 @@ Request
    to response headers and request context
    │
   ▼
-8. Story URL rewrite
-   src/proxy.ts — /story/[slug] → /immersive?story=[slug] for SEO URLs
-   │
-  ▼
 Route Handler / Page
 ```
+
+`/story/[slug]` was previously rewritten here to `/immersive?story=[slug]` before
+the App Router page could render, which made its per-story `generateMetadata`
+and prerendered pages unreachable (FE-H2 / #760). It is now a real page
+(`src/app/story/[slug]/page.tsx`) subject to the same chain as any other
+route, with no special-casing in the proxy.
 
 ## Key Files
 

@@ -474,7 +474,13 @@ describe("shouldBypassMaintenanceMode", () => {
   });
 });
 
-describe("/story/[slug] rewrite", () => {
+describe("/story/[slug] passthrough (FE-H2 / #760)", () => {
+  // Prior to FE-H2, handleStoryRewrite() 308-redirected every /story/:slug
+  // request before the App Router page could render, so generateMetadata,
+  // the opengraph-image route, and generateStaticParams's prerendered pages
+  // were unreachable. /story/[slug]/page.tsx is now a real rendered page,
+  // so the proxy must leave these requests untouched and let Next.js route
+  // them normally (including through maintenance mode, like any other page).
   beforeEach(() => {
     process.env.MAINTENANCE_MODE = "false";
     mockFetch.mockReset();
@@ -484,69 +490,54 @@ describe("/story/[slug] rewrite", () => {
     delete process.env.MAINTENANCE_MODE;
   });
 
-  it("rewrites /story/oviedo-catedral to /immersive?story=oviedo-catedral", async () => {
+  it("does not rewrite or redirect /story/oviedo-catedral", async () => {
     const request = new NextRequest("http://localhost:3006/story/oviedo-catedral");
     const response = await proxy(request);
 
-    expect(response.status).toBe(308);
-    expect(response.headers.get("location")).toBe(
-      "http://localhost:3006/immersive?story=oviedo-catedral"
-    );
+    expect(response.status).not.toBe(308);
+    expect(response.status).not.toBe(307);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
   });
 
-  it("rewrites /story/lagos-de-covadonga to /immersive?story=lagos-de-covadonga", async () => {
+  it("does not rewrite or redirect /story/lagos-de-covadonga", async () => {
     const request = new NextRequest("http://localhost:3006/story/lagos-de-covadonga");
     const response = await proxy(request);
 
-    expect(response.status).toBe(308);
-    expect(response.headers.get("location")).toBe(
-      "http://localhost:3006/immersive?story=lagos-de-covadonga"
-    );
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
   });
 
-  it("does not rewrite /story without a slug", async () => {
+  it("passes /story without a slug through untouched", async () => {
     const request = new NextRequest("http://localhost:3006/story");
     const response = await proxy(request);
 
-    // Should pass through normally (no redirect)
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
   });
 
-  it("does not rewrite /story/ with trailing slash but no slug", async () => {
-    const request = new NextRequest("http://localhost:3006/story/");
-    const response = await proxy(request);
-
-    // Should pass through normally (no redirect)
-    expect(response.headers.get("x-middleware-next")).toBeTruthy();
-  });
-
-  it("does not rewrite /stories or other similar paths", async () => {
+  it("passes /stories (plural) through untouched", async () => {
     const request = new NextRequest("http://localhost:3006/stories/test");
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
   });
 
-  it("preserves existing query params on /story/ redirect", async () => {
+  it("preserves query params on /story/:slug (no rewrite occurs)", async () => {
     const request = new NextRequest("http://localhost:3006/story/oviedo-catedral?ref=twitter");
     const response = await proxy(request);
 
-    expect(response.status).toBe(308);
-    const location = response.headers.get("location")!;
-    expect(location).toContain("/immersive");
-    expect(location).toContain("story=oviedo-catedral");
-    expect(location).toContain("ref=twitter");
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
   });
 
-  it("works during maintenance mode (story routes are redirected before maintenance check)", async () => {
+  it("is now subject to maintenance mode, unlike the old proxy-level rewrite that bypassed it", async () => {
     process.env.MAINTENANCE_MODE = "true";
     const request = new NextRequest("http://localhost:3006/story/oviedo-catedral");
     const response = await proxy(request);
 
-    // Should redirect to immersive, not to coming-soon
-    expect(response.status).toBe(308);
+    expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3006/immersive?story=oviedo-catedral"
+      "http://localhost:3006/coming-soon"
     );
   });
 });
