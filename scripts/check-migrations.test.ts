@@ -1,8 +1,8 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
-import { validateMigrations } from "./check-migrations";
+import { getFunctionHeader, normalizeSql, validateMigrations } from "./check-migrations";
 
 function createMigrationFixture(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "paisaxe-migrations-"));
@@ -354,6 +354,34 @@ describe("validateMigrations", () => {
     const result = validateMigrations({ root });
 
     expect(result.errors).toEqual([]);
+  });
+
+  it("keeps notify_webhook's SECURITY DEFINER search_path locked to '' (BE-M2, #783)", () => {
+    // Migration 015 originally fixed public.notify_webhook() to
+    // `SECURITY DEFINER ... SET search_path = ''`. Migration 025 later
+    // redefined the same function (to read config from webhook_config
+    // instead of app.* settings) and silently reverted the search_path to
+    // `public, extensions` — this is exactly the regression BE-M2 fixes.
+    //
+    // This test reads the real repo migrations directly, reusing the same
+    // normalizeSql/getFunctionHeader helpers the general validateMigrations()
+    // guard uses for its 3-name translation function allowlist (see QA-M5,
+    // out of scope here — this test does not extend that allowlist).
+    const migrationsDir = "supabase/migrations";
+    const migrationFiles = readdirSync(migrationsDir)
+      .filter((name) => /^\d+_[a-z0-9_]+\.sql$/.test(name))
+      .sort();
+
+    let latestHeader: string | null = null;
+    for (const name of migrationFiles) {
+      const sql = normalizeSql(readFileSync(join(migrationsDir, name), "utf8"));
+      const header = getFunctionHeader(sql, "notify_webhook");
+      if (header) latestHeader = header;
+    }
+
+    expect(latestHeader, "no migration defines public.notify_webhook()").not.toBeNull();
+    expect(latestHeader!).toContain("security definer");
+    expect(latestHeader!).toContain("set search_path = ''");
   });
 
   it("keeps the Stripe webhook route aligned with the stripe_webhook_events schema", () => {
