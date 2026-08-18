@@ -306,7 +306,12 @@ export function StoryViewer({
           alt={localizedStory.title}
           fill
           sizes="100vw"
-          className={cn("object-cover", zoomClass)}
+          // FE-M6 (#768): motion-reduce:animate-none is a CSS-layer backstop —
+          // it suppresses the zoom animation immediately regardless of JS
+          // timing, so reduced-motion visitors never see the one-frame flash
+          // that can occur between the hydration-safe `false` initial state
+          // and the effect that corrects prefersReducedMotion.
+          className={cn("object-cover", zoomClass, "motion-reduce:animate-none")}
           priority={currentIndex === 0}
           placeholder="blur"
           blurDataURL={story.blurDataUrl || darkPlaceholder}
