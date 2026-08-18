@@ -12,8 +12,14 @@ vi.mock("@/lib/logger", () => ({ logger }));
 vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
     headers: Map<string, string>;
-    constructor(_url: string, init?: { headers?: Record<string, string> }) {
+    method: string;
+    constructor(
+      _url: string,
+      init?: { headers?: Record<string, string>; method?: string }
+    ) {
       this.headers = new Map(Object.entries(init?.headers || {}));
+      // Every caller in this file exercises the POST handler.
+      this.method = init?.method || "POST";
     }
   },
   NextResponse: {
@@ -25,6 +31,8 @@ vi.mock("next/server", () => ({
 }));
 
 // Mock admin auth (fallback path) — always reject so webhook secret is tested
+// by default. Tests exercising the admin-cookie fallback (BE-H5/SE-M1)
+// override this via vi.doMock + a fresh dynamic import.
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: () => Promise.resolve({ valid: false, error: { status: 401 } }),
 }));
@@ -111,6 +119,55 @@ describe("POST /api/cron/github-traffic-sync", () => {
 
     const response = await POST(request as never);
     expect(response.status).toBe(401);
+  });
+
+  // BE-H5/SE-M1: the admin-cookie fallback (used by the admin dashboard's
+  // "sync now" button) is exactly the CSRF attack surface — a hostile
+  // cross-site page riding a logged-in admin's session cookie must NOT be
+  // able to trigger a sync without a valid CSRF token and Origin.
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with no CSRF token or Origin", async () => {
+    vi.doMock("@/lib/admin-auth", () => ({
+      validateAdminAuth: () => Promise.resolve({ valid: true, userId: "admin-user-123" }),
+    }));
+
+    const { POST } = await import("./route");
+    // No webhook secret, no Origin, no CSRF token — a cross-site POST
+    // riding the victim admin's session cookie.
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: {} }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(403);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("accepts admin-session fallback requests when CSRF token + Origin are valid (matches the admin dashboard's request shape)", async () => {
+    vi.doMock("@/lib/admin-auth", () => ({
+      validateAdminAuth: () => Promise.resolve({ valid: true, userId: "admin-user-123" }),
+    }));
+
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, views: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, clones: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      {
+        headers: {
+          origin: "https://paisaxe.es",
+          "x-csrf-token": "test-csrf-token",
+          cookie: "__csrf=test-csrf-token",
+        },
+      }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
   });
 
   it("returns 500 when GITHUB_TOKEN is missing", async () => {
@@ -511,7 +568,7 @@ describe("POST /api/cron/github-traffic-sync", () => {
     }));
   });
 
-  it("accepts POST with valid admin session when webhook secret is missing", async () => {
+  it("accepts POST with valid admin session when webhook secret is missing, given a valid CSRF token + Origin", async () => {
     // Override the admin auth mock to return valid for this test
     const adminAuth = await import("@/lib/admin-auth");
     vi.spyOn(adminAuth, "validateAdminAuth").mockResolvedValueOnce({ valid: true } as never);
@@ -525,7 +582,15 @@ describe("POST /api/cron/github-traffic-sync", () => {
     const { POST } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
       "https://paisaxe.es/api/cron/github-traffic-sync",
-      { headers: {} } // no webhook secret
+      {
+        // no webhook secret — falls through to admin auth, which requires
+        // a matching Origin + CSRF token (BE-H5/SE-M1)
+        headers: {
+          origin: "https://paisaxe.es",
+          "x-csrf-token": "test-csrf-token",
+          cookie: "__csrf=test-csrf-token",
+        },
+      }
     );
 
     const response = await POST(request as never);
