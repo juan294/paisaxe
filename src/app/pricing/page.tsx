@@ -8,7 +8,17 @@ import PricingLoading from "./loading";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
-import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing";
+import { PRICING_TIERS, type PricingTier, type PricingTierId } from "@/lib/pricing";
+
+/**
+ * Resolve the human-readable duration for a pricing tier, translated via
+ * `t(tier.durationKey)`. Falls back to `tier.fallbackLabel` only when the
+ * key is missing from the active locale (survives a locale shipping late).
+ */
+function resolveTierDuration(t: (key: string) => string, tier: PricingTier): string {
+  const translated = t(tier.durationKey);
+  return translated === tier.durationKey ? tier.fallbackLabel : translated;
+}
 
 export default function PricingPage() {
   return (
@@ -33,6 +43,13 @@ function PricingPageContent() {
 
   // #137: selected pass tier — defaults to the Day Pass.
   const [selectedTier, setSelectedTier] = useState<PricingTierId>("day_pass");
+  const selectedTierData =
+    PRICING_TIERS.find((tier) => tier.id === selectedTier) ?? PRICING_TIERS[0];
+  // UX-B1 (#886): the section label, feature bullet, and FAQ answer must
+  // describe the *selected* tier's duration — not be hardcoded to the Day
+  // Pass's "24 horas" regardless of which tier the user picked.
+  const selectedTierDuration = resolveTierDuration(t, selectedTierData);
+  const voicePassLabel = t("premium.voice_pass_label").replace("{duration}", selectedTierDuration);
 
   const checkoutParams = new URLSearchParams();
   if (returnTo) checkoutParams.set("returnTo", returnTo);
@@ -122,11 +139,11 @@ function PricingPageContent() {
             {/* Price + tier selector (#137) */}
             <div className="p-6 text-center border-b border-neutral-800">
               <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-4">
-                {t("premium.voice_pass_label")}
+                {voicePassLabel}
               </p>
               <div
                 role="radiogroup"
-                aria-label={t("premium.voice_pass_label")}
+                aria-label={voicePassLabel}
                 className="grid grid-cols-3 gap-2"
               >
                 {PRICING_TIERS.map((tier) => {
@@ -148,9 +165,7 @@ function PricingPageContent() {
                         {tier.price}
                       </span>
                       <span className="mt-1 text-[11px] text-neutral-400">
-                        {t(tier.durationKey) === tier.durationKey
-                          ? tier.fallbackLabel
-                          : t(tier.durationKey)}
+                        {resolveTierDuration(t, tier)}
                       </span>
                     </button>
                   );
@@ -163,7 +178,7 @@ function PricingPageContent() {
               <div className="flex items-center gap-3">
                 <Clock className="h-4 w-4 text-neutral-500 flex-shrink-0" />
                 <span className="text-sm text-neutral-300">
-                  {t("premium.feature_24h")}
+                  {t("premium.feature_duration").replace("{duration}", selectedTierDuration)}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -222,7 +237,7 @@ function PricingPageContent() {
                 {t("premium.faq_how_long")}
               </h3>
               <p className="text-xs text-neutral-500">
-                {t("premium.faq_how_long_answer")}
+                {t("premium.faq_how_long_answer").replace("{duration}", selectedTierDuration)}
               </p>
             </div>
           </div>
