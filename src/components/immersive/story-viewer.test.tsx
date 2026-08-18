@@ -58,9 +58,12 @@ async function flushUntil(query: () => HTMLElement | null): Promise<HTMLElement>
 
 // Mock i18n
 const mockT = createMockT();
+// UX-H6 (#892): mutable so individual tests can exercise non-Spanish locales
+// (e.g. localized screen-reader labels). Reset to "es" in afterEach below.
+let mockLocale = "es";
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
-    locale: "es",
+    locale: mockLocale,
     setLocale: vi.fn(),
     t: (key: string) => mockT(key),
   }),
@@ -235,6 +238,8 @@ describe("StoryViewer", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    // UX-H6 (#892): reset the mutable locale mock so per-test overrides don't bleed
+    mockLocale = "es";
     // Reset matchMedia mock to default (matches: false for all queries)
     vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
       matches: false,
@@ -1618,6 +1623,96 @@ describe("StoryViewer", () => {
       expect(onAskAbout).toHaveBeenCalledWith("What is the best time to visit?");
 
       mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  // UX-H6 (#892): getLocalizedStory was bypassed for the progress-bar screen-reader
+  // labels and the sr-only story-change announcement, and question_prompts had no
+  // translated form at all — every locale rendered raw Spanish at these surfaces.
+  describe("UX-H6 (#892): locale-aware text", () => {
+    const storiesWithTranslations: Story[] = [
+      {
+        ...mockStories[0],
+        metadata: {
+          question_prompts: ["¿Cuándo ir?", "¿Cómo llegar?"],
+          translations: {
+            fr: {
+              title: "Lacs de Covadonga",
+              subtitle: "Pics d'Europe",
+              description: "De magnifiques lacs glaciaires dans les montagnes",
+              question_prompts: ["Quand y aller ?", "Comment y arriver ?"],
+            },
+          },
+        },
+      },
+      mockStories[1],
+      mockStories[2],
+    ];
+
+    afterEach(() => {
+      mockLocale = "es";
+      mockIsEnabled.mockReturnValue(false);
+    });
+
+    it("uses the localized title in the progress bar screen-reader labels for a non-Spanish locale", async () => {
+      mockLocale = "fr";
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ stories: storiesWithTranslations, allStories: storiesWithTranslations })}
+        />
+      );
+
+      const progressBars = within(
+        screen.getByRole("navigation", { name: "Progreso de historias" })
+      ).getAllByRole("button");
+
+      expect(progressBars[0]?.getAttribute("aria-label")).toContain("Lacs de Covadonga");
+      expect(progressBars[0]?.getAttribute("aria-label")).not.toContain("Lagos de Covadonga");
+    });
+
+    it("uses the localized title/subtitle in the sr-only story-change announcement", async () => {
+      mockLocale = "fr";
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ stories: storiesWithTranslations, allStories: storiesWithTranslations })}
+        />
+      );
+
+      // Multiple elements may have role="status" (e.g. bookmark toast) — find the
+      // sr-only aria-live="polite" region that announces the current story.
+      const statusElements = screen.getAllByRole("status");
+      const liveRegion = statusElements.find(
+        (el) => el.getAttribute("aria-live") === "polite" && el.classList.contains("sr-only")
+      );
+      expect(liveRegion).toBeInTheDocument();
+      expect(liveRegion!.textContent).toContain("Lacs de Covadonga — Pics d'Europe");
+    });
+
+    it("renders translated question prompts for a non-Spanish locale", async () => {
+      mockLocale = "fr";
+      mockIsEnabled.mockImplementation((flag: string) => flag === "contextual_prompts");
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ stories: storiesWithTranslations, allStories: storiesWithTranslations })}
+        />
+      );
+
+      expect(screen.getByText("Quand y aller ?")).toBeInTheDocument();
+      expect(screen.queryByText("¿Cuándo ir?")).not.toBeInTheDocument();
+    });
+
+    it("falls back to Spanish question prompts when the active locale has no translated prompts", async () => {
+      mockLocale = "de";
+      mockIsEnabled.mockImplementation((flag: string) => flag === "contextual_prompts");
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ stories: storiesWithTranslations, allStories: storiesWithTranslations })}
+        />
+      );
+
+      expect(screen.getByText("¿Cuándo ir?")).toBeInTheDocument();
     });
   });
 
