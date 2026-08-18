@@ -8,7 +8,11 @@ import { chatRequestSchema } from "@/lib/schemas";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { withRouteContext } from "@/lib/request-validation";
 import { getClientIp } from "@/lib/request-utils";
-import { detectInjectionAttempt, sanitizeInput } from "@/lib/chat-safety";
+import {
+  detectInjectionAttempt,
+  detectPromptLeakage,
+  sanitizeInput,
+} from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
@@ -240,6 +244,18 @@ async function handlePost(request: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
+        // BE-H6/AR-H1 (#781, #855): this is the only chat route any real
+        // client calls, so the prompt-leakage output filter must run here.
+        // Detection runs on the FULL accumulated output BEFORE each chunk is
+        // flushed — never after. Once a chunk is enqueued it has already
+        // reached the client and been rendered (use-stream-chat.ts applies
+        // each "text" event to component state immediately), so checking
+        // after enqueue would only degrade to "truncate mid-delivery" with
+        // the leaked text already visible. Checking before enqueue keeps the
+        // original invariant: leaked content never reaches the rendered chat.
+        let accumulatedText = "";
+        let leakDetected = false;
+
         try {
           // Arm the idle timer before the first chunk so a stream that never
           // yields is still bounded.
@@ -261,13 +277,35 @@ async function handlePost(request: NextRequest) {
             // A chunk arrived — reset the idle window.
             resetIdleTimer();
 
-            // Send text chunk as SSE event
+            accumulatedText += chunk;
+            if (detectPromptLeakage(accumulatedText)) {
+              leakDetected = true;
+              logger.error("[CHAT_STREAM_SECURITY]", {
+                timestamp: new Date().toISOString(),
+                outputPreview: accumulatedText.slice(0, 200),
+              });
+              break;
+            }
+
+            // Send text chunk as SSE event — only after it has passed the
+            // leak check above.
             controller.enqueue(encoder.encode(
               encodeSseEvent({ type: "text", content: chunk })
             ));
           }
 
           clearIdleTimer();
+
+          if (leakDetected) {
+            streamAbortController.abort();
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({
+                type: "error",
+                message: "output_filtered",
+              })
+            ));
+            return;
+          }
 
           if (idleTimedOut) {
             throw new ChatStreamStageTimeoutError("response", IDLE_TIMEOUT_MS);

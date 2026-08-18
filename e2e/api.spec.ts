@@ -56,9 +56,15 @@ test.describe("API route smoke tests", () => {
     }
   });
 
-  test("POST /api/chat rejects empty body", async ({ request }) => {
+  // BE-H6/AR-H1 (#781, #855): /api/chat (non-streaming) was deleted — it had
+  // no caller besides this test. /api/chat/stream is the only route any real
+  // client calls, so the smoke coverage moves there. Validation failures
+  // short-circuit before the response becomes an SSE stream, so this
+  // specific case is still JSON; the second test below asserts the SSE
+  // framing (Content-Type: text/event-stream) that a real request produces.
+  test("POST /api/chat/stream rejects empty body", async ({ request }) => {
     const csrf = await getCsrfHeaders(request);
-    const response = await request.post("/api/chat", {
+    const response = await request.post("/api/chat/stream", {
       headers: csrf,
       data: {},
     });
@@ -67,6 +73,26 @@ test.describe("API route smoke tests", () => {
 
     const body = await response.json();
     expect(body).toHaveProperty("error");
+  });
+
+  test("POST /api/chat/stream returns SSE-framed response for a valid request", async ({
+    request,
+  }) => {
+    const csrf = await getCsrfHeaders(request);
+    const response = await request.post("/api/chat/stream", {
+      headers: csrf,
+      data: { message: "Hola" },
+    });
+
+    // A valid, non-flagged request streams via SSE rather than plain JSON.
+    // (Dummy AI credentials in this E2E environment still yield a stream
+    // response — it terminates with an "error" SSE event rather than a
+    // successful "done" event, but the framing under test is the same.)
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("text/event-stream");
+
+    const body = await response.text();
+    expect(body).toContain("data: ");
   });
 
   test("GET /api/favorites returns 401 without auth", async ({ request }) => {
