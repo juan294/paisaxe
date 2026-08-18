@@ -43,8 +43,13 @@ export const LOCAL_PRELAUNCH_STEPS: readonly GateStep[] = [
     command: ["npm", "run", "build"],
   },
   {
+    // QA-M2 (#873): plain `npm run test:e2e` has no zero-test guard, so this
+    // gate must go through the gated runner (scripts/run-prelaunch-e2e.ts)
+    // instead — it wires the same assertTestsExecuted guard run-stripe-e2e.ts
+    // already uses, and forces REQUIRE_AUTH_JOURNEYS so the authenticated
+    // journeys can't silently skip under this gate.
     name: "browser E2E",
-    command: ["npm", "run", "test:e2e"],
+    command: ["npm", "run", "test:e2e:prelaunch"],
   },
 ] as const;
 
