@@ -130,6 +130,58 @@ describe("validateMigrations", () => {
     expect(result.errors).toEqual([]);
   });
 
+  it("rejects a timestamp-prefixed migration filename fast instead of scanning an astronomical gap range (#828)", () => {
+    // Simulates docs/operations/rollback.md's old `$(date +%Y%m%d%H%M%S)` example:
+    // a 14-digit timestamp still parses as a migration number (~2e13). The pre-fix
+    // gap scanner looped `for (let i = min; i <= max; i++)`, which for this fixture
+    // would iterate roughly twenty trillion times — a hang/OOM in check-migrations.
+    const root = createMigrationFixture({
+      "001_init.sql": "-- noop",
+      "002_add_thing.sql": "-- noop",
+      "20260818120000_revert_bad.sql": "-- noop",
+    });
+
+    const start = performance.now();
+    const result = validateMigrations({ root });
+    const elapsedMs = performance.now() - start;
+
+    // Must fail fast (milliseconds, not hours) rather than iterating the full range.
+    expect(elapsedMs).toBeLessThan(2000);
+    expect(
+      result.errors.some((error) => /implausib/i.test(error) && error.includes("20260818120000"))
+    ).toBe(true);
+  });
+
+  it("still detects a real undocumented gap without regressing on the pairwise rewrite", () => {
+    const root = createMigrationFixture({
+      "001_a.sql": "-- noop",
+      "002_b.sql": "-- noop",
+      // 003 is missing and NOT in KNOWN_GAPS — must still be flagged.
+      "004_c.sql": "-- noop",
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toContain(
+      "Unexpected migration gap: missing 003 (not in KNOWN_GAPS)"
+    );
+  });
+
+  it("does not flag the project's documented historical gaps (5, 23, 24)", () => {
+    const files: Record<string, string> = {};
+    for (let n = 1; n <= 26; n++) {
+      if (n === 5 || n === 23 || n === 24) continue; // documented KNOWN_GAPS
+      files[`${String(n).padStart(3, "0")}_migration.sql`] = "-- noop";
+    }
+    const root = createMigrationFixture(files);
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors.filter((error) => error.includes("Unexpected migration gap"))).toEqual(
+      []
+    );
+  });
+
   it("keeps the Stripe webhook route aligned with the stripe_webhook_events schema", () => {
     const schema = readFileSync(
       "supabase/migrations/077_stripe_webhook_events.sql",
