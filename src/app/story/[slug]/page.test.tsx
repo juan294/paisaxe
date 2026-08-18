@@ -1,27 +1,48 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { redirect } from "next/navigation";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
+import { notFound } from "next/navigation";
 import StoryPage, { generateMetadata, generateStaticParams } from "./page";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
-  redirect: vi.fn(),
+  notFound: vi.fn(),
 }));
 
-vi.mock("next/server", () => ({
-  connection: vi.fn().mockResolvedValue(undefined),
+// Mock next/image and next/link as simple passthroughs so we can render
+// the server component's output with React Testing Library.
+vi.mock("next/image", () => ({
+  default: ({ fill: _fill, ...rest }: Record<string, unknown>) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img alt="" {...rest} />
+  ),
+}));
+
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
+// Mock the client-side hand-off component — it is covered by its own test.
+vi.mock("./story-redirect-client", () => ({
+  StoryRedirectClient: ({ href }: { href: string }) => (
+    <div data-testid="story-redirect-client" data-href={href} />
+  ),
 }));
 
 // Mock stories-data
 vi.mock("@/lib/stories-data", () => ({
-  getStoryMetadataBySlug: vi.fn(),
   getStoriesFromDB: vi.fn(),
+  getStoryBySlugFromDB: vi.fn(),
 }));
 
-import { getStoryMetadataBySlug, getStoriesFromDB } from "@/lib/stories-data";
+import { getStoriesFromDB, getStoryBySlugFromDB } from "@/lib/stories-data";
 
-const mockGetStoryMetadataBySlug = vi.mocked(getStoryMetadataBySlug);
 const mockGetStoriesFromDB = vi.mocked(getStoriesFromDB);
-const mockRedirect = vi.mocked(redirect);
+const mockGetStoryBySlugFromDB = vi.mocked(getStoryBySlugFromDB);
+const mockNotFound = vi.mocked(notFound);
 
 describe("StoryPage", () => {
   beforeEach(() => {
@@ -91,8 +112,19 @@ describe("StoryPage", () => {
   });
 
   describe("generateMetadata", () => {
+    const baseStory = {
+      id: "story-1",
+      slug: "test-story",
+      title: "Test Story",
+      subtitle: "Subtitle",
+      description: "A test description",
+      category: "nature" as const,
+      image: "/images/test.jpg",
+      sourcePdf: "test.pdf",
+    };
+
     it("should return default metadata when story not found", async () => {
-      mockGetStoryMetadataBySlug.mockResolvedValue(null);
+      mockGetStoryBySlugFromDB.mockResolvedValue(null);
 
       const metadata = await generateMetadata({
         params: Promise.resolve({ slug: "non-existent" }),
@@ -101,24 +133,16 @@ describe("StoryPage", () => {
       expect(metadata.title).toBe("Paisaxe | Descubre Asturias");
     });
 
-    it("uses the slim metadata query (not the full story row)", async () => {
-      mockGetStoryMetadataBySlug.mockResolvedValue({
-        slug: "test-story",
-        title: "Test Story",
-        description: "A test description",
-      });
+    it("reuses getStoryBySlugFromDB — deduplicated via React cache() with the page body — instead of a separate query (FE-H2 follow-up)", async () => {
+      mockGetStoryBySlugFromDB.mockResolvedValue(baseStory);
 
       await generateMetadata({ params: Promise.resolve({ slug: "test-story" }) });
 
-      expect(mockGetStoryMetadataBySlug).toHaveBeenCalledWith("test-story");
+      expect(mockGetStoryBySlugFromDB).toHaveBeenCalledWith("test-story");
     });
 
     it("should return story metadata when story exists", async () => {
-      mockGetStoryMetadataBySlug.mockResolvedValue({
-        slug: "test-story",
-        title: "Test Story",
-        description: "A test description",
-      });
+      mockGetStoryBySlugFromDB.mockResolvedValue(baseStory);
 
       const metadata = await generateMetadata({
         params: Promise.resolve({ slug: "test-story" }),
@@ -139,13 +163,16 @@ describe("StoryPage", () => {
       expect(twitter?.title).toBe("Test Story");
     });
 
-    it("falls back to undefined description when story.description is null (line 31)", async () => {
-      // const description = story.description ?? undefined; -- exercise the ??
-      // fallback for a story whose description column is null.
-      mockGetStoryMetadataBySlug.mockResolvedValue({
+    it("falls back to undefined description when story.description is empty", async () => {
+      // const description = story.description || undefined; -- exercise the ||
+      // fallback. Story.description is always a string (rowToPublicStory
+      // coerces a null DB value to ""), so "no description" surfaces as "",
+      // not null/undefined — the metadata tag must still be omitted.
+      mockGetStoryBySlugFromDB.mockResolvedValue({
+        ...baseStory,
         slug: "no-description-story",
         title: "No Description Story",
-        description: null,
+        description: "",
       });
 
       const metadata = await generateMetadata({
@@ -159,17 +186,83 @@ describe("StoryPage", () => {
     });
   });
 
-  describe("StoryPage component", () => {
-    it("should redirect to immersive page with story slug", async () => {
-      await StoryPage({ params: Promise.resolve({ slug: "test-story" }) });
+  describe("StoryPage component (FE-H2 / #760 — renders instead of redirecting)", () => {
+    const fullStory = {
+      id: "story-1",
+      slug: "test-story",
+      title: "Test Story",
+      subtitle: "A subtitle",
+      description: "A test description",
+      category: "nature" as const,
+      image: "/images/test.jpg",
+      sourcePdf: "test.pdf",
+    };
 
-      expect(mockRedirect).toHaveBeenCalledWith("/immersive?story=test-story");
+    afterEach(() => {
+      cleanup();
     });
 
-    it("should redirect with correct slug parameter", async () => {
-      await StoryPage({ params: Promise.resolve({ slug: "another-story" }) });
+    it("renders the story's title, subtitle, and description instead of redirecting", async () => {
+      mockGetStoryBySlugFromDB.mockResolvedValue(fullStory);
 
-      expect(mockRedirect).toHaveBeenCalledWith("/immersive?story=another-story");
+      const element = await StoryPage({
+        params: Promise.resolve({ slug: "test-story" }),
+      });
+      render(element);
+
+      expect(screen.getByRole("heading", { name: "Test Story" })).toBeInTheDocument();
+      expect(screen.getByText("A subtitle")).toBeInTheDocument();
+      expect(screen.getByText("A test description")).toBeInTheDocument();
+      expect(mockNotFound).not.toHaveBeenCalled();
+    });
+
+    it("colors the category label and CTA by category, reusing getCategoryColor (matches opengraph-image.tsx)", async () => {
+      mockGetStoryBySlugFromDB.mockResolvedValue(fullStory);
+
+      const element = await StoryPage({
+        params: Promise.resolve({ slug: "test-story" }),
+      });
+      render(element);
+
+      // "nature" -> #22c55e per CATEGORY_COLORS (src/lib/og-image-helpers.ts)
+      const label = screen.getByText("Naturaleza");
+      expect(label).toHaveStyle({ color: "#22c55e" });
+      const cta = screen.getByRole("link", { name: "Ver experiencia interactiva" });
+      expect(cta).toHaveStyle({ backgroundColor: "#22c55e" });
+    });
+
+    it("hands off to the immersive viewer via the client redirect component, not a server redirect", async () => {
+      mockGetStoryBySlugFromDB.mockResolvedValue(fullStory);
+
+      const element = await StoryPage({
+        params: Promise.resolve({ slug: "test-story" }),
+      });
+      render(element);
+
+      const handoff = screen.getByTestId("story-redirect-client");
+      expect(handoff.dataset.href).toBe("/immersive?story=test-story");
+    });
+
+    it("passes the correct slug through to getStoryBySlugFromDB and the hand-off URL", async () => {
+      mockGetStoryBySlugFromDB.mockResolvedValue({ ...fullStory, slug: "another-story" });
+
+      const element = await StoryPage({
+        params: Promise.resolve({ slug: "another-story" }),
+      });
+      render(element);
+
+      expect(mockGetStoryBySlugFromDB).toHaveBeenCalledWith("another-story");
+      expect(screen.getByTestId("story-redirect-client").dataset.href).toBe(
+        "/immersive?story=another-story"
+      );
+    });
+
+    it("calls notFound() when the story does not exist", async () => {
+      mockGetStoryBySlugFromDB.mockResolvedValue(null);
+
+      await StoryPage({ params: Promise.resolve({ slug: "missing-story" }) });
+
+      expect(mockNotFound).toHaveBeenCalledOnce();
     });
   });
 });
