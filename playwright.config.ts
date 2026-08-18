@@ -63,12 +63,18 @@ export default defineConfig({
     },
   },
 
+  // QA-M1: No config-level `storageState` seed here. The old file-based seed
+  // (e2e/storage-state.json) wrote a localStorage key, but NavigationHint
+  // reads/writes sessionStorage (see src/components/immersive/navigation-hint.tsx),
+  // which Playwright's storageState mechanism cannot restore at all — the seed
+  // had been inert since that change, and was also hardcoded to localhost:3100
+  // (mismatching the port-3101 stripe-e2e server). Suppression now happens via
+  // an origin-agnostic `addInitScript` in e2e/fixtures/base-test.ts.
   use: {
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: isCI ? "off" : "retain-on-failure",
-    storageState: "e2e/storage-state.json",
   },
 
   projects: [
