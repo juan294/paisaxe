@@ -20,7 +20,7 @@ Two endpoints serve different consumers:
 
 **`GET /api/health`** — public release diagnostics endpoint. Always returns HTTP 200 with `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": { "status": "ok" | "misconfigured" }, "sentry": { "status": "configured" | "unconfigured" }, "rate_limit": { "status": "ok" | "degraded", "backend": "upstash" | "memory" | "blocked", "reason"?: "upstash_missing" | "upstash_unavailable" } }`. The body status becomes `"degraded"` when Supabase connectivity fails, approved stories are unavailable, database usage reaches the 80% warning threshold, `NEXT_PUBLIC_SENTRY_DSN` is missing in Vercel production, or the rate-limit backend is misconfigured in production. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
-Readiness monitors must parse the `/api/health` JSON body, not just the HTTP status. The shared CI monitor is `node scripts/check-health-readiness.mjs <base-url>`; it fails unless `/api/health` returns HTTP 200 and `status: "healthy"`. Use `--require-sentry` for release gates that must also prove `sentry.status: "configured"`.
+Readiness monitors must parse the `/api/health` JSON body, not just the HTTP status. The shared CI monitor is `node scripts/check-health-readiness.mjs <base-url>`; it fails unless `/api/health` returns HTTP 200 and `status: "healthy"`. The monitor also accepts `--require-sentry` to additionally prove `sentry.status: "configured"`, but no CI workflow passes that flag today — see the Preview Smoke Test section below for why.
 
 ## Pre-Launch Checklist
 
@@ -345,7 +345,9 @@ Runs the real Stripe test-mode checkout path on nightly schedule, manual dispatc
 
 ### Preview Smoke Test (`preview-smoke.yml`)
 
-On PRs targeting `main`, waits for the Vercel preview deployment and runs `scripts/check-health-readiness.mjs "$PREVIEW_URL" --require-sentry` against real env vars before hitting the homepage. This is a **required status check** — `Smoke test Vercel preview` must pass before any merge to `main`. It catches runtime failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js 16.2.1 incident).
+On PRs targeting `main`, waits for the Vercel preview deployment and runs `scripts/check-health-readiness.mjs "$PREVIEW_URL"` (without `--require-sentry`) against real env vars before hitting the homepage. This is a **required status check** — `Smoke test Vercel preview` must pass before any merge to `main`. It catches runtime failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js 16.2.1 incident).
+
+**Sentry is not currently a hard release gate.** `sentry.status: "configured"` (see DO-B1) is derived purely from `NEXT_PUBLIC_SENTRY_DSN` being non-empty — it does not prove error delivery actually works. The Preview environment in Vercel also does not currently carry that DSN (confirmed via `vercel env ls preview`), so passing `--require-sentry` here would fail this required check on every PR targeting `main`, including hotfixes during an incident. Revisit once DO-B1 confirms live Sentry delivery and the Preview DSN is provisioned.
 
 ### Quality & Security Workflows
 
