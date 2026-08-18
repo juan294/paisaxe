@@ -217,11 +217,14 @@ describe("Maintenance mode", () => {
       );
     });
 
-    it("allows /immersive routes through (purchase flow testing)", async () => {
+    it("redirects /immersive to /coming-soon (DO-H3: maintenance mode must gate the main app)", async () => {
       const request = new NextRequest("http://localhost:3006/immersive");
       const response = await proxy(request);
 
-      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3006/coming-soon"
+      );
     });
 
     it("allows /pricing routes through (purchase flow)", async () => {
@@ -467,10 +470,20 @@ describe("shouldBypassMaintenanceMode", () => {
     expect(shouldBypassMaintenanceMode("/story/123")).toBe(false);
   });
 
-  it("returns true for /immersive and /pricing (purchase flow bypass)", () => {
-    expect(shouldBypassMaintenanceMode("/immersive")).toBe(true);
+  it("returns true for /pricing (purchase flow bypass)", () => {
     expect(shouldBypassMaintenanceMode("/pricing")).toBe(true);
     expect(shouldBypassMaintenanceMode("/pricing/success")).toBe(true);
+  });
+
+  it("returns false for /immersive (DO-H3: maintenance mode must gate the main app)", () => {
+    expect(shouldBypassMaintenanceMode("/immersive")).toBe(false);
+  });
+
+  it("returns true only for the exact PostHog reverse-proxy path, not other /a* routes (PE-M6)", () => {
+    expect(shouldBypassMaintenanceMode("/a/static/array.js")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/a/e/")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/about")).toBe(false);
+    expect(shouldBypassMaintenanceMode("/agenda")).toBe(false);
   });
 });
 
