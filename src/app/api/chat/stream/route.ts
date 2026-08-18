@@ -20,6 +20,13 @@ import {
 } from "@/lib/chat-stream-timeouts";
 import { encodeSseEvent } from "@/types/sse";
 
+function rateLimitedResponse(headers: Record<string, string>): Response {
+  return new Response(
+    JSON.stringify({ error: "Too many requests. Please try again later." }),
+    { status: 429, headers: { "Content-Type": "application/json", ...headers } }
+  );
+}
+
 function isAbortError(error: unknown): boolean {
   return (
     (error instanceof DOMException && error.name === "AbortError") ||
@@ -55,22 +62,40 @@ async function handlePost(request: NextRequest) {
         reason: "no_vercel_forwarded_for",
       });
     }
-    const rateLimit = await checkRateLimit(
-      ip === "unknown" ? "untrusted" : ip,
-      ip === "unknown" ? UNTRUSTED_RATE_LIMIT : undefined
-    );
+    let rateLimit: Awaited<ReturnType<typeof checkRateLimit>>;
+    try {
+      // PE-M3 (#811): checkRateLimit's own catch only fires when the Upstash
+      // call REJECTS. A degraded-but-not-failing Upstash region instead just
+      // hangs, and this is the first I/O on the chat path — ahead of every
+      // other stage timeout — so an unbounded hang here is invisible in the
+      // stage-timing logs used to diagnose the pipeline. Bound it the same way
+      // as the other stages.
+      rateLimit = await withChatStreamStageTiming(
+        "rateLimit",
+        checkRateLimit(
+          ip === "unknown" ? "untrusted" : ip,
+          ip === "unknown" ? UNTRUSTED_RATE_LIMIT : undefined
+        )
+      );
+    } catch (rateLimitErr) {
+      // Only the stage TIMEOUT is handled here — checkRateLimit() itself never
+      // rejects (it has its own internal try/catch, see rate-limit.ts), so any
+      // other rejection is a genuinely unexpected bug and should fall through
+      // to the outer catch's generic 500, not be silently swallowed here.
+      if (!isChatStreamStageTimeout(rateLimitErr)) {
+        throw rateLimitErr;
+      }
+      // Fail CLOSED on timeout — same direction as checkRateLimit's own
+      // production error path. Letting the request through here would turn a
+      // slow Upstash into a rate-limit bypass.
+      logger.warn("[CHAT_STREAM_RATE_LIMIT_TIMEOUT]", {
+        stage: rateLimitErr.stage,
+      });
+      return rateLimitedResponse({ "Retry-After": "60" });
+    }
 
     if (!rateLimit.allowed) {
-      return new Response(
-        JSON.stringify({ error: "Too many requests. Please try again later." }),
-        {
-          status: 429,
-          headers: {
-            "Content-Type": "application/json",
-            ...buildRateLimitHeaders(rateLimit, true),
-          },
-        }
-      );
+      return rateLimitedResponse(buildRateLimitHeaders(rateLimit, true));
     }
 
     // Input validation — single Zod parse path (BE-L3 #524).
