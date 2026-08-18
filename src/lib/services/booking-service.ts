@@ -31,7 +31,12 @@ export type BookingStatus =
   | "denied"
   | "no_answer"
   /** BE-H2: call timed out — row stays in 'initiating', cron/webhook reconciles */
-  | "timed_out";
+  | "timed_out"
+  /** BE-H2: stale 'initiating' row past the reconciliation window — needs
+   *  operator attention; a late webhook may still resolve it via its
+   *  booking_id fallback lookup. Distinct from 'failed' (definitely didn't
+   *  happen) because we genuinely don't know the outcome. */
+  | "orphaned";
 
 export interface PendingBookingSnapshot {
   conversation_id: string | null;
@@ -67,6 +72,26 @@ export const ACTIVE_BOOKING_STATUSES = new Set<string>([
 // Phone validation / normalization
 // ---------------------------------------------------------------------------
 
+// BE-B2: Spanish premium-rate (indicativo de tarificación adicional) number
+// ranges. These bill the CALLED party's line at premium rates — dialing one
+// with no ceiling on call volume is a direct telephony-cost abuse vector.
+// 800/900 (freephone) and ordinary geographic/mobile ranges are deliberately
+// NOT in this list — only the specific premium prefixes are blocked so
+// legitimate restaurant/venue numbers keep working.
+const PREMIUM_RATE_PREFIXES = ["803", "806", "807", "905", "907"];
+
+/**
+ * Extract the 9-digit national significant number from any of the three
+ * shapes the patterns above already validated (+34XXXXXXXXX, 34XXXXXXXXX,
+ * or XXXXXXXXX) — a national 9-digit number can never itself start with
+ * "34" (it must start with 6/7/8/9), so a plain prefix strip is unambiguous.
+ */
+function extractNationalNumber(cleaned: string): string {
+  if (cleaned.startsWith("+34")) return cleaned.slice(3);
+  if (cleaned.startsWith("34")) return cleaned.slice(2);
+  return cleaned;
+}
+
 /** Validate Spanish phone number format. */
 export function isValidSpanishPhone(phone: string): boolean {
   // Remove spaces and dashes
@@ -82,7 +107,16 @@ export function isValidSpanishPhone(phone: string): boolean {
     /^[6789]\d{8}$/, // National format
   ];
 
-  return patterns.some((pattern) => pattern.test(cleaned));
+  if (!patterns.some((pattern) => pattern.test(cleaned))) {
+    return false;
+  }
+
+  const national = extractNationalNumber(cleaned);
+  if (PREMIUM_RATE_PREFIXES.some((prefix) => national.startsWith(prefix))) {
+    return false;
+  }
+
+  return true;
 }
 
 /** Normalize phone to E.164 format for Twilio. */
@@ -355,5 +389,41 @@ export async function markPendingBookingFailed(
       error,
       ...logContext,
     });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Daily call cap (BE-B2)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_DAILY_BOOKING_CALL_CAP = 100;
+
+/**
+ * BE-B2: Atomically claims one of today's outbound booking call slots via
+ * the SQL-enforced daily cap in `claim_daily_booking_call_slot`
+ * (migration 105_booking_daily_call_cap.sql). This gates a "call" (a
+ * real-money outbound telephony request), not a "read" — unlike
+ * checkRateLimit's in-memory dev/test fallback, this MUST fail closed: any
+ * RPC error or thrown exception denies the slot so a database hiccup cannot
+ * silently remove the cost ceiling.
+ */
+export async function claimDailyBookingCallSlot(
+  maxPerDay: number = DEFAULT_DAILY_BOOKING_CALL_CAP
+): Promise<boolean> {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase.rpc("claim_daily_booking_call_slot", {
+      p_max_per_day: maxPerDay,
+    });
+
+    if (error) {
+      logger.error("[MAKE_BOOKING_DAILY_CAP_RPC_FAILED]", { error });
+      return false;
+    }
+
+    return data === true;
+  } catch (dbError) {
+    logger.error("[MAKE_BOOKING_DAILY_CAP_RPC_DB_ERROR]", { error: dbError });
+    return false;
   }
 }
