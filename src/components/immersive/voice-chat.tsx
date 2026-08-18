@@ -7,6 +7,7 @@ import { ChatActions } from "./chat-actions";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
+import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useStreamChat } from "@/hooks/use-stream-chat";
 import { useChatMode } from "@/hooks/use-chat-mode";
@@ -90,6 +91,9 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     [story, locale]
   );
   const posthog = usePaisaxePostHog();
+  // FE-H4: forward the signed-in user's session token so voice-mode MCP tool
+  // calls (bookings, favorites) can authenticate.
+  const { session } = useAuth();
   // FE-H3: useFocusTrap holds onEscape in a ref internally, so passing
   // onClose directly (rather than through a no-op stabilizing memo) is
   // safe — the trap's install/teardown effect doesn't depend on it.
@@ -302,6 +306,8 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
             story={story}
             agentId={agentId}
             onFallbackToText={handleVoiceFallback}
+            userAccessToken={session?.access_token}
+            initialMessage={initialMessageRef.current}
           />
         ) : useElevenLabs && needsPurchase ? (
           /* Show purchase CTA when user wants voice but needs to pay */

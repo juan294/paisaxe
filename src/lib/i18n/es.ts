@@ -210,6 +210,7 @@ export const es: Translations = {
     error: 'Error de conexión',
     error_not_configured: 'Agente de voz no configurado',
     no_permission: 'Necesito acceso al micrófono',
+    no_permission_retry: 'Si tu navegador bloqueó el acceso, habilítalo en su configuración de sitio y vuelve a intentarlo.',
     you: 'Tú',
     loading: 'Cargando asistente de voz...',
   },

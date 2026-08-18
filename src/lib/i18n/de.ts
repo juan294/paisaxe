@@ -210,6 +210,7 @@ export const de: Translations = {
     error: 'Verbindungsfehler',
     error_not_configured: 'Sprachassistent nicht konfiguriert',
     no_permission: 'Mikrofonzugriff benötigt',
+    no_permission_retry: 'Wenn dein Browser den Zugriff blockiert hat, aktiviere ihn in den Website-Einstellungen und versuche es erneut.',
     you: 'Du',
     loading: 'Sprachassistent wird geladen...',
   },

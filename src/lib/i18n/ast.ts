@@ -210,6 +210,7 @@ export const ast: Translations = {
     error: 'Error de conexón',
     error_not_configured: 'Axente de voz nun configuráu',
     no_permission: 'Necesito accesu al micrófonu',
+    no_permission_retry: "Si'l to navegador bloquió l'accesu, habilítalu na configuración del sitiu ya inténtalo otra vuelta.",
     you: 'Tu',
     loading: "Cargando l'asistente de voz...",
   },
