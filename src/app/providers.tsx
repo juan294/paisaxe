@@ -15,13 +15,18 @@ interface ProvidersProps {
   initialLocale?: Locale;
 }
 
-const DEFERRED_AUTH_PATHS = new Set(["/immersive", "/pricing", "/favorites"]);
-
 // Static routes that don't need an active auth session — defer the Supabase
 // getUser() round-trip by passing deferInitialAuth=true, but still mount
 // AuthProvider so the React tree shape is stable across navigations.
 // FE-M4: AuthProvider must ALWAYS be rendered; conditional removal causes a full
 // remount (and auth state reset) when the user navigates between pathnames.
+//
+// FE-B1 (#757): /immersive, /pricing, and /favorites must NEVER be added here.
+// They are the authenticated revenue path — favorites, paid ElevenLabs voice
+// access, and the in-chat purchase CTA all depend on getSession()/getUser()
+// actually running on these routes. A prior "DEFERRED_AUTH_PATHS" set wrongly
+// included them (originally meant for anonymous-first perf, see #338/#405),
+// which silently disabled auth for every signed-in user on the main route.
 const STATIC_PATHS = new Set(["/about", "/privacy", "/terms"]);
 
 // Providers wraps only client-context concerns (PostHog, i18n, Auth).
@@ -31,9 +36,7 @@ export function Providers({ children, initialLocale }: ProvidersProps) {
   const pathname = usePathname();
   // On static paths we defer auth init (no Supabase round-trip) but still
   // keep AuthProvider in the tree so the component identity never changes.
-  const deferInitialAuth = pathname
-    ? STATIC_PATHS.has(pathname) || DEFERRED_AUTH_PATHS.has(pathname)
-    : false;
+  const deferInitialAuth = pathname ? STATIC_PATHS.has(pathname) : false;
   const rootFeatureFlagsEnabled = pathname
     ? !pathname.startsWith("/immersive")
     : true;
