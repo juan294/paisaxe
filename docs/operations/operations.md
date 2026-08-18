@@ -426,7 +426,7 @@ Revenue analytics are available in the admin panel under Analytics → Revenue t
 
 ## Proxy Architecture
 
-Request interception uses `src/proxy.ts` (Next.js 16 replacement for `middleware.ts`). The middleware chain order is: canonical-domain → maintenance → CORS → CSP → CSRF → auth-refresh → request-id → story-rewrite.
+Request interception uses `src/proxy.ts` (Next.js 16 replacement for `middleware.ts`). The middleware chain order is: canonical-domain → maintenance → CORS → CSP → CSRF → auth-refresh → request-id. `/story/[slug]` is no longer proxy-rewritten (see FE-H2 / #760) — it is a real App Router page subject to the same chain as any other route.
 
 See [proxy-architecture.md](./proxy-architecture.md) for the full module map.
 
