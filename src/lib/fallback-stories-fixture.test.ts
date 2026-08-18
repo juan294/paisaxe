@@ -39,9 +39,6 @@ const SEED_CYCLING_SLUGS = [
 
 const EXPECTED_SLUGS = new Set([...SEED_DATABASE_SLUGS, ...SEED_CYCLING_SLUGS]);
 
-// Previous fixture size (PE-H4 finding) — this is the regression floor.
-const OLD_FALLBACK_STORY_COUNT = 8;
-
 interface FallbackStory {
   id: string;
   slug?: string;
@@ -68,8 +65,9 @@ describe("content/fallback-stories.json (PE-H4 fixture size)", () => {
   const stories = loadFallbackStories();
 
   it("is production-representative, not the old 8-story fixture", () => {
-    expect(stories.length).toBeGreaterThan(OLD_FALLBACK_STORY_COUNT);
-    // Matches every static, translation-covered slug we expanded it with.
+    // Matches every static, translation-covered slug we expanded it with
+    // (25), which is itself the regression guard against the old 8-story
+    // fixture — if this ever shrinks back to 8, the exact-match fails.
     expect(stories.length).toBe(EXPECTED_SLUGS.size);
   });
 
