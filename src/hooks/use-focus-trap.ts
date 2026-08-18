@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -14,6 +14,18 @@ export function useFocusTrap(
   active: boolean,
   onEscape?: () => void
 ) {
+  // Hold the latest onEscape in a ref (the "latest ref" pattern) so the
+  // install/teardown effect below never depends on the callback's identity.
+  // Callers often pass an inline function that is redeclared on every render
+  // (see FE-H3) — depending on it directly would tear down and reinstall the
+  // trap on every parent re-render, which moves focus out of the dialog via
+  // the cleanup's focus-restore even though the dialog never actually
+  // closed. Assigning during render (rather than in a useEffect) is safe
+  // here — it's an idempotent property write with no side effects that
+  // require cleanup — and skips an extra effect flush on every render.
+  const onEscapeRef = useRef(onEscape);
+  onEscapeRef.current = onEscape;
+
   useEffect(() => {
     if (!active) return;
 
@@ -37,9 +49,9 @@ export function useFocusTrap(
     const raf = requestAnimationFrame(focusFirstIfNeeded);
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onEscape) {
+      if (e.key === 'Escape' && onEscapeRef.current) {
         e.preventDefault();
-        onEscape();
+        onEscapeRef.current();
         return;
       }
 
@@ -72,5 +84,7 @@ export function useFocusTrap(
       // Restore focus when trap is deactivated
       previouslyFocused?.focus();
     };
-  }, [ref, active, onEscape]);
+    // Deliberately omit onEscape from deps — see the onEscapeRef comment
+    // above (FE-H3).
+  }, [ref, active]);
 }
