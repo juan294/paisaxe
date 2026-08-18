@@ -114,7 +114,7 @@ describe("PricingPage", () => {
     expect(screen.getByText("premium.pricing_title")).toBeInTheDocument();
     expect(screen.getByText("€1.99")).toBeInTheDocument();
     expect(screen.getByText("premium.faq_title")).toBeInTheDocument();
-    expect(screen.getByText("premium.feature_24h")).toBeInTheDocument();
+    expect(screen.getByText("premium.feature_duration")).toBeInTheDocument();
   });
 
   it("isolates search params behind a route shell when they suspend", () => {
@@ -313,7 +313,7 @@ describe("PricingPage", () => {
   it("should render features list", () => {
     render(<PricingPage />);
 
-    expect(screen.getByText("premium.feature_24h")).toBeInTheDocument();
+    expect(screen.getByText("premium.feature_duration")).toBeInTheDocument();
     expect(screen.getByText("premium.feature_booking")).toBeInTheDocument();
   });
 
@@ -577,6 +577,56 @@ describe("PricingPage", () => {
       // opacity-50 alone is insufficient for WCAG AA; the button must use
       // the gray gradient instead of (or in addition to replacing) opacity-50
       expect(button.className).not.toContain("disabled:opacity-50");
+    });
+  });
+
+  describe("UX-B1 (#886): section label, feature bullet, and FAQ answer track the selected tier", () => {
+    it("renders the day-pass duration by default, then switches to the monthly duration when that tier is selected — never staying stuck on '24 horas'", async () => {
+      // Simulate real (non-identity) translations so the derived copy is
+      // exercised, not just the `t(key) => key` passthrough used elsewhere
+      // in this file.
+      vi.doMock("@/lib/i18n", () => ({
+        useTranslation: () => ({
+          t: (key: string) => {
+            const translations: Record<string, string> = {
+              "premium.tier_day": "24 horas",
+              "premium.tier_week": "7 días",
+              "premium.tier_month": "30 días",
+              "premium.voice_pass_label": "Pase de Voz · {duration}",
+              "premium.feature_duration": "{duration} de conversaciones ilimitadas",
+              "premium.faq_how_long_answer": "{duration} desde la compra. Perfecto para explorar.",
+            };
+            return translations[key] ?? key;
+          },
+        }),
+      }));
+      vi.resetModules();
+      const { default: FreshPricingPage } = await import("./page");
+
+      render(<FreshPricingPage />);
+
+      // Day pass is selected by default — copy describes 24 hours.
+      expect(screen.getByText("Pase de Voz · 24 horas")).toBeInTheDocument();
+      expect(screen.getByText("24 horas de conversaciones ilimitadas")).toBeInTheDocument();
+      expect(screen.getByText("24 horas desde la compra. Perfecto para explorar.")).toBeInTheDocument();
+
+      // Selecting the monthly tier (€9.99) must update all three surfaces —
+      // this is the exact material misdescription UX-B1 flags: a user
+      // buying the monthly pass must not keep reading "24 horas".
+      fireEvent.click(screen.getByRole("radio", { name: /9\.99/ }));
+
+      expect(screen.getByText("Pase de Voz · 30 días")).toBeInTheDocument();
+      expect(screen.getByText("30 días de conversaciones ilimitadas")).toBeInTheDocument();
+      expect(screen.getByText("30 días desde la compra. Perfecto para explorar.")).toBeInTheDocument();
+      // The label, feature bullet, and FAQ answer must no longer describe
+      // "24 horas" (the Day Pass's own tier pill legitimately still shows
+      // "24 horas" — that pill always describes itself, tier-independent).
+      expect(screen.queryByText("Pase de Voz · 24 horas")).not.toBeInTheDocument();
+      expect(screen.queryByText("24 horas de conversaciones ilimitadas")).not.toBeInTheDocument();
+      expect(screen.queryByText("24 horas desde la compra. Perfecto para explorar.")).not.toBeInTheDocument();
+
+      vi.doUnmock("@/lib/i18n");
+      vi.resetModules();
     });
   });
 

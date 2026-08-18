@@ -261,12 +261,13 @@ export const ast: Translations = {
 
   premium: {
     premium_access: 'Accesu Premium',
-    voice_pass_label: 'Pase de Voz · 24h',
+    voice_pass_label: 'Pase de Voz · {duration}',
     voice_locked: 'El chat de voz ye una función premium',
     get_day_pass: 'Obtener Pase Diariu',
     voice_title: 'Fala cola To Guía',
     voice_description: 'Pelayu sabe más de lo que ves en pantalla. Namás entruga.',
     feature_24h: '24 hores de conversaciones illimitaes',
+    feature_duration: '{duration} de conversaciones illimitaes',
     feature_unlimited: 'Entrugues illimitaes',
     feature_realtime: 'Clima y recomendaciones en tiempu real',
     feature_booking: 'Pelayu reserva restaurantes y hoteles por ti',
@@ -289,8 +290,11 @@ export const ast: Translations = {
     faq_what_included_answer: '24 hores con Pelayu. Entrúga-y el tiempu enantes d\'ir a los Llagos, ónde comer la meyor fabada, qué llagariega visitar —',
     faq_what_included_highlight: '¡y él llama pa facete la reserva!',
     faq_how_long: 'Cuánto dura?',
-    faq_how_long_answer: '24 hores dende la compra. Perfectu pa planiar un día de viaxe o esplorar.',
+    faq_how_long_answer: '{duration} dende la compra. Perfectu pa planiar un día de viaxe o esplorar.',
     voice_pass_expiry: 'El to pase de voz caduca en {hours}h ({time})',
+    tier_day: '24 hores',
+    tier_week: '7 díes',
+    tier_month: '30 díes',
   },
 
   fullscreen: {

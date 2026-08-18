@@ -261,12 +261,13 @@ export const en: Translations = {
 
   premium: {
     premium_access: 'Premium Access',
-    voice_pass_label: 'Voice Pass · 24h',
+    voice_pass_label: 'Voice Pass · {duration}',
     voice_locked: 'Voice chat is a premium feature',
     get_day_pass: 'Get Day Pass',
     voice_title: 'Talk to Your Guide',
     voice_description: 'Pelayo knows more than what\'s on screen. Just ask.',
     feature_24h: '24 hours of unlimited conversations',
+    feature_duration: '{duration} of unlimited conversations',
     feature_unlimited: 'Ask unlimited questions',
     feature_realtime: 'Real-time weather and recommendations',
     feature_booking: 'Pelayo books restaurants and hotels for you',
@@ -289,8 +290,11 @@ export const en: Translations = {
     faq_what_included_answer: '24 hours with Pelayo. Ask about the weather before hiking the Lakes, where to find the best fabada, which cider house to visit —',
     faq_what_included_highlight: 'and he calls ahead to book your table!',
     faq_how_long: 'How long does it last?',
-    faq_how_long_answer: '24 hours from purchase. Perfect for a day of trip planning or exploring.',
+    faq_how_long_answer: '{duration} from purchase. Perfect for a day of trip planning or exploring.',
     voice_pass_expiry: 'Your voice pass expires in {hours}h ({time})',
+    tier_day: '24 hours',
+    tier_week: '7 days',
+    tier_month: '30 days',
   },
 
   fullscreen: {
