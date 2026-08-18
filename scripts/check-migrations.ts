@@ -160,6 +160,11 @@ function hasPattern(sql: string, pattern: RegExp): boolean {
   return pattern.test(sql);
 }
 
+// Shared by checkSensitiveTablePosture (per-table regex) and
+// checkPublicTableRlsPosture (generic table-name-capturing regex) so the two
+// REVOKE grammars stay in sync.
+const REVOKE_PREFIX_SOURCE = "revoke\\s+(?:all(?:\\s+privileges)?|select)\\s+on(?:\\s+table)?\\s+";
+
 function checkSensitiveTablePosture(sql: string): string[] {
   const errors: string[] = [];
 
@@ -186,9 +191,7 @@ function checkSensitiveTablePosture(sql: string): string[] {
       if (
         !hasPattern(
           sql,
-          new RegExp(
-            `revoke\\s+(?:all(?:\\s+privileges)?|select)\\s+on(?:\\s+table)?\\s+${qualifiedTable}\\s+from\\s+${role}\\b`
-          )
+          new RegExp(`${REVOKE_PREFIX_SOURCE}${qualifiedTable}\\s+from\\s+${role}\\b`)
         )
       ) {
         errors.push(`Sensitive table public.${table} must revoke privileges from ${role}`);
@@ -216,6 +219,123 @@ function checkSensitiveTablePosture(sql: string): string[] {
     ) {
       errors.push(`Sensitive table public.${table} must define a service_role RLS policy`);
     }
+  }
+
+  return errors;
+}
+
+interface PublicTableRlsTracker {
+  exists: boolean;
+  rlsEnabled: boolean;
+  revokedRoles: Set<string>;
+}
+
+type TableEvent =
+  | { index: number; kind: "create"; name: string }
+  | { index: number; kind: "drop"; name: string }
+  | { index: number; kind: "rename"; from: string; to: string }
+  | { index: number; kind: "rls"; name: string; enabled: boolean }
+  | { index: number; kind: "revoke"; name: string; roles: string[] };
+
+const CREATE_TABLE_RE = /create\s+table(?:\s+if\s+not\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)/g;
+const DROP_TABLE_RE = /drop\s+table(?:\s+if\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)/g;
+const RENAME_TABLE_RE =
+  /alter\s+table\s+(?:public\.)?([a-z_][a-z0-9_]*)\s+rename\s+to\s+(?:public\.)?([a-z_][a-z0-9_]*)/g;
+const RLS_TOGGLE_RE =
+  /alter\s+table\s+(?:public\.)?([a-z_][a-z0-9_]*)\s+(enable|disable)\s+row\s+level\s+security/g;
+const REVOKE_ROLES_RE = new RegExp(
+  `${REVOKE_PREFIX_SOURCE}(?:public\\.)?([a-z_][a-z0-9_]*)\\s+from\\s+([^;]+);`,
+  "g"
+);
+
+// Walks the concatenated migration SQL once, collecting every table lifecycle
+// event (create/drop/rename/RLS toggle/revoke) tagged with its position, then
+// replays them in true chronological order. This keeps a renamed table's
+// history attached across the rename, unlike processing each event type as a
+// separate full pass.
+function collectTableEvents(sql: string): TableEvent[] {
+  const events: TableEvent[] = [];
+
+  for (const match of sql.matchAll(CREATE_TABLE_RE)) {
+    events.push({ index: match.index ?? 0, kind: "create", name: match[1] });
+  }
+  for (const match of sql.matchAll(DROP_TABLE_RE)) {
+    events.push({ index: match.index ?? 0, kind: "drop", name: match[1] });
+  }
+  for (const match of sql.matchAll(RENAME_TABLE_RE)) {
+    events.push({ index: match.index ?? 0, kind: "rename", from: match[1], to: match[2] });
+  }
+  for (const match of sql.matchAll(RLS_TOGGLE_RE)) {
+    events.push({ index: match.index ?? 0, kind: "rls", name: match[1], enabled: match[2] === "enable" });
+  }
+  for (const match of sql.matchAll(REVOKE_ROLES_RE)) {
+    events.push({
+      index: match.index ?? 0,
+      kind: "revoke",
+      name: match[1],
+      roles: match[2].split(",").map((role) => role.trim()),
+    });
+  }
+
+  return events.sort((a, b) => a.index - b.index);
+}
+
+// Tables whose RLS is deliberately disabled must document the exception with an
+// explicit REVOKE from both anon and authenticated (see migration 076's
+// admin_audit_log pattern) -- this is the only tolerated alternative to RLS.
+function checkPublicTableRlsPosture(sql: string): string[] {
+  const tables = new Map<string, PublicTableRlsTracker>();
+
+  const getTracker = (name: string): PublicTableRlsTracker => {
+    let tracker = tables.get(name);
+    if (!tracker) {
+      tracker = { exists: false, rlsEnabled: false, revokedRoles: new Set() };
+      tables.set(name, tracker);
+    }
+    return tracker;
+  };
+
+  for (const event of collectTableEvents(sql)) {
+    switch (event.kind) {
+      case "create":
+        getTracker(event.name).exists = true;
+        break;
+      case "drop": {
+        const tracker = tables.get(event.name);
+        if (tracker) tracker.exists = false;
+        break;
+      }
+      case "rename": {
+        const tracker = tables.get(event.from);
+        if (tracker) {
+          tables.delete(event.from);
+          tables.set(event.to, tracker);
+        }
+        break;
+      }
+      case "rls": {
+        const tracker = tables.get(event.name);
+        if (tracker) tracker.rlsEnabled = event.enabled;
+        break;
+      }
+      case "revoke": {
+        const tracker = tables.get(event.name);
+        if (!tracker) break;
+        for (const role of event.roles) tracker.revokedRoles.add(role);
+        break;
+      }
+    }
+  }
+
+  const errors: string[] = [];
+  for (const [name, tracker] of tables) {
+    if (!tracker.exists || tracker.rlsEnabled) continue;
+    if (tracker.revokedRoles.has("anon") && tracker.revokedRoles.has("authenticated")) continue;
+
+    errors.push(
+      `Table public.${name} has no RLS enabled and no documented anon/authenticated revoke exception -- ` +
+        "enable RLS or add explicit REVOKE ... FROM anon, authenticated with a comment explaining why"
+    );
   }
 
   return errors;
@@ -317,6 +437,7 @@ export function validateMigrations(
   errors.push(...checkForDuplicates(migrations));
   errors.push(...checkForUnexpectedGaps(migrations));
   errors.push(...checkSensitiveTablePosture(migrationSql));
+  errors.push(...checkPublicTableRlsPosture(migrationSql));
   errors.push(...checkMarketingCredentialShape(migrationSql));
   errors.push(...checkTranslationFunctionSearchPaths(migrations));
   errors.push(...checkCompleteBookingSmsJobSignatureReferences(migrations));
