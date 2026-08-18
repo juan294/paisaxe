@@ -11,7 +11,6 @@ import {
 export const alt = "Paisaxe story";
 export const size = OG_IMAGE_SIZE;
 export const contentType = OG_IMAGE_CONTENT_TYPE;
-export const runtime = "edge";
 
 interface Props {
   params: Promise<{ slug: string }>;
