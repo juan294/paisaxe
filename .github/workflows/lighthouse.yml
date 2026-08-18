@@ -56,10 +56,33 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
 
-      - name: Run Lighthouse CI
+      - name: Run Lighthouse CI (desktop)
         uses: treosh/lighthouse-ci-action@v12
         with:
           configPath: './lighthouserc.json'
+          uploadArtifacts: true
+        env:
+          # Dummy values for server runtime (APIs not called during audit)
+          ANTHROPIC_API_KEY: dummy_key_for_build
+          VOYAGE_API_KEY: dummy_key_for_build
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
+          MAINTENANCE_MODE: "false"
+
+      # PE-H4 (#807): this is a mobile-first, swipe-driven product, but until now
+      # the gate only ever ran the desktop preset. lighthouserc.mobile.json omits
+      # `preset` entirely rather than setting `"preset": "mobile"` — Lighthouse's
+      # CLI only accepts "perf" | "experimental" | "desktop" as --preset values,
+      # so "mobile" is rejected outright (verified locally: `lhci collect
+      # --settings.preset=mobile` fails immediately with "Invalid values:
+      # Argument: preset, Given: mobile, Choices: perf, experimental, desktop").
+      # Omitting the key falls back to Lighthouse's default settings, whose
+      # formFactor is already "mobile" (see lighthouse/core/config/constants.js);
+      # the desktop config file is the one that opts OUT of that default.
+      - name: Run Lighthouse CI (mobile)
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: './lighthouserc.mobile.json'
           uploadArtifacts: true
         env:
           # Dummy values for server runtime (APIs not called during audit)

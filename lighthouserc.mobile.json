@@ -1,0 +1,57 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "npm run start",
+      "startServerReadyPattern": "Ready",
+      "url": ["http://localhost:3000/immersive"],
+      "numberOfRuns": 3,
+      "settings": {
+        "onlyCategories": [
+          "performance",
+          "accessibility",
+          "best-practices",
+          "seo"
+        ]
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": [
+          "error",
+          { "minScore": 0.7, "aggregationMethod": "median-run" }
+        ],
+        "categories:accessibility": [
+          "error",
+          { "minScore": 0.8, "aggregationMethod": "median-run" }
+        ],
+        "categories:best-practices": [
+          "warn",
+          { "minScore": 0.8, "aggregationMethod": "median-run" }
+        ],
+        "categories:seo": [
+          "warn",
+          { "minScore": 0.8, "aggregationMethod": "median-run" }
+        ],
+        "first-contentful-paint": [
+          "warn",
+          { "maxNumericValue": 3000, "aggregationMethod": "median-run" }
+        ],
+        "largest-contentful-paint": [
+          "error",
+          { "maxNumericValue": 4000, "aggregationMethod": "median-run" }
+        ],
+        "cumulative-layout-shift": [
+          "error",
+          { "maxNumericValue": 0.25, "aggregationMethod": "median-run" }
+        ],
+        "total-blocking-time": [
+          "warn",
+          { "maxNumericValue": 500, "aggregationMethod": "median-run" }
+        ]
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}
