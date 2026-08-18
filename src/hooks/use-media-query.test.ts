@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createElement } from "react";
-import { render, renderHook, act } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { useMediaQuery, useIsFinePointer } from "./use-media-query";
 
 // Build a controllable MediaQueryList mock
@@ -81,22 +80,24 @@ describe("useMediaQuery", () => {
     // (e.g. `(prefers-reduced-motion: reduce)` on a reduced-motion visitor).
     mql.matches = true;
 
-    const renderedValues: boolean[] = [];
-    function Probe() {
+    // Capture the value from the first synchronous render pass, before any
+    // effect runs — same idiom as src/hooks/use-stories.hydration.test.ts.
+    let capturedFirstRender: boolean | undefined;
+    const { result } = renderHook(() => {
       const value = useMediaQuery("(pointer: fine)");
-      renderedValues.push(value);
-      return null;
-    }
-
-    render(createElement(Probe));
+      if (capturedFirstRender === undefined) {
+        capturedFirstRender = value;
+      }
+      return value;
+    });
 
     // The server always renders `false` (no window). The hook's first
     // client render must return the same value, or React discards the
     // server-rendered markup for this subtree (hydration mismatch).
-    expect(renderedValues[0]).toBe(false);
+    expect(capturedFirstRender).toBe(false);
 
     // The effect then corrects state to the real media query value.
-    expect(renderedValues[renderedValues.length - 1]).toBe(true);
+    expect(result.current).toBe(true);
   });
 });
 
