@@ -37,6 +37,7 @@
     "test:e2e:dev": "PLAYWRIGHT_USE_DEV_SERVER=true PLAYWRIGHT_REUSE_SERVER=true playwright test --project=desktop --project=mobile --project=qa-journey",
     "test:e2e:visual": "playwright test --project=visual-desktop --project=visual-mobile",
     "test:e2e:stripe": "tsx scripts/run-stripe-e2e.ts",
+    "test:e2e:prelaunch": "tsx scripts/run-prelaunch-e2e.ts",
     "prelaunch": "tsx scripts/run-prelaunch-gate.ts",
     "prelaunch:live": "REQUIRE_LIVE_INTEGRATION=true npm run test:e2e:stripe",
     "test:e2e:visual:update": "playwright test --project=visual-desktop --project=visual-mobile --update-snapshots",

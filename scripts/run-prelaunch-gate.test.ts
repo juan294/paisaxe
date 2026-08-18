@@ -43,4 +43,14 @@ describe("run-prelaunch-gate", () => {
       })
     ).toThrow(/explicit live Stripe\/Supabase gate/);
   });
+
+  it("routes the browser E2E step through the zero-test guard (QA-M2, #873)", () => {
+    // Plain `npm run test:e2e` has no zero-test guard: Playwright exits 0
+    // when every selected test is skipped, so the gate could print "passed"
+    // having verified nothing. The prelaunch gate must use the gated runner
+    // instead (scripts/run-prelaunch-e2e.ts), which wires the same
+    // assertTestsExecuted guard run-stripe-e2e.ts already uses.
+    const e2eStep = LOCAL_PRELAUNCH_STEPS.find((step) => step.name === "browser E2E");
+    expect(e2eStep?.command).toEqual(["npm", "run", "test:e2e:prelaunch"]);
+  });
 });

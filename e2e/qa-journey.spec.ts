@@ -484,9 +484,21 @@ test.describe("QA Journey: New Features", () => {
  * This approach tests the favorites system end-to-end while being more robust.
  */
 authTest.describe("QA Journey: Authenticated User", () => {
-  // Skip entire suite if auth credentials not configured
+  // Skip entire suite if auth credentials not configured — but fail closed
+  // (QA-M2, #873) under CI or an explicit REQUIRE_AUTH_JOURNEYS flag, so a
+  // release gate can never report "passed" while this whole suite silently
+  // didn't execute. A credential-less local run without either signal still
+  // skips, so a developer without QA credentials keeps a usable anonymous-only
+  // E2E run.
   authTest.beforeAll(() => {
     if (!hasAuthCredentials()) {
+      if (process.env.CI || process.env.REQUIRE_AUTH_JOURNEYS) {
+        throw new Error(
+          "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD), " +
+            "but CI or REQUIRE_AUTH_JOURNEYS requires this authenticated-journey suite to run. " +
+            "Refusing to silently skip a suite this gate depends on."
+        );
+      }
       authTest.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
     }
   });
