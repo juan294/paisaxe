@@ -302,13 +302,14 @@ async function searchPlaces(
 }
 
 
-// BE-M1 (#782): pull a caller-supplied conversation identifier out of a plain
-// object, tolerating both the camelCase and snake_case spellings ElevenLabs
-// uses elsewhere (see src/app/api/mcp/save-favorite/route.ts). Absence is
-// expected and safe — callers fall back to IP-keyed rate limiting.
-function extractConversationId(source: Record<string, unknown> | null | undefined): string | null {
-  if (!source) return null;
-  const raw = source.conversationId ?? source.conversation_id;
+// BE-M1 (#782): pull a caller-supplied conversation identifier out of the
+// request body, tolerating both the camelCase and snake_case spellings
+// ElevenLabs uses elsewhere (see src/app/api/mcp/save-favorite/route.ts).
+// Absence is expected and safe — callers fall back to IP-keyed rate limiting.
+function extractConversationId(source: unknown): string | null {
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+  const record = source as Record<string, unknown>;
+  const raw = record.conversationId ?? record.conversation_id;
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
   if (!trimmed || trimmed.length > 200) return null;
@@ -321,32 +322,26 @@ function buildPerCallerRateLimitKey(conversationId: string | null, ip: string): 
     : `mcp-places:ip:${ip}`;
 }
 
-interface RateLimitDenied {
-  allowed: false;
+interface RateLimitCheck {
+  allowed: boolean;
   retryAfter?: number;
-}
-interface RateLimitOk {
-  allowed: true;
 }
 
 // BE-M1 (#782): check the global cost-cap bucket first (the real ceiling,
 // immune to a spoofed conversationId), then the per-caller fairness bucket.
+// Sequential and short-circuiting on purpose: a request already rejected by
+// the global bucket must not also consume a slot from the per-caller bucket.
 async function checkPlacesRateLimits(
   conversationId: string | null,
   ip: string
-): Promise<RateLimitDenied | RateLimitOk> {
+): Promise<RateLimitCheck> {
   const globalCheck = await checkRateLimit(PLACES_GLOBAL_RATE_LIMIT_KEY, PLACES_GLOBAL_RATE_LIMIT);
   if (!globalCheck.allowed) {
     return { allowed: false, retryAfter: globalCheck.retryAfter };
   }
 
   const perCallerKey = buildPerCallerRateLimitKey(conversationId, ip);
-  const perCallerCheck = await checkRateLimit(perCallerKey, PLACES_RATE_LIMIT);
-  if (!perCallerCheck.allowed) {
-    return { allowed: false, retryAfter: perCallerCheck.retryAfter };
-  }
-
-  return { allowed: true };
+  return checkRateLimit(perCallerKey, PLACES_RATE_LIMIT);
 }
 
 function tooManyRequestsResponse(retryAfter?: number): NextResponse {
@@ -460,7 +455,7 @@ async function handlePost(request: Request): Promise<NextResponse> {
     );
   }
 
-  let body: unknown = undefined;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
@@ -468,11 +463,7 @@ async function handlePost(request: Request): Promise<NextResponse> {
     // rejects it with a 400 rather than leaking a JSON-parser error message.
   }
 
-  const bodyRecord =
-    body && typeof body === "object" && !Array.isArray(body)
-      ? (body as Record<string, unknown>)
-      : null;
-  const conversationId = extractConversationId(bodyRecord);
+  const conversationId = extractConversationId(body);
   const ip = getClientIp(request);
   const rateCheck = await checkPlacesRateLimits(conversationId, ip);
   if (!rateCheck.allowed) {
