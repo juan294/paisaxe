@@ -175,6 +175,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    // BE-H4 (#779): customer_phone was previously bounds-checked only — it
+    // skipped this format gate entirely, so a malformed number (e.g. a
+    // French visitor's "0033612345678") silently became a garbled-but-valid-
+    // looking +34 number via normalizePhoneNumber()'s catch-all branch below,
+    // and the booking confirmation SMS went nowhere or to an unrelated
+    // subscriber. Gate it the same way as phone_number, symmetrically.
+    if (!isValidSpanishPhone(customer_phone)) {
+      return NextResponse.json<MakeBookingResponse>(
+        {
+          success: false,
+          message:
+            "Invalid customer phone number. Please provide a valid Spanish phone number for the visitor.",
+          status: "failed",
+          fallback_action:
+            "Ask the visitor to confirm their phone number before retrying the booking.",
+        },
+        { status: 400 }
+      );
+    }
+
     // Check if ElevenLabs outbound calling is configured
     if (
       !process.env.ELEVENLABS_API_KEY ||
