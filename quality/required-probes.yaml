@@ -109,6 +109,23 @@ probes:
       Read-only in effect: the payload is rejected before any handler side
       effect.
 
+  - id: chat-smoke
+    title: Chat/RAG pipeline responds with retrieved sources
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required chat-smoke"
+    oracles: [http]
+    notes: >-
+      QA-H2 (#869): full rationale in scripts/release/chat-smoke.ts's module
+      docblock. Consumes real Anthropic + Voyage credits per run, so this
+      selector belongs solely to the release-required Playwright project,
+      never desktop/mobile (which build with dummy Anthropic/Voyage keys —
+      see playwright.config.ts webServer.env).
+
   - id: favorite-roundtrip
     title: Favorite create, datastore read-back, cleanup
     owner: release

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { requireReleaseTarget } from "../scripts/release/probe-guards";
+import { parseChatSmokeEvents, assertChatSmokeShape } from "../scripts/release/chat-smoke";
 
 /**
  * Release-required probes — deployed environment, READ-ONLY.
@@ -104,4 +105,29 @@ test("@release-required webhook-unsigned: webhook rejects an unsigned payload", 
   });
 
   expect([401, 403]).toContain(response.status());
+});
+
+// QA-H2 (#869): full rationale in scripts/release/chat-smoke.ts's module
+// docblock. Read-only: `/api/chat/stream` only reads and calls out to
+// Claude/Voyage, never writes. Assertions are on SHAPE only — see chat-smoke.ts.
+test("@release-required chat-smoke: chat/RAG pipeline responds with retrieved sources", async ({
+  request,
+}) => {
+  // BE-H1: a caller with no trusted Vercel IP header shares the tight
+  // "untrusted" bucket (3 req/60s, shared across every such caller). Setting
+  // our own x-vercel-forwarded-for value gives this probe its own bucket
+  // under the default per-IP limit (10 req/60s in src/lib/rate-limit.ts)
+  // instead of contending with, or exhausting, that shared bucket.
+  // 203.0.113.0/24 is reserved for documentation/testing (RFC 5737) and will
+  // never collide with a real visitor's IP.
+  const response = await request.post("/api/chat/stream", {
+    headers: { "x-vercel-forwarded-for": "203.0.113.42" },
+    data: { message: "¿Qué se puede ver en los Lagos de Covadonga?" },
+  });
+
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("text/event-stream");
+
+  const events = parseChatSmokeEvents(await response.text());
+  assertChatSmokeShape(events);
 });
