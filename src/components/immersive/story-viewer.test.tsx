@@ -147,7 +147,7 @@ const renderWithAuth = async (ui: ReactNode) => {
 
 // Mock next/image — captures blur placeholder props for verification
 vi.mock("next/image", () => ({
-  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL }: {
+  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL, sizes }: {
     src: string;
     alt: string;
     className?: string;
@@ -155,6 +155,7 @@ vi.mock("next/image", () => ({
     priority?: boolean;
     placeholder?: string;
     blurDataURL?: string;
+    sizes?: string;
   }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -165,6 +166,7 @@ vi.mock("next/image", () => ({
       data-priority={priority}
       data-placeholder={placeholder}
       data-blur-data-url={blurDataURL}
+      data-sizes={sizes}
     />
   ),
 }));
@@ -1401,6 +1403,28 @@ describe("StoryViewer", () => {
       const mainEl = screen.getByRole("main");
       expect(mainEl).not.toHaveAttribute("aria-hidden");
     });
+
+    // UX-H2 (#888): aria-hidden alone doesn't stop keyboard focus — everything
+    // inside stayed Tab-reachable while announced as non-existent to AT.
+    // `inert` additionally removes the subtree from the tab order and blocks
+    // pointer interaction.
+    it("UX-H2: should set inert on <main> when chatOpen is true", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: true })} />
+      );
+
+      const mainEl = screen.getByRole("main", { hidden: true });
+      expect(mainEl).toHaveAttribute("inert");
+    });
+
+    it("UX-H2: should NOT set inert on <main> when chatOpen is false", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: false })} />
+      );
+
+      const mainEl = screen.getByRole("main");
+      expect(mainEl).not.toHaveAttribute("inert");
+    });
   });
 
   describe("auto-play when chat is open", () => {
@@ -2285,45 +2309,74 @@ describe("StoryViewer", () => {
     });
   });
 
-  describe("PE-M4 (#615): adjacent image prefetch", () => {
-    it("renders preload links for the next and previous story images", async () => {
+  describe("PE-H1/FE-M3 (#804, #765): adjacent image preload matches next/image request", () => {
+    // A hand-built <link rel="preload" as="image" href={rawUrl}> pointed at
+    // the raw origin URL, while the real <Image> requests the optimizer URL —
+    // the two never coincided, so the preload warmed nothing and ~350KB of
+    // origin image bytes were wasted per navigation. Adjacent images are now
+    // rendered as hidden, `priority` next/image elements instead, so Next.js
+    // itself owns generating the (correct) preload for the exact URL it will
+    // reuse once that image becomes the current one.
+    it("does not render a hand-built preload link for adjacent images", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
       );
 
-      const preloads = Array.from(
-        document.querySelectorAll('link[rel="preload"][as="image"]')
-      ).map((l) => l.getAttribute("href"));
+      const manualPreloadLinks = document.querySelectorAll(
+        'link[rel="preload"][as="image"]'
+      );
+      expect(manualPreloadLinks.length).toBe(0);
+    });
+
+    it("renders the next and previous story images as hidden, priority next/image elements", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
+      );
 
       // currentIndex 1 → prev = story-1 (lagos), next = story-3 (sidra)
-      expect(preloads).toContain("/images/lagos.jpg");
-      expect(preloads).toContain("/images/sidra.jpg");
+      const lagosImg = document.querySelector(
+        'img[src="/images/lagos.jpg"][data-priority="true"]'
+      );
+      const sidraImg = document.querySelector(
+        'img[src="/images/sidra.jpg"][data-priority="true"]'
+      );
+
+      expect(lagosImg).not.toBeNull();
+      expect(sidraImg).not.toBeNull();
+      // `sizes` must match the real, visible <Image> (sizes="100vw") so
+      // next/image computes the identical optimizer URL/srcset that will
+      // actually be requested once this image becomes the current one.
+      expect(lagosImg).toHaveAttribute("data-sizes", "100vw");
+      expect(sidraImg).toHaveAttribute("data-sizes", "100vw");
     });
 
-    it("wraps around: prefetches next and previous images from index 0", async () => {
+    it("wraps around: renders preload images for next and previous from index 0", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
       );
-
-      const preloads = Array.from(
-        document.querySelectorAll('link[rel="preload"][as="image"]')
-      ).map((l) => l.getAttribute("href"));
 
       // currentIndex 0 → next = story-2 (cathedral), prev wraps to story-3 (sidra)
-      expect(preloads).toContain("/images/cathedral.jpg");
-      expect(preloads).toContain("/images/sidra.jpg");
+      const cathedralImg = document.querySelector(
+        'img[src="/images/cathedral.jpg"][data-priority="true"]'
+      );
+      const sidraImg = document.querySelector(
+        'img[src="/images/sidra.jpg"][data-priority="true"]'
+      );
+
+      expect(cathedralImg).not.toBeNull();
+      expect(sidraImg).not.toBeNull();
     });
 
-    it("does not preload the current story image", async () => {
+    it("does not render a duplicate preload image for the current story", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
       );
 
-      const preloads = Array.from(
-        document.querySelectorAll('link[rel="preload"][as="image"]')
-      ).map((l) => l.getAttribute("href"));
-
-      expect(preloads).not.toContain("/images/lagos.jpg");
+      // lagos.jpg (current, index 0) should appear exactly once — as the
+      // real, visible background <Image> — not a second time as a hidden
+      // preload copy.
+      const lagosImgs = document.querySelectorAll('img[src="/images/lagos.jpg"]');
+      expect(lagosImgs.length).toBe(1);
     });
   });
 
