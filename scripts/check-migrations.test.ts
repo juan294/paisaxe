@@ -189,6 +189,43 @@ describe("validateMigrations", () => {
     expect(result.errors).toEqual([]);
   });
 
+  it("tracks RLS posture across a table rename", () => {
+    const root = createMigrationFixture({
+      "001_create.sql": `
+        CREATE TABLE IF NOT EXISTS public.old_name (
+          id uuid PRIMARY KEY
+        );
+      `,
+      "002_rename_and_secure.sql": `
+        ALTER TABLE public.old_name RENAME TO new_name;
+        ALTER TABLE public.new_name ENABLE ROW LEVEL SECURITY;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it("fails when a renamed table still lacks RLS under its new name", () => {
+    const root = createMigrationFixture({
+      "001_create.sql": `
+        CREATE TABLE IF NOT EXISTS public.old_name (
+          id uuid PRIMARY KEY
+        );
+      `,
+      "002_rename.sql": `
+        ALTER TABLE public.old_name RENAME TO new_name;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toContain(
+      "Table public.new_name has no RLS enabled and no documented anon/authenticated revoke exception -- enable RLS or add explicit REVOKE ... FROM anon, authenticated with a comment explaining why"
+    );
+  });
+
   it("ignores tables that were dropped by a later migration", () => {
     const root = createMigrationFixture({
       "001_create.sql": `
