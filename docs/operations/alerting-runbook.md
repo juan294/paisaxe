@@ -8,7 +8,7 @@
 |---------|----------|-------|
 | PostHog Alerts | Error rate spikes, event anomalies | Juan Gonzalez |
 | Vercel email notifications | Build failures, deployment errors | Juan Gonzalez |
-| Sentry (if configured) | Unhandled exceptions, performance regressions | Juan Gonzalez |
+| Sentry (DSN configured; delivery unverified — see below) | Unhandled exceptions, performance regressions | Juan Gonzalez |
 | Manual monitoring | `/api/health` endpoint status | Juan Gonzalez |
 
 ## Escalation & On-Call SLO (accepted risk)
@@ -28,6 +28,35 @@ Paisaxe is operated by a **single developer** (Juan Gonzalez). There is **no on-
 **Escalation path:** All alert channels (PostHog, Vercel email, Sentry, manual `/api/health` checks) route to the single operator. There is no secondary contact. If the operator becomes unavailable for an extended period, the documented mitigation is to enable `maintenance_mode` (admin panel → Feature Flags → Behavior) to take the site to a safe holding state rather than leave it degraded.
 
 **Re-evaluation trigger:** revisit this risk acceptance (and consider wiring critical alerts to a paging service such as BetterStack email-to-PagerDuty) if any of the following hold: sustained traffic growth, handling of sensitive user data, a second operator joins, or recurring off-hours incidents are observed.
+
+---
+
+## Sentry Delivery Unverified (DO-B1)
+
+**Status as of 2026-08-18:** The Sentry project `the-creative-token/paisaxe` exists and
+`NEXT_PUBLIC_SENTRY_DSN` is configured, so `/api/health` correctly reports
+`sentry.status: "configured"`. That only confirms the SDK was initialized with a DSN — it
+does **not** confirm events are reaching the project. A 90-day dashboard query returned
+zero issues, including across the 2026-07-20 outage window, where a real production
+failure left no trace in Sentry. Treat "configured" and "verified delivering" as two
+different claims until this is checked.
+
+This means every procedure below that says "check Sentry" or relies on Sentry as a
+signal may currently be checking a dashboard that never receives events. Cross-check with
+PostHog `$exception` events and the Vercel function logs / log drain (see
+`docs/operations/logging.md`) until delivery is confirmed.
+
+**Verification procedure (human action required):**
+
+1. Run `npm run verify-sentry-delivery` with the same DSN production uses. It fires a
+   synthetic exception tagged `do_b1_sentry_delivery_check:true` and prints a unique
+   marker — see `scripts/verify-sentry-delivery.ts` for details.
+2. Open the Sentry dashboard for `the-creative-token/paisaxe` and confirm an issue with
+   that tag/marker actually arrives (usually within ~1 minute).
+3. If nothing arrives after a few minutes, the pipeline is broken — this is a real
+   observability gap, not a docs issue. File/reopen an issue and keep #821 open.
+4. Only once a human has completed steps 1–3 successfully should this section (and #821)
+   be considered resolved.
 
 ---
 
