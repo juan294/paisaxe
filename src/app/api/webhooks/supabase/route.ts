@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
+import { safeEqual } from "@/lib/safe-equal";
 
 interface WebhookPayload {
   table_name: string;
@@ -52,13 +52,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const secret = request.headers.get("x-webhook-secret");
     const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
 
-    // Use constant-time comparison to prevent timing attacks
-    if (
-      !secret ||
-      !expectedSecret ||
-      secret.length !== expectedSecret.length ||
-      !timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))
-    ) {
+    // Use constant-time comparison to prevent timing attacks.
+    // DO-H6: safeEqual compares byte length before timingSafeEqual.
+    if (!secret || !expectedSecret || !safeEqual(secret, expectedSecret)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

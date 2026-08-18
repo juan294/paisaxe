@@ -9,6 +9,13 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
+// BE-H1: the database-size probe now runs on the admin (service-role)
+// client, since migrations 091/092 revoked EXECUTE on get_database_size()
+// from anon/authenticated.
+vi.mock("@/lib/supabase-admin", () => ({
+  getAdminClient: vi.fn(),
+}));
+
 vi.mock("@/lib/rate-limit", () => ({
   getRateLimitBackendStatus: vi.fn(() => ({
     backend: "memory",
@@ -18,6 +25,7 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 import { supabase } from "@/lib/supabase";
+import { getAdminClient } from "@/lib/supabase-admin";
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 
 const mockFetch = vi.fn();
@@ -93,16 +101,22 @@ function mockStoryCount(count: number | null, error: { message: string } | null)
   });
 }
 
+/**
+ * BE-H1: routes the database-size probe's `.rpc()` call through the mocked
+ * admin client (getAdminClient()), not the anon `supabase` client.
+ */
+function mockDatabaseRpc(rpcReturnValue: unknown) {
+  const rpc = vi.fn().mockReturnValue(rpcReturnValue);
+  vi.mocked(getAdminClient).mockReturnValue({ rpc } as never);
+  return rpc;
+}
+
 function mockDatabaseSize(sizeBytes: number) {
-  vi.mocked(supabase.rpc).mockReturnValue(
-    resolved({ data: sizeBytes, error: null }) as never
-  );
+  mockDatabaseRpc(resolved({ data: sizeBytes, error: null }));
 }
 
 function mockDatabaseSizeError(message: string) {
-  vi.mocked(supabase.rpc).mockReturnValue(
-    resolved({ data: null, error: { message } }) as never
-  );
+  mockDatabaseRpc(resolved({ data: null, error: { message } }));
 }
 
 describe("GET /api/health", () => {
@@ -255,6 +269,98 @@ describe("GET /api/health", () => {
     expect(data.status).toBe("healthy");
   });
 
+  // BE-H1: checkDatabaseSize() must run on the admin (service-role) client —
+  // migrations 091/092 revoked EXECUTE on get_database_size() from
+  // anon/authenticated, so the anon client's call always failed and was
+  // silently swallowed into usage_percent: null, permanently disabling the
+  // 80%-storage alarm.
+  describe("BE-H1: database-size probe uses the admin client", () => {
+    it("calls the admin client's rpc(), never the anon client's rpc()", async () => {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+
+      await GET();
+
+      expect(getAdminClient).toHaveBeenCalled();
+      expect(supabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it("does NOT degrade in non-production when the probe errors (distinguishable from over-threshold)", async () => {
+      mockHealthySupabase();
+      mockDatabaseSizeError("permission denied for function get_database_size");
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
+    });
+
+    it("degrades in production when the probe errors — the failure is distinguishable, not a silently healthy null", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      mockHealthySupabase();
+      mockDatabaseSizeError("permission denied for function get_database_size");
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
+    });
+
+    it("degrades in production when the probe throws unexpectedly", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      mockHealthySupabase();
+      mockDatabaseRpc(abortable(Promise.reject(new Error("Unexpected DB error"))));
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
+    });
+
+    it("degrades in production when the probe hangs past its timeout", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      mockHealthySupabase();
+      mockDatabaseRpc(abortable(new Promise(() => {})));
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
+    }, 10000);
+
+    it("stays healthy in production when the probe succeeds under the threshold", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      // Isolate the database probe: satisfy the other production-only gates
+      // (Sentry DSN, rate-limit backend) so only checkDatabaseSize is under test.
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
+    });
+
+    it("does not expose usage_percent, probe_status, or any database field in the public response", async () => {
+      mockHealthySupabase();
+      mockDatabaseSizeError("permission denied for function get_database_size");
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(data).not.toHaveProperty("database");
+      expect(data).not.toHaveProperty("usage_percent");
+      expect(data).not.toHaveProperty("probe_status");
+      expect(JSON.stringify(data)).not.toContain("usage_percent");
+    });
+  });
+
   it("fails fast when the chunks probe hangs", async () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
@@ -343,7 +449,7 @@ describe("GET /api/health", () => {
 
   it("stays healthy when the database size probe hangs past its timeout", async () => {
     mockHealthySupabase();
-    vi.mocked(supabase.rpc).mockReturnValue(abortable(new Promise(() => {})) as never);
+    mockDatabaseRpc(abortable(new Promise(() => {})));
 
     const response = await GET();
     const data = await response.json();
@@ -355,7 +461,7 @@ describe("GET /api/health", () => {
 
   it("does not degrade when the database size probe throws unexpectedly", async () => {
     mockHealthySupabase();
-    vi.mocked(supabase.rpc).mockReturnValue(abortable(Promise.reject(new Error("Unexpected DB error"))) as never);
+    mockDatabaseRpc(abortable(Promise.reject(new Error("Unexpected DB error"))));
 
     const response = await GET();
     const data = await response.json();
@@ -765,6 +871,46 @@ describe("GET /api/health", () => {
 
       const data = await (await GET(authorizedRequest(""))).json();
 
+      expect(data).not.toHaveProperty("build");
+    });
+
+    // DO-H6: a multibyte Authorization header value (e.g. "€") is a single
+    // UTF-16 code unit but three UTF-8 bytes. The pre-fix code guarded
+    // timingSafeEqual with `provided.length !== expected.length` (UTF-16
+    // code units) — such a header could slip past that guard while its
+    // actual byte length still differed, crashing timingSafeEqual with an
+    // unhandled RangeError before the route's try block even opened.
+    //
+    // The Fetch `Headers` class enforces ByteString on values passed through
+    // its own constructor/set/append (so `new Request(url, { headers })`
+    // can't carry a raw multibyte JS string here), but that restriction is a
+    // property of constructing a `Headers` object — not of every code path
+    // that reads an incoming request's headers. Node's HTTP layer can still
+    // decode a client's raw UTF-8 header bytes into a JS string containing
+    // real multibyte characters before handing it to route code. This test
+    // reproduces that exact string shape via a minimal `Request`-shaped stub
+    // whose `headers.get()` returns it directly, exercising the real
+    // `GET()` handler and `isReleaseIdentityAuthorized()` code path.
+    it("DO-H6: does not crash (RangeError) on a multibyte Authorization header of the same UTF-16 length as the expected value, and withholds the identity", async () => {
+      const expected = "Bearer test-secret"; // matches the top-level `CRON_SECRET` stub
+      const multibyteSameLength = "€".repeat(expected.length);
+      expect(multibyteSameLength.length).toBe(expected.length);
+      expect(Buffer.from(multibyteSameLength).length).not.toBe(
+        Buffer.from(expected).length
+      );
+
+      const request = {
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === "authorization" ? multibyteSameLength : null,
+        },
+      } as unknown as Request;
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
       expect(data).not.toHaveProperty("build");
     });
 
