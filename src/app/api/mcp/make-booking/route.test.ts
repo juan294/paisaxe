@@ -257,6 +257,106 @@ describe("/api/mcp/make-booking", () => {
       expect(data.status).toBe("not_configured");
     });
 
+    // ─── BE-H4 (#779): customer_phone format validation ────────────────────
+    // customer_phone previously had bounds-only validation (9-20 chars at the
+    // Zod layer) and was NEVER passed to isValidSpanishPhone() — only
+    // phone_number (the venue) was. A malformed-but-in-bounds customer_phone
+    // (e.g. a French visitor's "0033612345678") silently became a garbled-
+    // but-valid-looking +34 number via normalizePhoneNumber()'s catch-all
+    // branch, so the booking confirmation SMS went nowhere or to an
+    // unrelated subscriber.
+    it("should return 400 for a malformed customer phone number that was previously silently normalized", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "0033612345678", // French number — 13 chars, passes the old bounds-only check
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Invalid customer phone number");
+      // Non-crashing, clear response — no stack trace leaked to the voice agent.
+      expect(data.message).not.toMatch(/at Object|at Module|\.ts:\d+/);
+      expect(typeof data.fallback_action).toBe("string");
+    });
+
+    it("should return 400 for a customer phone number with a non-Spanish mobile prefix", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "512345678", // starts with 5 — not a valid Spanish mobile/landline prefix
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.message).toContain("Invalid customer phone number");
+    });
+
+    it("should accept a legitimate Spanish customer phone number in national format", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Passes phone validation for both fields — falls through to the
+      // not_configured branch since ElevenLabs isn't set up in this test.
+      expect(data.status).toBe("not_configured");
+    });
+
+    it("should accept a legitimate Spanish customer phone number in international format", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34 612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(data.status).toBe("not_configured");
+    });
+
     it("should support MCP tool call format", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
