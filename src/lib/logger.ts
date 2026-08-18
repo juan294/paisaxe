@@ -12,6 +12,7 @@
  *   logger.error("[TABLE_FALLBACK]", { table: "chunks" });
  */
 
+import "server-only";
 import pino from "pino";
 import { getRequestId } from "./request-context";
 import { sanitizeLogMessage, sanitizeValue } from "./logger-sanitize";

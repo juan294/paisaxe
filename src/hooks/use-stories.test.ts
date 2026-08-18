@@ -3,6 +3,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import React from "react";
 import { useStories, clearStoriesCache, prefetchStories, StoriesProvider } from "./use-stories";
 import type { Story } from "@/types/immersive";
+import { stubStoriesApiFetch } from "@/test/mock-stories-api-fetch";
 
 const mockStories: Story[] = [
   {
@@ -40,9 +41,13 @@ const mockFallbackStories: Story[] = [
   },
 ];
 
+// FE-H1 (#759): use-stories.ts now fetches through /api/stories instead of
+// calling getStoriesFromDB directly. mockGetStoriesFromDB models the API
+// route's underlying data source; the global fetch mock below wraps it in
+// a Response-shaped `{ data: [...] }` envelope, exactly like the real route.
 const mockGetStoriesFromDB = vi.fn();
 
-vi.mock("@/lib/stories-data", () => ({
+vi.mock("@/lib/stories-fallback", () => ({
   FALLBACK_STORIES: [
     {
       id: "fallback-1",
@@ -55,8 +60,9 @@ vi.mock("@/lib/stories-data", () => ({
       sourcePdf: "fallback.pdf",
     },
   ],
-  getStoriesFromDB: (...args: unknown[]) => mockGetStoriesFromDB(...args),
 }));
+
+stubStoriesApiFetch(mockGetStoriesFromDB);
 
 // Mock localStorage
 const localStorageMock = (() => {

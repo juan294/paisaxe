@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
+import { stubStoriesApiFetch } from "@/test/mock-stories-api-fetch";
 
 const mockStories = [
   {
@@ -25,9 +26,13 @@ const mockStories = [
   },
 ];
 
+// FE-H1 (#759): use-stories.ts now fetches through /api/stories instead of
+// calling getStoriesFromDB directly. See use-stories.test.ts for the full
+// rationale — the global fetch mock wraps mockGetStoriesFromDB in the same
+// `{ data: [...] }` envelope the real route returns.
 const mockGetStoriesFromDB = vi.fn();
 
-vi.mock("@/lib/stories-data", () => ({
+vi.mock("@/lib/stories-fallback", () => ({
   FALLBACK_STORIES: [
     {
       id: "fallback-1",
@@ -40,8 +45,9 @@ vi.mock("@/lib/stories-data", () => ({
       sourcePdf: "fallback.pdf",
     },
   ],
-  getStoriesFromDB: (...args: unknown[]) => mockGetStoriesFromDB(...args),
 }));
+
+stubStoriesApiFetch(mockGetStoriesFromDB);
 
 // Mock localStorage
 const localStorageMock = (() => {
