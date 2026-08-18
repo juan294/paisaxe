@@ -1,7 +1,7 @@
-import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
+import { safeEqual } from "@/lib/safe-equal";
 import { translateWebhookSchema } from "@/lib/schemas";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { translateStory } from "@/lib/translate-story";
@@ -157,12 +157,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const secret = request.headers.get("x-webhook-secret");
     const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
 
-    if (
-      !secret ||
-      !expectedSecret ||
-      secret.length !== expectedSecret.length ||
-      !timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))
-    ) {
+    // DO-H6: safeEqual compares byte length before timingSafeEqual.
+    if (!secret || !expectedSecret || !safeEqual(secret, expectedSecret)) {
       logger.error("[TRANSLATE_WEBHOOK_UNAUTHORIZED]");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
