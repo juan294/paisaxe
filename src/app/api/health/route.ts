@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { supabase } from "@/lib/supabase";
+import { getAdminClient } from "@/lib/supabase-admin";
 import { getEnv } from "@/lib/env";
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 import { PROBE_TIMEOUTS_MS } from "@/lib/health-timeouts";
+import { safeEqual } from "@/lib/safe-equal";
 
 type HealthStatus = "healthy" | "degraded";
 type SentryStatus = "configured" | "unconfigured";
@@ -50,6 +51,13 @@ interface StoriesProbeResult {
 
 interface DatabaseProbeResult {
   usage_percent: number | null;
+  /**
+   * BE-H1: distinguishes "the probe genuinely has nothing to report" from
+   * "the RPC call itself failed" (permission error, timeout, or infra
+   * outage). Both map to `usage_percent: null`, but only "unavailable"
+   * should ever escalate `status` to degraded — see isDatabaseProbeUnavailableInProduction.
+   */
+  probe_status: "ok" | "unavailable";
 }
 
 function checkSentry(): SentryProbeResult {
@@ -90,12 +98,15 @@ function isReleaseIdentityAuthorized(request: Request | undefined): boolean {
   }
 
   const provided = request.headers.get("authorization");
-  const expected = `Bearer ${cronSecret}`;
-  if (!provided || provided.length !== expected.length) {
+  if (!provided) {
     return false;
   }
 
-  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+  // DO-H6: safeEqual compares byte length before timingSafeEqual, so
+  // multibyte Authorization header values can't trigger an unhandled
+  // RangeError ahead of the route's try block.
+  const expected = `Bearer ${cronSecret}`;
+  return safeEqual(provided, expected);
 }
 
 function shortenHash(value: string): string {
@@ -191,16 +202,25 @@ async function checkStories(): Promise<StoriesProbeResult> {
   );
 }
 
+/**
+ * BE-H1: migrations 091/092 revoked EXECUTE on get_database_size() from
+ * anon/authenticated, granting it only to service_role — the anon client
+ * used elsewhere on this route can never call this RPC. Uses the admin
+ * (service-role) client instead. The response shape is unaffected: this
+ * probe's result never appears in the public JSON body (see
+ * buildHealthResponse) — it only feeds the internal degraded/healthy
+ * decision, so switching clients does not expose any new data.
+ */
 async function checkDatabaseSize(): Promise<DatabaseProbeResult> {
   return withTimeout(
     async (signal): Promise<DatabaseProbeResult> => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await getAdminClient()
           .rpc("get_database_size")
           .abortSignal(signal);
 
         if (error) {
-          return { usage_percent: null };
+          return { usage_percent: null, probe_status: "unavailable" };
         }
 
         const sizeBytes = data as number;
@@ -208,13 +228,13 @@ async function checkDatabaseSize(): Promise<DatabaseProbeResult> {
         const usage_percent =
           Math.round((size_mb / getStorageLimitMb()) * 1000) / 10;
 
-        return { usage_percent };
+        return { usage_percent, probe_status: "ok" };
       } catch {
-        return { usage_percent: null };
+        return { usage_percent: null, probe_status: "unavailable" };
       }
     },
     PROBE_TIMEOUTS_MS.database,
-    (): DatabaseProbeResult => ({ usage_percent: null })
+    (): DatabaseProbeResult => ({ usage_percent: null, probe_status: "unavailable" })
   );
 }
 
@@ -296,9 +316,15 @@ export async function GET(
   const cronAuth = checkCronAuthConfigured();
   const sentryStatus = checkSentry();
   const rateLimitStatus = checkRateLimitBackend();
-  const includeBuildIdentity = isReleaseIdentityAuthorized(request);
+  // DO-H6: default fail-closed (never expose build identity). The real
+  // computation moves inside the try block below as defense in depth — if
+  // isReleaseIdentityAuthorized ever throws, the route still returns a
+  // well-formed degraded response instead of an unhandled 500.
+  let includeBuildIdentity = false;
 
   try {
+    includeBuildIdentity = isReleaseIdentityAuthorized(request);
+
     const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
       checkSupabase(),
       checkStories(),
@@ -310,6 +336,13 @@ export async function GET(
     const isDatabaseOverThreshold =
       databaseStatus.usage_percent !== null &&
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
+    /**
+     * BE-H1: only escalate to degraded in production. Local/CI/preview
+     * environments commonly lack SUPABASE_SERVICE_ROLE_KEY, which would
+     * otherwise make every non-production health check falsely degraded.
+     */
+    const isDatabaseProbeUnavailableInProduction =
+      isProductionEnv() && databaseStatus.probe_status === "unavailable";
     const isSentryMissingInDeployedEnv =
       isSentryRequired() && sentryStatus.status !== "configured";
     const isRateLimitDegradedInRequiredEnv =
@@ -327,6 +360,7 @@ export async function GET(
       isSupabaseError ||
       isStoriesFallback ||
       isDatabaseOverThreshold ||
+      isDatabaseProbeUnavailableInProduction ||
       isSentryMissingInDeployedEnv ||
       isRateLimitDegradedInRequiredEnv ||
       isCronAuthMisconfiguredInProduction

@@ -1,4 +1,5 @@
-import { randomBytes, timingSafeEqual } from "crypto";
+import { randomBytes } from "crypto";
+import { safeEqual } from "@/lib/safe-equal";
 
 export const CSRF_COOKIE_NAME = "__csrf";
 export const CSRF_HEADER_NAME = "x-csrf-token";
@@ -136,10 +137,8 @@ export function validateCsrfToken(request: Request): boolean {
   const cookieToken = parseCookieValue(cookieHeader, CSRF_COOKIE_NAME);
 
   if (!headerToken || !cookieToken) return false;
-  if (headerToken.length !== cookieToken.length) return false;
 
-  return timingSafeEqual(
-    Buffer.from(headerToken),
-    Buffer.from(cookieToken)
-  );
+  // DO-H6: safeEqual compares byte length before timingSafeEqual, so
+  // multibyte tokens can't trigger an unhandled RangeError.
+  return safeEqual(headerToken, cookieToken);
 }
