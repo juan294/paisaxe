@@ -345,6 +345,7 @@ export function StoryViewer({
         onAskAbout={onAskAbout}
         onToggleInfo={toggleInfo}
         ast={ast}
+        locale={locale}
         isEnabled={isEnabled}
         questionPrompts={questionPrompts}
         requiresAuth={requiresAuth}
