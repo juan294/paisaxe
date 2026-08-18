@@ -28,6 +28,24 @@ const root = process.cwd();
 
 export const LOCAL_PRELAUNCH_STEPS: readonly GateStep[] = [
   {
+    // QA-M3 (#874): typecheck, lint, and the unit suite are the cheapest
+    // steps in this gate — they must run first so a fast, local failure
+    // surfaces before the gate burns time on the ~4-minute build or the
+    // browser E2E suite. Previously this gate did not run them at all,
+    // so `npm run prelaunch` could pass with broken types, lint errors,
+    // or failing unit tests that were never checked.
+    name: "typecheck",
+    command: ["npm", "run", "typecheck"],
+  },
+  {
+    name: "lint",
+    command: ["npm", "run", "lint"],
+  },
+  {
+    name: "unit test suite",
+    command: ["npm", "run", "test"],
+  },
+  {
     name: "verification coverage",
     command: ["npm", "run", "check-verification-coverage"],
   },
