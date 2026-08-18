@@ -35,7 +35,7 @@ Paisaxe is operated by a **single developer** (Juan Gonzalez). There is **no on-
 
 **Trigger:** `GET https://paisaxe.es/api/health` returns `status != "healthy"` in the JSON body (the endpoint always returns HTTP 200; degraded state is signalled via the body only).
 
-**Automated monitor:** CI uses `node scripts/check-health-readiness.mjs <base-url>` to parse `/api/health` and fail on any non-healthy body. The required `Smoke test Vercel preview` gate adds `--require-sentry`, so missing Sentry configuration is treated as release-blocking even though `/api/health/live` still returns liveness.
+**Automated monitor:** CI uses `node scripts/check-health-readiness.mjs <base-url>` to parse `/api/health` and fail on any non-healthy body. The required `Smoke test Vercel preview` gate does **not** currently pass `--require-sentry` — missing Sentry configuration is not release-blocking today. `sentry.status: "configured"` (see DO-B1) only proves `NEXT_PUBLIC_SENTRY_DSN` is non-empty, not that error delivery actually works, and the Preview environment does not carry that DSN — hard-gating on it now would fail every release PR. `/api/health/live` still returns liveness regardless.
 
 **Steps:**
 
