@@ -96,8 +96,10 @@ Before any migration that contains a `DROP TABLE`, `DROP COLUMN`, `TRUNCATE`, or
 - [ ] **Health endpoint verified after migration?**
 
   ```bash
-  curl -s https://paisaxe.es/api/health | jq
-  # Expected: "status": "healthy", supabase: "connected"
+  curl -s https://paisaxe.es/api/health | jq '.status'
+  # Expected: "healthy"
+  # Note: no separate `supabase` field exists (removed in SE-M1's response
+  # minimization) — connectivity failures roll up into top-level `status`.
   ```
 
 ---
@@ -174,9 +176,13 @@ column, table, or function that doesn't exist yet.
 ```
 1. Apply migration to production Supabase:
      supabase db push
-2. Verify schema change is live:
-     curl -s https://paisaxe.es/api/health | jq '.supabase'
-     # Must return "connected" — not "error"
+2. Verify the migration is recorded as applied on the remote database:
+     supabase migration list
+     # Confirms the migration's timestamp appears in both the Local and Remote
+     # columns — i.e. it actually landed, not just ran locally without error.
+     # (No generic `supabase` field exists on /api/health to check here —
+     # removed in SE-M1's response minimization — so this must be a real
+     # schema/CLI check, not a health-endpoint proxy.)
 3. Verify the specific object exists (for new tables/columns):
      # Example: new column on chunks
      SELECT column_name FROM information_schema.columns
@@ -190,7 +196,7 @@ When any PR being released includes a migration AND code that depends on that mi
 add these items to the pre-merge checklist in the PR description:
 
 - [ ] Migration applied to production: `supabase db push`
-- [ ] `/api/health` returns `"supabase": "connected"` after migration
+- [ ] `supabase migration list` shows the migration in both the Local and Remote columns
 - [ ] Schema object confirmed live (query or Supabase dashboard verification)
 - [ ] Code-side PR merges to `main` **after** all three items above are checked
 
