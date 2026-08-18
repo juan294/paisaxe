@@ -52,7 +52,7 @@ vi.mock("@/lib/stories-data", () => ({
   }),
 }));
 
-import Image, { alt, size, contentType, runtime } from "./opengraph-image";
+import Image, { alt, size, contentType } from "./opengraph-image";
 import * as ogModule from "./opengraph-image";
 
 describe("story opengraph-image", () => {
@@ -67,10 +67,6 @@ describe("story opengraph-image", () => {
 
   it("exports image/png content type", () => {
     expect(contentType).toBe("image/png");
-  });
-
-  it("exports edge runtime", () => {
-    expect(runtime).toBe("edge");
   });
 
   it("default export is a function", () => {
