@@ -1,20 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { createElement } from "react";
+import { render, renderHook, act } from "@testing-library/react";
 import { useReducedMotion } from "./use-reduced-motion";
-
-// Capture useState initializers so we can test the SSR guard (line 14).
-// vi.mock hoists above imports, so this wraps every useState call in the test file.
-const capturedInitializers: Array<(() => boolean) | boolean> = [];
-vi.mock("react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react")>();
-  return {
-    ...actual,
-    useState: (initializer: (() => boolean) | boolean) => {
-      capturedInitializers.push(initializer);
-      return actual.useState(initializer);
-    },
-  };
-});
 
 describe("useReducedMotion", () => {
   let matchMediaMock: {
@@ -24,8 +11,6 @@ describe("useReducedMotion", () => {
   };
 
   beforeEach(() => {
-    capturedInitializers.length = 0;
-
     matchMediaMock = {
       matches: false,
       addEventListener: vi.fn(),
@@ -101,26 +86,26 @@ describe("useReducedMotion", () => {
     expect(result.current).toBe(true);
   });
 
-  it("should return false from useState initializer when window is undefined (SSR guard)", () => {
-    // Render the hook so our mocked useState captures the initializer function
-    renderHook(() => useReducedMotion());
+  it("returns false on the client's very first render, matching the SSR value, even when prefers-reduced-motion already matches (FE-M6 hydration parity)", () => {
+    // Simulate a reduced-motion visitor: matchMedia already reports `true`
+    // on the client before the component ever mounts.
+    matchMediaMock.matches = true;
 
-    // The first captured initializer is from our hook's useState call
-    const initializer = capturedInitializers[0];
-    expect(typeof initializer).toBe("function");
-
-    // Temporarily remove window to simulate SSR environment
-    const originalWindow = globalThis.window;
-    // @ts-expect-error -- intentionally deleting window to simulate SSR
-    delete globalThis.window;
-
-    try {
-      // Call the initializer without window — exercises the SSR guard (line 14)
-      const result = (initializer as () => boolean)();
-      expect(result).toBe(false);
-    } finally {
-      // Always restore window for subsequent tests
-      globalThis.window = originalWindow;
+    const renderedValues: boolean[] = [];
+    function Probe() {
+      const value = useReducedMotion();
+      renderedValues.push(value);
+      return null;
     }
+
+    render(createElement(Probe));
+
+    // The server always renders `false` (no window). The hook's first
+    // client render must return the same value, or React discards the
+    // server-rendered markup for this subtree (hydration mismatch).
+    expect(renderedValues[0]).toBe(false);
+
+    // The effect then corrects state to the real media query value.
+    expect(renderedValues[renderedValues.length - 1]).toBe(true);
   });
 });
