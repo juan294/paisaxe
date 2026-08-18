@@ -22,7 +22,21 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return canonicalRedirect;
   }
 
-  // 1. Check maintenance mode (applies to all routes)
+  // 1. Redirect root path to /immersive. Checked ahead of the
+  //    maintenance-mode lookup (PE-H2, #805): a redirect response renders
+  //    nothing itself, so evaluating maintenance status for / before
+  //    redirecting was a wasted Supabase round-trip (60-330ms) on every
+  //    first-time visit — the browser's follow-up request to /immersive
+  //    goes through this proxy again and is gated by the maintenance check
+  //    below like any other route (/immersive is intentionally NOT in
+  //    MAINTENANCE_BYPASS_PREFIXES; see lib/proxy/maintenance.ts, DO-H3).
+  const rootRedirect = handleRootRedirect(request);
+  if (rootRedirect) {
+    rootRedirect.headers.set("X-Request-ID", requestId);
+    return rootRedirect;
+  }
+
+  // 2. Check maintenance mode (applies to all other routes)
   // Note: /story/:slug is a real rendered App Router page (see src/app/story/[slug]/page.tsx,
   // FE-H2 / #760) — it is NOT special-cased here, so it is subject to maintenance mode like
   // any other visitor route.
@@ -30,13 +44,6 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (maintenanceResponse) {
     maintenanceResponse.headers.set("X-Request-ID", requestId);
     return maintenanceResponse;
-  }
-
-  // 2. Redirect root path to /immersive
-  const rootRedirect = handleRootRedirect(request);
-  if (rootRedirect) {
-    rootRedirect.headers.set("X-Request-ID", requestId);
-    return rootRedirect;
   }
 
   // 3. Handle CORS preflight for API routes
