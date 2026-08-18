@@ -12,7 +12,7 @@ const CONTEXTUALIZED_MODEL = "voyage-3.5";
 const EMBEDDING_DIMENSIONS = 512;
 const MAX_BATCH_SIZE = 128;
 
-const embeddingCache = new EmbeddingCache();
+const embeddingCache = new EmbeddingCache(EMBEDDING_MODEL, EMBEDDING_DIMENSIONS);
 
 interface BatchEmbeddingResult {
   embeddings: number[][];
