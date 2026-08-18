@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+
+import { isMain } from "./lib/is-main";
 
 type PackageJson = {
   scripts: Record<string, string>;
@@ -120,11 +121,7 @@ export async function runPrelaunchGate(
   console.log(`Run npm run ${LIVE_GATE_SCRIPT} separately when live QA credentials are available.`);
 }
 
-function isMain(): boolean {
-  return process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
-}
-
-if (isMain()) {
+if (isMain(import.meta.url)) {
   runPrelaunchGate().catch((error) => {
     console.error("[prelaunch-gate] Failed:", error);
     process.exit(1);
