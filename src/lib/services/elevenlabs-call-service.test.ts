@@ -76,6 +76,42 @@ describe("elevenlabs-call-service.initiateCall", () => {
     });
   });
 
+  // BE-H2: the pending_bookings row id is persisted (claimed) before this call
+  // is placed. Sending it as an extra dynamic variable means ElevenLabs echoes
+  // it back in the post_call_transcription webhook even when our own fetch to
+  // ElevenLabs times out and we never learn the conversation_id — giving the
+  // webhook handler an unambiguous (primary-key) fallback correlation key.
+  it("BE-H2: includes booking_id as an extra dynamic variable when provided", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ conversation_id: "conv_with_booking_id" }),
+    });
+
+    await initiateCall("+34985887797", {
+      ...baseRequest,
+      booking_id: "pending-row-abc-123",
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.conversation_initiation_client_data.dynamic_variables.booking_id).toBe(
+      "pending-row-abc-123"
+    );
+  });
+
+  it("omits booking_id from dynamic variables when not provided (unchanged shape)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ conversation_id: "conv_no_booking_id" }),
+    });
+
+    await initiateCall("+34985887797", baseRequest);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(
+      "booking_id" in body.conversation_initiation_client_data.dynamic_variables
+    ).toBe(false);
+  });
+
   it("defaults special_requests to 'ninguna' when omitted", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

@@ -424,6 +424,181 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.ignored).toBe(true);
   });
 
+  // BE-H2: a call that timed out on our side before ElevenLabs responded
+  // never got its conversation_id persisted, so the primary lookup above
+  // finds nothing even though the call may have gone through. We sent our
+  // own pending_bookings.id as an extra `booking_id` dynamic variable when
+  // placing the call specifically so it comes back in
+  // conversation_initiation_client_data.dynamic_variables here — an
+  // unambiguous (primary-key) fallback correlation key.
+  describe("BE-H2: orphaned-booking fallback reconciliation via booking_id", () => {
+    const orphanedBooking = {
+      ...mockBooking,
+      id: "orphaned-booking-id",
+      conversation_id: null,
+      status: "orphaned",
+    };
+
+    it("reconciles via the booking_id dynamic variable when the primary conversation_id lookup finds nothing", async () => {
+      mockSelect
+        .mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        })
+        .mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: orphanedBooking, error: null }),
+          }),
+        });
+
+      const request = createSignedRequest({
+        conversation_id: "conv_late_arriving",
+        conversation_initiation_client_data: {
+          dynamic_variables: { booking_id: "orphaned-booking-id" },
+        },
+        transcript: buildTranscript(
+          { role: "agent", message: "Hola, llamo para reservar." },
+          { role: "user", message: "Perfecto, le esperamos." }
+        ),
+        analysis: { call_successful: "success" },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.ignored).toBeUndefined();
+      expect(data.bookingId).toBe("orphaned-booking-id");
+      expect(data.outcome).toBe("confirmed");
+      // The idempotent RPC runs against the resolved booking's id, same as
+      // the direct-match path.
+      expect(mockRpc).toHaveBeenCalledWith(
+        "process_elevenlabs_event_idempotent",
+        expect.objectContaining({ p_booking_id: "orphaned-booking-id" })
+      );
+      // Best-effort: link the conversation_id onto the row for future lookups.
+      expect(mockUpdate).toHaveBeenCalledWith({
+        conversation_id: "conv_late_arriving",
+      });
+    });
+
+    it("also checks the data-wrapped conversation_initiation_client_data location", async () => {
+      mockSelect
+        .mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        })
+        .mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: orphanedBooking, error: null }),
+          }),
+        });
+
+      const request = createSignedRequest({
+        conversation_id: "conv_data_wrapped",
+        data: {
+          conversation_initiation_client_data: {
+            dynamic_variables: { booking_id: "orphaned-booking-id" },
+          },
+          transcript: [],
+          analysis: { call_successful: "success" },
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.bookingId).toBe("orphaned-booking-id");
+    });
+
+    // Guards the uniqueness invariant: a booking_id hint must never let this
+    // webhook event resolve a row that isn't actually reconcilable, even if
+    // an attacker or a stale retry supplies a valid-looking id.
+    it("ignores the booking_id hint when the matched row is not in an orphaned/initiating state", async () => {
+      mockSelect
+        .mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        })
+        .mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { ...orphanedBooking, status: "confirmed" },
+              error: null,
+            }),
+          }),
+        });
+
+      const request = createSignedRequest({
+        conversation_id: "conv_already_resolved",
+        conversation_initiation_client_data: {
+          dynamic_variables: { booking_id: "orphaned-booking-id" },
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.ignored).toBe(true);
+    });
+
+    // Guards the uniqueness invariant: never repoint a row that already has a
+    // conversation_id — that would risk two different conversations claiming
+    // the same booking row.
+    it("ignores the booking_id hint when the matched row already has a conversation_id", async () => {
+      mockSelect
+        .mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        })
+        .mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { ...orphanedBooking, conversation_id: "conv_other" },
+              error: null,
+            }),
+          }),
+        });
+
+      const request = createSignedRequest({
+        conversation_id: "conv_already_linked",
+        conversation_initiation_client_data: {
+          dynamic_variables: { booking_id: "orphaned-booking-id" },
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.ignored).toBe(true);
+    });
+
+    it("does not attempt a fallback lookup when no booking_id dynamic variable is present", async () => {
+      mockSelect.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      });
+
+      const request = createSignedRequest({ conversation_id: "unknown_conv_no_hint" });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.ignored).toBe(true);
+      // Only the primary lookup ran — no second .select() for a fallback attempt.
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("should return duplicate without sending SMS when the event was already processed", async () => {
     mockRpc.mockImplementation((fn: string) => {
       if (fn === "process_elevenlabs_event_idempotent") {

@@ -237,4 +237,39 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — fail-stale-bookings", () => {
       })
     );
   });
+
+  // BE-H2: stale 'initiating' rows now move to 'orphaned' (see
+  // fail_stale_initiating_bookings in migration 102), not the terminal
+  // 'failed' — this must alert (ERROR, not WARN) so ops actually notice
+  // instead of the row silently vanishing into "failed".
+  it("BE-H2: emits [CRON_ORPHAN_STALE_BOOKINGS] at ERROR level when rows were orphaned", async () => {
+    mockRpc.mockResolvedValue({ data: 2, error: null });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-bookings", {
+      method: "GET",
+    });
+
+    const response = await GET(request);
+    expect(response.status).toBe(200);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CRON_ORPHAN_STALE_BOOKINGS]",
+      expect.objectContaining({ orphaned_count: 2 })
+    );
+  });
+
+  it("does not emit [CRON_ORPHAN_STALE_BOOKINGS] when no rows were orphaned", async () => {
+    mockRpc.mockResolvedValue({ data: 0, error: null });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-bookings", {
+      method: "GET",
+    });
+
+    await GET(request);
+
+    expect(logger.error).not.toHaveBeenCalledWith(
+      "[CRON_ORPHAN_STALE_BOOKINGS]",
+      expect.anything()
+    );
+  });
 });
