@@ -136,7 +136,9 @@ describe("CheckoutPage", () => {
       });
       fireEvent.click(button);
 
-      expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing/checkout");
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing/checkout?tier=day_pass"
+      );
     });
 
     it("should preserve returnTo in Google sign-in redirect", () => {
@@ -148,8 +150,57 @@ describe("CheckoutPage", () => {
       }));
 
       expect(mockSignInWithGoogle).toHaveBeenCalledWith(
-        "/pricing/checkout?returnTo=oviedo-walking-tour"
+        "/pricing/checkout?returnTo=oviedo-walking-tour&tier=day_pass"
       );
+    });
+
+    describe("UX-H4 (#890): selected tier survives the sign-in round trip", () => {
+      it("preserves a non-default tier in the sign-in redirect URL", () => {
+        mockSearchParams.set("tier", "monthly_pass");
+        render(<CheckoutPage />);
+
+        fireEvent.click(
+          screen.getByRole("button", { name: "auth.continue_with_google" })
+        );
+
+        expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+          "/pricing/checkout?tier=monthly_pass"
+        );
+
+        mockSearchParams.delete("tier");
+      });
+
+      it("preserves both returnTo and a non-default tier together", () => {
+        mockSearchParams.set("returnTo", "oviedo-walking-tour");
+        mockSearchParams.set("tier", "weekly_pass");
+        render(<CheckoutPage />);
+
+        fireEvent.click(
+          screen.getByRole("button", { name: "auth.continue_with_google" })
+        );
+
+        expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+          "/pricing/checkout?returnTo=oviedo-walking-tour&tier=weekly_pass"
+        );
+
+        mockSearchParams.delete("returnTo");
+        mockSearchParams.delete("tier");
+      });
+
+      it("falls back to day_pass in the redirect URL when tier is missing/invalid", () => {
+        mockSearchParams.set("tier", "not-a-real-tier");
+        render(<CheckoutPage />);
+
+        fireEvent.click(
+          screen.getByRole("button", { name: "auth.continue_with_google" })
+        );
+
+        expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+          "/pricing/checkout?tier=day_pass"
+        );
+
+        mockSearchParams.delete("tier");
+      });
     });
 
     it("should not render Stripe checkout when unauthenticated", () => {
@@ -456,7 +507,7 @@ describe("CheckoutPage", () => {
       fireEvent.click(button);
 
       expect(mockSignInWithGoogle).toHaveBeenCalledWith(
-        "/pricing/checkout?returnTo=oviedo-walking-tour"
+        "/pricing/checkout?returnTo=oviedo-walking-tour&tier=day_pass"
       );
 
       mockSearchParams.delete("returnTo");

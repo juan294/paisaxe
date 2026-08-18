@@ -8,7 +8,7 @@ import PricingLoading from "./loading";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
-import { PRICING_TIERS, type PricingTier, type PricingTierId } from "@/lib/pricing";
+import { PRICING_TIERS, buildCheckoutUrl, type PricingTier, type PricingTierId } from "@/lib/pricing";
 
 /**
  * Resolve the human-readable duration for a pricing tier, translated via
@@ -18,6 +18,11 @@ import { PRICING_TIERS, type PricingTier, type PricingTierId } from "@/lib/prici
 function resolveTierDuration(t: (key: string) => string, tier: PricingTier): string {
   const translated = t(tier.durationKey);
   return translated === tier.durationKey ? tier.fallbackLabel : translated;
+}
+
+/** UX-H4 (#890): allowlist check for a `tier` query param — never a passthrough. */
+function isValidTierId(value: string | null): value is PricingTierId {
+  return PRICING_TIERS.some((tier) => tier.id === value);
 }
 
 export default function PricingPage() {
@@ -36,13 +41,15 @@ function PricingPageContent() {
   const router = useRouter();
   const returnTo = searchParams.get("returnTo");
   const isResolvingAuthenticatedAccess = isLoading && !!user && !!session;
-  const encodedReturnTo = returnTo ? encodeURIComponent(returnTo) : null;
-  const pricingUrl = encodedReturnTo
-    ? `/pricing?returnTo=${encodedReturnTo}`
-    : "/pricing";
 
-  // #137: selected pass tier — defaults to the Day Pass.
-  const [selectedTier, setSelectedTier] = useState<PricingTierId>("day_pass");
+  // #137: selected pass tier — defaults to the Day Pass. UX-H4 (#890): seeded
+  // from the `tier` query param so a sign-in round trip (which lands back on
+  // this same route via signInWithGoogle's redirect) doesn't silently reset
+  // the user's choice back to the Day Pass.
+  const tierParam = searchParams.get("tier");
+  const [selectedTier, setSelectedTier] = useState<PricingTierId>(
+    isValidTierId(tierParam) ? tierParam : "day_pass"
+  );
   const selectedTierData =
     PRICING_TIERS.find((tier) => tier.id === selectedTier) ?? PRICING_TIERS[0];
   // UX-B1 (#886): the section label, feature bullet, and FAQ answer must
@@ -51,10 +58,14 @@ function PricingPageContent() {
   const selectedTierDuration = resolveTierDuration(t, selectedTierData);
   const voicePassLabel = t("premium.voice_pass_label").replace("{duration}", selectedTierDuration);
 
-  const checkoutParams = new URLSearchParams();
-  if (returnTo) checkoutParams.set("returnTo", returnTo);
-  checkoutParams.set("tier", selectedTier);
-  const checkoutUrl = `/pricing/checkout?${checkoutParams.toString()}`;
+  // UX-H4 (#890): carry both `returnTo` and the selected `tier` through the
+  // sign-in redirect so the tier survives the OAuth round trip back to /pricing.
+  const pricingParams = new URLSearchParams();
+  if (returnTo) pricingParams.set("returnTo", returnTo);
+  pricingParams.set("tier", selectedTier);
+  const pricingUrl = `/pricing?${pricingParams.toString()}`;
+
+  const checkoutUrl = buildCheckoutUrl(selectedTier, returnTo ?? undefined);
 
   const handlePurchase = () => {
     if (!user || !session) {
