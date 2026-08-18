@@ -178,6 +178,75 @@ function checkSensitiveTablePosture(sql: string): string[] {
   return errors;
 }
 
+interface PublicTableRlsTracker {
+  exists: boolean;
+  rlsEnabled: boolean;
+  revokedFromAnon: boolean;
+  revokedFromAuthenticated: boolean;
+}
+
+const CREATE_TABLE_RE = /create\s+table(?:\s+if\s+not\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)/g;
+const DROP_TABLE_RE = /drop\s+table(?:\s+if\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)/g;
+const RLS_TOGGLE_RE =
+  /alter\s+table\s+(?:public\.)?([a-z_][a-z0-9_]*)\s+(enable|disable)\s+row\s+level\s+security/g;
+const REVOKE_ROLES_RE =
+  /revoke\s+(?:all(?:\s+privileges)?|select)\s+on(?:\s+table)?\s+(?:public\.)?([a-z_][a-z0-9_]*)\s+from\s+([^;]+);/g;
+
+// Tables whose RLS is deliberately disabled must document the exception with an
+// explicit REVOKE from both anon and authenticated (see migration 076's
+// admin_audit_log pattern) -- this is the only tolerated alternative to RLS.
+function checkPublicTableRlsPosture(migrations: MigrationFile[]): string[] {
+  const tables = new Map<string, PublicTableRlsTracker>();
+
+  const getTracker = (name: string): PublicTableRlsTracker => {
+    let tracker = tables.get(name);
+    if (!tracker) {
+      tracker = { exists: false, rlsEnabled: false, revokedFromAnon: false, revokedFromAuthenticated: false };
+      tables.set(name, tracker);
+    }
+    return tracker;
+  };
+
+  for (const migration of migrations) {
+    const sql = normalizeSql(readFileSync(migration.path, "utf8"));
+
+    for (const match of sql.matchAll(CREATE_TABLE_RE)) {
+      getTracker(match[1]).exists = true;
+    }
+
+    for (const match of sql.matchAll(DROP_TABLE_RE)) {
+      const tracker = tables.get(match[1]);
+      if (tracker) tracker.exists = false;
+    }
+
+    for (const match of sql.matchAll(RLS_TOGGLE_RE)) {
+      const tracker = tables.get(match[1]);
+      if (tracker) tracker.rlsEnabled = match[2] === "enable";
+    }
+
+    for (const match of sql.matchAll(REVOKE_ROLES_RE)) {
+      const tracker = tables.get(match[1]);
+      if (!tracker) continue;
+      const roles = match[2].split(",").map((role) => role.trim());
+      if (roles.includes("anon")) tracker.revokedFromAnon = true;
+      if (roles.includes("authenticated")) tracker.revokedFromAuthenticated = true;
+    }
+  }
+
+  const errors: string[] = [];
+  for (const [name, tracker] of tables) {
+    if (!tracker.exists || tracker.rlsEnabled) continue;
+    if (tracker.revokedFromAnon && tracker.revokedFromAuthenticated) continue;
+
+    errors.push(
+      `Table public.${name} has no RLS enabled and no documented anon/authenticated revoke exception -- ` +
+        "enable RLS or add explicit REVOKE ... FROM anon, authenticated with a comment explaining why"
+    );
+  }
+
+  return errors;
+}
+
 function checkMarketingCredentialShape(sql: string): string[] {
   const marketingAccountsCreated = hasPattern(
     sql,
@@ -274,6 +343,7 @@ export function validateMigrations(
   errors.push(...checkForDuplicates(migrations));
   errors.push(...checkForUnexpectedGaps(migrations));
   errors.push(...checkSensitiveTablePosture(migrationSql));
+  errors.push(...checkPublicTableRlsPosture(migrations));
   errors.push(...checkMarketingCredentialShape(migrationSql));
   errors.push(...checkTranslationFunctionSearchPaths(migrations));
   errors.push(...checkCompleteBookingSmsJobSignatureReferences(migrations));

@@ -130,6 +130,83 @@ describe("validateMigrations", () => {
     expect(result.errors).toEqual([]);
   });
 
+  it("fails when a public table is created without RLS and no revoke exception", () => {
+    const root = createMigrationFixture({
+      "001_no_rls_table.sql": `
+        CREATE TABLE IF NOT EXISTS public.newsletter_signups (
+          id uuid PRIMARY KEY,
+          email text NOT NULL
+        );
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toContain(
+      "Table public.newsletter_signups has no RLS enabled and no documented anon/authenticated revoke exception -- enable RLS or add explicit REVOKE ... FROM anon, authenticated with a comment explaining why"
+    );
+  });
+
+  it("passes when a public table enables RLS", () => {
+    const root = createMigrationFixture({
+      "001_rls_table.sql": `
+        CREATE TABLE IF NOT EXISTS public.newsletter_signups (
+          id uuid PRIMARY KEY,
+          email text NOT NULL
+        );
+
+        ALTER TABLE public.newsletter_signups ENABLE ROW LEVEL SECURITY;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).not.toContain(
+      "Table public.newsletter_signups has no RLS enabled and no documented anon/authenticated revoke exception -- enable RLS or add explicit REVOKE ... FROM anon, authenticated with a comment explaining why"
+    );
+  });
+
+  it("passes when a public table without RLS has an explicit documented revoke exception (admin_audit_log pattern)", () => {
+    const root = createMigrationFixture({
+      "001_audit_log.sql": `
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+          id uuid PRIMARY KEY,
+          action text NOT NULL
+        );
+
+        -- Only admins (service role) should access this table.
+        -- Disable RLS so service-key client can write freely; the table itself is not
+        -- exposed to the anon or authenticated roles.
+        ALTER TABLE admin_audit_log DISABLE ROW LEVEL SECURITY;
+
+        -- Ensure authenticated/anon roles cannot select from this table.
+        REVOKE ALL ON admin_audit_log FROM anon, authenticated;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it("ignores tables that were dropped by a later migration", () => {
+    const root = createMigrationFixture({
+      "001_create.sql": `
+        CREATE TABLE IF NOT EXISTS public.analytics_events (
+          id uuid PRIMARY KEY
+        );
+        ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
+      `,
+      "002_drop.sql": `
+        DROP TABLE IF EXISTS public.analytics_events CASCADE;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toEqual([]);
+  });
+
   it("keeps the Stripe webhook route aligned with the stripe_webhook_events schema", () => {
     const schema = readFileSync(
       "supabase/migrations/077_stripe_webhook_events.sql",
