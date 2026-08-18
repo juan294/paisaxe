@@ -168,23 +168,49 @@ CURRENT_PHASE="server startup"
 PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3006/api/health 2>/dev/null || true)
 [[ -z "$PRECHECK_CODE" ]] && PRECHECK_CODE="000"
 if [[ "$PRECHECK_CODE" != "000" ]]; then
-  log_info "Dev server already running on port 3006 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
+  log_info "Server already running on port 3006 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
 else
-  log_info "Starting Next.js dev server..." | tee -a "$LOG_FILE"
+  # QA-H3 (#870): this used to run `npm run dev`, which forces
+  # NODE_ENV=development and routes every Anthropic call through the curl
+  # subprocess transport (see src/lib/claude.ts USE_CURL) instead of the
+  # Anthropic SDK production actually uses — different prompt structure (no
+  # cache_control) and different retry semantics. The only weekly gate that
+  # talks to a live model was validating a code path no real request takes.
+  # Build and run the same production artifact `next start` serves in prod.
+  log_info "Building production bundle (QA-H3: run the QA gate against a production build for parity with real traffic)..." | tee -a "$LOG_FILE"
+
+  # VOYAGE_API_KEY (and ANTHROPIC_API_KEY) are already exported above when
+  # present — no need to re-prefix them per-command.
+  npm run build > "$SERVER_LOG" 2>&1
+  BUILD_EXIT=$?
+  if [[ $BUILD_EXIT -ne 0 ]]; then
+    log_error "Production build failed (exit $BUILD_EXIT) — see $SERVER_LOG" | tee -a "$LOG_FILE"
+    exit 1
+  fi
+  log_success "Production build complete" | tee -a "$LOG_FILE"
+
+  log_info "Starting Next.js production server..." | tee -a "$LOG_FILE"
 
   # Start the server in the background
-  if [[ -n "$VOYAGE_API_KEY_VALUE" ]]; then
-    VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE" npm run dev > "$SERVER_LOG" 2>&1 &
-  else
-    npm run dev > "$SERVER_LOG" 2>&1 &
-  fi
+  npm run start -- --port 3006 >> "$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
 
-  # Wait for server to respond (max 240 seconds)
+  # Wait for server to respond.
   # Accept any HTTP response (200 or 503) — both mean the server is up.
   # A 503 from /api/health means Supabase is degraded, not that the server failed to start.
   # Phase 0 health checks below will properly report Supabase degradation.
-  MAX_WAIT=240
+  #
+  # QA-H3 (#870): MAX_WAIT only bounds the `next start` boot itself — the
+  # build above already completed synchronously and is not part of this
+  # budget. 240s was previously enough for `npm run dev`'s lazy/incremental
+  # compile-on-first-request. This repo already runs the exact "build then
+  # start, poll a health endpoint" pattern locally for Playwright E2E (see
+  # `getWebServerCommand()` in playwright.config.ts: `npm run build && npm
+  # run start`, 240_000ms webServer timeout, same machine class) — that
+  # combined build+start budget is proven sufficient at 240s. `next start`
+  # itself boots in seconds once built, so 120s here is a comfortable margin
+  # above that precedent for the boot step alone.
+  MAX_WAIT=120
   WAITED=0
   while true; do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3006/api/health" 2>/dev/null || true)
@@ -201,7 +227,7 @@ else
     fi
   done
 
-  log_success "Dev server ready (HTTP $HTTP_CODE, took ${WAITED}s)" | tee -a "$LOG_FILE"
+  log_success "Production server ready (HTTP $HTTP_CODE, took ${WAITED}s)" | tee -a "$LOG_FILE"
 fi
 
 # =============================================================================

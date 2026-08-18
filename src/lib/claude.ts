@@ -75,7 +75,16 @@ function createAbortError() {
 
 /**
  * Stream using the Anthropic SDK (production).
- * Adds a single retry on first-token failure; second failure surfaces the error.
+ *
+ * AR-H2 (#856): the SDK's own `maxRetries` only covers failures before
+ * response headers arrive (verified in @anthropic-ai/sdk client.js
+ * `makeRequest`) — once the SSE stream is handed back it never retries
+ * again, so the while-loop below covers the remaining gap: a stream that
+ * errors before any text reaches the caller. It must NOT retry once content
+ * has already been yielded (`yieldedAny`), or a retry re-issues the full
+ * response and duplicates output already forwarded to a live client.
+ * `maxRetries` is 1 here (was 3) so the two layers can't compound past
+ * 2 * (1 + 1) = 4 upstream calls (was 2 * (1 + 3) = 8).
  */
 async function* streamWithSDK(
   system: string,
@@ -84,7 +93,7 @@ async function* streamWithSDK(
   maxTokens: number,
   options: StreamOptions = {}
 ): AsyncGenerator<string, void, unknown> {
-  const client = new AnthropicSDK({ maxRetries: 3 });
+  const client = new AnthropicSDK({ maxRetries: 1 });
 
   const systemBlock = [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }];
 
@@ -98,12 +107,14 @@ async function* streamWithSDK(
   let attempt = 0;
   while (attempt < 2) {
     attempt++;
+    let yieldedAny = false;
     try {
       const stream = await client.messages.stream(params, {
         signal: options.signal,
       });
       for await (const event of stream) {
         if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          yieldedAny = true;
           yield event.delta.text;
         }
       }
@@ -117,9 +128,9 @@ async function* streamWithSDK(
       }
       return; // success
     } catch (err) {
-      if (attempt < 2) {
-        // Single retry
-        logger.warn("[Claude Streaming] SDK stream failed on first attempt, retrying", {
+      if (attempt < 2 && !yieldedAny) {
+        // Single retry — only when nothing has reached the caller yet.
+        logger.warn("[Claude Streaming] SDK stream failed before any content was yielded, retrying", {
           error: err instanceof Error ? err.message : String(err),
         });
         continue;
@@ -303,11 +314,12 @@ export async function callAnthropicAPI(
   system: string,
   messages: AnthropicMessage[],
   model: string,
-  maxTokens: number
+  maxTokens: number,
+  options: StreamOptions = {}
 ): Promise<Anthropic.Message> {
   const response = USE_CURL
-    ? await callWithCurl(system, messages, model, maxTokens)
-    : await callWithSDK(system, messages, model, maxTokens);
+    ? await callWithCurl(system, messages, model, maxTokens, options)
+    : await callWithSDK(system, messages, model, maxTokens, options);
 
   // #138: record token usage + estimated cost (best-effort, non-blocking).
   trackUsage(model, response.usage as RawUsage | undefined, "chat");
@@ -322,18 +334,22 @@ async function callWithSDK(
   system: string,
   messages: AnthropicMessage[],
   model: string,
-  maxTokens: number
+  maxTokens: number,
+  options: StreamOptions = {}
 ): Promise<Anthropic.Message> {
   const client = new AnthropicSDK({ maxRetries: 3 });
 
   const systemBlock = [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }];
 
-  return client.messages.create({
-    model,
-    max_tokens: maxTokens,
-    system: systemBlock,
-    messages,
-  });
+  return client.messages.create(
+    {
+      model,
+      max_tokens: maxTokens,
+      system: systemBlock,
+      messages,
+    },
+    { signal: options.signal }
+  );
 }
 
 /**
@@ -343,12 +359,17 @@ async function callWithCurl(
   system: string,
   messages: AnthropicMessage[],
   model: string,
-  maxTokens: number
+  maxTokens: number,
+  options: StreamOptions = {}
 ): Promise<Anthropic.Message> {
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const { setTimeout: sleep } = await import("node:timers/promises");
   const execFileAsync = promisify(execFile);
+
+  if (options.signal?.aborted) {
+    throw createAbortError();
+  }
 
   const body = JSON.stringify({
     model,
@@ -363,6 +384,10 @@ async function callWithCurl(
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    if (options.signal?.aborted) {
+      throw createAbortError();
+    }
+
     let stdout: string;
     let stderr: string;
 
@@ -381,10 +406,18 @@ async function callWithCurl(
         "-d", body,
       ], {
         timeout: 60000, // Increased timeout to allow for curl retries
+        // AR-H2 (#856): lets a stage timeout (or any other caller-driven
+        // cancellation) actually kill the curl subprocess instead of leaving
+        // it running — see chat-stream-timeouts.ts's `abortController.abort()`.
+        signal: options.signal,
       });
       stdout = result.stdout;
       stderr = result.stderr;
     } catch (execError) {
+      if (options.signal?.aborted) {
+        throw createAbortError();
+      }
+
       const err = execError as { code?: string | number; stderr?: string; killed?: boolean; signal?: string };
       const exitCode = typeof err.code === "number" ? err.code : parseInt(String(err.code), 10);
 
@@ -515,7 +548,8 @@ export async function generateChatResponse(
   context: Chunk[],
   asturianEnabled: boolean = false,
   messageIndex: number = 0,
-  images?: ImageResult[]
+  images?: ImageResult[],
+  options: StreamOptions = {}
 ): Promise<string> {
   const contextText = buildContextText(context);
   const imageContext = formatImagesForContext(images);
@@ -533,7 +567,8 @@ export async function generateChatResponse(
     systemPrompt,
     [{ role: "user", content: userContent }],
     CHAT_MODEL,
-    1024
+    1024,
+    options
   );
 
   const textBlock = response.content.find(

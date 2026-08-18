@@ -501,6 +501,54 @@ describe("claude", () => {
     });
   });
 
+  // ─── AR-H2 (#856): AbortSignal threading through callWithCurl ────────
+  //
+  // generateChatResponse previously had no way to cancel the underlying
+  // call, so a stage-timeout Promise.race left it running (and billing)
+  // after the caller moved on. Mirrors the AbortSignal handling already
+  // proven for streamWithCurl below.
+  describe("callWithCurl AbortSignal handling", () => {
+    it("throws AbortError immediately without calling execFile when the signal is already aborted", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        generateChatResponse("Test", [], false, 0, undefined, { signal: controller.signal })
+      ).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(mockExecFile).not.toHaveBeenCalled();
+    });
+
+    it("stops retrying and surfaces AbortError once the signal aborts between attempts", async () => {
+      const controller = new AbortController();
+      mockExecFile.mockImplementation(() => {
+        // Simulate the caller aborting (e.g. a stage timeout) right as the
+        // first attempt fails — the retry loop must not fire a 2nd attempt.
+        controller.abort();
+        return Promise.reject({ code: 56, stderr: "recv error" });
+      });
+
+      await expect(
+        generateChatResponse("Test", [], false, 0, undefined, { signal: controller.signal })
+      ).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+    });
+
+    it("passes the signal through to execFile so the curl subprocess itself can be cancelled", async () => {
+      const controller = new AbortController();
+      setupMockAPIResponse({
+        content: [{ type: "text", text: "ok" }],
+      });
+
+      await generateChatResponse("Test", [], false, 0, undefined, { signal: controller.signal });
+
+      const lastCall = mockExecFile.mock.calls[mockExecFile.mock.calls.length - 1];
+      const execOptions = lastCall[2] as { signal?: AbortSignal };
+      expect(execOptions.signal).toBe(controller.signal);
+    });
+  });
+
   // COVERAGE NOTE: claude.ts line 323 (`throw lastError || new Error("Max retries exceeded")`)
   // contributes the sole uncovered branch (90.29% branch coverage).
   //
@@ -1510,12 +1558,15 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         1024
       );
 
-      expect(mockCreate).toHaveBeenCalledWith({
-        model: "claude-sonnet-5",
-        max_tokens: 1024,
-        system: [{ type: "text", text: "system prompt", cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: "Hello" }],
-      });
+      expect(mockCreate).toHaveBeenCalledWith(
+        {
+          model: "claude-sonnet-5",
+          max_tokens: 1024,
+          system: [{ type: "text", text: "system prompt", cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: "Hello" }],
+        },
+        expect.any(Object)
+      );
       expect(result.content[0]).toEqual({ type: "text", text: "SDK response" });
     });
 
@@ -1532,6 +1583,28 @@ describe("claude SDK path (NODE_ENV=production)", () => {
           1024
         )
       ).rejects.toThrow("SDK authentication failed");
+    });
+
+    // ─── AR-H2 (#856): AbortSignal threading ──────────────────────────
+    it("passes an AbortSignal through to SDK create options", async () => {
+      const controller = new AbortController();
+      mockCreate.mockResolvedValue({
+        content: [{ type: "text", text: "ok" }],
+      });
+
+      const { callAnthropicAPI } = await import("./claude");
+      await callAnthropicAPI(
+        "system prompt",
+        [{ role: "user", content: "Hello" }],
+        "claude-sonnet-5",
+        1024,
+        { signal: controller.signal }
+      );
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ signal: controller.signal })
+      );
     });
   });
 
@@ -1765,7 +1838,15 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(capturedConstructorOptions).toMatchObject({ maxRetries: 3 });
     });
 
-    it("should instantiate Anthropic SDK with maxRetries: 3 when streaming", async () => {
+    // AR-H2 (#856): the streaming path has its own retry authority (the
+    // outer while-loop in streamWithSDK, below), which the non-streaming
+    // create() path does not. Compounding that outer loop with the SDK's own
+    // maxRetries:3 could amplify a single chat message to up to 8 upstream
+    // HTTP calls (2 outer attempts x up to 4 SDK-internal attempts each).
+    // The SDK client used for streaming keeps a much smaller maxRetries so
+    // the two retry layers' *product* stays bounded — see the "AR-H2: retry
+    // budget" suite below for the worst-case assertion.
+    it("should instantiate Anthropic SDK with maxRetries: 1 when streaming", async () => {
       mockStream.mockReturnValue({
         async *[Symbol.asyncIterator]() {
           yield { type: "content_block_delta", delta: { type: "text_delta", text: "hi" } };
@@ -1776,7 +1857,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _chunk of streamChat("Test", [])) { /* noop */ }
 
-      expect(capturedConstructorOptions).toMatchObject({ maxRetries: 3 });
+      expect(capturedConstructorOptions).toMatchObject({ maxRetries: 1 });
     });
 
     it("should retry the SDK stream once on first-token failure and succeed", async () => {
@@ -1854,6 +1935,100 @@ describe("claude SDK path (NODE_ENV=production)", () => {
 
       // Should have been called exactly twice (initial + one retry)
       expect(mockStream).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ─── AR-H2 (#856): collapsed retry budget ────────────────────────────
+  //
+  // Verification finding (see remediation report): the outer while-loop in
+  // streamWithSDK is NOT redundant with the SDK's own maxRetries. The SDK
+  // (node_modules/@anthropic-ai/sdk/client.js `makeRequest`) only retries
+  // failures that occur BEFORE the response headers are received — once the
+  // SSE body stream is handed back, the SDK never retries again. So a stream
+  // that errors out after `client.messages.stream()` has already returned
+  // (e.g. a mid-handshake reset before any delta arrives) is a real gap the
+  // SDK does not cover — this is what the outer loop is for.
+  //
+  // That gap is real but narrow: it must NOT fire once content has already
+  // been yielded to the caller, or a retry re-issues the full response from
+  // scratch while the caller (already forwarding earlier chunks over SSE to
+  // a live client) ends up emitting duplicated/garbled text. That was a
+  // latent bug in the original unconditional retry — fixed here by scoping
+  // the retry to "this attempt has yielded zero chunks so far".
+  describe("AR-H2: retry budget and no-duplicate-output guarantee", () => {
+    it("does not retry once content has already been yielded, to avoid duplicating output", async () => {
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          yield { type: "content_block_delta", delta: { type: "text_delta", text: "partial " } };
+          throw new Error("connection dropped mid-stream");
+        },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      await expect(async () => {
+        for await (const chunk of streamChat("Test", [])) {
+          chunks.push(chunk);
+        }
+      }).rejects.toThrow("connection dropped mid-stream");
+
+      // The partially-yielded text must not be duplicated by a retry.
+      expect(chunks).toEqual(["partial "]);
+      expect(mockStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("still retries a failure that occurs before any content is yielded (the real gap)", async () => {
+      let callCount = 0;
+      mockStream.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            async *[Symbol.asyncIterator]() {
+              throw new Error("reset before first token");
+            },
+          };
+        }
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield { type: "content_block_delta", delta: { type: "text_delta", text: "recovered text" } };
+          },
+        };
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(["recovered text"]);
+      expect(mockStream).toHaveBeenCalledTimes(2);
+    });
+
+    it("bounds worst-case upstream calls: outer retry (<=2) x SDK maxRetries (1) = at most 4 HTTP calls, down from up to 8", async () => {
+      mockStream.mockImplementation(() => ({
+        async *[Symbol.asyncIterator]() {
+          throw new Error("persistent failure");
+        },
+      }));
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      await expect(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _chunk of streamChat("Test", [])) { /* noop */ }
+      }).rejects.toThrow("persistent failure");
+
+      // Outer loop (streamWithSDK) makes at most 2 calls to
+      // client.messages.stream(). Each such call, inside the real SDK, may
+      // itself retry up to `maxRetries` times before surfacing an error to
+      // us — asserted at 1 above ("should instantiate Anthropic SDK with
+      // maxRetries: 1 when streaming"). Worst case: 2 * (1 + 1) = 4 upstream
+      // HTTP calls per chat message, down from the previous 2 * (1 + 3) = 8.
+      expect(mockStream).toHaveBeenCalledTimes(2);
+      expect(capturedConstructorOptions).toMatchObject({ maxRetries: 1 });
     });
   });
 
