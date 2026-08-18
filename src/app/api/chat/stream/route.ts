@@ -14,11 +14,28 @@ import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import {
   CHAT_STREAM_STAGE_TIMEOUTS_MS,
+  CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
   ChatStreamStageTimeoutError,
   isChatStreamStageTimeout,
   withChatStreamStageTiming,
 } from "@/lib/chat-stream-timeouts";
 import { encodeSseEvent } from "@/types/sse";
+
+// PE-H5 (#808): explicit ceiling for this route, replacing Vercel's implicit
+// project default. Must stay strictly greater than the worst-case internal
+// budget: embedding (12s) + search (5s) + featureFlag (2s) +
+// CHAT_STREAM_RESPONSE_TOTAL_CAP_MS (90s) = 109s worst case, so the internal
+// timeouts below remain the binding constraint and this platform ceiling
+// should never be the thing that actually fires.
+//
+// Vercel's currently documented default (Fluid Compute, on by default for new
+// functions) is 300s across every plan tier, so 120s is a deliberately LOWER,
+// explicit ceiling than that implicit default — it tightens the cost ceiling
+// on a hung request rather than raising it. This assumes Fluid Compute is
+// active for this project; if the dashboard (Settings > Functions > Function
+// Max Duration) shows a different project-level default, confirm 120s is
+// still consistent with it.
+export const maxDuration = 120;
 
 function isAbortError(error: unknown): boolean {
   return (
@@ -213,6 +230,19 @@ async function handlePost(request: NextRequest) {
       }, IDLE_TIMEOUT_MS);
     };
 
+    // PE-H5 (#808): the idle timer above resets on every chunk, so a
+    // slow-but-alive trickle (a chunk arriving just under IDLE_TIMEOUT_MS,
+    // forever) can keep resetting it and never trip. This second timer is
+    // armed exactly once, at generation start, and is never reset by chunk
+    // arrival — it bounds the TOTAL duration of the generation stage
+    // regardless of chunk cadence, which is what keeps this route's internal
+    // budget below the `maxDuration` declared above.
+    let totalCapTimedOut = false;
+    const totalCapTimer = setTimeout(() => {
+      totalCapTimedOut = true;
+      streamAbortController.abort();
+    }, CHAT_STREAM_RESPONSE_TOTAL_CAP_MS);
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -233,7 +263,8 @@ async function handlePost(request: NextRequest) {
               break;
             }
 
-            // A chunk arrived — reset the idle window.
+            // A chunk arrived — reset the idle window (the total cap timer
+            // is untouched here by design).
             resetIdleTimer();
 
             // Send text chunk as SSE event
@@ -243,9 +274,13 @@ async function handlePost(request: NextRequest) {
           }
 
           clearIdleTimer();
+          clearTimeout(totalCapTimer);
 
-          if (idleTimedOut) {
-            throw new ChatStreamStageTimeoutError("response", IDLE_TIMEOUT_MS);
+          if (idleTimedOut || totalCapTimedOut) {
+            throw new ChatStreamStageTimeoutError(
+              "response",
+              idleTimedOut ? IDLE_TIMEOUT_MS : CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
+            );
           }
 
           // Send final event with images and sources
@@ -261,9 +296,24 @@ async function handlePost(request: NextRequest) {
           }
 
         } catch (error) {
-          if (idleTimedOut || isChatStreamStageTimeout(error)) {
+          if (totalCapTimedOut) {
+            // Distinguished from the idle-window log below so platform kills
+            // (which never log anything) and this internal hard cap are
+            // both distinguishable from a normal idle-window timeout in logs.
+            logger.warn("[CHAT_STREAM_RESPONSE_TOTAL_CAP]", {
+              timeoutMs: CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
+              reason: "total_duration_cap",
+            });
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({
+                type: "error",
+                message: "response_timeout",
+              })
+            ));
+          } else if (idleTimedOut || isChatStreamStageTimeout(error)) {
             logger.warn("[CHAT_STREAM_RESPONSE_TIMEOUT]", {
               timeoutMs: IDLE_TIMEOUT_MS,
+              reason: "idle_window",
             });
             controller.enqueue(encoder.encode(
               encodeSseEvent({
@@ -288,6 +338,7 @@ async function handlePost(request: NextRequest) {
           }
         } finally {
           clearIdleTimer();
+          clearTimeout(totalCapTimer);
           request.signal.removeEventListener("abort", handleRequestAbort);
           try {
             controller.close();
@@ -298,6 +349,7 @@ async function handlePost(request: NextRequest) {
       },
       cancel() {
         clearIdleTimer();
+        clearTimeout(totalCapTimer);
         streamAbortController.abort();
         request.signal.removeEventListener("abort", handleRequestAbort);
       },

@@ -22,6 +22,14 @@ import {
   withChatStreamStageTiming,
 } from "@/lib/chat-stream-timeouts";
 
+// PE-H5 (#808): explicit ceiling for this legacy JSON route, replacing
+// Vercel's implicit project default. This route's stages are all wrapped in
+// a single non-resetting withChatStreamStageTiming call each (no idle-reset
+// loop like the SSE route), so the worst case is a fixed sum: embedding
+// (12s) + search (5s) + featureFlag (2s) + response (30s) = 49s. 60s keeps
+// this internal budget as the binding constraint with a comfortable margin.
+export const maxDuration = 60;
+
 /**
  * Extended response type with security metadata
  */

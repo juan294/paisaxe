@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { POST } from "./route";
-import { CHAT_STREAM_STAGE_TIMEOUTS_MS } from "@/lib/chat-stream-timeouts";
+import { POST, maxDuration } from "./route";
+import {
+  CHAT_STREAM_STAGE_TIMEOUTS_MS,
+  CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
+} from "@/lib/chat-stream-timeouts";
 import { NextRequest } from "next/server";
 
 // Mock the dependencies - must use dynamic import compatible approach
@@ -1042,6 +1045,111 @@ describe("POST /api/chat/stream", () => {
         // The idle timeout is a server-side abort, not an unexpected failure.
         expect(logger.error).not.toHaveBeenCalledWith(
           "[CHAT_STREAM_FAILURE]",
+          expect.anything()
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  // PE-H5 (#808): maxDuration must stay strictly above the worst-case
+  // internal budget (embedding + search + featureFlag + the total generation
+  // cap), computed from the actual constants so this test stays correct if
+  // any of those timeouts are retuned later. Otherwise the platform's own
+  // limit — not our internal timeouts — becomes the thing that actually
+  // fires, and truncations go back to being silent.
+  describe("PE-H5 maxDuration (#808)", () => {
+    it("declares maxDuration strictly greater than the worst-case internal budget", () => {
+      const worstCaseBudgetMs =
+        CHAT_STREAM_STAGE_TIMEOUTS_MS.embedding +
+        CHAT_STREAM_STAGE_TIMEOUTS_MS.search +
+        CHAT_STREAM_STAGE_TIMEOUTS_MS.featureFlag +
+        CHAT_STREAM_RESPONSE_TOTAL_CAP_MS;
+
+      expect(maxDuration).toBeTypeOf("number");
+      expect(maxDuration).toBeGreaterThan(worstCaseBudgetMs / 1000);
+    });
+  });
+
+  // PE-H5 (#808): the idle timer resets on every chunk, so a slow-but-alive
+  // trickle (a chunk arriving just under the idle window, forever) previously
+  // had no bound at all. The total-duration cap must terminate the stream
+  // even when no individual gap ever reaches the idle window.
+  describe("PE-H5 total-duration cap (#808)", () => {
+    it("terminates a slow trickle that would otherwise reset the idle timer forever", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+        vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+        vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+        // Each gap (20s) is comfortably under the 30s idle window, so under
+        // the old idle-only logic this generator would reset the idle timer
+        // forever and never trip. It only stops yielding once aborted.
+        const TRICKLE_GAP_MS = 20_000;
+        expect(TRICKLE_GAP_MS).toBeLessThan(CHAT_STREAM_STAGE_TIMEOUTS_MS.response);
+
+        vi.mocked(streamChatResponse).mockImplementation(
+          async function* (_m, _c, _a, _mi, _img, options) {
+            let i = 0;
+            while (true) {
+              if (options?.signal?.aborted) return;
+              await new Promise<void>((resolve) => {
+                const timer = setTimeout(resolve, TRICKLE_GAP_MS);
+                options?.signal?.addEventListener(
+                  "abort",
+                  () => {
+                    clearTimeout(timer);
+                    resolve();
+                  },
+                  { once: true }
+                );
+              });
+              if (options?.signal?.aborted) return;
+              yield `chunk-${i++}`;
+            }
+          }
+        );
+
+        const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+          method: "POST",
+          body: JSON.stringify({ message: "Tell me about Asturias" }),
+        });
+
+        const response = await POST(request);
+
+        const eventsPromise = collectStreamEvents(response);
+        // Advance well past the total-duration cap. If only the idle window
+        // bounded this stream, it would still be running at this point since
+        // no single gap ever exceeds it.
+        await vi.advanceTimersByTimeAsync(CHAT_STREAM_RESPONSE_TOTAL_CAP_MS + 1);
+        const events = await eventsPromise;
+
+        // Chunks kept arriving right up to the cap (proving the idle timer
+        // alone never had a chance to fire) ...
+        const textEvents = events.filter(
+          (e) => (e as { type: string }).type === "text"
+        );
+        expect(textEvents.length).toBeGreaterThan(0);
+
+        // ... but the stream still terminated once the total cap elapsed.
+        const errorEvent = events.find(
+          (e) => (e as { type: string }).type === "error"
+        ) as { message: string } | undefined;
+        expect(errorEvent?.message).toBe("response_timeout");
+
+        // The log line must be distinguishable from a plain idle-window
+        // timeout, so platform kills and internal timeouts stay diagnosable.
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[CHAT_STREAM_RESPONSE_TOTAL_CAP]",
+          expect.objectContaining({
+            timeoutMs: CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
+            reason: "total_duration_cap",
+          })
+        );
+        expect(logger.warn).not.toHaveBeenCalledWith(
+          "[CHAT_STREAM_RESPONSE_TIMEOUT]",
           expect.anything()
         );
       } finally {

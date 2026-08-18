@@ -12,6 +12,7 @@ import {
   ChatStreamStageTimeoutError,
   isChatStreamStageTimeout,
   CHAT_STREAM_STAGE_TIMEOUTS_MS,
+  CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
 } from "./chat-stream-timeouts";
 
 const mockLogger = vi.hoisted(() => ({
@@ -173,5 +174,24 @@ describe("withChatStreamStageTiming", () => {
     expect(isChatStreamStageTimeout(null)).toBe(false);
     expect(isChatStreamStageTimeout(undefined)).toBe(false);
     expect(isChatStreamStageTimeout("string")).toBe(false);
+  });
+});
+
+// PE-H5 (#808): the generation stage's idle window resets on every chunk, so
+// it alone cannot bound total stream duration. CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
+// is a separate, non-resetting ceiling for that stage.
+describe("CHAT_STREAM_RESPONSE_TOTAL_CAP_MS", () => {
+  it("is strictly greater than the resetting idle window it bounds", () => {
+    expect(CHAT_STREAM_RESPONSE_TOTAL_CAP_MS).toBeGreaterThan(
+      CHAT_STREAM_STAGE_TIMEOUTS_MS.response
+    );
+  });
+
+  it("is derived from the idle window constant, not an independent literal", () => {
+    // Guards against the cap and the idle window drifting apart silently if
+    // the idle window is retuned later.
+    expect(CHAT_STREAM_RESPONSE_TOTAL_CAP_MS).toBe(
+      CHAT_STREAM_STAGE_TIMEOUTS_MS.response * 3
+    );
   });
 });

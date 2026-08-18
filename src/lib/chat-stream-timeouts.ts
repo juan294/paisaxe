@@ -7,6 +7,18 @@ export const CHAT_STREAM_STAGE_TIMEOUTS_MS = {
   response: 30_000,
 } as const;
 
+// PE-H5 (#808): `response` above is an IDLE window for the generation stage —
+// the chat stream route resets it on every chunk, so a slow-but-alive
+// trickle (a chunk arriving just under the idle window, forever) could keep
+// resetting it indefinitely and never trip. This is a separate, non-resetting
+// ceiling on the TOTAL duration of the generation stage: it's armed once when
+// generation starts and is never reset by chunk arrival, so the stage is
+// bounded even under that pathological trickle. Sized at 3x the idle window
+// so a legitimately long (but continuously streaming) response has room to
+// complete, while a stream that never makes real progress is still capped.
+export const CHAT_STREAM_RESPONSE_TOTAL_CAP_MS =
+  CHAT_STREAM_STAGE_TIMEOUTS_MS.response * 3;
+
 export type ChatStreamStage = keyof typeof CHAT_STREAM_STAGE_TIMEOUTS_MS;
 
 export class ChatStreamStageTimeoutError extends Error {

@@ -1059,3 +1059,23 @@ describe("POST /api/chat", () => {
     });
   });
 });
+
+// PE-H5 (#808): this legacy JSON route has no idle-reset loop — every stage
+// is a single non-resetting withChatStreamStageTiming call — so the
+// worst-case internal budget is a fixed sum of the stage timeouts. Assert
+// maxDuration is declared and stays strictly above that sum, computed from
+// the actual constants so this test stays correct if the stage timeouts are
+// retuned later.
+describe("PE-H5 maxDuration (#808)", () => {
+  it("declares maxDuration strictly greater than the worst-case stage budget", async () => {
+    const routeModule = await import("./route");
+    const worstCaseBudgetMs =
+      CHAT_STREAM_STAGE_TIMEOUTS_MS.embedding +
+      CHAT_STREAM_STAGE_TIMEOUTS_MS.search +
+      CHAT_STREAM_STAGE_TIMEOUTS_MS.featureFlag +
+      CHAT_STREAM_STAGE_TIMEOUTS_MS.response;
+
+    expect(routeModule.maxDuration).toBeTypeOf("number");
+    expect(routeModule.maxDuration).toBeGreaterThan(worstCaseBudgetMs / 1000);
+  });
+});
