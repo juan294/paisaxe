@@ -1,3 +1,10 @@
+<!-- [NEEDS REVIEW] MCP Tool Endpoints box (swim-api, ~line 95) is missing
+     /api/mcp/save-favorite (added 2026-06-20, commit e06a17d8, issue #34).
+     Adding it needs a layout decision (widen swim-api or add a row) that a
+     blind XML edit risks getting visually wrong, so it is left for a human
+     pass in the drawio editor. cleanup-analytics was removed from Edge
+     Functions in this same pass (deleted 2026-01-28, commit ce634316) since
+     that was a pure deletion with no layout risk. -->
 <mxGraphModel adaptiveColors="auto" dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1400">
   <root>
     <mxCell id="0"/>
@@ -164,9 +171,6 @@
     <mxCell id="edge-keepalive" value="keep-alive" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-edge">
       <mxGeometry x="40" y="55" width="140" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="edge-cleanup" value="cleanup-analytics" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-edge">
-      <mxGeometry x="230" y="55" width="160" height="60" as="geometry"/>
-    </mxCell>
 
     <mxCell id="swim-external" value="External Services" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
       <mxGeometry x="40" y="915" width="1620" height="260" as="geometry"/>
@@ -277,9 +281,6 @@
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
     <mxCell id="e-edge-db" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;dashed=1;" edge="1" source="edge-keepalive" target="db-postgres" parent="1">
-      <mxGeometry relative="1" as="geometry"/>
-    </mxCell>
-    <mxCell id="e-edge-db-2" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;dashed=1;" edge="1" source="edge-cleanup" target="db-postgres" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
 

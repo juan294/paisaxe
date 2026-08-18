@@ -320,7 +320,7 @@ Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Logs writte
 - **Documentation Agent**: Runs weekly. Checks for stale docs, new migrations needing documentation, undocumented API routes and feature flags.
 - **Performance Agent**: Runs weekly. Analyzes bundle sizes, Lighthouse scores, Core Web Vitals, dependency counts, and disk usage.
 - **QA Agent**: Runs weekly. Automated LLM testing for RAG quality, safety, content boundaries, and response quality. Budget-conscious sampling (configurable via `testsPerCategory` in feature flag config). See `docs/testbed.md` for full test catalog.
-- **Localization Agent**: Runs weekly. Ensures 100% translation coverage across all 5 locales (es, en, fr, de, pt). Detects missing UI strings and story translations, then auto-fills gaps. Spanish is source of truth.
+- **Localization Agent**: Runs weekly. Ensures 100% translation coverage across all 6 locales (es, en, fr, de, pt, ast). Detects missing UI strings and story translations, then auto-fills gaps. Spanish is source of truth.
 - **Cost Analyst Agent**: Runs daily. Queries billing APIs (Anthropic, ElevenLabs, Twilio), analyzes spending trends, detects anomalies (>20% spikes, tier proximity), forecasts costs at 1x/3x/10x growth, and writes a structured financial health report.
 
 ## CI/CD Workflows
@@ -382,13 +382,19 @@ On PRs targeting `main`, waits for the Vercel preview deployment and runs `scrip
 
 ## Stripe Payments
 
-Voice Pass purchases (24h voice access for €1.99) processed via Stripe.
+Voice Pass purchases processed via Stripe, three tiers (see `src/lib/pricing.ts`, the single source of truth for pricing):
+
+| Tier | Price | Duration |
+|------|-------|----------|
+| Day Pass | €1.99 | 24 hours |
+| Weekly Pass | €4.99 | 7 days |
+| Monthly Pass | €9.99 | 30 days |
 
 ### Setup
 
 1. Create a Stripe account at [stripe.com](https://stripe.com)
-2. Create a product "Voice Pass - 24h" at €1.99 in the Stripe Dashboard
-3. Copy the Price ID (starts with `price_`)
+2. Create three products in the Stripe Dashboard: "Voice Pass - 24h" at €1.99, "Voice Pass - 7 days" at €4.99, "Voice Pass - 30 days" at €9.99
+3. Copy each Price ID (starts with `price_`)
 4. Create a webhook endpoint pointing to `/api/webhooks/stripe`
 5. Select `checkout.session.completed` event
 6. Copy the webhook signing secret (starts with `whsec_`)
@@ -399,7 +405,9 @@ Voice Pass purchases (24h voice access for €1.99) processed via Stripe.
 STRIPE_SECRET_KEY=sk_live_...           # Server-side API key
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...  # Client-side key
 STRIPE_WEBHOOK_SECRET=whsec_...         # Webhook signature verification
-STRIPE_DAY_PASS_PRICE_ID=price_...      # Price ID for Day Pass
+STRIPE_DAY_PASS_PRICE_ID=price_...      # Price ID for Day Pass (24h, €1.99)
+STRIPE_WEEKLY_PRICE_ID=price_...        # Price ID for Weekly Pass (7 days, €4.99)
+STRIPE_MONTHLY_PRICE_ID=price_...       # Price ID for Monthly Pass (30 days, €9.99)
 ```
 
 ### Webhook Testing (Local)
