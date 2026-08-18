@@ -33,6 +33,7 @@ describe("StoryInfoPanel", () => {
         onAskAbout={undefined}
         onToggleInfo={undefined}
         ast={false}
+        locale="es"
         isEnabled={(_flag) => false}
         questionPrompts={[]}
         requiresAuth={false}
@@ -55,6 +56,7 @@ describe("StoryInfoPanel", () => {
         onAskAbout={undefined}
         onToggleInfo={undefined}
         ast={false}
+        locale="es"
         isEnabled={(_flag) => false}
         questionPrompts={[]}
         requiresAuth={false}
@@ -78,6 +80,7 @@ describe("StoryInfoPanel", () => {
         onAskAbout={undefined}
         onToggleInfo={undefined}
         ast={false}
+        locale="es"
         isEnabled={(_flag) => false}
         questionPrompts={[]}
         requiresAuth={false}
@@ -100,6 +103,7 @@ describe("StoryInfoPanel", () => {
         onAskAbout={undefined}
         onToggleInfo={undefined}
         ast={false}
+        locale="es"
         isEnabled={(_flag) => false}
         questionPrompts={[]}
         requiresAuth={false}
@@ -123,6 +127,7 @@ describe("StoryInfoPanel", () => {
         onAskAbout={undefined}
         onToggleInfo={undefined}
         ast={false}
+        locale="es"
         isEnabled={(_flag) => false}
         questionPrompts={[]}
         requiresAuth={false}
@@ -149,6 +154,7 @@ describe("StoryInfoPanel", () => {
         onAskAbout={undefined}
         onToggleInfo={undefined}
         ast={false}
+        locale="es"
         isEnabled={(_flag) => false}
         questionPrompts={[]}
         requiresAuth={false}
@@ -174,6 +180,7 @@ describe("StoryInfoPanel", () => {
         onAskAbout={undefined}
         onToggleInfo={onToggleInfo}
         ast={false}
+        locale="es"
         isEnabled={(_flag) => false}
         questionPrompts={[]}
         requiresAuth={false}
@@ -199,6 +206,7 @@ describe("StoryInfoPanel", () => {
         onAskAbout={undefined}
         onToggleInfo={onToggleInfo}
         ast={false}
+        locale="es"
         isEnabled={(_flag) => false}
         questionPrompts={[]}
         requiresAuth={false}
@@ -210,5 +218,114 @@ describe("StoryInfoPanel", () => {
 
     fireEvent.click(screen.getByTestId("hide-info-button"));
     expect(onToggleInfo).toHaveBeenCalledTimes(1);
+  });
+
+  // UX-H5 (#891): regression tests for the raw-key bug and the locale override bug.
+  describe("asturianu labels (UX-H5, #891)", () => {
+    it("never renders the raw 'bookmarks' key — the second action button shows real Asturian text when ast is active", () => {
+      render(
+        <StoryInfoPanel
+          story={mockStory}
+          localizedStory={localizedStory}
+          showInfo={true}
+          t={mockT}
+          onAskAbout={undefined}
+          onToggleInfo={undefined}
+          ast={true}
+          locale="ast"
+          isEnabled={(_flag) => false}
+          questionPrompts={[]}
+          requiresAuth={false}
+          onAuthRequired={undefined}
+          onFavoritesNav={undefined}
+          isFavorite={false}
+        />
+      );
+
+      // Real Asturian translation ("Guardaos" — same as the "saved" label),
+      // never the literal untranslated key "bookmarks".
+      expect(screen.getByText("Guardaos")).toBeInTheDocument();
+      expect(screen.queryByText("bookmarks")).not.toBeInTheDocument();
+    });
+
+    it("respects the visitor's actual locale — flag ON but locale is 'en' must NOT show Asturian title/subtitle/labels", () => {
+      const storyWithAsturianMetadata: Story = {
+        ...mockStory,
+        metadata: {
+          asturianu_title: "Llagos de Cuaduonga",
+          asturianu_subtitle: "Picos d'Europa (ast)",
+        },
+      };
+      const localizedEnglishStory = {
+        title: "Lakes of Covadonga",
+        subtitle: "Picos de Europa",
+        description: "Beautiful glacial lakes in the mountains",
+      };
+
+      render(
+        <StoryInfoPanel
+          story={storyWithAsturianMetadata}
+          localizedStory={localizedEnglishStory}
+          showInfo={true}
+          t={mockT}
+          onAskAbout={undefined}
+          onToggleInfo={undefined}
+          ast={true}
+          locale="en"
+          isEnabled={(_flag) => false}
+          questionPrompts={[]}
+          requiresAuth={false}
+          onAuthRequired={undefined}
+          onFavoritesNav={undefined}
+          isFavorite={false}
+        />
+      );
+
+      // Title/subtitle must follow the visitor's chosen locale, not the
+      // Asturian metadata override, even though the flag (ast prop) is on.
+      expect(screen.getByText("Lakes of Covadonga")).toBeInTheDocument();
+      expect(screen.queryByText("Llagos de Cuaduonga")).not.toBeInTheDocument();
+      expect(screen.queryByText("Picos d'Europa (ast)")).not.toBeInTheDocument();
+
+      // Action labels must fall back to the `t()` translations, not getLabel().
+      expect(screen.getByText(mockT("stories.ask_about"))).toBeInTheDocument();
+      expect(screen.getByText(mockT("favorites.bookmarks"))).toBeInTheDocument();
+      expect(screen.queryByText("Entrugame sobre esto")).not.toBeInTheDocument();
+      expect(screen.queryByText("Guardaos")).not.toBeInTheDocument();
+    });
+
+    it("shows Asturian title/subtitle/labels only when ast is true AND locale is 'ast'", () => {
+      const storyWithAsturianMetadata: Story = {
+        ...mockStory,
+        metadata: {
+          asturianu_title: "Llagos de Cuaduonga",
+          asturianu_subtitle: "Picos d'Europa (ast)",
+        },
+      };
+
+      render(
+        <StoryInfoPanel
+          story={storyWithAsturianMetadata}
+          localizedStory={localizedStory}
+          showInfo={true}
+          t={mockT}
+          onAskAbout={undefined}
+          onToggleInfo={undefined}
+          ast={true}
+          locale="ast"
+          isEnabled={(_flag) => false}
+          questionPrompts={[]}
+          requiresAuth={false}
+          onAuthRequired={undefined}
+          onFavoritesNav={undefined}
+          isFavorite={false}
+        />
+      );
+
+      expect(screen.getByText("Llagos de Cuaduonga")).toBeInTheDocument();
+      expect(screen.getByText("Picos d'Europa (ast)")).toBeInTheDocument();
+      expect(screen.getByText("Entrugame sobre esto")).toBeInTheDocument();
+      expect(screen.getByText("Guardaos")).toBeInTheDocument();
+    });
   });
 });
