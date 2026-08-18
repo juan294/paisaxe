@@ -52,6 +52,46 @@ describe("request context", () => {
   });
 });
 
+describe("request context browser guard (FE-H1 / #759)", () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("never reaches Node's require() when window is defined (browser bundle)", async () => {
+    // jsdom always defines `window` (as does a real browser bundle); genuine
+    // server runtimes (Node, Edge) never do. This is exactly the condition
+    // the CSP-violating `Function("return require")()` call must never run
+    // under.
+    expect(typeof window).not.toBe("undefined");
+
+    const requireSpy = vi.fn(() => {
+      throw new Error("require() must never be reached from a browser-bundled module");
+    });
+    const globalWithRequire = globalThis as { require?: unknown };
+    const originalRequire = globalWithRequire.require;
+    globalWithRequire.require = requireSpy;
+
+    try {
+      vi.resetModules();
+      const mod = await import("./request-context");
+
+      // The module must load — and getRequestId/runWithRequestContext must still
+      // work via the safe synchronous fallback — without ever invoking require(),
+      // which is the CSP `unsafe-eval`-triggering call in a real browser.
+      expect(requireSpy).not.toHaveBeenCalled();
+
+      expect(mod.getRequestId()).toBeUndefined();
+      const value = mod.runWithRequestContext(
+        { requestId: "req-guard-test" },
+        () => mod.getRequestId()
+      );
+      expect(value).toBe("req-guard-test");
+    } finally {
+      globalWithRequire.require = originalRequire;
+    }
+  });
+});
+
 describe("request context under Edge runtime (no AsyncLocalStorage)", () => {
   afterEach(() => {
     delete (globalThis as { EdgeRuntime?: string }).EdgeRuntime;
