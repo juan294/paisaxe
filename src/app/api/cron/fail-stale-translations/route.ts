@@ -45,15 +45,43 @@ async function failStaleTranslations(): Promise<NextResponse> {
 
   const failed_count = typeof data === "number" ? data : 0;
 
+  // BE-B1: the attempts-capped queue (see fail_stale_story_translations,
+  // migration 101) retires poison-pill jobs to a terminal `dead` status
+  // instead of retrying them forever. Surface that here so it can be
+  // wired into alerting. Scoped to `updated_at >= sweepStartedAt` (this
+  // invocation only, with a small clock-skew buffer) rather than an
+  // all-time count — an unscoped count would stay > 0 forever after the
+  // first job ever died, firing a warning on every 15-minute cron run
+  // regardless of whether anything new died, which is alert-fatigue, not
+  // alerting.
+  const sweepStartedAt = new Date(start - 5_000).toISOString();
+  const { count: dead_count, error: deadCountError } = await supabase
+    .from("translate_webhook_events")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "dead")
+    .gte("updated_at", sweepStartedAt);
+
+  const dead_count_result = deadCountError ? undefined : (dead_count ?? 0);
+
+  if (deadCountError) {
+    logger.error("[CRON_FAIL_STALE_TRANSLATIONS_DEAD_COUNT_FAILED]", {
+      error: deadCountError.message,
+    });
+  } else if (dead_count_result) {
+    logger.warn("[CRON_FAIL_STALE_TRANSLATIONS_DEAD]", { dead_count: dead_count_result });
+  }
+
   logger.info("[CRON_FAIL_STALE_TRANSLATIONS]", {
     cutoff,
     failed_count,
+    dead_count: dead_count_result,
   });
 
   logger.info("[CRON_SUCCESS]", { job: "fail-stale-translations", duration_ms: Date.now() - start });
   return NextResponse.json({
     status: "ok",
     failed_count,
+    dead_count: dead_count_result,
     cutoff,
   });
 }

@@ -21,6 +21,16 @@ import { GET, POST } from "./route";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
+function mockDeadCountFrom(result: { count: number | null; error: { message: string } | null }) {
+  return vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        gte: vi.fn().mockResolvedValue(result),
+      }),
+    }),
+  });
+}
+
 describe("fail stale translations cron", () => {
   const mockRpc = vi.fn();
 
@@ -40,6 +50,7 @@ describe("fail stale translations cron", () => {
 
     vi.mocked(createAdminClient).mockReturnValue({
       rpc: mockRpc,
+      from: mockDeadCountFrom({ count: 0, error: null }),
     } as unknown as ReturnType<typeof createAdminClient>);
 
     vi.mocked(validateAdminAuth).mockResolvedValue({
@@ -207,6 +218,69 @@ describe("fail stale translations cron", () => {
       expect.anything()
     );
   });
+
+  it("includes dead_count in the response and does not warn when there are no dead jobs (BE-B1)", async () => {
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc: mockRpc,
+      from: mockDeadCountFrom({ count: 0, error: null }),
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
+      headers: { authorization: "Bearer cron-secret" },
+    });
+
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.dead_count).toBe(0);
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      "[CRON_FAIL_STALE_TRANSLATIONS_DEAD]",
+      expect.anything()
+    );
+  });
+
+  it("includes dead_count in the response and warns when translation jobs were retired to dead (BE-B1)", async () => {
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc: mockRpc,
+      from: mockDeadCountFrom({ count: 3, error: null }),
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
+      headers: { authorization: "Bearer cron-secret" },
+    });
+
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.dead_count).toBe(3);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "[CRON_FAIL_STALE_TRANSLATIONS_DEAD]",
+      expect.objectContaining({ dead_count: 3 })
+    );
+  });
+
+  it("logs an error but still returns 200 when the dead_count query itself fails (BE-B1)", async () => {
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc: mockRpc,
+      from: mockDeadCountFrom({ count: null, error: { message: "count query failed" } }),
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
+      headers: { authorization: "Bearer cron-secret" },
+    });
+
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.dead_count).toBeUndefined();
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CRON_FAIL_STALE_TRANSLATIONS_DEAD_COUNT_FAILED]",
+      expect.objectContaining({ error: "count query failed" })
+    );
+  });
 });
 
 describe("CRON_SUCCESS/CRON_FAILURE telemetry — fail-stale-translations", () => {
@@ -221,6 +295,7 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — fail-stale-translations", () =
 
     vi.mocked(createAdminClient).mockReturnValue({
       rpc: mockRpc2,
+      from: mockDeadCountFrom({ count: 0, error: null }),
     } as unknown as ReturnType<typeof createAdminClient>);
   });
 
