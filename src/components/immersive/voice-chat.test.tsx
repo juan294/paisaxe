@@ -1218,7 +1218,8 @@ describe("VoiceChat dynamic loading fallback", () => {
   });
 });
 
-// Tests for initialMessage prop
+// Tests for initialMessage prop (UX-H1: chip-tap prompts must not be silently
+// discarded — text mode auto-submits; voice mode forwards via FE-H4/UX-H7).
 describe("VoiceChat initialMessage", () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -1231,7 +1232,52 @@ describe("VoiceChat initialMessage", () => {
     vi.clearAllMocks();
   });
 
-  it("should populate input with initialMessage when provided", async () => {
+  it("should auto-submit initialMessage in text mode instead of just prefilling the input (UX-H1)", async () => {
+    mockFetch.mockResolvedValueOnce(
+      createStreamingResponse("The Lagos de Covadonga trail is a great choice.")
+    );
+
+    render(
+      <VoiceChat
+        story={mockStory}
+        open={true}
+        onClose={() => {}}
+        initialMessage="What are the best hiking trails?"
+      />
+    );
+
+    // The question should appear as a sent user message, not sit in the input
+    // box waiting for a second tap on Send.
+    await waitFor(() => {
+      expect(screen.getByText("What are the best hiking trails?")).toBeInTheDocument();
+    });
+
+    // And the assistant's response should stream in as a result of the
+    // automatic send.
+    await waitFor(() => {
+      expect(screen.getByText(/Lagos de Covadonga trail is a great choice/)).toBeInTheDocument();
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const requestBody = JSON.parse(
+      (mockFetch.mock.calls[0][1] as RequestInit).body as string
+    );
+    expect(requestBody.message).toBe("What are the best hiking trails?");
+
+    // Input box remains empty — the chip's text was submitted, not prefilled.
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
+    expect(input.value).toBe("");
+  });
+
+  it("should not auto-submit through the text pipeline when voice mode will be active (UX-H1)", async () => {
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.needsSignIn = false;
+    mockVoiceAccess.needsPurchase = false;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.isLoading = false;
+    mockVoiceAccess.isWhitelisted = true;
+    mockVoiceAccess.hasAccess = true;
+
     render(
       <VoiceChat
         story={mockStory}
@@ -1242,9 +1288,13 @@ describe("VoiceChat initialMessage", () => {
     );
 
     await waitFor(() => {
-      const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
-      expect(input.value).toBe("What are the best hiking trails?");
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
     });
+
+    // The text-mode auto-submit path (useStreamChat -> fetch) must not fire —
+    // VoiceChatElevenLabs is responsible for forwarding the prompt in voice
+    // mode (see FE-H4/UX-H7's `opening_question` dynamic variable).
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
