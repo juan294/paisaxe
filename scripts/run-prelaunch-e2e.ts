@@ -2,8 +2,8 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
 
+import { isMain } from "./lib/is-main";
 import {
   assertTestsExecuted,
   type PlaywrightJsonReport,
@@ -26,7 +26,7 @@ import {
  * authenticated suite fail closed (throw) instead of skipping when QA test
  * credentials are absent, rather than silently omitting that test class.
  */
-export const PRELAUNCH_E2E_ARGS = [
+const PRELAUNCH_E2E_ARGS = [
   "playwright",
   "test",
   "--project=desktop",
@@ -41,7 +41,7 @@ export type RunCommand = (
   env: NodeJS.ProcessEnv
 ) => Promise<{ code: number | null }>;
 
-export type ReadReport = (path: string) => PlaywrightJsonReport | undefined;
+type ReadReport = (path: string) => PlaywrightJsonReport | undefined;
 
 function defaultRunCommand(
   command: string,
@@ -110,13 +110,7 @@ export async function runGatedPrelaunchE2E(
   }
 }
 
-function isMain(): boolean {
-  return process.argv[1]
-    ? import.meta.url === pathToFileURL(process.argv[1]).href
-    : false;
-}
-
-if (isMain()) {
+if (isMain(import.meta.url)) {
   runGatedPrelaunchE2E().catch((error) => {
     console.error("[prelaunch-e2e] Failed:", error);
     process.exit(1);
