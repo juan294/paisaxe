@@ -14,6 +14,18 @@ const KNOWN_GAPS = new Set([
   24, // 024 was never committed — applied out-of-band during early development
 ]);
 
+// The largest gap between two consecutive migration numbers we consider plausible.
+// The project's real historical gaps (see KNOWN_GAPS) are all a single missing number,
+// so this is a very generous margin. It exists to fail fast on a malformed filename —
+// e.g. a timestamp prefix like 20260818120000_revert_x.sql (~2e13) instead of the
+// documented sequential NNN prefix (docs/operations/migration-policy.md) — without
+// foreclosing on any future numbering scheme. Bounding the GAP SIZE between
+// consecutive present numbers (rather than an absolute ceiling on the migration
+// number itself) means this doesn't care about the numbering scheme's magnitude:
+// consistently-close timestamp prefixes would still pass; a single wildly-out-of-range
+// outlier fails immediately instead of forcing a scan across trillions of integers.
+const MAX_PLAUSIBLE_GAP = 1000;
+
 // Migration file must match NNN_description.sql (1+ digit prefix, underscore, description, .sql)
 const MIGRATION_PATTERN = /^(\d+)_[a-z0-9_]+\.sql$/;
 
@@ -84,21 +96,45 @@ function checkForDuplicates(migrations: MigrationFile[]): string[] {
 function checkForUnexpectedGaps(migrations: MigrationFile[]): string[] {
   if (migrations.length === 0) return [];
 
+  // Walk the sorted numbers pairwise instead of iterating the full integer range
+  // from min to max. This is behaviorally identical for legitimate input (every
+  // integer strictly between two consecutive present numbers is exactly the set
+  // of "missing" numbers — duplicates naturally produce a non-positive gapSize
+  // below and are skipped, since checkForDuplicates already reports them), but
+  // bounds each individual gap independently — so a single pathological outlier
+  // (e.g. a timestamp-prefixed filename parsed as ~2e13) fails fast with a clear
+  // error instead of forcing the scanner to iterate — and potentially crash on —
+  // an astronomical range.
   const numbers = migrations.map((m) => m.number).sort((a, b) => a - b);
-  const min = numbers[0];
-  const max = numbers[numbers.length - 1];
-  const present = new Set(numbers);
+  const errors: string[] = [];
 
-  const unexpectedGaps: number[] = [];
-  for (let i = min; i <= max; i++) {
-    if (!present.has(i) && !KNOWN_GAPS.has(i)) {
-      unexpectedGaps.push(i);
+  for (let i = 1; i < numbers.length; i++) {
+    const prev = numbers[i - 1];
+    const curr = numbers[i];
+    const gapSize = curr - prev - 1;
+
+    if (gapSize <= 0) continue;
+
+    if (gapSize > MAX_PLAUSIBLE_GAP) {
+      errors.push(
+        `Migration number ${curr} is implausibly large: it creates a gap of ${gapSize} after ` +
+          `${prev}, far beyond the ${MAX_PLAUSIBLE_GAP}-gap sanity margin. Migration filenames ` +
+          `must use a sequential NNN prefix (see docs/operations/migration-policy.md), not a ` +
+          `timestamp — refusing to scan this gap rather than iterating it.`
+      );
+      continue;
+    }
+
+    for (let missing = prev + 1; missing < curr; missing++) {
+      if (!KNOWN_GAPS.has(missing)) {
+        errors.push(
+          `Unexpected migration gap: missing ${String(missing).padStart(3, "0")} (not in KNOWN_GAPS)`
+        );
+      }
     }
   }
 
-  return unexpectedGaps.map(
-    (gap) => `Unexpected migration gap: missing ${String(gap).padStart(3, "0")} (not in KNOWN_GAPS)`
-  );
+  return errors;
 }
 
 function escapeRegExp(value: string): string {
