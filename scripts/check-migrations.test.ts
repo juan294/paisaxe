@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
@@ -128,6 +128,42 @@ describe("validateMigrations", () => {
     const result = validateMigrations({ root: process.cwd() });
 
     expect(result.errors).toEqual([]);
+  });
+
+  it("keeps notify_webhook's SECURITY DEFINER search_path locked to '' (BE-M2, #783)", () => {
+    // Migration 015 originally fixed public.notify_webhook() to
+    // `SECURITY DEFINER ... SET search_path = ''`. Migration 025 later
+    // redefined the same function (to read config from webhook_config
+    // instead of app.* settings) and silently reverted the search_path to
+    // `public, extensions` — this is exactly the regression BE-M2 fixes.
+    //
+    // This test reads the real repo migrations directly (not the general
+    // validateMigrations() guard, which only covers a 3-name translation
+    // function allowlist — see QA-M5) and asserts that whichever migration
+    // most recently redefines notify_webhook() keeps `search_path = ''`.
+    const migrationsDir = "supabase/migrations";
+    const migrationFiles = readdirSync(migrationsDir)
+      .filter((name) => /^\d+_[a-z0-9_]+\.sql$/.test(name))
+      .sort();
+
+    let latestDefinition: { file: string; sql: string } | null = null;
+    for (const name of migrationFiles) {
+      const sql = readFileSync(join(migrationsDir, name), "utf8");
+      if (
+        /create\s+(?:or\s+replace\s+)?function\s+public\.notify_webhook\s*\(/i.test(
+          sql
+        )
+      ) {
+        latestDefinition = { file: name, sql };
+      }
+    }
+
+    expect(
+      latestDefinition,
+      "no migration defines public.notify_webhook()"
+    ).not.toBeNull();
+    expect(latestDefinition!.sql).toMatch(/security definer/i);
+    expect(latestDefinition!.sql).toMatch(/set\s+search_path\s*=\s*''/i);
   });
 
   it("keeps the Stripe webhook route aligned with the stripe_webhook_events schema", () => {
