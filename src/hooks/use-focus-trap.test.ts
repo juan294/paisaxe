@@ -207,7 +207,9 @@ describe("useFocusTrap", () => {
   });
 
   it("should clean up event listener on unmount", () => {
-    const removeEventSpy = vi.spyOn(container, "removeEventListener");
+    // UX-H2: the listener is bound to `document`, not the container, so the
+    // trap can recapture focus that has escaped outside it.
+    const removeEventSpy = vi.spyOn(document, "removeEventListener");
     const ref = makeRef(container);
 
     const { unmount } = renderHook(() => useFocusTrap(ref, true));
@@ -216,6 +218,55 @@ describe("useFocusTrap", () => {
 
     expect(removeEventSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
     removeEventSpy.mockRestore();
+  });
+
+  it("UX-H2: recaptures focus on Tab when it has escaped the container", () => {
+    const ref = makeRef(container);
+    renderHook(() => useFocusTrap(ref, true));
+
+    // Simulate focus escaping the trap: some element outside the container
+    // becomes focused (e.g. a background control that stayed focusable
+    // because `inert` wasn't applied, or was focused before it became inert).
+    const escapedButton = document.createElement("button");
+    escapedButton.textContent = "Escaped";
+    document.body.appendChild(escapedButton);
+    escapedButton.focus();
+    expect(document.activeElement).toBe(escapedButton);
+
+    // The trap's listener is on `document`, so it still intercepts this Tab
+    // press even though focus is currently outside the container.
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(event);
+
+    const firstButton = container.querySelector("button");
+    expect(document.activeElement).toBe(firstButton);
+  });
+
+  it("UX-H2: recaptures focus on Shift+Tab when it has escaped the container", () => {
+    const ref = makeRef(container);
+    renderHook(() => useFocusTrap(ref, true));
+
+    const escapedButton = document.createElement("button");
+    escapedButton.textContent = "Escaped";
+    document.body.appendChild(escapedButton);
+    escapedButton.focus();
+    expect(document.activeElement).toBe(escapedButton);
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(event);
+
+    const buttons = container.querySelectorAll("button");
+    const lastButton = buttons[buttons.length - 1];
+    expect(document.activeElement).toBe(lastButton);
   });
 
   it("should handle container with no focusable elements", () => {
