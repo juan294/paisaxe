@@ -89,7 +89,9 @@ describe("GET /api/feature-flags", () => {
     expect(data.data[1].flagKey).toBe("related_stories");
     expect(data.data[1].enabled).toBe(false);
     expect(data.data[1].config).toEqual({ maxResults: 5 });
-    expect(mockFrom).toHaveBeenCalledWith("feature_flags");
+    // SE-H1/BE-M9: reads through the DB-layer masking view, not the base table —
+    // anon no longer has column-level SELECT on feature_flags.config directly.
+    expect(mockFrom).toHaveBeenCalledWith("feature_flags_public");
     // PE-L2: narrow select — only the columns actually used after scrubSensitiveConfig
     expect(mockSelect).toHaveBeenCalledWith(
       "id, flag_key, enabled, label, description, config, environment, created_at, updated_at"
