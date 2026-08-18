@@ -95,6 +95,16 @@ describe("verification coverage config", () => {
     const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
 
     expect(previewSmokeWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
+    // DO-H4: --require-sentry deliberately stays off the required release gate.
+    // sentry.status: "configured" is derived purely from NEXT_PUBLIC_SENTRY_DSN
+    // being non-empty (src/app/api/health/route.ts checkSentry()) — it proves
+    // the env var is set, not that error delivery works (DO-B1: a 90-day Sentry
+    // query returned zero issues despite "configured", spanning a known outage).
+    // Hard-gating on an unverified signal would also be unsafe operationally:
+    // `vercel env ls preview` confirms the Preview environment does not carry
+    // NEXT_PUBLIC_SENTRY_DSN, so adding the flag today would fail this required
+    // check on every PR targeting main, including incident hotfixes. Revisit
+    // once DO-B1 confirms live Sentry delivery and Preview provisions the DSN.
     expect(previewSmokeWorkflow).not.toContain("--require-sentry");
 
     // DO-H1: the develop-push smoke job waited on a Vercel preview that
