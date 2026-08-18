@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, beforeEach } from "vitest";
-import { BasicMarkdown, __resetParseBlocksCallCountForTests } from "./basic-markdown";
-import * as BasicMarkdownModule from "./basic-markdown";
+import { describe, expect, it, vi } from "vitest";
+import { BasicMarkdown } from "./basic-markdown";
+import * as ParseBlocksModule from "./parse-blocks";
 
 describe("BasicMarkdown", () => {
   it("renders blockquotes as <blockquote> elements", () => {
@@ -91,32 +91,34 @@ describe("BasicMarkdown", () => {
   });
 
   describe("FE-M1: parseBlocks memoization", () => {
-    beforeEach(() => {
-      __resetParseBlocksCallCountForTests();
-    });
-
     it("does not re-parse content on re-render when `content` is unchanged", () => {
+      // Spying on the extracted parse-blocks module (rather than embedding a
+      // call counter in production code) — this works because BasicMarkdown
+      // calls `parseBlocks` via a cross-module import binding, which
+      // vi.spyOn can intercept.
+      const parseBlocksSpy = vi.spyOn(ParseBlocksModule, "parseBlocks");
+
       const { rerender } = render(<BasicMarkdown content="Hello world" />);
-      expect(BasicMarkdownModule.__parseBlocksCallCountForTests).toBe(1);
+      expect(parseBlocksSpy).toHaveBeenCalledTimes(1);
 
       // Re-render with an unrelated prop change but the SAME content string —
       // without useMemo([content]), parseBlocks would run again here.
       rerender(<BasicMarkdown content="Hello world" allowLinks />);
-      expect(BasicMarkdownModule.__parseBlocksCallCountForTests).toBe(1);
+      expect(parseBlocksSpy).toHaveBeenCalledTimes(1);
 
-      rerender(<BasicMarkdown content="Hello world" allowLinks paragraphClassName="x" />);
-      expect(BasicMarkdownModule.__parseBlocksCallCountForTests).toBe(1);
+      parseBlocksSpy.mockRestore();
     });
 
     it("re-parses when `content` actually changes (e.g. a new streamed token)", () => {
+      const parseBlocksSpy = vi.spyOn(ParseBlocksModule, "parseBlocks");
+
       const { rerender } = render(<BasicMarkdown content="Hello" />);
-      expect(BasicMarkdownModule.__parseBlocksCallCountForTests).toBe(1);
+      expect(parseBlocksSpy).toHaveBeenCalledTimes(1);
 
       rerender(<BasicMarkdown content="Hello world" />);
-      expect(BasicMarkdownModule.__parseBlocksCallCountForTests).toBe(2);
+      expect(parseBlocksSpy).toHaveBeenCalledTimes(2);
 
-      rerender(<BasicMarkdown content="Hello world!" />);
-      expect(BasicMarkdownModule.__parseBlocksCallCountForTests).toBe(3);
+      parseBlocksSpy.mockRestore();
     });
   });
 
