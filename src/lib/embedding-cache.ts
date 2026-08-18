@@ -25,8 +25,22 @@ function getRedis(): Redis {
 }
 
 export class EmbeddingCache {
+  /**
+   * @param model - Embedding model identifier (e.g. "voyage-3.5"). Included in
+   *   the cache key so a model change can't collide with entries produced by
+   *   a different model.
+   * @param dimensions - Output vector dimension (e.g. 512). Included in the
+   *   cache key so a dimension change (e.g. a Matryoshka reduction migration)
+   *   can't collide with entries of a different dimension, which would
+   *   otherwise silently serve stale-shape vectors or crash `match_chunks`.
+   */
+  constructor(
+    private readonly model: string,
+    private readonly dimensions: number
+  ) {}
+
   private hashKey(text: string): string {
-    return KEY_PREFIX + createHash("sha256").update(text).digest("hex");
+    return `${KEY_PREFIX}${this.model}:${this.dimensions}:${createHash("sha256").update(text).digest("hex")}`;
   }
 
   async get(text: string): Promise<number[] | null> {
