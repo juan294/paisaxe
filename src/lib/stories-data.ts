@@ -1,7 +1,9 @@
+import "server-only";
 import { cache } from "react";
 import type { PublicStoryRow, Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
 import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
 import { logger } from "@/lib/logger";
+import { FALLBACK_STORIES } from "@/lib/stories-fallback";
 
 // In the browser, reuse the existing createBrowserClient singleton to avoid
 // a duplicate GoTrueClient instance (which would share the same storage key
@@ -20,13 +22,10 @@ async function getClient() {
   return supabase;
 }
 
-// LOCATION-SPECIFIC: Import fallback stories from content directory
-// When replicating, replace content/fallback-stories.json with location-specific stories
-import fallbackStoriesData from "@content/fallback-stories.json";
-
-// LOCATION-SPECIFIC: Hardcoded fallback stories (used when database is unavailable)
-// These stories are loaded from content/fallback-stories.json for easy content management
-export const FALLBACK_STORIES: Story[] = fallbackStoriesData.stories as Story[];
+// FE-H1 (#759): FALLBACK_STORIES now lives in the client-safe `stories-fallback`
+// module (no logger/Supabase imports) and is re-exported here for backward
+// compatibility with existing server-side callers and tests.
+export { FALLBACK_STORIES };
 
 /**
  * Detect if we're in Next.js build/prerender phase.

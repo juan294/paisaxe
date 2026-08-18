@@ -11,7 +11,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
+import { FALLBACK_STORIES } from "@/lib/stories-fallback";
 import { clientLogger } from "@/lib/client-logger";
 import type { PublicStory, Story } from "@/types/immersive";
 import { publicStoryToStory, toPublicStory } from "@/types/immersive";
@@ -35,6 +35,28 @@ interface PersistedCache {
 }
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch stories through the server-side API route instead of calling
+ * Supabase directly from the browser.
+ *
+ * FE-H1 (#759): `@/lib/stories-data` (the direct DB-fetch module) imports
+ * `@/lib/logger`, which transitively pulls in Pino and
+ * `request-context.ts`'s `node:async_hooks` require. Reaching the browser
+ * bundle triggered a CSP `unsafe-eval` violation on every page load. Routing
+ * through `/api/stories` keeps all logger-touching code server-side; the
+ * route handler still calls the real `getStoriesFromDB()` (with its
+ * FALLBACK_STORIES safety net and `[TABLE_FALLBACK]` logging) — only the
+ * caller moved.
+ */
+async function fetchStoriesFromApi(): Promise<Story[]> {
+  const response = await fetch("/api/stories");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch stories: ${response.status}`);
+  }
+  const payload: { data: Story[] } = await response.json();
+  return payload.data;
+}
 
 // Singleton cache shared across all hook instances
 const cache: StoriesCache = {
@@ -186,7 +208,7 @@ function useStoriesState(
     }
 
     // Create new fetch promise
-    cache.promise = getStoriesFromDB()
+    cache.promise = fetchStoriesFromApi()
       .then((data) => {
         cache.data = data;
         cache.timestamp = Date.now();
@@ -315,7 +337,7 @@ export function useStories() {
 export function prefetchStories(): void {
   const isStale = Date.now() - cache.timestamp > CACHE_TTL;
   if (!cache.data || isStale) {
-    getStoriesFromDB()
+    fetchStoriesFromApi()
       .then((data) => {
         cache.data = data;
         cache.timestamp = Date.now();
