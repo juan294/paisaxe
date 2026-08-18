@@ -15,7 +15,7 @@
     "lint": "npm run lint:src && npm run lint:scripts",
     "lint:src": "eslint src/",
     "lint:scripts": "eslint scripts --max-warnings=0",
-    "lint:deps": "npx --yes madge --circular --extensions ts,tsx src",
+    "lint:deps": "npx --yes madge --circular --extensions ts,tsx --ts-config tsconfig.json src",
     "typecheck": "npm run typecheck:app && npm run typecheck:scripts && npm run typecheck:e2e && npm run typecheck:edge",
     "typecheck:app": "tsc --noEmit",
     "typecheck:scripts": "tsc --noEmit -p scripts/tsconfig.json",
