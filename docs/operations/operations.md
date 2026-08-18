@@ -353,6 +353,7 @@ On PRs targeting `main`, waits for the Vercel preview deployment and runs `scrip
 |----------|---------|-------------|
 | **Security Audit** (`security.yml`) | Push/PR + daily 08:00 UTC | `npm audit --omit=dev --audit-level=moderate`; also runs `vercel-env-safety` |
 | **Gitleaks** (job in `security.yml`) | Push/PR + daily 08:00 UTC | Scans for secrets in git history |
+| **Vercel env safety** (job in `security.yml`) | Push/PR + daily 08:00 UTC | Asserts a legacy agent-runner override is absent from the deployed Vercel project's env vars. Requires `VERCEL_TOKEN` (repo **secret**, currently unset — **action required**: a human with repo admin access must add it under Settings → Secrets and variables → Actions → Secrets) plus `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID` (repo **variables**, already set). Without `VERCEL_TOKEN` the job **fails** on push/schedule/same-repo-PR runs — it no longer silently skips and reports success (DO-M2, issue #829: skip-to-pass was "requiredness without evidence," the same anti-pattern rejected for Dependabot preview smoke checks). The skip-to-pass path is kept only for PRs from forks, which cannot read repository secrets. |
 | **License Check** (`license-check.yml`) | PRs only | Blocks copyleft/GPL dependencies |
 | **Lighthouse CI** (`lighthouse.yml`) | PRs only | Performance & accessibility auditing |
 | **Bundle Size** (`bundle-size.yml`) | PRs only | Reports JS bundle sizes as PR comment |

@@ -89,11 +89,42 @@ jobs:
       # from repository variables instead of a checked-in metadata file.
       # Configure `VERCEL_PROJECT_ID` and `VERCEL_ORG_ID` under
       # Settings → Secrets and variables → Actions → Variables.
-      - name: Skip when Vercel credentials are unavailable
-        if: ${{ env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '' }}
+      #
+      # VERCEL_TOKEN (a secret) is REQUIRED for this job to do anything.
+      # DO-M2 (#829): it has never been set, so this job used to skip its one
+      # assertion step and still report success on every push/schedule run —
+      # "requiredness without evidence," the same pattern this project
+      # rejected for Dependabot preview smoke tests (see the Dependabot
+      # branch in preview-smoke.yml). Skip-to-pass is now reserved for fork
+      # PRs, where GitHub genuinely withholds secrets (expected sandboxing,
+      # not a gap). On push/schedule/same-repo-PR runs, a missing token now
+      # fails the job loudly instead of silently passing.
+      #
+      # ACTION REQUIRED (human, repo admin): add VERCEL_TOKEN under
+      # Settings → Secrets and variables → Actions → Secrets. Until that is
+      # done, this job is EXPECTED to fail on every push/schedule run — that
+      # is the fix working as intended, not a regression.
+      - name: Fail when Vercel credentials are unavailable (not a fork PR)
+        if: >-
+          ${{
+            (env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '') &&
+            !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true)
+          }}
         run: |
-          echo "Vercel env safety check requires VERCEL_TOKEN (secret) plus"
-          echo "VERCEL_PROJECT_ID and VERCEL_ORG_ID (repo variables). Skipping."
+          echo "::error::Vercel env safety check cannot run: VERCEL_TOKEN (secret) plus VERCEL_PROJECT_ID and VERCEL_ORG_ID (repo variables) are required."
+          echo "::error::VERCEL_TOKEN is missing. A human with repo admin access must add it under Settings > Secrets and variables > Actions > Secrets before this job can pass again."
+          echo "::error::This is the only automated check on deployed Vercel environment state in this repo (DO-M2 / issue #829) — it must fail rather than silently report success while checking nothing."
+          exit 1
+
+      - name: Skip when Vercel credentials are unavailable (fork PR)
+        if: >-
+          ${{
+            (env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '') &&
+            github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true
+          }}
+        run: |
+          echo "Fork PRs cannot read repository secrets (GitHub withholds them from forked-repo workflow runs)."
+          echo "Skipping the Vercel env safety assertion — this is expected sandboxing, not a missing-secret gap."
 
       - name: Assert legacy agent override is absent from Vercel env
         if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_PROJECT_ID != '' && env.VERCEL_ORG_ID != '' }}
