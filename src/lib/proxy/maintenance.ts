@@ -7,14 +7,15 @@ import { logger } from "@/lib/logger";
  * Routes that bypass maintenance mode.
  */
 const MAINTENANCE_BYPASS_PREFIXES = [
-  "/a",            // PostHog reverse proxy (analytics)
+  "/a/",           // PostHog reverse proxy (analytics) — exact segment, see next.config.ts rewrites
   "/admin",        // Admin panel
   "/api",          // API routes (health checks, webhooks)
   "/auth",         // OAuth callbacks for admin sign-in
   "/coming-soon",  // The coming soon page itself
   "/pricing",      // Purchase flow (includes /pricing/success)
-  "/immersive",    // Main app (for testing purchase flow)
   "/_next",        // Next.js internals
+  // NOTE: /immersive (the main app) is intentionally NOT bypassed — maintenance mode
+  // must gate the primary surface, or the control does nothing (DO-H3).
 ];
 
 /**
@@ -56,12 +57,38 @@ export function resetMaintenanceModeCache(): void {
 }
 
 /**
+ * Fall back to the last successfully-fetched value for this Supabase project when a
+ * DB refresh genuinely fails (DO-H3), regardless of whether that value is still
+ * within its 30s freshness window. Defaults to `false` when there is no known-good
+ * value yet (e.g. first request, or a different project) — logging in both cases so
+ * the fallback is observable.
+ */
+function resolveMaintenanceFallback(supabaseUrl: string): boolean {
+  if (maintenanceCacheValue !== null && maintenanceCacheUrl === supabaseUrl) {
+    logger.error("Serving last-known maintenance mode value after fetch failure", {
+      lastKnownValue: maintenanceCacheValue,
+    });
+    return maintenanceCacheValue;
+  }
+  return false;
+}
+
+/**
  * Check if maintenance mode is enabled.
  * Priority: ENV var override > in-memory cache > Database flag
  *
  * - MAINTENANCE_MODE=true  → always on
  * - MAINTENANCE_MODE=false → always off
  * - unset → check DB (cached for 30s in production, uncached in development)
+ *
+ * If a DB refresh fails (non-OK response or thrown error) in production, this
+ * serves the last successfully-fetched value for the same Supabase project —
+ * even if it is past its 30s TTL — rather than defaulting to `false` (DO-H3).
+ * Failing open here would defeat the control precisely when it matters most
+ * (a database outage); failing closed on any transient blip would be worse
+ * (self-amplifying, since checking this flag itself hits the database). With
+ * no last-known value yet (e.g. cold start, or a different Supabase project),
+ * it defaults to `false`.
  */
 export async function isMaintenanceModeEnabled(): Promise<boolean> {
   const envFlag = getEnv("MAINTENANCE_MODE");
@@ -108,7 +135,7 @@ export async function isMaintenanceModeEnabled(): Promise<boolean> {
       logger.error("Failed to fetch maintenance mode flag", {
         status: response.status,
       });
-      return false;
+      return resolveMaintenanceFallback(supabaseUrl);
     }
 
     const data = await response.json();
@@ -125,7 +152,7 @@ export async function isMaintenanceModeEnabled(): Promise<boolean> {
     logger.error("Error checking maintenance mode", {
       error: error instanceof Error ? error.message : String(error),
     });
-    return false;
+    return resolveMaintenanceFallback(supabaseUrl);
   }
 }
 
