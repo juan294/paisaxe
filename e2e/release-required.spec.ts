@@ -107,18 +107,9 @@ test("@release-required webhook-unsigned: webhook rejects an unsigned payload", 
   expect([401, 403]).toContain(response.status());
 });
 
-// QA-H2 (#869): exercises the real embedding → search → rerank → generate
-// pipeline against deployed Anthropic/Voyage/Supabase upstreams. Nothing else
-// in the required-probe suite touches chat — every browser-level chat test
-// intercepts this endpoint with a canned SSE response, so a Voyage dimension
-// change, a match_chunks signature drift, an SDK breaking change, or an
-// expired key can currently ship with a fully green release.
-//
-// Read-only: `/api/chat/stream` (src/app/api/chat/stream/route.ts) only
-// reads (embedding lookup, vector search) and calls out to Claude/Voyage —
-// it never writes to Supabase or anywhere else.
-//
-// Assertions are on SHAPE only, never on answer content — see chat-smoke.ts.
+// QA-H2 (#869): full rationale in scripts/release/chat-smoke.ts's module
+// docblock. Read-only: `/api/chat/stream` only reads and calls out to
+// Claude/Voyage, never writes. Assertions are on SHAPE only — see chat-smoke.ts.
 test("@release-required chat-smoke: chat/RAG pipeline responds with retrieved sources", async ({
   request,
 }) => {

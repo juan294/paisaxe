@@ -120,12 +120,8 @@ probes:
       selector: "@release-required chat-smoke"
     oracles: [http]
     notes: >-
-      QA-H2 (#869): exercises the real embedding→search→rerank→generate
-      pipeline against deployed Anthropic/Voyage/Supabase upstreams — no
-      other required probe touches chat. Asserts SSE shape only (200,
-      text/event-stream, a non-empty text event, a terminal done event with
-      >=1 source proving retrieval ran), never answer content. Consumes real
-      Anthropic + Voyage credits per run, so it is release-gate only: this
+      QA-H2 (#869): full rationale in scripts/release/chat-smoke.ts's module
+      docblock. Consumes real Anthropic + Voyage credits per run, so this
       selector belongs solely to the release-required Playwright project,
       never desktop/mobile (which build with dummy Anthropic/Voyage keys —
       see playwright.config.ts webServer.env).
