@@ -19,7 +19,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
-      required-checks: '["Lighthouse Audit"]'
+      required_checks: '["Lighthouse Audit"]'
 
   lighthouse:
     name: Lighthouse Audit

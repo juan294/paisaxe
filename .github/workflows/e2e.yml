@@ -19,7 +19,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
-      required-checks: '["Playwright E2E","Visual Regression"]'
+      required_checks: '["Playwright E2E","Visual Regression"]'
 
   e2e:
     name: Playwright E2E
