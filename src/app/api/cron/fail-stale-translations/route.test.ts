@@ -94,15 +94,38 @@ describe("fail stale translations cron", () => {
     expect(validateAdminAuth).not.toHaveBeenCalled();
   });
 
-  it("falls back to admin auth for POST when webhook secret is missing", async () => {
+  it("falls back to admin auth for POST when webhook secret is missing, given a valid CSRF token + Origin", async () => {
     const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
       method: "POST",
+      headers: {
+        origin: "https://paisaxe.es",
+        "x-csrf-token": "test-csrf-token",
+        cookie: "__csrf=test-csrf-token",
+      },
     });
 
     const response = await POST(request);
 
     expect(response.status).toBe(200);
     expect(validateAdminAuth).toHaveBeenCalled();
+  });
+
+  // BE-H5/SE-M1: the admin-cookie fallback is exactly the CSRF attack
+  // surface — a hostile cross-site page riding a logged-in admin's session
+  // cookie must NOT be able to trigger this job without a valid CSRF token
+  // and Origin.
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with no CSRF token or Origin", async () => {
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
+      method: "POST",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(403);
+    expect(mockRpc).not.toHaveBeenCalledWith(
+      "fail_stale_story_translations_locked",
+      expect.anything()
+    );
   });
 
   it("returns 401 for POST when webhook secret missing and admin auth invalid (line 73)", async () => {

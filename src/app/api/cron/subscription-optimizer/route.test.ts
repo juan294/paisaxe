@@ -12,8 +12,14 @@ vi.mock("@/lib/logger", () => ({ logger }));
 vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
     headers: Map<string, string>;
-    constructor(_url: string, init?: { headers?: Record<string, string> }) {
+    method: string;
+    constructor(
+      _url: string,
+      init?: { headers?: Record<string, string>; method?: string }
+    ) {
       this.headers = new Map(Object.entries(init?.headers || {}));
+      // Every caller in this file exercises the POST handler.
+      this.method = init?.method || "POST";
     }
   },
   NextResponse: {
@@ -24,7 +30,9 @@ vi.mock("next/server", () => ({
   },
 }));
 
-// Mock admin auth — always reject so webhook secret is tested
+// Mock admin auth — always reject so webhook secret is tested by default.
+// Tests exercising the admin-cookie fallback (BE-H5/SE-M1) override this
+// via vi.doMock + a fresh dynamic import.
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: () =>
     Promise.resolve({ valid: false, error: { status: 401 } }),
@@ -382,7 +390,7 @@ describe("POST /api/cron/subscription-optimizer", () => {
     );
   });
 
-  it("succeeds via admin auth fallback when webhook secret is invalid", async () => {
+  it("succeeds via admin auth fallback when webhook secret is invalid, given a valid CSRF token + Origin", async () => {
     // Override admin auth mock to return valid BEFORE importing the route
     vi.doMock("@/lib/admin-auth", () => ({
       validateAdminAuth: () =>
@@ -399,10 +407,18 @@ describe("POST /api/cron/subscription-optimizer", () => {
     mockGenerateReport.mockReturnValue("# Report");
 
     const { POST } = await import("./route");
-    // No webhook secret header — forces the admin auth fallback
+    // No webhook secret header — forces the admin auth fallback. Matches
+    // the admin dashboard's request shape (triggerOptimizerRun sends
+    // csrfHeaders()).
     const request = new (await import("next/server")).NextRequest(
       "https://paisaxe.es/api/cron/subscription-optimizer",
-      { headers: {} }
+      {
+        headers: {
+          origin: "https://paisaxe.es",
+          "x-csrf-token": "test-csrf-token",
+          cookie: "__csrf=test-csrf-token",
+        },
+      }
     );
 
     const response = await POST(request as never);
@@ -414,6 +430,29 @@ describe("POST /api/cron/subscription-optimizer", () => {
         totalMonthlySpend: 50,
       })
     );
+  });
+
+  // BE-H5/SE-M1: the admin-cookie fallback (used by the admin dashboard's
+  // "run optimizer" button) is exactly the CSRF attack surface — a hostile
+  // cross-site page riding a logged-in admin's session cookie must NOT be
+  // able to trigger the optimizer without a valid CSRF token and Origin.
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with no CSRF token or Origin", async () => {
+    vi.doMock("@/lib/admin-auth", () => ({
+      validateAdminAuth: () =>
+        Promise.resolve({ valid: true, userId: "admin-user-123" }),
+    }));
+
+    const { POST } = await import("./route");
+    // No webhook secret, no Origin, no CSRF token — a cross-site POST
+    // riding the victim admin's session cookie.
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: {} }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(403);
+    expect(mockAnalyze).not.toHaveBeenCalled();
   });
 
   it("uses default metrics when POST body is empty or invalid JSON", async () => {
