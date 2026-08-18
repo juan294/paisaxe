@@ -18,11 +18,22 @@ import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import {
   CHAT_STREAM_STAGE_TIMEOUTS_MS,
+  CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
   ChatStreamStageTimeoutError,
   isChatStreamStageTimeout,
   withChatStreamStageTiming,
 } from "@/lib/chat-stream-timeouts";
 import { encodeSseEvent } from "@/types/sse";
+
+// PE-H5 (#808): explicit ceiling, replacing Vercel's implicit default, kept
+// strictly above the worst-case internal budget (embedding 12s + search 5s +
+// featureFlag 2s + CHAT_STREAM_RESPONSE_TOTAL_CAP_MS 90s = 109s) so the
+// internal timeouts below — not this platform ceiling — always fire first.
+// Vercel's currently documented default (Fluid Compute, on by default) is
+// 300s for every plan tier, so 120s tightens that ceiling rather than
+// raising it. Assumes Fluid Compute is active for this project; reconfirm
+// against Settings > Functions > Function Max Duration if not.
+export const maxDuration = 120;
 
 function rateLimitedResponse(headers: Record<string, string>): Response {
   return new Response(
@@ -225,9 +236,15 @@ async function handlePost(request: NextRequest) {
     // hang the connection indefinitely. We reset an idle timer on every chunk
     // and abort the stream if no chunk arrives within the configured window.
     const IDLE_TIMEOUT_MS = CHAT_STREAM_STAGE_TIMEOUTS_MS.response;
-    let idleTimer: ReturnType<typeof setTimeout> | undefined;
-    let idleTimedOut = false;
 
+    // PE-H5 (#808): `responseTimeoutReason` is the single source of truth for
+    // which of the two generation timers fired, used both to build the
+    // thrown error below and to pick the log line in the catch block — so
+    // the two never have to be re-derived independently.
+    type ResponseTimeoutReason = "idle_window" | "total_duration_cap";
+    let responseTimeoutReason: ResponseTimeoutReason | undefined;
+
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
     const clearIdleTimer = () => {
       if (idleTimer !== undefined) {
         clearTimeout(idleTimer);
@@ -237,10 +254,21 @@ async function handlePost(request: NextRequest) {
     const resetIdleTimer = () => {
       clearIdleTimer();
       idleTimer = setTimeout(() => {
-        idleTimedOut = true;
+        responseTimeoutReason = "idle_window";
         streamAbortController.abort();
       }, IDLE_TIMEOUT_MS);
     };
+
+    // The idle timer above resets on every chunk, so a slow-but-alive
+    // trickle (a chunk arriving just under IDLE_TIMEOUT_MS, forever) can keep
+    // resetting it and never trip. This second timer is armed once, at
+    // generation start, and is never reset by chunk arrival — it bounds the
+    // TOTAL generation duration regardless of chunk cadence, keeping this
+    // route's internal budget below the `maxDuration` declared above.
+    const totalCapTimer = setTimeout(() => {
+      responseTimeoutReason = "total_duration_cap";
+      streamAbortController.abort();
+    }, CHAT_STREAM_RESPONSE_TOTAL_CAP_MS);
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -274,7 +302,8 @@ async function handlePost(request: NextRequest) {
               break;
             }
 
-            // A chunk arrived — reset the idle window.
+            // A chunk arrived — reset the idle window (the total cap timer
+            // is untouched here by design).
             resetIdleTimer();
 
             accumulatedText += chunk;
@@ -295,6 +324,7 @@ async function handlePost(request: NextRequest) {
           }
 
           clearIdleTimer();
+          clearTimeout(totalCapTimer);
 
           if (leakDetected) {
             streamAbortController.abort();
@@ -307,8 +337,13 @@ async function handlePost(request: NextRequest) {
             return;
           }
 
-          if (idleTimedOut) {
-            throw new ChatStreamStageTimeoutError("response", IDLE_TIMEOUT_MS);
+          if (responseTimeoutReason) {
+            throw new ChatStreamStageTimeoutError(
+              "response",
+              responseTimeoutReason === "idle_window"
+                ? IDLE_TIMEOUT_MS
+                : CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
+            );
           }
 
           // Send final event with images and sources
@@ -324,10 +359,22 @@ async function handlePost(request: NextRequest) {
           }
 
         } catch (error) {
-          if (idleTimedOut || isChatStreamStageTimeout(error)) {
-            logger.warn("[CHAT_STREAM_RESPONSE_TIMEOUT]", {
-              timeoutMs: IDLE_TIMEOUT_MS,
-            });
+          if (responseTimeoutReason || isChatStreamStageTimeout(error)) {
+            // Distinct log names per reason so platform kills (which never
+            // log anything) and each internal timeout stay distinguishable.
+            const reason = responseTimeoutReason ?? "idle_window";
+            logger.warn(
+              reason === "total_duration_cap"
+                ? "[CHAT_STREAM_RESPONSE_TOTAL_CAP]"
+                : "[CHAT_STREAM_RESPONSE_TIMEOUT]",
+              {
+                timeoutMs:
+                  reason === "total_duration_cap"
+                    ? CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
+                    : IDLE_TIMEOUT_MS,
+                reason,
+              }
+            );
             controller.enqueue(encoder.encode(
               encodeSseEvent({
                 type: "error",
@@ -351,6 +398,7 @@ async function handlePost(request: NextRequest) {
           }
         } finally {
           clearIdleTimer();
+          clearTimeout(totalCapTimer);
           request.signal.removeEventListener("abort", handleRequestAbort);
           try {
             controller.close();
@@ -361,6 +409,7 @@ async function handlePost(request: NextRequest) {
       },
       cancel() {
         clearIdleTimer();
+        clearTimeout(totalCapTimer);
         streamAbortController.abort();
         request.signal.removeEventListener("abort", handleRequestAbort);
       },
