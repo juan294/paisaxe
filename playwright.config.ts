@@ -79,6 +79,7 @@ export default defineConfig({
         "**/qa-journey.spec.ts",
         "**/visual-regression.spec.ts",
         "**/stripe-real-checkout.spec.ts",
+        "**/favorites-real.spec.ts",
         ...releaseSpecs,
       ],
     },
@@ -89,6 +90,7 @@ export default defineConfig({
         "**/qa-journey.spec.ts",
         "**/visual-regression.spec.ts",
         "**/stripe-real-checkout.spec.ts",
+        "**/favorites-real.spec.ts",
         ...releaseSpecs,
       ],
     },
@@ -105,6 +107,23 @@ export default defineConfig({
       timeout: 120_000,
       // This is a release gate: a Playwright retry would turn a flaky payment
       // into a green check that does not satisfy the pre-launch contract.
+      retries: 0,
+    },
+    {
+      // FE-B2: the only project that exercises a client-side authenticated
+      // journey through the real UI (bookmark toggle) rather than an API
+      // bypass. Meaningless with the shared webServer's default dummy
+      // credentials — see e2e/favorites-real.spec.ts for the required
+      // invocation. Never selected by `npm run test:e2e`; local Docker /
+      // release-candidate verification only, matching FE-B2's regression
+      // guidance not to add stateful checks to routine CI.
+      name: "auth-integration",
+      use: { ...desktopChrome, locale: "en-US" },
+      testMatch: "favorites-real.spec.ts",
+      // Does two full navigations (initial load + reload) plus two
+      // API round trips against the sign-in fixture's cold-started server —
+      // matches release-required-local's budget, not the default 30s.
+      timeout: 60_000,
       retries: 0,
     },
     {
