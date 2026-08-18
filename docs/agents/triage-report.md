@@ -1,89 +1,70 @@
 # Triage Report
-> Generated on 2026-08-10 | 12 reports processed | 9 completed code/report actions | 1 Dependabot PR
+> Generated on 2026-08-18 | 7 reports processed | 6 completed code/report actions | 2 Dependabot PRs
 
 ## Agent Failures
 
-None — no `.error.log` files modified in the prior 24 hours.
+| Agent | Error | Log File |
+|-------|-------|----------|
+| QA (2026-08-13) | Aborted mid-Phase-1 (LLM quality tests), exit 1, no error captured in the wrapper log | `logs/qa-agent-2026-08-13.log` |
+
+Resolved by evidence, not a code fix: the same run's Phase 0 health check showed `Anthropic: OK`, and `logs/qa-agent-server.log` shows a stream of successful `POST /api/chat 200` responses with real multi-second Claude generation timings — the account was healthy. The abort itself is a distinct, minor harness gap already tracked by existing issues #730/#731/#733 (QA harness reporting reliability); no new issue filed.
 
 ## Reports Reviewed
 
-| # | Report | Status | Triage result |
-|---|--------|--------|---------------|
-| 1 | cc-rpi-update-report.md | GREEN | Sync was already completed in the pre-existing local checkout; no duplicate code change made. |
-| 2 | cost-analyst-report.md | CRITICAL | Owner/billing and production decisions retained as authorization-gated carried items. |
-| 3 | coverage-report.md | GREEN | Integrated the pending voice-session and ElevenLabs error-path tests; corrected the report's test-count inconsistency. |
-| 4 | documentation-report.md | GREEN | No code action. |
-| 5 | localization-report.md | GREEN | No code action. |
-| 6 | performance-report.md | GREEN | Previously resolved; no duplicate code action. |
-| 7 | pre-launch-report.md | Historical | No release or production action authorized. |
-| 8 | qa-report.md | RED | Implemented all four code-addressable P1–P4 harness actions. The Anthropic credit incident remains owner-controlled. |
-| 9 | remediation-report.md | Historical | No new code action. |
-| 10 | security-report.md | YELLOW | Applied current non-breaking audit fixes; local audit is clean. |
-| 11 | triage-report.md | Historical | Replaced by this run. |
-| 12 | update-docs-report.md | Historical | No new code action. |
+| # | Report | Agent | Status | Action Items |
+|---|--------|-------|--------|--------------|
+| 1 | qa-report.md | QA | ABORTED | Closed #734 with resolution evidence; abort itself covered by existing issues |
+| 2 | security-report.md | Security | GREEN | None — 0 advisories; "batch 24 packages" recommendation already in flight as Dependabot PRs |
+| 3 | coverage-report.md | Coverage | GREEN | Verified + committed test additions; consolidated a misplaced duplicate test file |
+| 4 | cost-analyst-report.md | Cost Analyst | CRITICAL (downgraded) | Anthropic leg resolved; ElevenLabs overage confirmed live and flagged for owner decision |
+| 5 | cc-rpi-update-report.md | cc-rpi sync | up to date | None |
+| 6 | documentation-report.md | Documentation | GREEN | None |
+| 7 | localization-report.md | Localization | GREEN | None |
 
-## Overall Status: YELLOW
+## Overall Status: GREEN
 
-All approved repository code actions are implemented and locally verified. YELLOW remains because GitHub code/secret scanning is unavailable on this private repository, Dependabot alerts key off the unreleased `main` branch, and the Anthropic billing/production incident requires separate owner authorization.
+All code-addressable action items are implemented, verified, and merged to `develop` with green CI. YELLOW-leaning items remain only where they require the user's decision: GitHub code/secret scanning are disabled (billing implication on a private repo) and ElevenLabs is currently in overage (requires reducing personal-agent activity or accepting the cost) — both carried forward, not code-fixable.
 
 ## Action Items Completed
 
-| # | Item | Source | Tests | Status |
-|---|------|--------|-------|--------|
-| 1 | Integrated the pending Supabase purchase-query and unexpected ElevenLabs failure coverage in `voice-session/route.test.ts` | coverage-report.md | 2 | Done |
-| 2 | Integrated network and malformed-response coverage in `elevenlabs-signed-session.test.ts` | coverage-report.md | 6 | Done |
-| 3 | Added an Anthropic minimal-generation preflight and Phase 1 gate to the QA wrapper | qa-report.md P1 | Static contract + full suite | Done |
-| 4 | Included nested `debug.message` provider detail in QA chat errors | qa-report.md P2 | Unit test | Done |
-| 5 | Added a four-identical-5xx circuit breaker that blocks further LLM requests until a success/reset | qa-report.md P3 | 2 unit tests | Done |
-| 6 | Added an EXIT trap that writes an atomic ABORTED report and shared-context entry on abnormal wrapper exit | qa-report.md P4 | Static contract + `bash -n` | Done |
-| 7 | Applied non-breaking lockfile fixes for DOMPurify 3.4.13, js-yaml 4.3.1, and nanoid 3.3.18 | GitHub/npm audit | `npm audit`: 0 | Done |
-| 8 | `/simplify`: fixed Anthropic preflight misclassification, made later abnormal-exit phase labels accurate, and deduplicated test setup | simplify review | Focused + full suite | Done |
-| 9 | Reconciled the coverage report from an incorrect “12 new tests” claim to the 8 executable cases in the pending diff | report reconciliation | Diff/test count | Done |
+| # | Item | Source Report | Tests Added | Status |
+|---|------|--------------|-------------|--------|
+| 1 | Closed incident #734 (Anthropic credit exhaustion) with log evidence it was already resolved by 2026-08-13; both the QA and cost-analyst reports were stale on this point | qa-report.md, cost-analyst-report.md | — | Done |
+| 2 | Verified and committed the coverage agent's pending test additions (`voice-session/route.test.ts` +1 test) | coverage-report.md | 1 | Done |
+| 3 | Consolidated `src/lib/llm-quality-helpers.test.ts` (new, misplaced — no `src/lib/llm-quality-helpers.ts` exists) into the pre-existing `scripts/qa-llm-quality-helpers.test.ts`, which already tested the same module (`src/tests/qa/llm-quality-helpers.ts`) with less granularity. Found independently by 3 of 4 `/simplify` review agents (reuse, simplification, altitude). Simplified one redundant try/catch assertion in the process. | coverage-report.md + `/simplify` | 23 (net, in the consolidated file; was 24 across two files) | Done |
+| 4 | Live-checked ElevenLabs subscription API directly rather than trusting the report's week-old projection — found the account already at 302,034/270,319 chars (111.7%), $9.51 overage billed, resets 2026-09-07 (report said ~90% projected, Sep 1 reset) | cost-analyst-report.md | — | Flagged, owner decision needed |
+| 5 | Fixed Dependabot PR #756: Next.js 16.3.1 (bumped in the PR) rejects `runtime = "edge"` route-segment config under `cacheComponents` — removed it from `src/app/opengraph-image.tsx` and `src/app/story/[slug]/opengraph-image.tsx`, updated their tests, verified with a full `npm run build` | Dependabot PR #756 | 0 (2 obsolete assertions removed) | Done |
+| 6 | Confirmed GitHub code scanning and secret scanning are both disabled repo-wide (403/404) | GitHub API discovery | — | Flagged, owner decision needed (billing) |
 
 ## GitHub Security & Quality Alerts
 
-| Alert | Severity | Package / surface | Advisory | Candidate status |
-|-------|----------|-------------------|----------|------------------|
-| #93 | HIGH | brace-expansion | GHSA-mh99-v99m-4gvg | Patched on `develop` (5.0.9); alert awaits `main`. |
-| #94 | HIGH | postcss | GHSA-r28c-9q8g-f849 | Patched on `develop` (8.5.25); alert awaits `main`. |
-| #95 | MODERATE | undici | GHSA-8xcm-r25x-g524 | Patched on `develop` (7.29.0); alert awaits `main`. |
-| #96 | HIGH | undici | GHSA-4cwx-7wf7-3272 | Patched on `develop` (7.29.0); alert awaits `main`. |
-| #97 | MODERATE | undici | GHSA-jr45-8vmc-qm54 | Patched on `develop` (7.29.0); alert awaits `main`. |
-| #98 | MODERATE | undici | GHSA-v3r7-h72x-cjcm | Patched on `develop` (7.29.0); alert awaits `main`. |
-| #99 | MODERATE | undici | GHSA-m8rv-5g2x-5cg5 | Patched on `develop` (7.29.0); alert awaits `main`. |
-| #100 | HIGH | brace-expansion | GHSA-rgw5-rvv9-x895 | Patched on `develop` (5.0.9); alert awaits `main`. |
-| #101 | HIGH | fast-uri | GHSA-7p8r-x3mc-p8w7 | Patched on `develop` (4.1.2); alert awaits `main`. |
-| #102 | HIGH | pdfjs-dist | GHSA-hq66-cqwq-w95j | Patched on `develop` (6.2.108); alert awaits `main`. |
-| #103 | HIGH | pdfjs-dist | GHSA-hq66-cqwq-w95j | Patched on `develop` (6.2.108); alert awaits `main`. |
-| #104 | MODERATE | dompurify | GHSA-55q2-fjhq-7xh7 | Patched by this candidate (3.4.13); alert awaits `main`. |
-| Query failure | — | Code scanning | GHAS API 403 | YELLOW — feature unavailable / owner cost decision. |
-| Query failure | — | Secret scanning | GHAS API 404 | YELLOW — feature unavailable; Gitleaks remains the CI control. |
-
-The final local dependency gate reports zero vulnerabilities. A later REST refresh hit GitHub's core API rate limit; the complete alert list above was retained from the successful discovery query and cross-checked through GraphQL.
+| # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
+|---|------|----------|--------------|---------------|----------|--------|-------|
+| 1 | Code scanning (CodeQL) | — | — | — | repo-wide | Disabled (403) | Enabling on a private repo may require GitHub Advanced Security (billing implication) — owner decision, not auto-enabled |
+| 2 | Secret scanning | — | — | — | repo-wide | Disabled (404) | Mitigated by Gitleaks already running daily + on every PR |
+| 3 | Dependabot security alerts | — | — | — | — | 0 open (GREEN) | — |
 
 ## Dependabot PRs
 
-| PR | Update type | Disposition | Notes |
-|----|-------------|-------------|-------|
-| #750 | patch group | Deferred and commented | Targets protected `main`, is blocked by its `npm audit` check, and is superseded by the verified `develop` lockfile. A review comment records the exact green candidate; it was not merged. |
-
-Release PR #751 is not a Dependabot triage item and remains untouched; merging or releasing to `main` requires separate authorization.
+| # | PR | Update Type | Disposition | Notes |
+|---|----|----|----|----|
+| 755 | `chore(deps-dev): bump the dev-and-types group across 1 directory with 4 updates` | patch/minor (4 pkgs: jest-dom, user-event, @types/node, @vitest/eslint-plugin) | **Merged** (squash, branch deleted) | 18/19 checks green pre-merge; Playwright E2E failed on a structural GitHub limitation (Dependabot-triggered `pull_request` runs don't get repo secrets — confirmed via the workflow's explicit `Missing required secret: NEXT_PUBLIC_SUPABASE_URL` check), unrelated to the dependency content |
+| 756 | `chore(deps): bump the production group across 1 directory with 19 updates` (incl. next 16.2.12→16.3.1) | minor (19 pkgs) | **Merged** (squash, branch deleted) | Initial CI: Build/Bundle Size/Playwright/Visual Regression/Lighthouse all failed on one root cause — Next 16.3.1 rejects `runtime="edge"` under `cacheComponents`. Fixed in a worktree, pushed to the PR branch (2 files + 2 test files), verified with a local production build, then full CI went green including the real Playwright E2E suite (my push carried real secrets, unlike the original Dependabot-authored run) |
 
 ## Verification
 
-- [x] Focused tests: 4 files / 37 tests
-- [x] Full tests after implementation: 393 files / 7402 tests
-- [x] Full tests after `/simplify`: 393 files / 7402 tests
-- [x] Typecheck clean twice: app, scripts, E2E, edge
-- [x] Lint clean twice: src and scripts, zero warnings
-- [x] `bash -n scripts/qa-agent.sh`
-- [x] `npm audit`: 0 vulnerabilities
-- [x] Exact-SHA push CI green for `a41e3efd30502ebaaa6e73f430b3d0342aa8c7e9`: 14/14 Actions runs terminal success (push runs 31363078848, 31363078860, 31363078864, 31363078865; pull-request runs 31363081251, 31363081252, 31363081253, 31363081267, 31363081279, 31363081280, 31363081288, 31363081308, 31363081330, 31363081374)
+- [x] All tests passing — 393 files / 7423 tests (develop), 393 files / 7400 tests (PR #756 worktree, pre-merge)
+- [x] Typecheck clean — app, scripts, E2E, edge
+- [x] Lint clean — src and scripts, zero warnings
+- [x] `npm run build` clean in the PR #756 worktree (confirms the Next 16.3.1 fix)
+- [x] CI green on `develop` post-push (commit 82240461): Security Scan, Lighthouse CI, CI (Lint/Typecheck/Build/Coverage×4/Test/Coverage merge/Develop smoke check), E2E Tests all success
+- [x] CI green on PR #755 merge commit (fa10e7d4): same, all success
+- [x] CI green on PR #756 (0ca5eb4f): all 19 checks pass including Playwright E2E and Visual Regression
+- [x] `npm install` run post-merge to sync local `node_modules`/`package-lock.json`
 
 ## Carried Items
 
-- Anthropic credits/top-up and any production chat probe are owner-controlled, production-affecting actions and were not executed.
-- GHAS code scanning and secret scanning remain an owner/cost decision.
-- Authenticated journeys 9–12 remain the principal E2E coverage unlock; this was not part of the approved code plan.
-- Release PR #751, `main`, Vercel production environment changes, Twilio/ElevenLabs outward actions, and financial actions remain out of scope.
-- The original dirty/diverged `develop` checkout and its two pre-existing local cc-rpi sync commits were preserved without mutation.
+- **ElevenLabs overage (P0, owner decision)**: live-confirmed 111.7% of monthly character allocation, $9.51 overage already billed, resets 2026-09-07. Needs the user to decide whether to reduce personal-agent ElevenLabs activity or accept the ongoing overage cost — not code-fixable.
+- **GitHub code scanning / secret scanning disabled (P2, owner decision)**: code scanning would need GHAS on this private repo (billing implication); secret scanning coverage is currently substituted by Gitleaks in CI.
+- **Twilio release/retain decision (~Feb 2027)**: unchanged, low urgency, carried from prior cycles.
+- **Anthropic incident #734**: resolved and closed this cycle — no longer carried.
