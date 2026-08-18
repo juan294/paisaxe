@@ -143,7 +143,9 @@ describe("POST /api/webhooks/supabase", () => {
   });
 
   it("should return 400 when payload body is null", async () => {
-    // JSON.parse("null") returns null — exercises the `body === null` branch in isValidPayload
+    // JSON.parse("null") returns null — exercises the "not an object" branch
+    // of the enforced SupabaseWebhookSchema (BE-H3 replaced the old manual
+    // `isValidPayload` type guard with schema enforcement).
     const request = new NextRequest(
       "http://localhost:3000/api/webhooks/supabase",
       {
@@ -185,8 +187,12 @@ describe("POST /api/webhooks/supabase", () => {
   });
 
   describe("Zod schema validation", () => {
-    it("should warn on unexpected payload shape and still process", async () => {
-      // Payload that passes isValidPayload but has unknown extra fields
+    // BE-H3 (#778): the passthrough invariant — provider payload evolution
+    // (a new, unknown top-level field) must not silently break the webhook.
+    // The observability-only StrictSupabaseWebhookSchema still logs a
+    // warning, but the enforced schema accepts the payload and the request
+    // succeeds using `parseResult.data`.
+    it("should warn on unexpected payload shape but still succeed (passthrough)", async () => {
       const request = createRequest(
         {
           table_name: "stories",
@@ -198,31 +204,35 @@ describe("POST /api/webhooks/supabase", () => {
       );
 
       const response = await POST(request);
+      const data = await response.json();
+
       expect(response.status).toBe(200);
-      // Route calls logger.warn for unknown shape
-      expect(logger.warn).toHaveBeenCalledWith("[WEBHOOK_UNKNOWN_SHAPE]", expect.anything());
+      expect(data.success).toBe(true);
+      expect(logger.warn).toHaveBeenCalledWith("[WEBHOOK_UNKNOWN_SHAPE]", {
+        webhook: "supabase",
+        fields: ["unexpected_field"],
+      });
     });
 
     it("should emit WEBHOOK_UNKNOWN_SHAPE warn when payload is missing operation field", async () => {
-      // This payload passes our legacy isValidPayload check but fails Zod
-      // We'll test that Zod validation catches the missing operation field
-      // by providing a body that isValidPayload accepts but Zod finds incomplete
+      // The enforced SupabaseWebhookSchema requires table_name + operation +
+      // timestamp (BE-H3), so a missing `operation` field is a genuine
+      // validation failure, not just an informational warning.
       const rawPayload = { table_name: "stories", timestamp: new Date().toISOString() };
       const request = createRequest(rawPayload, {
         "x-webhook-secret": "test-webhook-secret",
       });
 
-      // Will hit 400 (isValidPayload) or warn (Zod) depending on implementation
       const response = await POST(request);
-      // isValidPayload requires table_name + operation + timestamp, so 400
       expect(response.status).toBe(400);
     });
 
-    it("should map a field-level Zod issue (non-strict-mode, has a path) to its dotted path", async () => {
-      // `record` isn't type-checked by isValidPayload, so a wrong-typed `record`
-      // sails past isValidPayload but fails Zod's z.record() check with an
-      // `invalid_type` issue that has a non-empty `path` and no `keys` array.
-      // This exercises the `i.path.length > 0 ? [i.path.join(".")] : []` branch.
+    // BE-H3 (#778): before this fix, a wrong-typed `record` sailed past the
+    // legacy `isValidPayload` guard, was only warned about by a `.strict()`
+    // Zod schema whose result was then discarded, and the handler proceeded
+    // to read the raw (unvalidated) body regardless. Now the enforced schema
+    // actually rejects a malformed known field with a 400.
+    it("should return 400 when a known field (record) has the wrong type", async () => {
       const request = createRequest(
         {
           table_name: "stories",
@@ -236,14 +246,10 @@ describe("POST /api/webhooks/supabase", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      // Zod failure is warn-only — request still succeeds
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(logger.warn).toHaveBeenCalledWith("[WEBHOOK_UNKNOWN_SHAPE]", {
-        webhook: "supabase",
-        fields: ["record"],
-      });
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Bad request: missing required fields");
     });
+
   });
 
   // -----------------------------------------------------------------------
