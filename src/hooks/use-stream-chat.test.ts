@@ -3,23 +3,30 @@ import { renderHook, act } from "@testing-library/react";
 import { useStreamChat } from "./use-stream-chat";
 
 // Mock i18n
+//
+// FE-M1: `t` is hoisted to module scope so it's the SAME function reference
+// across every call to useTranslation() — matching production, where
+// useTranslation() returns a memoized `t` (see src/lib/i18n/use-translation.ts).
+// Recreating `t` inline on every call (as the mock previously did) would make
+// sendMessage's useCallback identity churn on every render regardless of the
+// FE-M1 fix, since `t` is one of sendMessage's dependencies.
+const mockTranslations: Record<string, string> = {
+  "chat.error_generic": "Lo siento, hubo un error. Intenta de nuevo.",
+  "chat.error_processing": "Lo siento, no pude procesar tu pregunta.",
+  "chat.error": "No se pudo conectar. Por favor, inténtalo de nuevo.",
+  "chat.error_auth": "Tu sesión ha expirado. Recarga la página para continuar.",
+  "chat.error_server": "Ocurrió un error en el servidor. Inténtalo de nuevo más tarde.",
+  "chat.connection_lost": "Se perdió la conexión. Reintentar",
+  "chat.error_timeout": "La respuesta tardó demasiado. Por favor, inténtalo de nuevo.",
+  "chat.new_chat_prompt": "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar.",
+};
+const mockT = (key: string) => mockTranslations[key] || key;
+
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
     locale: "es",
     setLocale: vi.fn(),
-    t: (key: string) => {
-      const translations: Record<string, string> = {
-        "chat.error_generic": "Lo siento, hubo un error. Intenta de nuevo.",
-        "chat.error_processing": "Lo siento, no pude procesar tu pregunta.",
-        "chat.error": "No se pudo conectar. Por favor, inténtalo de nuevo.",
-        "chat.error_auth": "Tu sesión ha expirado. Recarga la página para continuar.",
-        "chat.error_server": "Ocurrió un error en el servidor. Inténtalo de nuevo más tarde.",
-        "chat.connection_lost": "Se perdió la conexión. Reintentar",
-        "chat.error_timeout": "La respuesta tardó demasiado. Por favor, inténtalo de nuevo.",
-        "chat.new_chat_prompt": "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar.",
-      };
-      return translations[key] || key;
-    },
+    t: mockT,
   }),
 }));
 
@@ -1409,6 +1416,182 @@ describe("useStreamChat", () => {
     expect(lastMsg.content).toBe(
       "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar."
     );
+  });
+
+  describe("FE-M1: sendMessage identity stability", () => {
+    it("does not change identity when `messages` updates via dismissUpsell/resetMessages", () => {
+      // Both dismissUpsell and resetMessages call setMessages with a brand
+      // new array reference (same as every "text" SSE token does during
+      // streaming). If sendMessage's useCallback depended on `messages`
+      // directly, either of these would recreate it.
+      const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+      const initialSendMessage = result.current.sendMessage;
+
+      act(() => {
+        result.current.dismissUpsell(0);
+      });
+      expect(result.current.sendMessage).toBe(initialSendMessage);
+
+      act(() => {
+        result.current.resetMessages();
+      });
+      expect(result.current.sendMessage).toBe(initialSendMessage);
+    });
+
+    it("does not change identity across multiple full send/stream cycles", async () => {
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("First reply"));
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Second reply"));
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Third reply"));
+
+      const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+      const initialSendMessage = result.current.sendMessage;
+
+      await act(async () => {
+        await result.current.sendMessage("One", {
+          context: "ctx",
+          locale: "es",
+          messageIndex: 0,
+        });
+      });
+      expect(result.current.messages).toHaveLength(2);
+      expect(result.current.sendMessage).toBe(initialSendMessage);
+
+      await act(async () => {
+        await result.current.sendMessage("Two", {
+          context: "ctx",
+          locale: "es",
+          messageIndex: 1,
+        });
+      });
+      expect(result.current.messages).toHaveLength(4);
+      expect(result.current.sendMessage).toBe(initialSendMessage);
+
+      await act(async () => {
+        await result.current.sendMessage("Three", {
+          context: "ctx",
+          locale: "es",
+          messageIndex: 2,
+        });
+      });
+      expect(result.current.messages).toHaveLength(6);
+      expect(result.current.sendMessage).toBe(initialSendMessage);
+    });
+
+    it("stays stable while multiple text tokens stream in for a single message", async () => {
+      // A manually-driven stream lets us enqueue one SSE "text" event at a
+      // time and sample sendMessage's identity in between, mirroring what
+      // happens token-by-token in production.
+      let controllerRef!: ReadableStreamDefaultController<Uint8Array>;
+      const manualStream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controllerRef = controller;
+        },
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ "content-type": "text/event-stream" }),
+        body: manualStream,
+      });
+
+      const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+      const initialSendMessage = result.current.sendMessage;
+
+      let sendPromise!: Promise<void>;
+      act(() => {
+        sendPromise = result.current.sendMessage("Question", {
+          context: "ctx",
+          locale: "es",
+          messageIndex: 0,
+        });
+      });
+
+      // `isStreaming` legitimately flips false -> true once at the start of a
+      // send (and back to false once at the end) — that's expected to change
+      // sendMessage's identity twice per message, not per token. Compare
+      // subsequent per-token samples against the identity captured right
+      // after streaming started, not the pre-call one.
+      const identityAtStreamStart = result.current.sendMessage;
+      const encoder = new TextEncoder();
+      const identitiesDuringStream: unknown[] = [];
+
+      for (const word of ["Hello", " there", " friend"]) {
+        await act(async () => {
+          controllerRef.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "text", content: word })}\n\n`)
+          );
+          // Give the pending reader.read() promise a few microtask turns to
+          // resolve and run onEvent -> setMessages before we sample.
+          await Promise.resolve();
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+        identitiesDuringStream.push(result.current.sendMessage);
+      }
+
+      await act(async () => {
+        controllerRef.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`
+          )
+        );
+        controllerRef.close();
+        await sendPromise;
+      });
+
+      expect(result.current.messages[1].content).toBe("Hello there friend");
+      expect(identitiesDuringStream).toHaveLength(3);
+      for (const identity of identitiesDuringStream) {
+        expect(identity).toBe(identityAtStreamStart);
+      }
+      // Sanity: initialSendMessage really is a distinct reference from the
+      // one captured once isStreaming flips true, proving the assertions
+      // above are actually exercising identity equality, not vacuously
+      // comparing an object to itself throughout.
+      expect(identityAtStreamStart).not.toBe(initialSendMessage);
+    });
+  });
+
+  describe("FE-M1: turn-cap reads the live message count", () => {
+    it("does not lag after an external resetMessages call (ref stays in sync)", async () => {
+      // Fill 19 turns (38 messages), reset, then confirm a new send is NOT
+      // blocked — it would be if the turn-cap check read a stale pre-reset
+      // count instead of the live one.
+      for (let i = 0; i < 19; i++) {
+        mockFetch.mockResolvedValueOnce(createStreamingResponse("Ok"));
+      }
+
+      const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+      for (let i = 0; i < 19; i++) {
+        await act(async () => {
+          await result.current.sendMessage(`Q${i}`, {
+            context: "ctx",
+            locale: "es",
+            messageIndex: i,
+          });
+        });
+      }
+      expect(result.current.messages).toHaveLength(38);
+
+      act(() => {
+        result.current.resetMessages();
+      });
+      expect(result.current.messages).toEqual([]);
+
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Fresh start"));
+      await act(async () => {
+        await result.current.sendMessage("New conversation", {
+          context: "ctx",
+          locale: "es",
+          messageIndex: 0,
+        });
+      });
+
+      expect(mockFetch).toHaveBeenCalled();
+      expect(result.current.messages).toHaveLength(2);
+      expect(result.current.messages[1].content).toBe("Fresh start");
+    });
   });
 
   it("onError: sets connection_lost when AbortError arrives after 60s timeout aborts the controller (line 235)", async () => {
