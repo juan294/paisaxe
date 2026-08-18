@@ -12,6 +12,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.branch || github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   update-baselines:
     name: Regenerate Visual Baselines
