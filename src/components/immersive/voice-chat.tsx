@@ -100,12 +100,17 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
   // Voice/text mode state — extracted to useChatMode hook
   const { useElevenLabs, setUseElevenLabs, toggle: handleToggleMode } = useChatMode(false);
 
+  // Whether voice mode is/will be the active mode once access resolves — a
+  // single source shared by the mode-sync effect and the initial-message
+  // effect below so the two can't independently drift out of sync.
+  const willUseVoiceMode = canUseVoice && !!agentId;
+
   // Sync voice mode whenever access status resolves or changes (e.g., mid-session purchase)
   useEffect(() => {
-    if (!isVoiceAccessLoading && canUseVoice && agentId) {
+    if (!isVoiceAccessLoading && willUseVoiceMode) {
       setUseElevenLabs(true);
     }
-  }, [isVoiceAccessLoading, canUseVoice, agentId, setUseElevenLabs]);
+  }, [isVoiceAccessLoading, willUseVoiceMode, setUseElevenLabs]);
 
   // Don't render content until we've determined the default mode
   const isInitializing = isVoiceAccessLoading;
@@ -123,41 +128,51 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     }
   }, []);
 
+  // Story context passed to the chat API — shared by every message-sending
+  // path (submit, retry, initial-message auto-send) so it can't drift.
+  const buildStoryContext = useCallback(
+    () =>
+      `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+    [localizedStory, story]
+  );
+
+  // Sends a user message and tracks it in PostHog — shared by the composer's
+  // Send button and the initial-message auto-send effect below (UX-H1) so
+  // tracking/context logic lives in one place instead of being copy-pasted.
+  const submitMessage = useCallback(
+    async (message: string) => {
+      const isFirstMessage = messages.length === 0;
+      const messageIndex = messages.filter((m) => m.role === "user").length;
+      setLastMessage(message);
+      if (isFirstMessage) {
+        posthog?.capture("chat_conversation_started", { story_id: story.id });
+      }
+      posthog?.capture("chat_message_sent", { story_id: story.id, message_index: messageIndex });
+      await sendMessage(message, { context: buildStoryContext(), locale, messageIndex });
+    },
+    [messages, posthog, story, sendMessage, buildStoryContext, locale]
+  );
+
   // Auto-send initial message (e.g. a suggested-question chip) — one-shot,
   // deferred until voice-access resolution settles so we know which mode will
   // actually render:
   //  - Voice mode: VoiceChatElevenLabs reads initialMessageRef.current directly
-  //    and forwards it as the `opening_question` dynamic variable (FE-H4/UX-H7).
+  //    and forwards it as the `opening_question` dynamic variable (FE-H4/UX-H7),
+  //    so the ref is left untouched for it to read.
   //  - Text mode: auto-submit here so a chip tap produces an answer instead of
   //    silently prefilling `inputValue` and waiting for a second tap on Send
   //    that ChatComposer (unmounted in voice mode) may never offer (UX-H1).
-  // Capture prop in a ref so the effect never re-runs when the prop changes later.
+  // Capture prop in a ref so the effect never re-runs when the prop changes
+  // later; clearing it after consuming doubles as the one-shot "handled" guard.
   const initialMessageRef = useRef(initialMessage);
-  const initialMessageHandledRef = useRef(false);
   useEffect(() => {
-    if (!initialMessageRef.current || initialMessageHandledRef.current || isInitializing) {
+    if (!initialMessageRef.current || isInitializing || willUseVoiceMode) {
       return;
     }
-    initialMessageHandledRef.current = true;
-
-    // Mirrors the mode-sync effect above (canUseVoice && agentId) rather than
-    // reading `useElevenLabs` state directly — that state update lands one
-    // render later, which would otherwise race this effect on first resolve.
-    const willUseVoice = canUseVoice && !!agentId;
-    if (willUseVoice) {
-      return;
-    }
-
     const message = initialMessageRef.current;
-    setLastMessage(message);
-    posthog?.capture("chat_conversation_started", { story_id: story.id });
-    posthog?.capture("chat_message_sent", { story_id: story.id, message_index: 0 });
-    void sendMessage(message, {
-      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
-      locale,
-      messageIndex: 0,
-    });
-  }, [isInitializing, canUseVoice, agentId, sendMessage, localizedStory, story, locale, posthog]);
+    initialMessageRef.current = undefined;
+    void submitMessage(message);
+  }, [isInitializing, willUseVoiceMode, submitMessage]);
 
   const handlePrivacyDismiss = useCallback(() => {
     setPrivacyAcknowledged(true);
@@ -173,34 +188,18 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     if (!inputValue.trim() || isLoading) return;
 
     const userMessage = inputValue.trim();
-    const isFirstMessage = messages.length === 0;
     setInputValue("");
-    setLastMessage(userMessage);
-
-    // Track chat events in PostHog
-    if (isFirstMessage) {
-      posthog?.capture("chat_conversation_started", { story_id: story.id });
-    }
-    posthog?.capture("chat_message_sent", {
-      story_id: story.id,
-      message_index: messages.filter((m) => m.role === "user").length,
-    });
-
-    await sendMessage(userMessage, {
-      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
-      locale,
-      messageIndex: messages.filter((m) => m.role === "user").length,
-    });
+    await submitMessage(userMessage);
   };
 
   const handleRetry = useCallback(async () => {
     if (!lastMessage || isLoading) return;
     await sendMessage(lastMessage, {
-      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+      context: buildStoryContext(),
       locale,
       messageIndex: messages.filter((m) => m.role === "user").length,
     });
-  }, [lastMessage, isLoading, sendMessage, localizedStory, story, locale, messages]);
+  }, [lastMessage, isLoading, sendMessage, buildStoryContext, locale, messages]);
 
   if (!open) return null;
 
