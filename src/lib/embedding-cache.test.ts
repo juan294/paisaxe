@@ -18,12 +18,19 @@ vi.mock("./logger", () => ({
 }));
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+const TEST_MODEL = "voyage-3.5";
+const TEST_DIMENSIONS = 512;
+
 function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
-function redisKey(text: string): string {
-  return `embed:${sha256(text)}`;
+function redisKey(
+  text: string,
+  model: string = TEST_MODEL,
+  dimensions: number = TEST_DIMENSIONS
+): string {
+  return `embed:${model}:${dimensions}:${sha256(text)}`;
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -40,7 +47,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
 
   it("returns null on cache miss (Redis returns null)", async () => {
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     const result = await cache.get("hello world");
 
@@ -53,7 +60,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     mockRedisGet.mockResolvedValue(JSON.stringify(vector));
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     const result = await cache.get("hello world");
 
@@ -67,7 +74,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     mockRedisGet.mockResolvedValue(vector); // already-parsed array, not a string
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     const result = await cache.get("auto-parsed text");
 
@@ -79,7 +86,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     const vector = [0.4, 0.5, 0.6];
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await cache.set("some text", vector);
 
@@ -90,22 +97,55 @@ describe("EmbeddingCache (Redis-backed)", () => {
     );
   });
 
-  it("uses embed: prefix + SHA-256 of input as Redis key", async () => {
+  it("uses embed: prefix + model + dimensions + SHA-256 of input as Redis key", async () => {
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await cache.get("my query text");
 
     const expectedKey = redisKey("my query text");
     expect(mockRedisGet).toHaveBeenCalledWith(expectedKey);
-    expect(expectedKey).toMatch(/^embed:[a-f0-9]{64}$/);
+    expect(expectedKey).toMatch(/^embed:voyage-3\.5:512:[a-f0-9]{64}$/);
+  });
+
+  it("produces a different cache key when the model changes for the same query text", async () => {
+    // Regression test for BE-M7: the cache key must be scoped to the embedding
+    // model, or a model change would silently serve stale-model vectors from
+    // the old key for up to the 24h TTL.
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cacheOldModel = new EmbeddingCache("voyage-3.5", TEST_DIMENSIONS);
+    const cacheNewModel = new EmbeddingCache("voyage-4", TEST_DIMENSIONS);
+
+    await cacheOldModel.get("same query text");
+    await cacheNewModel.get("same query text");
+
+    const [oldKey] = mockRedisGet.mock.calls[0];
+    const [newKey] = mockRedisGet.mock.calls[1];
+    expect(newKey).not.toBe(oldKey);
+  });
+
+  it("produces a different cache key when the output dimension changes for the same query text", async () => {
+    // Regression test for BE-M7: the cache key must be scoped to the output
+    // dimension, or a dimension change (e.g. migration 017's Matryoshka
+    // reduction) would collide with vectors of the previous dimension and
+    // could crash match_chunks on a dimension mismatch.
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cacheOldDims = new EmbeddingCache(TEST_MODEL, 1024);
+    const cacheNewDims = new EmbeddingCache(TEST_MODEL, 512);
+
+    await cacheOldDims.get("same query text");
+    await cacheNewDims.get("same query text");
+
+    const [oldKey] = mockRedisGet.mock.calls[0];
+    const [newKey] = mockRedisGet.mock.calls[1];
+    expect(newKey).not.toBe(oldKey);
   });
 
   it("returns null and logs warning when Redis.get throws", async () => {
     mockRedisGet.mockRejectedValue(new Error("Connection refused"));
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     const result = await cache.get("error text");
 
@@ -120,7 +160,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     mockRedisGet.mockRejectedValue(new Error("Network error"));
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await cache.get("error text");
 
@@ -133,7 +173,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await expect(cache.get("text")).resolves.toBeNull();
     await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
@@ -146,7 +186,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     mockRedisSet.mockRejectedValue(new Error("Write failed"));
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     // Should not throw
     await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
@@ -156,7 +196,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     mockRedisGet.mockRejectedValue("plain string rejection");
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     const result = await cache.get("weird error text");
 
@@ -172,7 +212,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     mockRedisSet.mockRejectedValue({ code: "ECONNRESET" });
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await cache.set("text", [0.1, 0.2]);
     // Allow the fire-and-forget .catch() microtask to run.
@@ -193,7 +233,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     });
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
     expect(mockLoggerWarn).toHaveBeenCalledWith(
@@ -209,7 +249,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     });
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
     expect(mockLoggerWarn).toHaveBeenCalledWith(
@@ -222,7 +262,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     mockRedisSet.mockReturnValue(new Promise(() => {}));
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     const result = await Promise.race([
       cache.set("slow write", [0.1, 0.2]).then(() => "returned"),
@@ -240,7 +280,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     });
 
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
     expect(mockLoggerWarn).toHaveBeenCalledWith(
@@ -251,7 +291,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
 
   it("different texts produce different Redis keys", async () => {
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await cache.get("text A");
     await cache.get("text B");
@@ -262,7 +302,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
 
   it("same text always produces the same Redis key (deterministic hash)", async () => {
     const { EmbeddingCache } = await import("./embedding-cache");
-    const cache = new EmbeddingCache();
+    const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
 
     await cache.get("repeated text");
     await cache.get("repeated text");
