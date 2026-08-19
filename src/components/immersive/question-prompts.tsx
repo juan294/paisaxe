@@ -48,7 +48,8 @@ export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: 
             handleClick(prompt);
           }}
           className={cn(
-            "px-3 py-1.5 text-xs font-medium rounded-full",
+            // UX-M6 (#899): min-h-11 (44px) touch-target floor.
+            "px-3 py-1.5 min-h-11 inline-flex items-center text-xs font-medium rounded-full",
             "bg-white/10 hover:bg-white/20 backdrop-blur-sm",
             "text-white/80 hover:text-white",
             "transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100",

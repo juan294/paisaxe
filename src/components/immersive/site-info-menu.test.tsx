@@ -93,10 +93,13 @@ describe("SiteInfoMenu", () => {
     render(<SiteInfoMenu />);
     fireEvent.click(screen.getByRole("button"));
 
-    const termsLink = screen.getByRole("link", { name: /condiciones/i });
+    // UX-M3 (#896): links inside the menu carry role="menuitem"
+    // (standardized on ToolbarOverflowMenu's pattern), not the implicit
+    // "link" role.
+    const termsLink = screen.getByRole("menuitem", { name: /condiciones/i });
     expect(termsLink).toHaveAttribute("href", "/terms");
 
-    const privacyLink = screen.getByRole("link", { name: /privacid/i });
+    const privacyLink = screen.getByRole("menuitem", { name: /privacid/i });
     expect(privacyLink).toHaveAttribute("href", "/privacy");
   });
 
@@ -104,7 +107,7 @@ describe("SiteInfoMenu", () => {
     render(<SiteInfoMenu />);
     fireEvent.click(screen.getByRole("button"));
 
-    expect(screen.queryByRole("link", { name: /guardados/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /guardados/i })).not.toBeInTheDocument();
   });
 
   it("closes panel on Escape key", () => {
@@ -197,13 +200,15 @@ describe("SiteInfoMenu", () => {
       render(<SiteInfoMenu />);
       fireEvent.click(screen.getByRole("button"));
 
-      expect(screen.getByRole("button", { name: mockT("auth.sign_out") })).toBeInTheDocument();
+      // UX-M3 (#896): menu items use role="menuitem" (standardized on
+      // ToolbarOverflowMenu's pattern), not the native "button" role.
+      expect(screen.getByRole("menuitem", { name: mockT("auth.sign_out") })).toBeInTheDocument();
     });
 
     it("calls signOut when clicking sign out", () => {
       render(<SiteInfoMenu />);
       fireEvent.click(screen.getByRole("button"));
-      fireEvent.click(screen.getByRole("button", { name: mockT("auth.sign_out") }));
+      fireEvent.click(screen.getByRole("menuitem", { name: mockT("auth.sign_out") }));
 
       expect(mockSignOut).toHaveBeenCalled();
     });
@@ -330,6 +335,84 @@ describe("SiteInfoMenu", () => {
       render(<SiteInfoMenu />);
       const skeleton = document.querySelector(".animate-pulse");
       expect(skeleton).toBeInTheDocument();
+    });
+  });
+
+  // UX-M3 (#896): standardized on ToolbarOverflowMenu's pattern — the trigger
+  // now announces its popup state, the panel exposes role="menu", and focus
+  // moves into and back out of the menu, matching the other two toolbar
+  // dropdowns instead of having no ARIA state or focus management at all.
+  describe("aria-expanded and focus management (UX-M3, #896)", () => {
+    it("sets aria-haspopup and aria-expanded=false on the trigger by default", () => {
+      render(<SiteInfoMenu />);
+      const trigger = screen.getByRole("button");
+      expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("sets aria-expanded=true on the trigger when the panel opens", () => {
+      render(<SiteInfoMenu />);
+      const trigger = screen.getByRole("button");
+      fireEvent.click(trigger);
+      expect(trigger).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("exposes the panel with role=menu when open", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+    });
+
+    it("focuses the first menu item when the panel opens", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      expect(document.activeElement).toBe(items[0]);
+    });
+
+    it("returns focus to the trigger when Escape closes the panel", () => {
+      render(<SiteInfoMenu />);
+      const trigger = screen.getByRole("button");
+      fireEvent.click(trigger);
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it("navigates between menu items with ArrowDown", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      const menu = screen.getByRole("menu");
+
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(items[1]);
+    });
+
+    it("wraps ArrowDown from the last item to the first item", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      const menu = screen.getByRole("menu");
+      items[items.length - 1].focus();
+
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(items[0]);
+    });
+
+    it("navigates between menu items with ArrowUp", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      const menu = screen.getByRole("menu");
+      items[1].focus();
+
+      fireEvent.keyDown(menu, { key: "ArrowUp" });
+      expect(document.activeElement).toBe(items[0]);
     });
   });
 });
