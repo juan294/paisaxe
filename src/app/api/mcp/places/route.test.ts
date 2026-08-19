@@ -253,6 +253,24 @@ describe("/api/mcp/places", () => {
       expect(body.locationBias.circle.center.latitude).toBeCloseTo(43.3619, 2);
     });
 
+    it("sets a private (not public) Cache-Control header (#799)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      // BE-L6 (#799): this response is only reachable with a valid x-mcp-secret,
+      // so `public` would let any shared/CDN cache serve it to unauthenticated
+      // requesters. `private` restricts caching to the requesting client only.
+      expect(response.headers.get("Cache-Control")).toBe("private, max-age=3600");
+    });
+
     it("should support location-specific searches", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -362,7 +380,9 @@ describe("/api/mcp/places", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      expect(response.headers.get("Cache-Control")).toBe("public, max-age=3600");
+      // BE-L6 (#799): see the GET test above for why `private` — kept
+      // identical between GET/POST intentionally (#614).
+      expect(response.headers.get("Cache-Control")).toBe("private, max-age=3600");
     });
 
     it("should return 400 for invalid MCP request", async () => {
