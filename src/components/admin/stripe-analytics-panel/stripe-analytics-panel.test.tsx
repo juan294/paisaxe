@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { StripeAnalyticsPanel } from "./stripe-analytics-panel";
-import { AnalyticsCacheProvider } from "./analytics-cache-context";
+import { StripeAnalyticsPanel } from "./index";
+import { AnalyticsCacheProvider } from "../analytics-cache-context";
 import * as adminApi from "@/lib/admin-api";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
