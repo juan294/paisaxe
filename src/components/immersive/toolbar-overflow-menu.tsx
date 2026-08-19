@@ -131,7 +131,7 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
 
 interface ToolbarOverflowItemProps {
   icon: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
   onClick?: () => void;
   active?: boolean;
 }

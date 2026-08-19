@@ -174,6 +174,44 @@ vi.mock("next/image", () => ({
   ),
 }));
 
+// FE-M2 (#764): capture the exact `localizedStory`/`questionPrompts` prop
+// references StoryViewer passes down on every render, so a regression test can
+// assert they stay referentially stable across unrelated re-renders. Renders
+// the real component underneath (via importActual) so every other test that
+// asserts on StoryInfoPanel's markup (story-title, ask-button, etc.) is
+// unaffected.
+const capturedLocalizedStoryRefs: unknown[] = [];
+const capturedQuestionPromptsRefs: unknown[] = [];
+vi.mock("./story-info-panel", async () => {
+  const actual = await vi.importActual<typeof import("./story-info-panel")>(
+    "./story-info-panel"
+  );
+  function CapturingStoryInfoPanel(props: Record<string, unknown>) {
+    capturedLocalizedStoryRefs.push(props.localizedStory);
+    capturedQuestionPromptsRefs.push(props.questionPrompts);
+    const Real = actual.StoryInfoPanel;
+    return <Real {...(props as unknown as Parameters<typeof actual.StoryInfoPanel>[0])} />;
+  }
+  return { ...actual, StoryInfoPanel: CapturingStoryInfoPanel };
+});
+
+// FE-M7 (#769): SuggestPlaceDialog must be dynamically imported and only
+// mounted when the user_story_suggestions flag is on — track how many times
+// the component actually gets instantiated so a test can assert it is never
+// mounted while the flag is disabled (not just visually hidden).
+let suggestPlaceDialogMountCount = 0;
+vi.mock("./suggest-place-dialog", async () => {
+  const actual = await vi.importActual<typeof import("./suggest-place-dialog")>(
+    "./suggest-place-dialog"
+  );
+  function CapturingSuggestPlaceDialog(props: Record<string, unknown>) {
+    suggestPlaceDialogMountCount++;
+    const Real = actual.SuggestPlaceDialog;
+    return <Real {...(props as unknown as Parameters<typeof actual.SuggestPlaceDialog>[0])} />;
+  }
+  return { ...actual, SuggestPlaceDialog: CapturingSuggestPlaceDialog };
+});
+
 const mockStories: Story[] = [
   {
     id: "story-1",
@@ -1196,7 +1234,9 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      expect(screen.getByText("Compartir")).toBeInTheDocument();
+      // #908/#771: the mobile share row is now the dynamically-imported
+      // ShareButton ("menu" variant) — flush its import microtask.
+      await flushUntil(() => screen.queryByText("Compartir"));
     });
 
     it("should copy to clipboard when navigator.share unavailable", async () => {
@@ -1221,7 +1261,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // UX-B1: must use singular `/story/<slug>` to match the actual route,
@@ -1268,7 +1308,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       expect(mockWriteText).toHaveBeenCalledWith(
@@ -1299,7 +1339,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // Falls back to id under the singular `/story/` path
@@ -1480,13 +1520,34 @@ describe("StoryViewer", () => {
         writable: true,
         configurable: true,
       });
+      // #908/#771: the consolidated useShareStory hook picks native share vs.
+      // clipboard based on the input device (pointer: coarse), same as the
+      // desktop ShareButton always did — simulate a touch device so this
+      // exercises the native-share branch.
+      Object.defineProperty(navigator, "canShare", {
+        value: () => true,
+        writable: true,
+        configurable: true,
+      });
+      vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      // #908/#771: the mobile share row is now the dynamically-imported
+      // ShareButton ("menu" variant) — flush its import microtask.
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // UX-B1: must use singular `/story/<slug-or-id>`, not plural `/stories/<id>`
@@ -1503,6 +1564,11 @@ describe("StoryViewer", () => {
 
       // Clean up
       Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "canShare", {
         value: undefined,
         writable: true,
         configurable: true,
@@ -2152,6 +2218,28 @@ describe("StoryViewer", () => {
     }, 30000);
   });
 
+  describe("FE-M7 (#769): SuggestPlaceDialog code-splitting", () => {
+    beforeEach(() => {
+      suggestPlaceDialogMountCount = 0;
+    });
+
+    it("never mounts the SuggestPlaceDialog module when user_story_suggestions is disabled", async () => {
+      mockIsEnabled.mockReturnValue(false);
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Drain any pending dynamic-import microtasks — the component must
+      // still never mount, even after the loader has had a chance to settle.
+      for (let i = 0; i < 10; i++) {
+        await act(async () => {
+          await Promise.resolve();
+        });
+      }
+
+      expect(suggestPlaceDialogMountCount).toBe(0);
+    });
+  });
+
   describe("suggest place dialog lifecycle (lines 388, 490)", () => {
     it("should invoke onOpen on SuggestPlaceButton click and onClose when dialog Cancel is pressed", async () => {
       mockIsEnabled.mockImplementation(
@@ -2161,18 +2249,18 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // Trigger onOpen (line 388): click the desktop SuggestPlaceButton.
-      // #569: SuggestPlaceButton is dynamically imported — flush the import
-      // microtask before querying (fake timers block findBy* polling).
-      await act(async () => { await Promise.resolve(); });
-      const suggestBtn = screen.getByRole("button", {
-        name: "suggestions.suggest_place",
-      });
+      // #569/#769: SuggestPlaceButton and SuggestPlaceDialog are both
+      // dynamically imported — flush the import microtasks before querying
+      // (fake timers block findBy* polling).
+      const suggestBtn = await flushUntil(() =>
+        screen.queryByRole("button", { name: "suggestions.suggest_place" })
+      );
       fireEvent.click(suggestBtn);
 
       // Verify dialog opened (Cancel button appears)
-      const cancelBtn = screen.getByRole("button", {
-        name: "suggestions.cancel",
-      });
+      const cancelBtn = await flushUntil(() =>
+        screen.queryByRole("button", { name: "suggestions.cancel" })
+      );
       expect(cancelBtn).toBeInTheDocument();
 
       // Trigger onClose (line 490): click Cancel in the dialog
@@ -2531,8 +2619,13 @@ describe("StoryViewer", () => {
   describe("FE-L1: StoryInfoPanel and StoryToolbar memoization", () => {
     it("StoryInfoPanel export is a memo component (has $$typeof or displayName)", async () => {
       // Verify the component is wrapped in memo by checking it renders correctly
-      // and checking the module export type via dynamic import
-      const mod = await import("./story-info-panel");
+      // and checking the module export type. FE-M2's capturing mock above
+      // wraps the exported StoryInfoPanel in a plain (non-memo) passthrough
+      // function for prop-capture purposes, so bypass it via importActual to
+      // check the real, unmocked module export.
+      const mod = await vi.importActual<typeof import("./story-info-panel")>(
+        "./story-info-panel"
+      );
       // memo returns an object with $$typeof = Symbol(react.memo)
       const comp = mod.StoryInfoPanel as unknown as { $$typeof?: symbol; type?: unknown };
       expect(comp.$$typeof?.toString()).toContain("react.memo");
@@ -2542,6 +2635,40 @@ describe("StoryViewer", () => {
       const mod = await import("./story-toolbar");
       const comp = mod.StoryToolbar as unknown as { $$typeof?: symbol; type?: unknown };
       expect(comp.$$typeof?.toString()).toContain("react.memo");
+    });
+  });
+
+  describe("FE-M2 (#764): StoryInfoPanel receives referentially stable props", () => {
+    beforeEach(() => {
+      capturedLocalizedStoryRefs.length = 0;
+      capturedQuestionPromptsRefs.length = 0;
+    });
+
+    it("passes the same localizedStory and questionPrompts object across an unrelated re-render", async () => {
+      // autoplay_button only — toggling it changes unrelated `autoPlay` state,
+      // it does not touch story/locale, so localizedStory/questionPrompts
+      // should not need to change identity.
+      mockIsEnabled.mockImplementation((flag: string) => flag === "autoplay_button");
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const countBefore = capturedLocalizedStoryRefs.length;
+      expect(countBefore).toBeGreaterThan(0);
+      const localizedBefore = capturedLocalizedStoryRefs[countBefore - 1];
+      const promptsBefore = capturedQuestionPromptsRefs[countBefore - 1];
+
+      // Trigger a re-render unrelated to story/locale: toggle autoplay.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("ambient-toggle"));
+      });
+
+      expect(capturedLocalizedStoryRefs.length).toBeGreaterThan(countBefore);
+      const localizedAfter = capturedLocalizedStoryRefs.at(-1);
+      const promptsAfter = capturedQuestionPromptsRefs.at(-1);
+
+      // Memoization is defeated if these were freshly allocated every render.
+      expect(localizedAfter).toBe(localizedBefore);
+      expect(promptsAfter).toBe(promptsBefore);
     });
   });
 
