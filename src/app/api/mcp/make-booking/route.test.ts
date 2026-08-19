@@ -25,16 +25,24 @@ const mockUpdate = vi.fn();
 const mockDbSelect = vi.fn();
 // BE-B2: claim_daily_booking_call_slot RPC (SQL-enforced daily cap)
 const mockRpc = vi.fn();
-vi.mock("@/lib/supabase-admin", () => ({
-  createAdminClient: vi.fn(() => ({
+// booking-service.ts (#787) reads the admin client via the singleton
+// getAdminClient(), not createAdminClient() directly — both are provided
+// here (createAdminClient for any other direct caller in this route's
+// dependency graph, getAdminClient for booking-service.ts itself).
+vi.mock("@/lib/supabase-admin", () => {
+  const mockAdminClient = vi.fn(() => ({
     from: vi.fn(() => ({
       insert: mockInsert,
       update: mockUpdate,
       select: mockDbSelect,
     })),
     rpc: mockRpc,
-  })),
-}));
+  }));
+  return {
+    createAdminClient: mockAdminClient,
+    getAdminClient: mockAdminClient,
+  };
+});
 
 // Partial mock of the ElevenLabs call service: delegates to the real
 // implementation by default (so all fetch-based tests below are unaffected),

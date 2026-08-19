@@ -167,6 +167,43 @@ describe("Providers", () => {
     );
   });
 
+  // PE-L3 (#817): /pricing (and its subpaths) is the only root-level flag
+  // consumer outside /immersive — useVoiceAccess -> useVisitorVoiceAccess ->
+  // useFeatureFlags(). Every other static/content page reads no flag.
+  it.each(["/pricing", "/pricing/success", "/pricing/checkout", "/pricing/checkout/return"])(
+    "PE-L3 (#817): keeps the root feature flag fetch enabled on %s (useVoiceAccess consumes flags there)",
+    (path) => {
+      mockUsePathname.mockReturnValue(path);
+      const { container } = render(
+        <Providers>
+          <p>Content</p>
+        </Providers>
+      );
+
+      expect(container.querySelector("[data-testid='feature-flags-provider']")).toHaveAttribute(
+        "data-enabled",
+        "true"
+      );
+    }
+  );
+
+  it.each(["/about", "/privacy", "/terms", "/favorites", "/"])(
+    "PE-L3 (#817): disables the root feature flag fetch on %s (no flag consumer renders there)",
+    (path) => {
+      mockUsePathname.mockReturnValue(path);
+      const { container } = render(
+        <Providers>
+          <p>Content</p>
+        </Providers>
+      );
+
+      expect(container.querySelector("[data-testid='feature-flags-provider']")).toHaveAttribute(
+        "data-enabled",
+        "false"
+      );
+    }
+  );
+
   it.each(["/about", "/privacy", "/terms"])(
     "defers auth (but still mounts AuthProvider) on static route %s",
     (path) => {
