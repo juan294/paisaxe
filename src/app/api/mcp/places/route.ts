@@ -503,8 +503,9 @@ async function handlePost(request: Request): Promise<NextResponse> {
     const results = await searchPlaces(query, type, city);
     return NextResponse.json(results, {
       headers: {
-        // BE-L6 (#799): see matching comment in handleGet — same authenticated
-        // audience, same reasoning, kept identical (#614) intentionally.
+        // BE-L6 (#799): see the Cache-Control comment in handleGet above —
+        // same authenticated audience, same reasoning, kept identical
+        // between GET/POST intentionally (#614).
         "Cache-Control": "private, max-age=3600", // Cache for 1 hour (matches GET)
       },
     });
