@@ -77,6 +77,30 @@ describe("AuthorTypewriter", () => {
     expect(screen.getByText("Juan González")).toBeInTheDocument();
   });
 
+  it("reveals the social popover on keyboard focus, matching the hover reveal (#906)", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    render(<AuthorTypewriter />);
+    const popover = screen.getByLabelText("X (Twitter)").closest(
+      "div.absolute.bottom-full"
+    )!;
+    // The popover must pair every hover-reveal utility with a focus-within
+    // counterpart, so tabbing to a social link also makes it visible.
+    expect(popover).toHaveClass("group-hover:opacity-100");
+    expect(popover).toHaveClass("group-focus-within:opacity-100");
+    expect(popover).toHaveClass("group-hover:pointer-events-auto");
+    expect(popover).toHaveClass("group-focus-within:pointer-events-auto");
+  });
+
+  it("gives each social link a visible focus-visible ring (#906)", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    render(<AuthorTypewriter />);
+    for (const label of ["X (Twitter)", "LinkedIn", "Medium", "GitHub"]) {
+      const link = screen.getByLabelText(label);
+      expect(link).toHaveClass("focus-visible:outline-none");
+      expect(link).toHaveClass("focus-visible:ring-2");
+    }
+  });
+
   it("does not start animation when prefers-reduced-motion is set", async () => {
     mockMatchMedia(true);
     const { AuthorTypewriter } = await import("./author-typewriter");
