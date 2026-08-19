@@ -83,8 +83,8 @@ improvise a different sequence here or in any other file. Its ordering is:
 
 1. Identify the candidate (by **tree hash** — squash merges do not preserve the tested SHA)
 2. Pre-deployment gates — full suite, `npm run check-migrations`, `npm run check-required-probes`,
-   `npm run prelaunch`, the 6 manual gates in `docs/operations/pre-launch-security-checklist.md`,
-   and the mutating probes against the **local Docker** stack
+   `npm run prelaunch`, the 6 gates in `docs/operations/pre-launch-security-checklist.md` (5
+   manual, 1 CI-verified), and the mutating probes against the **local Docker** stack
 3. Merge and deploy — user says "go ahead", then `gh pr merge --squash`
 4. Verify the deployed identity matches the candidate tree
 5. Run the required probes (`quality/required-probes.yaml`)
@@ -367,7 +367,7 @@ Go directly to these paths — never search the codebase for them.
 | Release procedure | `docs/runbooks/release-checklist.md` | Single procedural authority — all release docs delegate to it |
 | Rollback | `docs/operations/rollback.md` | Roll back first, investigate second. `vercel rollback`, never `vercel deploy --prod` |
 | Incident alerting | `docs/operations/alerting-runbook.md` | Per-alert-type response procedures |
-| Security gates | `docs/operations/pre-launch-security-checklist.md` | 6 manual gates required before a release PR |
+| Security gates | `docs/operations/pre-launch-security-checklist.md` | 6 gates required before a release PR (5 manual, 1 CI-verified) |
 
 ## Issue Tracking (GitHub Issues)
 
