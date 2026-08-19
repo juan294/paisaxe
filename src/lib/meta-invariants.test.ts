@@ -7,8 +7,8 @@
  *   1. Every exported HTTP method handler in an admin API route references
  *      one of the admin-auth guards from src/lib/admin-auth.ts.
  *   2. Every Supabase `.rpc("name")` call site in application source
- *      references a function name that is actually defined in a migration
- *      (catches typos/renames that would otherwise silently no-op).
+ *      references a function name that is actually live in a migration
+ *      (catches typos/renames/drops that would otherwise silently no-op).
  *
  * Follows the same scan-the-tree pattern as the AR-H2 logger migration
  * regression test in src/lib/logger-migration.test.ts.
@@ -17,6 +17,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { describe, it, expect } from "vitest";
+import { collectFiles } from "./collect-files";
 
 const ADMIN_API_DIR = path.join(__dirname, "../app/api/admin");
 const SRC_DIR = path.join(__dirname, "..");
@@ -40,44 +41,30 @@ const HTTP_METHODS = [
  */
 const ADMIN_GUARD_PATTERN = /validateAdminAuth\(|withAdmin\(|withAdminRead\(/;
 
-/**
- * Recursively collect all `route.ts` files under a directory.
- */
 function collectRouteFiles(dir: string): string[] {
-  const result: string[] = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      result.push(...collectRouteFiles(full));
-    } else if (entry.isFile() && entry.name === "route.ts") {
-      result.push(full);
-    }
-  }
-  return result;
+  return collectFiles(dir, (name) => name === "route.ts");
 }
 
-/**
- * Recursively collect all non-test TypeScript/TSX source files under a
- * directory.
- */
 function collectSourceFiles(dir: string): string[] {
-  const result: string[] = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      result.push(...collectSourceFiles(full));
-    } else if (
-      entry.isFile() &&
-      (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) &&
-      !entry.name.endsWith(".test.ts") &&
-      !entry.name.endsWith(".test.tsx")
-    ) {
-      result.push(full);
-    }
+  return collectFiles(
+    dir,
+    (name) =>
+      (name.endsWith(".ts") || name.endsWith(".tsx")) &&
+      !name.endsWith(".test.ts") &&
+      !name.endsWith(".test.tsx")
+  );
+}
+
+/** Line number (1-based) of a character offset within `content`. */
+function lineAt(content: string, index: number): number {
+  return content.slice(0, index).split("\n").length;
+}
+
+/** Throw a formatted error listing every violation, or do nothing if none. */
+function reportViolations(violations: string[], header: string): void {
+  if (violations.length > 0) {
+    throw new Error(`${header}\n\n` + violations.map((v) => `  ${v}`).join("\n"));
   }
-  return result;
 }
 
 /**
@@ -98,8 +85,11 @@ function splitExportedMethods(
     const match = matches[i];
     const start = match.index ?? 0;
     const end = matches[i + 1]?.index ?? content.length;
-    const line = content.slice(0, start).split("\n").length;
-    segments.push({ method: match[1], line, body: content.slice(start, end) });
+    segments.push({
+      method: match[1],
+      line: lineAt(content, start),
+      body: content.slice(start, end),
+    });
   }
 
   return segments;
@@ -131,19 +121,57 @@ describe("QA-M4 admin-guard invariant", () => {
       }
     }
 
-    if (violations.length > 0) {
-      throw new Error(
-        `Found ${violations.length} admin route handler(s) without an admin-auth guard. ` +
-          `Every admin route method must call validateAdminAuth(), or be wrapped in ` +
-          `withAdmin()/withAdminRead() from "@/lib/admin-auth":\n\n` +
-          violations.map((v) => `  ${v}`).join("\n")
-      );
-    }
+    reportViolations(
+      violations,
+      `Found ${violations.length} admin route handler(s) without an admin-auth guard. ` +
+        `Every admin route method must call validateAdminAuth(), or be wrapped in ` +
+        `withAdmin()/withAdminRead() from "@/lib/admin-auth":`
+    );
   });
 });
 
 describe("QA-M4 RPC-name invariant", () => {
-  it("every supabase .rpc() call references a function defined in a migration", () => {
+  /**
+   * Function names live at the end of migration history: a name is added by
+   * CREATE (OR REPLACE) FUNCTION and removed by DROP FUNCTION. Processing
+   * migrations in filename order (numeric prefixes are chronological) and
+   * applying each file's events in source order means a function that was
+   * dropped and never recreated is correctly treated as gone, not merely
+   * "defined at some point".
+   */
+  function collectLiveFunctionNames(migrationFiles: string[]): Set<string> {
+    const createPattern =
+      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?([a-zA-Z_][a-zA-Z0-9_]*)/gi;
+    const dropPattern =
+      /DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?(?:public\.)?([a-zA-Z_][a-zA-Z0-9_]*)/gi;
+
+    const live = new Set<string>();
+
+    for (const file of [...migrationFiles].sort()) {
+      const content = fs.readFileSync(file, "utf-8");
+      const events: Array<{ index: number; name: string; drop: boolean }> = [];
+
+      for (const match of content.matchAll(createPattern)) {
+        events.push({ index: match.index ?? 0, name: match[1], drop: false });
+      }
+      for (const match of content.matchAll(dropPattern)) {
+        events.push({ index: match.index ?? 0, name: match[1], drop: true });
+      }
+      events.sort((a, b) => a.index - b.index);
+
+      for (const event of events) {
+        if (event.drop) {
+          live.delete(event.name);
+        } else {
+          live.add(event.name);
+        }
+      }
+    }
+
+    return live;
+  }
+
+  it("every supabase .rpc() call references a function live in a migration", () => {
     const sourceFiles = collectSourceFiles(SRC_DIR);
     expect(sourceFiles.length).toBeGreaterThan(0);
 
@@ -153,48 +181,50 @@ describe("QA-M4 RPC-name invariant", () => {
       .map((f) => path.join(MIGRATIONS_DIR, f));
     expect(migrationFiles.length).toBeGreaterThan(0);
 
-    // Collect every function name defined across all migrations. Later
-    // migrations may redefine (CREATE OR REPLACE) a function from an
-    // earlier one — that's expected, not a violation.
-    const definedFunctions = new Set<string>();
-    const definitionPattern =
-      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?([a-zA-Z_][a-zA-Z0-9_]*)/gi;
-    for (const file of migrationFiles) {
-      const content = fs.readFileSync(file, "utf-8");
-      for (const match of content.matchAll(definitionPattern)) {
-        definedFunctions.add(match[1]);
-      }
-    }
-    expect(definedFunctions.size).toBeGreaterThan(0);
+    const liveFunctions = collectLiveFunctionNames(migrationFiles);
+    expect(liveFunctions.size).toBeGreaterThan(0);
 
-    // Collect every `.rpc("name"` call site across application source and
-    // assert the referenced function exists in some migration. RPC calls
-    // that pass a variable instead of a string literal are not statically
-    // checkable and are intentionally skipped (see issue #875 regression
-    // risk note).
-    const rpcCallPattern = /\.rpc\(\s*["']([a-zA-Z_][a-zA-Z0-9_]*)["']/g;
+    // RPC calls that pass a variable instead of a string literal aren't
+    // statically checkable (see issue #875 regression risk note) and are
+    // skipped for the migration-match check — but every `.rpc(` call site is
+    // still counted so a shift from literal to dynamic names doesn't shrink
+    // this invariant's coverage silently. All current call sites use string
+    // literals, so this must stay at 0 unless a reviewer deliberately widens
+    // the allowance.
+    const anyRpcCallPattern = /\.rpc\(/g;
+    const literalRpcCallPattern = /\.rpc\(\s*["']([a-zA-Z_][a-zA-Z0-9_]*)["']/g;
     const violations: string[] = [];
+    let dynamicCallSites = 0;
 
     for (const file of sourceFiles) {
       const content = fs.readFileSync(file, "utf-8");
-      for (const match of content.matchAll(rpcCallPattern)) {
+      if (!content.includes(".rpc(")) continue;
+
+      const totalCalls = [...content.matchAll(anyRpcCallPattern)].length;
+      const literalCalls = [...content.matchAll(literalRpcCallPattern)];
+      dynamicCallSites += totalCalls - literalCalls.length;
+
+      for (const match of literalCalls) {
         const name = match[1];
-        if (!definedFunctions.has(name)) {
-          const line = content.slice(0, match.index ?? 0).split("\n").length;
+        if (!liveFunctions.has(name)) {
           const rel = path.relative(REPO_ROOT, file);
           violations.push(
-            `${rel}:${line} — .rpc("${name}") has no matching migration definition`
+            `${rel}:${lineAt(content, match.index ?? 0)} — .rpc("${name}") has no live migration definition`
           );
         }
       }
     }
 
-    if (violations.length > 0) {
-      throw new Error(
-        `Found ${violations.length} .rpc() call(s) referencing a function with no ` +
-          `matching migration definition:\n\n` +
-          violations.map((v) => `  ${v}`).join("\n")
-      );
-    }
+    expect(
+      dynamicCallSites,
+      "a .rpc() call using a dynamic (non-literal) function name was found — " +
+        "this invariant cannot statically verify it against migrations; " +
+        "review it manually and, if intentional, update this test's baseline"
+    ).toBe(0);
+
+    reportViolations(
+      violations,
+      `Found ${violations.length} .rpc() call(s) referencing a function with no live migration definition:`
+    );
   });
 });
