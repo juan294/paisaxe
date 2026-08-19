@@ -466,6 +466,54 @@ describe("POST /api/checkout/day-pass", () => {
     );
   });
 
+  // DO-M5 (#832): `??` only falls back on null/undefined, so a
+  // whitespace-contaminated NEXT_PUBLIC_SITE_URL (which Vercel CLI can
+  // introduce per CLAUDE.md) must still be trimmed/rejected via getSiteUrl(),
+  // not passed through raw.
+  it("DO-M5: should fall back to the hardcoded default when NEXT_PUBLIC_SITE_URL is whitespace-only", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "   ");
+
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+      "https://checkout.stripe.com/session123"
+    );
+
+    const request = createRequest();
+    await POST(request);
+
+    expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl: "https://paisaxe.es/pricing/success",
+        cancelUrl: "https://paisaxe.es/pricing",
+      })
+    );
+  });
+
+  it("DO-M5: should trim a whitespace-contaminated NEXT_PUBLIC_SITE_URL instead of embedding it raw", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://staging.paisaxe.es \n");
+
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+      "https://checkout.stripe.com/session123"
+    );
+
+    const request = createRequest();
+    await POST(request);
+
+    expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl: "https://staging.paisaxe.es/pricing/success",
+        cancelUrl: "https://staging.paisaxe.es/pricing",
+      })
+    );
+  });
+
   describe("ALLOWED_ORIGINS in development mode (module-level branch)", () => {
     // ALLOWED_ORIGINS is computed once at module load time, so exercising the
     // NODE_ENV === "development" branch requires resetting modules and
