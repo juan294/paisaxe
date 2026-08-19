@@ -1568,6 +1568,107 @@ describe("useStreamChat", () => {
     expect(result.current.error).toBe("Se perdió la conexión. Reintentar");
   });
 
+  describe("PE-M4: SSE text chunks are coalesced into a single rAF-batched flush", () => {
+    it("flushes the buffered content synchronously on 'done' even when the mocked rAF never fires, and coalesces renders", async () => {
+      // Freeze requestAnimationFrame so it never invokes its callback. If the
+      // final content is still correct, the coalesced chunk must have been
+      // flushed synchronously when the "done" event arrived rather than
+      // depending on an actual paint frame ever occurring.
+      const rafCallbacks: FrameRequestCallback[] = [];
+      const rafSpy = vi
+        .spyOn(window, "requestAnimationFrame")
+        .mockImplementation((cb) => {
+          rafCallbacks.push(cb);
+          return rafCallbacks.length;
+        });
+      const cafSpy = vi
+        .spyOn(window, "cancelAnimationFrame")
+        .mockImplementation(() => {});
+
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("one two three four five")
+      );
+
+      let renderCount = 0;
+      const { result } = renderHook(() => {
+        renderCount++;
+        return useStreamChat({ canUseVoice: false });
+      });
+      const renderCountBeforeSend = renderCount;
+
+      await act(async () => {
+        await result.current.sendMessage("Hi", {
+          context: "ctx",
+          locale: "es",
+          messageIndex: 0,
+        });
+      });
+
+      // A flush was scheduled (chunks were buffered instead of being
+      // applied to state one at a time)...
+      expect(rafSpy).toHaveBeenCalled();
+      // ...but the mocked rAF callback was NEVER invoked by this test, and
+      // the content is still fully correct — proving "done" flushes the
+      // buffered chunk synchronously rather than relying on a paint frame.
+      expect(rafCallbacks.length).toBeGreaterThan(0);
+      expect(result.current.messages[1].content).toBe(
+        "one two three four five"
+      );
+
+      // 5 "text" chunks arrived, but batching means far fewer renders than
+      // one-render-per-chunk.
+      const rendersDuringStream = renderCount - renderCountBeforeSend;
+      expect(rendersDuringStream).toBeLessThan(5);
+
+      rafSpy.mockRestore();
+      cafSpy.mockRestore();
+    });
+
+    it("still replaces content with the error fallback when an error event follows buffered text chunks", async () => {
+      // Regression guard: buffered-but-unflushed text must never leak into
+      // the error-replacement content applied when the stream fails.
+      const encoder = new TextEncoder();
+      const events = [
+        `data: ${JSON.stringify({ type: "text", content: "Partial " })}\n\n`,
+        `data: ${JSON.stringify({ type: "text", content: "answer" })}\n\n`,
+        `data: ${JSON.stringify({ type: "error", message: "stream_failed" })}\n\n`,
+      ];
+      let index = 0;
+      const stream = new ReadableStream({
+        pull(controller) {
+          if (index < events.length) {
+            controller.enqueue(encoder.encode(events[index]));
+            index++;
+          } else {
+            controller.close();
+          }
+        },
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ "content-type": "text/event-stream" }),
+        body: stream,
+      });
+
+      const { result } = renderHook(() =>
+        useStreamChat({ canUseVoice: false })
+      );
+
+      await act(async () => {
+        await result.current.sendMessage("Question", {
+          context: "ctx",
+          locale: "es",
+          messageIndex: 0,
+        });
+      });
+
+      expect(result.current.messages[1].content).toBe(
+        "Lo siento, hubo un error. Intenta de nuevo."
+      );
+    });
+  });
+
   it("catch block: pushes new timeout message when assistantIndex is out of bounds after reset (line 293)", async () => {
     vi.useFakeTimers();
 
