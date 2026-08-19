@@ -1,6 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateAdminAuth, withAdmin, withAdminRead } from "./admin-auth";
+import {
+  validateAdminAuth,
+  withAdmin,
+  withAdminRead,
+  invalidateRoleCache,
+  ROLE_CACHE_MAX_ENTRIES,
+  getRoleCacheSize,
+} from "./admin-auth";
 import { getRequestId } from "./request-context";
+
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock("@/lib/logger", () => ({ logger }));
 
 // Mock createAdminClient so withAdmin tests don't need SUPABASE_SERVICE_KEY
 const mockAdminClient = { from: vi.fn() };
@@ -249,6 +264,32 @@ describe("validateAdminAuth", () => {
     }
   });
 
+  // ─── BE-L7 (#800): the catch-all failure must be logged, not swallowed ───
+  it("should log the caught error before returning 500 on an unexpected failure", async () => {
+    mockGetUser.mockRejectedValue(new Error("Unexpected failure"));
+
+    await validateAdminAuth();
+
+    // Regression risk (#800): Supabase auth errors can carry token fragments,
+    // so this must go through the shared `logger` (which sanitizes meta via
+    // src/lib/logger-sanitize.ts — see logger-sanitize.test.ts) rather than a
+    // raw console call.
+    expect(logger.error).toHaveBeenCalledWith("[ADMIN_AUTH_UNHANDLED_ERROR]", {
+      error: "Unexpected failure",
+    });
+  });
+
+  it("should log a non-Error thrown value on an unexpected failure", async () => {
+    mockGetUser.mockRejectedValue("raw string failure");
+
+    await validateAdminAuth();
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[ADMIN_AUTH_UNHANDLED_ERROR]",
+      { error: "raw string failure" }
+    );
+  });
+
   describe("withAdmin HOF", () => {
     it("should return 401 response when auth fails", async () => {
       mockGetUser.mockResolvedValue({
@@ -419,6 +460,109 @@ describe("validateAdminAuth", () => {
         expect(result.error.status).toBe(500);
       }
     });
+  });
+
+  // ─── SE-M4 (#848): invalidateRoleCache escape hatch ──────────────────────
+  describe("SE-M4: invalidateRoleCache", () => {
+    it("evicts a cached entry so the next call re-hits the DB", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "invalidate-user", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      await validateAdminAuth();
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+
+      invalidateRoleCache("invalidate-user");
+
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "invalidate-user", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      const result = await validateAdminAuth();
+      expect(result.valid).toBe(true);
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+    });
+
+    it("is a no-op for a user id that was never cached", () => {
+      expect(() => invalidateRoleCache("never-cached-user")).not.toThrow();
+    });
+  });
+
+  // ─── SE-M4 (#848): mutating HTTP methods skip the warm role cache ────────
+  describe("SE-M4: skip cache for mutating methods (withAdmin)", () => {
+    it("re-checks the DB for a POST even when the role cache is warm", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "mutate-user", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      // Warm the cache via a GET-like call (no request / non-mutating method).
+      await withAdmin(vi.fn().mockResolvedValue("ok"));
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "mutate-user", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      const request = new Request("https://paisaxe.test/api/admin/x", {
+        method: "POST",
+      });
+
+      await withAdmin(vi.fn().mockResolvedValue("ok"), request);
+
+      // A mutating method must not trust the 30s-stale cached role.
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+    });
+
+    it("still uses the warm cache for a GET request", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "get-user", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      const request = new Request("https://paisaxe.test/api/admin/x", {
+        method: "GET",
+      });
+
+      await withAdmin(vi.fn().mockResolvedValue("ok"), request);
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "get-user", email: "admin@example.com" } },
+        error: null,
+      });
+
+      await withAdmin(vi.fn().mockResolvedValue("ok"), request);
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── BE-L7 (#800): role cache is bounded, not just TTL'd ─────────────────
+  describe("BE-L7: bounded role cache", () => {
+    it("never grows past ROLE_CACHE_MAX_ENTRIES", async () => {
+      for (let i = 0; i < ROLE_CACHE_MAX_ENTRIES + 50; i++) {
+        mockGetUser.mockResolvedValue({
+          data: { user: { id: `bound-user-${i}`, email: `u${i}@example.com` } },
+          error: null,
+        });
+        setupProfileMock({ role: "admin" });
+         
+        await validateAdminAuth();
+      }
+
+      expect(getRoleCacheSize()).toBeLessThanOrEqual(ROLE_CACHE_MAX_ENTRIES);
+    }, 20_000);
   });
 
   describe("cookie callbacks", () => {
