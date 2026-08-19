@@ -58,13 +58,17 @@ type StreamOptions = {
 // flipping the global NODE_ENV — which has broad side effects elsewhere in
 // Next.js beyond just this file. Unset (the default) preserves the existing
 // NODE_ENV-based behavior exactly.
-const ANTHROPIC_TRANSPORT_OVERRIDE = process.env.ANTHROPIC_TRANSPORT?.trim();
-const USE_CURL =
-  ANTHROPIC_TRANSPORT_OVERRIDE === "sdk"
-    ? false
-    : ANTHROPIC_TRANSPORT_OVERRIDE === "curl"
-      ? true
-      : process.env.NODE_ENV !== "production";
+function resolveUseCurl(): boolean {
+  switch (process.env.ANTHROPIC_TRANSPORT?.trim()) {
+    case "sdk":
+      return false;
+    case "curl":
+      return true;
+    default:
+      return process.env.NODE_ENV !== "production";
+  }
+}
+const USE_CURL = resolveUseCurl();
 
 /**
  * Stream text chunks from the Anthropic API.
