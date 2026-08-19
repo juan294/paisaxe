@@ -244,5 +244,53 @@ describe("Voice Access API", () => {
       const json = await response.json();
       expect(json.error).toBe("Failed to check access");
     });
+
+    // BE-M12 (#793): getSupabaseClient() was called with no `request`
+    // argument, so a bearer-authenticated caller's voice_purchases lookup
+    // ran on an unauthenticated client — RLS then hid the row and produced
+    // a false "Voice access required" denial for the documented API-client
+    // auth path (bearer clients don't send the cookie session).
+    it("BE-M12: forwards the bearer token to the RLS-scoped voice_purchases query", async () => {
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              gt: vi.fn(() => ({
+                order: vi.fn(() => ({
+                  limit: vi.fn(() => ({
+                    maybeSingle: vi.fn(() =>
+                      Promise.resolve({ data: null, error: null })
+                    ),
+                  })),
+                })),
+              })),
+            })),
+          })),
+        })),
+      } as never);
+
+      const request = createRequest({
+        headers: { Authorization: "Bearer valid-token" },
+      });
+      await GET(request);
+
+      const forwardedBearerToken = mockCreateServerClient.mock.calls.some(
+        (call) => {
+          const options = call[2] as {
+            global?: { headers?: Record<string, string> };
+          };
+          return (
+            options?.global?.headers?.Authorization === "Bearer valid-token"
+          );
+        }
+      );
+      expect(forwardedBearerToken).toBe(true);
+    });
   });
 });
