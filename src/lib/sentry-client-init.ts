@@ -13,26 +13,46 @@ export function getClientDsn(): string | undefined {
 }
 
 /**
- * Initialize the Sentry client SDK, but only when a DSN is actually
- * configured. `@sentry/nextjs` is loaded via a dynamic `import()` rather
- * than a static one so that builds without a DSN (local dev, Preview) can
- * fully dead-code-eliminate the SDK instead of shipping it inert in the
- * shared JS baseline of every prerendered page (~8.4KB gzip — #818). When a
- * DSN *is* present (Production today), this still initializes Sentry with
- * the exact same config as before, just one microtask later.
+ * Load the Sentry client SDK, but only when a DSN is actually configured.
+ * `@sentry/nextjs` is loaded via a dynamic `import()` rather than a static
+ * one so that builds without a DSN (local dev, Preview) can fully
+ * dead-code-eliminate the SDK instead of shipping it inert in the shared
+ * JS baseline of every prerendered page (~8.4KB gzip — #818).
+ *
+ * This is the shared primitive: anywhere that wants to call into Sentry
+ * (client SDK init here, `Sentry.captureException` in error boundaries —
+ * see the #941 follow-up for the latter) can call this first and skip the
+ * work entirely when it resolves to `undefined`.
  *
  * `loadSentry` is injectable so tests can assert the gating behavior
  * without pulling in the real SDK.
+ */
+export async function loadSentryIfConfigured(
+  dsn: string | undefined = getClientDsn(),
+  loadSentry: () => Promise<typeof SentryNS> = () => import("@sentry/nextjs"),
+): Promise<typeof SentryNS | undefined> {
+  if (!dsn) {
+    return undefined;
+  }
+
+  return loadSentry();
+}
+
+/**
+ * Initialize the Sentry client SDK with this project's config. When a DSN
+ * *is* present (Production today), this initializes Sentry with the exact
+ * same config as before the #818 dynamic-import gating, just one microtask
+ * later.
  */
 export async function initSentryClient(
   dsn: string | undefined = getClientDsn(),
   loadSentry: () => Promise<typeof SentryNS> = () => import("@sentry/nextjs"),
 ): Promise<void> {
-  if (!dsn) {
+  const Sentry = await loadSentryIfConfigured(dsn, loadSentry);
+  if (!Sentry || !dsn) {
     return;
   }
 
-  const Sentry = await loadSentry();
   Sentry.init({
     dsn,
     // Capture 10% of transactions for performance monitoring
