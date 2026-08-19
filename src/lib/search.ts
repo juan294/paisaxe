@@ -1,11 +1,17 @@
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
+import { SearchResultCache } from "./embedding-cache";
 import type { Chunk, ImageResult, SearchResult } from "@/types";
 import { logger } from "@/lib/logger";
 
 /** Number of candidates to retrieve from vector search before reranking */
 const RERANK_CANDIDATE_COUNT = 10;
 export const RERANK_TIMEOUT_MS = 2_500;
+
+// PE-M2 (#810): caches the full retrieval result (vector search + rerank +
+// image lookup) keyed on the normalized query text, so a repeat question
+// skips all three round-trips, not just the embedding call.
+const searchResultCache = new SearchResultCache();
 
 export async function searchChunks(
   queryEmbedding: number[],
@@ -81,6 +87,15 @@ export async function search(
   limit: number = 5,
   queryText?: string
 ): Promise<SearchResult> {
+  // PE-M2 (#810): a cache hit here skips the vector-search RPC, the rerank
+  // call, AND the image lookup — not just the embedding (see embedding-cache.ts).
+  // Only cached when queryText is provided; the plain-vector-search fallback
+  // path below is not cached (see keying rationale there).
+  if (queryText) {
+    const cached = await searchResultCache.get(queryText, limit);
+    if (cached) return cached;
+  }
+
   // When reranking, widen the initial search to get more candidates
   const candidateCount = queryText ? RERANK_CANDIDATE_COUNT : limit;
   const candidates = await searchChunks(queryEmbedding, candidateCount);
@@ -99,7 +114,7 @@ export async function search(
   const allCandidateRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
   const uniqueCandidateRefs = [...new Set(allCandidateRefs)];
 
-  const rerankWithFallback = withRerankTimeout(
+  const rerankRace = withRerankTimeout(
     rerankChunks(queryText, candidates, limit),
     candidates,
     limit
@@ -107,7 +122,7 @@ export async function search(
 
   // Start both in parallel — neither depends on the other's result yet.
   const [rerankedChunks, allImages] = await Promise.all([
-    rerankWithFallback,
+    rerankRace.result,
     getRelatedImages(uniqueCandidateRefs),
   ]);
 
@@ -115,46 +130,36 @@ export async function search(
   const topKRefs = new Set(rerankedChunks.flatMap((chunk) => chunk.imageRefs || []));
   const images = allImages.filter((img) => topKRefs.has(img.path));
 
-  return { chunks: rerankedChunks, images };
+  const result: SearchResult = { chunks: rerankedChunks, images };
+
+  // Don't cache a rerank-timeout fallback: it's a degraded (vector-order-only)
+  // result, and caching it would serve that degraded ranking to every repeat
+  // query for the full TTL even after a transient rerank slowdown passes.
+  if (!rerankRace.timedOut()) {
+    void searchResultCache.set(queryText, limit, result);
+  }
+
+  return result;
 }
 
 function withRerankTimeout(
   rerankPromise: Promise<Chunk[]>,
   candidates: Chunk[],
   limit: number
-): Promise<Chunk[]> {
+): { result: Promise<Chunk[]>; timedOut: () => boolean } {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
   const timeoutPromise = new Promise<Chunk[]>((resolve) => {
     timer = setTimeout(() => {
+      timedOut = true;
       logger.warn("[SEARCH_RERANK_TIMEOUT]", { timeoutMs: RERANK_TIMEOUT_MS });
       resolve(candidates.slice(0, limit));
     }, RERANK_TIMEOUT_MS);
   });
 
-  return Promise.race([rerankPromise, timeoutPromise]).finally(() => {
+  const result = Promise.race([rerankPromise, timeoutPromise]).finally(() => {
     if (timer !== undefined) clearTimeout(timer);
   });
-}
 
-// Keyword-based fallback search for specific place names
-export async function keywordSearch(query: string, limit: number = 5): Promise<Chunk[]> {
-  const { data, error } = await supabase
-    .from("chunks")
-    .select("id, content, source_pdf, page_number, section_title, image_refs")
-    .textSearch("content", query, { type: "websearch", config: "spanish" })
-    .limit(limit);
-
-  if (error) {
-    logger.error("[TABLE_FALLBACK]", { table: "chunks", error: error.message ?? String(error) });
-    return [];
-  }
-
-  return data.map((row) => ({
-    id: row.id,
-    content: row.content,
-    sourcePdf: row.source_pdf,
-    pageNumber: row.page_number,
-    sectionTitle: row.section_title,
-    imageRefs: row.image_refs,
-  }));
+  return { result, timedOut: () => timedOut };
 }
