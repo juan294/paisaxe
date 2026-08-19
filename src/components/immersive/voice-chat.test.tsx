@@ -1637,6 +1637,31 @@ describe("VoiceChat upgrade and expiry", () => {
     expect(warning).toBeInTheDocument();
   });
 
+  // UX-M11 (#904): the expiry-warning time must be formatted using the app's
+  // active locale (mapped to an explicit Intl tag), not the browser default.
+  it("formats the expiry warning time using the app's active locale", () => {
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.hoursUntilExpiry = 3;
+    mockVoiceAccess.expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
+    mockVoiceAccess.isWhitelisted = false;
+    mockVoiceAccess.hasAccess = true;
+
+    const toLocaleTimeStringSpy = vi.spyOn(Date.prototype, "toLocaleTimeString");
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    // The i18n mock at the top of this file fixes locale to "es" — mapped to
+    // the explicit BCP-47 tag "es-ES" via toIntlLocale, not left undefined
+    // (which would fall back to the browser's own locale).
+    expect(toLocaleTimeStringSpy).toHaveBeenCalledWith("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    toLocaleTimeStringSpy.mockRestore();
+  });
+
   it("should show loading state during initialization", () => {
     mockVoiceAccess.isLoading = true;
 

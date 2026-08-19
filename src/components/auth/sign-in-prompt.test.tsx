@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SignInPrompt } from "./sign-in-prompt";
 import { createMockT } from "@/test/i18n-mock";
 
@@ -143,6 +143,71 @@ describe("SignInPrompt", () => {
 
       const dialog = screen.getByRole("dialog");
       expect(dialog).toHaveAttribute("aria-modal", "true");
+    });
+  });
+
+  // UX-M2 (#895): this was the worst-off of the four hand-rolled visitor
+  // modals — no focus trap, no Escape handler, no initial focus, and no
+  // focus restoration on close. Adopt the same useFocusTrap hook already
+  // used by mood-overlay.tsx and voice-chat.tsx (the recommendation's
+  // explicit starting point: "least custom, worst a11y").
+  describe("focus trap (UX-M2 #895)", () => {
+    beforeEach(() => {
+      vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+        cb(0);
+        return 1;
+      });
+      vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      cleanup();
+      vi.restoreAllMocks();
+    });
+
+    it("moves initial focus into the dialog when opened", () => {
+      render(<SignInPrompt {...defaultProps} />);
+
+      const dialog = screen.getByRole("dialog");
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
+    it("traps focus within the dialog (Tab wraps from last to first)", () => {
+      render(<SignInPrompt {...defaultProps} />);
+      const dialog = screen.getByRole("dialog");
+
+      const buttons = dialog.querySelectorAll<HTMLElement>("button");
+      const firstButton = buttons[0];
+      const lastButton = buttons[buttons.length - 1];
+
+      lastButton.focus();
+      expect(document.activeElement).toBe(lastButton);
+
+      fireEvent.keyDown(dialog, { key: "Tab", shiftKey: false });
+      expect(document.activeElement).toBe(firstButton);
+    });
+
+    it("traps focus within the dialog (Shift+Tab wraps from first to last)", () => {
+      render(<SignInPrompt {...defaultProps} />);
+      const dialog = screen.getByRole("dialog");
+
+      const buttons = dialog.querySelectorAll<HTMLElement>("button");
+      const firstButton = buttons[0];
+      const lastButton = buttons[buttons.length - 1];
+
+      firstButton.focus();
+      expect(document.activeElement).toBe(firstButton);
+
+      fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(lastButton);
+    });
+
+    it("calls onClose when Escape is pressed", () => {
+      render(<SignInPrompt {...defaultProps} />);
+      const dialog = screen.getByRole("dialog");
+
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      expect(defaultProps.onClose).toHaveBeenCalled();
     });
   });
 });

@@ -131,11 +131,11 @@ export const pt: Translations = {
     // LOCATION-SPECIFIC: Location name
     empty_description: 'Explore as histórias das Astúrias e guarde as que mais gostar para ver depois.',
     explore: 'Explorar histórias',
-    loading_more: 'A carregar mais...',
     all_viewed: 'Já viu todos os seus guardados',
     remove_from_saved: 'Remover dos guardados',
     removed: 'Removido dos favoritos',
     saved_toast: 'Guardado nos favoritos',
+    undo: 'Desfazer',
   },
 
   accessibility: {
