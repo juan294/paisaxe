@@ -29,14 +29,15 @@ vi.mock("@/lib/admin-auth", () => ({
 
 vi.mock("@/lib/content-discovery", () => ({
   runDiscovery: vi.fn(),
+  MAX_DISCOVERIES_PER_RUN: 5,
 }));
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({ from: vi.fn(), rpc: mockRpc })),
 }));
 
-import { GET, POST } from "./route";
-import { runDiscovery } from "@/lib/content-discovery";
+import { GET, POST, maxDuration } from "./route";
+import { runDiscovery, MAX_DISCOVERIES_PER_RUN } from "@/lib/content-discovery";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
 function makeRequest(headers: Record<string, string> = {}, method = "POST") {
@@ -491,5 +492,28 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — content-discovery", () => {
         error: expect.stringContaining("Google Places API rate limit exceeded"),
       })
     );
+  });
+});
+
+// DO-M6 (#833): explicit ceiling, replacing Vercel's implicit platform
+// default, kept strictly above the worst-case network budget the discovery
+// pipeline can run up: one Google Places search
+// (AbortSignal.timeout(8_000) — src/lib/content-discovery.ts:219) plus up to
+// MAX_DISCOVERIES_PER_RUN sequential Claude description calls
+// (AbortSignal.timeout(8_000) each — src/lib/content-discovery.ts:273).
+describe("DO-M6: maxDuration (#833)", () => {
+  it("declares an explicit numeric maxDuration", () => {
+    expect(typeof maxDuration).toBe("number");
+    expect(Number.isFinite(maxDuration)).toBe(true);
+  });
+
+  it("keeps maxDuration strictly greater than the worst-case network budget", () => {
+    const PLACES_SEARCH_TIMEOUT_SECONDS = 8;
+    const DESCRIPTION_TIMEOUT_SECONDS = 8;
+    const worstCaseNetworkSeconds =
+      PLACES_SEARCH_TIMEOUT_SECONDS +
+      MAX_DISCOVERIES_PER_RUN * DESCRIPTION_TIMEOUT_SECONDS;
+
+    expect(maxDuration).toBeGreaterThan(worstCaseNetworkSeconds);
   });
 });

@@ -22,6 +22,28 @@ import { ALLOWED_ORIGINS } from "@/lib/proxy/cors";
 const LOCK_KEY = "content-discovery";
 const LOCK_LEASE_SECONDS = 20 * 60;
 
+// DO-M6 (#833): explicit ceiling for this route, replacing Vercel's implicit
+// project default. Worst-case network budget = one Google Places search
+// (AbortSignal.timeout(8_000) — src/lib/content-discovery.ts:219) plus up to
+// MAX_DISCOVERIES_PER_RUN (5) sequential Claude description calls
+// (AbortSignal.timeout(8_000) each — src/lib/content-discovery.ts:273) =
+// 8 + 5*8 = 48s. 90s keeps a substantial margin over that for Supabase
+// round-trips (existing-story dedup fetch, lock acquire/release, story
+// insert) without approving an open-ended runtime — each external call in
+// the pipeline is already individually bounded by its own AbortSignal, and
+// MAX_DISCOVERIES_PER_RUN caps the fan-out, so this ceiling cannot silently
+// grow via more discoveries per run.
+//
+// Per PE-H5 (#808) / BE-M3 (#784), Vercel's currently documented default
+// (Fluid Compute, on by default) is 300s across all plan tiers — so 90s here
+// is a deliberately LOWER, explicit ceiling than that implicit default. This
+// could not be confirmed against this project's actual dashboard setting
+// (`vercel project inspect` does not surface Function Max Duration);
+// flagging for human confirmation via Settings > Functions > Function Max
+// Duration, consistent with the same caveat already recorded on the other
+// two routes that declare `maxDuration`.
+export const maxDuration = 90;
+
 /** Core discovery logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
 async function discoverContent(): Promise<NextResponse> {
   const start = Date.now();
