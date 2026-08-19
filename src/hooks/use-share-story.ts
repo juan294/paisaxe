@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
+import { useIsFinePointer } from "@/hooks/use-media-query";
 import type { Story } from "@/types/immersive";
 
 /**
@@ -26,6 +27,9 @@ export function useShareStory(story: Story) {
   const { t, locale } = useTranslation();
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // FE-M6 (#768): reuse the existing hydration-safe pointer-type hook instead
+  // of re-querying matchMedia inline — one source of truth for pointer detection.
+  const isFinePointer = useIsFinePointer();
 
   const showToast = useCallback((message: string) => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -44,7 +48,7 @@ export function useShareStory(story: Story) {
       url: shareUrl,
     };
 
-    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+    const isTouchDevice = !isFinePointer;
 
     try {
       if (isTouchDevice && navigator.share && navigator.canShare?.(shareData)) {
@@ -70,7 +74,7 @@ export function useShareStory(story: Story) {
         }
       }
     }
-  }, [story, locale, t, showToast]);
+  }, [story, locale, t, showToast, isFinePointer]);
 
   return { toast, handleShare };
 }
