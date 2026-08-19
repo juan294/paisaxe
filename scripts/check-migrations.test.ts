@@ -180,8 +180,151 @@ describe("validateMigrations", () => {
     const result = validateMigrations({ root });
 
     expect(result.errors).toContain(
-      "SECURITY DEFINER translation function public.fail_stale_story_translations must use SET search_path = ''"
+      "SECURITY DEFINER function public.fail_stale_story_translations must use SET search_path = ''"
     );
+  });
+
+  it("fails when a SECURITY DEFINER function with a name outside the old 3-name allowlist lacks SET search_path (#876)", () => {
+    // Regression test for QA-M5: the old checkTranslationFunctionSearchPaths only
+    // checked TRANSLATION_SECURITY_DEFINER_FUNCTIONS (3 hard-coded names). Any other
+    // SECURITY DEFINER function -- like this arbitrary one -- must now be caught too.
+    const root = createMigrationFixture({
+      "001_arbitrary_function.sql": `
+        CREATE OR REPLACE FUNCTION public.totally_unrelated_admin_helper(
+          p_id uuid
+        ) RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        BEGIN
+          NULL;
+        END;
+        $$;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toContain(
+      "SECURITY DEFINER function public.totally_unrelated_admin_helper must use SET search_path = ''"
+    );
+  });
+
+  it("passes when an arbitrary SECURITY DEFINER function does set search_path = ''", () => {
+    const root = createMigrationFixture({
+      "001_arbitrary_function.sql": `
+        CREATE OR REPLACE FUNCTION public.totally_unrelated_admin_helper(
+          p_id uuid
+        ) RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = ''
+        AS $$
+        BEGIN
+          NULL;
+        END;
+        $$;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(
+      result.errors.some((error) => error.includes("totally_unrelated_admin_helper"))
+    ).toBe(false);
+  });
+
+  it("does not flag a SECURITY INVOKER (non-DEFINER) function for missing search_path", () => {
+    const root = createMigrationFixture({
+      "001_invoker_function.sql": `
+        CREATE OR REPLACE FUNCTION public.harmless_invoker_helper()
+        RETURNS void
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+          NULL;
+        END;
+        $$;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it("judges a SECURITY DEFINER function on its latest redefinition, not an earlier non-compliant one", () => {
+    const root = createMigrationFixture({
+      "001_create_bad.sql": `
+        CREATE OR REPLACE FUNCTION public.evolving_function()
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = public
+        AS $$
+        BEGIN
+          NULL;
+        END;
+        $$;
+      `,
+      "002_fix_search_path.sql": `
+        CREATE OR REPLACE FUNCTION public.evolving_function()
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = ''
+        AS $$
+        BEGIN
+          NULL;
+        END;
+        $$;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(
+      result.errors.some((error) => error.includes("evolving_function"))
+    ).toBe(false);
+  });
+
+  it("does not fire on a DROP FUNCTION statement for a SECURITY DEFINER function name", () => {
+    // A DROP FUNCTION IF EXISTS statement (e.g. dropping an old overload before
+    // recreating with a new signature) must not be mistaken for a function header.
+    const root = createMigrationFixture({
+      "001_create.sql": `
+        CREATE OR REPLACE FUNCTION public.replaced_function(p_a text)
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = ''
+        AS $$
+        BEGIN
+          NULL;
+        END;
+        $$;
+      `,
+      "002_drop_and_recreate.sql": `
+        DROP FUNCTION IF EXISTS public.replaced_function(text);
+
+        CREATE OR REPLACE FUNCTION public.replaced_function(p_a text, p_b text)
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = ''
+        AS $$
+        BEGIN
+          NULL;
+        END;
+        $$;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(
+      result.errors.some((error) => error.includes("replaced_function"))
+    ).toBe(false);
   });
 
   it("validates repository migrations including sensitive table and credential checks", () => {

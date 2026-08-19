@@ -62,12 +62,6 @@ const SENSITIVE_SERVICE_ROLE_TABLES = [
   "pending_bookings",
 ];
 
-const TRANSLATION_SECURITY_DEFINER_FUNCTIONS = [
-  "trigger_translation_webhook",
-  "fail_stale_story_translations",
-  "fail_stale_story_translations_locked",
-];
-
 const COMPLETE_BOOKING_SMS_JOB_SIGNATURE_ERROR =
   "Internal function revokes must target public.complete_booking_sms_job(text, text, text), not the dropped two-argument signature";
 
@@ -376,17 +370,32 @@ export function getFunctionHeader(sql: string, functionName: string): string | n
   return headerEnd === -1 ? sql.slice(match.index) : sql.slice(match.index, headerEnd);
 }
 
-function checkTranslationFunctionSearchPaths(migrations: MigrationFile[]): string[] {
+// Matches every `CREATE [OR REPLACE] FUNCTION [public.]name(` header across all
+// migrations -- not a hard-coded allowlist of names (see #876/QA-M5, which found
+// the previous allowlist covered only 3 of 25+ real SECURITY DEFINER functions).
+// Deliberately anchored on "create function", so DROP FUNCTION / REVOKE ... ON
+// FUNCTION statements (which reference a function name but never start with
+// "create") never match and can't be mistaken for a definition.
+const FUNCTION_DEFINITION_RE =
+  /create\s+(?:or\s+replace\s+)?function\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(/g;
+
+// Every SECURITY DEFINER function in the schema must pin `SET search_path = ''`
+// (see CLAUDE.md's "Database function security" guardrail). Walks migrations in
+// filename order and keeps only the last header seen per function name, so a
+// function that was fixed in a later migration (or redefined with a new
+// signature) is judged on its current definition, not an earlier draft.
+function checkSecurityDefinerSearchPaths(migrations: MigrationFile[]): string[] {
   const errors: string[] = [];
   const latestHeaders = new Map<string, string>();
 
   for (const migration of migrations) {
     const sql = normalizeSql(readFileSync(migration.path, "utf8"));
 
-    for (const functionName of TRANSLATION_SECURITY_DEFINER_FUNCTIONS) {
-      const header = getFunctionHeader(sql, functionName);
-      if (!header) continue;
-
+    for (const match of sql.matchAll(FUNCTION_DEFINITION_RE)) {
+      const functionName = match[1];
+      const startIndex = match.index ?? 0;
+      const headerEnd = sql.indexOf(" as $$", startIndex);
+      const header = headerEnd === -1 ? sql.slice(startIndex) : sql.slice(startIndex, headerEnd);
       latestHeaders.set(functionName, header);
     }
   }
@@ -396,7 +405,7 @@ function checkTranslationFunctionSearchPaths(migrations: MigrationFile[]): strin
 
     if (!header.includes("set search_path = ''")) {
       errors.push(
-        `SECURITY DEFINER translation function public.${functionName} must use SET search_path = ''`
+        `SECURITY DEFINER function public.${functionName} must use SET search_path = ''`
       );
     }
   }
@@ -442,7 +451,7 @@ export function validateMigrations(
   errors.push(...checkSensitiveTablePosture(migrationSql));
   errors.push(...checkPublicTableRlsPosture(migrationSql));
   errors.push(...checkMarketingCredentialShape(migrationSql));
-  errors.push(...checkTranslationFunctionSearchPaths(migrations));
+  errors.push(...checkSecurityDefinerSearchPaths(migrations));
   errors.push(...checkCompleteBookingSmsJobSignatureReferences(migrations));
 
   return {
