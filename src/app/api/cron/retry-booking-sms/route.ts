@@ -49,7 +49,6 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
   const jobs = (claimedJobs ?? []) as RetryableSMSJob[];
   let sentCount = 0;
   let failedCount = 0;
-  let deadLetterCount = 0;
 
   for (const job of jobs) {
     let smsResult: Awaited<ReturnType<typeof sendSMS>>;
@@ -108,21 +107,34 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
         error: failError.message,
       });
     }
+  }
 
-    // BE-M11: a job at max attempts is never claimed again (see
-    // claim_retryable_booking_sms_jobs) but was previously indistinguishable
-    // from a job that will still retry -- log and count it distinctly so a
-    // broken Twilio config is observable instead of a silent dead-letter.
-    if (job.attempts >= SMS_RETRY_MAX_ATTEMPTS) {
-      deadLetterCount += 1;
-      logger.error("[CRON_RETRY_BOOKING_SMS_DEAD_LETTER]", {
-        booking_id: job.booking_id,
-        event_key: job.event_key,
-        attempts: job.attempts,
-        max_attempts: SMS_RETRY_MAX_ATTEMPTS,
-        error: errorMessage,
-      });
-    }
+  // BE-M11: claim_retryable_booking_sms_jobs (088/100) never reclaims a job
+  // once its attempts reach SMS_RETRY_MAX_ATTEMPTS, but fail_booking_sms_job
+  // (109) now retires it to a terminal `dead` status instead of the
+  // retryable `failed`, so it stops being silently indistinguishable from a
+  // job that will still retry. Surface that count with a scoped query --
+  // mirrors the dead-letter pattern already used by
+  // fail-stale-translations/route.ts (BE-B1) for the analogous
+  // translate_webhook_events queue. Scoped to `updated_at >= sweepStartedAt`
+  // (this invocation only, with a small clock-skew buffer) rather than an
+  // all-time count, which would stay > 0 forever after the first job ever
+  // died and fire on every run regardless of whether anything new died.
+  const sweepStartedAt = new Date(start - 5_000).toISOString();
+  const { count: deadLetterCount, error: deadCountError } = await supabase
+    .from("booking_sms_jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "dead")
+    .gte("updated_at", sweepStartedAt);
+
+  const deadLetterCountResult = deadCountError ? undefined : (deadLetterCount ?? 0);
+
+  if (deadCountError) {
+    logger.error("[CRON_RETRY_BOOKING_SMS_DEAD_COUNT_FAILED]", {
+      error: deadCountError.message,
+    });
+  } else if (deadLetterCountResult) {
+    logger.warn("[CRON_RETRY_BOOKING_SMS_DEAD]", { dead_letter_count: deadLetterCountResult });
   }
 
   logger.info("[CRON_SUCCESS]", {
@@ -131,7 +143,7 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
     claimed_count: jobs.length,
     sent_count: sentCount,
     failed_count: failedCount,
-    dead_letter_count: deadLetterCount,
+    dead_letter_count: deadLetterCountResult,
     max_attempts: SMS_RETRY_MAX_ATTEMPTS,
   });
 
@@ -140,7 +152,7 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
     claimed_count: jobs.length,
     sent_count: sentCount,
     failed_count: failedCount,
-    dead_letter_count: deadLetterCount,
+    dead_letter_count: deadLetterCountResult,
     max_attempts: SMS_RETRY_MAX_ATTEMPTS,
   });
 }
