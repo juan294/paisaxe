@@ -4,6 +4,7 @@ import { Share2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { ToolbarOverflowItem } from "./toolbar-overflow-menu";
 import { useShareStory } from "@/hooks/use-share-story";
 import type { Story } from "@/types/immersive";
 
@@ -29,26 +30,22 @@ export function ShareButton({ story, variant = "icon" }: ShareButtonProps) {
 
   if (variant === "menu") {
     return (
-      <button
-        type="button"
-        role="menuitem"
-        onClick={onClick}
-        className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors text-sm"
-      >
-        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-          {toast ? (
+      <ToolbarOverflowItem
+        icon={
+          toast ? (
             <Check className="h-4 w-4 animate-in fade-in zoom-in duration-200" />
           ) : (
             <Share2 className="h-4 w-4" />
-          )}
-        </span>
-        {/* Regression risk from #908: the icon variant's toast is an
-            absolutely-positioned popover anchored to its own trigger button,
-            which would clip inside the overflow menu's constrained popover.
-            Swapping the row's own label in place — instead of layering a
-            second popover — avoids that clipping without needing a portal. */}
-        <span role="status">{toast || t("share.share")}</span>
-      </button>
+          )
+        }
+        // Regression risk from #908: the icon variant's toast is an
+        // absolutely-positioned popover anchored to its own trigger button,
+        // which would clip inside the overflow menu's constrained popover.
+        // Swapping the row's own label in place — instead of layering a
+        // second popover — avoids that clipping without needing a portal.
+        label={<span role="status">{toast || t("share.share")}</span>}
+        onClick={handleShare}
+      />
     );
   }
 
