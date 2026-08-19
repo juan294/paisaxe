@@ -408,10 +408,7 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     const title = page.getByTestId("story-title").first();
     const initialTitle = await title.textContent();
 
-    // Open the suggest place dialog
-    // QA-M8: the trigger renders alongside the already-visible story title
-    // (see beforeEach) — 5s is generous without claiming the entire 15s
-    // CI per-test budget on a single wait.
+    // Open the suggest place dialog (see QA-M8 note above)
     const suggestButton = page.locator("[data-suggest-place-trigger]");
     await expect(suggestButton).toBeVisible({ timeout: 5000 });
     await suggestButton.click();
