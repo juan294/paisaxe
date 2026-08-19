@@ -33,38 +33,34 @@ export default function FavoritesPage() {
   const [undoState, setUndoState] = useState<{ storyId: string; title: string } | null>(null);
   const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (undoTimeoutRef.current !== null) {
-        clearTimeout(undoTimeoutRef.current);
-      }
-    };
+  const clearUndoTimeout = useCallback(() => {
+    if (undoTimeoutRef.current !== null) {
+      clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
+    }
   }, []);
+
+  useEffect(() => clearUndoTimeout, [clearUndoTimeout]);
 
   const handleRemove = useCallback(
     (storyId: string, title: string) => {
       toggleFavorite(storyId);
-      if (undoTimeoutRef.current !== null) {
-        clearTimeout(undoTimeoutRef.current);
-      }
+      clearUndoTimeout();
       setUndoState({ storyId, title });
       undoTimeoutRef.current = setTimeout(() => {
         setUndoState(null);
         undoTimeoutRef.current = null;
       }, UNDO_TIMEOUT_MS);
     },
-    [toggleFavorite]
+    [toggleFavorite, clearUndoTimeout]
   );
 
   const handleUndo = useCallback(() => {
     if (!undoState) return;
     toggleFavorite(undoState.storyId);
     setUndoState(null);
-    if (undoTimeoutRef.current !== null) {
-      clearTimeout(undoTimeoutRef.current);
-      undoTimeoutRef.current = null;
-    }
-  }, [undoState, toggleFavorite]);
+    clearUndoTimeout();
+  }, [undoState, toggleFavorite, clearUndoTimeout]);
 
   // requiresAuth is true for anonymous users — they can never have saved favorites.
   const canWaitForStories = !requiresAuth || favorites.length > 0;
