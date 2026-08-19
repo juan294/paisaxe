@@ -21,7 +21,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const supabase = await getSupabaseClient();
+  const supabase = await getSupabaseClient(request);
 
   // Query for active voice purchase — maybeSingle() returns {data: null, error: null}
   // when no row is found (no PGRST116 needed)

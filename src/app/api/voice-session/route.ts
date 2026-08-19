@@ -46,7 +46,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid agent" }, { status: 400 });
   }
 
-  const supabase = await getSupabaseClient();
+  const supabase = await getSupabaseClient(request);
   const { data, error } = await supabase
     .from("voice_purchases")
     .select("id")
