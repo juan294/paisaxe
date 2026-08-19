@@ -10,7 +10,7 @@ Detailed documentation for database maintenance, monitoring, webhooks, and autom
 | `docs/operations/rollback.md` | Production is broken. Roll back first, investigate second |
 | `docs/operations/alerting-runbook.md` | Responding to a specific alert type |
 | `docs/operations/migration-policy.md` | Writing or applying a migration |
-| `docs/operations/pre-launch-security-checklist.md` | The 6 manual security gates before a release PR |
+| `docs/operations/pre-launch-security-checklist.md` | The 6 security gates before a release PR (5 manual, 1 CI-verified) |
 
 ## Health Check Endpoints
 

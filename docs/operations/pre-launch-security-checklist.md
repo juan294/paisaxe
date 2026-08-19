@@ -1,9 +1,12 @@
 # Pre-Launch Security Checklist
 
-> SE-S1: Manual security gates that MUST be satisfied before every production
-> release to `main`. Automated CI cannot run these checks (no live credentials,
-> no git-history access, no external network in sandboxed agents). A human must
-> execute each step and record the result.
+> SE-S1: Security gates that MUST be satisfied before every production release
+> to `main`. Gates 2–6 need things automated CI doesn't have — live credentials,
+> a running deployment, or external network access — so a human must execute
+> each of those steps and record the result. Gate 1 (secret history scan) *is*
+> fully automated in CI; it's listed here as a checklist item so the release
+> manager confirms it passed for the exact commit/tree being released, not to
+> ask for a manual re-scan.
 
 This document converts SE-S1 from an open finding into a tracked, documented gate.
 It is referenced by `CLAUDE.md` (Production Release Step 2) and must be completed
@@ -11,26 +14,44 @@ before the release PR is created.
 
 ---
 
-## Gate 1 — Secret History Scan (gitleaks)
+## Gate 1 — Secret History Scan (Gitleaks) — Automated (CI Gate)
 
-**Why:** Secrets committed to git history persist even after the file is deleted.
-Automated CI only scans the working tree; history requires a full clone scan.
+**Why:** Secrets committed to git history persist even after the file is
+deleted, so a secret scan needs to cover history, not just the working tree.
+The `Security Scan` workflow (`.github/workflows/security.yml`) already does
+this: it checks out full git history (`fetch-depth: 0`) and runs a blocking
+Gitleaks scan against it on every push to `develop`/`main`, every PR, and
+daily at 08:00 UTC.
+
+**What to do:** Confirm the `Gitleaks secret scan` check passed for the exact
+commit/tree being released — not just "the PR is green" (see
+`docs/runbooks/release-checklist.md` Step 1: squash merges don't preserve the
+tested SHA, releases are identified by tree hash). Do not manually re-run
+Gitleaks as a substitute for this; find the run for that commit/tree in the
+Actions tab and confirm its status.
+
+**If the CI job ever fails:** Don't read the failure details from the public
+Actions log. CI's invocation (`gitleaks detect --source . --verbose`) has no
+`--redact` flag, so a real match would print in plaintext. Pull the report
+locally instead:
 
 ```bash
 # Install gitleaks if not present
 brew install gitleaks
 
-# Scan the full git history with redaction (safe to run in terminal)
+# Scan the full git history with redaction (safe to run in a terminal)
 gitleaks detect --source . --redact --report-format json --report-path /tmp/gitleaks-report.json
 
 # Review any findings
 cat /tmp/gitleaks-report.json | jq '.[] | {file, startLine, rule: .RuleID}'
 ```
 
-**Pass criteria:** Zero unredacted secrets in history. False positives must be
-baseline-listed in `.gitleaks.toml`.
+**Pass criteria:** `Gitleaks secret scan` CI check is green for the released
+commit/tree. False positives must be baseline-listed in `.gitleaks.toml`.
 
-**Run by:** Developer or release manager. Required before every `develop → main` PR.
+**Run by:** Automated (CI). Release manager confirms the check status before
+every `develop → main` PR; falls back to the local redacted scan above only
+if the CI check fails.
 
 ---
 
@@ -216,7 +237,7 @@ This gate does NOT need manual execution — it is already a required CI check.
 
 Before creating a `develop → main` release PR, confirm:
 
-- [ ] Gate 1: `gitleaks detect --redact` — zero findings in git history
+- [ ] Gate 1: `Gitleaks secret scan` CI check is green for the released commit/tree
 - [ ] Gate 2: Admin endpoints return 403 for non-admin QA user
 - [ ] Gate 3: Cron endpoints return 401 without `x-vercel-cron` header
 - [ ] Gate 4: MCP endpoints return 401 without `x-mcp-secret` header
