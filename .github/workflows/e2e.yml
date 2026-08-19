@@ -3,10 +3,20 @@ name: E2E Tests
 on:
   push:
     branches: [develop, main]
+    # DO-M7 (#834): broadened from docs/research|plans|agents/** to the
+    # whole docs/** tree plus root prose files — a docs-only commit outside
+    # those three subfolders (e.g. docs/operations/**, docs/project/**)
+    # was still triggering the full E2E + Visual Regression suite. Filters
+    # `push` only; `pull_request` stays unfiltered because "Playwright E2E"
+    # is a required status check for the `main` branch protection rule —
+    # filtering it there could leave a docs-only release PR waiting forever
+    # on a required context that never runs.
     paths-ignore:
-      - "docs/research/**"
-      - "docs/plans/**"
-      - "docs/agents/**"
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
+      - "AGENTS.md"
   pull_request:
     branches: [develop, main]
 
