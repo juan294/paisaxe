@@ -16,7 +16,6 @@ import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { getRelatedStories } from "@/lib/related-stories";
 import { LanguageSwitcher } from "./language-switcher";
-import { SuggestPlaceDialog } from "./suggest-place-dialog";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
 
 // #569: Flag-gated tools are dynamically imported so their code only loads when
@@ -40,6 +39,13 @@ const SuggestPlaceButton = dynamic(
 );
 const FullscreenButton = dynamic(
   () => import("./fullscreen-button").then((m) => m.FullscreenButton),
+  { ssr: false, loading: () => null }
+);
+// FE-M7 (#769): was a static import mounted unconditionally regardless of the
+// user_story_suggestions flag — now dynamic like its sibling tools, and
+// rendered only once the flag is on (see the isEnabled(...) guard below).
+const SuggestPlaceDialog = dynamic(
+  () => import("./suggest-place-dialog").then((m) => m.SuggestPlaceDialog),
   { ssr: false, loading: () => null }
 );
 import { useTranslation } from "@/lib/i18n";
@@ -231,8 +237,14 @@ export function StoryViewer({
   // Asturianu labels
   const ast = isEnabled("asturianu_touches");
 
-  // Get localized story text based on current locale (falls back to Spanish)
-  const localizedStory = story ? getLocalizedStory(story, locale) : null;
+  // Get localized story text based on current locale (falls back to Spanish).
+  // FE-M2 (#764): useMemo so this object keeps its identity across renders that
+  // don't change story/locale — otherwise it's a fresh object every render,
+  // which defeats StoryInfoPanel's memo (getLocalizedStory itself stays pure).
+  const localizedStory = useMemo(
+    () => (story ? getLocalizedStory(story, locale) : null),
+    [story, locale]
+  );
 
   // FE-L1: Stable callback for StoryInfoPanel props — prevents re-renders when
   // only the index changes (story/id change is reflected via the story prop itself).
@@ -245,6 +257,9 @@ export function StoryViewer({
   // Question prompts from metadata.
   // UX-H6 (#892): resolve the translated prompts for the active locale,
   // falling back to Spanish when no translation exists (see getLocalizedQuestionPrompts).
+  // FE-M2 (#764): getLocalizedQuestionPrompts returns a module-level constant
+  // empty array (not a fresh `[]`) when there are no prompts, so this stays
+  // referentially stable across renders without needing its own useMemo.
   const questionPrompts = getLocalizedQuestionPrompts(story, locale);
 
   return (
@@ -536,11 +551,17 @@ export function StoryViewer({
       {/* First-visit navigation hint for mobile users */}
       <NavigationHint />
 
-      {/* Suggest Place dialog — state lifted here (#328: no DOM coupling) */}
-      <SuggestPlaceDialog
-        isOpen={isSuggestDialogOpen}
-        onClose={() => setIsSuggestDialogOpen(false)}
-      />
+      {/* Suggest Place dialog — state lifted here (#328: no DOM coupling).
+          FE-M7 (#769): only mounted when the flag is on — SuggestPlaceButton
+          already returns null when the flag is off, so isSuggestDialogOpen
+          can never become true in that case anyway; this also keeps the
+          dialog's code out of the bundle until the flag is enabled. */}
+      {isEnabled("user_story_suggestions") && (
+        <SuggestPlaceDialog
+          isOpen={isSuggestDialogOpen}
+          onClose={() => setIsSuggestDialogOpen(false)}
+        />
+      )}
     </main>
   );
 }

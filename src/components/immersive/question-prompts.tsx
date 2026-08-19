@@ -10,6 +10,11 @@ interface QuestionPromptsProps {
   onSelectPrompt: (prompt: string) => void;
 }
 
+// FE-M2 (#764): a shared, stable empty array so callers that receive "no
+// prompts" get the same reference every time instead of a fresh `[]` — a
+// fresh array each render defeats StoryInfoPanel's memo on `questionPrompts`.
+const EMPTY_PROMPTS: string[] = [];
+
 /**
  * UX-H6 (#892): resolve the suggested-question chips for the active locale.
  *
@@ -20,7 +25,7 @@ interface QuestionPromptsProps {
  * than rendering an empty/undefined list.
  */
 export function getLocalizedQuestionPrompts(story: Story, locale: Locale): string[] {
-  const spanishPrompts = story.metadata?.question_prompts || [];
+  const spanishPrompts = story.metadata?.question_prompts || EMPTY_PROMPTS;
 
   if (locale === "es") return spanishPrompts;
 
