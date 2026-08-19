@@ -1,0 +1,60 @@
+name: Install canvas system dependencies
+description: >-
+  Install the system libraries that let the optional `canvas` npm package build
+  from source, with bounded retries so a stalled apt mirror fails fast instead
+  of wedging the job.
+
+runs:
+  using: composite
+  steps:
+    # On 2026-08-19 this step (previously an unguarded
+    # `apt-get update && apt-get install`) hung on three jobs in one CI run and
+    # five in the next, every time sitting in apt with no output. Plain apt has
+    # no overall deadline, so a single unreachable mirror stalls forever: the
+    # jobs only died once `timeout-minutes` killed them at 30-40 minutes, and
+    # before those caps existed they were on course for GitHub's 6-hour default.
+    #
+    # Each apt invocation is now wrapped in `timeout` and the pair is retried up
+    # to three times, dropping the (possibly half-written) package lists between
+    # attempts. A healthy runner still finishes in ~10s; a stalled mirror now
+    # costs at most ~3 minutes before the job fails with a real error instead of
+    # burning its entire timeout budget.
+    #
+    # `canvas` is an optionalDependency used only by scripts/extract-images.ts,
+    # which CI never executes, and it normally installs a prebuilt binary via
+    # prebuild-install. These headers are only the source-build fallback.
+    - name: Install canvas system dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        packages=(
+          build-essential
+          libcairo2-dev
+          libpango1.0-dev
+          libjpeg-dev
+          libgif-dev
+          librsvg2-dev
+          libpixman-1-dev
+        )
+
+        apt_opts=(
+          -o Acquire::Retries=3
+          -o Acquire::http::Timeout=20
+          -o Acquire::https::Timeout=20
+        )
+
+        for attempt in 1 2 3; do
+          if sudo timeout 120 apt-get "${apt_opts[@]}" update \
+            && sudo timeout 300 apt-get "${apt_opts[@]}" install -y "${packages[@]}"; then
+            echo "canvas system dependencies installed (attempt $attempt)"
+            exit 0
+          fi
+
+          echo "::warning::apt attempt $attempt failed or timed out; retrying"
+          sudo rm -rf /var/lib/apt/lists/*
+          sleep 10
+        done
+
+        echo "::error::apt failed after 3 attempts - likely a stalled Ubuntu mirror on this runner"
+        exit 1
