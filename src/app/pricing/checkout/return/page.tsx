@@ -6,6 +6,7 @@ import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Check, Mic, RefreshCw } from "lucide-react";
+import { toIntlLocale } from "@/lib/utils";
 
 /**
  * Return page after Stripe Embedded Checkout completes.
@@ -22,7 +23,7 @@ export default function CheckoutReturnPage() {
 
 function CheckoutReturnPageContent() {
   const { canUseVoice, expiresAt, isLoading, refresh } = useVoiceAccess();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const immersiveHref = returnTo
@@ -77,7 +78,7 @@ function CheckoutReturnPageContent() {
               {t("premium.success_expires")}
             </p>
             <p className="text-sm font-medium text-white">
-              {expiresAt.toLocaleString(undefined, {
+              {expiresAt.toLocaleString(toIntlLocale(locale), {
                 weekday: "short",
                 month: "short",
                 day: "numeric",

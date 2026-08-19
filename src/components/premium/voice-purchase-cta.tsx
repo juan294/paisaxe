@@ -111,8 +111,10 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
         {user ? t("premium.get_day_pass") : t("premium.sign_in_to_purchase")}
       </button>
 
-      {/* Info text */}
-      <p className="mt-4 text-white/50 text-xs">
+      {/* Info text — UX-M7 (#900): this reassurance copy sits directly under
+          the purchase button; at text-white/50 it computed to ~2.8:1
+          contrast, well below the 4.5:1 AA floor. Raised to /70. */}
+      <p className="mt-4 text-white/70 text-xs">
         {t("premium.secure_payment")}
       </p>
     </div>

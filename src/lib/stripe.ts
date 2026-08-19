@@ -70,18 +70,6 @@ export function getStripeClient(): Stripe {
   });
 }
 
-/**
- * Options for creating a Stripe Checkout Session.
- */
-interface StripeCheckoutOptions {
-  userId: string;
-  userEmail: string;
-  successUrl: string;
-  cancelUrl: string;
-  /** Which pass tier to buy. Defaults to the Day Pass for backwards compat. */
-  purchaseType?: PurchaseType;
-}
-
 /** Human-readable env var name for a tier, for clear error messages. */
 const PRICE_ENV_NAMES: Record<PurchaseType, string> = {
   day_pass: "STRIPE_DAY_PASS_PRICE_ID",
@@ -96,38 +84,6 @@ function requirePriceId(purchaseType: PurchaseType): string {
     throw new Error(`${PRICE_ENV_NAMES[purchaseType]} not configured`);
   }
   return priceId;
-}
-
-/**
- * Create a Stripe Checkout Session for a voice pass.
- * Returns the checkout URL to redirect the user to.
- * The chosen tier is recorded in `metadata.purchase_type` so the webhook can
- * grant the correct access duration.
- */
-export async function createDayPassCheckoutSession(
-  options: StripeCheckoutOptions
-): Promise<string> {
-  const stripe = getStripeClient();
-  const purchaseType = options.purchaseType ?? "day_pass";
-  const priceId = requirePriceId(purchaseType);
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: [{ price: priceId, quantity: 1 }],
-    customer_email: options.userEmail,
-    metadata: { user_id: options.userId, purchase_type: purchaseType },
-    success_url: options.successUrl,
-    cancel_url: options.cancelUrl,
-    // Note: automatic_tax requires Stripe Tax to be configured in dashboard
-    // automatic_tax: { enabled: true },
-  });
-
-  if (!session.url) {
-    throw new Error("Failed to create checkout session - no URL returned");
-  }
-
-  return session.url;
 }
 
 /**
