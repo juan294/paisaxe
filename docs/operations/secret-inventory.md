@@ -40,7 +40,7 @@ GitHub-Actions-only allowlist inside the script, for secrets like
 | Secret | Purpose | Storage | Consuming code | Cadence |
 |---|---|---|---|---|
 | `ANTHROPIC_API_KEY` | Claude API (chat, embeddings prompts, agents) | Vercel (Production + Preview); GitHub Actions secret (Claude Review workflow); local `.env.local` | `src/lib/claude.ts`, `src/config/agent-prompts.ts` | Annual, or immediately on suspected leak |
-| `SUPABASE_SERVICE_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase admin client (bypasses RLS) | Vercel (Production + Preview); GitHub Actions secret (`SUPABASE_SERVICE_KEY`, used by Playwright/integration CI) | `src/lib/supabase*.ts` (admin client construction) | Annual, or immediately on suspected leak — highest blast radius in this table |
+| `SUPABASE_SERVICE_KEY` | Server-side Supabase admin client (bypasses RLS) | Vercel (Production + Preview); GitHub Actions secret (`SUPABASE_SERVICE_KEY`, used by Playwright/integration CI) | `src/lib/supabase*.ts` (admin client construction) | Annual, or immediately on suspected leak — highest blast radius in this table |
 | `VOYAGE_API_KEY` | Embeddings (voyage-3.5) and reranking (rerank-2.5) | Vercel (Production + Preview); local `.env.local` (for `npm run seed-db`) | `src/lib/embeddings.ts`, `src/lib/rerank.ts` | Annual |
 | `ELEVENLABS_API_KEY` | Voice agent API (Pelayo, booking, marketing agents) | Vercel (Production + Preview); local `.env.local` (for `scripts/setup-elevenlabs-agents.ts`) | `src/lib/elevenlabs-signed-session.ts`, `src/lib/services/elevenlabs-call-service.ts` | Annual |
 | `ELEVENLABS_WEBHOOK_SECRET` | Verifies inbound post-call webhooks from ElevenLabs | Vercel (Production + Preview); ElevenLabs dashboard (webhook config) | `src/lib/services/elevenlabs-webhook-service.ts` | Annual — **multi-homed**, see below |
@@ -122,9 +122,9 @@ Same Supabase-issued value duplicated in two independent secret stores.
 
 1. Rotate the key in the Supabase Dashboard (Settings → API) — this
    immediately invalidates the old value.
-2. Update the Vercel env var (both names, since either is accepted) and
-   redeploy immediately — production admin operations (auth, RLS-bypassing
-   queries) fail with the old value the moment step 1 completes.
+2. Update the Vercel `SUPABASE_SERVICE_KEY` env var and redeploy immediately
+   — production admin operations (auth, RLS-bypassing queries) fail with the
+   old value the moment step 1 completes.
 3. Update the `SUPABASE_SERVICE_KEY` GitHub Actions repository secret so CI
    integration tests don't start failing on the next run.
 
