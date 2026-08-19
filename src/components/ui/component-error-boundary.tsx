@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, Fragment, type ErrorInfo, type ReactNode } from "react";
 import { LanguageContext } from "@/lib/i18n/provider";
 import type { LanguageContextValue } from "@/lib/i18n/provider";
 import { clientLogger } from "@/lib/client-logger";
@@ -12,6 +12,13 @@ interface ComponentErrorBoundaryProps {
 
 interface ComponentErrorBoundaryState {
   hasError: boolean;
+  // Incremented on every retry and used as the `key` on the children
+  // wrapper below. Changing the key forces React to unmount and recreate
+  // the child subtree from scratch, rather than reusing the fiber (and
+  // any stale/corrupted instance state) that existed before the crash.
+  // This is self-contained: the boundary owns its own retry counter, so
+  // no caller needs to pass a resettable key.
+  retryKey: number;
 }
 
 export class ComponentErrorBoundary extends Component<
@@ -23,10 +30,10 @@ export class ComponentErrorBoundary extends Component<
 
   constructor(props: ComponentErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, retryKey: 0 };
   }
 
-  static getDerivedStateFromError(): ComponentErrorBoundaryState {
+  static getDerivedStateFromError(): Pick<ComponentErrorBoundaryState, "hasError"> {
     return { hasError: true };
   }
 
@@ -36,7 +43,10 @@ export class ComponentErrorBoundary extends Component<
   }
 
   handleReset = () => {
-    this.setState({ hasError: false });
+    this.setState((prevState) => ({
+      hasError: false,
+      retryKey: prevState.retryKey + 1,
+    }));
   };
 
   render() {
@@ -59,6 +69,6 @@ export class ComponentErrorBoundary extends Component<
       );
     }
 
-    return this.props.children;
+    return <Fragment key={this.state.retryKey}>{this.props.children}</Fragment>;
   }
 }
