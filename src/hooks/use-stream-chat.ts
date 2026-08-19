@@ -142,6 +142,18 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
       });
       setIsStreaming(true);
 
+      // PE-M4: SSE "text" events can arrive many times per second during a
+      // fast stream; applying each one directly to state forced BasicMarkdown
+      // to re-parse the whole accumulated string on every chunk (O(n) per
+      // parse, O(n^2) over a response's lifetime). Chunks are buffered here
+      // and flushed at most once per animation frame, so the number of state
+      // updates — and therefore re-parses — is bounded by paint frequency
+      // instead of token count. Declared at sendMessage's top level (not
+      // inside the try block) so every exit path below can reach
+      // `cancelPendingFlush`.
+      let pendingChunk = "";
+      let flushHandle: number | null = null;
+
       try {
         const response = await fetch("/api/chat/stream", {
           method: "POST",
@@ -187,6 +199,37 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         // Handle streaming response
         if (!response.body) throw new Error("No reader");
 
+        // PE-M4: applies buffered "text" chunks to state in one update, then
+        // clears the buffer. Safe to call when `pendingChunk` is empty (the
+        // "done"/onDone paths call it defensively even if a flush already
+        // ran).
+        const flushPendingChunk = () => {
+          flushHandle = null;
+          if (!pendingChunk) return;
+          const toAppend = pendingChunk;
+          pendingChunk = "";
+          updateMessages((prev) => {
+            const updated = [...prev];
+            const current = updated[assistantIndex];
+            updated[assistantIndex] = {
+              ...current,
+              content: current.content + toAppend,
+            };
+            return updated;
+          });
+        };
+
+        // Discards any buffered text instead of flushing it — used on the
+        // error paths below, where the assistant content is about to be
+        // replaced wholesale rather than appended to.
+        const cancelPendingFlush = () => {
+          if (flushHandle !== null) {
+            cancelAnimationFrame(flushHandle);
+            flushHandle = null;
+          }
+          pendingChunk = "";
+        };
+
         const processEvent = (line: string) => {
           const event = parseSseEvent(line);
           if (!event) {
@@ -194,16 +237,19 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           }
 
           if (event.type === "text") {
-            updateMessages((prev) => {
-              const updated = [...prev];
-              const current = updated[assistantIndex];
-              updated[assistantIndex] = {
-                ...current,
-                content: current.content + event.content,
-              };
-              return updated;
-            });
+            pendingChunk += event.content;
+            if (flushHandle === null) {
+              flushHandle = requestAnimationFrame(flushPendingChunk);
+            }
           } else if (event.type === "done") {
+            // Flush synchronously first — the upsell detection below reads
+            // `currentMsg.content` and must see every buffered chunk, and
+            // this must not wait for an animation frame that may never
+            // come before the caller reads the final content.
+            if (flushHandle !== null) {
+              cancelAnimationFrame(flushHandle);
+            }
+            flushPendingChunk();
             updateMessages((prev) => {
               const updated = [...prev];
               const currentMsg = updated[assistantIndex];
@@ -229,6 +275,12 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           } else {
             // event.type === "error" — the only remaining member of the
             // ChatStreamEvent union once "text" and "done" are ruled out.
+            // PE-M4: content below is replaced wholesale, so any buffered
+            // text is discarded rather than flushed — flushing first would
+            // just have it immediately overwritten anyway, but leaving a
+            // scheduled frame armed risks it firing later against content
+            // this branch didn't produce.
+            cancelPendingFlush();
             // FE-H2: differentiate server-side error messages
             const isTimeout =
               event.message === "response_timeout" ||
@@ -253,10 +305,21 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         await readSseStream(response.body, {
           onEvent: processEvent,
           onDone: () => {
-            // Stream ended cleanly — no action needed here; all state is
-            // managed incrementally inside processEvent callbacks.
+            // PE-M4: defensive backstop — every stream is expected to end
+            // with a "text"-events-then-"done" data event (already flushed
+            // synchronously above), but if the connection ever closes
+            // cleanly without one, this still applies any buffered chunk
+            // instead of leaving it stranded until a paint frame arrives.
+            if (flushHandle !== null) {
+              cancelAnimationFrame(flushHandle);
+            }
+            flushPendingChunk();
           },
           onError: (err) => {
+            // PE-M4: the branches below always replace content wholesale
+            // rather than appending, so discard (don't flush) any buffered
+            // text and disarm the scheduled frame.
+            cancelPendingFlush();
             // FE-H2: AbortError from connection loss surfaces to the user
             if (err.name === "AbortError") {
               if (controller.signal.aborted) {
@@ -349,6 +412,13 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         });
       } finally {
         clearTimeout(timeoutId);
+        // PE-M4: defensive backstop — every code path above that can leave
+        // a chunk buffered already disarms it, but this guarantees no
+        // scheduled animation frame ever outlives this call.
+        if (flushHandle !== null) {
+          cancelAnimationFrame(flushHandle);
+          flushHandle = null;
+        }
         setIsStreaming(false);
       }
     },
