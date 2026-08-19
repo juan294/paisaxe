@@ -435,7 +435,13 @@ async function handleGet(request: Request): Promise<NextResponse> {
     const results = await searchPlaces(query, type, city);
     return NextResponse.json(results, {
       headers: {
-        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+        // BE-L6 (#799): this response is only reachable with a valid
+        // x-mcp-secret header. `public` would let any shared/CDN cache store
+        // and replay it to a requester who never presented the secret.
+        // `private` still lets the authenticated caller's own HTTP client
+        // reuse the response for 1 hour (avoiding a repeat Google Places
+        // charge for the same caller/query), just not via a shared cache.
+        "Cache-Control": "private, max-age=3600", // Cache for 1 hour (caller-private)
       },
     });
   } catch (err) {
@@ -497,7 +503,9 @@ async function handlePost(request: Request): Promise<NextResponse> {
     const results = await searchPlaces(query, type, city);
     return NextResponse.json(results, {
       headers: {
-        "Cache-Control": "public, max-age=3600", // Cache for 1 hour (matches GET)
+        // BE-L6 (#799): see matching comment in handleGet — same authenticated
+        // audience, same reasoning, kept identical (#614) intentionally.
+        "Cache-Control": "private, max-age=3600", // Cache for 1 hour (matches GET)
       },
     });
   } catch (err) {
