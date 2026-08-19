@@ -3,6 +3,7 @@ import { createDayPassCheckoutSession, type PurchaseType } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
 import { checkoutBodySchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
+import { getSiteUrl } from "@/lib/env";
 
 /** Voice-pass tiers accepted by checkout (#137). */
 const VALID_PURCHASE_TYPES: readonly PurchaseType[] = [
@@ -25,7 +26,7 @@ function parsePurchaseType(raw: unknown): PurchaseType {
 }
 
 const ALLOWED_ORIGINS = [
-  process.env.NEXT_PUBLIC_SITE_URL,
+  getSiteUrl(),
   "https://paisaxe.es",
   "https://paisaxe.com",
   "https://www.paisaxe.es",
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const origin =
       rawOrigin && ALLOWED_ORIGINS.includes(rawOrigin)
         ? rawOrigin
-        : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://paisaxe.es");
+        : (getSiteUrl() ?? "https://paisaxe.es");
 
     // Parse optional returnTo slug + pass tier from request body
     let returnTo: string | undefined;
