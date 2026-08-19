@@ -14,7 +14,7 @@
     "check-bundle-budget": "tsx scripts/check-bundle-budget.ts",
     "start": "next start",
     "lint": "npm run lint:src && npm run lint:scripts",
-    "lint:src": "eslint src/",
+    "lint:src": "eslint src/ --max-warnings=0",
     "lint:scripts": "eslint scripts --max-warnings=0",
     "lint:deps": "npx --yes madge --circular --extensions ts,tsx --ts-config tsconfig.json src",
     "typecheck": "npm run typecheck:app && npm run typecheck:scripts && npm run typecheck:e2e && npm run typecheck:edge",
