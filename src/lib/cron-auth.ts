@@ -1,3 +1,4 @@
+import "server-only";
 import { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
 import { getEnv } from "@/lib/env";

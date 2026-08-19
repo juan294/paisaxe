@@ -13,6 +13,7 @@
 // with a fully event-driven promise (no fixed-interval polling, no added latency).
 // Re-test the SDK in dev after future Next.js patches; if it streams cleanly, delete the
 // curl branches and the USE_CURL flag and route all environments through the SDK.
+import "server-only";
 import AnthropicSDK from "@anthropic-ai/sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";

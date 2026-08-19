@@ -5,6 +5,7 @@
  * Sends SMS to customers after booking agent calls complete.
  */
 
+import "server-only";
 import { logger } from "@/lib/logger";
 
 export interface PendingBooking {

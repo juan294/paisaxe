@@ -6,6 +6,7 @@
  * NOT in the database.
  */
 
+import "server-only";
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
 const ALGORITHM = "aes-256-gcm";

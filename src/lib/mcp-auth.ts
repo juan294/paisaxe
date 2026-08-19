@@ -1,3 +1,4 @@
+import "server-only";
 import { safeEqual } from "@/lib/safe-equal";
 
 const MCP_IDEMPOTENCY_HEADER_NAMES = [
