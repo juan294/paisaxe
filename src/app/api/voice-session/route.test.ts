@@ -162,4 +162,14 @@ describe("POST /api/voice-session", () => {
       error: "upstream_unavailable",
     });
   });
+
+  // BE-M12 (#793): getSupabaseClient() was called with no `request` argument,
+  // so a bearer-authenticated caller's voice_purchases lookup ran on an
+  // unauthenticated client — RLS then hid the row and produced a false
+  // "Voice access required" 403 for the documented API-client auth path.
+  it("BE-M12: forwards the request to getSupabaseClient so bearer-token clients keep RLS auth context", async () => {
+    const req = request();
+    await POST(req);
+    expect(mocks.getSupabaseClient).toHaveBeenCalledWith(req);
+  });
 });
