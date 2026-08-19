@@ -9,29 +9,21 @@
 import * as fs from "fs";
 import * as path from "path";
 import { describe, it, expect } from "vitest";
+import { collectFiles } from "./collect-files";
 
 const API_DIR = path.join(__dirname, "../app/api");
 
 /**
- * Recursively collect all non-test TypeScript route files under src/app/api.
+ * Collect all non-test TypeScript route files under src/app/api.
  */
 function collectRouteFiles(dir: string): string[] {
-  const result: string[] = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      result.push(...collectRouteFiles(full));
-    } else if (
-      entry.isFile() &&
-      entry.name.endsWith(".ts") &&
-      !entry.name.endsWith(".test.ts") &&
-      !entry.name.endsWith(".spec.ts")
-    ) {
-      result.push(full);
-    }
-  }
-  return result;
+  return collectFiles(
+    dir,
+    (name) =>
+      name.endsWith(".ts") &&
+      !name.endsWith(".test.ts") &&
+      !name.endsWith(".spec.ts")
+  );
 }
 
 describe("AR-H2 Logger migration regression", () => {
