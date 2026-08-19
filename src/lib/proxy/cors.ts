@@ -17,8 +17,13 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Allow the E2E test server origin (set in playwright.config.ts webServer.env).
-// This is never set in production or preview deployments.
-if (process.env.PLAYWRIGHT_TEST_ORIGIN) {
+// Guarded on VERCEL_ENV being unset (BE-M5 pattern) rather than NODE_ENV: Vercel
+// sets VERCEL_ENV for every deployment (production, preview, staging), so its
+// absence reliably means "running locally". NODE_ENV alone is not sufficient —
+// Playwright sometimes runs against a local production build (`next build &&
+// next start`), where NODE_ENV is "production" but VERCEL_ENV is still unset,
+// and the E2E suite needs this origin honored in that case. (SE-L3)
+if (process.env.PLAYWRIGHT_TEST_ORIGIN && process.env.VERCEL_ENV === undefined) {
   ALLOWED_ORIGINS.push(process.env.PLAYWRIGHT_TEST_ORIGIN);
 }
 

@@ -27,6 +27,30 @@ describe("cors — ALLOWED_ORIGINS", () => {
     expect(ALLOWED_ORIGINS).not.toContain("http://localhost:3100");
   });
 
+  it("ignores PLAYWRIGHT_TEST_ORIGIN when VERCEL_ENV indicates a deployed environment (production)", async () => {
+    vi.stubEnv("PLAYWRIGHT_TEST_ORIGIN", "http://localhost:3100");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.resetModules();
+    const { ALLOWED_ORIGINS } = await import("./cors");
+    expect(ALLOWED_ORIGINS).not.toContain("http://localhost:3100");
+  });
+
+  it("ignores PLAYWRIGHT_TEST_ORIGIN when VERCEL_ENV indicates a deployed environment (preview)", async () => {
+    vi.stubEnv("PLAYWRIGHT_TEST_ORIGIN", "http://localhost:3100");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.resetModules();
+    const { ALLOWED_ORIGINS } = await import("./cors");
+    expect(ALLOWED_ORIGINS).not.toContain("http://localhost:3100");
+  });
+
+  it("honors PLAYWRIGHT_TEST_ORIGIN when NODE_ENV is production but VERCEL_ENV is unset (local production build)", async () => {
+    vi.stubEnv("PLAYWRIGHT_TEST_ORIGIN", "http://localhost:3100");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.resetModules();
+    const { ALLOWED_ORIGINS } = await import("./cors");
+    expect(ALLOWED_ORIGINS).toContain("http://localhost:3100");
+  });
+
   it("includes localhost:3006 when NODE_ENV is development", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.resetModules();
