@@ -12,17 +12,17 @@
 -- this, so a broken Twilio config looks identical to an idle queue and a
 -- visitor never learns their confirmation SMS failed.
 --
--- This migration:
---   1. Replaces fail_booking_sms_job to accept an optional p_max_attempts.
---      When supplied and the job's current attempts have reached it, the job
---      is marked with a new terminal status, 'dead', instead of the
---      retryable 'failed' -- distinct from 'pending'/'processing'/'failed'
---      and never matched by claim_retryable_booking_sms_jobs's candidate
---      filter (which only selects 'pending' or 'failed').
---   2. Adds count_dead_letter_booking_sms_jobs() so the dead-letter count is
---      queryable for health/alerting, following this codebase's existing
---      "surface failure counts, don't just log them" convention (see
---      docs/operations/alerting-runbook.md).
+-- This migration replaces fail_booking_sms_job to accept an optional
+-- p_max_attempts. When supplied and the job's current attempts have reached
+-- it, the job is marked with a new terminal status, 'dead', instead of the
+-- retryable 'failed' -- distinct from 'pending'/'processing'/'failed' and
+-- never matched by claim_retryable_booking_sms_jobs's candidate filter
+-- (which only selects 'pending' or 'failed'). The route reads the resulting
+-- dead-letter count with a plain scoped query (status = 'dead' AND
+-- updated_at >= sweep start), following the same pattern already used by
+-- src/app/api/cron/fail-stale-translations/route.ts for the analogous
+-- translate_webhook_events dead-letter queue -- no separate counting
+-- function needed.
 --
 -- Regression risk called out in #792: the webhook path
 -- (claim_booking_sms_job / process_elevenlabs_event_idempotent, 079/100) has
@@ -45,22 +45,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-DECLARE
-  v_attempts integer;
 BEGIN
-  SELECT attempts INTO v_attempts
-  FROM public.booking_sms_jobs
-  WHERE event_key = p_event_key
-  FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RETURN false;
-  END IF;
-
+  -- A single UPDATE is enough: its own row lock already serializes
+  -- concurrent access, so a separate SELECT ... FOR UPDATE beforehand would
+  -- just be an extra round-trip. `attempts` in the CASE below is read as it
+  -- stood before this statement's write, which is exactly the value
+  -- claim_retryable_booking_sms_jobs last set.
   UPDATE public.booking_sms_jobs
   SET
     status = CASE
-      WHEN p_max_attempts IS NOT NULL AND v_attempts >= p_max_attempts THEN 'dead'
+      WHEN p_max_attempts IS NOT NULL AND attempts >= p_max_attempts THEN 'dead'
       ELSE 'failed'
     END,
     lease_expires_at = NULL,
@@ -68,7 +62,7 @@ BEGIN
     updated_at = now()
   WHERE event_key = p_event_key;
 
-  RETURN true;
+  RETURN FOUND;
 END;
 $$;
 
@@ -77,21 +71,3 @@ COMMENT ON FUNCTION public.fail_booking_sms_job(text, text, integer) IS
 
 REVOKE ALL ON FUNCTION public.fail_booking_sms_job(text, text, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fail_booking_sms_job(text, text, integer) TO service_role;
-
-CREATE OR REPLACE FUNCTION public.count_dead_letter_booking_sms_jobs()
-RETURNS integer
-LANGUAGE sql
-SECURITY DEFINER
-STABLE
-SET search_path = ''
-AS $$
-  SELECT count(*)::integer
-  FROM public.booking_sms_jobs
-  WHERE status = 'dead';
-$$;
-
-COMMENT ON FUNCTION public.count_dead_letter_booking_sms_jobs() IS
-  'Counts booking SMS jobs permanently exhausted (status = dead) so a broken delivery pipeline is observable instead of silent -- see BE-M11 (#792).';
-
-REVOKE ALL ON FUNCTION public.count_dead_letter_booking_sms_jobs() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.count_dead_letter_booking_sms_jobs() TO service_role;
