@@ -1,9 +1,54 @@
+import { gzipSync } from "node:zlib";
 import type { PublicStoryRow, Story } from "@/types/immersive";
 import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/env";
 import { FALLBACK_STORIES } from "@/lib/stories-data";
 import { getEnvironment } from "@/lib/environment";
 import { logger } from "@/lib/logger";
+
+/**
+ * PE-M5 (#813): the full story catalogue is serialized into the initial
+ * `/immersive` payload (LCP-critical) and grows linearly as the catalogue
+ * expands. The audit's recommendation was to instrument payload size/growth
+ * first rather than restructure data loading — windowing/on-demand fetch
+ * would break the client-side Fisher-Yates shuffle and deep-link slug
+ * resolution in `immersive-page-content.tsx`, both of which require the full
+ * story array to already be in memory. This constant documents the size
+ * measured at audit time (71 stories ≈ 50KB gzip) so `[STORIES_PAYLOAD_SIZE]`
+ * warns once growth exceeds it, making the trend visible before it's a
+ * problem (see docs/operations/operations.md for the log-drain query).
+ */
+export const STORY_PAYLOAD_WARN_BYTES_GZIP = 50 * 1024;
+
+/**
+ * Log the serialized (raw + gzip) size of the story payload that will be
+ * embedded in the initial `/immersive` server render. Only called on a true
+ * cache MISS (real Supabase fetch), matching `logCacheMiss()`, so this never
+ * runs on every request — only once per revalidate window.
+ */
+function logPayloadSize(stories: Story[]): void {
+  try {
+    const json = JSON.stringify(stories);
+    const rawBytes = Buffer.byteLength(json);
+    const gzipBytes = gzipSync(json).length;
+    const meta = {
+      story_count: stories.length,
+      raw_bytes: rawBytes,
+      gzip_bytes: gzipBytes,
+      threshold_gzip_bytes: STORY_PAYLOAD_WARN_BYTES_GZIP,
+    };
+
+    if (gzipBytes > STORY_PAYLOAD_WARN_BYTES_GZIP) {
+      logger.warn("[STORIES_PAYLOAD_SIZE]", meta);
+    } else {
+      logger.info("[STORIES_PAYLOAD_SIZE]", meta);
+    }
+  } catch (error) {
+    // Instrumentation must never break the story fetch path.
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn("[STORIES_PAYLOAD_SIZE_MEASURE_FAILED]", { error: message });
+  }
+}
 
 /**
  * Log a warning when serving fallback stories.
@@ -84,7 +129,9 @@ export async function getStoriesServer(): Promise<Story[]> {
       return FALLBACK_STORIES;
     }
 
-    return data.map(rowToPublicStory);
+    const stories = data.map(rowToPublicStory);
+    logPayloadSize(stories);
+    return stories;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error("[TABLE_FALLBACK]", { table: "stories", error: message });
