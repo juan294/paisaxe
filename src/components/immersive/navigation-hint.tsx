@@ -37,7 +37,29 @@ export function NavigationHint() {
     setVisible(true);
 
     const timer = setTimeout(() => dismiss(), AUTO_DISMISS_MS);
-    return () => clearTimeout(timer);
+
+    // UX-M9: The overlay is pointer-events-none (see className below), so it
+    // never intercepts the tap that would otherwise reach the nav
+    // zones/toolbar beneath it. Instead, dismiss on the user's *first*
+    // interaction anywhere on the page via passive, once-only window
+    // listeners. Passive means we never call preventDefault/
+    // stopPropagation, so the same tap still performs whatever navigation
+    // it was meant to.
+    const handleInteraction = () => dismiss();
+    window.addEventListener("touchstart", handleInteraction, {
+      passive: true,
+      once: true,
+    });
+    window.addEventListener("click", handleInteraction, {
+      passive: true,
+      once: true,
+    });
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("touchstart", handleInteraction);
+      window.removeEventListener("click", handleInteraction);
+    };
   }, [dismiss]);
 
   if (!visible) return null;
@@ -45,11 +67,9 @@ export function NavigationHint() {
   return (
     <div
       className={cn(
-        "absolute inset-0 z-30 flex items-center justify-between px-8 transition-opacity duration-500",
-        fading ? "opacity-0 pointer-events-none" : "opacity-100"
+        "absolute inset-0 z-30 flex items-center justify-between px-8 pointer-events-none transition-opacity duration-500",
+        fading ? "opacity-0" : "opacity-100"
       )}
-      onClick={dismiss}
-      onTouchStart={dismiss}
       data-testid="navigation-hint"
     >
       {/* Left hint */}
