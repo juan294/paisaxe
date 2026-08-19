@@ -215,6 +215,22 @@ describe("RootLayout", () => {
       expect(body.className).toContain("antialiased");
     });
 
+    it("should apply an explicit dark background to body (UX-M1 #894 — no white flash on overscroll)", async () => {
+      // Regression test: the app is all-dark (immersive visitor UI), but body
+      // previously relied on the `bg-background` token, which resolves to white
+      // under `:root` because the visitor app never sets `.dark` on <html>. That
+      // made the body flash white on iOS overscroll. Body must carry an explicit
+      // dark background class, independent of the semantic token/.dark class
+      // system (see CLAUDE.md-linked docs/agents/pre-launch-report.md UX-M1 —
+      // flipping the root token palette is out of scope; it would invert the
+      // ~41 existing `.dark`-semantics token consumers, including admin).
+      const Component = await RootLayout({ children: <div>Content</div> });
+      render(Component);
+
+      const body = document.body;
+      expect(body.className).toContain("bg-neutral-950");
+    });
+
     it("should render JsonLd WebSite component", async () => {
       const Component = await RootLayout({ children: <div>Content</div> });
       const { container } = render(Component);
