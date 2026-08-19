@@ -25,5 +25,5 @@ const INTL_LOCALE_MAP: Record<Locale, string> = {
 };
 
 export function toIntlLocale(locale: Locale): string {
-  return INTL_LOCALE_MAP[locale] ?? INTL_LOCALE_MAP.es;
+  return INTL_LOCALE_MAP[locale];
 }
