@@ -492,4 +492,62 @@ describe("ShareButton", () => {
       })
     );
   });
+
+  // #908/#771: the "menu" variant renders the mobile overflow-menu row using
+  // the exact same useShareStory hook as the desktop icon variant, so it
+  // gets the same localization, clipboard-failure feedback, and share-
+  // cancellation handling — instead of the old, weaker inline handler that
+  // lived in story-viewer.tsx.
+  describe("menu variant (#908, #771)", () => {
+    it("renders as a menuitem row with the share label and icon", () => {
+      render(<ShareButton story={mockStory} variant="menu" />);
+
+      const item = screen.getByRole("menuitem");
+      expect(item).toHaveTextContent("Compartir");
+    });
+
+    it("swaps the label text to the toast message instead of a popover (avoids clipping in the overflow menu)", async () => {
+      const user = userEvent.setup();
+      render(<ShareButton story={mockStory} variant="menu" />);
+
+      await user.click(screen.getByRole("menuitem"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("status")).toHaveTextContent("Enlace copiado");
+      });
+      // No absolutely-positioned popover toast should exist for this variant.
+      expect(screen.queryByText("Compartir")).not.toBeInTheDocument();
+    });
+
+    it("shows error feedback inline when clipboard fails (no native share)", async () => {
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+        writable: true,
+        configurable: true,
+      });
+
+      const { fireEvent: fe } = await import("@testing-library/react");
+      render(<ShareButton story={mockStory} variant="menu" />);
+      fe.click(screen.getByRole("menuitem"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("status")).toHaveTextContent("No se pudo copiar");
+      });
+    });
+
+    it("stops event propagation on click", async () => {
+      const parentClick = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <div onClick={parentClick}>
+          <ShareButton story={mockStory} variant="menu" />
+        </div>
+      );
+
+      await user.click(screen.getByRole("menuitem"));
+
+      expect(parentClick).not.toHaveBeenCalled();
+    });
+  });
 });

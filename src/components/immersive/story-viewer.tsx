@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { Play, Pause, Share2, Shuffle } from "lucide-react";
+import { Play, Pause, Shuffle } from "lucide-react";
 import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { SiteInfoMenu } from "./site-info-menu";
@@ -493,25 +493,14 @@ export function StoryViewer({
               }}
             />
           )}
+          {/* #908/#771: was a standalone inline handler that skipped error
+              feedback and never handled share-cancellation/clipboard-failure
+              rejections. Now reuses the exact same ShareButton + useShareStory
+              hook as the desktop control ("menu" variant renders as a
+              ToolbarOverflowItem-style row), so there is one share behaviour
+              with consistent localization and feedback everywhere. */}
           {isEnabled("story_sharing") && (
-            <ToolbarOverflowItem
-              icon={<Share2 className="h-4 w-4" />}
-              label={t("share.share")}
-              onClick={() => {
-                // UX-B1: route is `/story/[slug]` (singular, by slug) — using the
-                // plural `/stories/<id>` path would 404. Mirrors share-button.tsx.
-                const shareUrl = `${window.location.origin}/story/${story.slug || story.id}`;
-                if (navigator.share) {
-                  navigator.share({
-                    title: localizedStory.title,
-                    text: localizedStory.description,
-                    url: shareUrl,
-                  });
-                } else {
-                  navigator.clipboard.writeText(shareUrl);
-                }
-              }}
-            />
+            <ShareButton story={story} variant="menu" />
           )}
           {isEnabled("user_story_suggestions") && (
             <SuggestPlaceButton
