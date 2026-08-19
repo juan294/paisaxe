@@ -42,11 +42,16 @@ export default defineConfig({
         "**/*.test.{ts,tsx}",
         "**/*.d.ts",
       ],
+      // QA-L1: Thresholds are recalibrated close to measured actuals (see
+      // `npm run test:coverage` summary) with a small deliberate buffer
+      // (~1.5-2 points) so a real regression trips the gate without normal
+      // coverage fluctuation causing false failures. Previously 95/90/95/95
+      // sat 4-7 points below actual coverage of ~98.6/97.0/98.9/99.0.
       thresholds: {
-        statements: 95,
-        branches: 90,
-        functions: 95,
-        lines: 95,
+        statements: 97,
+        branches: 95,
+        functions: 97,
+        lines: 97,
       },
     },
     // Local `npm run test` over-subscribes this machine at default thread
