@@ -141,7 +141,18 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      {/*
+        UX-M1 (#894): explicit dark background, independent of the semantic
+        `bg-background` token. The visitor app is all-dark (immersive UI) but
+        never toggles `.dark` on <html> — only the admin theme provider does —
+        so the token layer resolves to `:root`'s white `--background` here,
+        producing a white flash on iOS overscroll. bg-neutral-950 (#0a0a0a)
+        matches the `themeColor` above and the dark shade already used across
+        the visitor UI. Consolidating the three parallel color systems (token
+        layer, ad hoc Tailwind utilities, ~1,969 raw hex literals in admin) is
+        tracked separately — see #938.
+      */}
+      <body className={`${inter.variable} font-sans antialiased bg-neutral-950`}>
         <JsonLd type="website" />
         <Providers>
           <PostHogPageView />
