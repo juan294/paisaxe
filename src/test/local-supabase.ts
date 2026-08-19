@@ -11,13 +11,19 @@ import { execFileSync } from "node:child_process";
  * Also used by SE-H2 (#842):
  * - supabase/migrations/102_tighten_stories_rls.postgrest-rls.test.ts
  *
+ * Also used by QA-H4 (#871):
+ * - src/app/api/webhooks/stripe/route.postgrest-integration.test.ts
+ *
  * These suites require `supabase start` (local Docker) and self-skip when the
  * stack isn't reachable — CI does not run a local Supabase stack, consistent
  * with the rest of the migration-safety workflow (see .claude/rules/supabase.md).
  */
 
+/** Base API URL of the local Supabase stack (see `supabase status`). */
+export const LOCAL_API_URL = process.env.SUPABASE_LOCAL_API_URL ?? "http://127.0.0.1:54321";
+
 /** REST endpoint of the local Supabase stack (see `supabase status`). */
-export const LOCAL_REST_URL = process.env.SUPABASE_LOCAL_REST_URL ?? "http://127.0.0.1:54321/rest/v1";
+export const LOCAL_REST_URL = process.env.SUPABASE_LOCAL_REST_URL ?? `${LOCAL_API_URL}/rest/v1`;
 
 /**
  * Well-known local-dev anon key baked into the Supabase CLI's demo JWT secret
@@ -27,6 +33,17 @@ export const LOCAL_REST_URL = process.env.SUPABASE_LOCAL_REST_URL ?? "http://127
 export const LOCAL_ANON_KEY =
   process.env.SUPABASE_LOCAL_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+
+/**
+ * Well-known local-dev service_role key baked into the Supabase CLI's demo
+ * JWT secret — not a secret, identical for every local `supabase start`
+ * unless `config.toml` overrides it. Used by QA-H4 (#871) to exercise
+ * service-role-only RPCs (e.g. grant_day_pass_idempotent) exactly as
+ * createAdminClient() does, and to prove anon/authenticated truly lack access.
+ */
+export const LOCAL_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_LOCAL_SERVICE_ROLE_KEY ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
 
 /**
  * Local Supabase Docker container name — matches `supabase_db_<project_id>`
