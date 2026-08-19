@@ -1,3 +1,4 @@
+import "server-only";
 import { createHash } from "crypto";
 import { Redis } from "@upstash/redis";
 import { logger } from "./logger";
