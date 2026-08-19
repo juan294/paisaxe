@@ -47,6 +47,27 @@ vi.mock("next/headers", () => ({
 import { createServerClient } from "@supabase/ssr";
 const mockCreateServerClient = vi.mocked(createServerClient);
 
+// Builds the `from()` mock for the voice_purchases select→eq→gt→order→limit→
+// maybeSingle chain the route queries, resolving `maybeSingle()` to `result`.
+function mockVoicePurchaseFrom(result: {
+  data: unknown;
+  error: unknown;
+}) {
+  return vi.fn(() => ({
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        gt: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn(() => ({
+              maybeSingle: vi.fn(() => Promise.resolve(result)),
+            })),
+          })),
+        })),
+      })),
+    })),
+  }));
+}
+
 describe("Voice Access API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -127,22 +148,8 @@ describe("Voice Access API", () => {
             error: null,
           }),
         },
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              gt: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn(() =>
-                      // maybeSingle returns {data: null, error: null} for no rows — no PGRST116
-                      Promise.resolve({ data: null, error: null })
-                    ),
-                  })),
-                })),
-              })),
-            })),
-          })),
-        })),
+        // maybeSingle returns {data: null, error: null} for no rows — no PGRST116
+        from: mockVoicePurchaseFrom({ data: null, error: null }),
       } as never);
 
       const request = createRequest({
@@ -166,28 +173,14 @@ describe("Voice Access API", () => {
             error: null,
           }),
         },
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              gt: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn(() =>
-                      Promise.resolve({
-                        data: {
-                          id: "purchase-123",
-                          purchase_type: "day_pass",
-                          expires_at: expiresAt,
-                        },
-                        error: null,
-                      })
-                    ),
-                  })),
-                })),
-              })),
-            })),
-          })),
-        })),
+        from: mockVoicePurchaseFrom({
+          data: {
+            id: "purchase-123",
+            purchase_type: "day_pass",
+            expires_at: expiresAt,
+          },
+          error: null,
+        }),
       } as never);
 
       const request = createRequest({
@@ -210,25 +203,11 @@ describe("Voice Access API", () => {
             error: null,
           }),
         },
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              gt: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn(() =>
-                      // With maybeSingle, any non-null error is a real DB error
-                      Promise.resolve({
-                        data: null,
-                        error: { code: "PGRST500", message: "Database error" },
-                      })
-                    ),
-                  })),
-                })),
-              })),
-            })),
-          })),
-        })),
+        // With maybeSingle, any non-null error is a real DB error
+        from: mockVoicePurchaseFrom({
+          data: null,
+          error: { code: "PGRST500", message: "Database error" },
+        }),
       } as never);
 
       const request = createRequest({
@@ -258,21 +237,7 @@ describe("Voice Access API", () => {
             error: null,
           }),
         },
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              gt: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn(() =>
-                      Promise.resolve({ data: null, error: null })
-                    ),
-                  })),
-                })),
-              })),
-            })),
-          })),
-        })),
+        from: mockVoicePurchaseFrom({ data: null, error: null }),
       } as never);
 
       const request = createRequest({
