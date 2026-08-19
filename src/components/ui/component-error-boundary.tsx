@@ -33,7 +33,7 @@ export class ComponentErrorBoundary extends Component<
     this.state = { hasError: false, retryKey: 0 };
   }
 
-  static getDerivedStateFromError(): Pick<ComponentErrorBoundaryState, "hasError"> {
+  static getDerivedStateFromError(): Partial<ComponentErrorBoundaryState> {
     return { hasError: true };
   }
 
