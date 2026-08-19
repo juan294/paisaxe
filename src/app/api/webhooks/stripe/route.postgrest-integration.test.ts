@@ -58,6 +58,25 @@ const PAYMENT_ID_CONCURRENCY = "pi_qa_h4_concurrency";
 const ALL_TEST_PAYMENT_IDS = [PAYMENT_ID_IDEMPOTENCY, PAYMENT_ID_CONCURRENCY];
 const ALL_TEST_EVENT_IDS = [EVENT_ID_IDEMPOTENCY, EVENT_ID_CONCURRENCY];
 
+/** SQL `IN (...)` literal lists — computed once, shared by every cleanup call below. */
+const toSqlList = (ids: string[]) => ids.map((id) => `'${id}'`).join(", ");
+const PAYMENT_ID_SQL_LIST = toSqlList(ALL_TEST_PAYMENT_IDS);
+const EVENT_ID_SQL_LIST = toSqlList(ALL_TEST_EVENT_IDS);
+const USER_ID_SQL_LIST = toSqlList(ALL_TEST_USER_IDS);
+
+/**
+ * Deletes every fixture row this suite creates. Used both as defensive
+ * pre-cleanup (in case a previous run crashed before its own afterAll ran —
+ * these fixture ids are fixed/deterministic, so a stale row would otherwise
+ * make "granted" assertions flake) and as real teardown.
+ */
+function deleteFixtureRows(): void {
+  psql(`DELETE FROM public.voice_purchases WHERE payment_provider_id IN (${PAYMENT_ID_SQL_LIST});`);
+  psql(`DELETE FROM public.stripe_webhook_events WHERE event_id IN (${EVENT_ID_SQL_LIST});`);
+  psql(`DELETE FROM public.user_profiles WHERE user_id IN (${USER_ID_SQL_LIST});`);
+  psql(`DELETE FROM auth.users WHERE id IN (${USER_ID_SQL_LIST});`);
+}
+
 /** Ensures a fixture user exists (auth.users + user_profiles) for the FK on voice_purchases. */
 function seedTestUser(userId: string): void {
   psql(
@@ -105,22 +124,12 @@ describe.skipIf(!dbReachable)(
       // Defensive cleanup in case a previous run crashed before its own
       // afterAll ran — these fixture ids are fixed (deterministic), so a
       // stale row here would otherwise make "granted" assertions below flake.
-      const paymentList = ALL_TEST_PAYMENT_IDS.map((id) => `'${id}'`).join(", ");
-      const eventList = ALL_TEST_EVENT_IDS.map((id) => `'${id}'`).join(", ");
-      psql(`DELETE FROM public.voice_purchases WHERE payment_provider_id IN (${paymentList});`);
-      psql(`DELETE FROM public.stripe_webhook_events WHERE event_id IN (${eventList});`);
-
+      deleteFixtureRows();
       ALL_TEST_USER_IDS.forEach(seedTestUser);
     });
 
     afterAll(() => {
-      const paymentList = ALL_TEST_PAYMENT_IDS.map((id) => `'${id}'`).join(", ");
-      const eventList = ALL_TEST_EVENT_IDS.map((id) => `'${id}'`).join(", ");
-      const userList = ALL_TEST_USER_IDS.map((id) => `'${id}'`).join(", ");
-      psql(`DELETE FROM public.voice_purchases WHERE payment_provider_id IN (${paymentList});`);
-      psql(`DELETE FROM public.stripe_webhook_events WHERE event_id IN (${eventList});`);
-      psql(`DELETE FROM public.user_profiles WHERE user_id IN (${userList});`);
-      psql(`DELETE FROM auth.users WHERE id IN (${userList});`);
+      deleteFixtureRows();
     });
 
     it("grants exactly once when the same event is processed twice sequentially (idempotency)", async () => {
