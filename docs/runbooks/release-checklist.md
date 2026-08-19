@@ -41,7 +41,7 @@ Record `CANDIDATE_TREE`. Every later step refers to it.
 ## 2. Pre-deployment gates
 
 ```bash
-git log main..develop --oneline      # what would ship
+npm run what-would-ship              # commits + file-level diffstat since the last release
 gh run list --branch develop --limit 3
 
 npm run test && npm run typecheck && npm run lint
@@ -49,6 +49,13 @@ npm run check-migrations             # required probe: migration-posture
 npm run check-required-probes        # manifest and Playwright must agree
 npm run prelaunch
 ```
+
+`what-would-ship` (`scripts/release/what-would-ship.ts`) replaces a plain `git log main..develop`
+(DO-M8, #835): because the repo squash-merges, `main..develop` never prunes — every commit ever
+squash-merged stays "not an ancestor of main" forever, so the range grows monotonically release
+after release regardless of tagging. The script instead resolves the develop commit whose tree
+matches the last release tag's recorded tree (see step 8) and diffs from there, falling back
+explicitly to the `main`/`develop` merge-base — and saying so — when no release tag resolves yet.
 
 Mutating verification runs against the local Docker stack, never a deployed environment —
 Preview shares the production Supabase project and holds live-mode Stripe keys.

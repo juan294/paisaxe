@@ -149,7 +149,7 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 
 1. Check the `cron_auth` field in `/api/health` — it surfaces the current cron secret validation state.
 2. For `missing_secret`: verify `CRON_SECRET` is set in Vercel environment variables → Settings → Environment Variables.
-3. For `header_missing` or `mismatch`: verify the Vercel cron configuration (`vercel.json`) is sending the correct Authorization header, or that the secret wasn't rotated without updating all call sites.
+3. For `header_missing` or `mismatch`: verify the Vercel cron configuration (`vercel.json`) is sending the correct Authorization header, or that the secret wasn't rotated without updating all call sites — see [secret-inventory.md](secret-inventory.md#cron_secret-rotation-vercel-and-the-operators-local-copy) for `CRON_SECRET`'s multi-homed rotation order (Vercel's own Cron feature reads this env var, and the operator's local `.env.local` copy goes stale silently).
 4. Once the secret is correctly configured, trigger the affected cron manually to confirm (see the
    `POST` auth note under [Cron Job Failure](#cron-job-failure) above):
    ```bash
@@ -255,3 +255,5 @@ This is informational only — the request was silently discarded with a fake 20
 - [Operations overview](operations.md)
 - [Branch protection](branch-protection.md)
 - [Pending setup items](pending-setup.md)
+- [Secret inventory & rotation](secret-inventory.md) — for `Cron Auth Rejected` / `Stripe Webhook
+  Failure` where the fix is a credential rotation, not just a config check
