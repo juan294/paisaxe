@@ -21,7 +21,10 @@ export default function RootError({
   const { t } = useTranslation();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-950 px-4 text-center">
+    <div
+      role="alert"
+      className="flex min-h-screen flex-col items-center justify-center bg-neutral-950 px-4 text-center"
+    >
       <div className="mb-8 h-16 w-16 text-primary">
         <Logo />
       </div>
