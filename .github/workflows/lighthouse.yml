@@ -93,6 +93,13 @@ jobs:
       # enough to absorb runner noise, tight enough to still catch a real
       # regression. Getting /immersive under 4000ms on mobile is tracked
       # separately as real perf work in issue #926.
+      #
+      # categories:performance is likewise 0.6 on mobile, not the desktop 0.7.
+      # Observed mobile scores run 0.64-0.70+ (one run passed 0.7, the next gave
+      # 0.64/0.69/0.69), so the desktop-derived 0.7 sits inside the run-to-run
+      # noise band and the gate was roughly a coin flip. 0.6 is below the
+      # observed floor: it no longer flakes, but a genuine regression (a drop to
+      # ~0.5) still hard-fails. Raising it back to 0.7 is part of #926.
       # total-blocking-time is deliberately left at warn/500ms (observed
       # 696-767ms) so the regression stays visible instead of being tuned away.
       - name: Run Lighthouse CI (mobile)

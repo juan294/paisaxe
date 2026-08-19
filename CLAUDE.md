@@ -261,7 +261,7 @@ Core tables (see `supabase/migrations/` for full DDL):
 
 1. **No secrets in code** — Use env vars. Gitleaks scans git history.
 2. **No copyleft dependencies** — MIT, Apache-2.0, BSD, ISC only. See `docs/project/license-exceptions.md` for approved exceptions.
-3. **Performance budgets** — Lighthouse: Perf >= 70%, A11y >= 80%, LCP < 4s desktop / < 5.5s mobile (mobile emulation throttles CPU 4x and the network to slow 4G; see `.github/workflows/lighthouse.yml` and #926).
+3. **Performance budgets** — Lighthouse: A11y >= 80%; desktop Perf >= 70% and LCP < 4s; mobile Perf >= 60% and LCP < 5.5s. Mobile emulation throttles CPU 4x and the network to slow 4G, so its thresholds are calibrated separately — see `.github/workflows/lighthouse.yml` and #926.
 4. **No dead code** — Knip reports unused exports on PRs.
 5. **Health endpoint is sacred** — `/api/health` monitored 24/7. Don't break it.
 6. **Database function security** — All functions need explicit `SET search_path`. Use `search_path = ''` with fully qualified refs for security-definer functions.
