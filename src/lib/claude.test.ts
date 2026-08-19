@@ -2074,3 +2074,106 @@ describe("claude SDK path (NODE_ENV=production)", () => {
     });
   });
 });
+
+// ─── BE-L1 (#794): explicit ANTHROPIC_TRANSPORT opt-in override ─────────
+//
+// The USE_CURL gate is normally derived from NODE_ENV alone (curl in
+// dev/test, SDK in production). This suite verifies the explicit override
+// lets tooling select either transport regardless of NODE_ENV, without
+// needing to flip the global NODE_ENV (which has side effects beyond this
+// file) — the fallback recommendation from the finding when the underlying
+// Turbopack ECONNRESET reproduction can't be safely re-verified.
+describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
+  const mockCreate = vi.fn();
+  const mockStream = vi.fn();
+  const localMockExecFile = vi.fn();
+  const localMockSpawn = vi.fn();
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockCreate.mockReset();
+    mockStream.mockReset();
+    localMockExecFile.mockReset();
+    localMockSpawn.mockReset();
+
+    vi.doMock("@anthropic-ai/sdk", () => {
+      return {
+        default: class MockAnthropic {
+          messages = {
+            create: mockCreate,
+            stream: mockStream,
+          };
+        },
+      };
+    });
+
+    vi.doMock("node:child_process", () => ({
+      execFile: localMockExecFile,
+      spawn: localMockSpawn,
+    }));
+    vi.doMock("node:util", () => ({
+      promisify: (fn: unknown) => fn,
+    }));
+    vi.doMock("node:timers/promises", () => ({
+      setTimeout: vi.fn().mockResolvedValue(undefined),
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("forces the SDK path when ANTHROPIC_TRANSPORT=sdk even though NODE_ENV is not production", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("ANTHROPIC_TRANSPORT", "sdk");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    mockCreate.mockResolvedValue({ content: [{ type: "text", text: "sdk response" }] });
+
+    const { callAnthropicAPI } = await import("./claude");
+    const result = await callAnthropicAPI(
+      "system",
+      [{ role: "user", content: "hi" }],
+      "claude-sonnet-5",
+      100
+    );
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(localMockExecFile).not.toHaveBeenCalled();
+    expect(result.content[0]).toEqual({ type: "text", text: "sdk response" });
+  });
+
+  it("forces the curl path when ANTHROPIC_TRANSPORT=curl even though NODE_ENV is production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ANTHROPIC_TRANSPORT", "curl");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    localMockExecFile.mockResolvedValue({
+      stdout: JSON.stringify({ content: [{ type: "text", text: "curl response" }] }),
+      stderr: "",
+    });
+
+    const { callAnthropicAPI } = await import("./claude");
+    const result = await callAnthropicAPI(
+      "system",
+      [{ role: "user", content: "hi" }],
+      "claude-sonnet-5",
+      100
+    );
+
+    expect(localMockExecFile).toHaveBeenCalledTimes(1);
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(result.content[0]).toEqual({ type: "text", text: "curl response" });
+  });
+
+  it("falls back to the existing NODE_ENV-based selection when ANTHROPIC_TRANSPORT is unset", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    // ANTHROPIC_TRANSPORT intentionally left unset.
+    mockCreate.mockResolvedValue({ content: [{ type: "text", text: "sdk response" }] });
+
+    const { callAnthropicAPI } = await import("./claude");
+    await callAnthropicAPI("system", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100);
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(localMockExecFile).not.toHaveBeenCalled();
+  });
+});
