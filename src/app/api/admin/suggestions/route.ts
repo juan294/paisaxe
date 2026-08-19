@@ -4,6 +4,39 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import type { StorySuggestionRow, SuggestionStatus } from "@/types/suggestions";
 import { rowToAdminStorySuggestion } from "@/types/suggestions";
 import { logger } from "@/lib/logger";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * PE-L1 (#815): bound how many `auth.admin.getUserById` calls run at once.
+ * A plain sequential loop made this linear in submitter count with no
+ * timeout; an unbounded `Promise.all` would instead fan out N concurrent
+ * admin-API calls, which for a large backlog could trip Supabase's
+ * auth-admin rate limits. This keeps a fixed number of calls in flight.
+ */
+const GET_USER_BY_ID_CONCURRENCY = 5;
+
+async function fetchUserEmails(
+  supabase: SupabaseClient,
+  userIds: string[]
+): Promise<Record<string, string>> {
+  const userEmails: Record<string, string> = {};
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < userIds.length) {
+      const userId = userIds[nextIndex++];
+      const { data: userData } = await supabase.auth.admin.getUserById(userId);
+      if (userData?.user?.email) {
+        userEmails[userId] = userData.user.email;
+      }
+    }
+  }
+
+  const workerCount = Math.min(GET_USER_BY_ID_CONCURRENCY, userIds.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+  return userEmails;
+}
 
 export async function GET(request: NextRequest) {
   // Validate admin auth
@@ -48,15 +81,8 @@ export async function GET(request: NextRequest) {
     // Get unique user IDs (filter out nulls for anonymous submissions)
     const userIds = [...new Set(suggestions.map((s) => s.user_id).filter(Boolean))] as string[];
 
-    // Fetch user emails from auth.users
-    // Using admin client to query user metadata
-    const userEmails: Record<string, string> = {};
-    for (const userId of userIds) {
-      const { data: userData } = await supabase.auth.admin.getUserById(userId);
-      if (userData?.user?.email) {
-        userEmails[userId] = userData.user.email;
-      }
-    }
+    // Fetch user emails from auth.users (bounded concurrency — see PE-L1 #815)
+    const userEmails = await fetchUserEmails(supabase, userIds);
 
     // Convert to admin suggestions with emails
     const adminSuggestions = suggestions.map((row) => {
