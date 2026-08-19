@@ -7,11 +7,17 @@ const mocks = vi.hoisted(() => ({
   getSupabaseClient: vi.fn(),
   getElevenLabsSignedUrl: vi.fn(),
   loggerError: vi.fn(),
+  loggerWarn: vi.fn(),
+  checkRateLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase-auth", () => ({
   getUserFromRequest: mocks.getUserFromRequest,
   getSupabaseClient: mocks.getSupabaseClient,
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: mocks.checkRateLimit,
 }));
 
 vi.mock("@/lib/elevenlabs-signed-session", async (importOriginal) => {
@@ -26,6 +32,7 @@ vi.mock("@/lib/elevenlabs-signed-session", async (importOriginal) => {
 vi.mock("@/lib/logger", () => ({
   logger: {
     error: mocks.loggerError,
+    warn: mocks.loggerWarn,
   },
 }));
 
@@ -72,6 +79,14 @@ describe("POST /api/voice-session", () => {
     mocks.getElevenLabsSignedUrl.mockResolvedValue(
       "wss://signed.example/visitor"
     );
+    // BE-S2 (#803): rate limiting allows by default; individual tests
+    // override to exercise the blocked path.
+    mocks.checkRateLimit.mockResolvedValue({
+      allowed: true,
+      limit: 10,
+      remaining: 9,
+      resetAt: Date.now() + 60_000,
+    });
   });
 
   it("rejects unauthenticated visitors", async () => {
@@ -79,6 +94,58 @@ describe("POST /api/voice-session", () => {
     const response = await POST(request());
     expect(response.status).toBe(401);
     expect(mocks.getElevenLabsSignedUrl).not.toHaveBeenCalled();
+  });
+
+  // BE-S2 (#803): voice-session mints a signed ElevenLabs URL per call and
+  // had no rate limiting at all — unbounded per-user request volume against
+  // a metered upstream.
+  describe("rate limiting (BE-S2)", () => {
+    it("returns 429 when the per-user limit is exceeded", async () => {
+      mocks.checkRateLimit.mockResolvedValue({
+        allowed: false,
+        limit: 10,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+        retryAfter: 42,
+      });
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("42");
+      await expect(response.json()).resolves.toEqual({
+        error: "Too many requests. Please try again later.",
+      });
+      expect(mocks.getElevenLabsSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it("keys the rate limit on the authenticated user id", async () => {
+      await POST(request());
+      expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+        "voice-session:visitor-1",
+        expect.any(Object)
+      );
+    });
+
+    it("checks the rate limit before querying voice purchase access", async () => {
+      mocks.checkRateLimit.mockResolvedValue({
+        allowed: false,
+        limit: 10,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+        retryAfter: 10,
+      });
+
+      await POST(request());
+
+      expect(mocks.getSupabaseClient).not.toHaveBeenCalled();
+    });
+
+    it("does not rate limit unauthenticated requests (401 short-circuits first)", async () => {
+      mocks.getUserFromRequest.mockResolvedValue(null);
+      await POST(request());
+      expect(mocks.checkRateLimit).not.toHaveBeenCalled();
+    });
   });
 
   it("rejects visitors without current paid voice access", async () => {

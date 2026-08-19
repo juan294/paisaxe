@@ -2,7 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { createDayPassCheckoutSession, type PurchaseType } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
 import { checkoutBodySchema } from "@/lib/schemas";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+
+// BE-S2 (#803): this route had no rate limiting at all — a repeat-click or
+// scripted loop could create unbounded Stripe Checkout Sessions per user.
+// Keyed on the authenticated user id (not IP): every caller here has
+// already passed auth, so the user id is a stable, unspoofable identifier.
+// 5 req/60s comfortably covers legitimate retries (e.g. after a declined
+// card) while bounding abuse of Stripe session creation.
+const DAY_PASS_RATE_LIMIT = {
+  windowMs: 60_000,
+  maxRequests: 5,
+  maxEntries: 10_000,
+};
 
 /** Voice-pass tiers accepted by checkout (#137). */
 const VALID_PURCHASE_TYPES: readonly PurchaseType[] = [
@@ -57,6 +70,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await checkRateLimit(
+      `day-pass:${user.id}`,
+      DAY_PASS_RATE_LIMIT
+    );
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: rateLimit.retryAfter
+            ? { "Retry-After": String(rateLimit.retryAfter) }
+            : undefined,
+        }
+      );
     }
 
     const hasSecretKey = !!process.env.STRIPE_SECRET_KEY?.trim();
