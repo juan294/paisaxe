@@ -34,6 +34,56 @@ function getRedis(): Redis {
 }
 
 /**
+ * Shared get/set implementation for the Redis-JSON caches below
+ * (`EmbeddingCache`, `SearchResultCache`). Both cache a JSON-serializable
+ * value under a hashed key with a TTL and treat any Redis failure as a
+ * soft miss — never let a cache problem fail the request it's speeding up.
+ */
+async function redisJsonGet<T>(key: string, missLogTag: string): Promise<T | null> {
+  if (!hasRedisConfig()) return null;
+
+  try {
+    const raw = await getRedis().get<string>(key);
+    if (raw === null || raw === undefined) return null;
+    // Upstash may auto-parse JSON; handle both string and already-parsed
+    // values. `typeof raw === "object"` covers both arrays (embeddings) and
+    // plain objects (search results) since arrays are objects in JS.
+    if (typeof raw === "object") return raw as T;
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    logger.warn(missLogTag, {
+      reason: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+async function redisJsonSet(
+  key: string,
+  value: unknown,
+  ttlSeconds: number,
+  failLogTag: string
+): Promise<void> {
+  if (!hasRedisConfig()) return;
+
+  try {
+    void getRedis()
+      .set(key, JSON.stringify(value), { ex: ttlSeconds })
+      .catch((err: unknown) => {
+        logger.warn(failLogTag, {
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      });
+  } catch (err) {
+    // Fire-and-forget: a write failure is non-fatal. The value was already
+    // computed; the worst outcome is a cache miss next time.
+    logger.warn(failLogTag, {
+      reason: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
  * Normalize query text before it's used as a cache key.
  *
  * PE-L5 (#819): trims leading/trailing whitespace and collapses internal
@@ -70,42 +120,11 @@ export class EmbeddingCache {
   }
 
   async get(text: string): Promise<number[] | null> {
-    if (!hasRedisConfig()) return null;
-
-    const key = this.hashKey(text);
-    try {
-      const raw = await getRedis().get<string>(key);
-      if (raw === null || raw === undefined) return null;
-      // Upstash may auto-parse JSON; handle both string and already-parsed array.
-      if (Array.isArray(raw)) return raw as number[];
-      return JSON.parse(raw) as number[];
-    } catch (err) {
-      logger.warn("[EMBEDDING_CACHE_MISS]", {
-        reason: err instanceof Error ? err.message : String(err),
-      });
-      return null;
-    }
+    return redisJsonGet<number[]>(this.hashKey(text), "[EMBEDDING_CACHE_MISS]");
   }
 
   async set(text: string, embedding: number[]): Promise<void> {
-    if (!hasRedisConfig()) return;
-
-    const key = this.hashKey(text);
-    try {
-      void getRedis()
-        .set(key, JSON.stringify(embedding), { ex: TTL_SECONDS })
-        .catch((err: unknown) => {
-          logger.warn("[EMBEDDING_CACHE_SET_FAILED]", {
-            reason: err instanceof Error ? err.message : String(err),
-          });
-        });
-    } catch (err) {
-      // Fire-and-forget: a write failure is non-fatal. The embedding was
-      // already computed; the worst outcome is a cache miss next time.
-      logger.warn("[EMBEDDING_CACHE_SET_FAILED]", {
-        reason: err instanceof Error ? err.message : String(err),
-      });
-    }
+    return redisJsonSet(this.hashKey(text), embedding, TTL_SECONDS, "[EMBEDDING_CACHE_SET_FAILED]");
   }
 }
 
@@ -126,41 +145,15 @@ export class SearchResultCache {
   }
 
   async get(queryText: string, limit: number): Promise<SearchResult | null> {
-    if (!hasRedisConfig()) return null;
-
-    const key = this.hashKey(queryText, limit);
-    try {
-      const raw = await getRedis().get<string>(key);
-      if (raw === null || raw === undefined) return null;
-      // Upstash may auto-parse JSON; handle both string and already-parsed object.
-      if (typeof raw === "object") return raw as SearchResult;
-      return JSON.parse(raw) as SearchResult;
-    } catch (err) {
-      logger.warn("[SEARCH_RESULT_CACHE_MISS]", {
-        reason: err instanceof Error ? err.message : String(err),
-      });
-      return null;
-    }
+    return redisJsonGet<SearchResult>(this.hashKey(queryText, limit), "[SEARCH_RESULT_CACHE_MISS]");
   }
 
   async set(queryText: string, limit: number, result: SearchResult): Promise<void> {
-    if (!hasRedisConfig()) return;
-
-    const key = this.hashKey(queryText, limit);
-    try {
-      void getRedis()
-        .set(key, JSON.stringify(result), { ex: SEARCH_TTL_SECONDS })
-        .catch((err: unknown) => {
-          logger.warn("[SEARCH_RESULT_CACHE_SET_FAILED]", {
-            reason: err instanceof Error ? err.message : String(err),
-          });
-        });
-    } catch (err) {
-      // Fire-and-forget: a write failure is non-fatal. The result was
-      // already computed; the worst outcome is a cache miss next time.
-      logger.warn("[SEARCH_RESULT_CACHE_SET_FAILED]", {
-        reason: err instanceof Error ? err.message : String(err),
-      });
-    }
+    return redisJsonSet(
+      this.hashKey(queryText, limit),
+      result,
+      SEARCH_TTL_SECONDS,
+      "[SEARCH_RESULT_CACHE_SET_FAILED]"
+    );
   }
 }

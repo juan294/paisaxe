@@ -114,17 +114,12 @@ export async function search(
   const allCandidateRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
   const uniqueCandidateRefs = [...new Set(allCandidateRefs)];
 
-  const rerankRace = withRerankTimeout(
-    rerankChunks(queryText, candidates, limit),
-    candidates,
-    limit
-  );
-
   // Start both in parallel — neither depends on the other's result yet.
-  const [rerankedChunks, allImages] = await Promise.all([
-    rerankRace.result,
+  const [rerankOutcome, allImages] = await Promise.all([
+    withRerankTimeout(rerankChunks(queryText, candidates, limit), candidates, limit),
     getRelatedImages(uniqueCandidateRefs),
   ]);
+  const { chunks: rerankedChunks, timedOut } = rerankOutcome;
 
   // Filter images to only those referenced by the reranked top-k chunks.
   const topKRefs = new Set(rerankedChunks.flatMap((chunk) => chunk.imageRefs || []));
@@ -135,31 +130,36 @@ export async function search(
   // Don't cache a rerank-timeout fallback: it's a degraded (vector-order-only)
   // result, and caching it would serve that degraded ranking to every repeat
   // query for the full TTL even after a transient rerank slowdown passes.
-  if (!rerankRace.timedOut()) {
+  if (!timedOut) {
     void searchResultCache.set(queryText, limit, result);
   }
 
   return result;
 }
 
+interface RerankOutcome {
+  chunks: Chunk[];
+  /** True when the rerank timed out and `chunks` fell back to vector order. */
+  timedOut: boolean;
+}
+
 function withRerankTimeout(
   rerankPromise: Promise<Chunk[]>,
   candidates: Chunk[],
   limit: number
-): { result: Promise<Chunk[]>; timedOut: () => boolean } {
+): Promise<RerankOutcome> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let timedOut = false;
-  const timeoutPromise = new Promise<Chunk[]>((resolve) => {
+  const timeoutPromise = new Promise<RerankOutcome>((resolve) => {
     timer = setTimeout(() => {
-      timedOut = true;
       logger.warn("[SEARCH_RERANK_TIMEOUT]", { timeoutMs: RERANK_TIMEOUT_MS });
-      resolve(candidates.slice(0, limit));
+      resolve({ chunks: candidates.slice(0, limit), timedOut: true });
     }, RERANK_TIMEOUT_MS);
   });
 
-  const result = Promise.race([rerankPromise, timeoutPromise]).finally(() => {
+  return Promise.race([
+    rerankPromise.then((chunks) => ({ chunks, timedOut: false })),
+    timeoutPromise,
+  ]).finally(() => {
     if (timer !== undefined) clearTimeout(timer);
   });
-
-  return { result, timedOut: () => timedOut };
 }
