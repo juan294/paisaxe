@@ -1498,6 +1498,41 @@ describe("claude", () => {
 
 // ─── SDK path tests (USE_CURL = false, NODE_ENV = production) ──────────
 
+// Shared by both describe blocks below ("claude SDK path" and "ANTHROPIC_TRANSPORT
+// override"), which each need to mock @anthropic-ai/sdk plus the node:child_process/
+// util/timers trio the same way ahead of a fresh vi.resetModules() + dynamic
+// import("./claude"). vi.doMock (unlike vi.mock) isn't hoisted, so it's safe to
+// call from inside a regular helper function.
+function mockAnthropicTransportModules(options: {
+  create: ReturnType<typeof vi.fn>;
+  stream: ReturnType<typeof vi.fn>;
+  execFile?: ReturnType<typeof vi.fn>;
+  spawn?: ReturnType<typeof vi.fn>;
+  onConstruct?: (constructorOptions?: Record<string, unknown>) => void;
+}): void {
+  vi.doMock("@anthropic-ai/sdk", () => ({
+    default: class MockAnthropic {
+      constructor(constructorOptions?: Record<string, unknown>) {
+        options.onConstruct?.(constructorOptions);
+      }
+      messages = {
+        create: options.create,
+        stream: options.stream,
+      };
+    },
+  }));
+  vi.doMock("node:child_process", () => ({
+    execFile: options.execFile ?? vi.fn(),
+    spawn: options.spawn ?? vi.fn(),
+  }));
+  vi.doMock("node:util", () => ({
+    promisify: (fn: unknown) => fn,
+  }));
+  vi.doMock("node:timers/promises", () => ({
+    setTimeout: vi.fn().mockResolvedValue(undefined),
+  }));
+}
+
 describe("claude SDK path (NODE_ENV=production)", () => {
   const mockCreate = vi.fn();
   const mockStream = vi.fn();
@@ -1511,32 +1546,13 @@ describe("claude SDK path (NODE_ENV=production)", () => {
     mockStream.mockReset();
     capturedConstructorOptions = undefined;
 
-    // Mock the Anthropic SDK module
-    vi.doMock("@anthropic-ai/sdk", () => {
-      return {
-        default: class MockAnthropic {
-          constructor(options?: Record<string, unknown>) {
-            capturedConstructorOptions = options;
-          }
-          messages = {
-            create: mockCreate,
-            stream: mockStream,
-          };
-        },
-      };
+    mockAnthropicTransportModules({
+      create: mockCreate,
+      stream: mockStream,
+      onConstruct: (constructorOptions) => {
+        capturedConstructorOptions = constructorOptions;
+      },
     });
-
-    // Mock child_process so it doesn't interfere
-    vi.doMock("node:child_process", () => ({
-      execFile: vi.fn(),
-      spawn: vi.fn(),
-    }));
-    vi.doMock("node:util", () => ({
-      promisify: (fn: unknown) => fn,
-    }));
-    vi.doMock("node:timers/promises", () => ({
-      setTimeout: vi.fn().mockResolvedValue(undefined),
-    }));
   });
 
   afterEach(() => {
@@ -2096,27 +2112,12 @@ describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
     localMockExecFile.mockReset();
     localMockSpawn.mockReset();
 
-    vi.doMock("@anthropic-ai/sdk", () => {
-      return {
-        default: class MockAnthropic {
-          messages = {
-            create: mockCreate,
-            stream: mockStream,
-          };
-        },
-      };
-    });
-
-    vi.doMock("node:child_process", () => ({
+    mockAnthropicTransportModules({
+      create: mockCreate,
+      stream: mockStream,
       execFile: localMockExecFile,
       spawn: localMockSpawn,
-    }));
-    vi.doMock("node:util", () => ({
-      promisify: (fn: unknown) => fn,
-    }));
-    vi.doMock("node:timers/promises", () => ({
-      setTimeout: vi.fn().mockResolvedValue(undefined),
-    }));
+    });
   });
 
   afterEach(() => {

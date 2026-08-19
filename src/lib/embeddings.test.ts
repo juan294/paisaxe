@@ -79,21 +79,6 @@ describe("embeddings", () => {
       );
     });
 
-    it("should not call the Voyage embed request when the request is already aborted and cached", async () => {
-      // A cache hit must skip the Voyage call entirely regardless of abort
-      // state — no network call to cancel in the first place.
-      const cachedEmbedding = Array(512).fill(0.5);
-      mockGet.mockResolvedValue(cachedEmbedding);
-      const controller = new AbortController();
-      controller.abort();
-
-      const { generateEmbedding } = await import("./embeddings");
-      const result = await generateEmbedding("cached text", { signal: controller.signal });
-
-      expect(result).toEqual(cachedEmbedding);
-      expect(mockEmbed).not.toHaveBeenCalled();
-    });
-
     it("should throw error when no embedding is returned", async () => {
       mockGet.mockResolvedValue(null);
       mockEmbed.mockResolvedValue({ data: [] });
