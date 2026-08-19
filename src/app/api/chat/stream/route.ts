@@ -189,9 +189,16 @@ async function handlePost(request: NextRequest) {
     let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
     let images: Awaited<ReturnType<typeof search>>["images"] = [];
     try {
+      // BE-M4 (#785): wire an AbortController into the embedding stage so a
+      // stage timeout actually cancels the in-flight Voyage call instead of
+      // leaving it running (and billing) after withChatStreamStageTiming has
+      // already rejected and moved on. Mirrors the AbortSignal threading
+      // already applied to the Anthropic generation stage below (AR-H2, #856).
+      const embeddingAbortController = new AbortController();
       const queryEmbedding = await withChatStreamStageTiming(
         "embedding",
-        generateEmbedding(cleanMessage)
+        generateEmbedding(cleanMessage, { signal: embeddingAbortController.signal }),
+        embeddingAbortController
       );
       ({ chunks, images } = await withChatStreamStageTiming(
         "search",
