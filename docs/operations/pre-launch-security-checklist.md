@@ -23,12 +23,11 @@ this: it checks out full git history (`fetch-depth: 0`) and runs a blocking
 Gitleaks scan against it on every push to `develop`/`main`, every PR, and
 daily at 08:00 UTC.
 
-**What to do:** Confirm the `Gitleaks secret scan` check passed for the exact
-commit/tree being released — not just "the PR is green" (see
-`docs/runbooks/release-checklist.md` Step 1: squash merges don't preserve the
-tested SHA, releases are identified by tree hash). Do not manually re-run
-Gitleaks as a substitute for this; find the run for that commit/tree in the
-Actions tab and confirm its status.
+**How to verify:** Find the `Gitleaks secret scan` run for the exact
+commit/tree being released in the Actions tab — not just "the PR is green"
+(see `docs/runbooks/release-checklist.md` Step 1: squash merges don't
+preserve the tested SHA, releases are identified by tree hash). Do not
+manually re-run Gitleaks as a substitute for this check.
 
 **If the CI job ever fails:** Don't read the failure details from the public
 Actions log. CI's invocation (`gitleaks detect --source . --verbose`) has no
@@ -46,8 +45,8 @@ gitleaks detect --source . --redact --report-format json --report-path /tmp/gitl
 cat /tmp/gitleaks-report.json | jq '.[] | {file, startLine, rule: .RuleID}'
 ```
 
-**Pass criteria:** `Gitleaks secret scan` CI check is green for the released
-commit/tree. False positives must be baseline-listed in `.gitleaks.toml`.
+**Pass criteria:** That check is green for the released commit/tree. False
+positives must be baseline-listed in `.gitleaks.toml`.
 
 **Run by:** Automated (CI). Release manager confirms the check status before
 every `develop → main` PR; falls back to the local redacted scan above only
