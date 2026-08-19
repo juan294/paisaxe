@@ -121,10 +121,94 @@ describe("/api/cron/retry-booking-sms", () => {
     expect(response.status).toBe(200);
     expect(data.sent_count).toBe(0);
     expect(data.failed_count).toBe(1);
+    expect(data.dead_letter_count).toBe(0);
     expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
       p_event_key: "post_call_transcription:conv_456",
       p_error: "Twilio unavailable",
+      p_max_attempts: 3,
     });
+    expect(logger.error).not.toHaveBeenCalledWith(
+      "[CRON_RETRY_BOOKING_SMS_DEAD_LETTER]",
+      expect.anything()
+    );
+  });
+
+  // BE-M11 (#792): a job that hits max attempts must be surfaced as a
+  // distinct terminal dead-letter -- not silently left in a 'failed' row
+  // indistinguishable from one that will still be retried.
+  it("BE-M11: marks a job at max attempts as dead-letter and logs it distinctly", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    vi.mocked(sendSMS).mockResolvedValue({
+      success: false,
+      error: "Twilio unavailable",
+    });
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "claim_retryable_booking_sms_jobs") {
+        return Promise.resolve({
+          data: [
+            {
+              booking_id: "booking-exhausted",
+              event_key: "post_call_transcription:conv_exhausted",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+              attempts: 3, // == SMS_RETRY_MAX_ATTEMPTS: this is the final attempt
+            },
+          ],
+          error: null,
+        });
+      }
+      if (fn === "fail_booking_sms_job") {
+        return Promise.resolve({ data: true, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.failed_count).toBe(1);
+    expect(data.dead_letter_count).toBe(1);
+    expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
+      p_event_key: "post_call_transcription:conv_exhausted",
+      p_error: "Twilio unavailable",
+      p_max_attempts: 3,
+    });
+    expect(logger.error).toHaveBeenCalledWith("[CRON_RETRY_BOOKING_SMS_DEAD_LETTER]", {
+      booking_id: "booking-exhausted",
+      event_key: "post_call_transcription:conv_exhausted",
+      attempts: 3,
+      max_attempts: 3,
+      error: "Twilio unavailable",
+    });
+  });
+
+  it("BE-M11: does not dead-letter a job still under the attempt cap, and reports the count in the cron summary", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    vi.mocked(sendSMS).mockResolvedValue({
+      success: false,
+      error: "Twilio unavailable",
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // default beforeEach mock claims a job with attempts: 2 (< max of 3)
+    expect(data.failed_count).toBe(1);
+    expect(data.dead_letter_count).toBe(0);
+    expect(logger.info).toHaveBeenCalledWith(
+      "[CRON_SUCCESS]",
+      expect.objectContaining({ job: "retry-booking-sms", dead_letter_count: 0 })
+    );
   });
 
   it("accepts POST with a valid webhook secret without falling back to admin auth (line 136)", async () => {

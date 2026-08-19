@@ -49,6 +49,7 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
   const jobs = (claimedJobs ?? []) as RetryableSMSJob[];
   let sentCount = 0;
   let failedCount = 0;
+  let deadLetterCount = 0;
 
   for (const job of jobs) {
     let smsResult: Awaited<ReturnType<typeof sendSMS>>;
@@ -97,6 +98,7 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
     const { error: failError } = await supabase.rpc("fail_booking_sms_job", {
       p_event_key: job.event_key,
       p_error: errorMessage,
+      p_max_attempts: SMS_RETRY_MAX_ATTEMPTS,
     });
 
     if (failError) {
@@ -104,6 +106,21 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
         booking_id: job.booking_id,
         event_key: job.event_key,
         error: failError.message,
+      });
+    }
+
+    // BE-M11: a job at max attempts is never claimed again (see
+    // claim_retryable_booking_sms_jobs) but was previously indistinguishable
+    // from a job that will still retry -- log and count it distinctly so a
+    // broken Twilio config is observable instead of a silent dead-letter.
+    if (job.attempts >= SMS_RETRY_MAX_ATTEMPTS) {
+      deadLetterCount += 1;
+      logger.error("[CRON_RETRY_BOOKING_SMS_DEAD_LETTER]", {
+        booking_id: job.booking_id,
+        event_key: job.event_key,
+        attempts: job.attempts,
+        max_attempts: SMS_RETRY_MAX_ATTEMPTS,
+        error: errorMessage,
       });
     }
   }
@@ -114,6 +131,7 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
     claimed_count: jobs.length,
     sent_count: sentCount,
     failed_count: failedCount,
+    dead_letter_count: deadLetterCount,
     max_attempts: SMS_RETRY_MAX_ATTEMPTS,
   });
 
@@ -122,6 +140,7 @@ async function retryBookingSMSJobs(): Promise<NextResponse> {
     claimed_count: jobs.length,
     sent_count: sentCount,
     failed_count: failedCount,
+    dead_letter_count: deadLetterCount,
     max_attempts: SMS_RETRY_MAX_ATTEMPTS,
   });
 }
