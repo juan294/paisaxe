@@ -6,6 +6,7 @@ import {
 } from "@/lib/elevenlabs-signed-session";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import { logger } from "@/lib/logger";
 
 // BE-S2 (#803): this route mints a signed ElevenLabs URL per call — a
@@ -34,12 +35,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
-      {
-        status: 429,
-        headers: rateLimit.retryAfter
-          ? { "Retry-After": String(rateLimit.retryAfter) }
-          : undefined,
-      }
+      { status: 429, headers: buildRateLimitHeaders(rateLimit, true) }
     );
   }
 
