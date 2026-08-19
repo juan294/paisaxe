@@ -148,11 +148,44 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
       // parse, O(n^2) over a response's lifetime). Chunks are buffered here
       // and flushed at most once per animation frame, so the number of state
       // updates — and therefore re-parses — is bounded by paint frequency
-      // instead of token count. Declared at sendMessage's top level (not
-      // inside the try block) so every exit path below can reach
-      // `cancelPendingFlush`.
+      // instead of token count. Declared (and the two helpers below defined)
+      // at sendMessage's top level, not inside the try block, so every exit
+      // path — including catch/finally — can reach them.
       let pendingChunk = "";
       let flushHandle: number | null = null;
+
+      // Applies the buffered chunk to state in one update and disarms any
+      // scheduled frame. Safe to call with nothing buffered (the "done" event
+      // branch and onDone both call it unconditionally as a flush-if-needed).
+      const flushPendingChunk = () => {
+        if (flushHandle !== null) {
+          cancelAnimationFrame(flushHandle);
+          flushHandle = null;
+        }
+        if (!pendingChunk) return;
+        const toAppend = pendingChunk;
+        pendingChunk = "";
+        updateMessages((prev) => {
+          const updated = [...prev];
+          const current = updated[assistantIndex];
+          updated[assistantIndex] = {
+            ...current,
+            content: current.content + toAppend,
+          };
+          return updated;
+        });
+      };
+
+      // Discards any buffered text instead of flushing it — used on paths
+      // where the assistant content is about to be replaced wholesale
+      // rather than appended to, and defensively in `finally`.
+      const cancelPendingFlush = () => {
+        if (flushHandle !== null) {
+          cancelAnimationFrame(flushHandle);
+          flushHandle = null;
+        }
+        pendingChunk = "";
+      };
 
       try {
         const response = await fetch("/api/chat/stream", {
@@ -199,37 +232,6 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         // Handle streaming response
         if (!response.body) throw new Error("No reader");
 
-        // PE-M4: applies buffered "text" chunks to state in one update, then
-        // clears the buffer. Safe to call when `pendingChunk` is empty (the
-        // "done"/onDone paths call it defensively even if a flush already
-        // ran).
-        const flushPendingChunk = () => {
-          flushHandle = null;
-          if (!pendingChunk) return;
-          const toAppend = pendingChunk;
-          pendingChunk = "";
-          updateMessages((prev) => {
-            const updated = [...prev];
-            const current = updated[assistantIndex];
-            updated[assistantIndex] = {
-              ...current,
-              content: current.content + toAppend,
-            };
-            return updated;
-          });
-        };
-
-        // Discards any buffered text instead of flushing it — used on the
-        // error paths below, where the assistant content is about to be
-        // replaced wholesale rather than appended to.
-        const cancelPendingFlush = () => {
-          if (flushHandle !== null) {
-            cancelAnimationFrame(flushHandle);
-            flushHandle = null;
-          }
-          pendingChunk = "";
-        };
-
         const processEvent = (line: string) => {
           const event = parseSseEvent(line);
           if (!event) {
@@ -246,9 +248,6 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             // `currentMsg.content` and must see every buffered chunk, and
             // this must not wait for an animation frame that may never
             // come before the caller reads the final content.
-            if (flushHandle !== null) {
-              cancelAnimationFrame(flushHandle);
-            }
             flushPendingChunk();
             updateMessages((prev) => {
               const updated = [...prev];
@@ -310,9 +309,6 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             // synchronously above), but if the connection ever closes
             // cleanly without one, this still applies any buffered chunk
             // instead of leaving it stranded until a paint frame arrives.
-            if (flushHandle !== null) {
-              cancelAnimationFrame(flushHandle);
-            }
             flushPendingChunk();
           },
           onError: (err) => {
@@ -415,10 +411,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         // PE-M4: defensive backstop — every code path above that can leave
         // a chunk buffered already disarms it, but this guarantees no
         // scheduled animation frame ever outlives this call.
-        if (flushHandle !== null) {
-          cancelAnimationFrame(flushHandle);
-          flushHandle = null;
-        }
+        cancelPendingFlush();
         setIsStreaming(false);
       }
     },
