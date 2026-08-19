@@ -25,6 +25,7 @@
     "check-verification-coverage": "tsx scripts/check-verification-coverage.ts",
     "check-env": "tsx scripts/check-env.ts",
     "check-migrations": "tsx scripts/check-migrations.ts",
+    "check-licenses": "tsx scripts/check-production-licenses.ts",
     "check-required-probes": "tsx scripts/release/required-probes.ts",
     "verify-sentry-delivery": "tsx scripts/verify-sentry-delivery.ts",
     "analyze-release": "tsx scripts/release/analyze-release-run.ts",
