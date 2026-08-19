@@ -22,6 +22,10 @@ import { queryPostHog, formatForHogQL } from "@/lib/posthog-query";
 import { ELEVENLABS_API_BASE } from "@/config/elevenlabs-agents";
 import { logger } from "@/lib/logger";
 
+// PE-L2: bound each ElevenLabs call so a hung upstream can't hold this admin
+// route open until the platform's default function timeout.
+const ELEVENLABS_FETCH_TIMEOUT_MS = 8_000;
+
 function formatUsd(amount: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -249,6 +253,7 @@ async function fetchUsageMetrics(
             headers: {
               "xi-api-key": elevenLabsKey,
             },
+            signal: AbortSignal.timeout(ELEVENLABS_FETCH_TIMEOUT_MS),
           }
         );
 
@@ -281,6 +286,7 @@ async function fetchUsageMetrics(
             headers: {
               "xi-api-key": elevenLabsKey,
             },
+            signal: AbortSignal.timeout(ELEVENLABS_FETCH_TIMEOUT_MS),
           }
         );
 
@@ -312,7 +318,19 @@ async function fetchUsageMetrics(
           voiceMinutes = Math.round(voiceMinutes * 10) / 10;
         }
       } catch (error) {
-        logger.warn("[COSTS_ANALYTICS_ELEVENLABS_USAGE_FETCH_FAILED]", { error });
+        // PE-L2: distinguish a timeout/abort (AbortError / TimeoutError
+        // emitted by AbortSignal.timeout) from a definitive ElevenLabs
+        // error, since this call already degrades to partial data — a
+        // hung upstream should be visible separately from a real failure.
+        // We check .name directly (not just instanceof Error) because
+        // DOMException may not extend Error in all JS runtimes/environments.
+        const errorName = (error as { name?: string } | null)?.name;
+        const isTimeout = errorName === "AbortError" || errorName === "TimeoutError";
+
+        logger.warn("[COSTS_ANALYTICS_ELEVENLABS_USAGE_FETCH_FAILED]", {
+          error,
+          timed_out: isTimeout,
+        });
       }
     }
 

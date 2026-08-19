@@ -42,6 +42,10 @@ interface ElevenLabsLiveCountResponse {
   count: number;
 }
 
+// PE-L2: bound each ElevenLabs call so a hung upstream can't hold this admin
+// route open until the platform's default function timeout.
+const ELEVENLABS_FETCH_TIMEOUT_MS = 8_000;
+
 async function fetchElevenLabs<T>(
   endpoint: string,
   apiKey: string
@@ -50,6 +54,7 @@ async function fetchElevenLabs<T>(
     headers: {
       "xi-api-key": apiKey,
     },
+    signal: AbortSignal.timeout(ELEVENLABS_FETCH_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -247,7 +252,18 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    logger.error("ElevenLabs analytics API error:", { error: error instanceof Error ? error.message : String(error) });
+    // PE-L2: distinguish a timeout/abort (AbortError / TimeoutError emitted by
+    // AbortSignal.timeout) from a definitive ElevenLabs error so a hung
+    // upstream is visible separately from a real API failure. We check
+    // .name directly (not just instanceof Error) because DOMException may
+    // not extend Error in all JS runtimes/environments.
+    const errorName = (error as { name?: string } | null)?.name;
+    const isTimeout = errorName === "AbortError" || errorName === "TimeoutError";
+
+    logger.error("ElevenLabs analytics API error:", {
+      error: error instanceof Error ? error.message : String(error),
+      timed_out: isTimeout,
+    });
 
     // Return empty data on error
     const url = new URL(request.url);
