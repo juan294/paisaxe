@@ -8,6 +8,7 @@
  * (Vercel env vars may have invisible trailing whitespace).
  */
 
+import "server-only";
 import { Resend } from "resend";
 import { logger } from "@/lib/logger";
 

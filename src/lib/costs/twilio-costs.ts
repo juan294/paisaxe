@@ -1,3 +1,4 @@
+import "server-only";
 import type { ServiceCost } from "@/types/costs-analytics";
 import { PLATFORM_SERVICES } from "@/types/costs-analytics";
 import { logger } from "@/lib/logger";
