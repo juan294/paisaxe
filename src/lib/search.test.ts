@@ -29,7 +29,19 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
-import { RERANK_TIMEOUT_MS, searchChunks, getRelatedImages, search, keywordSearch } from "./search";
+// Mock the search-result cache (#810). vi.mock is hoisted above top-level
+// const declarations, so the mock fns must be created via vi.hoisted().
+const { mockSearchResultCacheGet, mockSearchResultCacheSet } = vi.hoisted(() => ({
+  mockSearchResultCacheGet: vi.fn(),
+  mockSearchResultCacheSet: vi.fn(),
+}));
+vi.mock("./embedding-cache", () => ({
+  SearchResultCache: vi.fn(function () {
+    return { get: mockSearchResultCacheGet, set: mockSearchResultCacheSet };
+  }),
+}));
+
+import { RERANK_TIMEOUT_MS, searchChunks, getRelatedImages, search } from "./search";
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
 import { logger } from "@/lib/logger";
@@ -37,6 +49,10 @@ import { logger } from "@/lib/logger";
 describe("search", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: cache miss, cache write succeeds — most tests exercise the
+    // uncached retrieval path and don't care about caching.
+    mockSearchResultCacheGet.mockResolvedValue(null);
+    mockSearchResultCacheSet.mockResolvedValue(undefined);
   });
 
   describe("searchChunks", () => {
@@ -507,96 +523,107 @@ describe("search", () => {
     });
   });
 
-  describe("keywordSearch", () => {
-    it("should search chunks by keyword", async () => {
-      const mockData = [
-        {
-          id: "chunk-1",
-          content: "Oviedo is the capital",
-          source_pdf: "guide.pdf",
-          page_number: 1,
-          section_title: "Oviedo",
-          image_refs: [],
-        },
+  describe("search — result caching (#810)", () => {
+    it("returns the cached SearchResult without calling vector search, rerank, or image lookup", async () => {
+      const cachedResult = {
+        chunks: [
+          {
+            id: "cached-1",
+            content: "Cached content",
+            sourcePdf: "guide.pdf",
+            pageNumber: 1,
+            sectionTitle: undefined,
+            imageRefs: [],
+            similarity: 0.9,
+          },
+        ],
+        images: [],
+      };
+      mockSearchResultCacheGet.mockResolvedValueOnce(cachedResult);
+
+      const embedding = new Array(512).fill(0.1);
+      const result = await search(embedding, 3, "Oviedo");
+
+      expect(result).toEqual(cachedResult);
+      expect(supabase.rpc).not.toHaveBeenCalled();
+      expect(rerankChunks).not.toHaveBeenCalled();
+      expect(mockSearchResultCacheGet).toHaveBeenCalledWith("Oviedo", 3);
+    });
+
+    it("stores the result in the cache after a successful reranked search", async () => {
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: [
+          { id: "chunk-1", content: "Content", source_pdf: "guide.pdf", page_number: 1, section_title: null, image_refs: [], similarity: 0.8 },
+        ],
+        error: null,
+      } as never);
+
+      const rerankedChunks = [
+        { id: "chunk-1", content: "Content", sourcePdf: "guide.pdf", pageNumber: 1, sectionTitle: undefined, imageRefs: [], similarity: 0.8 },
       ];
-
-      const mockTextSearch = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValueOnce({ data: mockData, error: null }),
-      });
+      vi.mocked(rerankChunks).mockResolvedValueOnce(rerankedChunks);
 
       const mockSelect = vi.fn().mockReturnValue({
-        textSearch: mockTextSearch,
+        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
       });
-
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
-
-      const results = await keywordSearch("Oviedo", 5);
-
-      expect(supabase.from).toHaveBeenCalledWith("chunks");
-      expect(results).toHaveLength(1);
-      expect(results[0].content).toBe("Oviedo is the capital");
-    });
-
-    it("should return empty array on error", async () => {
-      const mockTextSearch = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: { message: "Search error" },
-        }),
-      });
-
-      const mockSelect = vi.fn().mockReturnValue({
-        textSearch: mockTextSearch,
-      });
-
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
-
-      const results = await keywordSearch("test");
-      expect(results).toEqual([]);
-    });
-
-    it("logs [TABLE_FALLBACK] with logger.error on keyword search error (#249)", async () => {
-      vi.mocked(logger.error).mockClear();
-
-      const mockTextSearch = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: { message: "DB error" },
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ textSearch: mockTextSearch });
       vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
 
-      await keywordSearch("test");
+      const embedding = new Array(512).fill(0.1);
+      const result = await search(embedding, 3, "best hiking in Asturias");
 
-      expect(logger.error).toHaveBeenCalledWith(
-        "[TABLE_FALLBACK]",
-        expect.objectContaining({ table: "chunks" })
+      expect(mockSearchResultCacheSet).toHaveBeenCalledWith(
+        "best hiking in Asturias",
+        3,
+        result
       );
     });
 
-    it("uses String(error) fallback when keywordSearch error has no message field", async () => {
-      vi.mocked(logger.error).mockClear();
-
-      const mockTextSearch = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: "raw error string",
-        }),
+    it("does not query or write the cache when no queryText is provided (vector-only fallback path)", async () => {
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: [], error: null } as never);
+      const mockSelect = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
       });
-      const mockSelect = vi.fn().mockReturnValue({ textSearch: mockTextSearch });
       vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
 
-      const results = await keywordSearch("test");
-      expect(results).toEqual([]);
-      expect(logger.error).toHaveBeenCalledWith(
-        "[TABLE_FALLBACK]",
-        expect.objectContaining({ table: "chunks", error: "raw error string" })
-      );
+      const embedding = new Array(512).fill(0.1);
+      await search(embedding, 5);
+
+      expect(mockSearchResultCacheGet).not.toHaveBeenCalled();
+      expect(mockSearchResultCacheSet).not.toHaveBeenCalled();
+    });
+
+    it("does not cache a rerank-timeout fallback result (avoid persisting a degraded ranking)", async () => {
+      vi.useFakeTimers();
+      try {
+        const mockDbChunks = Array.from({ length: 10 }, (_, i) => ({
+          id: `chunk-${i}`,
+          content: `Content ${i}`,
+          source_pdf: `guide-${i}.pdf`,
+          page_number: i + 1,
+          section_title: null,
+          image_refs: [`img${i}.jpg`],
+          similarity: 0.9 - i * 0.02,
+        }));
+
+        vi.mocked(supabase.rpc).mockResolvedValueOnce({
+          data: mockDbChunks,
+          error: null,
+        } as never);
+        vi.mocked(rerankChunks).mockReturnValue(new Promise(() => {}));
+
+        const mockSelect = vi.fn().mockReturnValue({
+          in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
+        });
+        vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+        const pendingSearch = search(new Array(512).fill(0.1), 3, "slow rerank");
+        await vi.advanceTimersByTimeAsync(RERANK_TIMEOUT_MS + 1);
+        await pendingSearch;
+
+        expect(mockSearchResultCacheSet).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
