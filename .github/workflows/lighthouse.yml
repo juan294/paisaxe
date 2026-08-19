@@ -30,6 +30,7 @@ jobs:
     needs: develop_push_source
     if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
