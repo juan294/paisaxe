@@ -364,12 +364,17 @@ Runs on every PR against `http://localhost:3000/immersive`.
 
 **Core Web Vitals Budgets**:
 
-| Metric | Maximum |
-|--------|---------|
-| FCP | 3000ms |
-| LCP | 4000ms |
-| CLS | 0.25 |
-| TBT | 500ms |
+| Metric | Maximum (desktop) | Maximum (mobile) |
+|--------|-------------------|------------------|
+| FCP | 3000ms | 3000ms |
+| LCP | 4000ms | 5500ms |
+| CLS | 0.25 | 0.25 |
+| TBT | 500ms | 500ms |
+
+The mobile LCP budget is looser because Lighthouse's mobile emulation applies 4x
+CPU throttling and slow-4G network on top of a deliberately inflated 25-story
+fallback fixture. Bringing `/immersive` mobile LCP under 4000ms so both columns
+can match is tracked in #926.
 
 ### Bundle Size
 
