@@ -25,12 +25,20 @@ function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
+function normalizedText(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}
+
 function redisKey(
   text: string,
   model: string = TEST_MODEL,
   dimensions: number = TEST_DIMENSIONS
 ): string {
-  return `embed:${model}:${dimensions}:${sha256(text)}`;
+  return `embed:${model}:${dimensions}:${sha256(normalizedText(text))}`;
+}
+
+function searchResultKey(text: string, limit: number): string {
+  return `search:${limit}:${sha256(normalizedText(text))}`;
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -309,5 +317,177 @@ describe("EmbeddingCache (Redis-backed)", () => {
 
     const calls = mockRedisGet.mock.calls;
     expect(calls[0][0]).toBe(calls[1][0]);
+  });
+
+  // ── PE-L5 (#819): normalize query text before hashing ─────────────────────
+  describe("query text normalization (#819)", () => {
+    it("trims leading/trailing whitespace before hashing, so 'Oviedo' and ' Oviedo  ' share a cache entry", async () => {
+      const { EmbeddingCache } = await import("./embedding-cache");
+      const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
+
+      await cache.get("Oviedo");
+      await cache.get("  Oviedo  ");
+
+      const calls = mockRedisGet.mock.calls;
+      expect(calls[0][0]).toBe(calls[1][0]);
+      expect(calls[0][0]).toBe(redisKey("Oviedo"));
+    });
+
+    it("collapses internal whitespace runs before hashing", async () => {
+      const { EmbeddingCache } = await import("./embedding-cache");
+      const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
+
+      await cache.get("best   restaurants  in Asturias");
+      await cache.get("best restaurants in Asturias");
+
+      const calls = mockRedisGet.mock.calls;
+      expect(calls[0][0]).toBe(calls[1][0]);
+    });
+
+    it("does NOT fold case — embeddings are case-sensitive, so 'Oviedo' and 'oviedo' must stay distinct entries", async () => {
+      const { EmbeddingCache } = await import("./embedding-cache");
+      const cache = new EmbeddingCache(TEST_MODEL, TEST_DIMENSIONS);
+
+      await cache.get("Oviedo");
+      await cache.get("oviedo");
+
+      const calls = mockRedisGet.mock.calls;
+      expect(calls[0][0]).not.toBe(calls[1][0]);
+    });
+
+    it("exports normalizeQueryText for reuse by other cache keys (e.g. SearchResultCache)", async () => {
+      const { normalizeQueryText } = await import("./embedding-cache");
+      expect(normalizeQueryText("  Oviedo   guide  ")).toBe("Oviedo guide");
+    });
+  });
+});
+
+// ── SearchResultCache (#810) ─────────────────────────────────────────────────
+describe("SearchResultCache (Redis-backed)", () => {
+  const sampleResult = {
+    chunks: [
+      {
+        id: "chunk-1",
+        content: "Oviedo is the capital of Asturias",
+        sourcePdf: "guide.pdf",
+        pageNumber: 1,
+        sectionTitle: "Intro",
+        imageRefs: ["img1.jpg"],
+        similarity: 0.9,
+      },
+    ],
+    images: [{ id: "img-1", path: "img1.jpg", caption: "Oviedo", sourcePdf: "guide.pdf" }],
+  };
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.resetAllMocks();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.com");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-token");
+    mockRedisGet.mockResolvedValue(null);
+    mockRedisSet.mockResolvedValue("OK");
+  });
+
+  it("returns null on cache miss", async () => {
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    const result = await cache.get("Oviedo", 3);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns the parsed SearchResult on cache hit (Redis returns JSON string)", async () => {
+    mockRedisGet.mockResolvedValue(JSON.stringify(sampleResult));
+
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    const result = await cache.get("Oviedo", 3);
+
+    expect(result).toEqual(sampleResult);
+  });
+
+  it("returns the result directly when Upstash auto-parses JSON into an object", async () => {
+    mockRedisGet.mockResolvedValue(sampleResult);
+
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    const result = await cache.get("Oviedo", 3);
+
+    expect(result).toEqual(sampleResult);
+  });
+
+  it("stores the result as JSON with the short (10 minute) TTL", async () => {
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    await cache.set("Oviedo", 3, sampleResult);
+
+    expect(mockRedisSet).toHaveBeenCalledWith(
+      searchResultKey("Oviedo", 3),
+      JSON.stringify(sampleResult),
+      { ex: 600 }
+    );
+  });
+
+  it("keys on normalized query text + limit — distinct limits do not collide", async () => {
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    await cache.get("Oviedo", 3);
+    await cache.get("Oviedo", 5);
+
+    const calls = mockRedisGet.mock.calls;
+    expect(calls[0][0]).not.toBe(calls[1][0]);
+  });
+
+  it("normalizes whitespace before hashing, consistent with the embedding cache", async () => {
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    await cache.get("  Oviedo  ", 3);
+    await cache.get("Oviedo", 3);
+
+    const calls = mockRedisGet.mock.calls;
+    expect(calls[0][0]).toBe(calls[1][0]);
+  });
+
+  it("skips Redis calls when cache env vars are missing", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    await expect(cache.get("Oviedo", 3)).resolves.toBeNull();
+    await expect(cache.set("Oviedo", 3, sampleResult)).resolves.toBeUndefined();
+    expect(mockRedisGet).not.toHaveBeenCalled();
+    expect(mockRedisSet).not.toHaveBeenCalled();
+  });
+
+  it("returns null and logs a warning when Redis.get throws", async () => {
+    mockRedisGet.mockRejectedValue(new Error("Connection refused"));
+
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    const result = await cache.get("Oviedo", 3);
+
+    expect(result).toBeNull();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[SEARCH_RESULT_CACHE_MISS]",
+      expect.objectContaining({ reason: expect.any(String) })
+    );
+  });
+
+  it("silently absorbs Redis.set errors (fire-and-forget)", async () => {
+    mockRedisSet.mockRejectedValue(new Error("Write failed"));
+
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+
+    await expect(cache.set("Oviedo", 3, sampleResult)).resolves.toBeUndefined();
   });
 });
