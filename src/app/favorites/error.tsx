@@ -4,6 +4,10 @@ import { useEffect } from "react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
 import { useTranslation } from "@/lib/i18n";
+import {
+  GLASS_RETRY_BUTTON_CLASS,
+  GLASS_HOME_LINK_CLASS,
+} from "@/lib/error-boundary-styles";
 
 export default function FavoritesError({
   error,
@@ -31,16 +35,10 @@ export default function FavoritesError({
         {t("errors.favorites_description")}
       </p>
       <div className="mt-8 flex flex-col items-center gap-4">
-        <button
-          onClick={reset}
-          className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-        >
+        <button onClick={reset} className={GLASS_RETRY_BUTTON_CLASS}>
           {t("errors.retry")}
         </button>
-        <Link
-          href="/"
-          className="text-white/60 hover:text-white transition-colors text-sm underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-        >
+        <Link href="/" className={GLASS_HOME_LINK_CLASS}>
           {t("errors.go_home")}
         </Link>
       </div>
