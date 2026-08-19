@@ -29,7 +29,7 @@ describe("verification coverage config", () => {
   it("lints non-src TypeScript scripts through the default lint gate", () => {
     const pkg = readJson<{ scripts: Record<string, string> }>("package.json");
 
-    expect(pkg.scripts["lint:src"]).toBe("eslint src/");
+    expect(pkg.scripts["lint:src"]).toBe("eslint src/ --max-warnings=0");
     expect(pkg.scripts["lint:scripts"]).toBe("eslint scripts --max-warnings=0");
     expect(pkg.scripts.lint).toContain("npm run lint:src");
     expect(pkg.scripts.lint).toContain("npm run lint:scripts");
