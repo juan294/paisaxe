@@ -500,7 +500,43 @@ describe("POST /api/chat/stream", () => {
     await POST(request);
 
     expect(sanitizeInput).toHaveBeenCalled();
-    expect(generateEmbedding).toHaveBeenCalledWith("Tell me about  Oviedo");
+    expect(generateEmbedding).toHaveBeenCalledWith(
+      "Tell me about  Oviedo",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
+
+  // ─── BE-M4 (#785): stage timeout actually cancels the embedding call ──
+  it("BE-M4: aborts the in-flight embedding call when the embedding stage times out", async () => {
+    vi.useFakeTimers();
+    try {
+      let capturedSignal: AbortSignal | undefined;
+      vi.mocked(generateEmbedding).mockImplementation(
+        (_text: string, options?: { signal?: AbortSignal }) => {
+          capturedSignal = options?.signal;
+          return new Promise(() => {}); // never resolves — only the timeout can end this
+        }
+      );
+
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Asturias" }),
+      });
+
+      const pendingResponse = POST(request);
+      await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.embedding + 1);
+      const response = await pendingResponse;
+      await collectStreamEvents(response);
+
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+      expect(capturedSignal?.aborted).toBe(true);
+      expect(logger.warn).toHaveBeenCalledWith(
+        "[CHAT_STREAM_STAGE_TIMEOUT]",
+        expect.objectContaining({ stage: "embedding" })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("should handle stream error gracefully", async () => {

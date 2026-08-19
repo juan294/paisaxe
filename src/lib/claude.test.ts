@@ -1498,6 +1498,41 @@ describe("claude", () => {
 
 // ─── SDK path tests (USE_CURL = false, NODE_ENV = production) ──────────
 
+// Shared by both describe blocks below ("claude SDK path" and "ANTHROPIC_TRANSPORT
+// override"), which each need to mock @anthropic-ai/sdk plus the node:child_process/
+// util/timers trio the same way ahead of a fresh vi.resetModules() + dynamic
+// import("./claude"). vi.doMock (unlike vi.mock) isn't hoisted, so it's safe to
+// call from inside a regular helper function.
+function mockAnthropicTransportModules(options: {
+  create: ReturnType<typeof vi.fn>;
+  stream: ReturnType<typeof vi.fn>;
+  execFile?: ReturnType<typeof vi.fn>;
+  spawn?: ReturnType<typeof vi.fn>;
+  onConstruct?: (constructorOptions?: Record<string, unknown>) => void;
+}): void {
+  vi.doMock("@anthropic-ai/sdk", () => ({
+    default: class MockAnthropic {
+      constructor(constructorOptions?: Record<string, unknown>) {
+        options.onConstruct?.(constructorOptions);
+      }
+      messages = {
+        create: options.create,
+        stream: options.stream,
+      };
+    },
+  }));
+  vi.doMock("node:child_process", () => ({
+    execFile: options.execFile ?? vi.fn(),
+    spawn: options.spawn ?? vi.fn(),
+  }));
+  vi.doMock("node:util", () => ({
+    promisify: (fn: unknown) => fn,
+  }));
+  vi.doMock("node:timers/promises", () => ({
+    setTimeout: vi.fn().mockResolvedValue(undefined),
+  }));
+}
+
 describe("claude SDK path (NODE_ENV=production)", () => {
   const mockCreate = vi.fn();
   const mockStream = vi.fn();
@@ -1511,32 +1546,13 @@ describe("claude SDK path (NODE_ENV=production)", () => {
     mockStream.mockReset();
     capturedConstructorOptions = undefined;
 
-    // Mock the Anthropic SDK module
-    vi.doMock("@anthropic-ai/sdk", () => {
-      return {
-        default: class MockAnthropic {
-          constructor(options?: Record<string, unknown>) {
-            capturedConstructorOptions = options;
-          }
-          messages = {
-            create: mockCreate,
-            stream: mockStream,
-          };
-        },
-      };
+    mockAnthropicTransportModules({
+      create: mockCreate,
+      stream: mockStream,
+      onConstruct: (constructorOptions) => {
+        capturedConstructorOptions = constructorOptions;
+      },
     });
-
-    // Mock child_process so it doesn't interfere
-    vi.doMock("node:child_process", () => ({
-      execFile: vi.fn(),
-      spawn: vi.fn(),
-    }));
-    vi.doMock("node:util", () => ({
-      promisify: (fn: unknown) => fn,
-    }));
-    vi.doMock("node:timers/promises", () => ({
-      setTimeout: vi.fn().mockResolvedValue(undefined),
-    }));
   });
 
   afterEach(() => {
@@ -2072,5 +2088,93 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(typeof callArgs.system[0].text).toBe("string");
       expect(callArgs.system[0].text.length).toBeGreaterThan(0);
     });
+  });
+});
+
+// ─── BE-L1 (#794): explicit ANTHROPIC_TRANSPORT opt-in override ─────────
+//
+// The USE_CURL gate is normally derived from NODE_ENV alone (curl in
+// dev/test, SDK in production). This suite verifies the explicit override
+// lets tooling select either transport regardless of NODE_ENV, without
+// needing to flip the global NODE_ENV (which has side effects beyond this
+// file) — the fallback recommendation from the finding when the underlying
+// Turbopack ECONNRESET reproduction can't be safely re-verified.
+describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
+  const mockCreate = vi.fn();
+  const mockStream = vi.fn();
+  const localMockExecFile = vi.fn();
+  const localMockSpawn = vi.fn();
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockCreate.mockReset();
+    mockStream.mockReset();
+    localMockExecFile.mockReset();
+    localMockSpawn.mockReset();
+
+    mockAnthropicTransportModules({
+      create: mockCreate,
+      stream: mockStream,
+      execFile: localMockExecFile,
+      spawn: localMockSpawn,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("forces the SDK path when ANTHROPIC_TRANSPORT=sdk even though NODE_ENV is not production", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("ANTHROPIC_TRANSPORT", "sdk");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    mockCreate.mockResolvedValue({ content: [{ type: "text", text: "sdk response" }] });
+
+    const { callAnthropicAPI } = await import("./claude");
+    const result = await callAnthropicAPI(
+      "system",
+      [{ role: "user", content: "hi" }],
+      "claude-sonnet-5",
+      100
+    );
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(localMockExecFile).not.toHaveBeenCalled();
+    expect(result.content[0]).toEqual({ type: "text", text: "sdk response" });
+  });
+
+  it("forces the curl path when ANTHROPIC_TRANSPORT=curl even though NODE_ENV is production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ANTHROPIC_TRANSPORT", "curl");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    localMockExecFile.mockResolvedValue({
+      stdout: JSON.stringify({ content: [{ type: "text", text: "curl response" }] }),
+      stderr: "",
+    });
+
+    const { callAnthropicAPI } = await import("./claude");
+    const result = await callAnthropicAPI(
+      "system",
+      [{ role: "user", content: "hi" }],
+      "claude-sonnet-5",
+      100
+    );
+
+    expect(localMockExecFile).toHaveBeenCalledTimes(1);
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(result.content[0]).toEqual({ type: "text", text: "curl response" });
+  });
+
+  it("falls back to the existing NODE_ENV-based selection when ANTHROPIC_TRANSPORT is unset", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    // ANTHROPIC_TRANSPORT intentionally left unset.
+    mockCreate.mockResolvedValue({ content: [{ type: "text", text: "sdk response" }] });
+
+    const { callAnthropicAPI } = await import("./claude");
+    await callAnthropicAPI("system", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100);
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(localMockExecFile).not.toHaveBeenCalled();
   });
 });

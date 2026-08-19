@@ -47,7 +47,28 @@ type StreamOptions = {
 
 // Use curl in development/test (Turbopack ECONNRESET workaround), SDK in production
 // Production is the only environment where Turbopack is not used
-const USE_CURL = process.env.NODE_ENV !== "production";
+//
+// BE-L1 (#794): explicit opt-in escape hatch. The Turbopack reproduction that
+// justifies the curl branch requires an interactive dev server with live
+// upstream credentials (see the header comment above) and can't be safely
+// re-verified by an automated agent, so the curl branch stays. What CAN be
+// fixed without that risk is the NODE_ENV-only coupling itself: tooling that
+// needs to exercise the real SDK transport (an integration probe, a manual
+// repro script) can now do so explicitly via ANTHROPIC_TRANSPORT, without
+// flipping the global NODE_ENV — which has broad side effects elsewhere in
+// Next.js beyond just this file. Unset (the default) preserves the existing
+// NODE_ENV-based behavior exactly.
+function resolveUseCurl(): boolean {
+  switch (process.env.ANTHROPIC_TRANSPORT?.trim()) {
+    case "sdk":
+      return false;
+    case "curl":
+      return true;
+    default:
+      return process.env.NODE_ENV !== "production";
+  }
+}
+const USE_CURL = resolveUseCurl();
 
 /**
  * Stream text chunks from the Anthropic API.
