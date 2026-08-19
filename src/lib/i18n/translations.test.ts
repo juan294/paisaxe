@@ -144,7 +144,7 @@ describe('locale files', () => {
 
       const favorites = es.favorites as Record<string, string>;
       expect(favorites.empty_title).toContain('todavía');
-      expect(favorites.loading_more).toContain('más');
+      expect(favorites.undo).toContain('Deshacer');
 
       const premium = es.premium as Record<string, string>;
       expect(premium.voice_title).toContain('Guía');
@@ -215,9 +215,9 @@ describe('locale files', () => {
       'favorites.empty_title',
       'favorites.empty_description',
       'favorites.explore',
-      'favorites.loading_more',
       'favorites.all_viewed',
       'favorites.remove_from_saved',
+      'favorites.undo',
       'accessibility.related_stories',
       'accessibility.language_switcher',
       'accessibility.go_back',

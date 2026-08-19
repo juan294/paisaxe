@@ -191,6 +191,38 @@ describe("FavoritesPage", () => {
       });
       expect(screen.queryByText(mockT("favorites.sign_in_to_save"))).not.toBeInTheDocument();
     });
+
+    // UX-L2 (#907): the signed-out empty state explained that signing in was
+    // needed but offered no control to actually do it — a conversion dead
+    // end on the exact screen where an anonymous user demonstrated intent.
+    it("shows a sign-in button in the signed-out empty state and triggers Google sign-in on click", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.sign_in_to_save"))).toBeInTheDocument();
+      });
+
+      const signInButton = screen.getByRole("button", { name: mockT("auth.sign_in") });
+      fireEvent.click(signInButton);
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith("/favorites");
+    });
+
+    it("does not show a sign-in button in the authenticated empty state", async () => {
+      mockUseFavorites.mockReturnValue({
+        favorites: [],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+        requiresAuth: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.empty_description"))).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("button", { name: mockT("auth.sign_in") })).not.toBeInTheDocument();
+    });
   });
 
   describe("with favorites", () => {
@@ -243,6 +275,86 @@ describe("FavoritesPage", () => {
       fireEvent.click(removeButton);
 
       expect(mockToggleFavorite).toHaveBeenCalledWith("story-1");
+    });
+
+    // UX-L2 (#907): delete is the only destructive action in the visitor app
+    // and had no confirmation, undo, or announcement. Verify an undo
+    // affordance appears, is announced, and re-adds the story (rather than
+    // delaying the original write, per the issue's regression-risk note).
+    describe("undo affordance for removal (UX-L2)", () => {
+      it("shows an announced undo toast after removing a favorite", async () => {
+        render(<FavoritesPage />);
+
+        await waitFor(() => {
+          expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByLabelText(mockT("favorites.remove_from_saved")));
+
+        const toast = await screen.findByRole("status");
+        expect(toast).toBeInTheDocument();
+        expect(toast).toHaveTextContent("Lagos de Covadonga");
+        expect(toast).toHaveTextContent(mockT("favorites.removed"));
+        expect(
+          screen.getByRole("button", { name: mockT("favorites.undo") })
+        ).toBeInTheDocument();
+      });
+
+      it("re-adds the story when Undo is clicked", async () => {
+        render(<FavoritesPage />);
+
+        await waitFor(() => {
+          expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByLabelText(mockT("favorites.remove_from_saved")));
+        expect(mockToggleFavorite).toHaveBeenCalledTimes(1);
+        expect(mockToggleFavorite).toHaveBeenNthCalledWith(1, "story-1");
+
+        fireEvent.click(screen.getByRole("button", { name: mockT("favorites.undo") }));
+
+        // Undo re-adds via the same toggle (the hook's toggleFavorite flips
+        // the current state back), per the issue's "implement undo as a
+        // re-add" regression note.
+        expect(mockToggleFavorite).toHaveBeenCalledTimes(2);
+        expect(mockToggleFavorite).toHaveBeenNthCalledWith(2, "story-1");
+
+        // The toast dismisses once undone.
+        await waitFor(() => {
+          expect(
+            screen.queryByRole("button", { name: mockT("favorites.undo") })
+          ).not.toBeInTheDocument();
+        });
+      });
+
+      it("dismisses the undo toast automatically after its timeout", async () => {
+        // Render and let async/IntersectionObserver-driven state settle with
+        // real timers first — testing-library's `waitFor` polls via its own
+        // setTimeout, which never advances under fake timers.
+        render(<FavoritesPage />);
+
+        await waitFor(() => {
+          expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+        });
+
+        vi.useFakeTimers();
+        try {
+          fireEvent.click(screen.getByLabelText(mockT("favorites.remove_from_saved")));
+          expect(
+            screen.getByRole("button", { name: mockT("favorites.undo") })
+          ).toBeInTheDocument();
+
+          act(() => {
+            vi.advanceTimersByTime(7000);
+          });
+
+          expect(
+            screen.queryByRole("button", { name: mockT("favorites.undo") })
+          ).not.toBeInTheDocument();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
     });
 
     it("does not nest the remove button inside the story link", async () => {
@@ -541,21 +653,19 @@ describe("FavoritesPage", () => {
   });
 
   describe("loadMore guard (page.tsx line 38)", () => {
-    it("should guard loadMore when already loading or no more items", async () => {
-      // COVERAGE NOTE (2026-07-09): the guard `if (isLoadingMore || !hasMore) return;`
-      // inside loadMore (page.tsx:38) is defensive dead code, unreachable in
-      // jsdom AND in production:
-      //   1. Its sole caller — the IntersectionObserver callback — pre-checks
-      //      `hasMore && !isLoadingMore` from the SAME render closure before
-      //      invoking loadMore, so the guard's condition is always false when
-      //      loadMore runs (even via stale closures, both see identical values).
-      //   2. `setIsLoadingMore(true)` / `setDisplayCount` / `setIsLoadingMore(false)`
-      //      batch into a single commit, so no rendered closure ever observes
-      //      `isLoadingMore === true`.
-      // This test verifies the observable behavior (no extra items load when
-      // hasMore is false via the observer pre-check); the in-function guard
-      // itself cannot be executed without a source change.
+    it("should guard loadMore when no more items", async () => {
+      // COVERAGE NOTE: the guard `if (!hasMore) return;` inside loadMore
+      // (page.tsx:38) is defensive dead code, unreachable in jsdom AND in
+      // production — its sole caller, the IntersectionObserver callback,
+      // pre-checks `hasMore` from the same render closure before invoking
+      // loadMore, so the guard's condition is always false when loadMore
+      // runs. This test verifies the observable behavior (no extra items
+      // load when hasMore is false via the observer pre-check); the
+      // in-function guard itself cannot be executed without a source change.
       //
+      // UX-L2 (#907): the sibling `isLoadingMore` state this comment
+      // previously documented was removed entirely — see the "coverage
+      // notes" describe block below.
       // With exactly 20 stories (= ITEMS_PER_PAGE), hasMore starts as false,
       // so no further page is loaded on intersection.
       const exactStories = Array.from({ length: 20 }, (_, i) => ({
@@ -1074,24 +1184,16 @@ describe("FavoritesPage", () => {
 
   describe("coverage notes — unreachable guards", () => {
     it("documents loadMore guard (line 38) as dead code — IntersectionObserver pre-guards before invoking loadMore", async () => {
-      // Line 38: `if (isLoadingMore || !hasMore) return;` inside loadMore is dead code.
+      // Line 38: `if (!hasMore) return;` inside loadMore is defensive dead code.
       //
-      // Reason: The ONLY call site is the IntersectionObserver callback (page.tsx lines 49-52):
-      //   if (entries[0].isIntersecting && hasMore && !isLoadingMore) { loadMore(); }
-      // The IO callback already checks `hasMore && !isLoadingMore` before calling loadMore().
-      // Therefore when loadMore() executes, isLoadingMore is always false and hasMore is always
-      // true — the guard inside loadMore can never trigger.
+      // Reason: The ONLY call site is the IntersectionObserver callback, which already
+      // checks `hasMore` before calling loadMore(). There is no "Load More" button or
+      // other call site, so the guard inside loadMore can never trigger.
       //
-      // There is no "Load More" button or other call site. The guard is defensive dead code.
-      // The tests in "loadMore guard (line 36)" and "loadMore isLoadingMore guard" above verify
-      // correct behavior but cannot cover line 38 for this structural reason.
-      //
-      // Empirically verified (isolated renderHook probe): calling loadMore() twice
-      // synchronously back-to-back still results in both calls seeing isLoadingMore=false,
-      // because setIsLoadingMore(true) and setIsLoadingMore(false) both fire within the
-      // same synchronous call (no await/yield between them), so React never commits an
-      // intermediate render where isLoadingMore is observably true, and both closures
-      // captured the same stale `false` value from the render that created them.
+      // UX-L2 (#907): the sibling `isLoadingMore` state (and the "loading_more" spinner
+      // branch it gated, which never actually rendered — both setters fired synchronously
+      // in the same call with no yield between them) was removed entirely rather than
+      // left as unreachable dead code.
 
       // Demonstrate: 20 stories (hasMore=false) → IO fires immediately → no items beyond 20 loaded
       const twentyStories = Array.from({ length: 20 }, (_, i) => ({
@@ -1113,36 +1215,6 @@ describe("FavoritesPage", () => {
       await waitFor(() => expect(screen.getByText("Story 19")).toBeInTheDocument());
       // Still exactly 20 items — line 38's return was never executed (IO prevented the call)
       expect(screen.queryByText(`21 ${mockT("favorites.place_plural")}`)).not.toBeInTheDocument();
-    });
-
-    it("documents the isLoadingMore spinner (line 157) as unreachable — setIsLoadingMore(true)/(false) are synchronous with no yield between them", async () => {
-      // Line 157: `{isLoadingMore && (<div>...spinner...</div>)}` never renders true.
-      //
-      // Reason: loadMore() calls setIsLoadingMore(true) and setIsLoadingMore(false)
-      // synchronously in the same function body, with no `await` or async gap between
-      // them (UX-L2 removed the artificial 300ms delay that used to create that gap).
-      // React batches these two updates from the same synchronous callback into a
-      // single re-render, so isLoadingMore is never observably true in any committed
-      // render — the spinner branch is dead code left over from before UX-L2.
-      const manyStories = Array.from({ length: 25 }, (_, i) => ({
-        id: `story-${i}`,
-        slug: `slug-${i}`,
-        title: `Story ${i}`,
-        subtitle: `Sub ${i}`,
-        description: `Desc ${i}`,
-        image: `/img/${i}.jpg`,
-        category: "nature" as const,
-        sourcePdf: "x.pdf",
-      }));
-      mockUseStories.mockReturnValue({ stories: manyStories, isLoading: false, error: null, refresh: vi.fn() });
-      mockUseFavorites.mockReturnValue({ favorites: manyStories.map((s) => s.id), toggleFavorite: mockToggleFavorite, isLoading: false });
-
-      render(<FavoritesPage />);
-
-      // All 25 load synchronously via the IO mock; the "loading_more" spinner text
-      // is never present at any point because isLoadingMore is never true during a render.
-      await waitFor(() => expect(screen.getByText("Story 24")).toBeInTheDocument());
-      expect(screen.queryByText(mockT("favorites.loading_more"))).not.toBeInTheDocument();
     });
 
     it("documents GalleryItem's itemRef null-guards (lines 205, 210) as architecturally unreachable", () => {

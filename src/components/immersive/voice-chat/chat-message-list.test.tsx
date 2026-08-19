@@ -58,6 +58,15 @@ describe("ChatMessageList", () => {
     expect(screen.getByText("chat.empty_state")).toBeInTheDocument();
   });
 
+  // UX-M7 (#900): this state copy computed to roughly 2.8:1 contrast against
+  // its background at text-white/50 — well below the 4.5:1 AA floor. Raise
+  // the floor for state-carrying text specifically (not every low-alpha use).
+  it("renders the empty state at a contrast-safe opacity (not text-white/50 or lower)", () => {
+    render(<ChatMessageList messages={[]} isLoading={false} onUpsellDismiss={noop} />);
+    const emptyState = screen.getByText("chat.empty_state").closest("div");
+    expect(emptyState?.className).not.toMatch(/text-white\/(0|10|20|30|40|50)\b/);
+  });
+
   it("renders user message with bubble styling", () => {
     const msg = makeMessage({ role: "user", content: "Hola!" });
     render(<ChatMessageList messages={[msg]} isLoading={false} onUpsellDismiss={noop} />);

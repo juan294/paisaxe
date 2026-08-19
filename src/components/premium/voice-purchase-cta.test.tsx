@@ -89,6 +89,16 @@ describe("VoicePurchaseCTA", () => {
       expect(screen.getByText("Secure payment via Stripe")).toBeInTheDocument();
     });
 
+    // UX-M7 (#900): "secure payment" copy sits directly under the purchase
+    // button and is meant to reduce purchase anxiety — it computed to
+    // roughly 2.8:1 contrast at text-white/50, well below the 4.5:1 AA
+    // floor, undermining its own purpose if illegible in daylight.
+    it("renders the secure payment copy at a contrast-safe opacity (not text-white/50 or lower)", () => {
+      render(<VoicePurchaseCTA />);
+      const secureText = screen.getByText("Secure payment via Stripe");
+      expect(secureText.className).not.toMatch(/text-white\/(0|10|20|30|40|50)\b/);
+    });
+
     it("shows 'Get Day Pass' button when user is signed in", () => {
       render(<VoicePurchaseCTA />);
       expect(screen.getByRole("button", { name: /Get Day Pass/ })).toBeInTheDocument();

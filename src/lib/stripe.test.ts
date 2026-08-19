@@ -29,7 +29,6 @@ import {
   getPriceIdForPurchaseType,
   formatPrice,
   getStripeClient,
-  createDayPassCheckoutSession,
   createEmbeddedCheckoutSession,
   verifyWebhookSignature,
   type PurchaseType,
@@ -180,107 +179,6 @@ describe("stripe", () => {
       );
 
       CtorSpy.mockRestore();
-    });
-  });
-
-  describe("createDayPassCheckoutSession", () => {
-    beforeEach(() => {
-      mockCreate.mockReset();
-    });
-
-    it("should throw error when STRIPE_DAY_PASS_PRICE_ID is missing", async () => {
-      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
-      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "");
-
-      await expect(
-        createDayPassCheckoutSession({
-          userId: "user-123",
-          userEmail: "test@example.com",
-          successUrl: "https://example.com/success",
-          cancelUrl: "https://example.com/cancel",
-        })
-      ).rejects.toThrow("STRIPE_DAY_PASS_PRICE_ID not configured");
-    });
-
-    it("should create checkout session with correct parameters", async () => {
-      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
-      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
-
-      mockCreate.mockResolvedValue({
-        url: "https://checkout.stripe.com/session123",
-      });
-
-      const url = await createDayPassCheckoutSession({
-        userId: "user-123",
-        userEmail: "test@example.com",
-        successUrl: "https://example.com/success",
-        cancelUrl: "https://example.com/cancel",
-      });
-
-      expect(url).toBe("https://checkout.stripe.com/session123");
-      expect(mockCreate).toHaveBeenCalledWith({
-        mode: "payment",
-        payment_method_types: ["card"],
-        line_items: [{ price: "price_123", quantity: 1 }],
-        customer_email: "test@example.com",
-        metadata: { user_id: "user-123", purchase_type: "day_pass" },
-        success_url: "https://example.com/success",
-        cancel_url: "https://example.com/cancel",
-      });
-    });
-
-    it("should use the weekly price ID and record the tier in metadata", async () => {
-      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
-      vi.stubEnv("STRIPE_WEEKLY_PRICE_ID", "price_week");
-
-      mockCreate.mockResolvedValue({ url: "https://checkout.stripe.com/week" });
-
-      const url = await createDayPassCheckoutSession({
-        userId: "user-123",
-        userEmail: "test@example.com",
-        successUrl: "https://example.com/success",
-        cancelUrl: "https://example.com/cancel",
-        purchaseType: "weekly_pass",
-      });
-
-      expect(url).toBe("https://checkout.stripe.com/week");
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          line_items: [{ price: "price_week", quantity: 1 }],
-          metadata: { user_id: "user-123", purchase_type: "weekly_pass" },
-        })
-      );
-    });
-
-    it("throws when the requested tier's price ID is missing", async () => {
-      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
-      vi.stubEnv("STRIPE_MONTHLY_PRICE_ID", "");
-
-      await expect(
-        createDayPassCheckoutSession({
-          userId: "user-123",
-          userEmail: "test@example.com",
-          successUrl: "https://example.com/success",
-          cancelUrl: "https://example.com/cancel",
-          purchaseType: "monthly_pass",
-        })
-      ).rejects.toThrow("STRIPE_MONTHLY_PRICE_ID not configured");
-    });
-
-    it("should throw error when session URL is not returned", async () => {
-      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
-      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
-
-      mockCreate.mockResolvedValue({ url: null });
-
-      await expect(
-        createDayPassCheckoutSession({
-          userId: "user-123",
-          userEmail: "test@example.com",
-          successUrl: "https://example.com/success",
-          cancelUrl: "https://example.com/cancel",
-        })
-      ).rejects.toThrow("Failed to create checkout session - no URL returned");
     });
   });
 
