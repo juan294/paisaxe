@@ -20,9 +20,17 @@ vi.mock("@/lib/search", () => ({
   search: vi.fn(),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
-  checkRateLimit: vi.fn(),
-}));
+vi.mock("@/lib/rate-limit", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/rate-limit")>(
+    "@/lib/rate-limit"
+  );
+  return {
+    checkRateLimit: vi.fn(),
+    // BE-L5 (#798): use the REAL normalizer so tests exercise the actual
+    // IPv6 bucketing behavior, not a stub.
+    normalizeIpForRateLimit: actual.normalizeIpForRateLimit,
+  };
+});
 
 vi.mock("@/lib/logger", () => ({
   logger: {
@@ -197,6 +205,44 @@ describe("POST /api/chat/stream", () => {
 
       expect(response.status).toBe(200);
       expect(checkRateLimit).toHaveBeenCalled();
+    });
+  });
+
+  // BE-L5 (#798): IPv6 clients must not get an effectively unlimited bucket
+  // by rotating the host portion of their address (e.g. privacy extensions).
+  describe("IPv6 rate-limit bucketing (BE-L5)", () => {
+    it("buckets two IPv6 addresses from the same /64 identically", async () => {
+      const request1 = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        headers: { "x-vercel-forwarded-for": "2001:db8:85a3::8a2e:370:7334" },
+        body: JSON.stringify({ message: "Test" }),
+      });
+      await POST(request1);
+
+      const request2 = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        headers: { "x-vercel-forwarded-for": "2001:db8:85a3::1111:2222:3333" },
+        body: JSON.stringify({ message: "Test" }),
+      });
+      await POST(request2);
+
+      const [firstCallIdentifier] = vi.mocked(checkRateLimit).mock.calls[0]!;
+      const [secondCallIdentifier] = vi.mocked(checkRateLimit).mock.calls[1]!;
+
+      expect(firstCallIdentifier).toBe("2001:db8:85a3:0::/64");
+      expect(secondCallIdentifier).toBe(firstCallIdentifier);
+    });
+
+    it("does not alter an IPv4 identifier", async () => {
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        headers: { "x-vercel-forwarded-for": "203.0.113.50" },
+        body: JSON.stringify({ message: "Test" }),
+      });
+      await POST(request);
+
+      const [identifier] = vi.mocked(checkRateLimit).mock.calls[0]!;
+      expect(identifier).toBe("203.0.113.50");
     });
   });
 

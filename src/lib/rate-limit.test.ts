@@ -640,4 +640,62 @@ describe("rate-limit", () => {
       expect(isRateLimitDegraded()).toBe(false);
     });
   });
+
+  // BE-L5 (#798): `getClientIp` returns IPv6 addresses verbatim. A /64
+  // residential allocation gives one subscriber 2^64 distinct source
+  // addresses, each hashing to its own Upstash bucket, so the full address
+  // must never be used as the rate-limit key. IPv4 stays untouched.
+  describe("normalizeIpForRateLimit (BE-L5)", () => {
+    it("collapses a full IPv6 address to its /64 prefix", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("2001:db8:85a3:0000:0000:8a2e:0370:7334")).toBe(
+        "2001:db8:85a3:0::/64"
+      );
+    });
+
+    it("gives two addresses from the same /64 the same bucket key", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      // Same subscriber, two different suffixes (e.g. IPv6 privacy extensions
+      // rotating the host portion on every request).
+      const a = normalizeIpForRateLimit("2001:db8:85a3::8a2e:370:7334");
+      const b = normalizeIpForRateLimit("2001:db8:85a3::1111:2222:3333");
+      expect(a).toBe(b);
+    });
+
+    it("gives addresses from different /64s different bucket keys", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      const a = normalizeIpForRateLimit("2001:db8:85a3::1");
+      const b = normalizeIpForRateLimit("2001:db8:85a4::1");
+      expect(a).not.toBe(b);
+    });
+
+    it("expands a leading :: correctly", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("::1")).toBe("0:0:0:0::/64");
+    });
+
+    it("strips a zone/scope id before normalizing", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("fe80::1%eth0")).toBe(
+        normalizeIpForRateLimit("fe80::1")
+      );
+    });
+
+    it("leaves IPv4 addresses untouched", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("203.0.113.50")).toBe("203.0.113.50");
+    });
+
+    it('leaves non-IP sentinels like "unknown" untouched', async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("unknown")).toBe("unknown");
+    });
+
+    it("falls back to the raw string for a malformed IPv6-looking value", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      // Too many groups once "::" is expanded — not a valid IPv6 address.
+      const malformed = "1:2:3:4:5:6:7:8:9::";
+      expect(normalizeIpForRateLimit(malformed)).toBe(malformed);
+    });
+  });
 });
