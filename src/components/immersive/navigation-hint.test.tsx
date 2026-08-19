@@ -117,13 +117,16 @@ describe("NavigationHint", () => {
     expect(screen.queryByTestId("navigation-hint")).not.toBeInTheDocument();
   });
 
-  it("dismisses immediately on user click", () => {
+  // UX-M9: dismissal is driven by a passive window-level listener (not a
+  // handler on the overlay itself), so it must fire on interactions
+  // anywhere on the page -- not just on the hint element.
+  it("dismisses immediately on a click anywhere on the page", () => {
     render(<NavigationHint />);
 
     const hint = screen.getByTestId("navigation-hint");
     expect(hint).toBeInTheDocument();
 
-    fireEvent.click(hint);
+    fireEvent.click(window);
 
     // Should start fading
     expect(hint).toHaveClass("opacity-0");
@@ -136,11 +139,11 @@ describe("NavigationHint", () => {
     expect(screen.queryByTestId("navigation-hint")).not.toBeInTheDocument();
   });
 
-  it("dismisses immediately on user touch", () => {
+  it("dismisses immediately on a touch anywhere on the page", () => {
     render(<NavigationHint />);
 
     const hint = screen.getByTestId("navigation-hint");
-    fireEvent.touchStart(hint);
+    fireEvent.touchStart(window);
 
     // Should start fading
     expect(hint).toHaveClass("opacity-0");
@@ -153,12 +156,42 @@ describe("NavigationHint", () => {
     expect(screen.queryByTestId("navigation-hint")).not.toBeInTheDocument();
   });
 
-  // UX-M2: Now sets sessionStorage key (not localStorage)
+  // UX-M9: The overlay must be pointer-events-none so the user's first tap
+  // reaches -- and is handled by -- whatever nav zone/toolbar sits beneath
+  // it, instead of being swallowed just to dismiss the hint.
+  it("does not block the tap that reaches an element underneath it", () => {
+    render(
+      <div>
+        <button data-testid="nav-zone">Next</button>
+        <NavigationHint />
+      </div>
+    );
+
+    const navZone = screen.getByTestId("nav-zone");
+    const navClickHandler = vi.fn();
+    navZone.addEventListener("click", navClickHandler);
+
+    fireEvent.click(navZone);
+
+    // The underlying element's own handler still runs...
+    expect(navClickHandler).toHaveBeenCalledTimes(1);
+
+    // ...and the same tap dismisses the hint via the passive window listener.
+    const hint = screen.getByTestId("navigation-hint");
+    expect(hint).toHaveClass("opacity-0");
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.queryByTestId("navigation-hint")).not.toBeInTheDocument();
+  });
+
+  // UX-M9: Now sets sessionStorage key (not localStorage)
   it("sets sessionStorage key after dismissing (not localStorage)", () => {
     render(<NavigationHint />);
 
-    const hint = screen.getByTestId("navigation-hint");
-    fireEvent.click(hint);
+    fireEvent.click(window);
 
     expect(sessionStorage.getItem("paisaxe-nav-hint-seen")).toBe("true");
     // Must NOT write to localStorage (new session-scoped behavior)
@@ -199,15 +232,17 @@ describe("NavigationHint", () => {
     expect(hint).toHaveClass("z-30");
   });
 
-  it("disables pointer events while fading", () => {
+  // UX-M9: pointer-events-none is applied at all times (not just while
+  // fading) so the overlay never intercepts the tap meant for whatever is
+  // underneath it.
+  it("is pointer-events-none while visible, and stays that way while fading", () => {
     render(<NavigationHint />);
 
     const hint = screen.getByTestId("navigation-hint");
-    expect(hint).not.toHaveClass("pointer-events-none");
+    expect(hint).toHaveClass("pointer-events-none");
 
-    fireEvent.click(hint);
+    fireEvent.click(window);
 
-    // While fading, pointer-events should be disabled
     expect(hint).toHaveClass("pointer-events-none");
     expect(hint).toHaveClass("opacity-0");
   });
