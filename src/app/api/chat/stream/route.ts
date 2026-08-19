@@ -5,7 +5,7 @@ import { chatRequestSchema } from "@/lib/schemas";
 // Static here so they are resolved once at module load, not on every request.
 // This removes 100-300 ms of cold-start dynamic-import cost for rejected
 // requests (rate-limit, validation, injection) that never need the AI stack.
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, normalizeIpForRateLimit } from "@/lib/rate-limit";
 import { withRouteContext } from "@/lib/request-validation";
 import { getClientIp } from "@/lib/request-utils";
 import {
@@ -85,10 +85,15 @@ async function handlePost(request: NextRequest) {
       // other stage timeout — so an unbounded hang here is invisible in the
       // stage-timing logs used to diagnose the pipeline. Bound it the same way
       // as the other stages.
+      // BE-L5 (#798): normalize IPv6 to its /64 prefix before it becomes the
+      // bucket key — otherwise a residential /64 allocation gives one
+      // subscriber 2^64 distinct buckets (trivially rotated via IPv6 privacy
+      // extensions), making the limit effectively unenforceable. IPv4 and
+      // the "untrusted" sentinel pass through unchanged.
       rateLimit = await withChatStreamStageTiming(
         "rateLimit",
         checkRateLimit(
-          ip === "unknown" ? "untrusted" : ip,
+          ip === "unknown" ? "untrusted" : normalizeIpForRateLimit(ip),
           ip === "unknown" ? UNTRUSTED_RATE_LIMIT : undefined
         )
       );

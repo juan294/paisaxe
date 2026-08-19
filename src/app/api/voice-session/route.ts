@@ -5,12 +5,42 @@ import {
   isVisitorVoiceAgentKey,
 } from "@/lib/elevenlabs-signed-session";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+
+// BE-S2 (#803): this route mints a signed ElevenLabs URL per call — a
+// per-caller ceiling on a metered upstream — with no rate limiting at all
+// before this fix. Keyed on the authenticated user id (not IP): every
+// caller here has already passed auth, so the user id is a stable,
+// unspoofable identifier and avoids the shared-bucket problems IP-keying
+// has for NAT'd/mobile clients (BE-M1). 10 req/60s is generous enough for
+// legitimate reconnects while bounding abuse of the signed-URL mint.
+const VOICE_SESSION_RATE_LIMIT = {
+  windowMs: 60_000,
+  maxRequests: 10,
+  maxEntries: 10_000,
+};
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const user = await getUserFromRequest(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimit = await checkRateLimit(
+    `voice-session:${user.id}`,
+    VOICE_SESSION_RATE_LIMIT
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: rateLimit.retryAfter
+          ? { "Retry-After": String(rateLimit.retryAfter) }
+          : undefined,
+      }
+    );
   }
 
   const body = (await request.json().catch(() => null)) as {

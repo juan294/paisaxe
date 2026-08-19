@@ -9,6 +9,9 @@ const logger = vi.hoisted(() => ({
 
 vi.mock("@/lib/logger", () => ({ logger }));
 
+const mockCheckRateLimit = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: mockCheckRateLimit }));
+
 // Set env vars before any imports that might use them
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
 vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
@@ -61,6 +64,64 @@ describe("POST /api/checkout/day-pass", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://paisaxe.es");
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
     vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
+    // BE-S2 (#803): rate limiting allows by default; individual tests
+    // override to exercise the blocked path.
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: true,
+      limit: 5,
+      remaining: 4,
+      resetAt: Date.now() + 60_000,
+    });
+  });
+
+  // BE-S2 (#803): checkout/day-pass had no rate limiting — a repeat-click or
+  // scripted loop could create unbounded Stripe Checkout Sessions per user.
+  describe("rate limiting (BE-S2)", () => {
+    it("returns 429 when the per-user limit is exceeded", async () => {
+      mockCheckRateLimit.mockResolvedValue({
+        allowed: false,
+        limit: 5,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+        retryAfter: 17,
+      });
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      const request = createRequest({ origin: "https://paisaxe.es" });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("17");
+      expect(data.error).toBe("Too many requests. Please try again later.");
+      expect(createDayPassCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it("keys the rate limit on the authenticated user id", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+      vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+        "https://checkout.stripe.com/session123"
+      );
+
+      await POST(createRequest({ origin: "https://paisaxe.es" }));
+
+      expect(mockCheckRateLimit).toHaveBeenCalledWith(
+        "day-pass:user-123",
+        expect.any(Object)
+      );
+    });
+
+    it("does not rate limit unauthenticated requests (401 short-circuits first)", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+      await POST(createRequest());
+      expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    });
   });
 
   it("should return 401 when user is not authenticated", async () => {
