@@ -16,6 +16,9 @@ const MESSAGES = [
   "404: sueño no encontrado",
 ];
 
+const SOCIAL_LINK_CLASSNAME =
+  "p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
+
 const CHAR_DELAY = 80;
 const EMPTY_PAUSE = 300;
 const HOME_HOLD = 30_000;
@@ -129,7 +132,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
               href="https://x.com/JuanG294"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className={SOCIAL_LINK_CLASSNAME}
               aria-label="X (Twitter)"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -140,7 +143,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
               href="https://www.linkedin.com/in/juanagonzalezp/"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className={SOCIAL_LINK_CLASSNAME}
               aria-label="LinkedIn"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -151,7 +154,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
               href="https://medium.com/@juang294"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className={SOCIAL_LINK_CLASSNAME}
               aria-label="Medium"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -162,7 +165,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
               href="https://github.com/juan294"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className={SOCIAL_LINK_CLASSNAME}
               aria-label="GitHub"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
