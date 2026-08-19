@@ -34,11 +34,25 @@ import { sendSMS } from "@/lib/twilio-sms";
 
 const mockRpc = vi.fn();
 
+// BE-M11 (#792): mirrors mockDeadCountFrom in
+// fail-stale-translations/route.test.ts for the analogous dead-letter
+// scoped-count query.
+function mockDeadCountFrom(result: { count: number | null; error: { message: string } | null }) {
+  return vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        gte: vi.fn().mockResolvedValue(result),
+      }),
+    }),
+  });
+}
+
 describe("/api/cron/retry-booking-sms", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(createAdminClient).mockReturnValue({
       rpc: mockRpc,
+      from: mockDeadCountFrom({ count: 0, error: null }),
     } as unknown as ReturnType<typeof createAdminClient>);
     mockRpc.mockImplementation((fn: string) => {
       if (fn === "claim_retryable_booking_sms_jobs") {
@@ -121,10 +135,85 @@ describe("/api/cron/retry-booking-sms", () => {
     expect(response.status).toBe(200);
     expect(data.sent_count).toBe(0);
     expect(data.failed_count).toBe(1);
+    expect(data.dead_letter_count).toBe(0);
     expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
       p_event_key: "post_call_transcription:conv_456",
       p_error: "Twilio unavailable",
+      p_max_attempts: 3,
     });
+  });
+
+  // BE-M11 (#792): a job that hits max attempts must be surfaced as a
+  // distinct terminal dead-letter -- not silently left in a 'failed' row
+  // indistinguishable from one that will still be retried. The route reads
+  // this via a scoped dead-count query (mirroring the fail-stale-translations
+  // dead-letter pattern), not by re-deriving the exhaustion threshold itself
+  // -- fail_booking_sms_job (migration 109) is the sole source of truth for
+  // when a job actually goes terminal.
+  it("BE-M11: includes dead_letter_count in the response and does not warn when there are no dead jobs", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc: mockRpc,
+      from: mockDeadCountFrom({ count: 0, error: null }),
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.dead_letter_count).toBe(0);
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      "[CRON_RETRY_BOOKING_SMS_DEAD]",
+      expect.anything()
+    );
+  });
+
+  it("BE-M11: includes dead_letter_count in the response and warns when jobs were retired to dead", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc: mockRpc,
+      from: mockDeadCountFrom({ count: 2, error: null }),
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.dead_letter_count).toBe(2);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "[CRON_RETRY_BOOKING_SMS_DEAD]",
+      expect.objectContaining({ dead_letter_count: 2 })
+    );
+  });
+
+  it("BE-M11: logs an error but still returns 200 when the dead-letter count query itself fails", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc: mockRpc,
+      from: mockDeadCountFrom({ count: null, error: { message: "count query failed" } }),
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.dead_letter_count).toBeUndefined();
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CRON_RETRY_BOOKING_SMS_DEAD_COUNT_FAILED]",
+      expect.objectContaining({ error: "count query failed" })
+    );
   });
 
   it("accepts POST with a valid webhook secret without falling back to admin auth (line 136)", async () => {
