@@ -27,6 +27,19 @@ name: CI
 on:
   push:
     branches: [develop, main]
+    # DO-M7 (#834): skip the full lint/test/build suite for commits that
+    # touch only prose. Filters the `push` trigger ONLY — `pull_request`
+    # below stays unfiltered because "Lint & Typecheck", "Test", and
+    # "Build" are required status checks for the `main` branch protection
+    # rule. Filtering pull_request too could leave a docs-only release PR
+    # waiting forever on a required context that never runs. See
+    # e2e.yml/lighthouse.yml for the same convention.
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
+      - "AGENTS.md"
   pull_request:
     branches: [develop, main]
 
