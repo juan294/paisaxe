@@ -1,34 +1,48 @@
-import { describe, expect, it, vi } from "vitest";
-import { getClientDsn, initSentryClient } from "./sentry-client-init";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getClientDsn, initSentryClient, loadSentryIfConfigured } from "./sentry-client-init";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("getClientDsn", () => {
   it("returns undefined when NEXT_PUBLIC_SENTRY_DSN is unset", () => {
-    const original = process.env.NEXT_PUBLIC_SENTRY_DSN;
-    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
 
     expect(getClientDsn()).toBeUndefined();
-
-    if (original !== undefined) process.env.NEXT_PUBLIC_SENTRY_DSN = original;
   });
 
   it("trims whitespace and returns undefined for a blank value", () => {
-    const original = process.env.NEXT_PUBLIC_SENTRY_DSN;
-    process.env.NEXT_PUBLIC_SENTRY_DSN = "   ";
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "   ");
 
     expect(getClientDsn()).toBeUndefined();
-
-    if (original === undefined) delete process.env.NEXT_PUBLIC_SENTRY_DSN;
-    else process.env.NEXT_PUBLIC_SENTRY_DSN = original;
   });
 
   it("returns the trimmed DSN when set", () => {
-    const original = process.env.NEXT_PUBLIC_SENTRY_DSN;
-    process.env.NEXT_PUBLIC_SENTRY_DSN = "  https://example@sentry.io/1  ";
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "  https://example@sentry.io/1  ");
 
     expect(getClientDsn()).toBe("https://example@sentry.io/1");
+  });
+});
 
-    if (original === undefined) delete process.env.NEXT_PUBLIC_SENTRY_DSN;
-    else process.env.NEXT_PUBLIC_SENTRY_DSN = original;
+describe("loadSentryIfConfigured", () => {
+  it("resolves to undefined without loading the SDK when no DSN is configured", async () => {
+    const loadSentry = vi.fn();
+
+    const result = await loadSentryIfConfigured(undefined, loadSentry);
+
+    expect(result).toBeUndefined();
+    expect(loadSentry).not.toHaveBeenCalled();
+  });
+
+  it("resolves to the loaded SDK module when a DSN is present — reusable by other call sites (#941)", async () => {
+    const sentryModule = { init: vi.fn(), captureException: vi.fn() };
+    const loadSentry = vi.fn().mockResolvedValue(sentryModule);
+
+    const result = await loadSentryIfConfigured("https://example@sentry.io/1", loadSentry);
+
+    expect(result).toBe(sentryModule);
+    expect(loadSentry).toHaveBeenCalledTimes(1);
   });
 });
 
