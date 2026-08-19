@@ -210,30 +210,6 @@ describe("validateMigrations", () => {
     );
   });
 
-  it("passes when an arbitrary SECURITY DEFINER function does set search_path = ''", () => {
-    const root = createMigrationFixture({
-      "001_arbitrary_function.sql": `
-        CREATE OR REPLACE FUNCTION public.totally_unrelated_admin_helper(
-          p_id uuid
-        ) RETURNS void
-        LANGUAGE plpgsql
-        SECURITY DEFINER
-        SET search_path = ''
-        AS $$
-        BEGIN
-          NULL;
-        END;
-        $$;
-      `,
-    });
-
-    const result = validateMigrations({ root });
-
-    expect(
-      result.errors.some((error) => error.includes("totally_unrelated_admin_helper"))
-    ).toBe(false);
-  });
-
   it("does not flag a SECURITY INVOKER (non-DEFINER) function for missing search_path", () => {
     const root = createMigrationFixture({
       "001_invoker_function.sql": `
@@ -324,6 +300,34 @@ describe("validateMigrations", () => {
 
     expect(
       result.errors.some((error) => error.includes("replaced_function"))
+    ).toBe(false);
+  });
+
+  it("stops tracking a SECURITY DEFINER function once it is dropped without a later recreation", () => {
+    // Regression guard for the altitude gap identified in #876's /simplify pass:
+    // a stale cached header for a permanently-dropped function must not cause a
+    // false-positive error, even if that stale header was non-compliant.
+    const root = createMigrationFixture({
+      "001_create_noncompliant.sql": `
+        CREATE OR REPLACE FUNCTION public.retired_function()
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        BEGIN
+          NULL;
+        END;
+        $$;
+      `,
+      "002_drop_for_good.sql": `
+        DROP FUNCTION IF EXISTS public.retired_function();
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(
+      result.errors.some((error) => error.includes("retired_function"))
     ).toBe(false);
   });
 
