@@ -48,10 +48,17 @@
  *     src/app/api/voice-session/route.test.ts).
  */
 
+import type { Locator } from "@playwright/test";
 import { test, expect } from "./fixtures/base-test";
 import { withFeatureFlags } from "./fixtures/mock-data";
 
 test.describe("Visitor voice — paywall gate (no access)", () => {
+  let chatPanel: Locator;
+  // The upgrade CTA (a <Link> to /pricing carrying the AudioLines icon)
+  // renders whenever the visitor lacks paid voice access — see
+  // src/components/immersive/voice-chat/chat-header.tsx.
+  let upgradeCta: Locator;
+
   test.beforeEach(async ({ page }) => {
     // visitor_voice_agent enabled — the gate we're testing is the paid
     // access check, not the feature flag (the flag only controls whether
@@ -66,23 +73,19 @@ test.describe("Visitor voice — paywall gate (no access)", () => {
 
     await page.goto("/immersive");
     await expect(page.locator("h1").first()).toBeVisible();
+
+    await page.locator('[data-testid="ask-button"]').first().click();
+    chatPanel = page.locator(".fixed.inset-0.z-50");
+    await expect(chatPanel).toBeVisible();
+
+    upgradeCta = chatPanel
+      .getByRole("link")
+      .filter({ has: page.locator("svg.lucide-audio-lines") });
   });
 
   test("opening the chat panel shows the voice upgrade CTA, not a voice toggle", async ({
     page,
   }) => {
-    const askButton = page.locator('[data-testid="ask-button"]').first();
-    await askButton.click();
-
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    // The upgrade CTA (a <Link> to /pricing carrying the AudioLines icon)
-    // renders whenever the visitor lacks paid voice access — see
-    // src/components/immersive/voice-chat/chat-header.tsx.
-    const upgradeCta = chatPanel
-      .getByRole("link")
-      .filter({ has: page.locator("svg.lucide-audio-lines") });
     await expect(upgradeCta).toBeVisible();
     await expect(upgradeCta).toHaveAttribute("href", /^\/pricing/);
 
@@ -97,32 +100,11 @@ test.describe("Visitor voice — paywall gate (no access)", () => {
   });
 
   test("upgrade CTA navigates to the pricing page", async ({ page }) => {
-    const askButton = page.locator('[data-testid="ask-button"]').first();
-    await askButton.click();
-
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    const upgradeCta = chatPanel
-      .getByRole("link")
-      .filter({ has: page.locator("svg.lucide-audio-lines") });
     await upgradeCta.click();
-
     await expect(page).toHaveURL(/\/pricing/);
   });
 
-  test("upgrade CTA carries a returnTo pointing back at the current story", async ({
-    page,
-  }) => {
-    const askButton = page.locator('[data-testid="ask-button"]').first();
-    await askButton.click();
-
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    const upgradeCta = chatPanel
-      .getByRole("link")
-      .filter({ has: page.locator("svg.lucide-audio-lines") });
+  test("upgrade CTA carries a returnTo pointing back at the current story", async () => {
     const href = await upgradeCta.getAttribute("href");
 
     // storySlug is always defined for a story rendered via /immersive, so
