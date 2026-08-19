@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase-admin";
+import { getAdminClient } from "@/lib/supabase-admin";
 import { logger } from "@/lib/logger";
 
 /**
@@ -30,9 +30,9 @@ export type BookingStatus =
   | "confirmed"
   | "denied"
   | "no_answer"
-  /** BE-H2: call timed out — row stays in 'initiating', cron/webhook reconciles */
+  /** #777: call timed out — row stays in 'initiating', cron/webhook reconciles */
   | "timed_out"
-  /** BE-H2: stale 'initiating' row past the reconciliation window — needs
+  /** #777: stale 'initiating' row past the reconciliation window — needs
    *  operator attention; a late webhook may still resolve it via its
    *  booking_id fallback lookup. Distinct from 'failed' (definitely didn't
    *  happen) because we genuinely don't know the outcome. */
@@ -72,7 +72,7 @@ export const ACTIVE_BOOKING_STATUSES = new Set<string>([
 // Phone validation / normalization
 // ---------------------------------------------------------------------------
 
-// BE-B2: Spanish premium-rate (indicativo de tarificación adicional) number
+// #775: Spanish premium-rate (indicativo de tarificación adicional) number
 // ranges. These bill the CALLED party's line at premium rates — dialing one
 // with no ceiling on call volume is a direct telephony-cost abuse vector.
 // 800/900 (freephone) and ordinary geographic/mobile ranges are deliberately
@@ -229,7 +229,7 @@ export function formatTimeNatural(time: string): string {
 export async function getPriorBookingByIdempotencyKey(
   idempotencyKey: string
 ): Promise<PendingBookingSnapshot | null> {
-  const supabase = createAdminClient();
+  const supabase = getAdminClient();
   const { data, error } = await supabase
     .from("pending_bookings")
     .select("conversation_id, status, venue_name, outcome_message")
@@ -261,7 +261,7 @@ export async function claimPendingBooking(
   input: ClaimBookingInput
 ): Promise<ClaimBookingResult> {
   try {
-    const supabase = createAdminClient();
+    const supabase = getAdminClient();
     const { data: insertedRows, error: insertError } = await supabase
       .from("pending_bookings")
       .insert({
@@ -326,7 +326,7 @@ export async function persistBookingConversationId(
   idempotencyKey: string
 ): Promise<boolean> {
   try {
-    const supabase = createAdminClient();
+    const supabase = getAdminClient();
     const { error: updateError } = await supabase
       .from("pending_bookings")
       .update({
@@ -365,7 +365,7 @@ export async function markPendingBookingFailed(
   logContext: Record<string, unknown> = {}
 ): Promise<void> {
   try {
-    const supabase = createAdminClient();
+    const supabase = getAdminClient();
     const { error } = await supabase
       .from("pending_bookings")
       .update({
@@ -393,13 +393,13 @@ export async function markPendingBookingFailed(
 }
 
 // ---------------------------------------------------------------------------
-// Daily call cap (BE-B2)
+// Daily call cap (#775)
 // ---------------------------------------------------------------------------
 
 const DEFAULT_DAILY_BOOKING_CALL_CAP = 100;
 
 /**
- * BE-B2: Atomically claims one of today's outbound booking call slots via
+ * #775: Atomically claims one of today's outbound booking call slots via
  * the SQL-enforced daily cap in `claim_daily_booking_call_slot`
  * (migration 105_booking_daily_call_cap.sql). This gates a "call" (a
  * real-money outbound telephony request), not a "read" — unlike
@@ -411,7 +411,7 @@ export async function claimDailyBookingCallSlot(
   maxPerDay: number = DEFAULT_DAILY_BOOKING_CALL_CAP
 ): Promise<boolean> {
   try {
-    const supabase = createAdminClient();
+    const supabase = getAdminClient();
     const { data, error } = await supabase.rpc("claim_daily_booking_call_slot", {
       p_max_per_day: maxPerDay,
     });

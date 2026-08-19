@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   //    first-time visit — the browser's follow-up request to /immersive
   //    goes through this proxy again and is gated by the maintenance check
   //    below like any other route (/immersive is intentionally NOT in
-  //    MAINTENANCE_BYPASS_PREFIXES; see lib/proxy/maintenance.ts, DO-H3).
+  //    MAINTENANCE_BYPASS_PREFIXES; see lib/proxy/maintenance.ts, #824).
   const rootRedirect = handleRootRedirect(request);
   if (rootRedirect) {
     rootRedirect.headers.set("X-Request-ID", requestId);
@@ -68,7 +68,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // 6. Set static CSP header on page responses only.
   //    API responses (incl. high-frequency /api/chat/stream, /api/feature-flags) do not
   //    need CSP — it is a browser page protection header. Skipping the string-build on
-  //    every API call avoids pointless work on hot paths (PE-M2).
+  //    every API call avoids pointless work on hot paths (#678).
   if (!isApiRoute) {
     response.headers.set("Content-Security-Policy", buildCspHeader());
 

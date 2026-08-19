@@ -31,12 +31,22 @@ interface BuildIdentity {
 interface PublicHealthResponse {
   status: HealthStatus;
   timestamp: string;
-  cron_auth: CronAuthStatus;
-  sentry: SentryProbeResult;
-  rate_limit: RateLimitProbeResult;
+  /**
+   * SE-L2 (#850): cron_auth/sentry/rate_limit disclose backend configuration
+   * state. Both fail closed when misconfigured (a missing cron secret
+   * rejects every cron request; a degraded rate limiter denies traffic), so
+   * disclosure impact is low, but they're still reconnaissance surface —
+   * present only for the same authorized caller as `build`, never to an
+   * anonymous monitor.
+   */
+  cron_auth?: CronAuthStatus;
+  sentry?: SentryProbeResult;
+  rate_limit?: RateLimitProbeResult;
   /**
    * Present only for authorized callers — see checkBuildIdentity. The public
-   * response keeps the exact shape SE-M1 allow-lists.
+   * response keeps this field, and cron_auth/sentry/rate_limit above, gated
+   * to the same authorized caller so an unauthenticated monitor sees only
+   * status/timestamp.
    */
   build?: BuildIdentity;
 }
@@ -49,10 +59,14 @@ interface StoriesProbeResult {
   status: "ok" | "fallback";
 }
 
+interface VoicePurchasesProbeResult {
+  status: "ok" | "error";
+}
+
 interface DatabaseProbeResult {
   usage_percent: number | null;
   /**
-   * BE-H1: distinguishes "the probe genuinely has nothing to report" from
+   * #776: distinguishes "the probe genuinely has nothing to report" from
    * "the RPC call itself failed" (permission error, timeout, or infra
    * outage). Both map to `usage_percent: null`, but only "unavailable"
    * should ever escalate `status` to degraded — see isDatabaseProbeUnavailableInProduction.
@@ -99,11 +113,11 @@ async function checkRateLimitBackend(): Promise<RateLimitProbeResult> {
  * Release verification (Wave A, Phase 2): report what this deployment was built
  * from, so release evidence can be bound to a candidate rather than to a URL.
  *
- * SE-M1 forbids operational recon data on the *unauthenticated* endpoint, and
+ * Operational recon data must never reach the *unauthenticated* endpoint, and
  * this repo is private — a deployed commit SHA is exactly that. So the identity
  * is returned only to callers presenting `Authorization: Bearer <CRON_SECRET>`,
- * the same trusted-automation credential Vercel Cron uses. The public response
- * keeps the shape SE-M1 asserts, unchanged.
+ * the same trusted-automation credential Vercel Cron uses. The unauthorized
+ * response shape is unaffected by this gate.
  *
  * The check is silent by design: /api/health is polled continuously by Upptime,
  * so borrowing verifyVercelCron() would emit a [CRON_AUTH_REJECTED] warning on
@@ -123,7 +137,7 @@ function isReleaseIdentityAuthorized(request: Request | undefined): boolean {
     return false;
   }
 
-  // DO-H6: safeEqual compares byte length before timingSafeEqual, so
+  // #827: safeEqual compares byte length before timingSafeEqual, so
   // multibyte Authorization header values can't trigger an unhandled
   // RangeError ahead of the route's try block.
   const expected = `Bearer ${cronSecret}`;
@@ -167,7 +181,17 @@ function isRateLimitBackendRequired(): boolean {
 }
 
 /**
- * DO-L1: Allow overriding the storage limit via env var so operators can
+ * Shared escalation rule for probes that run on the admin client
+ * (database size, voice_purchases): only degrade in production, since
+ * local/CI/preview environments commonly lack SUPABASE_SERVICE_KEY, which
+ * would otherwise make every non-production health check falsely degraded.
+ */
+function isProbeUnavailableInProduction(isUnavailable: boolean): boolean {
+  return isProductionEnv() && isUnavailable;
+}
+
+/**
+ * Allow overriding the storage limit via env var so operators can
  * adjust the threshold without a code change (e.g. after a plan upgrade).
  * Defaults to 8192 MB (Supabase Pro tier: 8 GB).
  * Evaluated at call time so tests can stub SUPABASE_STORAGE_LIMIT_MB.
@@ -224,7 +248,57 @@ async function checkStories(): Promise<StoriesProbeResult> {
 }
 
 /**
- * BE-H1: migrations 091/092 revoked EXECUTE on get_database_size() from
+ * Shared shape for probes that run on the admin (service-role) client:
+ * fetch the client, run the query, and map any thrown/rejected error to the
+ * same failure result the timeout path already returns — bounded by the
+ * same timeout harness as every other probe on this route.
+ */
+async function probeAdminClient<T>(
+  run: (client: ReturnType<typeof getAdminClient>, signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  onFailure: () => T
+): Promise<T> {
+  return withTimeout(
+    async (signal) => {
+      try {
+        return await run(getAdminClient(), signal);
+      } catch {
+        return onFailure();
+      }
+    },
+    timeoutMs,
+    onFailure
+  );
+}
+
+/**
+ * QA-L3 (#882): the anon client has no grant on voice_purchases — RLS scopes
+ * SELECT to `auth.uid() = user_id` and only `authenticated`/`service_role`
+ * hold the grant at all (migration 075), so an anon probe would either
+ * error on every call (no grant) or, if a broader grant is ever added,
+ * silently return zero rows regardless of the table's real health. Uses the
+ * admin (service-role) client instead, the same reasoning as
+ * checkDatabaseSize below. Like that probe, the result never appears in the
+ * public JSON body — it only feeds the internal degraded/healthy decision.
+ */
+async function checkVoicePurchases(): Promise<VoicePurchasesProbeResult> {
+  return probeAdminClient(
+    async (client, signal) => {
+      const { error } = await client
+        .from("voice_purchases")
+        .select("id")
+        .limit(1)
+        .abortSignal(signal);
+
+      return error ? { status: "error" } : { status: "ok" };
+    },
+    PROBE_TIMEOUTS_MS.voicePurchases,
+    (): VoicePurchasesProbeResult => ({ status: "error" })
+  );
+}
+
+/**
+ * Migrations 091/092 revoked EXECUTE on get_database_size() from
  * anon/authenticated, granting it only to service_role — the anon client
  * used elsewhere on this route can never call this RPC. Uses the admin
  * (service-role) client instead. The response shape is unaffected: this
@@ -233,26 +307,20 @@ async function checkStories(): Promise<StoriesProbeResult> {
  * decision, so switching clients does not expose any new data.
  */
 async function checkDatabaseSize(): Promise<DatabaseProbeResult> {
-  return withTimeout(
-    async (signal): Promise<DatabaseProbeResult> => {
-      try {
-        const { data, error } = await getAdminClient()
-          .rpc("get_database_size")
-          .abortSignal(signal);
+  return probeAdminClient(
+    async (client, signal) => {
+      const { data, error } = await client.rpc("get_database_size").abortSignal(signal);
 
-        if (error) {
-          return { usage_percent: null, probe_status: "unavailable" };
-        }
-
-        const sizeBytes = data as number;
-        const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
-        const usage_percent =
-          Math.round((size_mb / getStorageLimitMb()) * 1000) / 10;
-
-        return { usage_percent, probe_status: "ok" };
-      } catch {
+      if (error) {
         return { usage_percent: null, probe_status: "unavailable" };
       }
+
+      const sizeBytes = data as number;
+      const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
+      const usage_percent =
+        Math.round((size_mb / getStorageLimitMb()) * 1000) / 10;
+
+      return { usage_percent, probe_status: "ok" };
     },
     PROBE_TIMEOUTS_MS.database,
     (): DatabaseProbeResult => ({ usage_percent: null, probe_status: "unavailable" })
@@ -285,7 +353,7 @@ function withTimeout<T>(
 }
 
 /**
- * BE-B1: surface CRON_SECRET configuration in the public health body so that
+ * Surface CRON_SECRET configuration in the public health body so that
  * monitoring can detect silent cron-auth misconfigurations. Informational only —
  * does not affect overall health status. The secret value itself is never
  * included; only "ok" / "misconfigured".
@@ -303,9 +371,9 @@ function buildHealthResponse(
   cronAuth: CronAuthStatus,
   sentry: SentryProbeResult,
   rateLimit: RateLimitProbeResult,
-  includeBuildIdentity: boolean
+  isAuthorizedCaller: boolean
 ): NextResponse<PublicHealthResponse> {
-  // DO-H1 / PE-H3: Always return HTTP 200.
+  // Always return HTTP 200.
   // Degraded state is signalled via the JSON body only.
   // This keeps Upptime happy and allows preview-smoke.yml to gate on body content.
   // The dedicated liveness probe (/api/health/live) is a no-probe always-200 endpoint
@@ -314,12 +382,17 @@ function buildHealthResponse(
     {
       status,
       timestamp: new Date().toISOString(),
-      cron_auth: cronAuth,
-      sentry,
-      rate_limit: rateLimit,
-      // Additive and informational only: build identity never affects `status`,
-      // so an unidentified build (local, non-Vercel) cannot flip health to degraded.
-      ...(includeBuildIdentity ? { build: checkBuildIdentity() } : {}),
+      // SE-L2 (#850): cron_auth/sentry/rate_limit/build are all additive and
+      // informational only — none of them affect `status`, so withholding
+      // them from an unauthorized caller cannot flip health to degraded.
+      ...(isAuthorizedCaller
+        ? {
+            cron_auth: cronAuth,
+            sentry,
+            rate_limit: rateLimit,
+            build: checkBuildIdentity(),
+          }
+        : {}),
     },
     {
       status: 200,
@@ -336,24 +409,26 @@ export async function GET(
 ): Promise<NextResponse<PublicHealthResponse>> {
   const cronAuth = checkCronAuthConfigured();
   const sentryStatus = checkSentry();
-  // DO-H6: default fail-closed (never expose build identity). The real
+  // Default fail-closed (never expose gated fields). The real
   // computation moves inside the try block below as defense in depth — if
   // isReleaseIdentityAuthorized ever throws, the route still returns a
   // well-formed degraded response instead of an unhandled 500.
-  let includeBuildIdentity = false;
+  let isAuthorizedCaller = false;
   // Fallback only for the (effectively unreachable) outer catch below — every
   // real failure/timeout path is handled inside checkRateLimitBackend itself.
   let rateLimitStatus: RateLimitProbeResult = { status: "ok", backend: "memory" };
 
   try {
-    includeBuildIdentity = isReleaseIdentityAuthorized(request);
+    isAuthorizedCaller = isReleaseIdentityAuthorized(request);
 
-    const [supabaseStatus, storiesStatus, databaseStatus, rateLimit] = await Promise.all([
-      checkSupabase(),
-      checkStories(),
-      checkDatabaseSize(),
-      checkRateLimitBackend(),
-    ]);
+    const [supabaseStatus, storiesStatus, databaseStatus, voicePurchasesStatus, rateLimit] =
+      await Promise.all([
+        checkSupabase(),
+        checkStories(),
+        checkDatabaseSize(),
+        checkVoicePurchases(),
+        checkRateLimitBackend(),
+      ]);
     rateLimitStatus = rateLimit;
 
     const isSupabaseError = supabaseStatus.status !== "connected";
@@ -361,19 +436,21 @@ export async function GET(
     const isDatabaseOverThreshold =
       databaseStatus.usage_percent !== null &&
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
-    /**
-     * BE-H1: only escalate to degraded in production. Local/CI/preview
-     * environments commonly lack SUPABASE_SERVICE_ROLE_KEY, which would
-     * otherwise make every non-production health check falsely degraded.
-     */
-    const isDatabaseProbeUnavailableInProduction =
-      isProductionEnv() && databaseStatus.probe_status === "unavailable";
+    const isDatabaseProbeUnavailableInProduction = isProbeUnavailableInProduction(
+      databaseStatus.probe_status === "unavailable"
+    );
+    // QA-L3 (#882): same production-only gate as the database probe above,
+    // and for the same reason — non-production environments commonly lack
+    // the service-role credential this probe also depends on.
+    const isVoicePurchasesProbeUnavailableInProduction = isProbeUnavailableInProduction(
+      voicePurchasesStatus.status === "error"
+    );
     const isSentryMissingInDeployedEnv =
       isSentryRequired() && sentryStatus.status !== "configured";
     const isRateLimitDegradedInRequiredEnv =
       isRateLimitBackendRequired() && rateLimitStatus.status === "degraded";
     /**
-     * DO-L2: In production, an unconfigured CRON_SECRET means scheduled jobs
+     * In production, an unconfigured CRON_SECRET means scheduled jobs
      * silently fail auth. Surface this as degraded so monitors catch it.
      * Non-production environments (dev, preview) are excluded to avoid noise.
      * HTTP status stays 200 — degraded is expressed in the body only.
@@ -386,6 +463,7 @@ export async function GET(
       isStoriesFallback ||
       isDatabaseOverThreshold ||
       isDatabaseProbeUnavailableInProduction ||
+      isVoicePurchasesProbeUnavailableInProduction ||
       isSentryMissingInDeployedEnv ||
       isRateLimitDegradedInRequiredEnv ||
       isCronAuthMisconfiguredInProduction
@@ -397,7 +475,7 @@ export async function GET(
       cronAuth,
       sentryStatus,
       rateLimitStatus,
-      includeBuildIdentity
+      isAuthorizedCaller
     );
   } catch {
     return buildHealthResponse(
@@ -405,7 +483,7 @@ export async function GET(
       cronAuth,
       sentryStatus,
       rateLimitStatus,
-      includeBuildIdentity
+      isAuthorizedCaller
     );
   }
 }

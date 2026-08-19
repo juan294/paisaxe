@@ -25,8 +25,11 @@ const mockUpdate = vi.fn();
 const mockDbSelect = vi.fn();
 // BE-B2: claim_daily_booking_call_slot RPC (SQL-enforced daily cap)
 const mockRpc = vi.fn();
+// booking-service.ts (#787) — the only consumer of @/lib/supabase-admin in
+// this route's dependency graph — reads the admin client via the singleton
+// getAdminClient(), not createAdminClient().
 vi.mock("@/lib/supabase-admin", () => ({
-  createAdminClient: vi.fn(() => ({
+  getAdminClient: vi.fn(() => ({
     from: vi.fn(() => ({
       insert: mockInsert,
       update: mockUpdate,
