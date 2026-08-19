@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import Stripe from "stripe";
 
-const { mockRpc, mockAuditFrom, mockAuditInsert, logger } = vi.hoisted(() => ({
+const { mockRpc, mockAuditFrom, mockAuditInsert, logger, mockCaptureMessage } = vi.hoisted(() => ({
   mockRpc: vi.fn(),
   mockAuditInsert: vi.fn(),
   mockAuditFrom: vi.fn(),
@@ -11,6 +11,7 @@ const { mockRpc, mockAuditFrom, mockAuditInsert, logger } = vi.hoisted(() => ({
     warn: vi.fn(),
     info: vi.fn(),
   },
+  mockCaptureMessage: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase-admin", () => ({
@@ -18,6 +19,12 @@ vi.mock("@/lib/supabase-admin", () => ({
     rpc: mockRpc,
     from: mockAuditFrom,
   })),
+}));
+
+// QA-L4 (#883): STRIPE_UNRECOVERABLE / STRIPE_RPC_TIMEOUT now also forward to
+// Sentry so the alert reaches the same channel as other unhandled errors.
+vi.mock("@sentry/nextjs", () => ({
+  captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
 }));
 
 vi.mock("@/lib/stripe", () => ({
@@ -161,6 +168,15 @@ describe("POST /api/webhooks/stripe", () => {
       eventId: "evt_test123",
       reason: "missing_user_id",
     });
+    // QA-L4 (#883): the marker must also reach Sentry, not just the log line.
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "[STRIPE_UNRECOVERABLE]",
+      expect.objectContaining({
+        level: "error",
+        tags: expect.objectContaining({ stripe_alert: "unrecoverable", reason: "missing_user_id" }),
+        extra: expect.objectContaining({ eventId: "evt_test123" }),
+      })
+    );
   });
 
   it("returns 200 unrecoverable when payment_intent is missing", async () => {
@@ -185,6 +201,15 @@ describe("POST /api/webhooks/stripe", () => {
       eventId: "evt_missing_intent",
       reason: "missing_payment_intent",
     });
+    // QA-L4 (#883): the marker must also reach Sentry, not just the log line.
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "[STRIPE_UNRECOVERABLE]",
+      expect.objectContaining({
+        level: "error",
+        tags: expect.objectContaining({ stripe_alert: "unrecoverable", reason: "missing_payment_intent" }),
+        extra: expect.objectContaining({ eventId: "evt_missing_intent" }),
+      })
+    );
   });
 
   it("returns duplicate when the idempotent RPC reports a repeat event", async () => {
@@ -696,6 +721,15 @@ describe("POST /api/webhooks/stripe", () => {
         expect(logger.error).toHaveBeenCalledWith(
           "[STRIPE_RPC_TIMEOUT]",
           expect.objectContaining({ eventId: "evt_timeout" })
+        );
+        // QA-L4 (#883): the marker must also reach Sentry, not just the log line.
+        expect(mockCaptureMessage).toHaveBeenCalledWith(
+          "[STRIPE_RPC_TIMEOUT]",
+          expect.objectContaining({
+            level: "error",
+            tags: expect.objectContaining({ stripe_alert: "rpc_timeout" }),
+            extra: expect.objectContaining({ eventId: "evt_timeout" }),
+          })
         );
       } finally {
         vi.useRealTimers();
