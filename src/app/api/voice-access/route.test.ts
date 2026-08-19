@@ -47,6 +47,27 @@ vi.mock("next/headers", () => ({
 import { createServerClient } from "@supabase/ssr";
 const mockCreateServerClient = vi.mocked(createServerClient);
 
+// Builds the `from()` mock for the voice_purchases select→eq→gt→order→limit→
+// maybeSingle chain the route queries, resolving `maybeSingle()` to `result`.
+function mockVoicePurchaseFrom(result: {
+  data: unknown;
+  error: unknown;
+}) {
+  return vi.fn(() => ({
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        gt: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn(() => ({
+              maybeSingle: vi.fn(() => Promise.resolve(result)),
+            })),
+          })),
+        })),
+      })),
+    })),
+  }));
+}
+
 describe("Voice Access API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -127,22 +148,8 @@ describe("Voice Access API", () => {
             error: null,
           }),
         },
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              gt: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn(() =>
-                      // maybeSingle returns {data: null, error: null} for no rows — no PGRST116
-                      Promise.resolve({ data: null, error: null })
-                    ),
-                  })),
-                })),
-              })),
-            })),
-          })),
-        })),
+        // maybeSingle returns {data: null, error: null} for no rows — no PGRST116
+        from: mockVoicePurchaseFrom({ data: null, error: null }),
       } as never);
 
       const request = createRequest({
@@ -166,28 +173,14 @@ describe("Voice Access API", () => {
             error: null,
           }),
         },
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              gt: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn(() =>
-                      Promise.resolve({
-                        data: {
-                          id: "purchase-123",
-                          purchase_type: "day_pass",
-                          expires_at: expiresAt,
-                        },
-                        error: null,
-                      })
-                    ),
-                  })),
-                })),
-              })),
-            })),
-          })),
-        })),
+        from: mockVoicePurchaseFrom({
+          data: {
+            id: "purchase-123",
+            purchase_type: "day_pass",
+            expires_at: expiresAt,
+          },
+          error: null,
+        }),
       } as never);
 
       const request = createRequest({
@@ -210,25 +203,11 @@ describe("Voice Access API", () => {
             error: null,
           }),
         },
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              gt: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn(() =>
-                      // With maybeSingle, any non-null error is a real DB error
-                      Promise.resolve({
-                        data: null,
-                        error: { code: "PGRST500", message: "Database error" },
-                      })
-                    ),
-                  })),
-                })),
-              })),
-            })),
-          })),
-        })),
+        // With maybeSingle, any non-null error is a real DB error
+        from: mockVoicePurchaseFrom({
+          data: null,
+          error: { code: "PGRST500", message: "Database error" },
+        }),
       } as never);
 
       const request = createRequest({
@@ -243,6 +222,40 @@ describe("Voice Access API", () => {
       });
       const json = await response.json();
       expect(json.error).toBe("Failed to check access");
+    });
+
+    // BE-M12 (#793): getSupabaseClient() was called with no `request`
+    // argument, so a bearer-authenticated caller's voice_purchases lookup
+    // ran on an unauthenticated client — RLS then hid the row and produced
+    // a false "Voice access required" denial for the documented API-client
+    // auth path (bearer clients don't send the cookie session).
+    it("BE-M12: forwards the bearer token to the RLS-scoped voice_purchases query", async () => {
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from: mockVoicePurchaseFrom({ data: null, error: null }),
+      } as never);
+
+      const request = createRequest({
+        headers: { Authorization: "Bearer valid-token" },
+      });
+      await GET(request);
+
+      const forwardedBearerToken = mockCreateServerClient.mock.calls.some(
+        (call) => {
+          const options = call[2] as {
+            global?: { headers?: Record<string, string> };
+          };
+          return (
+            options?.global?.headers?.Authorization === "Bearer valid-token"
+          );
+        }
+      );
+      expect(forwardedBearerToken).toBe(true);
     });
   });
 });
