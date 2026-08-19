@@ -63,6 +63,7 @@ GitHub-Actions-only allowlist inside the script, for secrets like
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypasses Vercel deployment protection for release-verification probes | Vercel (Deployment Protection settings); local `.env.local` | `scripts/release/candidate-identity.ts`, `scripts/check-health-readiness.mjs` | Annual |
 | `VERCEL_TOKEN` | CI-only: `vercel-env-safety` job reads deployed env var names via the Vercel API | GitHub Actions secret only — **not in `.env.example`**, the app never reads it | `.github/workflows/security.yml` | Currently **unset** (action required — see `operations.md` CI/CD Workflows). Once added: annual |
 | `SUPABASE_LOCAL_ANON_KEY` | Local Docker Supabase stack override | Local `.env.local` only (optional; defaults to the well-known `supabase start` demo anon key) | `src/test/local-supabase.ts` | Not sensitive — it is the public, well-known local-dev default; no rotation needed |
+| `SUPABASE_LOCAL_SERVICE_ROLE_KEY` | Local Docker Supabase stack override, service-role-only RPC tests (#871) | Local `.env.local` only (optional; defaults to the well-known `supabase start` demo service-role key) | `src/test/local-supabase.ts` | Not sensitive — it is the public, well-known local-dev default; no rotation needed |
 
 ## Multi-homed secrets: rotation order
 

@@ -133,19 +133,10 @@ test.describe("API route smoke tests", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
-  test("POST /api/checkout/day-pass rejects without auth", async ({
-    request,
-  }) => {
-    const csrf = await getCsrfHeaders(request);
-    const response = await request.post("/api/checkout/day-pass", {
-      headers: csrf,
-    });
-    // Returns 401 (no user) or 500 (Stripe not configured) — either is non-200
-    expect(response.ok()).toBe(false);
-
-    const body = await response.json();
-    expect(body).toHaveProperty("error");
-  });
+  // POST /api/checkout/day-pass was removed (#898/UX-M5 — dead orphaned
+  // route, /api/checkout/embedded is the reachable one). Equivalent
+  // auth-rejection coverage for the surviving route lives in
+  // e2e/checkout.spec.ts ("checkout/embedded denies unauthenticated POST").
 });
 
 // ─── Chat Multi-Turn messageIndex ────────────────────────────────
