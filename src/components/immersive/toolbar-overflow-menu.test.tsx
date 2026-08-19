@@ -555,4 +555,14 @@ describe("ToolbarOverflowItem", () => {
     // Should not throw
     await user.click(screen.getByText("No handler"));
   });
+
+  // UX-M6 (#899): items must meet the 44×44 touch-target convention already
+  // used by other toolbar controls (e.g. glassIcon).
+  it("has a 44px (min-h-11) touch-target floor", () => {
+    render(
+      <ToolbarOverflowItem icon={<span>I</span>} label="Sized item" />
+    );
+
+    expect(screen.getByRole("menuitem")).toHaveClass("min-h-11");
+  });
 });

@@ -4,6 +4,12 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
+import type { Translations } from "@/lib/i18n/types";
+import { es } from "@/lib/i18n/es";
+import { fr } from "@/lib/i18n/fr";
+import { de } from "@/lib/i18n/de";
+import { pt } from "@/lib/i18n/pt";
+import { ast } from "@/lib/i18n/ast";
 import { cn } from "@/lib/utils";
 
 const ALL_LANGUAGES: { code: Locale; label: string; fullName: string }[] = [
@@ -16,29 +22,68 @@ const ALL_LANGUAGES: { code: Locale; label: string; fullName: string }[] = [
 ];
 
 /**
- * UX-M3: Estimated UI translation coverage per locale (0\u2013100 %).
- *
- * 'es' and 'en' are always shown (reference locales, 100 % coverage).
- * Other locales are shown only when their coverage meets MIN_COVERAGE_THRESHOLD.
- *
- * Update these values whenever a locale's translation file is updated:
- * - Run the translation coverage script (if available) or manually audit
- *   `src/lib/i18n/<locale>.ts` against `es.ts` to estimate completeness.
- *
- * @remarks
- * This is a reversible, minimal gate: lowering MIN_COVERAGE_THRESHOLD or
- * raising a locale's coverage score will make it visible immediately.
- * The gate is intentionally static (no runtime API call) to keep the
- * component synchronous and tree-shakeable.
+ * Recursively collect every leaf translation key using dot-notation
+ * (e.g. "chat.placeholder"). Mirrors the collector used by
+ * `src/lib/i18n/translations.test.ts` for key-parity checks.
  */
-export const LOCALE_COVERAGE: Partial<Record<Locale, number>> = {
-  es: 100,
-  en: 100,
-  fr: 85,  // French translation file is substantially complete
-  de: 85,  // German translation file is substantially complete
-  pt: 85,  // Portuguese translation file is substantially complete
-  ast: 40, // Asturian translation is partial \u2014 below threshold by default
-};
+function collectTranslationKeys(obj: Translations, prefix = ""): string[] {
+  const keys: string[] = [];
+  for (const key of Object.keys(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    const value = obj[key];
+    if (typeof value === "string") {
+      keys.push(fullKey);
+    } else if (typeof value === "object" && value !== null) {
+      keys.push(...collectTranslationKeys(value, fullKey));
+    }
+  }
+  return keys;
+}
+
+function getByPath(obj: Translations, path: string): string | Translations | undefined {
+  return path.split(".").reduce<Translations | string | undefined>((acc, segment) => {
+    if (acc && typeof acc === "object") return acc[segment];
+    return undefined;
+  }, obj);
+}
+
+/**
+ * UX-M10 (#903): Compute translation coverage directly from each locale file
+ * against the Spanish reference, instead of hand-maintaining a percentage
+ * constant. A hand-maintained constant silently drifts out of sync with the
+ * real file \u2014 'ast' was pinned at a stale 40 % long after the locale file
+ * reached 81 % real coverage, hiding a fully-usable locale from the switcher.
+ *
+ * A key counts as "translated" when its value differs from the Spanish
+ * reference value at the same path (an untranslated key is typically a
+ * verbatim copy of the Spanish string). Coverage is the percentage of
+ * Spanish leaf keys with a translated (different) counterpart in the target
+ * locale.
+ */
+function computeCoverage(reference: Translations, target: Translations): number {
+  const referenceKeys = collectTranslationKeys(reference);
+  if (referenceKeys.length === 0) return 0;
+  let translated = 0;
+  for (const key of referenceKeys) {
+    if (getByPath(target, key) !== getByPath(reference, key)) translated++;
+  }
+  return Math.round((translated / referenceKeys.length) * 100);
+}
+
+const LOCALE_FILES: Partial<Record<Locale, Translations>> = { fr, de, pt, ast };
+
+/**
+ * UX-M10 (#903): Measured UI translation coverage per locale (0\u2013100 %),
+ * computed from the actual locale files at module-load time \u2014 not a
+ * hand-maintained constant that can drift from reality.
+ *
+ * 'es' and 'en' are always shown regardless of this map (reference locales).
+ * Other locales are shown only when their computed coverage meets
+ * MIN_COVERAGE_THRESHOLD.
+ */
+export const LOCALE_COVERAGE: Partial<Record<Locale, number>> = Object.fromEntries(
+  Object.entries(LOCALE_FILES).map(([code, data]) => [code, computeCoverage(es, data)])
+) as Partial<Record<Locale, number>>;
 
 /**
  * Minimum coverage percentage required to show a locale in the switcher.
@@ -158,7 +203,10 @@ export function LanguageSwitcher() {
         aria-expanded={isExpanded}
         aria-haspopup="listbox"
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-full",
+          // UX-M6 (#899): min-h-11 (44px) meets the 44×44 touch-target
+          // convention used by other toolbar controls (e.g. glassIcon
+          // buttons); the visual pill still hugs its content via px-3 py-1.5.
+          "flex items-center gap-1.5 px-3 py-1.5 min-h-11 rounded-full",
           "text-xs font-medium text-white",
           "bg-white/10 backdrop-blur-sm border border-white/10",
           "transition-all duration-200",
@@ -177,6 +225,9 @@ export function LanguageSwitcher() {
       </button>
 
       {/* Dropdown Panel */}
+      {/* UX-M3 (#896): `inert` keeps the closed panel mounted (required for
+          the open/close transition) while removing it from the a11y tree
+          and tab order — options must not be reachable while invisible. */}
       <div
         className={cn(
           "absolute top-full right-0 mt-2 p-1.5 rounded-xl",
@@ -190,6 +241,7 @@ export function LanguageSwitcher() {
         role="listbox"
         aria-label={t("accessibility.language_switcher")}
         onKeyDown={handleListboxKeyDown}
+        inert={!isExpanded}
       >
         <div ref={listboxRef} className="flex flex-col gap-1">
           {languages.map((lang, index) => (
@@ -207,7 +259,8 @@ export function LanguageSwitcher() {
                 animationDelay: isExpanded ? `${50 + index * 30}ms` : "0ms",
               }}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-medium text-left",
+                // UX-M6 (#899): min-h-11 (44px) touch-target floor.
+                "flex items-center px-3 py-1.5 min-h-11 rounded-lg text-xs font-medium text-left",
                 "transition-all duration-200",
                 "active:scale-95",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",

@@ -94,6 +94,16 @@ describe("QuestionPrompts", () => {
     expect(button).toHaveClass("py-1.5");
   });
 
+  // UX-M6 (#899): chips must meet the 44×44 touch-target convention already
+  // used by other toolbar controls (e.g. glassIcon).
+  it("gives each prompt chip a 44px (min-h-11) touch-target floor", () => {
+    render(
+      <QuestionPrompts prompts={defaultPrompts} storyId="test-1" onSelectPrompt={mockOnSelectPrompt} />
+    );
+    const button = screen.getByText("What is this place?");
+    expect(button).toHaveClass("min-h-11");
+  });
+
   it("renders a single prompt correctly", () => {
     render(
       <QuestionPrompts prompts={["Single prompt"]} storyId="test-1" onSelectPrompt={mockOnSelectPrompt} />
