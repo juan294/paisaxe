@@ -104,4 +104,30 @@ describe("ImmersiveError", () => {
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/");
   });
+
+  // UX-M4: converged error-boundary treatment across all four boundaries
+  it("UX-M4: wrapper has role=alert for screen reader announcement", () => {
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
+  it("UX-M4: retry button has a visible focus ring", () => {
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
+    const btn = screen.getByRole("button", { name: "Reintentar" });
+    expect(btn.className).toMatch(/focus-visible:ring-2/);
+  });
+
+  it("UX-M4: retry button uses the shared glass treatment (matches favorites/ComponentErrorBoundary)", () => {
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
+    const btn = screen.getByRole("button", { name: "Reintentar" });
+    expect(btn.className).toContain("bg-white/20");
+    expect(btn.className).toContain("hover:bg-white/30");
+    expect(btn.className).toContain("backdrop-blur-sm");
+  });
+
+  it("UX-M4: home link has a visible focus ring", () => {
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
+    const link = screen.getByRole("link", { name: "Volver al inicio" });
+    expect(link.className).toMatch(/focus-visible:ring-2/);
+  });
 });
