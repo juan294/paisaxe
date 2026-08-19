@@ -1,5 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { sanitizeValue } from "@/lib/logger-sanitize";
+import { getEnv } from "@/lib/env";
+import type { logger as loggerInstance } from "@/lib/logger";
 
 /**
  * #657: Next.js 15/16 calls this named export to forward server-side errors to Sentry.
@@ -52,6 +54,10 @@ function buildConsoleMeta(method: "debug" | "error" | "info" | "warn", args: unk
  * Scoped to VERCEL_ENV === "production" only: Preview and local legitimately
  * lack many of these (Stripe/ElevenLabs/Twilio credentials are routinely
  * unset outside production), so checking them there would just be noise.
+ *
+ * NEXT_PUBLIC_SENTRY_DSN is deliberately not in this list — it already has
+ * its own dedicated [SENTRY_UNCONFIGURED] check a few lines below in
+ * register(); including it here would just double-log the same gap.
  */
 const PRODUCTION_REQUIRED_ENV_VARS = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -73,19 +79,14 @@ const PRODUCTION_REQUIRED_ENV_VARS = [
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "CRON_SECRET",
-  "NEXT_PUBLIC_SENTRY_DSN",
 ] as const;
 
-function checkProductionEnvManifest(logger: {
-  warn: (msg: string, meta?: Record<string, unknown>) => void;
-}): void {
+function checkProductionEnvManifest(logger: Pick<typeof loggerInstance, "warn">): void {
   if (process.env.VERCEL_ENV !== "production") {
     return;
   }
 
-  const missing = PRODUCTION_REQUIRED_ENV_VARS.filter(
-    (key) => !process.env[key]?.trim()
-  );
+  const missing = PRODUCTION_REQUIRED_ENV_VARS.filter((key) => !getEnv(key));
 
   if (missing.length > 0) {
     logger.warn(
