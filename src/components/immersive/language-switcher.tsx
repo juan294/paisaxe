@@ -6,6 +6,17 @@ import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
+// UX-M10 (#903) / bundle-size follow-up: coverage is computed at build time
+// by scripts/generate-locale-coverage.ts from the real locale files (see
+// src/lib/i18n/coverage.ts for the shared computation logic), not inline
+// here. Importing fr/de/pt/ast directly in this client component would ship
+// ~100KB of locale-file source into the browser bundle just to diff their
+// keys for a percentage \u2014 those files are already lazy-loaded on demand by
+// src/lib/i18n/provider.tsx. locale-coverage.generated.ts exports only the
+// small resulting numbers, so zero locale-file bytes reach the client.
+import { LOCALE_COVERAGE } from "@/lib/i18n/locale-coverage.generated";
+export { LOCALE_COVERAGE };
+
 const ALL_LANGUAGES: { code: Locale; label: string; fullName: string }[] = [
   { code: "es", label: "ES", fullName: "Espa\u00f1ol (ES)" },
   { code: "ast", label: "AST", fullName: "Asturianu (AST)" },
@@ -14,31 +25,6 @@ const ALL_LANGUAGES: { code: Locale; label: string; fullName: string }[] = [
   { code: "de", label: "DE", fullName: "Deutsch (DE)" },
   { code: "pt", label: "PT", fullName: "Portugu\u00eas (PT)" },
 ];
-
-/**
- * UX-M3: Estimated UI translation coverage per locale (0\u2013100 %).
- *
- * 'es' and 'en' are always shown (reference locales, 100 % coverage).
- * Other locales are shown only when their coverage meets MIN_COVERAGE_THRESHOLD.
- *
- * Update these values whenever a locale's translation file is updated:
- * - Run the translation coverage script (if available) or manually audit
- *   `src/lib/i18n/<locale>.ts` against `es.ts` to estimate completeness.
- *
- * @remarks
- * This is a reversible, minimal gate: lowering MIN_COVERAGE_THRESHOLD or
- * raising a locale's coverage score will make it visible immediately.
- * The gate is intentionally static (no runtime API call) to keep the
- * component synchronous and tree-shakeable.
- */
-export const LOCALE_COVERAGE: Partial<Record<Locale, number>> = {
-  es: 100,
-  en: 100,
-  fr: 85,  // French translation file is substantially complete
-  de: 85,  // German translation file is substantially complete
-  pt: 85,  // Portuguese translation file is substantially complete
-  ast: 40, // Asturian translation is partial \u2014 below threshold by default
-};
 
 /**
  * Minimum coverage percentage required to show a locale in the switcher.
@@ -158,7 +144,10 @@ export function LanguageSwitcher() {
         aria-expanded={isExpanded}
         aria-haspopup="listbox"
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-full",
+          // UX-M6 (#899): min-h-11 (44px) meets the 44×44 touch-target
+          // convention used by other toolbar controls (e.g. glassIcon
+          // buttons); the visual pill still hugs its content via px-3 py-1.5.
+          "flex items-center gap-1.5 px-3 py-1.5 min-h-11 rounded-full",
           "text-xs font-medium text-white",
           "bg-white/10 backdrop-blur-sm border border-white/10",
           "transition-all duration-200",
@@ -177,6 +166,9 @@ export function LanguageSwitcher() {
       </button>
 
       {/* Dropdown Panel */}
+      {/* UX-M3 (#896): `inert` keeps the closed panel mounted (required for
+          the open/close transition) while removing it from the a11y tree
+          and tab order — options must not be reachable while invisible. */}
       <div
         className={cn(
           "absolute top-full right-0 mt-2 p-1.5 rounded-xl",
@@ -190,6 +182,7 @@ export function LanguageSwitcher() {
         role="listbox"
         aria-label={t("accessibility.language_switcher")}
         onKeyDown={handleListboxKeyDown}
+        inert={!isExpanded}
       >
         <div ref={listboxRef} className="flex flex-col gap-1">
           {languages.map((lang, index) => (
@@ -207,7 +200,8 @@ export function LanguageSwitcher() {
                 animationDelay: isExpanded ? `${50 + index * 30}ms` : "0ms",
               }}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-medium text-left",
+                // UX-M6 (#899): min-h-11 (44px) touch-target floor.
+                "flex items-center px-3 py-1.5 min-h-11 rounded-lg text-xs font-medium text-left",
                 "transition-all duration-200",
                 "active:scale-95",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
