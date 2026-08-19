@@ -162,7 +162,7 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 | `api/mcp/weather/route.test.ts` | — | Weather endpoint for Pelayo |
 | `api/mcp/places/route.test.ts` | — | Places search for Pelayo |
 | `api/mcp/make-booking/route.test.ts` | — | Booking initiation via ElevenLabs + Twilio |
-| `api/checkout/day-pass/route.test.ts` | — | Stripe day-pass checkout |
+| `api/checkout/embedded/route.test.ts` | — | Stripe embedded checkout (day/weekly/monthly passes; day-pass's standalone route was removed as dead code, #898) |
 | `api/cron/content-discovery/route.test.ts` | — | Content discovery cron |
 | `api/cron/fail-stale-translations/route.test.ts` | — | Stale translation cleanup |
 | `api/cron/github-traffic-sync/route.test.ts` | — | GitHub traffic sync |
