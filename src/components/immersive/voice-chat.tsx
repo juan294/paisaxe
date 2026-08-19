@@ -14,6 +14,7 @@ import { useChatMode } from "@/hooks/use-chat-mode";
 import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { usePaisaxePostHog } from "@/components/posthog-provider";
+import { toIntlLocale } from "@/lib/utils";
 
 import { ChatHeader } from "./voice-chat/chat-header";
 import { ChatMessageList } from "./voice-chat/chat-message-list";
@@ -288,7 +289,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
             <p className="text-xs text-amber-200">
               {t("premium.voice_pass_expiry")
                 .replace("{hours}", String(Math.ceil(hoursUntilExpiry)))
-                .replace("{time}", expiresAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}
+                .replace("{time}", expiresAt.toLocaleTimeString(toIntlLocale(locale), { hour: '2-digit', minute: '2-digit' }))}
             </p>
           </div>
         )}

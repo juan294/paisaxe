@@ -122,7 +122,9 @@ export function ChatMessageList({
       className="h-64 md:h-96 lg:h-[28rem] overflow-y-auto p-4 space-y-4"
     >
       {messages.length === 0 && (
-        <div className="text-center text-white/50 py-8">
+        // UX-M7 (#900): this state copy computed to roughly 2.8:1 contrast
+        // at text-white/50 — well below the 4.5:1 AA floor. Raised to /70.
+        <div className="text-center text-white/70 py-8">
           <p>{t("chat.empty_state")}</p>
         </div>
       )}

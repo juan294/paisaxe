@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
 import { PRICING_TIERS, buildCheckoutUrl, type PricingTier, type PricingTierId } from "@/lib/pricing";
+import { toIntlLocale } from "@/lib/utils";
 
 /**
  * Resolve the human-readable duration for a pricing tier, translated via
@@ -36,7 +37,7 @@ export default function PricingPage() {
 function PricingPageContent() {
   const { user, session, signInWithGoogle } = useAuth();
   const { canUseVoice, isWhitelisted, expiresAt, isLoading } = useVoiceAccess();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
   const returnTo = searchParams.get("returnTo");
@@ -52,6 +53,38 @@ function PricingPageContent() {
   );
   const selectedTierData =
     PRICING_TIERS.find((tier) => tier.id === selectedTier) ?? PRICING_TIERS[0];
+
+  // UX-M12 (#905): the tier selector declares role="radio"/"radiogroup" —
+  // that markup promises a roving-tabindex, arrow-key-navigable radiogroup.
+  // Without this, a screen-reader user is told "radio group, 1 of 3" and
+  // then finds arrow keys inert, which is worse than no ARIA role at all.
+  // Mirrors the roving-tabindex pattern already implemented in
+  // story-progress-bar.tsx.
+  const tierRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const handleTierKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      const count = PRICING_TIERS.length;
+      let nextIndex: number | null = null;
+
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        nextIndex = index < count - 1 ? index + 1 : 0;
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        nextIndex = index > 0 ? index - 1 : count - 1;
+      } else if (e.key === "Home") {
+        nextIndex = 0;
+      } else if (e.key === "End") {
+        nextIndex = count - 1;
+      }
+
+      if (nextIndex === null) return;
+
+      e.preventDefault();
+      setSelectedTier(PRICING_TIERS[nextIndex].id);
+      tierRefs.current[nextIndex]?.focus();
+    },
+    []
+  );
   // UX-B1 (#886): the section label, feature bullet, and FAQ answer must
   // describe the *selected* tier's duration — not be hardcoded to the Day
   // Pass's "24 horas" regardless of which tier the user picked.
@@ -130,7 +163,7 @@ function PricingPageContent() {
                 </p>
                 {expiresAt && (
                   <p className="text-xs text-green-500/60">
-                    {t("premium.success_expires")} {expiresAt.toLocaleString()}
+                    {t("premium.success_expires")} {expiresAt.toLocaleString(toIntlLocale(locale))}
                   </p>
                 )}
               </div>
@@ -157,15 +190,18 @@ function PricingPageContent() {
                 aria-label={voicePassLabel}
                 className="grid grid-cols-3 gap-2"
               >
-                {PRICING_TIERS.map((tier) => {
+                {PRICING_TIERS.map((tier, index) => {
                   const selected = selectedTier === tier.id;
                   return (
                     <button
                       key={tier.id}
+                      ref={(el) => { tierRefs.current[index] = el; }}
                       type="button"
                       role="radio"
                       aria-checked={selected}
+                      tabIndex={selected ? 0 : -1}
                       onClick={() => setSelectedTier(tier.id)}
+                      onKeyDown={(e) => handleTierKeyDown(e, index)}
                       className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 ${
                         selected
                           ? "border-green-500 bg-green-500/10"

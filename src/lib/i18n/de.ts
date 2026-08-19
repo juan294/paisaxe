@@ -131,11 +131,11 @@ export const de: Translations = {
     // LOCATION-SPECIFIC: Location name
     empty_description: 'Entdecken Sie die Geschichten Asturiens und speichern Sie Ihre Favoriten für später.',
     explore: 'Geschichten entdecken',
-    loading_more: 'Mehr laden...',
     all_viewed: 'Sie haben alle Ihre Speicherungen gesehen',
     remove_from_saved: 'Aus Gespeicherten entfernen',
     removed: 'Aus Favoriten entfernt',
     saved_toast: 'Zu Favoriten hinzugefügt',
+    undo: 'Rückgängig',
   },
 
   accessibility: {

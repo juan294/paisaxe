@@ -339,6 +339,43 @@ describe("PricingPage", () => {
     expect(screen.getByText(/premium.success_expires/)).toBeInTheDocument();
   });
 
+  // UX-M11 (#904): the expiry timestamp is the single most consequential
+  // piece of formatted data on this page (it's on a paid pass) and must
+  // render in the app's active locale, not the browser's.
+  it("formats the expiry date with the app's active locale, not the default browser locale", async () => {
+    vi.doMock("@/lib/i18n", () => ({
+      useTranslation: () => ({
+        t: (key: string) => key,
+        locale: "fr",
+      }),
+    }));
+    vi.resetModules();
+    const { default: FreshPricingPage } = await import("./page");
+
+    const toLocaleStringSpy = vi.spyOn(Date.prototype, "toLocaleString");
+
+    mockUseVoiceAccess.mockReturnValue({
+      hasAccess: true,
+      isWhitelisted: false,
+      canUseVoice: true,
+      needsSignIn: false,
+      needsPurchase: false,
+      expiresAt: new Date("2024-12-31T23:59:59Z"),
+      hoursUntilExpiry: 24,
+      agentId: "test-agent",
+      isLoading: false,
+      refresh: mockRefresh,
+    });
+
+    render(<FreshPricingPage />);
+
+    expect(toLocaleStringSpy).toHaveBeenCalledWith("fr-FR");
+
+    toLocaleStringSpy.mockRestore();
+    vi.doUnmock("@/lib/i18n");
+    vi.resetModules();
+  });
+
   it("should show Premium Access for whitelisted users", () => {
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: false,
@@ -539,6 +576,97 @@ describe("PricingPage", () => {
       const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
       expect(button.className).toContain("focus-visible:ring-2");
       expect(button.className).toContain("focus-visible:ring-green-300");
+    });
+  });
+
+  // UX-M12 (#905): the tier selector declared role="radio"/"radiogroup" but
+  // had no roving tabindex and no arrow-key handler — a screen reader user
+  // is told "radio group, 1 of 3" and then finds arrow keys inert.
+  describe("UX-M12 (#905): tier radiogroup keyboard behavior", () => {
+    it("gives only the selected tier a tab stop; the other two are not tab stops", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      expect(radios).toHaveLength(3);
+      // Day pass (index 0) is selected by default.
+      expect(radios[0]).toHaveAttribute("tabindex", "0");
+      expect(radios[1]).toHaveAttribute("tabindex", "-1");
+      expect(radios[2]).toHaveAttribute("tabindex", "-1");
+    });
+
+    it("ArrowRight moves selection to the next tier and moves the tab stop with it", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[0].focus();
+      fireEvent.keyDown(radios[0], { key: "ArrowRight" });
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[1]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[1]).toHaveAttribute("tabindex", "0");
+      expect(radiosAfter[0]).toHaveAttribute("tabindex", "-1");
+      expect(radiosAfter[1]).toHaveFocus();
+    });
+
+    it("ArrowLeft from the first tier wraps to the last tier", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[0].focus();
+      fireEvent.keyDown(radios[0], { key: "ArrowLeft" });
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[2]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[2]).toHaveFocus();
+    });
+
+    it("ArrowRight from the last tier wraps to the first tier", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[0].focus();
+      fireEvent.keyDown(radios[0], { key: "ArrowRight" }); // -> weekly
+      fireEvent.keyDown(screen.getAllByRole("radio")[1], { key: "ArrowRight" }); // -> monthly
+      fireEvent.keyDown(screen.getAllByRole("radio")[2], { key: "ArrowRight" }); // wraps -> day
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[0]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[0]).toHaveFocus();
+    });
+
+    it("Home moves selection and focus to the first tier", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[2].focus();
+      fireEvent.keyDown(radios[2], { key: "Home" });
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[0]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[0]).toHaveFocus();
+    });
+
+    it("End moves selection and focus to the last tier", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[0].focus();
+      fireEvent.keyDown(radios[0], { key: "End" });
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[2]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[2]).toHaveFocus();
+    });
+
+    it("one further Tab from the selected tier still reaches the purchase CTA (regression risk noted in #905)", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      // Only one radio is a tab stop (tabindex=0); the CTA button is the
+      // very next element in source order with a positive/default tabindex.
+      expect(radios[0]).toHaveAttribute("tabindex", "0");
+      const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
+      expect(button.getAttribute("tabindex")).not.toBe("-1");
     });
   });
 

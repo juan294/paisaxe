@@ -131,11 +131,11 @@ export const en: Translations = {
     // LOCATION-SPECIFIC: Location name
     empty_description: 'Explore the stories of Asturias and save the ones you like to view later.',
     explore: 'Explore stories',
-    loading_more: 'Loading more...',
     all_viewed: 'You have seen all your saved stories',
     remove_from_saved: 'Remove from saved',
     removed: 'Removed from favorites',
     saved_toast: 'Saved to favorites',
+    undo: 'Undo',
   },
 
   accessibility: {

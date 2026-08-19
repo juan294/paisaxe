@@ -131,11 +131,11 @@ export const ast: Translations = {
     // LOCATION-SPECIFIC: Location name
     empty_description: 'Esplora les histories d\'Asturies y guarda les que más te presten pa veles depués.',
     explore: 'Esplorar histories',
-    loading_more: 'Cargando más...',
     all_viewed: 'Vieres tolos tos guardaos',
     remove_from_saved: 'Quitar de guardaos',
     removed: 'Desaniciáu de favoritos',
     saved_toast: 'Guardáu en favoritos',
+    undo: 'Desfacer',
   },
 
   accessibility: {
