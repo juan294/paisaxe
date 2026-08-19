@@ -9,9 +9,11 @@ const logger = vi.hoisted(() => ({
 
 vi.mock("@/lib/logger", () => ({ logger }));
 
-// Mock admin auth
+// AR-M2 (#859): this route now uses the RLS-scoped withAdminRead wrapper
+// instead of validateAdminAuth() + createAdminClient() directly.
+const mockWithAdminRead = vi.fn();
 vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
+  withAdminRead: (...args: unknown[]) => mockWithAdminRead(...args),
 }));
 
 // Create mock for Supabase
@@ -20,8 +22,11 @@ const mockOrder = vi.fn();
 const mockEq = vi.fn();
 const mockRange = vi.fn();
 
-vi.mock("@/lib/supabase-admin", () => ({
-  createAdminClient: () => ({
+function buildMockClient(
+  resolver: () => Promise<{ data: unknown; error: unknown; count: number | null }> = () =>
+    Promise.resolve({ data: [], error: null, count: 0 })
+) {
+  return {
     from: () => ({
       select: (...args: unknown[]) => {
         mockSelect(...args);
@@ -37,55 +42,45 @@ vi.mock("@/lib/supabase-admin", () => ({
                     return {
                       range: (...rangeArgs: unknown[]) => {
                         mockRange(...rangeArgs);
-                        return Promise.resolve({
-                          data: [],
-                          error: null,
-                          count: 0,
-                        });
+                        return resolver();
                       },
                     };
                   },
                   range: (...rangeArgs: unknown[]) => {
                     mockRange(...rangeArgs);
-                    return Promise.resolve({
-                      data: [],
-                      error: null,
-                      count: 0,
-                    });
+                    return resolver();
                   },
                 };
               },
               range: (...rangeArgs: unknown[]) => {
                 mockRange(...rangeArgs);
-                return Promise.resolve({
-                  data: [],
-                  error: null,
-                  count: 0,
-                });
+                return resolver();
               },
             };
           },
         };
       },
     }),
-  }),
-}));
+  };
+}
 
 // Import after mocks
 import { GET } from "./route";
-import { validateAdminAuth } from "@/lib/admin-auth";
 
 describe("/api/admin/marketing/agent-logs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: authorized — call handler with a mock RLS-scoped client.
+    mockWithAdminRead.mockImplementation(
+      async (handler: (client: unknown) => Promise<unknown>) => handler(buildMockClient())
+    );
   });
 
   describe("GET", () => {
     it("should return 401 if not authenticated", async () => {
-      vi.mocked(validateAdminAuth).mockResolvedValueOnce({
-        valid: false,
-        error: NextResponse.json({ error: "Not authenticated" }, { status: 401 }),
-      });
+      mockWithAdminRead.mockResolvedValueOnce(
+        NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+      );
 
       const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
 
@@ -94,6 +89,14 @@ describe("/api/admin/marketing/agent-logs", () => {
 
       expect(response.status).toBe(401);
       expect(data.error).toBe("Not authenticated");
+    });
+
+    it("should pass the request through to withAdminRead (for request-context wiring)", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
+
+      await GET(request);
+
+      expect(mockWithAdminRead).toHaveBeenCalledWith(expect.any(Function), request);
     });
 
     it("should return empty logs array with pagination info", async () => {
@@ -158,76 +161,59 @@ describe("/api/admin/marketing/agent-logs", () => {
     });
 
     it("should convert database rows to log objects", async () => {
-      // Override the mock to return actual data
-      vi.doMock("@/lib/supabase-admin", () => ({
-        createAdminClient: () => ({
-          from: () => ({
-            select: () => ({
-              order: () => ({
-                range: () =>
-                  Promise.resolve({
-                    data: [
-                      {
-                        id: "log-1",
-                        agent_name: "xander",
-                        action: "generate_content",
-                        status: "success",
-                        details: { key: "value" },
-                        error_message: null,
-                        post_id: null,
-                        duration_ms: 1500,
-                        created_at: "2024-01-01T00:00:00Z",
-                      },
-                    ],
-                    error: null,
-                    count: 1,
-                  }),
-              }),
-            }),
-          }),
-        }),
-      }));
+      mockWithAdminRead.mockImplementation(
+        async (handler: (client: unknown) => Promise<unknown>) =>
+          handler(
+            buildMockClient(() =>
+              Promise.resolve({
+                data: [
+                  {
+                    id: "log-1",
+                    agent_name: "xander",
+                    action: "generate_content",
+                    status: "success",
+                    details: { key: "value" },
+                    error_message: null,
+                    post_id: null,
+                    duration_ms: 1500,
+                    created_at: "2024-01-01T00:00:00Z",
+                  },
+                ],
+                error: null,
+                count: 1,
+              })
+            )
+          )
+      );
 
-      // Re-import to get the new mock
-      const { GET: GET2 } = await import("./route");
       const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
 
-      const response = await GET2(request);
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
       // The conversion should happen via rowToMarketingAgentLog
       expect(data.data).toBeDefined();
+      expect(data.data).toHaveLength(1);
     });
 
     it("should return 500 when database query returns an error", async () => {
-      vi.resetModules();
+      mockWithAdminRead.mockImplementation(
+        async (handler: (client: unknown) => Promise<unknown>) =>
+          handler(
+            buildMockClient(() =>
+              Promise.resolve({
+                data: null,
+                error: { message: "relation does not exist", code: "42P01" },
+                count: null,
+              })
+            )
+          )
+      );
 
-      vi.doMock("@/lib/admin-auth", () => ({
-        validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
-      }));
-
-      vi.doMock("@/lib/supabase-admin", () => ({
-        createAdminClient: () => ({
-          from: () => ({
-            select: () => ({
-              order: () => ({
-                range: () =>
-                  Promise.resolve({
-                    data: null,
-                    error: { message: "relation does not exist", code: "42P01" },
-                    count: null,
-                  }),
-              }),
-            }),
-          }),
-        }),
-      }));
-
-      const { GET: GET3 } = await import("./route");
       const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
 
-      const response = await GET3(request);
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -235,45 +221,40 @@ describe("/api/admin/marketing/agent-logs", () => {
     });
 
     it("should return 500 when an unexpected exception is thrown", async () => {
-      vi.resetModules();
+      mockWithAdminRead.mockImplementation(async (handler: (client: unknown) => Promise<unknown>) => {
+        try {
+          return await handler({
+            from: () => {
+              throw new Error("Connection refused");
+            },
+          });
+        } catch {
+          throw new Error("should not reach here — route catches internally");
+        }
+      });
 
-      vi.doMock("@/lib/admin-auth", () => ({
-        validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
-      }));
-
-      vi.doMock("@/lib/supabase-admin", () => ({
-        createAdminClient: () => {
-          throw new Error("Connection refused");
-        },
-      }));
-
-      const { GET: GET4 } = await import("./route");
       const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
 
-      const response = await GET4(request);
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
 
-    it("should return 500 when a non-Error value is thrown (line 70)", async () => {
-      vi.resetModules();
+    it("should return 500 when a non-Error value is thrown", async () => {
+      mockWithAdminRead.mockImplementation(async (handler: (client: unknown) => Promise<unknown>) =>
+        handler({
+          from: () => {
 
-      vi.doMock("@/lib/admin-auth", () => ({
-        validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
-      }));
+            throw "string error without Error class";
+          },
+        })
+      );
 
-      vi.doMock("@/lib/supabase-admin", () => ({
-        createAdminClient: () => {
-          throw "string error without Error class";
-        },
-      }));
-
-      const { GET: GET6 } = await import("./route");
       const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
 
-      const response = await GET6(request);
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -282,17 +263,18 @@ describe("/api/admin/marketing/agent-logs", () => {
   });
 
   it("should use logger.error (not console.error) on unhandled GET error", async () => {
-    vi.doMock("@/lib/supabase-admin", () => ({
-      createAdminClient: () => {
-        throw new Error("Connection refused");
-      },
-    }));
+    mockWithAdminRead.mockImplementation(async (handler: (client: unknown) => Promise<unknown>) =>
+      handler({
+        from: () => {
+          throw new Error("Connection refused");
+        },
+      })
+    );
 
-    const { GET: GET5 } = await import("./route");
     const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const response = await GET5(request);
+    const response = await GET(request);
     consoleSpy.mockRestore();
 
     expect(response.status).toBe(500);
