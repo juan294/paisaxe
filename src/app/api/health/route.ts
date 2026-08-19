@@ -181,6 +181,16 @@ function isRateLimitBackendRequired(): boolean {
 }
 
 /**
+ * Shared escalation rule for probes that run on the admin client
+ * (database size, voice_purchases): only degrade in production, since
+ * local/CI/preview environments commonly lack SUPABASE_SERVICE_KEY, which
+ * would otherwise make every non-production health check falsely degraded.
+ */
+function isProbeUnavailableInProduction(isUnavailable: boolean): boolean {
+  return isProductionEnv() && isUnavailable;
+}
+
+/**
  * Allow overriding the storage limit via env var so operators can
  * adjust the threshold without a code change (e.g. after a plan upgrade).
  * Defaults to 8192 MB (Supabase Pro tier: 8 GB).
@@ -238,6 +248,30 @@ async function checkStories(): Promise<StoriesProbeResult> {
 }
 
 /**
+ * Shared shape for probes that run on the admin (service-role) client:
+ * fetch the client, run the query, and map any thrown/rejected error to the
+ * same failure result the timeout path already returns — bounded by the
+ * same timeout harness as every other probe on this route.
+ */
+async function probeAdminClient<T>(
+  run: (client: ReturnType<typeof getAdminClient>, signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  onFailure: () => T
+): Promise<T> {
+  return withTimeout(
+    async (signal) => {
+      try {
+        return await run(getAdminClient(), signal);
+      } catch {
+        return onFailure();
+      }
+    },
+    timeoutMs,
+    onFailure
+  );
+}
+
+/**
  * QA-L3 (#882): the anon client has no grant on voice_purchases — RLS scopes
  * SELECT to `auth.uid() = user_id` and only `authenticated`/`service_role`
  * hold the grant at all (migration 075), so an anon probe would either
@@ -248,19 +282,15 @@ async function checkStories(): Promise<StoriesProbeResult> {
  * public JSON body — it only feeds the internal degraded/healthy decision.
  */
 async function checkVoicePurchases(): Promise<VoicePurchasesProbeResult> {
-  return withTimeout(
-    async (signal): Promise<VoicePurchasesProbeResult> => {
-      try {
-        const { error } = await getAdminClient()
-          .from("voice_purchases")
-          .select("id")
-          .limit(1)
-          .abortSignal(signal);
+  return probeAdminClient(
+    async (client, signal) => {
+      const { error } = await client
+        .from("voice_purchases")
+        .select("id")
+        .limit(1)
+        .abortSignal(signal);
 
-        return error ? { status: "error" } : { status: "ok" };
-      } catch {
-        return { status: "error" };
-      }
+      return error ? { status: "error" } : { status: "ok" };
     },
     PROBE_TIMEOUTS_MS.voicePurchases,
     (): VoicePurchasesProbeResult => ({ status: "error" })
@@ -277,26 +307,20 @@ async function checkVoicePurchases(): Promise<VoicePurchasesProbeResult> {
  * decision, so switching clients does not expose any new data.
  */
 async function checkDatabaseSize(): Promise<DatabaseProbeResult> {
-  return withTimeout(
-    async (signal): Promise<DatabaseProbeResult> => {
-      try {
-        const { data, error } = await getAdminClient()
-          .rpc("get_database_size")
-          .abortSignal(signal);
+  return probeAdminClient(
+    async (client, signal) => {
+      const { data, error } = await client.rpc("get_database_size").abortSignal(signal);
 
-        if (error) {
-          return { usage_percent: null, probe_status: "unavailable" };
-        }
-
-        const sizeBytes = data as number;
-        const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
-        const usage_percent =
-          Math.round((size_mb / getStorageLimitMb()) * 1000) / 10;
-
-        return { usage_percent, probe_status: "ok" };
-      } catch {
+      if (error) {
         return { usage_percent: null, probe_status: "unavailable" };
       }
+
+      const sizeBytes = data as number;
+      const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
+      const usage_percent =
+        Math.round((size_mb / getStorageLimitMb()) * 1000) / 10;
+
+      return { usage_percent, probe_status: "ok" };
     },
     PROBE_TIMEOUTS_MS.database,
     (): DatabaseProbeResult => ({ usage_percent: null, probe_status: "unavailable" })
@@ -412,20 +436,15 @@ export async function GET(
     const isDatabaseOverThreshold =
       databaseStatus.usage_percent !== null &&
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
-    /**
-     * Only escalate to degraded in production. Local/CI/preview environments
-     * commonly lack SUPABASE_SERVICE_KEY, which would otherwise make every
-     * non-production health check falsely degraded.
-     */
-    const isDatabaseProbeUnavailableInProduction =
-      isProductionEnv() && databaseStatus.probe_status === "unavailable";
-    /**
-     * QA-L3 (#882): same production-only gate as the database probe above,
-     * and for the same reason — non-production environments commonly lack
-     * the service-role credential this probe also depends on.
-     */
-    const isVoicePurchasesProbeUnavailableInProduction =
-      isProductionEnv() && voicePurchasesStatus.status === "error";
+    const isDatabaseProbeUnavailableInProduction = isProbeUnavailableInProduction(
+      databaseStatus.probe_status === "unavailable"
+    );
+    // QA-L3 (#882): same production-only gate as the database probe above,
+    // and for the same reason — non-production environments commonly lack
+    // the service-role credential this probe also depends on.
+    const isVoicePurchasesProbeUnavailableInProduction = isProbeUnavailableInProduction(
+      voicePurchasesStatus.status === "error"
+    );
     const isSentryMissingInDeployedEnv =
       isSentryRequired() && sentryStatus.status !== "configured";
     const isRateLimitDegradedInRequiredEnv =

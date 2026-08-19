@@ -36,6 +36,12 @@ const STATIC_PATHS = new Set(["/about", "/privacy", "/terms"]);
 // /favorites, /) reads no flag — verified by grepping every useFeatureFlags()
 // call site — so an allowlist avoids a wasted fetch on them instead of an
 // ever-growing denylist that silently misses a new flag consumer.
+//
+// Maintenance note: this list is manually curated, not derived — a new route
+// that starts calling useFeatureFlags() (directly or via a hook built on it)
+// outside /immersive must add its prefix here, or it silently gets no flags
+// and no fetch (no type error, no test failure). Re-grep every
+// useFeatureFlags() call site before adding a new consumer route.
 const FLAG_CONSUMING_PATH_PREFIXES = ["/pricing"];
 
 function pathConsumesFeatureFlags(pathname: string): boolean {
