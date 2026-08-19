@@ -232,6 +232,47 @@ This is informational only — the request was silently discarded with a fake 20
 
 ---
 
+## Stripe Payment-Without-Grant (QA-L4)
+
+**Trigger:** `[STRIPE_UNRECOVERABLE]` or `[STRIPE_RPC_TIMEOUT]` log events from `src/app/api/webhooks/stripe/route.ts`. Both are logged at `error` level and also forwarded to Sentry via `Sentry.captureMessage()` (search the `stripe_alert` tag below), in addition to the structured log line.
+
+This is the highest-severity silent-failure class in the system: Stripe has taken payment, but the handler could not grant access, and — for `STRIPE_UNRECOVERABLE` specifically — the endpoint deliberately returns `200` so Stripe stops retrying (retrying a malformed event forever would be worse). **Do not change that 200 response** to force retries; a malformed event will never become processable no matter how many times Stripe redelivers it. If a reconciliation job is ever added to detect this class automatically, it must be strictly read-only against Stripe/the DB — remediation stays a manual, audited action (see Steps below).
+
+### Structured Telemetry Log Events
+
+| Event | Level | Fields | Sentry tag | Meaning |
+|-------|-------|--------|------------|---------|
+| `[STRIPE_UNRECOVERABLE]` | `error` | `eventId`, `reason` (`missing_user_id` \| `missing_payment_intent`) | `stripe_alert: "unrecoverable"` | Checkout session paid but carries no usable `user_id` / `payment_intent` in metadata — the grant RPC is never called. Returns `200` so Stripe stops retrying. |
+| `[STRIPE_RPC_TIMEOUT]` | `error` | `eventId`, `purchaseType` | `stripe_alert: "rpc_timeout"` | The `grant_day_pass_idempotent` RPC took longer than 10s (BE-L2 client-side timeout). Returns `500` so Stripe retries — the retry itself is safe (the RPC is idempotent on `eventId`), but repeated timeouts indicate a systemic DB issue, not a transient blip. |
+| `[STRIPE_RPC_FAILURE]` | `error` | `eventId`, `error` | — (not yet wired to Sentry; same remediation path applies) | The RPC returned a Postgres error. Returns `500` so Stripe retries. |
+
+**Example log drain query:**
+```
+msg:[STRIPE_UNRECOVERABLE] OR msg:[STRIPE_RPC_TIMEOUT] OR msg:[STRIPE_RPC_FAILURE]
+```
+
+### Manual-grant remediation procedure
+
+1. Find the event: search Vercel logs (or Sentry, tag `stripe_alert`) for the `eventId` in the marker, then look up that event in the Stripe dashboard → Developers → Events to confirm payment actually settled (`payment_status: "paid"`) and read `checkout.session.completed.data.object.metadata` for the intended `user_id` and `purchase_type`.
+2. Confirm no grant already exists for that payment: `SELECT * FROM public.stripe_webhook_events WHERE event_id = '<eventId>';` and `SELECT * FROM public.voice_purchases WHERE payment_provider_id = '<payment_intent id from Stripe>';` — if a row already exists, no action is needed (the grant succeeded on a later retry).
+3. If confirmed paid with no grant, call the same RPC the webhook would have called, using the Supabase SQL editor (or `psql` against production, service-role only) with the values recovered from Stripe:
+   ```sql
+   SELECT public.grant_day_pass_idempotent(
+     p_event_id           => '<Stripe event id>',
+     p_event_type         => '<Stripe event type>',
+     p_user_id            => '<user_id from session metadata>',
+     p_payment_provider_id => '<payment_intent id>',
+     p_expires_at         => '<now() + entitlement window for purchase_type>',
+     p_amount_paid        => <session.amount_total>,
+     p_purchase_type      => '<purchase_type from session metadata>'
+   );
+   ```
+   This is the exact idempotent path the webhook uses — safe to run even if a concurrent retry lands at the same time (it will simply report `'duplicate'`).
+4. Confirm the row now exists in `voice_purchases` and notify the affected user if there was a meaningful delay.
+5. File a post-mortem issue if this was caused by a code/config bug (e.g. a checkout session created without `metadata.user_id`) rather than a one-off DB blip: `gh issue create --title "Incident: Stripe payment-without-grant <date>" --label "type: bug,priority: high,area: payments"`.
+
+---
+
 ## Stripe Webhook Failure
 
 **Trigger:** Stripe dashboard shows failed webhook deliveries.
