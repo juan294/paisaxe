@@ -4,13 +4,18 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
-import type { Translations } from "@/lib/i18n/types";
-import { es } from "@/lib/i18n/es";
-import { fr } from "@/lib/i18n/fr";
-import { de } from "@/lib/i18n/de";
-import { pt } from "@/lib/i18n/pt";
-import { ast } from "@/lib/i18n/ast";
 import { cn } from "@/lib/utils";
+
+// UX-M10 (#903) / bundle-size follow-up: coverage is computed at build time
+// by scripts/generate-locale-coverage.ts from the real locale files (see
+// src/lib/i18n/coverage.ts for the shared computation logic), not inline
+// here. Importing fr/de/pt/ast directly in this client component would ship
+// ~100KB of locale-file source into the browser bundle just to diff their
+// keys for a percentage \u2014 those files are already lazy-loaded on demand by
+// src/lib/i18n/provider.tsx. locale-coverage.generated.ts exports only the
+// small resulting numbers, so zero locale-file bytes reach the client.
+import { LOCALE_COVERAGE } from "@/lib/i18n/locale-coverage.generated";
+export { LOCALE_COVERAGE };
 
 const ALL_LANGUAGES: { code: Locale; label: string; fullName: string }[] = [
   { code: "es", label: "ES", fullName: "Espa\u00f1ol (ES)" },
@@ -20,70 +25,6 @@ const ALL_LANGUAGES: { code: Locale; label: string; fullName: string }[] = [
   { code: "de", label: "DE", fullName: "Deutsch (DE)" },
   { code: "pt", label: "PT", fullName: "Portugu\u00eas (PT)" },
 ];
-
-/**
- * Recursively collect every leaf translation key using dot-notation
- * (e.g. "chat.placeholder"). Mirrors the collector used by
- * `src/lib/i18n/translations.test.ts` for key-parity checks.
- */
-function collectTranslationKeys(obj: Translations, prefix = ""): string[] {
-  const keys: string[] = [];
-  for (const key of Object.keys(obj)) {
-    const fullKey = prefix ? `${prefix}.${key}` : key;
-    const value = obj[key];
-    if (typeof value === "string") {
-      keys.push(fullKey);
-    } else if (typeof value === "object" && value !== null) {
-      keys.push(...collectTranslationKeys(value, fullKey));
-    }
-  }
-  return keys;
-}
-
-function getByPath(obj: Translations, path: string): string | Translations | undefined {
-  return path.split(".").reduce<Translations | string | undefined>((acc, segment) => {
-    if (acc && typeof acc === "object") return acc[segment];
-    return undefined;
-  }, obj);
-}
-
-/**
- * UX-M10 (#903): Compute translation coverage directly from each locale file
- * against the Spanish reference, instead of hand-maintaining a percentage
- * constant. A hand-maintained constant silently drifts out of sync with the
- * real file \u2014 'ast' was pinned at a stale 40 % long after the locale file
- * reached 81 % real coverage, hiding a fully-usable locale from the switcher.
- *
- * A key counts as "translated" when its value differs from the Spanish
- * reference value at the same path (an untranslated key is typically a
- * verbatim copy of the Spanish string). Coverage is the percentage of
- * Spanish leaf keys with a translated (different) counterpart in the target
- * locale.
- */
-function computeCoverage(reference: Translations, target: Translations): number {
-  const referenceKeys = collectTranslationKeys(reference);
-  if (referenceKeys.length === 0) return 0;
-  let translated = 0;
-  for (const key of referenceKeys) {
-    if (getByPath(target, key) !== getByPath(reference, key)) translated++;
-  }
-  return Math.round((translated / referenceKeys.length) * 100);
-}
-
-const LOCALE_FILES: Partial<Record<Locale, Translations>> = { fr, de, pt, ast };
-
-/**
- * UX-M10 (#903): Measured UI translation coverage per locale (0\u2013100 %),
- * computed from the actual locale files at module-load time \u2014 not a
- * hand-maintained constant that can drift from reality.
- *
- * 'es' and 'en' are always shown regardless of this map (reference locales).
- * Other locales are shown only when their computed coverage meets
- * MIN_COVERAGE_THRESHOLD.
- */
-export const LOCALE_COVERAGE: Partial<Record<Locale, number>> = Object.fromEntries(
-  Object.entries(LOCALE_FILES).map(([code, data]) => [code, computeCoverage(es, data)])
-) as Partial<Record<Locale, number>>;
 
 /**
  * Minimum coverage percentage required to show a locale in the switcher.
