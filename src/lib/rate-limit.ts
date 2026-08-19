@@ -245,6 +245,80 @@ export async function probeRateLimitBackend(
   }
 }
 
+// --- IPv6 bucket normalization (BE-L5) ---
+
+/**
+ * BE-L5 (#798): `getClientIp` (src/lib/request-utils.ts) returns IPv6
+ * addresses verbatim. A residential /64 allocation gives one subscriber
+ * 2^64 distinct source addresses — trivially rotated via IPv6 privacy
+ * extensions — each hashing to its own Upstash bucket, so the per-IP rate
+ * limit is effectively unenforceable for IPv6 clients.
+ *
+ * Collapses an IPv6 address to its /64 prefix (the first four hextets) so
+ * every address from the same allocation shares one bucket. IPv4 addresses
+ * and non-IP sentinels (e.g. "unknown") pass through unchanged.
+ *
+ * Regression risk called out in the finding: a /64 can be a large shared
+ * population behind some mobile/CGNAT-equivalent IPv6 deployments, which
+ * risks false 429s for legitimate co-tenants. This intentionally keeps the
+ * existing per-identifier request cap unchanged rather than guessing at a
+ * higher one — if false-positive reports surface in practice, widen the cap
+ * (or make the prefix length configurable) then, backed by real traffic
+ * data rather than speculation.
+ */
+export function normalizeIpForRateLimit(ip: string): string {
+  if (!ip.includes(":")) {
+    // Not IPv6 (IPv4, "unknown", or any other non-colon identifier).
+    return ip;
+  }
+
+  // Strip an interface zone/scope id (e.g. "fe80::1%eth0") if present.
+  const withoutZone = ip.split("%")[0]!;
+
+  const doubleColonIndex = withoutZone.indexOf("::");
+  let groups: string[];
+
+  if (doubleColonIndex !== -1) {
+    const left = withoutZone
+      .slice(0, doubleColonIndex)
+      .split(":")
+      .filter(Boolean);
+    const right = withoutZone
+      .slice(doubleColonIndex + 2)
+      .split(":")
+      .filter(Boolean);
+    const missing = 8 - left.length - right.length;
+    if (missing < 0) {
+      // More groups than a valid IPv6 address can hold — malformed input.
+      // Fail safe: fall back to the raw string as the bucket key rather
+      // than throwing or silently merging unrelated clients.
+      return ip;
+    }
+    groups = [...left, ...Array(missing).fill("0"), ...right];
+  } else {
+    groups = withoutZone.split(":");
+    if (groups.length !== 8) {
+      // Not a recognizable fully-expanded IPv6 address — fall back.
+      return ip;
+    }
+  }
+
+  // Only the /64 prefix (first four hextets) ends up in the bucket key, so
+  // only those need validating/normalizing — the full 8-group resolution
+  // above was still required to correctly place "::"'s implied zeros.
+  // Normalize each hextet (e.g. "0000" and "0" must bucket identically —
+  // they're the same address) and validate it's actually hex. Any group
+  // that fails validation means the input wasn't real IPv6; fall back to
+  // the raw string rather than producing a bogus bucket key.
+  const HEX_GROUP = /^[0-9a-fA-F]{1,4}$/;
+  const prefixGroups = groups.slice(0, 4);
+  if (!prefixGroups.every(g => HEX_GROUP.test(g))) {
+    return ip;
+  }
+
+  return `${prefixGroups.map(g => parseInt(g, 16).toString(16)).join(":")}::/64`;
+}
+
 function failClosed(config: RateLimitConfig): RateLimitResult {
   return {
     allowed: false,
