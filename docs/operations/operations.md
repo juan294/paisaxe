@@ -11,6 +11,7 @@ Detailed documentation for database maintenance, monitoring, webhooks, and autom
 | `docs/operations/alerting-runbook.md` | Responding to a specific alert type |
 | `docs/operations/migration-policy.md` | Writing or applying a migration |
 | `docs/operations/pre-launch-security-checklist.md` | The 6 manual security gates before a release PR |
+| `docs/operations/secret-inventory.md` | Rotating or revoking a credential; auditing what secrets exist |
 
 ## Health Check Endpoints
 
@@ -95,14 +96,13 @@ curl -s https://paisaxe.es/robots.txt
 ### 5. Git Status
 
 ```bash
-# Check for unpushed commits on develop
-git log main..develop --oneline
-
-# Verify branches are in sync for release
-git diff develop main --stat
+# Commits + file-level diffstat since the last release (see DO-M8, #835:
+# a plain `git log main..develop` never prunes under squash merges)
+npm run what-would-ship
 ```
 
-**For release:** `develop` and `main` should be in sync (no diff).
+**For release:** the file-level diffstat is the real scope of what would ship — see
+`docs/runbooks/release-checklist.md` step 2 for the full procedure and rationale.
 
 ### 6. Feature Flags Review
 
@@ -195,7 +195,6 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `analyze-main-tables` | Daily 4:00 AM UTC | 011 | ANALYZE on chunks, images, stories |
 | `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
 | `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Database activity safeguard |
-| `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
 | `content-discovery` | Weekly Monday 3:00 AM UTC (`0 3 * * 1`) | Vercel Cron | Discovers new Asturias places via Google Places API |
 | `fail-stale-translations` | Every 15 minutes (`*/15 * * * *`) | Vercel Cron | Mark stories stuck in `translating` state as failed |
 | `fail-stale-bookings` | Every 5 minutes (`*/5 * * * *`) | Vercel Cron | Mark bookings stuck in a pending/in-progress state as failed |
@@ -205,7 +204,15 @@ Automated maintenance jobs run on Supabase via pg_cron:
 
 The Vercel Cron schedules above mirror `vercel.json` exactly — keep both in sync when adding or rescheduling a job.
 
-Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
+**`edge-keep-alive`** (migration `014`) was unscheduled on 2026-02-03 — it is **not** an
+active job, despite the migration still being applied. See
+[pending-setup.md](./pending-setup.md#3-configure-supabase-edge-function-settings) for why.
+Do not re-schedule it to make this table match the migration; the migration's presence is
+historical, not a signal that the job runs.
+
+Verify jobs (also the way to catch this table drifting from reality — a job listed above but
+absent from the query result, or vice versa, means this table is stale):
+`SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
 
 ## Database Webhooks (pg_net)
 
@@ -239,11 +246,11 @@ Utilities in `src/lib/realtime.ts` provide generic `subscribeToTable()` and spec
 
 ## Supabase Edge Functions
 
-Deno-based Edge Functions in `supabase/functions/` (500K invocations/month included). Scheduled via pg_cron + pg_net.
+Deno-based Edge Functions in `supabase/functions/` (500K invocations/month included).
 
 | Function | Purpose | Schedule |
 |----------|---------|----------|
-| `keep-alive` | Queries active stories to generate database activity | Every 3 days |
+| `keep-alive` | Queries active stories to generate database activity | Not scheduled — the `edge-keep-alive` pg_cron job that called it via pg_net was unscheduled on 2026-02-03 (see [pending-setup.md](./pending-setup.md#3-configure-supabase-edge-function-settings)); the function remains deployed and can be invoked manually |
 
 Deploy: `supabase functions deploy keep-alive`
 
@@ -374,7 +381,7 @@ On PRs targeting `main`, waits for the Vercel preview deployment and runs `scrip
 4. **Build failures**: Run `npm run build` locally, check for build-time errors
 5. **E2E failures**: Run `npm run test:e2e` locally, inspect `playwright-report/` for traces
 6. **License failures**: Run `npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"` to identify problematic deps
-7. **Gitleaks failures**: Remove the detected secret from code and rotate the exposed credential
+7. **Gitleaks failures**: Remove the detected secret from code and rotate the exposed credential — see [secret-inventory.md](./secret-inventory.md) for the storage locations and rotation order per secret
 
 ### Notes
 
