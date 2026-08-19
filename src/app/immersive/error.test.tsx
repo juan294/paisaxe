@@ -2,6 +2,10 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import * as Sentry from "@sentry/nextjs";
 import { LanguageProvider } from "@/lib/i18n";
+import {
+  GLASS_RETRY_BUTTON_CLASS,
+  GLASS_HOME_LINK_CLASS,
+} from "@/lib/error-boundary-styles";
 import ImmersiveError from "./error";
 
 vi.mock("@sentry/nextjs", () => ({
@@ -117,17 +121,21 @@ describe("ImmersiveError", () => {
     expect(btn.className).toMatch(/focus-visible:ring-2/);
   });
 
-  it("UX-M4: retry button uses the shared glass treatment (matches favorites/ComponentErrorBoundary)", () => {
+  it("UX-M4: retry button uses the shared glass treatment (matches favorites/global-error)", () => {
     renderWithI18n(<ImmersiveError {...defaultProps} />);
     const btn = screen.getByRole("button", { name: "Reintentar" });
-    expect(btn.className).toContain("bg-white/20");
-    expect(btn.className).toContain("hover:bg-white/30");
-    expect(btn.className).toContain("backdrop-blur-sm");
+    expect(btn.className).toBe(GLASS_RETRY_BUTTON_CLASS);
   });
 
   it("UX-M4: home link has a visible focus ring", () => {
     renderWithI18n(<ImmersiveError {...defaultProps} />);
     const link = screen.getByRole("link", { name: "Volver al inicio" });
     expect(link.className).toMatch(/focus-visible:ring-2/);
+  });
+
+  it("UX-M4: home link uses the shared glass treatment (matches favorites/global-error)", () => {
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
+    const link = screen.getByRole("link", { name: "Volver al inicio" });
+    expect(link.className).toBe(GLASS_HOME_LINK_CLASS);
   });
 });
