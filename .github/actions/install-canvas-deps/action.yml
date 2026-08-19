@@ -44,6 +44,21 @@ runs:
           -o Acquire::https::Timeout=20
         )
 
+        # Drop the Azure regional mirrorlist in favour of the canonical Ubuntu
+        # archive. The observed stall is `apt-get update` printing
+        # "Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]" and then
+        # emitting nothing at all until killed - it never reaches an HTTP fetch,
+        # so Acquire::*::Timeout never applies and retrying the same config just
+        # stalls again. Repointing at archive.ubuntu.com skips the mirrorlist.
+        use_canonical_archive() {
+          echo "Repointing apt at archive.ubuntu.com (skipping Azure mirrorlist)"
+          sudo find /etc/apt -name '*.sources' -o -name '*.list' \
+            | xargs -r sudo sed -i \
+                -e 's|mirror+file:/etc/apt/apt-mirrors.txt|http://archive.ubuntu.com/ubuntu/|g' \
+                -e 's|https\?://azure.archive.ubuntu.com/ubuntu/\?|http://archive.ubuntu.com/ubuntu/|g' \
+            || echo "::warning::could not rewrite apt sources; retrying as-is"
+        }
+
         for attempt in 1 2 3; do
           if sudo timeout 120 apt-get "${apt_opts[@]}" update \
             && sudo timeout 300 apt-get "${apt_opts[@]}" install -y "${packages[@]}"; then
@@ -51,10 +66,17 @@ runs:
             exit 0
           fi
 
-          echo "::warning::apt attempt $attempt failed or timed out; retrying"
+          echo "::warning::apt attempt $attempt failed or timed out"
           sudo rm -rf /var/lib/apt/lists/*
+
+          # Switch off the mirrorlist immediately after the first failure rather
+          # than burning two more identical stalls on the same broken config.
+          if [ "$attempt" -eq 1 ]; then
+            use_canonical_archive
+          fi
+
           sleep 10
         done
 
-        echo "::error::apt failed after 3 attempts - likely a stalled Ubuntu mirror on this runner"
+        echo "::error::apt failed after 3 attempts, including a retry against archive.ubuntu.com"
         exit 1
