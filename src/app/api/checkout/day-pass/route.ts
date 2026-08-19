@@ -3,6 +3,7 @@ import { createDayPassCheckoutSession, type PurchaseType } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
 import { checkoutBodySchema } from "@/lib/schemas";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import { logger } from "@/lib/logger";
 
 // BE-S2 (#803): this route had no rate limiting at all — a repeat-click or
@@ -79,12 +80,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
-        {
-          status: 429,
-          headers: rateLimit.retryAfter
-            ? { "Retry-After": String(rateLimit.retryAfter) }
-            : undefined,
-        }
+        { status: 429, headers: buildRateLimitHeaders(rateLimit, true) }
       );
     }
 

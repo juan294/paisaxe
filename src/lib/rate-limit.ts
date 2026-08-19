@@ -303,17 +303,20 @@ export function normalizeIpForRateLimit(ip: string): string {
     }
   }
 
+  // Only the /64 prefix (first four hextets) ends up in the bucket key, so
+  // only those need validating/normalizing — the full 8-group resolution
+  // above was still required to correctly place "::"'s implied zeros.
   // Normalize each hextet (e.g. "0000" and "0" must bucket identically —
   // they're the same address) and validate it's actually hex. Any group
   // that fails validation means the input wasn't real IPv6; fall back to
   // the raw string rather than producing a bogus bucket key.
   const HEX_GROUP = /^[0-9a-fA-F]{1,4}$/;
-  if (!groups.every(g => HEX_GROUP.test(g))) {
+  const prefixGroups = groups.slice(0, 4);
+  if (!prefixGroups.every(g => HEX_GROUP.test(g))) {
     return ip;
   }
-  const normalizedGroups = groups.map(g => parseInt(g, 16).toString(16));
 
-  return `${normalizedGroups.slice(0, 4).join(":")}::/64`;
+  return `${prefixGroups.map(g => parseInt(g, 16).toString(16)).join(":")}::/64`;
 }
 
 function failClosed(config: RateLimitConfig): RateLimitResult {
