@@ -1140,7 +1140,60 @@ describe("ElevenLabs Analytics API Route", () => {
     expect(data.data.summary.totalConversations).toBe(0);
     expect(logger.error).toHaveBeenCalledWith(
       "ElevenLabs analytics API error:",
-      { error: "upstream unavailable" },
+      { error: "upstream unavailable", timed_out: false },
+    );
+  });
+
+  // -----------------------------------------------------------------------
+  // PE-L2: server-side external API fetches without timeouts (#816)
+  // -----------------------------------------------------------------------
+
+  it("PE-L2: fetchElevenLabs includes an AbortSignal timeout on every call (#816)", async () => {
+    const capturedInits: (RequestInit | undefined)[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      capturedInits.push(init);
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ agents: [] }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ conversations: [] }),
+      });
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    await GET(request);
+
+    expect(capturedInits.length).toBeGreaterThan(0);
+    for (const init of capturedInits) {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it("PE-L2: logs a distinct timed_out marker when the conversations fetch aborts (#816)", async () => {
+    vi.stubEnv("ELEVENLABS_API_KEY", "test-api-key");
+
+    const timeoutError = new DOMException("The operation was aborted", "TimeoutError");
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ agents: [] }),
+        });
+      }
+      return Promise.reject(timeoutError);
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    expect(logger.error).toHaveBeenCalledWith(
+      "ElevenLabs analytics API error:",
+      expect.objectContaining({ timed_out: true })
     );
   });
 });

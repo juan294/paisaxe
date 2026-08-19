@@ -7,22 +7,44 @@ import { logger } from "@/lib/logger";
 // concurrent HTTP calls to the translate webhook.
 const WEBHOOK_FAN_OUT_CONCURRENCY = 5;
 
+// PE-L2: bound each webhook ping so a hung endpoint can't hold this admin
+// route open until the platform's default function timeout.
+const WEBHOOK_PING_TIMEOUT_MS = 8_000;
+
+/**
+ * BE-L2: Resolves the base URL used to ping the translate webhook.
+ *
+ * `NEXT_PUBLIC_APP_URL` is the primary source. Vercel's `VERCEL_URL` is a
+ * bare hostname with no scheme (e.g. "my-app-abc123.vercel.app") — passing
+ * it directly to `fetch()` throws `TypeError: Failed to parse URL`, so it
+ * must be prefixed with `https://` to be usable. The fallback is restricted
+ * to `VERCEL_ENV === "production"` because Preview deployments share
+ * production Supabase (see docs/operations); enabling the fallback there
+ * would let a preview's approve-all POST to its own (shared-DB) webhook
+ * handler using a preview hostname never intended for that traffic.
+ */
+function resolveWebhookBaseUrl(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (appUrl) {
+    return appUrl;
+  }
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl && process.env.VERCEL_ENV === "production") {
+    return `https://${vercelUrl}`;
+  }
+
+  return "";
+}
+
 /**
  * Fires a single translate-webhook ping for a story, swallowing errors so a
  * network hiccup never blocks the approve-all response.  Jobs are durably
  * enqueued in the DB by the trigger; this call is best-effort to wake the
  * worker quickly.
  */
-async function pingTranslateWebhook(storyId: string): Promise<void> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.VERCEL_URL?.trim() ||
-    "";
+async function pingTranslateWebhook(storyId: string, baseUrl: string): Promise<void> {
   const secret = process.env.WEBHOOK_SECRET?.trim() ?? "";
-
-  if (!baseUrl) {
-    return;
-  }
 
   try {
     await fetch(`${baseUrl}/api/webhooks/translate`, {
@@ -32,6 +54,7 @@ async function pingTranslateWebhook(storyId: string): Promise<void> {
         "x-webhook-secret": secret,
       },
       body: JSON.stringify({ storyId }),
+      signal: AbortSignal.timeout(WEBHOOK_PING_TIMEOUT_MS),
     });
   } catch (err) {
     // Non-fatal: job is durably enqueued; cron will retry if the ping is missed.
@@ -93,10 +116,18 @@ export async function POST(_request: NextRequest) {
     // already durably enqueued translation jobs, so these pings are best-effort
     // worker wake-ups.  Errors are logged but do not fail the request.
     if (approvedIds.length > 0) {
-      const pingTasks = approvedIds.map(
-        (id) => () => pingTranslateWebhook(id)
-      );
-      await runWithConcurrencyLimit(pingTasks, WEBHOOK_FAN_OUT_CONCURRENCY);
+      const baseUrl = resolveWebhookBaseUrl();
+      if (!baseUrl) {
+        // BE-L2: log once for the whole batch, not once per loop iteration.
+        logger.warn("[APPROVE_ALL_WEBHOOK_BASE_URL_MISSING]", {
+          approved_count: approvedIds.length,
+        });
+      } else {
+        const pingTasks = approvedIds.map(
+          (id) => () => pingTranslateWebhook(id, baseUrl)
+        );
+        await runWithConcurrencyLimit(pingTasks, WEBHOOK_FAN_OUT_CONCURRENCY);
+      }
     }
 
     return NextResponse.json({
