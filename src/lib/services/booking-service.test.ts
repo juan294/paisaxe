@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock Supabase before importing the service
 vi.mock("@/lib/supabase-admin", () => ({
-  createAdminClient: vi.fn(),
+  getAdminClient: vi.fn(),
 }));
 
-import { createAdminClient } from "@/lib/supabase-admin";
+import { getAdminClient } from "@/lib/supabase-admin";
 import {
   ACTIVE_BOOKING_STATUSES,
   claimDailyBookingCallSlot,
@@ -143,13 +143,13 @@ describe("booking-service", () => {
         }),
       });
 
-      vi.mocked(createAdminClient).mockReturnValue({
+      vi.mocked(getAdminClient).mockReturnValue({
         from: vi.fn(() => ({
           insert: mockInsert,
           update: mockUpdate,
           select: mockDbSelect,
         })),
-      } as unknown as ReturnType<typeof createAdminClient>);
+      } as unknown as ReturnType<typeof getAdminClient>);
     });
 
     describe("getPriorBookingByIdempotencyKey", () => {
@@ -394,14 +394,14 @@ describe("booking-service", () => {
 
       beforeEach(() => {
         mockRpc = vi.fn().mockResolvedValue({ data: true, error: null });
-        vi.mocked(createAdminClient).mockReturnValue({
+        vi.mocked(getAdminClient).mockReturnValue({
           from: vi.fn(() => ({
             insert: mockInsert,
             update: mockUpdate,
             select: mockDbSelect,
           })),
           rpc: mockRpc,
-        } as unknown as ReturnType<typeof createAdminClient>);
+        } as unknown as ReturnType<typeof getAdminClient>);
       });
 
       it("returns true and calls the RPC with the default cap when under the limit", async () => {
