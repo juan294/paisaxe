@@ -16,6 +16,9 @@ const MESSAGES = [
   "404: sueño no encontrado",
 ];
 
+const SOCIAL_LINK_CLASSNAME =
+  "p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
+
 const CHAR_DELAY = 80;
 const EMPTY_PAUSE = 300;
 const HOME_HOLD = 30_000;
@@ -116,7 +119,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
     >
       {/* Popover card — appears above the pill on hover */}
       <div
-        className="absolute bottom-full right-0 pb-2 opacity-0 translate-y-2 scale-95 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]"
+        className="absolute bottom-full right-0 pb-2 opacity-0 translate-y-2 scale-95 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]"
       >
         <div
           className="p-3 rounded-xl bg-white/10 backdrop-blur-xl border border-white/15"
@@ -129,7 +132,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
               href="https://x.com/JuanG294"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
+              className={SOCIAL_LINK_CLASSNAME}
               aria-label="X (Twitter)"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -140,7 +143,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
               href="https://www.linkedin.com/in/juanagonzalezp/"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
+              className={SOCIAL_LINK_CLASSNAME}
               aria-label="LinkedIn"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -151,7 +154,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
               href="https://medium.com/@juang294"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
+              className={SOCIAL_LINK_CLASSNAME}
               aria-label="Medium"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -162,7 +165,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
               href="https://github.com/juan294"
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
+              className={SOCIAL_LINK_CLASSNAME}
               aria-label="GitHub"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
