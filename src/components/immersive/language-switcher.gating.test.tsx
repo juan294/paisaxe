@@ -42,6 +42,14 @@ describe("LanguageSwitcher — locale gating (UX-M3)", () => {
       expect(MIN_COVERAGE_THRESHOLD).toBeGreaterThan(0);
       expect(MIN_COVERAGE_THRESHOLD).toBeLessThanOrEqual(100);
     });
+
+    // UX-M10 (#903): a hardcoded LOCALE_COVERAGE.ast constant had drifted to a
+    // stale 40% long after the locale file reached real coverage. Coverage is
+    // now computed from the actual locale file, so this can never drift again.
+    it("computes 'ast' coverage from the real locale file — above threshold, not a stale hardcoded 40", () => {
+      expect(LOCALE_COVERAGE.ast).toBeGreaterThanOrEqual(MIN_COVERAGE_THRESHOLD);
+      expect(LOCALE_COVERAGE.ast).not.toBe(40);
+    });
   });
 
   describe("always-visible locales", () => {
