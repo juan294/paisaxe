@@ -1,74 +1,62 @@
 "use client";
 
-import { useState, useRef } from "react";
 import { Share2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { getLocalizedStory } from "@/lib/localize-story";
+import { useShareStory } from "@/hooks/use-share-story";
 import type { Story } from "@/types/immersive";
 
 interface ShareButtonProps {
   story: Story;
+  /**
+   * #908/#771: "icon" is the standalone glass icon button (desktop nav).
+   * "menu" renders as a ToolbarOverflowItem-style row so it can be dropped
+   * directly into the mobile overflow menu, reusing the exact same share
+   * logic and feedback instead of a separate, weaker inline implementation.
+   */
+  variant?: "icon" | "menu";
 }
 
-export function ShareButton({ story }: ShareButtonProps) {
-  const { t, locale } = useTranslation();
-  const [toast, setToast] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function ShareButton({ story, variant = "icon" }: ShareButtonProps) {
+  const { t } = useTranslation();
+  const { toast, handleShare } = useShareStory(story);
 
-  const showToast = (message: string) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setToast(message);
-    timerRef.current = setTimeout(() => setToast(null), 1500);
-  };
-
-  const handleShare = async (e: React.MouseEvent) => {
+  const onClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    // UX-H6 (#892): route through getLocalizedStory so a non-Spanish visitor
-    // shares their own language's title/subtitle, not the raw Spanish text.
-    const { title, subtitle } = getLocalizedStory(story, locale);
-    const shareUrl = `${window.location.origin}/story/${story.slug || story.id}`;
-    const shareData = {
-      title,
-      text: `${title} - ${subtitle}`,
-      url: shareUrl,
-    };
-
-    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-
-    try {
-      if (isTouchDevice && navigator.share && navigator.canShare?.(shareData)) {
-        await navigator.share(shareData);
-      } else {
-        try {
-          await navigator.clipboard.writeText(shareUrl);
-          showToast(t("share.link_copied"));
-        } catch {
-          // UX-L3 (#523): Show error feedback when clipboard fails on desktop
-          showToast(t("share.copy_error"));
-        }
-      }
-    } catch (err) {
-      // User cancelled share or clipboard failed - try clipboard as fallback
-      if ((err as Error).name !== "AbortError") {
-        try {
-          await navigator.clipboard.writeText(shareUrl);
-          showToast(t("share.link_copied"));
-        } catch {
-          // UX-L3 (#523): Show error feedback instead of silently ignoring
-          showToast(t("share.copy_error"));
-        }
-      }
-    }
+    handleShare();
   };
+
+  if (variant === "menu") {
+    return (
+      <button
+        type="button"
+        role="menuitem"
+        onClick={onClick}
+        className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors text-sm"
+      >
+        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+          {toast ? (
+            <Check className="h-4 w-4 animate-in fade-in zoom-in duration-200" />
+          ) : (
+            <Share2 className="h-4 w-4" />
+          )}
+        </span>
+        {/* Regression risk from #908: the icon variant's toast is an
+            absolutely-positioned popover anchored to its own trigger button,
+            which would clip inside the overflow menu's constrained popover.
+            Swapping the row's own label in place — instead of layering a
+            second popover — avoids that clipping without needing a portal. */}
+        <span role="status">{toast || t("share.share")}</span>
+      </button>
+    );
+  }
 
   return (
     <div className="relative">
       <Button
         variant="glassIcon"
-        onClick={handleShare}
+        onClick={onClick}
         aria-label={t("share.share")}
         title={t("share.share")}
       >

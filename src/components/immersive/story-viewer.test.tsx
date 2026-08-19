@@ -1234,7 +1234,9 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      expect(screen.getByText("Compartir")).toBeInTheDocument();
+      // #908/#771: the mobile share row is now the dynamically-imported
+      // ShareButton ("menu" variant) — flush its import microtask.
+      await flushUntil(() => screen.queryByText("Compartir"));
     });
 
     it("should copy to clipboard when navigator.share unavailable", async () => {
@@ -1259,7 +1261,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // UX-B1: must use singular `/story/<slug>` to match the actual route,
@@ -1306,7 +1308,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       expect(mockWriteText).toHaveBeenCalledWith(
@@ -1337,7 +1339,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // Falls back to id under the singular `/story/` path
@@ -1518,13 +1520,34 @@ describe("StoryViewer", () => {
         writable: true,
         configurable: true,
       });
+      // #908/#771: the consolidated useShareStory hook picks native share vs.
+      // clipboard based on the input device (pointer: coarse), same as the
+      // desktop ShareButton always did — simulate a touch device so this
+      // exercises the native-share branch.
+      Object.defineProperty(navigator, "canShare", {
+        value: () => true,
+        writable: true,
+        configurable: true,
+      });
+      vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      // #908/#771: the mobile share row is now the dynamically-imported
+      // ShareButton ("menu" variant) — flush its import microtask.
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // UX-B1: must use singular `/story/<slug-or-id>`, not plural `/stories/<id>`
@@ -1541,6 +1564,11 @@ describe("StoryViewer", () => {
 
       // Clean up
       Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "canShare", {
         value: undefined,
         writable: true,
         configurable: true,
