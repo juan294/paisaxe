@@ -1,19 +1,19 @@
-# Coverage Agent Report — 2026-08-13
+# Coverage Agent Report — 2026-08-20
 
-## Status: GREEN (ceiling sustained, helpers coverage completed)
+## Status: GREEN (helpers fully covered, QA infrastructure hardened)
 
-Suite is green (394/394 files passing, 7,424 tests pass), statement coverage at 98.9%. This cycle added comprehensive unit tests for LLM quality helper utilities (`formatChatApiError`, `RepeatedServerFailureCircuit`) and logging coverage for voice-session route error paths. All additions passed the full test suite. Statement coverage improved by 0.03pp to 98.9%, branches improved by 0.03pp to 97.42%.
+Suite is green (406/406 test files passing, 7,783 tests pass), statement coverage at **98.73%** (+0.24pp from 98.49%). This cycle completed comprehensive test coverage for QA helper module (`llm-quality-helpers.ts` now **100% statements**) and added error-path tests for voice-session route. All additions passed the full test suite, with no source code modifications (test-only additions per TDD protocol).
 
 ## Overall coverage
 
-| Metric | 2026-08-06 (prior) | 2026-08-13 (this cycle) | Delta |
+| Metric | 2026-08-13 (prior) | 2026-08-20 (this cycle) | Delta |
 |--------|-------------------|--------------------------|-------|
-| Statements | 98.87% (11336/11465) | **98.9%** (11340/11465) | +0.03pp (4 stmts) |
-| Branches | 97.39% (7725/7932) | **97.42%** (7728/7932) | +0.03pp (3 branches) |
-| Functions | 99.01% (2217/2239) | **99.06%** (2218/2239) | +0.05pp (1 func) |
-| Lines | 99.26% (10783/10863) | **99.29%** (10786/10863) | +0.03pp (3 lines) |
-| Test files | 393 passing | **394 passing** (0 failures) | +1 file |
-| Tests | 7402 passing | **7424 passing** (0 failures) | +22 tests |
+| Statements | 98.49% (11,676/11,854) | **98.73%** (11,704/11,854) | +0.24pp (+28 stmts) |
+| Branches | 96.69% (7,893/8,163) | **96.92%** (7,912/8,163) | +0.23pp (+19 branches) |
+| Functions | 98.87% (2,292/2,318) | **99.09%** (2,297/2,318) | +0.22pp (+5 funcs) |
+| Lines | 98.91% (11,112/11,234) | **99.14%** (11,138/11,234) | +0.23pp (+26 lines) |
+| Test files | 406 passing | **406 passing** (0 failures) | 0 (same count) |
+| Tests | 7,740 passing | **7,783 passing** (0 failures) | +43 tests |
 
 ## Tests added
 
