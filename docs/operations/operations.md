@@ -21,6 +21,13 @@ Two endpoints serve different consumers:
 
 **`GET /api/health`** — public release diagnostics endpoint. Always returns HTTP 200 with `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": { "status": "ok" | "misconfigured" }, "sentry": { "status": "configured" | "unconfigured" }, "rate_limit": { "status": "ok" | "degraded", "backend": "upstash" | "memory" | "blocked", "reason"?: "upstash_missing" | "upstash_unavailable" } }`. The body status becomes `"degraded"` when Supabase connectivity fails, approved stories are unavailable, database usage reaches the 80% warning threshold, `NEXT_PUBLIC_SENTRY_DSN` is missing in Vercel production, or the rate-limit backend is misconfigured in production. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
+**`GET /api/health/voice`** — authorized ElevenLabs deep health. Requires
+`Authorization: Bearer <HEALTH_PROBE_SECRET>`, requests and discards signed
+URLs for all five owned agents, and returns only provider state, safe key
+fingerprint, binding state, agent keys, and the safe deployment commit. It
+returns 503 when the provider or credential check fails. Anonymous
+`/api/health` and `/api/health/live` never call ElevenLabs.
+
 Readiness monitors must parse the `/api/health` JSON body, not just the HTTP status. The shared CI monitor is `node scripts/check-health-readiness.mjs <base-url>`; it fails unless `/api/health` returns HTTP 200 and `status: "healthy"`. The monitor also accepts `--require-sentry` to additionally prove `sentry.status: "configured"`, but no CI workflow passes that flag today — see the Preview Smoke Test section below for why.
 
 ## Pre-Launch Checklist
@@ -201,6 +208,7 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `github-traffic-sync` | Every 6 hours (`0 */6 * * *`) | Vercel Cron | Sync GitHub traffic stats to admin dashboard |
 | `subscription-optimizer` | Weekly Monday 4:00 AM UTC (`0 4 * * 1`) | Vercel Cron | Analyze service costs and spending |
 | `retry-booking-sms` | Every 10 minutes (`*/10 * * * *`) | Vercel Cron | Retry failed booking SMS confirmations (up to 3 attempts per job) |
+| `elevenlabs-voice-canary` | Every 15 minutes (`*/15 * * * *`) | Vercel Cron | Request and discard one Pelayo Visitor signed URL; report monitor and credential state |
 
 The Vercel Cron schedules above mirror `vercel.json` exactly — keep both in sync when adding or rescheduling a job.
 
@@ -352,7 +360,13 @@ Runs the real Stripe test-mode checkout path on nightly schedule, manual dispatc
 
 ### Preview Smoke Test (`preview-smoke.yml`)
 
-On PRs targeting `main`, waits for the Vercel preview deployment and runs `scripts/check-health-readiness.mjs "$PREVIEW_URL"` (without `--require-sentry`) against real env vars before hitting the homepage. This is a **required status check** — `Smoke test Vercel preview` must pass before any merge to `main`. It catches runtime failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js 16.2.1 incident).
+On PRs targeting `main`, waits for the Vercel preview deployment, runs
+`scripts/check-health-readiness.mjs "$PREVIEW_URL"` (without
+`--require-sentry`), runs the authenticated five-agent ElevenLabs preflight,
+then checks the homepage. This is a **required status check** — `Smoke test
+Vercel preview` must pass before any merge to `main`. It catches runtime
+failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js
+16.2.1 incident).
 
 **Sentry is not currently a hard release gate.** `sentry.status: "configured"` (see DO-B1) is derived purely from `NEXT_PUBLIC_SENTRY_DSN` being non-empty — it does not prove error delivery actually works. The Preview environment in Vercel also does not currently carry that DSN (confirmed via `vercel env ls preview`), so passing `--require-sentry` here would fail this required check on every PR targeting `main`, including hotfixes during an incident. Revisit once DO-B1 confirms live Sentry delivery and the Preview DSN is provisioned.
 
@@ -445,6 +459,10 @@ See [proxy-architecture.md](./proxy-architecture.md) for the full module map.
 ## ElevenLabs Voice Agents
 
 Voice agents for the Paisaxe experience. Configs are tracked in git via the ElevenLabs CLI — see [elevenlabs-agents-as-code.md](./elevenlabs-agents-as-code.md) for the workflow.
+
+Runtime credential binding, the five-agent preflight, the scheduled sentinel,
+and safe rotation are documented in
+[the ElevenLabs credential runbook](../runbooks/elevenlabs-credential-rotation.md).
 
 Configured in `src/config/elevenlabs-agents.ts`.
 

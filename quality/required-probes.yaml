@@ -59,6 +59,21 @@ probes:
       selector: "@release-required health-db"
     oracles: [http]
 
+  - id: elevenlabs-voice-preflight
+    title: ElevenLabs runtime credential and five owned agents are reachable
+    owner: voice
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: script
+      command: npm run check-elevenlabs-voice
+    oracles: [http]
+    notes: >-
+      Authenticated with HEALTH_PROBE_SECRET. Requests and discards signed URLs
+      for all five owned agents, then records only the safe key fingerprint,
+      binding state, agent keys, custom-LLM not-applicable state, and the exact
+      target, commit, deployment, and check time.
+
   - id: csp-canary
     title: Homepage renders and client JS executes
     owner: release

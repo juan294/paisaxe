@@ -28,6 +28,22 @@ describe("ElevenLabs Analytics API Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("ELEVENLABS_API_KEY", "test-api-key");
+    vi.stubEnv("ELEVENLABS_API_KEY_FINGERPRINT", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+  });
+
+  it("does not call the provider when production fingerprint binding is missing", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.summary.totalConversations).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("returns 500 when API key is missing", async () => {
@@ -52,6 +68,24 @@ describe("ElevenLabs Analytics API Route", () => {
     expect(data.data.summary.totalConversations).toBe(0);
     expect(data.data.conversationsByAgent).toEqual([]);
     expect(data.data.recentConversations).toEqual([]);
+  });
+
+  it("stops after one provider request and one canonical event on 401", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = new NextRequest(
+      "http://localhost/api/admin/elevenlabs-analytics"
+    );
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledWith(
+      "[ELEVENLABS_CREDENTIAL_REJECTED]",
+      expect.objectContaining({ provider_status: 401 })
+    );
   });
 
   it("parses date range from query params", async () => {
@@ -1125,7 +1159,7 @@ describe("ElevenLabs Analytics API Route", () => {
     consoleSpy.mockRestore();
   });
 
-  it("stringifies a non-Error thrown value in the outer catch block (line 250)", async () => {
+  it("classifies a non-Error upstream rejection without logging its value", async () => {
     vi.stubEnv("ELEVENLABS_API_KEY", "test-key");
 
     // Reject with a non-Error value (e.g. a plain string) to exercise the
@@ -1139,8 +1173,11 @@ describe("ElevenLabs Analytics API Route", () => {
     expect(response.status).toBe(200);
     expect(data.data.summary.totalConversations).toBe(0);
     expect(logger.error).toHaveBeenCalledWith(
-      "ElevenLabs analytics API error:",
-      { error: "upstream unavailable", timed_out: false },
+      "[ELEVENLABS_PROVIDER_UNAVAILABLE]",
+      expect.objectContaining({ failure_class: "upstream_unavailable" })
+    );
+    expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain(
+      "upstream unavailable"
     );
   });
 
@@ -1192,8 +1229,8 @@ describe("ElevenLabs Analytics API Route", () => {
 
     expect(response.status).toBe(200);
     expect(logger.error).toHaveBeenCalledWith(
-      "ElevenLabs analytics API error:",
-      expect.objectContaining({ timed_out: true })
+      "[ELEVENLABS_PROVIDER_UNAVAILABLE]",
+      expect.objectContaining({ failure_class: "upstream_timeout" })
     );
   });
 });

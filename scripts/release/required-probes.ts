@@ -16,7 +16,7 @@
  * nobody declared required.
  */
 import { execFileSync } from "child_process";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { parse } from "yaml";
@@ -131,7 +131,34 @@ export function validateManifest(manifest: RequiredProbeManifest): string[] {
         errors.push(`${label}: selector must contain the @release-required tag`);
       }
     } else if (probe.runner?.kind === "script") {
-      if (!probe.runner.command) errors.push(`${label}: script runner has no command`);
+      if (!probe.runner.command) {
+        errors.push(`${label}: script runner has no command`);
+      } else {
+        const npmAlias = probe.runner.command.match(/^npm run ([a-z0-9:_-]+)$/i)?.[1];
+        const scriptPath = probe.runner.command.match(
+          /^npx tsx (scripts\/[a-z0-9_./-]+\.tsx?)(?:\s|$)/i
+        )?.[1];
+        if (npmAlias) {
+          const packageJson = JSON.parse(
+            readFileSync(join(process.cwd(), "package.json"), "utf8")
+          ) as { scripts?: Record<string, string> };
+          if (!packageJson.scripts?.[npmAlias]) {
+            errors.push(
+              `${label}: script runner references missing package alias "${npmAlias}"`
+            );
+          }
+        } else if (scriptPath) {
+          if (!existsSync(join(process.cwd(), scriptPath))) {
+            errors.push(
+              `${label}: script runner references missing file "${scriptPath}"`
+            );
+          }
+        } else {
+          errors.push(
+            `${label}: script runner command must use a checked npm alias or scripts/ TypeScript file`
+          );
+        }
+      }
     } else {
       errors.push(`${label}: unknown runner kind`);
     }

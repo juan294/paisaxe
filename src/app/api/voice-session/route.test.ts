@@ -174,14 +174,20 @@ describe("POST /api/voice-session", () => {
     await expect(response.json()).resolves.toEqual({
       signedUrl: "wss://signed.example/visitor",
     });
-    expect(mocks.getElevenLabsSignedUrl).toHaveBeenCalledWith("pelayo");
+    expect(mocks.getElevenLabsSignedUrl).toHaveBeenCalledWith(
+      "pelayo",
+      "visitor-session"
+    );
   });
 
   it.each([
     ["missing_api_key", 503],
-    ["upstream_authentication_failed", 502],
+    ["missing_api_key_fingerprint", 503],
+    ["malformed_api_key_fingerprint", 503],
+    ["api_key_fingerprint_mismatch", 503],
+    ["upstream_authentication_failed", 503],
     ["upstream_rate_limited", 503],
-    ["upstream_unavailable", 502],
+    ["upstream_unavailable", 503],
   ] as const)("maps %s provider failures to %s", async (code, status) => {
     mocks.getElevenLabsSignedUrl.mockRejectedValue(
       new ElevenLabsSignedSessionError(code, status)
@@ -221,10 +227,10 @@ describe("POST /api/voice-session", () => {
     );
   });
 
-  it("returns 502 when getElevenLabsSignedUrl throws a non-ElevenLabsSignedSessionError", async () => {
+  it("returns 503 when getElevenLabsSignedUrl throws an unexpected error", async () => {
     mocks.getElevenLabsSignedUrl.mockRejectedValue(new Error("Network error"));
     const response = await POST(request());
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
       error: "upstream_unavailable",
     });

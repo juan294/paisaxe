@@ -19,6 +19,9 @@ Tasks to complete once the domain (paisaxe.com / paisaxe.es) is fully configured
 | 7 | Add ELEVENLABS_API_KEY to Vercel | COMPLETED (2026-01-31) |
 | 8 | Trigger redeployment | COMPLETED (site live since 2026-01-31) |
 | 9 | Verify Everything Works | COMPLETED (site live and monitored by Upptime) |
+| 10 | Create dedicated `paisaxe-production-runtime` ElevenLabs key | PENDING — production change requires authorization |
+| 11 | Set runtime fingerprint and `HEALTH_PROBE_SECRET` in Vercel/GitHub | PENDING — external configuration requires authorization |
+| 12 | Verify canary check-in and credential-rejection alert delivery | PENDING — Sentry delivery is not yet proven |
 
 ---
 
@@ -123,4 +126,7 @@ supabase functions list
 
 ---
 
-*All tasks completed. This file is retained as a historical record of the initial launch setup.*
+Initial launch tasks are complete. ElevenLabs reliability activation tasks
+10–12 remain pending; use
+`docs/runbooks/elevenlabs-credential-rotation.md` and do not weaken the release
+gate while they are incomplete.

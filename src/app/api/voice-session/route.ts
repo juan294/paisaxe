@@ -74,7 +74,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const signedUrl = await getElevenLabsSignedUrl(body.agentKey);
+    const signedUrl = await getElevenLabsSignedUrl(
+      body.agentKey,
+      "visitor-session"
+    );
     return NextResponse.json(
       { signedUrl },
       { headers: { "Cache-Control": "no-store" } }
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     return NextResponse.json(
       { error: "upstream_unavailable" },
-      { status: 502 }
+      { status: 503 }
     );
   }
 }

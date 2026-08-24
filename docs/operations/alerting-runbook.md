@@ -173,6 +173,33 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 
 ---
 
+## ElevenLabs Voice Credential Rejected
+
+**Trigger:** `[ELEVENLABS_CREDENTIAL_REJECTED]`, a failed
+`elevenlabs-voice-canary` monitor check-in, or `/api/health/voice` returning
+`provider: credential_rejected`.
+
+The event contains only the safe fingerprint, provider status, agent key, and
+failure class. It must never contain an API key, bearer, provider response
+body, or signed `wss://` URL.
+
+1. Treat this as an active voice outage. Visitor, admin, and booking paths use
+   the same production runtime key.
+2. Compare the reported fingerprint with
+   `ELEVENLABS_API_KEY_FINGERPRINT` in the affected Vercel environment.
+3. If the key was disabled, expired, or replaced, follow
+   [the credential rotation runbook](../runbooks/elevenlabs-credential-rotation.md).
+   Keep the old key enabled until the new candidate passes.
+4. Run `npm run check-elevenlabs-voice` against the candidate, then production,
+   with the appropriate `RELEASE_TARGET_URL` and `HEALTH_PROBE_SECRET`.
+5. Confirm a successful scheduled check-in after recovery.
+
+Sentry delivery is still unverified as documented above. Do not mark the voice
+alert ready until a success check-in and a test credential-rejection event both
+arrive at the operator destination.
+
+---
+
 ## Honeypot Triggered
 
 **Trigger:** `[HONEYPOT_TRIGGERED]` log events on `POST /api/suggestions` — a bot submitted the hidden `website` field.

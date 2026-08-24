@@ -58,6 +58,20 @@ describe("the committed manifest", () => {
       }
     }
   });
+
+  it("requires the authenticated five-agent ElevenLabs preflight", () => {
+    expect(
+      committed.probes.find((probe) => probe.id === "elevenlabs-voice-preflight")
+    ).toMatchObject({
+      tier: "deployed-readonly",
+      safety: "read-only",
+      runner: {
+        kind: "script",
+        command: "npm run check-elevenlabs-voice",
+      },
+      oracles: ["http"],
+    });
+  });
 });
 
 describe("validateManifest", () => {
@@ -137,6 +151,28 @@ describe("validateManifest", () => {
     expect(errors).toContainEqual(expect.stringMatching(/unknown tier/));
     expect(errors).toContainEqual(expect.stringMatching(/unknown safety class/));
     expect(errors).toContainEqual(expect.stringMatching(/unknown oracle/));
+  });
+
+  it("rejects a script runner whose package alias cannot be resolved", () => {
+    const errors = validateManifest(
+      manifest([
+        probe({
+          runner: { kind: "script", command: "npm run missing-probe" },
+        }),
+      ])
+    );
+
+    expect(errors).toContainEqual(expect.stringMatching(/missing package alias/));
+  });
+
+  it("rejects an unchecked script command shape", () => {
+    const errors = validateManifest(
+      manifest([
+        probe({ runner: { kind: "script", command: "bash anything.sh" } }),
+      ])
+    );
+
+    expect(errors).toContainEqual(expect.stringMatching(/checked npm alias/));
   });
 });
 

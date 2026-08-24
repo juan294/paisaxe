@@ -177,6 +177,9 @@ describe("GET /api/health", () => {
     expect(data).not.toHaveProperty("services");
     expect(data).not.toHaveProperty("uptime");
     expect(data).not.toHaveProperty("version");
+    expect(data).not.toHaveProperty("fingerprint");
+    expect(data).not.toHaveProperty("fingerprint_matches");
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
   });
 

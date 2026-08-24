@@ -66,6 +66,7 @@ const PRODUCTION_REQUIRED_ENV_VARS = [
   "ANTHROPIC_API_KEY",
   "VOYAGE_API_KEY",
   "ELEVENLABS_API_KEY",
+  "ELEVENLABS_API_KEY_FINGERPRINT",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "STRIPE_DAY_PASS_PRICE_ID",
@@ -79,6 +80,7 @@ const PRODUCTION_REQUIRED_ENV_VARS = [
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "CRON_SECRET",
+  "HEALTH_PROBE_SECRET",
 ] as const;
 
 function checkProductionEnvManifest(logger: Pick<typeof loggerInstance, "warn">): void {
