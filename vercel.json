@@ -4,6 +4,10 @@
   "regions": ["fra1"],
   "crons": [
     {
+      "path": "/api/cron/elevenlabs-voice-canary",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/github-traffic-sync",
       "schedule": "0 */6 * * *"
     },

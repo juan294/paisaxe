@@ -10,6 +10,15 @@ import type {
 } from "@/types/elevenlabs-analytics";
 import { ELEVENLABS_AGENT_IDS, ELEVENLABS_API_BASE } from "@/config/elevenlabs-agents";
 import { logger } from "@/lib/logger";
+import {
+  ElevenLabsCredentialError,
+  getElevenLabsRuntimeCredential,
+  type ElevenLabsRuntimeCredential,
+} from "@/lib/elevenlabs-credentials";
+import {
+  classifyElevenLabsProviderStatus,
+  logElevenLabsFailure,
+} from "@/lib/elevenlabs-observability";
 
 interface ElevenLabsConversationResponse {
   conversations: Array<{
@@ -46,20 +55,32 @@ interface ElevenLabsLiveCountResponse {
 // route open until the platform's default function timeout.
 const ELEVENLABS_FETCH_TIMEOUT_MS = 8_000;
 
+class ElevenLabsProviderResponseError extends Error {
+  constructor(public readonly status: number) {
+    super(`ElevenLabs API error: ${status}`);
+  }
+}
+
 async function fetchElevenLabs<T>(
   endpoint: string,
-  apiKey: string
+  credential: ElevenLabsRuntimeCredential
 ): Promise<T> {
   const response = await fetch(`${ELEVENLABS_API_BASE}${endpoint}`, {
     headers: {
-      "xi-api-key": apiKey,
+      "xi-api-key": credential.apiKey,
     },
     signal: AbortSignal.timeout(ELEVENLABS_FETCH_TIMEOUT_MS),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+    logElevenLabsFailure({
+      source: "admin-analytics",
+      failureClass: classifyElevenLabsProviderStatus(response.status),
+      providerStatus: response.status,
+      fingerprint: credential.fingerprint,
+      fingerprintMatches: credential.fingerprintMatches,
+    });
+    throw new ElevenLabsProviderResponseError(response.status);
   }
 
   return response.json();
@@ -101,6 +122,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const credential = getElevenLabsRuntimeCredential();
     const url = new URL(request.url);
     const fromParam = url.searchParams.get("from") ||
       new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -112,8 +134,16 @@ export async function GET(request: NextRequest) {
     // Fetch agents list first to get Paisaxe agent IDs
     const agentsResponse = await fetchElevenLabs<ElevenLabsAgentsResponse>(
       `/convai/agents`,
-      apiKey
-    ).catch(() => ({ agents: [] }));
+      credential
+    ).catch((error) => {
+      if (
+        error instanceof ElevenLabsProviderResponseError &&
+        (error.status === 401 || error.status === 403)
+      ) {
+        throw error;
+      }
+      return { agents: [] };
+    });
 
     // Filter to only Paisaxe agents (names starting with "Paisaxe")
     const paisaxeAgents = (agentsResponse.agents || []).filter(
@@ -135,7 +165,7 @@ export async function GET(request: NextRequest) {
     // Fetch conversations and calculate active calls for Paisaxe agents
     const conversationsResponse = await fetchElevenLabs<ElevenLabsConversationResponse>(
       `/convai/conversations?start_time_unix_gte=${fromUnix}&start_time_unix_lte=${toUnix}`,
-      apiKey
+      credential
     );
 
     // Filter conversations to only Paisaxe agents
@@ -149,7 +179,7 @@ export async function GET(request: NextRequest) {
       Array.from(paisaxeAgentIds).map((agentId) =>
         fetchElevenLabs<ElevenLabsLiveCountResponse>(
           `/convai/analytics/live-count?agent_id=${agentId}`,
-          apiKey
+          credential
         ).catch(() => ({ count: 0 as number }))
       )
     );
@@ -260,10 +290,24 @@ export async function GET(request: NextRequest) {
     const errorName = (error as { name?: string } | null)?.name;
     const isTimeout = errorName === "AbortError" || errorName === "TimeoutError";
 
-    logger.error("ElevenLabs analytics API error:", {
-      error: error instanceof Error ? error.message : String(error),
-      timed_out: isTimeout,
-    });
+    if (error instanceof ElevenLabsCredentialError) {
+      logElevenLabsFailure({
+        source: "admin-analytics",
+        failureClass: error.code,
+        fingerprint: error.fingerprint,
+        fingerprintMatches: error.fingerprintMatches,
+      });
+    } else if (isTimeout) {
+      logElevenLabsFailure({
+        source: "admin-analytics",
+        failureClass: "upstream_timeout",
+      });
+    } else if (!(error instanceof ElevenLabsProviderResponseError)) {
+      logElevenLabsFailure({
+        source: "admin-analytics",
+        failureClass: "upstream_unavailable",
+      });
+    }
 
     // Return empty data on error
     const url = new URL(request.url);

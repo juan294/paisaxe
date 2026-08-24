@@ -50,6 +50,11 @@ npm run check-required-probes        # manifest and Playwright must agree
 npm run prelaunch
 ```
 
+Before a release candidate can pass Preview smoke, configure the same
+`HEALTH_PROBE_SECRET` in Vercel Preview and GitHub Actions. Production must use
+the corresponding Vercel Production value. Configuration is an explicit
+production boundary; do not weaken or skip the check when a value is missing.
+
 `what-would-ship` (`scripts/release/what-would-ship.ts`) replaces a plain `git log main..develop`
 (DO-M8, #835): because the repo squash-merges, `main..develop` never prunes — every commit ever
 squash-merged stays "not an ancestor of main" forever, so the range grows monotonically release
@@ -117,7 +122,20 @@ read-only.
 
 ```bash
 RELEASE_TARGET_URL=https://paisaxe.es npx playwright test --project=release-required
+RELEASE_TARGET_URL=https://paisaxe.es \
+RELEASE_CANDIDATE_COMMIT="$DEPLOYED_COMMIT" \
+RELEASE_GITHUB_DEPLOYMENT_ID="$GITHUB_DEPLOYMENT_ID" \
+npm run check-elevenlabs-voice
 ```
+
+The ElevenLabs command also requires `HEALTH_PROBE_SECRET` locally. Set
+`DEPLOYED_COMMIT` from the successful candidate-identity check and
+`GITHUB_DEPLOYMENT_ID` to the immutable numeric GitHub Deployment API ID. The check requires HTTPS,
+rejects redirects, has a 45-second timeout, and fails unless the authenticated
+voice endpoint reports the same commit. It requests
+and discards signed URLs for Pelayo Visitor, Pelayo Booking, Penny, Iris, and
+Xander. It prints one safe JSON object that is ready to copy into the evidence
+manifest.
 
 No probe may be skipped. A probe whose prerequisites are missing fails — that is deliberate, and
 a skipped required probe blocks the release exactly like a failed one.
@@ -133,7 +151,12 @@ npm run analyze-release -- --evidence "docs/release/evidence/${CANDIDATE_TREE}.y
 
 The analyzer blocks on: zero passes; any required probe failed, skipped or absent; disagreeing
 candidate/shipped/deployed trees; a required probe missing its declared oracle evidence; fixture
-data left behind; and any exception covering a required probe. Exit 0 is the only green.
+data left behind; incomplete or unsafe ElevenLabs credential evidence; and any exception covering
+a required probe. The `elevenlabs-voice-preflight` evidence must include `provider: ok`, a valid
+fingerprint, `fingerprint_matches: true`, all five agent keys, and
+`custom_llm: not_applicable`. Its target URL, response URL, GitHub deployment ID,
+deployed commit, and timestamp must also match the release manifest. Exit 0 is
+the only green.
 
 The analyzer runs locally, not in CI — it consumes no CI minutes.
 

@@ -96,6 +96,7 @@ describe("/api/mcp/make-booking", () => {
       resetAt: Date.now() + 60_000,
     });
     process.env = { ...originalEnv };
+    delete process.env.VERCEL_ENV;
     process.env.MCP_API_SECRET = MCP_SECRET;
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_PHONE_NUMBER_ID;
@@ -1426,7 +1427,9 @@ describe("/api/mcp/make-booking", () => {
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           status: "failed",
-          outcome_message: expect.stringContaining("Network error"),
+          outcome_message: expect.stringContaining(
+            "ElevenLabs request unavailable"
+          ),
         })
       );
     });
@@ -1532,7 +1535,7 @@ describe("/api/mcp/make-booking", () => {
       );
     });
 
-    it("should handle ElevenLabs API error with message field (not detail)", async () => {
+    it("does not expose an ElevenLabs API error message field", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
@@ -1564,7 +1567,8 @@ describe("/api/mcp/make-booking", () => {
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
       expect(data.status).toBe("failed");
-      expect(data.message).toContain("Server error");
+      expect(data.message).toContain("ElevenLabs API error: 500");
+      expect(data.message).not.toContain("Server error");
     });
 
     it("should use correct date formatting in dynamic variables", async () => {
@@ -2251,7 +2255,7 @@ describe("/api/mcp/make-booking", () => {
       expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("dos menos cuarto de la tarde");
     });
 
-    it("should handle non-Error throw inside initiateCall catch", async () => {
+    it("does not expose a non-Error provider rejection", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
@@ -2278,7 +2282,8 @@ describe("/api/mcp/make-booking", () => {
 
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
-      expect(data.message).toContain("Unknown error");
+      expect(data.message).toContain("ElevenLabs request unavailable");
+      expect(data.message).not.toContain("non-error string");
     });
 
     // === #386 (BE-B1): pre-call row must be nullable + fatal on failure ===

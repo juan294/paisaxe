@@ -10,6 +10,7 @@ import type { RequiredProbeManifest } from "./required-probes";
 
 const TREE = "95a62c4be18d9b222187b88a450ba02bcc664365";
 const OTHER_TREE = "0123456789abcdef0123456789abcdef01234567";
+const COMMIT = "784aa0d5efc4ed699007721314872e780102f1eb";
 const NOW = new Date("2026-07-28T12:00:00Z");
 
 /**
@@ -62,6 +63,9 @@ function evidence(overrides: Partial<EvidenceManifest> = {}): EvidenceManifest {
     shipped_tree: TREE,
     deployed_tree: TREE,
     target_url: "https://paisaxe.es",
+    deployed_commit: COMMIT,
+    github_deployment_id: "123456",
+    generated_at: "2026-07-28T12:00:00Z",
     probes: PASSING_PROBES,
     ...overrides,
   };
@@ -213,5 +217,73 @@ describe("runCli", () => {
     expect(
       runCli(["node", "analyze-release-run.ts", "--evidence", "/nonexistent/evidence.yaml"])
     ).toBe(1);
+  });
+});
+
+describe("ElevenLabs voice preflight evidence", () => {
+  const voiceManifest: RequiredProbeManifest = {
+    version: 1,
+    probes: [
+      {
+        id: "elevenlabs-voice-preflight",
+        title: "voice",
+        owner: "voice",
+        tier: "deployed-readonly",
+        safety: "read-only",
+        runner: {
+          kind: "script",
+          command: "npm run check-elevenlabs-voice",
+        },
+        oracles: ["http"],
+      },
+    ],
+  };
+  const validVoiceProbe: ProbeEvidence = {
+    id: "elevenlabs-voice-preflight",
+    status: "passed",
+    oracles: ["http"],
+    provider: "ok",
+    fingerprint: "sha256:1234567890abcdef",
+    fingerprint_matches: true,
+    agents: ["pelayo", "booking", "penny", "iris", "xander"],
+    custom_llm: "not_applicable",
+    target_url: "https://paisaxe.es",
+    response_url: "https://paisaxe.es/api/health/voice",
+    github_deployment_id: "123456",
+    deployment_commit: COMMIT,
+    checked_at: "2026-07-28T11:59:00Z",
+  };
+
+  function analyzeVoice(probe: ProbeEvidence) {
+    return analyzeRelease(
+      evidence({ probes: [probe] }),
+      voiceManifest,
+      NOW
+    );
+  }
+
+  it("accepts complete five-agent, bound, custom-LLM-not-applicable evidence", () => {
+    expect(analyzeVoice(validVoiceProbe).blockers).toEqual([]);
+  });
+
+  it.each([
+    [{ provider: "credential_rejected" }, /provider state/i],
+    [{ fingerprint: "invalid" }, /fingerprint.*malformed/i],
+    [{ fingerprint_matches: false }, /fingerprint.*not bound/i],
+    [{ agents: ["pelayo"] }, /agent coverage/i],
+    [{ custom_llm: "passed" }, /custom LLM.*not_applicable/i],
+    [{ target_url: "https://stale.example" }, /target does not match/i],
+    [{ response_url: "https://stale.example/api/health/voice" }, /response URL/i],
+    [{ github_deployment_id: "654321" }, /deployment id does not match/i],
+    [{ deployment_commit: OTHER_TREE }, /deployment commit does not match/i],
+    [{ checked_at: "not-a-date" }, /timestamp.*invalid/i],
+    [{ signed_url: "wss://secret.example" }, /unsafe or unexpected field/i],
+    [{ api_key: "sk_runtime_secret" }, /unsafe or unexpected field/i],
+    [{ token: "eleven-secret" }, /unsafe or unexpected field/i],
+  ])("blocks incomplete or unsafe voice evidence", (override, message) => {
+    const result = analyzeVoice({ ...validVoiceProbe, ...override });
+
+    expect(result.ok).toBe(false);
+    expect(result.blockers).toContainEqual(expect.stringMatching(message));
   });
 });

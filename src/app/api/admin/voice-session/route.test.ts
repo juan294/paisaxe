@@ -80,7 +80,10 @@ describe("POST /api/admin/voice-session", () => {
       await expect(response.json()).resolves.toEqual({
         signedUrl: "wss://signed.example/admin",
       });
-      expect(mocks.getElevenLabsSignedUrl).toHaveBeenCalledWith(agentKey);
+      expect(mocks.getElevenLabsSignedUrl).toHaveBeenCalledWith(
+        agentKey,
+        "admin-session"
+      );
     }
   );
 
@@ -95,12 +98,12 @@ describe("POST /api/admin/voice-session", () => {
     });
   });
 
-  it("returns 502 for unexpected errors", async () => {
+  it("returns 503 for unexpected errors", async () => {
     mocks.getElevenLabsSignedUrl.mockRejectedValue(
       new Error("Unexpected error")
     );
     const response = await POST(request("penny"));
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
       error: "upstream_unavailable",
     });

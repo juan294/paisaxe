@@ -1370,12 +1370,44 @@ describe("GET /api/admin/costs-analytics", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(200);
-    expect(logger.warn).toHaveBeenCalledWith(
-      "[COSTS_ANALYTICS_ELEVENLABS_USAGE_FETCH_FAILED]",
-      expect.objectContaining({ timed_out: true })
+    expect(logger.error).toHaveBeenCalledWith(
+      "[ELEVENLABS_PROVIDER_UNAVAILABLE]",
+      expect.objectContaining({ failure_class: "upstream_timeout" })
     );
 
     global.fetch = originalFetch;
+    vi.unstubAllEnvs();
+  });
+
+  it("stops usage collection after one request and one canonical event on ElevenLabs 401", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+    vi.mocked(fetchAnthropicCosts).mockResolvedValue(null);
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(null);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(null);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+    vi.stubEnv("POSTHOG_PROJECT_ID", "");
+    vi.stubEnv("POSTHOG_PERSONAL_API_KEY", "");
+    vi.stubEnv("ELEVENLABS_API_KEY", "xi-test");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = new NextRequest(
+      "http://localhost/api/admin/costs-analytics?includeUsage=true&from=2026-02-01&to=2026-02-06"
+    );
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledWith(
+      "[ELEVENLABS_CREDENTIAL_REJECTED]",
+      expect.objectContaining({ provider_status: 401 })
+    );
     vi.unstubAllEnvs();
   });
 });

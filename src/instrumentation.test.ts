@@ -175,6 +175,7 @@ describe("instrumentation register", () => {
       vi.stubEnv("VERCEL_ENV", "production");
       vi.stubEnv("SUPABASE_SERVICE_KEY", "test-service-key");
       vi.stubEnv("ELEVENLABS_API_KEY", "test-key");
+      vi.stubEnv("ELEVENLABS_API_KEY_FINGERPRINT", "sha256:1234567890abcdef");
       vi.stubEnv("STRIPE_SECRET_KEY", "test-key");
       vi.stubEnv("STRIPE_WEBHOOK_SECRET", "test-key");
       vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_test");
@@ -188,6 +189,7 @@ describe("instrumentation register", () => {
       vi.stubEnv("GOOGLE_CLIENT_ID", "test-client-id");
       vi.stubEnv("GOOGLE_CLIENT_SECRET", "test-client-secret");
       vi.stubEnv("CRON_SECRET", "test-cron-secret");
+      vi.stubEnv("HEALTH_PROBE_SECRET", "test-health-probe-secret");
       vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
       const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
