@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Performance Agent — Runs weekly on Saturday at 10:00 AM via launchd (com.paisaxe.performance-agent)
+# Performance Agent — Runs weekly on Thursday at 10:00 AM via launchd (com.paisaxe.performance-agent)
 # Analyzes bundle sizes, identifies optimization opportunities, tracks regressions
 set -euo pipefail
 
@@ -14,6 +14,14 @@ METRICS_FILE="$PROJECT_DIR/.performance-metrics.tmp"
 
 mkdir -p "$LOG_DIR"
 trap 'rm -f "$METRICS_FILE"' EXIT
+
+# Every prior silent-death cycle (6 consecutive weeks, since 2026-07-18) left
+# NOTHING in either log — no error, no final "finished" line — yet launchd's
+# LastExitStatus stayed 0, so it read as healthy. This trap converts any
+# set -e abort, anywhere in the script, into a loud, non-zero, log-visible
+# failure instead of a silent one. Built manually (not via log_error | tee)
+# because log_error writes to fd 2, which a trailing `| tee` cannot capture.
+trap 'ec=$?; { printf "[ERROR] %s FATAL: command failed at line %s (exit %s) — aborting\n" "$(date "+%Y-%m-%d %H:%M:%S")" "$LINENO" "$ec"; } | tee -a "$LOG_FILE" >&2; exit "$ec"' ERR
 
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
@@ -212,7 +220,14 @@ fi
   echo ""
   if [[ "$FRESH_BUILD" == "true" ]]; then
     echo "FIRST LOAD JS (per-route split, from next build):"
-    echo "$BUILD_OUTPUT" | grep -E "First Load JS" | head -10
+    # Turbopack's route table (Next 16+) no longer prints a "First Load JS"
+    # column — this is now reliably empty. Under `set -o pipefail`, a grep
+    # with zero matches makes the whole pipeline (and this `{ } > file`
+    # block) exit non-zero, which silently killed the script here every
+    # single run for 6 weeks (2026-07-18 to 2026-08-20) before this guard.
+    # The filesystem-measured BUNDLE SIZES/LARGEST JS CHUNKS sections above
+    # already cover this data from `.next/static`, so this is best-effort.
+    echo "$BUILD_OUTPUT" | grep -E "First Load JS" | head -10 || echo "(not present in this build's output — see BUNDLE SIZES above for authoritative numbers)"
     echo ""
   fi
   echo "LARGEST JS CHUNKS:"
@@ -272,7 +287,7 @@ Current metrics:
 $(cat "$METRICS_FILE")
 
 Build output summary:
-$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30; else echo "(No build output — build was skipped or failed, used cached .next data)"; fi)
+$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30 || echo "(no matching lines in this build's output)"; else echo "(No build output — build was skipped or failed, used cached .next data)"; fi)
 
 $SHARED_CONTEXT_READ
 

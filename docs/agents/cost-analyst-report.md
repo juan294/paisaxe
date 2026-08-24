@@ -1,6 +1,8 @@
 # Cost Analyst Report
 
-> **Generated**: 2026-08-20 (estimated daily run) | **Period**: August 2026 (day 20 of 31) | **Status**: CRITICAL (Anthropic incident #734 unresolved; ElevenLabs overage NOW ACTIVE and escalating)
+> **Generated**: 2026-08-20 (estimated daily run) | **Period**: August 2026 (day 20 of 31) | **Status**: YELLOW (ElevenLabs overage ACTIVE and escalating)
+
+> **Correction (2026-08-24, triage)**: every "Anthropic incident #734 unresolved / day N" claim below is stale and false. Incident #734 (Anthropic credit exhaustion, onset ~Jul 20) was confirmed resolved by Aug 13 and formally closed in triage on 2026-08-18 with evidence (Aug 13 server logs showing successful Claude generations, live Aug 18 production health check) — see `docs/agents/shared-context.md` triage entry timestamp `2026-08-18T08:00:00Z`. This report re-asserted the incident as still-CRITICAL on 2026-08-20, two days after that closure, because the agent's prompt read its own prior report narrative instead of checking shared-context for a superseding status. That prompt gap is now fixed in `src/config/agent-prompts.ts` (cost_analyst_agent_enabled). Treat every "#734" / "day N unresolved" reference below as void; the file will regenerate cleanly at the next scheduled run (daily, 3:00 AM).
 
 ---
 
