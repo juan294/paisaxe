@@ -10,7 +10,7 @@ name: Coverage
 
 on:
   push:
-    branches: [develop]
+    branches: [main]
   schedule:
     - cron: "45 3 * * *"
   workflow_dispatch:
@@ -63,5 +63,5 @@ jobs:
           SOURCE_COMMIT_SHA: ${{ github.sha }}
           COVERAGE_RUN_ID: ${{ github.run_id }}
           COVERAGE_WORKFLOW_REF: ${{ github.workflow_ref }}
-          SOURCE_TARGET_BRANCH: develop
+          SOURCE_TARGET_BRANCH: main
         run: bash scripts/report-coverage.sh
