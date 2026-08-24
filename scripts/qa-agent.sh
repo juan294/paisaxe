@@ -24,6 +24,14 @@ QA_TEST_USER_PASSWORD="${QA_TEST_USER_PASSWORD:-}"
 
 mkdir -p "$LOG_DIR"
 
+# The 2026-08-20 run aborted mid-Phase-1 with nothing in the log beyond the
+# phase header — same silent-death class as performance-agent's 6-week bug
+# (fixed in c4a3d559): a `set -e` abort produces no error line by default.
+# This trap logs the failing line number before the existing EXIT trap
+# (handle_exit) writes the ABORTED report, so the next failure is diagnosable
+# from the log alone instead of requiring bisection.
+trap 'ec=$?; { printf "[ERROR] %s FATAL: command failed at line %s (exit %s) — aborting\n" "$(date "+%Y-%m-%d %H:%M:%S")" "$LINENO" "$ec"; } | tee -a "$LOG_FILE" >&2; exit "$ec"' ERR
+
 trim_value() {
   local value="${1:-}"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -515,8 +523,13 @@ TEST_OUTPUT_PLAIN=$(printf '%s' "$TEST_OUTPUT" | sed -E 's/\x1b\[[0-9;]*m//g')
 # "Test Files  N passed" line and a "Tests  M passed" line; without anchoring
 # to "Tests" specifically, grep matches the Test Files line first and reports
 # the file count instead of the test count.
-PASSED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}')
-FAILED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}')
+# A vitest crash before it prints the summary line (or an output-format
+# change) makes this grep match nothing. Under `set -o pipefail`, a
+# zero-match grep inside a `VAR=$(...)` assignment aborts the whole script
+# via `set -e` with nothing on stderr — this silently killed the 2026-08-20
+# run right here, identical to the performance-agent bug fixed in c4a3d559.
+PASSED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || true)
+FAILED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || true)
 PASSED_TESTS=${PASSED_TESTS:-0}
 FAILED_TESTS=${FAILED_TESTS:-0}
 TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))

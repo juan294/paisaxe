@@ -1,70 +1,65 @@
 # Triage Report
-> Generated on 2026-08-18 | 7 reports processed | 6 completed code/report actions | 2 Dependabot PRs
+> Generated on 2026-08-24 | 12 reports processed | 8 action items | 3 Dependabot PRs
 
 ## Agent Failures
-
 | Agent | Error | Log File |
 |-------|-------|----------|
-| QA (2026-08-13) | Aborted mid-Phase-1 (LLM quality tests), exit 1, no error captured in the wrapper log | `logs/qa-agent-2026-08-13.log` |
-
-Resolved by evidence, not a code fix: the same run's Phase 0 health check showed `Anthropic: OK`, and `logs/qa-agent-server.log` shows a stream of successful `POST /api/chat 200` responses with real multi-second Claude generation timings — the account was healthy. The abort itself is a distinct, minor harness gap already tracked by existing issues #730/#731/#733 (QA harness reporting reliability); no new issue filed.
+| qa-agent (2026-08-20) | Silent abort entering Phase 1 (exit 1, no error output) — same `set -e`/pipefail class as the performance-agent bug fixed in `c4a3d559` | `logs/qa-agent-2026-08-20.log` |
+| performance-agent (2026-08-24) | Self-recovered — first run FATAL'd at line 251 (build-output parsing), automatic retry completed cleanly 2 minutes later | `logs/performance-agent-2026-08-24.log` |
 
 ## Reports Reviewed
-
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | qa-report.md | QA | ABORTED | Closed #734 with resolution evidence; abort itself covered by existing issues |
-| 2 | security-report.md | Security | GREEN | None — 0 advisories; "batch 24 packages" recommendation already in flight as Dependabot PRs |
-| 3 | coverage-report.md | Coverage | GREEN | Verified + committed test additions; consolidated a misplaced duplicate test file |
-| 4 | cost-analyst-report.md | Cost Analyst | CRITICAL (downgraded) | Anthropic leg resolved; ElevenLabs overage confirmed live and flagged for owner decision |
-| 5 | cc-rpi-update-report.md | cc-rpi sync | up to date | None |
-| 6 | documentation-report.md | Documentation | GREEN | None |
-| 7 | localization-report.md | Localization | GREEN | None |
+| 1 | pre-launch-report.md | Pre-Launch Audit (2026-08-18) | Historical | 0 (12 apparent gaps verified as false positives — see below) |
+| 2 | remediation-report.md | Remediation | Historical, fully merged | 0 |
+| 3 | security-report.md | Security | GREEN | 0 (report regen only) |
+| 4 | coverage-report.md | Coverage | GREEN | 0 (already committed) |
+| 5 | documentation-report.md | Documentation | GREEN (32 clean runs) | 0 |
+| 6 | cc-rpi-update-report.md | cc-rpi sync | Up to date | 0 |
+| 7 | update-docs-report.md | Update Docs | Mostly merged | 1 (drawio diagram node) |
+| 8 | performance-report.md | Performance | YELLOW | 1 (budget reconciliation) |
+| 9 | qa-report.md | QA | ABORTED | 1 (silent-death fix) |
+| 10 | cost-analyst-report.md | Cost Analyst | Stale content, corrected | 2 (both flagged to user, not code fixes) |
+| 11 | localization-report.md | Localization | Uncommitted fixes | 1 (commit already-applied fixes) |
+| 12 | triage-report.md | Prior triage (2026-08-18) | N/A | 0 |
 
-## Overall Status: GREEN
+## Overall Status: YELLOW
 
-All code-addressable action items are implemented, verified, and merged to `develop` with green CI. YELLOW-leaning items remain only where they require the user's decision: GitHub code/secret scanning are disabled (billing implication on a private repo) and ElevenLabs is currently in overage (requires reducing personal-agent activity or accepting the cost) — both carried forward, not code-fixable.
+GREEN across security, coverage, documentation. YELLOW on performance (budget headroom thinning, now addressed) and on cost (ElevenLabs overage confirmed live and real — pending a user decision, not a code defect). No CI-blocking regressions; no open GitHub security/Dependabot alerts.
 
 ## Action Items Completed
-
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Closed incident #734 (Anthropic credit exhaustion) with log evidence it was already resolved by 2026-08-13; both the QA and cost-analyst reports were stale on this point | qa-report.md, cost-analyst-report.md | — | Done |
-| 2 | Verified and committed the coverage agent's pending test additions (`voice-session/route.test.ts` +1 test) | coverage-report.md | 1 | Done |
-| 3 | Consolidated `src/lib/llm-quality-helpers.test.ts` (new, misplaced — no `src/lib/llm-quality-helpers.ts` exists) into the pre-existing `scripts/qa-llm-quality-helpers.test.ts`, which already tested the same module (`src/tests/qa/llm-quality-helpers.ts`) with less granularity. Found independently by 3 of 4 `/simplify` review agents (reuse, simplification, altitude). Simplified one redundant try/catch assertion in the process. | coverage-report.md + `/simplify` | 23 (net, in the consolidated file; was 24 across two files) | Done |
-| 4 | Live-checked ElevenLabs subscription API directly rather than trusting the report's week-old projection — found the account already at 302,034/270,319 chars (111.7%), $9.51 overage billed, resets 2026-09-07 (report said ~90% projected, Sep 1 reset) | cost-analyst-report.md | — | Flagged, owner decision needed |
-| 5 | Fixed Dependabot PR #756: Next.js 16.3.1 (bumped in the PR) rejects `runtime = "edge"` route-segment config under `cacheComponents` — removed it from `src/app/opengraph-image.tsx` and `src/app/story/[slug]/opengraph-image.tsx`, updated their tests, verified with a full `npm run build` | Dependabot PR #756 | 0 (2 obsolete assertions removed) | Done |
-| 6 | Confirmed GitHub code scanning and secret scanning are both disabled repo-wide (403/404) | GitHub API discovery | — | Flagged, owner decision needed (billing) |
+| 1 | Fixed `qa-agent.sh` silent-death bug: `\|\| true` guards on two grep pipelines (lines 531-532) + ERR trap logging the failing line number | qa-report.md | N/A (agent script, not app code) | Fixed, filed as issue #949 |
+| 2 | Raised `performance-agent.sh`'s stale raw-total-JS budget 3500→4000 KB per the report's own P1 recommendation | performance-report.md | N/A | Fixed |
+| 3 | Added missing `/api/mcp/save-favorite` node to `docs/paisaxe-architecture.drawio`, cascaded the swimlane layout, rendered to PNG and visually verified, removed the `[NEEDS REVIEW]` marker | update-docs-report.md | N/A | Fixed |
+| 4 | Committed `src/lib/i18n/pt.ts` fixes ("Entendido"→"Entendi", "Todas"→"Tudo") and regenerated `localization-report.md`/`security-report.md`, already applied by their respective agent runs | localization-report.md, security-report.md | N/A (report/copy only) | Fixed |
+| 5 | Deleted `scripts/find-untranslated.mjs` — a scratch debug script left uncommitted by the localization agent, fully redundant with `scripts/generate-locale-coverage.ts` | localization-report.md | N/A | Cleaned up |
+| 6 | Cross-checked pre-launch-report.md's 154 findings against remediation-report.md's tables; 12 apparent gaps were verified against GitHub issues and found to be false positives (all already fixed and closed — remediation-report.md's tables simply omit finding IDs on several consolidated rows) | pre-launch-report.md, remediation-report.md | N/A | Verified, no fix needed |
+| 7 | Filed GitHub issue #949 for the qa-agent.sh root cause | qa-report.md | N/A | Filed |
+| 8 | Live-verified: Anthropic API generation works (credits not exhausted); production `/api/health` shows Sentry configured (cost-analyst's "unset DSN" claim is stale, no action needed) | cost-analyst-report.md | N/A | Verified, no fix needed |
 
 ## GitHub Security & Quality Alerts
-
 | # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
 |---|------|----------|--------------|---------------|----------|--------|-------|
-| 1 | Code scanning (CodeQL) | — | — | — | repo-wide | Disabled (403) | Enabling on a private repo may require GitHub Advanced Security (billing implication) — owner decision, not auto-enabled |
-| 2 | Secret scanning | — | — | — | repo-wide | Disabled (404) | Mitigated by Gitleaks already running daily + on every PR |
-| 3 | Dependabot security alerts | — | — | — | — | 0 open (GREEN) | — |
+| — | Code scanning (CodeQL) | — | — | — | repo-wide | Disabled (403) | Known, previously flagged as a billing decision (GHAS on private repo); unchanged since 2026-08-18 |
+| — | Secret scanning | — | — | — | repo-wide | Disabled (404) | Known; Gitleaks in CI substitutes |
+| — | Dependabot security alerts | — | — | — | — | 0 open | Clean |
 
 ## Dependabot PRs
-
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| 755 | `chore(deps-dev): bump the dev-and-types group across 1 directory with 4 updates` | patch/minor (4 pkgs: jest-dom, user-event, @types/node, @vitest/eslint-plugin) | **Merged** (squash, branch deleted) | 18/19 checks green pre-merge; Playwright E2E failed on a structural GitHub limitation (Dependabot-triggered `pull_request` runs don't get repo secrets — confirmed via the workflow's explicit `Missing required secret: NEXT_PUBLIC_SUPABASE_URL` check), unrelated to the dependency content |
-| 756 | `chore(deps): bump the production group across 1 directory with 19 updates` (incl. next 16.2.12→16.3.1) | minor (19 pkgs) | **Merged** (squash, branch deleted) | Initial CI: Build/Bundle Size/Playwright/Visual Regression/Lighthouse all failed on one root cause — Next 16.3.1 rejects `runtime="edge"` under `cacheComponents`. Fixed in a worktree, pushed to the PR branch (2 files + 2 test files), verified with a local production build, then full CI went green including the real Playwright E2E suite (my push carried real secrets, unlike the original Dependabot-authored run) |
+| 945 | chore(deps): bump the production group with 8 updates | minor/patch (config-restricted) | Merged | CI red (Test/Playwright/Vercel-env-safety) verified to trace entirely to GitHub withholding repo Actions secrets from Dependabot-triggered runs (`Secret source: Dependabot`) — not a code regression. `develop` has no required status checks. |
+| 946 | chore(deps-dev): bump the dev-and-types group with 3 updates | minor/patch (config-restricted) | Merged | Same root cause as #945 |
+| 944 | chore(deps): bump actions/checkout from 5 to 7 | major | Deferred | Major version bump — human review required per policy regardless of CI status |
 
 ## Verification
-
-- [x] All tests passing — 393 files / 7423 tests (develop), 393 files / 7400 tests (PR #756 worktree, pre-merge)
-- [x] Typecheck clean — app, scripts, E2E, edge
-- [x] Lint clean — src and scripts, zero warnings
-- [x] `npm run build` clean in the PR #756 worktree (confirms the Next 16.3.1 fix)
-- [x] CI green on `develop` post-push (commit 82240461): Security Scan, Lighthouse CI, CI (Lint/Typecheck/Build/Coverage×4/Test/Coverage merge/Develop smoke check), E2E Tests all success
-- [x] CI green on PR #755 merge commit (fa10e7d4): same, all success
-- [x] CI green on PR #756 (0ca5eb4f): all 19 checks pass including Playwright E2E and Visual Regression
-- [x] `npm install` run post-merge to sync local `node_modules`/`package-lock.json`
+- [x] All tests passing (412 files, 7,861 tests)
+- [x] Typecheck clean (app, scripts, e2e, edge)
+- [x] Lint clean (src, scripts)
+- [x] `/simplify` run on changed files — 3 findings (reuse: duplicate ERR trap vs. performance-agent.sh; simplification: could use `log_error()` helper; altitude: `\|\| true` is a bandaid, budget raise delays a lower-signal metric) — all skipped with reasoning: `log_error()` emits ANSI color codes that would risk reintroducing the exact grep-vs-color-code parsing bug this fix addresses; the existing `PARSE_FAILURE` detection (from #731) already distinguishes a real 0-test run from a broken parse, so the `\|\| true` fix is exactly deep enough; extracting the trap to a shared helper would touch performance-agent.sh's already-shipped, live-verified code outside this diff's scope.
+- [ ] CI green on push — pending (see below)
 
 ## Carried Items
-
-- **ElevenLabs overage (P0, owner decision)**: live-confirmed 111.7% of monthly character allocation, $9.51 overage already billed, resets 2026-09-07. Needs the user to decide whether to reduce personal-agent ElevenLabs activity or accept the ongoing overage cost — not code-fixable.
-- **GitHub code scanning / secret scanning disabled (P2, owner decision)**: code scanning would need GHAS on this private repo (billing implication); secret scanning coverage is currently substituted by Gitleaks in CI.
-- **Twilio release/retain decision (~Feb 2027)**: unchanged, low urgency, carried from prior cycles.
-- **Anthropic incident #734**: resolved and closed this cycle — no longer carried.
+- **ElevenLabs cost overage** — live-verified real and current (305,072/270,319 chars, 113%, $10.43 overage). Requires a user decision (account separation, throttling, or shelving) before the Sep 7 reset. Not a code fix; flagged to user in this session, tracked in shared-context for future cycles until resolved.
+- **Performance budget** — raw total-JS budget headroom widened to ~785 KB; the report itself concedes this metric is lower-signal than `check-bundle-budget`'s per-route gzip check. Worth revisiting if dependency drift trips it again in a few cycles.

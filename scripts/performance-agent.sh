@@ -50,8 +50,14 @@ restart_dev_server_if_needed() {
 # Raised 2026-06-10: ElevenLabs ConvAI SDK (~605 KB deferred, click-to-mount) is a hard
 # dependency and already fully lazy-loaded — no further reduction possible. Total budget
 # raised to 3,500 KB (100 KB headroom over current 3,398 KB). Initial-load budget unchanged.
+# Raised 2026-08-24 (triage, per performance-report.md P1): this raw sum-of-all-chunks
+# metric predates check-bundle-budget.ts's per-route gzip budget (PE-H3), which is the
+# authoritative, comfortably-passing signal (11-19% headroom on every route). This coarser
+# metric had climbed to 91.8% (286 KB headroom) purely from routine dependency-version
+# drift, at a pace that would trip it within 1-2 more batch cycles with no real regression.
+# Widened headroom to ~800 KB so dependency drift stops false-alarming this metric.
 BUDGET_INITIAL_JS_KB=2100    # 2.1 MB initial load JS (static chunks only, excl. deferred)
-BUDGET_TOTAL_JS_KB=3500      # 3.5 MB total JS (including deferred dynamic chunks)
+BUDGET_TOTAL_JS_KB=4000      # 4.0 MB total JS (including deferred dynamic chunks)
 BUDGET_LARGEST_CHUNK_KB=650  # 650 KB per chunk (ElevenLabs deferred chunk is 605 KB)
 BUDGET_NODE_MODULES_MB=1100  # 1.1 GB node_modules (@sentry/nextjs 67 MB is permanent)
 BUDGET_PROD_DEPS=40          # Max production dependencies

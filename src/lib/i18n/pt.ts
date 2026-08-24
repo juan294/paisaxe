@@ -34,7 +34,7 @@ export const pt: Translations = {
     source: 'Fonte',
     // LOCATION-SPECIFIC: Location name in privacy notice
     privacy_notice: 'As suas perguntas são processadas com inteligência artificial para lhe oferecer as melhores respostas sobre as Astúrias. Não guardamos as suas conversas.',
-    understood: 'Entendido',
+    understood: 'Entendi',
     call: 'Ligar',
     directions: 'Como chegar',
     copy_conversation: 'Copiar conversa',
@@ -479,7 +479,7 @@ export const pt: Translations = {
       withImages: 'com imagens',
       noStories: 'Nenhuma história encontrada',
       loading: 'A carregar...',
-      all: 'Todas',
+      all: 'Tudo',
       noImage: 'Sem imagem',
       clickToAdd: 'Clique para adicionar',
       needsCuration: 'Necessita curadoria',
