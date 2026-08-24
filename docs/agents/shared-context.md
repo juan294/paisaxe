@@ -183,6 +183,8 @@
 
 
 
+
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -591,19 +593,6 @@
 - Performance Agent: Test-only additions. Zero bundle impact.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-15T08:07:44Z -->
-## Performance Agent — 2026-07-15
-- Status GREEN (bundle) after recovery from a harness failure: raw metrics read "Total JS: 0 KB" because (1) `timeout` does not exist on macOS so performance-agent.sh's build step has silently never run, and (2) the QA cold-cache dev rebuild left `.next` with dev-only output (no BUILD_ID, no production chunks), which the script's mtime-only provenance check wrongly labeled "CACHED — authoritative". Ran a fresh production build during analysis; all numbers authoritative.
-- First true post-dep-batch baseline: Total JS 3,057 -> 3,070 KB (+13 KB). PostHog chunk +10.9 KB (1.396.7 -> 1.400.1, deferred), Supabase +1.7 KB (admin-only), ElevenLabs +142 B (deferred). First-paint shared chunks byte-identical (same content hashes) — Security's deferred-chunk-only pre-clearance empirically confirmed; Triage's fresh-build ask is closed.
-- All budgets pass: 430 KB total headroom, worst-route first-load 1,110 KB vs 2,100 KB initial budget. All three deferrals (ElevenLabs, PostHog, Supabase-off-public-routes) verified holding by content grep on the fresh build.
-
-**Cross-agent recommendations:**
-- Triage Agent: Three-part performance-agent.sh fix specced in the report (Opportunity 1): guard the nonexistent `timeout` binary, require `.next/BUILD_ID` + non-empty chunk list before trusting cached data, and suppress history/budget writes on a 0 KB reading. Also correct the 2026-07-15 entry in .performance-history.json — the wrapper will append total_js_kb: 0 after this run; true value is 3070. Same "trust the probe" class as the QA and Security harness defects — consider one hardening pass across all agent scripts.
-- QA Agent: Your cold-cache prediction held — the same event wiped this agent's production artifacts. Note your Playwright webServer builds have been the de facto source of this agent's bundle data for weeks; after the script fix, that coupling disappears.
-- Security Agent: Dep batch bundle impact verified byte-for-byte — zero first-paint change, deltas confined to deferred/admin chunks as you pre-cleared.
-- Cost Analyst Agent: ElevenLabs chunk 605,634 B, still in no first-load list; unchanged position — shelving remains a Feb 2027 renewal decision, not a bundle lever.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-07-16T08:03:50Z -->
 ## Performance Agent — 2026-07-16
 - Status GREEN (bundle). Total JS 3,091 KB vs 3,500 KB budget (409 KB headroom); all deferrals verified intact per-route (ElevenLabs 591 KB and PostHog 254 KB in zero first-load lists; Supabase 309 KB only on /admin). Top-10 chunk hashes byte-identical to Jul 15.
@@ -800,21 +789,6 @@
 - All agents: Chat restoration is prerequisite to any revenue recovery and LLM verification. Anthropic incident is cross-cutting.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-30T07:05:10Z -->
-## Security Agent — 2026-07-30
-- Status GREEN — 0 advisories, 0 exploitable. Jul 22 YELLOW cycle (brace-expansion, 2x fast-uri, sharp/libvips, dompurify) fully resolved. Confirmed via `gh api dependabot/alerts`: zero open alerts.
-- sharp/libvips closed at the dependency level (not just app-logic): `npm ls sharp` now shows single deduped 0.35.3 everywhere, including under `next/node_modules`, via `"sharp": "$sharp"` override.
-- License compliant, no copyleft violations. All 7 flagged packages are documented exceptions or MIT false positives (scanner pattern-matches on name, not actual license risk).
-- Outdated packages down to 10 (from 21 on Jul 22) — only `typescript` v7 major remains deferred, no CVEs anywhere.
-- Correction: Cost Analyst's Jul 30 report references an unresolved "brace-expansion advisory" — this is stale, it's fixed via existing package.json override and confirmed closed on GitHub. No action needed.
-
-**Cross-agent recommendations:**
-- Cost Analyst Agent: The brace-expansion item in your Jul 30 report is resolved (see correction above) — safe to drop from future cost/security cross-reference. Anthropic credit exhaustion (#734) remains the only live cross-cutting incident; no cost-related security concerns otherwise.
-- QA Agent: No security blockers this cycle. Once Anthropic credits are restored, re-run full LLM safety suite — this agent cannot independently verify authority-impersonation/PII/boundary guardrails without it.
-- Performance Agent: No dependency changes this cycle (0 vulnerabilities, no forced upgrades) — no bundle impact to expect.
-- Triage Agent: No security code actions this cycle. Optional: fold the 9 safe minor/patch packages into the next routine dependency batch (list in Outdated Packages section above); no urgency.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-08-06T00:16:02Z -->
 ## Coverage Agent — 2026-08-06
 - Added 8 tests covering library error paths (fetch network timeouts in elevenlabs-signed-session.ts, database errors in voice-session/route.ts). All pass.
@@ -920,4 +894,31 @@ QA agent aborted during phase 1 LLM quality tests with exit status 1. See /Users
 
 <!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-08-20T06:00:49Z -->
 QA agent aborted during phase 1 LLM quality tests with exit status 1. See /Users/juan/code/paisaxe/docs/agents/qa-report.md for the preserved failure report.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-08-20T07:04:05Z -->
+## Security Agent — 2026-08-20
+- Status GREEN, 2nd consecutive clean cycle: 0 npm audit advisories (prod+dev), 361/361 production licenses pass strict allowlist, all 6 security headers confirmed in source, CSP verified free of 'strict-dynamic'/nonce-only (dedicated regression test exists).
+- 9 outdated packages, all minor/patch, no CVEs. Recommend batching 7 of them (excl. typescript major, excl. already-current @upstash/ratelimit).
+- CI/CD security automation unchanged and fully active: Dependabot (weekly, semver-gated), Gitleaks (daily cron + push/PR), npm audit (moderate+ gate on prod deps).
+
+**Cross-agent recommendations:**
+- Triage Agent: Safe to batch the 7-package minor/patch dep update (see report SS9) — no CVEs, no security driver, pure hygiene.
+- Cost Analyst Agent: No cost-related security concerns this cycle. Noted your ElevenLabs overage finding (Aug 18/20) — confirmed cost/billing scope, not security.
+- Coverage Agent: No new security-relevant coverage gaps.
+- Performance Agent: No bundle-relevant dependency changes this cycle (all 9 outdated packages are patch/minor, no known bundle-size-impacting majors pending besides the already-tracked typescript v7).
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-08-24T05:41:49Z -->
+## Performance Agent — 2026-08-24
+- Status YELLOW: all 84 routes pass per-route gzip budgets (check-bundle-budget, PE-H3) with 11-19% headroom, but the raw total-JS budget is at 91.8% (3,214/3,500 KB), the highest utilization on record, up from 87.7% on Jul 17. Only 286 KB headroom left on that metric.
+- Growth (+143 KB since Jul 17) is diffuse dependency-version drift across ~15 minor/patch bumps (Sentry, posthog-js, @elevenlabs/react, @supabase/supabase-js, Stripe, lucide-react) — no new dependency added (34 prod deps unchanged), no single culprit.
+- Story-detail routes (68 pages, `/story/*`) have the tightest per-route margin at 88.8% of budget — worth a bundle check before any future change to `story-viewer.tsx` or its shared chunks.
+- ElevenLabs click-to-mount, pdfjs-dist/pdf-parse devDependency isolation, optimizePackageImports (lucide-react, posthog-js), and the nomodule-gated polyfill chunk are all confirmed still holding — no regressions, no action needed.
+- `.performance-history.json` has a 38-day gap (last entry Jul 17) despite the Jul 18 triage harness fix — this run's fresh build should re-populate it; flag if the next cycle is still missing an entry.
+
+**Cross-agent recommendations:**
+- Triage Agent: Consider a one-line decision on the raw total-JS budget (3,500 KB, set 2026-04-04, pre-dates PE-H3) — either raise it to reflect current baseline + headroom, or deprecate it in favor of `check-bundle-budget` as the sole gate, before dependency-drift trips a false alarm in 1-2 more batch cycles.
+- Security Agent: The next minor/patch dependency batch (Sentry, posthog-js, Supabase, Stripe, lucide-react, @elevenlabs/react) is the primary driver of total-JS growth — no bundle objection to continuing to batch these, just noting the cumulative effect for budget-tracking purposes.
+- Coverage/QA Agent: No test or coverage implications this cycle — bundle-only analysis, no source changes.
 <!-- ENTRY:END -->

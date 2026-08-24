@@ -206,7 +206,7 @@ STEPS:
    d. Read src/config/service-tiers.ts for current tier limits and pricing.
    e. Read src/config/recurring-costs.ts for fixed subscription costs.
 
-2. READ PREVIOUS REPORT — Read docs/agents/cost-analyst-report.md for trend comparison with yesterday's data.
+2. READ PREVIOUS REPORT — Read docs/agents/cost-analyst-report.md for trend comparison with yesterday's data. Then read docs/agents/shared-context.md and find the most recent dated entry (from ANY agent — QA, Security, Triage, etc.) that mentions the status of any operational incident (API outage, credit exhaustion, service disruption) your previous report described as ongoing. The most recent dated entry always wins, even if it contradicts your own previous report or an older shared-context entry. If the most recent entry says an incident was closed/resolved, stop reporting it as ongoing — do not keep incrementing a "day N unresolved" counter from a stale start date without re-confirming the incident is still live. If no entry supersedes it, state explicitly in the report that the incident's status is unverified since [date of last confirming entry], rather than presenting an old, uncorroborated claim as still-current fact.
 
 3. ANALYZE — Compute:
    - Total monthly spend (fixed + variable)
@@ -269,7 +269,8 @@ RULES:
 - Use actual API data when available; fall back to config file values for services without APIs.
 - All dollar amounts in USD, rounded to 2 decimal places.
 - Commit nothing. The user will review and commit manually.
-- Be precise with numbers and conservative with forecasts.`,
+- Be precise with numbers and conservative with forecasts.
+- Never re-assert a previously-reported operational incident as still ongoing purely by extrapolating elapsed days from its original start date. Recency in shared-context.md overrides your own report's prior narrative — a closure recorded there supersedes any "day N unresolved" framing you previously used, even across multiple cycles.`,
   },
 
   localization_agent_enabled: {
