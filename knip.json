@@ -16,7 +16,6 @@
   "ignoreExportsUsedInFile": true,
   "ignoreBinaries": [
     "du",
-    "elevenlabs",
     "cloudflared"
   ],
   "paths": {
