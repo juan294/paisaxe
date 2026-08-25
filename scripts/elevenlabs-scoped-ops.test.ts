@@ -1,74 +1,54 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildAgentCliArgs,
   buildAgentUpdateBody,
-  buildToolCliArgs,
+  buildAgentUrl,
+  buildToolUrl,
   formatProviderFailure,
+  runDirectAgentPull,
+  runDirectToolPull,
 } from "./elevenlabs-scoped-ops";
 
 describe("Paisaxe-scoped ElevenLabs operations", () => {
-  it("builds a targeted agent pull", () => {
-    expect(
-      buildAgentCliArgs("pull", {
-        agent: "pelayo",
-        branch: "agtbrch_2801kgqjhbhaf9097aka9qeek8qj",
-        apply: false,
-      })
-    ).toEqual([
-      "agents",
-      "pull",
-      "--agent",
+  it("scopes an agent pull to the owned agent and pinned branch", () => {
+    const url = buildAgentUrl(
       "agent_1201kgqhsdzxfkk9x7m1bjaew9mv",
-      "--branch",
-      "agtbrch_2801kgqjhbhaf9097aka9qeek8qj",
-      "--update",
-      "--dry-run",
-      "--no-ui",
-    ]);
+      "agtbrch_2801kgqjhbhaf9097aka9qeek8qj"
+    );
+    expect(url.pathname).toBe(
+      "/v1/convai/agents/agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+    );
+    expect(url.searchParams.get("branch_id")).toBe(
+      "agtbrch_2801kgqjhbhaf9097aka9qeek8qj"
+    );
   });
 
-  it("uses a dry-run for status and refuses an unowned agent", () => {
-    expect(
-      buildAgentCliArgs("status", {
-        agent: "xander",
-        branch: "agtbrch_3701ks19j2yme6m9qedhx8bz808s",
-        apply: false,
-      })
-    ).toContain("--dry-run");
-    expect(() =>
-      buildAgentCliArgs("status", {
+  it("refuses to pull an agent Paisaxe does not own", async () => {
+    await expect(
+      runDirectAgentPull({
         agent: "agent_roots",
         branch: "agtbrch_roots",
         apply: false,
       })
-    ).toThrow(/Paisaxe/);
+    ).rejects.toThrow(/Paisaxe/);
   });
 
-  it("requires an explicit apply flag for writes", () => {
-    expect(() =>
-      buildAgentCliArgs("push", {
+  it("refuses to pull an agent onto an unpinned branch", async () => {
+    await expect(
+      runDirectAgentPull({
         agent: "pelayo",
-        branch: "agtbrch_2801kgqjhbhaf9097aka9qeek8qj",
+        branch: "agtbrch_not_the_pinned_branch",
         apply: false,
       })
-    ).toThrow(/--apply/);
+    ).rejects.toThrow(/does not match the Paisaxe agent manifest/);
   });
 
-  it("targets exactly one registered webhook tool", () => {
-    expect(
-      buildToolCliArgs("pull", { tool: "get_weather", apply: false })
-    ).toEqual([
-      "tools",
-      "pull",
-      "--tool",
-      "tool_7901kgqhsetben3bbbg4p360d987",
-      "--update",
-      "--dry-run",
-      "--no-ui",
-    ]);
-    expect(() =>
-      buildToolCliArgs("push", { tool: "roots_tool", apply: true })
-    ).toThrow(/Paisaxe/);
+  it("targets exactly one registered webhook tool", async () => {
+    expect(buildToolUrl("tool_7901kgqhsetben3bbbg4p360d987")).toBe(
+      "https://api.elevenlabs.io/v1/convai/tools/tool_7901kgqhsetben3bbbg4p360d987"
+    );
+    await expect(
+      runDirectToolPull({ tool: "roots_tool", apply: true })
+    ).rejects.toThrow(/Paisaxe/);
   });
 
   it("puts the exact branch in direct agent update bodies", () => {

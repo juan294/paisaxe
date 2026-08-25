@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { readFile, writeFile } from "node:fs/promises";
 
@@ -85,47 +84,6 @@ function ownedTool(value: string) {
   return entry[1];
 }
 
-export function buildAgentCliArgs(
-  operation: AgentOperation,
-  options: AgentOptions
-): string[] {
-  const agent = ownedAgent(options.agent);
-  if (options.branch !== agent.branch) {
-    throw new Error("The branch does not match the Paisaxe agent manifest.");
-  }
-
-  if (operation === "pull") {
-    return [
-      "agents",
-      "pull",
-      "--agent",
-      agent.id,
-      "--branch",
-      agent.branch,
-      "--update",
-      ...(options.apply ? [] : ["--dry-run"]),
-      "--no-ui",
-    ];
-  }
-
-  if (operation === "push" && !options.apply) {
-    throw new Error("Agent writes require the explicit --apply flag.");
-  }
-
-  return [
-    "agents",
-    "push",
-    "--agent",
-    agent.id,
-    "--branch",
-    agent.branch,
-    ...(operation === "push"
-      ? ["--version-description", "Paisaxe scoped configuration update"]
-      : ["--dry-run"]),
-    "--no-ui",
-  ];
-}
-
 export function buildAgentUpdateBody(
   config: Record<string, unknown>,
   _branchId: string
@@ -162,37 +120,6 @@ export function formatProviderFailure(
   return `${operation} (${status}${request}).`;
 }
 
-export function buildToolCliArgs(
-  operation: ToolOperation,
-  options: ToolOptions
-): string[] {
-  const tool = ownedTool(options.tool);
-  if (operation === "pull") {
-    return [
-      "tools",
-      "pull",
-      "--tool",
-      tool.id,
-      "--update",
-      ...(options.apply ? [] : ["--dry-run"]),
-      "--no-ui",
-    ];
-  }
-
-  if (operation === "push" && !options.apply) {
-    throw new Error("Tool writes require the explicit --apply flag.");
-  }
-
-  return [
-    "tools",
-    "push",
-    "--tool",
-    tool.id,
-    ...(operation === "push" ? [] : ["--dry-run"]),
-    "--no-ui",
-  ];
-}
-
 function valueAfter(args: string[], flag: string): string {
   const index = args.indexOf(flag);
   const value = index >= 0 ? args[index + 1] : undefined;
@@ -216,7 +143,7 @@ async function runDirectToolOperation(
   }
 
   const local = JSON.parse(await readFile(tool.config, "utf8")) as object;
-  const url = `https://api.elevenlabs.io/v1/convai/tools/${tool.id}`;
+  const url = buildToolUrl(tool.id);
   const remoteResponse = await fetch(url, {
     headers: { "xi-api-key": apiKey },
   });
@@ -253,19 +180,29 @@ async function runDirectToolOperation(
   console.log(`${tool.id}: scoped update verified`);
 }
 
-async function runDirectAgentOperation(
-  operation: Exclude<AgentOperation, "pull">,
-  options: AgentOptions
-): Promise<void> {
-  const owned = ownedAgent(options.agent);
-  if (operation === "push" && !options.apply) {
-    throw new Error("Agent writes require the explicit --apply flag.");
-  }
+const API_BASE = "https://api.elevenlabs.io";
+
+export function buildAgentUrl(agentId: string, branchId: string): URL {
+  const url = new URL(`${API_BASE}/v1/convai/agents/${agentId}`);
+  url.searchParams.set("branch_id", branchId);
+  return url;
+}
+
+export function buildToolUrl(toolId: string): string {
+  return `${API_BASE}/v1/convai/tools/${toolId}`;
+}
+
+function requireApiKey(scope: string): string {
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("ELEVENLABS_API_KEY is required for scoped agent operations.");
+    throw new Error(`ELEVENLABS_API_KEY is required for scoped ${scope} operations.`);
   }
+  return apiKey;
+}
 
+/** Resolve the manifest entry and branch for an owned agent, refusing anything unpinned. */
+async function resolveAgentTarget(options: AgentOptions) {
+  const owned = ownedAgent(options.agent);
   const manifest = JSON.parse(await readFile("agents.json", "utf8")) as {
     agents: AgentManifestEntry[];
   };
@@ -284,15 +221,113 @@ async function runDirectAgentOperation(
   if (!branch || branch.branch_id !== options.branch) {
     throw new Error("The branch does not match the Paisaxe agent manifest.");
   }
+  return { owned, manifest, entry, branch };
+}
+
+/**
+ * ElevenLabs CLI v1.0.0 removed `agents pull` / `tools pull` along with the
+ * rest of the agent-as-code surface, and its ConvAI commands no longer accept
+ * an API key at runtime. Pull therefore reads over REST like every other
+ * operation here: still branch-scoped, still refusing agents Paisaxe does not
+ * own, and still write-gated behind --apply.
+ */
+export async function runDirectAgentPull(options: AgentOptions): Promise<void> {
+  const { owned, branch } = await resolveAgentTarget(options);
+  const apiKey = requireApiKey("agent");
+
+  const url = buildAgentUrl(owned.id, branch.branch_id);
+  const response = await fetch(url, { headers: { "xi-api-key": apiKey } });
+  if (!response.ok) {
+    throw new Error(
+      formatProviderFailure(
+        "ElevenLabs agent read failed",
+        response.status,
+        response.headers.get("request-id") ?? response.headers.get("x-request-id")
+      )
+    );
+  }
+  const remote = (await response.json()) as Record<string, unknown>;
+  const pulled = {
+    conversation_config: remote.conversation_config,
+    platform_settings: remote.platform_settings,
+    workflow: remote.workflow,
+  };
 
   const local = JSON.parse(await readFile(branch.config, "utf8")) as Record<
     string,
     unknown
   >;
-  const url = new URL(
-    `https://api.elevenlabs.io/v1/convai/agents/${owned.id}`
+  const drift =
+    JSON.stringify({
+      conversation_config: local.conversation_config,
+      platform_settings: local.platform_settings,
+      workflow: local.workflow,
+    }) !== JSON.stringify(pulled);
+
+  if (!options.apply) {
+    console.log(
+      drift
+        ? `${owned.id}/${branch.branch_id}: pull would rewrite ${branch.config}`
+        : `${owned.id}/${branch.branch_id}: ${branch.config} already matches live`
+    );
+    return;
+  }
+
+  await writeFile(
+    branch.config,
+    `${JSON.stringify({ ...local, ...pulled }, null, 4)}\n`
   );
-  url.searchParams.set("branch_id", branch.branch_id);
+  console.log(`${owned.id}/${branch.branch_id}: pulled into ${branch.config}`);
+}
+
+export async function runDirectToolPull(options: ToolOptions): Promise<void> {
+  const tool = ownedTool(options.tool);
+  const apiKey = requireApiKey("tool");
+
+  const response = await fetch(buildToolUrl(tool.id), {
+    headers: { "xi-api-key": apiKey },
+  });
+  if (!response.ok) {
+    throw new Error(
+      formatProviderFailure(
+        "ElevenLabs tool read failed",
+        response.status,
+        response.headers.get("request-id") ?? response.headers.get("x-request-id")
+      )
+    );
+  }
+  const remote = (await response.json()) as { tool_config?: object };
+  const local = JSON.parse(await readFile(tool.config, "utf8")) as object;
+  const drift = JSON.stringify(remote.tool_config) !== JSON.stringify(local);
+
+  if (!options.apply) {
+    console.log(
+      drift
+        ? `${tool.id}: pull would rewrite ${tool.config}`
+        : `${tool.id}: ${tool.config} already matches live`
+    );
+    return;
+  }
+
+  await writeFile(tool.config, `${JSON.stringify(remote.tool_config, null, 4)}\n`);
+  console.log(`${tool.id}: pulled into ${tool.config}`);
+}
+
+async function runDirectAgentOperation(
+  operation: Exclude<AgentOperation, "pull">,
+  options: AgentOptions
+): Promise<void> {
+  const { owned, entry, branch, manifest } = await resolveAgentTarget(options);
+  if (operation === "push" && !options.apply) {
+    throw new Error("Agent writes require the explicit --apply flag.");
+  }
+  const apiKey = requireApiKey("agent");
+
+  const local = JSON.parse(await readFile(branch.config, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  const url = buildAgentUrl(owned.id, branch.branch_id);
   const remoteResponse = await fetch(url, {
     headers: { "xi-api-key": apiKey },
   });
@@ -374,7 +409,6 @@ async function runDirectAgentOperation(
 async function main(args: string[]): Promise<void> {
   const [scope, operation] = args;
   const apply = args.includes("--apply");
-  let cliArgs: string[];
 
   if (scope === "agent") {
     const agentOptions = {
@@ -382,32 +416,31 @@ async function main(args: string[]): Promise<void> {
       branch: valueAfter(args, "--branch"),
       apply,
     };
-    if (operation !== "pull") {
-      await runDirectAgentOperation(
-        operation as Exclude<AgentOperation, "pull">,
-        agentOptions
-      );
+    if (operation === "pull") {
+      await runDirectAgentPull(agentOptions);
       return;
     }
-    cliArgs = buildAgentCliArgs(operation as AgentOperation, agentOptions);
-  } else if (scope === "tool") {
-    if (operation !== "pull") {
-      await runDirectToolOperation(operation as Exclude<ToolOperation, "pull">, {
-        tool: valueAfter(args, "--tool"),
-        apply,
-      });
-      return;
-    }
-    cliArgs = buildToolCliArgs(operation as ToolOperation, {
-      tool: valueAfter(args, "--tool"),
-      apply,
-    });
-  } else {
-    throw new Error("Usage: agent|tool <operation> with an explicit target.");
+    await runDirectAgentOperation(
+      operation as Exclude<AgentOperation, "pull">,
+      agentOptions
+    );
+    return;
   }
 
-  const result = spawnSync("elevenlabs", cliArgs, { stdio: "inherit" });
-  process.exitCode = result.status ?? 1;
+  if (scope === "tool") {
+    const toolOptions = { tool: valueAfter(args, "--tool"), apply };
+    if (operation === "pull") {
+      await runDirectToolPull(toolOptions);
+      return;
+    }
+    await runDirectToolOperation(
+      operation as Exclude<ToolOperation, "pull">,
+      toolOptions
+    );
+    return;
+  }
+
+  throw new Error("Usage: agent|tool <operation> with an explicit target.");
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
