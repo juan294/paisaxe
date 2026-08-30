@@ -42,6 +42,17 @@ test.describe("API route smoke tests", () => {
     expect(["healthy", "degraded"]).toContain(body.status);
   });
 
+  test("GET /api/stories returns a non-empty story list", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/stories");
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.length).toBeGreaterThan(0);
+  });
+
   test("GET /api/feature-flags returns data or error", async ({ request }) => {
     const response = await request.get("/api/feature-flags");
     const body = await response.json();

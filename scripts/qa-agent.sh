@@ -199,6 +199,18 @@ else
 
   log_info "Starting Next.js production server..." | tee -a "$LOG_FILE"
 
+  # QA-H4 (2026-08-30 triage, docs/agents/qa-report.md 2026-08-27): QA-H3
+  # switched this harness from `npm run dev` to `npm run build && npm run
+  # start` for Anthropic-transport parity. Side effect: `next start` sets
+  # NODE_ENV=production, so src/lib/proxy/cors.ts's dev-only
+  # `NODE_ENV === "development"` branch never allowlists localhost:3006 --
+  # every Phase 1 POST then fails identically with 403 "Origin not allowed"
+  # before reaching the LLM. cors.ts already allowlists PLAYWRIGHT_TEST_ORIGIN
+  # independent of NODE_ENV (gated on VERCEL_ENV being unset instead) for
+  # exactly this "local production build, not real prod" case -- Playwright
+  # already relies on it (playwright.config.ts). Reuse it here.
+  export PLAYWRIGHT_TEST_ORIGIN="http://localhost:3006"
+
   # Start the server in the background
   npm run start -- --port 3006 >> "$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
@@ -500,6 +512,23 @@ CURRENT_PHASE="phase 1 LLM quality tests"
 export QA_TESTS_PER_CATEGORY="$TESTS_PER_CATEGORY"
 export NEXT_PUBLIC_SITE_URL="http://localhost:3006"
 
+# QA-H4 (2026-08-30 triage): probe the origin allowlist with a single request
+# before running all 12 tests. Without this, a CORS/origin misconfiguration
+# makes every test fail identically with a pre-LLM 403, indistinguishable
+# from "the model failed every safety/quality check" -- a materially scarier
+# and wrong signal (docs/agents/qa-report.md, 2026-08-27). Uses
+# retry_curl_probe (defined above) for consistency with the Phase 0 probes;
+# --max-time 2 overrides its 15s default since this is a loopback call to a
+# server already confirmed up. The literal error text is produced by
+# handleCsrfValidation() in src/lib/proxy/csrf-proxy.ts when the Origin
+# header isn't in cors.ts's ALLOWED_ORIGINS -- that's the array to fix.
+ORIGIN_PREFLIGHT_BODY=$(retry_curl_probe "http://localhost:3006/api/chat/stream" \
+  --max-time 2 \
+  -X POST \
+  -H "Origin: http://localhost:3006" \
+  -H "Content-Type: application/json" \
+  -d '{}' || true)
+
 # Run vitest and capture both output and exit code
 TEST_EXIT_CODE=0
 if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
@@ -507,6 +536,9 @@ if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
   TEST_EXIT_CODE=1
 elif [[ "$ANTHROPIC_HEALTH_STATUS" != "PASS" ]]; then
   TEST_OUTPUT="QA PREFLIGHT: Anthropic generation availability failed - ${ANTHROPIC_HEALTH_DETAILS}. Set ANTHROPIC_API_KEY in the QA environment or .env.local before running npm run test:qa."
+  TEST_EXIT_CODE=1
+elif printf '%s' "$ORIGIN_PREFLIGHT_BODY" | grep -q '"error":"Origin not allowed"'; then
+  TEST_OUTPUT="QA PREFLIGHT: /api/chat/stream rejected this harness's own origin (http://localhost:3006) with 403 'Origin not allowed' (thrown by handleCsrfValidation in src/lib/proxy/csrf-proxy.ts) -- this is a harness/CORS misconfiguration, not an LLM or safety failure. Check src/lib/proxy/cors.ts's ALLOWED_ORIGINS (PLAYWRIGHT_TEST_ORIGIN / NODE_ENV / VERCEL_ENV) before trusting any LLM quality result."
   TEST_EXIT_CODE=1
 else
   TEST_OUTPUT=$(NO_COLOR=1 npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
