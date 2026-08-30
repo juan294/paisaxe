@@ -2,11 +2,11 @@
 /**
  * Release candidate identity — Wave A, Phase 2.
  *
- * The repo permits squash merges only, so the commit SHA that CI tested never
- * reaches `main`. The *tree* does: `strict: true` branch protection forces the
- * PR branch to be up to date before merging, so the squashed commit on `main`
- * carries the same tree as the tested head. Release evidence therefore
- * identifies a candidate by tree hash, not commit SHA (plan D-A).
+ * Release PRs use merge commits, whose commit SHA differs from the tested
+ * `develop` head. `strict: true` branch protection forces the PR branch to be
+ * up to date before merging, and the promotion merge must carry the same tree
+ * as the tested head. Release evidence therefore identifies a candidate by
+ * tree hash, not commit SHA (plan D-A).
  *
  * Usage:
  *   candidate-identity.ts --tree <ref>

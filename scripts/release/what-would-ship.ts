@@ -3,15 +3,14 @@
  * "What would ship" — release-checklist.md step 2 / operations.md pre-launch
  * checklist step 5.
  *
- * The repo squash-merges `develop` into `main` (see candidate-identity.ts):
- * every commit that was ever squash-merged stays "not an ancestor of main"
- * forever, on both `develop` and any tag created on `main` afterward. That
- * means a plain `git log main..develop` — or even `git log <last-tag>..develop`
- * — never prunes: it lists every commit since the branches' common history
- * began, growing monotonically release after release (DO-M8, #835).
+ * Paisaxe historically squash-merged `develop` into `main`. Those old release
+ * commits remain outside `develop` ancestry even after release promotion moves
+ * to merge commits. A plain `git log <last-tag>..develop` therefore still
+ * includes already shipped history when the last tag names a historical
+ * squash release (DO-M8, #835).
  *
- * The fix: releases are identified by *tree* hash, not commit SHA (the same
- * reason candidate-identity.ts exists), and the release tag's annotation
+ * The fix remains useful across both topologies: releases are identified by
+ * *tree* hash, not commit SHA, and the release tag's annotation
  * records that tree (see release-checklist.md step 8: `git tag -a "v<version>"
  * -m "Release v<version> (tree <hash>)"`). That tree hash necessarily also
  * appears as some commit's tree on `develop` — the commit that was the
