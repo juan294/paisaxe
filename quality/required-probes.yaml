@@ -34,8 +34,8 @@ probes:
       command: npx tsx scripts/release/candidate-identity.ts --verify
     oracles: [identity]
     notes: >-
-      Binds the release to a tree hash rather than a commit SHA, because
-      squash merges do not preserve the tested SHA (plan D-A).
+      Binds the release to a tree hash rather than a commit SHA. The promotion
+      merge has a new SHA but must preserve the tested tree (plan D-A).
 
   - id: health-status
     title: "/api/health returns 200 and status healthy"

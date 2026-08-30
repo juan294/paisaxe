@@ -6,6 +6,7 @@
 - **Explicit release authorization remains mandatory**: the user must authorize the production merge in the current conversation
 - **All status checks must pass**: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Smoke test Vercel preview`
 - **Strict mode**: branch must be up to date with `main` before merge
+- **Release merge method**: merge commit; squash remains available only for feature PRs into `develop`
 - **dismiss_stale_reviews**: true — stale approvals are dismissed when new commits are pushed
 - **enforce_admins**: true — rules apply to repository admins as well
 - **Force pushes**: blocked
@@ -18,6 +19,7 @@
 | 2026-04-19 | Raised `required_approving_review_count` from 0 to 1 | Dependabot incident 2026-03-24 shipped broken Next.js 16.2.1 with 0-approval policy — a single self-approval click adds a deliberate pause before any production merge |
 | 2026-04-23 | Added `Smoke test Vercel preview` to required checks | Runtime-only failures must be blocked by a real-environment preview gate before merge |
 | 2026-08-10 | Lowered `required_approving_review_count` from 1 to 0 | GitHub rejects self-approval and the repository has no other collaborators; explicit current-conversation authorization plus strict required checks remain the production gate |
+| 2026-08-30 | Enabled merge commits for `develop` -> `main` releases | Preserve shared ancestry and remove the recurring post-release back-merge; release-path tests reject squash promotion |
 
 ## Rationale
 
@@ -36,6 +38,10 @@ gh api repos/juan294/paisaxe/branches/main/protection \
     print('Dismiss stale:', pr.get('dismiss_stale_reviews')); \
     print('Enforce admins:', d.get('enforce_admins',{}).get('enabled')); \
     print('Status checks:', [c['context'] for c in sc.get('checks',[])])"
+
+gh api repos/juan294/paisaxe \
+  --jq '{allow_merge_commit, allow_squash_merge, allow_rebase_merge}'
 ```
 
 The output must report `Approvals required: 0`, and the status-check list must include `Smoke test Vercel preview`.
+Repository settings must report `allow_merge_commit: true`; squash can remain enabled for feature PRs.

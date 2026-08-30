@@ -36,7 +36,7 @@ develop   # Active development (DEFAULT)
 
 1. All development happens on `develop`
 2. Never commit directly to `main` — it is protected with required status checks
-3. Release to production via PR: `develop` → `main` (see Production Release below)
+3. Release to production via a **merge-commit** PR: `develop` → `main` (see Production Release below). Never squash a release PR; feature PRs may still squash.
 4. Always run tests before committing
 5. **No PRs for `develop`** — commit/merge directly, verify CI, done
 6. **PRs required for `main`** — branch protection enforces CI must pass before merge
@@ -81,11 +81,11 @@ develop   # Active development (DEFAULT)
 **`docs/runbooks/release-checklist.md` is the single procedural authority.** Follow it; do not
 improvise a different sequence here or in any other file. Its ordering is:
 
-1. Identify the candidate (by **tree hash** — squash merges do not preserve the tested SHA)
+1. Identify the candidate by **tree hash** so the same proof works across the promotion merge and deployment
 2. Pre-deployment gates — full suite, `npm run check-migrations`, `npm run check-required-probes`,
    `npm run prelaunch`, the 6 gates in `docs/operations/pre-launch-security-checklist.md` (5
    manual, 1 CI-verified), and the mutating probes against the **local Docker** stack
-3. Merge and deploy — user says "go ahead", then `gh pr merge --squash`
+3. Merge and deploy — user says "go ahead", then `gh pr merge --merge`
 4. Verify the deployed identity matches the candidate tree
 5. Run the required probes (`quality/required-probes.yaml`)
 6. Analyze the evidence — `npm run analyze-release`

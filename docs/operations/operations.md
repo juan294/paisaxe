@@ -103,8 +103,8 @@ curl -s https://paisaxe.es/robots.txt
 ### 5. Git Status
 
 ```bash
-# Commits + file-level diffstat since the last release (see DO-M8, #835:
-# a plain `git log main..develop` never prunes under squash merges)
+# Commits + file-level diffstat since the last release. This handles the
+# historical squash-release ancestry described in DO-M8 and #835.
 npm run what-would-ship
 ```
 

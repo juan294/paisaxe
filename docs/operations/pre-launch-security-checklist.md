@@ -25,8 +25,8 @@ daily at 08:00 UTC.
 
 **How to verify:** Find the `Gitleaks secret scan` run for the exact
 commit/tree being released in the Actions tab — not just "the PR is green"
-(see `docs/runbooks/release-checklist.md` Step 1: squash merges don't
-preserve the tested SHA, releases are identified by tree hash). Do not
+(see `docs/runbooks/release-checklist.md` Step 1: the promotion merge has a
+new SHA, so releases are identified by tree hash). Do not
 manually re-run Gitleaks as a substitute for this check.
 
 **If the CI job ever fails:** Don't read the failure details from the public

@@ -26,12 +26,16 @@ verified in production. Tag before step 6 and the tag asserts something nobody c
 
 ## 1. Identify the candidate
 
-The repo squash-merges, so the commit SHA that CI tested never reaches `main`. The **tree** does:
-`strict: true` branch protection forces the PR branch up to date before merging, so the squashed
-commit carries the tested tree. Releases are therefore identified by tree hash.
+Release PRs use merge commits so `main` remains an ancestor of `develop`. The merge commit has a
+new SHA, but its **tree** must match the tested `develop` head. Releases therefore keep using tree
+identity from candidate selection through deployed verification.
 
 ```bash
 git fetch --all
+git merge-base --is-ancestor origin/main origin/develop || {
+  echo "STOP: main ancestry is missing from develop; a release PR was probably squashed"
+  exit 1
+}
 CANDIDATE_TREE=$(npx tsx scripts/release/candidate-identity.ts --tree origin/develop)
 echo "$CANDIDATE_TREE"
 ```
@@ -55,12 +59,11 @@ Before a release candidate can pass Preview smoke, configure the same
 the corresponding Vercel Production value. Configuration is an explicit
 production boundary; do not weaken or skip the check when a value is missing.
 
-`what-would-ship` (`scripts/release/what-would-ship.ts`) replaces a plain `git log main..develop`
-(DO-M8, #835): because the repo squash-merges, `main..develop` never prunes — every commit ever
-squash-merged stays "not an ancestor of main" forever, so the range grows monotonically release
-after release regardless of tagging. The script instead resolves the develop commit whose tree
-matches the last release tag's recorded tree (see step 8) and diffs from there, falling back
-explicitly to the `main`/`develop` merge-base — and saying so — when no release tag resolves yet.
+`what-would-ship` (`scripts/release/what-would-ship.ts`) resolves the `develop` commit whose tree
+matches the last release tag's recorded tree (see step 8) and diffs from there. This remains
+compatible with the historical squash releases whose ancestry cannot be repaired retroactively.
+It falls back explicitly to the `main`/`develop` merge-base — and says so — when no release tag
+resolves yet.
 
 Mutating verification runs against the local Docker stack, never a deployed environment —
 Preview shares the production Supabase project and holds live-mode Stripe keys.
@@ -89,7 +92,7 @@ Required contexts: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`,
 Report status and **stop**. Only after the user says "merge it":
 
 ```bash
-gh pr merge --squash                  # allow_merge_commit is false; --merge fails
+gh pr merge --merge                   # never squash a develop -> main release PR
 ```
 
 Never `--auto`: it merges unattended and bypasses the authorization gate.
