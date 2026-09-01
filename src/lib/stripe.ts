@@ -52,7 +52,7 @@ export function getPriceIdForPurchaseType(
  * Explicit pin prevents silent behavior changes when the SDK is upgraded.
  * Update this after reading the Stripe API changelog and testing locally.
  */
-const STRIPE_API_VERSION = "2026-07-29.dahlia" as const;
+const STRIPE_API_VERSION = "2026-08-26.dahlia" as const;
 
 /**
  * Get server-side Stripe client.
