@@ -160,10 +160,10 @@ describe("stripe", () => {
       // is verified here. The constant value is asserted via the export.
     });
 
-    it("exported STRIPE_API_VERSION matches the date-based Stripe API format", async () => {
+    it("uses the Stripe API version supported by stripe 22.6.0", async () => {
       // Re-import to access the internal constant via a workaround:
       // The constant is used in getStripeClient — we verify the Stripe
-      // constructor is called with an apiVersion that looks like a date string.
+      // constructor is called with the API version supported by this SDK release.
       // Since the module-level mock captures constructor args, use a spy.
       const StripeMod = await import("stripe");
       const CtorSpy = vi.spyOn(StripeMod, "default");
@@ -174,7 +174,7 @@ describe("stripe", () => {
       expect(CtorSpy).toHaveBeenCalledWith(
         "sk_test_version_check",
         expect.objectContaining({
-          apiVersion: expect.stringMatching(/^\d{4}-\d{2}-\d{2}/),
+          apiVersion: "2026-08-26.dahlia",
         })
       );
 
