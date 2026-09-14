@@ -2,19 +2,19 @@ import { describe, it, expect } from "vitest";
 import { collectTranslationKeys, getByPath, computeCoverage } from "./coverage";
 import type { Translations } from "./types";
 
+const NESTED_TRANSLATIONS = {
+  chat: {
+    placeholder: "What would you like to explore?",
+    title: "Chat",
+  },
+  settings: {
+    language: "Language",
+  },
+} as Translations;
+
 describe("collectTranslationKeys", () => {
   it("collects all leaf keys with dot notation", () => {
-    const translations = {
-      chat: {
-        placeholder: "What would you like to explore?",
-        title: "Chat",
-      },
-      settings: {
-        language: "Language",
-      },
-    } as Translations;
-
-    const keys = collectTranslationKeys(translations);
+    const keys = collectTranslationKeys(NESTED_TRANSLATIONS);
     expect(keys).toEqual(["chat.placeholder", "chat.title", "settings.language"]);
   });
 
@@ -25,23 +25,13 @@ describe("collectTranslationKeys", () => {
 });
 
 describe("getByPath", () => {
-  const translations = {
-    chat: {
-      placeholder: "What would you like to explore?",
-      title: "Chat",
-    },
-    settings: {
-      language: "Language",
-    },
-  } as Translations;
-
   it("returns the leaf value for a valid nested path", () => {
-    const value = getByPath(translations, "chat.placeholder");
+    const value = getByPath(NESTED_TRANSLATIONS, "chat.placeholder");
     expect(value).toBe("What would you like to explore?");
   });
 
   it("returns the nested object for a partial path", () => {
-    const value = getByPath(translations, "chat");
+    const value = getByPath(NESTED_TRANSLATIONS, "chat");
     expect(value).toEqual({
       placeholder: "What would you like to explore?",
       title: "Chat",
@@ -49,18 +39,18 @@ describe("getByPath", () => {
   });
 
   it("returns undefined for a non-existent path", () => {
-    const value = getByPath(translations, "nonexistent");
+    const value = getByPath(NESTED_TRANSLATIONS, "nonexistent");
     expect(value).toBeUndefined();
   });
 
-  it("returns undefined when accessing beyond a leaf node (line 25 — accessing property on string)", () => {
+  it("returns undefined when accessing beyond a leaf node", () => {
     // Attempting to access a property on a string value should return undefined
-    const value = getByPath(translations, "chat.placeholder.invalid");
+    const value = getByPath(NESTED_TRANSLATIONS, "chat.placeholder.invalid");
     expect(value).toBeUndefined();
   });
 
   it("returns undefined for deeply nested non-existent paths", () => {
-    const value = getByPath(translations, "chat.nonexistent.deeply");
+    const value = getByPath(NESTED_TRANSLATIONS, "chat.nonexistent.deeply");
     expect(value).toBeUndefined();
   });
 });

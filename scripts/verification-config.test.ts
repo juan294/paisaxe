@@ -99,8 +99,10 @@ describe("verification coverage config", () => {
   it("runs secret-free E2E coverage for Dependabot while preserving authenticated checks elsewhere", () => {
     const workflow = readText(".github/workflows/e2e.yml");
 
-    expect(workflow).toContain("github.event.pull_request.user.login != 'dependabot[bot]'");
+    expect(workflow).toContain("SECRETS_WITHHELD_PR:");
     expect(workflow).toContain("github.event.pull_request.user.login == 'dependabot[bot]'");
+    expect(workflow).toContain("if: env.SECRETS_WITHHELD_PR != 'true'");
+    expect(workflow).toContain("if: env.SECRETS_WITHHELD_PR == 'true'");
     expect(workflow).toContain("--grep-invert=\"QA Journey: Authenticated User\"");
     expect(workflow).toContain("NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co");
     expect(workflow).toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e");

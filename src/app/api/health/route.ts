@@ -405,7 +405,7 @@ function buildHealthResponse(
 }
 
 export async function GET(
-  request?: Request
+  request: Request
 ): Promise<NextResponse<PublicHealthResponse>> {
   const cronAuth = checkCronAuthConfigured();
   const sentryStatus = checkSentry();
