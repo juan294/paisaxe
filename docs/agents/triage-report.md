@@ -1,56 +1,90 @@
 # Triage Report
-> Generated on 2026-08-30 | 8 reports processed | 6 action items | 1 Dependabot PR
+
+> Generated on 2026-09-14 | 8 reports processed | `develop` dependency baseline `ce26513f`
 
 ## Agent Failures
-| Agent | Error | Log File |
-|-------|-------|----------|
-None — all agents ran successfully (no `.error.log` files modified in the last 24h).
+
+The September 10 QA run and the first September 14 restart aborted during startup or Phase 1. The final September 14 run completed successfully: 12/12 LLM quality checks and 10/10 executed browser journeys passed. One authenticated journey remains skipped because enabling its local credentials would run production test-user cleanup.
 
 ## Reports Reviewed
-| # | Report | Agent | Status | Action Items |
-|---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi sync | Up to date | 0 |
-| 2 | cost-analyst-report.md | Cost Analyst | WATCH | 2 (both flagged to user, not code fixes; 1 stale claim corrected) |
-| 3 | performance-report.md | Performance | GREEN | 0 |
-| 4 | coverage-report.md | Coverage | GREEN | 0 |
-| 5 | localization-report.md | Localization | GREEN (62 clean runs) | 0 |
-| 6 | documentation-report.md | Documentation | GREEN (33 clean runs) | 0 |
-| 7 | security-report.md | Security | GREEN | 1 (dependency batch attempted, reverted — see below) |
-| 8 | qa-report.md | QA | RED (harness bug, not product) | 3 (CORS fix, preflight guard, E2E gap) |
+
+| # | Report | Source status | Triage result |
+|---|---|---|---|
+| 1 | performance-report.md | YELLOW | Fixed the missing exact-byte largest-chunk gate. Fresh webpack output is 539,312 bytes, below 650 KiB. |
+| 2 | localization-report.md | PASS | No localization action required. |
+| 3 | coverage-report.md | GREEN | Preserved the useful coverage additions, removed one cache test that did not prove its claim, and verified the full suite. |
+| 4 | cost-analyst-report.md | WATCH | Replaced stale estimates with live billing and provider evidence. |
+| 5 | cc-rpi-update-report.md | Blocked by scheduled invocation policy | Ran the interactive updater. It stopped safely on ownership, setup-scope, and Codex capability conflicts. |
+| 6 | documentation-report.md | GREEN | No documentation gap. The voice health probe is already in the release checklist. |
+| 7 | qa-report.md | Prior run aborted | Recovered the harness and completed a GREEN run. |
+| 8 | security-report.md | YELLOW | Resolved all locally auditable dependencies and repaired Dependabot-safe CI. |
 
 ## Overall Status: YELLOW
 
-GREEN across performance, coverage, localization, documentation, and security's own vulnerability posture (0 advisories). YELLOW on QA (harness-only regression, now fixed) and on cost (ElevenLabs overage decision pending, user-controlled, 2-day deadline at report time). The dependency-batch attempt was reverted after breaking tests — filed as a tracked follow-up rather than shipped broken or skipped silently.
+The verified `develop` branch is green. Production remains YELLOW because the default `main` branch still carries 15 Dependabot alerts until a separately authorized release. GitHub code scanning and secret scanning are unavailable for this private repository under the current plan. The cc-rpi 2.0.2 update also requires an explicit adoption/setup decision.
 
-## Action Items Completed
-| # | Item | Source Report | Tests Added | Status |
-|---|------|--------------|-------------|--------|
-| 1 | Fixed QA-H4: exported `PLAYWRIGHT_TEST_ORIGIN` before `next start` in `scripts/qa-agent.sh` so the harness's own production server allowlists its own origin — restores LLM quality signal blocked since Aug 27 (403 "Origin not allowed" on all 12 tests) | qa-report.md | N/A (shell script) | Done |
-| 2 | Added an origin preflight probe (via existing `retry_curl_probe` helper) to `scripts/qa-agent.sh` so a future CORS misconfiguration reports as "harness blocked," not a false 0% safety/quality score | qa-report.md | N/A (shell script) | Done |
-| 3 | Added E2E coverage for `GET /api/stories` in `e2e/api.spec.ts` (previously unit-tested only, zero E2E coverage) | qa-report.md | 1 (Playwright) | Done |
-| 4 | **Attempted** the security-recommended 25-package minor/patch dependency batch (`npm update` + manual `@anthropic-ai/sdk`/`stripe` bumps) — passed `npm audit` clean (0 vulnerabilities) but broke 17 tests across 3 files. Root cause confirmed for `@sentry/core`/`@sentry/nextjs` (new transitive `@sentry/server-utils` throws `ERR_INVALID_URL_SCHEME` under vitest); root cause NOT isolated for `github-analytics-panel.test.tsx` (3 tests) despite bisecting every other changed package via clean `npm ci` reinstalls. **Fully reverted** (zero net diff to `package.json`/`package-lock.json`). Filed #951 with complete findings for a properly-resourced follow-up | security-report.md | N/A (reverted) | Reverted, tracked in #951 |
-| 5 | Deferred Dependabot PR #944 (`actions/checkout` 5→7, major bump, CI red on 3 required checks) with an explanatory comment; left open for manual review | Dependabot scan | N/A | Done |
-| 6 | Corrected stale claim: cost-analyst-report.md's P2 item "Set `NEXT_PUBLIC_SENTRY_DSN` in Vercel production" was already resolved per Aug 24 triage — noted in shared-context.md so it stops being restated | cost-analyst-report.md | N/A | Corrected (no code change needed) |
+## Actions Completed
 
-## GitHub Security & Quality Alerts
-| # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
-|---|------|----------|--------------|---------------|----------|--------|-------|
-| 1 | Code scanning (CodeQL) | — | — | — | repo-wide | Disabled (403) | Carried from Aug 18 — GHAS billing decision on a private repo, not auto-actionable. Gitleaks substitutes for secret scanning in CI. |
-| 2 | Secret scanning | — | — | — | repo-wide | Disabled (404) | Same as above. |
-| 3 | Dependabot security alerts | — | — | — | — | 0 open (GREEN) | Query succeeded, empty result. |
+| Area | Result |
+|---|---|
+| Security dependencies | Pinned fixed transitive versions for `fast-uri`, `browserslist`, `js-yaml`, `fflate`, `baseline-browser-mapping`, and `@humanfs/node`. `npm audit` reports 0 vulnerabilities. Next, Sharp, and Vitest were already fixed on `develop`. |
+| Dependabot CI | Added secret-free anonymous E2E for bot/fork PRs while retaining authenticated, fail-closed checks for trusted changes. Limited the Vercel-secret exception to bot/fork PRs. |
+| Coverage CI | Made the coverage merge depend on all successful shards and added `always()` so an intentionally skipped PR source gate cannot suppress it. The `Test` compatibility check now reports the real suite state. |
+| Performance | Enforced the existing 650 KiB largest-chunk budget using exact emitted bytes and fail-closed validation. Added three focused tests. |
+| Next route contracts | Corrected the health handler request signature and moved unsupported translate-route exports into a config module. Webpack analysis now builds cleanly. |
+| QA | Completed 5/5 integration checks, 12/12 LLM checks, and 10/10 executed browser journeys. GitHub issue creation stayed disabled. |
+| Live operations | Production `/api/health` and `/immersive` are healthy. Cron, Sentry, and Upstash probes pass. |
+| Cost evidence | ElevenLabs Creator usage is 16,413/100,000 characters; the five Paisaxe agents had zero calls in the last seven days. Anthropic shows $9.78 credit and $49.94 monthly spend against a $400 limit. |
+| Simplify review | Completed three cleanup passes for reuse, test clarity, and stale/generated instruction removal, then reverified the suite. |
 
-## Dependabot PRs
-| # | PR | Update Type | Disposition | Notes |
-|---|----|----|----|----|
-| 944 | `actions/checkout` 5 → 7 | Major | Deferred | CI red on 3 required checks (Playwright E2E, Test, Vercel env safety); major bump requires human review regardless of CI per policy. Comment posted explaining deferral. |
+## GitHub Security and Quality Alerts
+
+All 15 alerts below are fixed in `develop`. GitHub evaluates them against default branch `main`, so they remain open until release and rescan.
+
+| Alert | Severity | Package | Advisory | Fixed version |
+|---|---|---|---|---|
+| 119 | High | `js-yaml` | GHSA-2883-xcg3-v3hh | 4.3.2 |
+| 118 | Critical | `next` | GHSA-2xp9-vwfh-vxw4 | 16.3.3 |
+| 117 | Critical | `next` | GHSA-p293-qw3h-jr36 | 16.3.3 |
+| 116 | High | `sharp` | GHSA-rgj7-g3m4-5g8c | 0.35.4 |
+| 115 | Medium | `vitest` | GHSA-82fw-gwwq-j7x9 | 4.1.11 |
+| 114 | Medium | `baseline-browser-mapping` | GHSA-w5vr-8v7q-w6rv | 2.11.0 |
+| 113 | Medium | `@vitest/mocker` | GHSA-82fw-gwwq-j7x9 | 4.1.11 |
+| 112 | High | `browserslist` | GHSA-73wf-gq98-2v4g | 4.28.7 |
+| 111 | High | `browserslist` | GHSA-c83g-rgw3-j3cx | 4.28.7 |
+| 110 | Medium | `fflate` | GHSA-px8p-9vwx-vf98 | 0.4.9 |
+| 109 | Medium | `@humanfs/node` | GHSA-p498-v437-472g | 0.16.8 |
+| 108 | High | `fast-uri` | GHSA-5jgf-p345-68v8 | 4.1.3 |
+| 107 | High | `fast-uri` | GHSA-f65p-4m7j-42xc | 4.1.3 |
+| 106 | High | `fast-uri` | GHSA-fph4-wmhf-6fwf | 4.1.3 |
+| 105 | High | `fast-uri` | GHSA-jqff-g426-hqxp | 4.1.3 |
+
+Code scanning returns HTTP 403 and secret scanning returns HTTP 404. Repository settings expose Dependabot controls but no GitHub Advanced Security controls under the current private-repository plan. Gitleaks and `npm audit` remain active and green in CI.
+
+## Dependabot Pull Requests
+
+| PR | Update | Disposition |
+|---|---|---|
+| #964 | 25 production patch/minor updates | Merged after all CI, coverage, E2E, Lighthouse, security, bundle, license, dead-code, and Vercel checks passed. |
+| #963 | 2 development/type patch updates | Resolved the post-#964 lockfile conflict, verified the intended two-package diff, and merged after every check passed. |
+| #960 | `@vitest/coverage-v8` 5 major | Deferred with a comment for a coordinated Vitest 5 migration. |
+| #959 | Vitest 5 major | Deferred with a comment for compatibility review and a dedicated migration. |
+| #956 | `fast-uri` 4.1.4 targeting `main` | Closed as superseded by the verified `develop` fix. |
 
 ## Verification
-- [x] All tests passing (413 files, 7,869 tests)
-- [x] Typecheck clean (app, scripts, e2e, edge)
-- [x] Lint clean (src, scripts)
-- [ ] CI green — pending push and monitoring
 
-## Carried Items (user decisions, not code actions)
-- **ElevenLabs overage mitigation decision** (cost-analyst-report.md) — deadline Sep 1 (2 days from this triage run). Options: move personal agents to a separate ElevenLabs account (recommended), throttle activity, or shelve the service. Outside triage's code scope; flagged directly to the user.
-- **Twilio release/retain decision** — no action needed now, ~6.4 months of runway remaining (~Feb 2027 decision window).
-- **Dependency batch follow-up** (#951) — needs a dedicated investigation session to bisect the `github-analytics-panel.test.tsx` regression and confirm a Sentry version that doesn't break under vitest, before the 25-package batch can land safely.
+- [x] Full tests passed twice before the final CI correction: 415 files, 7,890 tests.
+- [x] Final CI correction passed the repository pre-commit gate: typecheck, lint, 415 files, 7,890 tests, and Knip.
+- [x] App, scripts, E2E, and Edge typechecks are clean.
+- [x] Source and scripts lint are clean.
+- [x] Fresh webpack bundle analysis passes; largest client chunk is 539,312 bytes.
+- [x] Focused workflow wiring test passes: 16 tests.
+- [x] Exact pushed baseline `6fe97451` passed CI, all four coverage shards and merge, E2E, visual regression, security, Lighthouse, dead-code, and Vercel checks.
+- [x] Dependabot PR #964 and #963 checks passed after refresh; both PRs were squash-merged into `develop`.
+
+## Carried Items
+
+- Release `develop` to `main` to ship the Next and Sharp fixes and allow GitHub to close the 15 default-branch alerts. This is a separate production gate.
+- Adopt cc-rpi 2.0.2 with the required setup scope and `resource:codex-permissions` capability. The updater proposed 276 operations and stopped without overwriting files because ownership was unproven.
+- Decide whether to separate the five dormant Paisaxe agents from the shared ElevenLabs account. Current usage is within plan, so there is no active overage incident.
+- Run authenticated production QA and a real Day Pass/Pelayo transaction only with production-data and payment authorization.
