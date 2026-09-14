@@ -90,6 +90,24 @@ describe("verification coverage config", () => {
     expect(workflow).toContain("npm run check-verification-coverage");
   });
 
+  it("runs coverage merge after successful shards even when the push-source job is skipped", () => {
+    const workflow = readText(".github/workflows/ci.yml");
+
+    expect(workflow).toContain("if: ${{ needs.coverage-shard.result == 'success' }}");
+  });
+
+  it("runs secret-free E2E coverage for Dependabot while preserving authenticated checks elsewhere", () => {
+    const workflow = readText(".github/workflows/e2e.yml");
+
+    expect(workflow).toContain("SECRETS_WITHHELD_PR:");
+    expect(workflow).toContain("github.event.pull_request.user.login == 'dependabot[bot]'");
+    expect(workflow).toContain("if: env.SECRETS_WITHHELD_PR != 'true'");
+    expect(workflow).toContain("if: env.SECRETS_WITHHELD_PR == 'true'");
+    expect(workflow).toContain("--grep-invert=\"QA Journey: Authenticated User\"");
+    expect(workflow).toContain("NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co");
+    expect(workflow).toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e");
+  });
+
   it("uses the body-parsing readiness monitor for Vercel health smoke checks, and does not run the dead develop-push smoke job (DO-H1)", () => {
     const ciWorkflow = readText(".github/workflows/ci.yml");
     const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
@@ -177,41 +195,41 @@ describe("verification coverage config", () => {
     expect(qaAgent).toContain('CURRENT_PHASE="phase 5 report generation"');
   });
 
-  it("fails (not silently skips) the Vercel env safety job when its secret is missing outside fork PRs", () => {
+  it("fails the Vercel env safety job when its secret is missing outside secret-withheld PRs", () => {
     const workflow = readText(".github/workflows/security.yml");
 
     // DO-M2 (#829): the job used to skip its only assertion whenever
     // VERCEL_TOKEN was unset and still report success on every push/
     // schedule run — requiredness without evidence, the same pattern
     // rejected for Dependabot in preview-smoke.yml. Skip-to-pass must now
-    // be scoped to fork PRs only (GitHub genuinely withholds secrets
-    // there); every other trigger with a missing secret must fail.
-    expect(workflow).toContain("Fail when Vercel credentials are unavailable (not a fork PR)");
-    expect(workflow).toContain("Skip when Vercel credentials are unavailable (fork PR)");
+    // be scoped to PRs where GitHub genuinely withholds secrets: forks and
+    // Dependabot. Every other trigger with a missing secret must fail.
+    expect(workflow).toContain("Fail when Vercel credentials are unavailable (trusted event)");
+    expect(workflow).toContain("Skip when Vercel credentials are unavailable (secret-withheld PR)");
 
     // The fail step's run body ends in `exit 1` right after its distinctive
-    // error line — proves the missing-secret/non-fork-PR path actually fails.
+    // error line — proves the missing-secret/trusted-event path actually fails.
     expect(workflow).toContain(
       '          echo "::error::This is the only automated check on deployed Vercel environment state in this repo (DO-M2 / issue #829) — it must fail rather than silently report success while checking nothing."\n' +
         "          exit 1"
     );
 
     // The skip step's last echo line is immediately followed by the next
-    // step (no `exit 1` in between) — proves the fork-PR path still passes.
+    // step (no `exit 1` in between) — proves the secret-withheld path passes.
     expect(workflow).toContain(
-      '          echo "Skipping the Vercel env safety assertion — this is expected sandboxing, not a missing-secret gap."\n' +
+      '          echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."\n' +
         "\n" +
         "      - name: Assert legacy agent override is absent from Vercel env"
     );
 
-    // The fail path must be gated on NOT being a fork PR; the skip path
-    // must be gated on genuinely being one. If these conditions were ever
-    // swapped, the job would go back to silently passing everywhere.
+    // The fail path must exclude only fork and Dependabot PRs; the skip path
+    // must accept only those same secret-withheld cases. If these conditions
+    // were ever widened, the job could silently pass on trusted events.
     expect(workflow).toContain(
-      "!(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true)"
+      "github.event.pull_request.user.login == 'dependabot[bot]'"
     );
     expect(workflow).toContain(
-      "github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true"
+      "github.event.pull_request.head.repo.fork == true"
     );
   });
 

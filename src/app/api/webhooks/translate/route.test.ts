@@ -3,9 +3,11 @@ import { NextRequest } from "next/server";
 import {
   POST,
   maxDuration,
+} from "./route";
+import {
   TRANSLATE_JOB_BATCH_SIZE,
   TRANSLATE_JOB_PER_JOB_MAX_SECONDS,
-} from "./route";
+} from "./config";
 import { logger } from "@/lib/logger";
 
 vi.mock("@/lib/supabase-admin", () => ({

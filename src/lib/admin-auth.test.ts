@@ -557,12 +557,13 @@ describe("validateAdminAuth", () => {
           error: null,
         });
         setupProfileMock({ role: "admin" });
-         
+
         await validateAdminAuth();
       }
 
       expect(getRoleCacheSize()).toBeLessThanOrEqual(ROLE_CACHE_MAX_ENTRIES);
     }, 20_000);
+
   });
 
   describe("cookie callbacks", () => {

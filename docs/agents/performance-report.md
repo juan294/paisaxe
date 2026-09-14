@@ -1,78 +1,93 @@
-# Performance Agent Report — 2026-08-27
+# Performance Agent Report — 2026-09-03
 
 ## Summary
 
-Status: **GREEN**. The 2026-08-24 triage action (raising the raw total-JS budget from 3,500 KB to 4,000 KB, per this agent's own P1 recommendation) has resolved last cycle's YELLOW. No source code, dependency count, or bundle content has changed since the Aug 24 build — this is a re-verification of a byte-identical build, not a new state.
+Status: **YELLOW**. All three *scripted* budget checks pass, but the largest single JS chunk (the ElevenLabs SDK, 729 KB) has silently exceeded its own defined 650 KB per-chunk budget by 79 KB (12%) — a real regression that `scripts/performance-agent.sh` does not currently check for (its `VIOLATIONS` logic only tests total JS, prod deps, and node_modules size). Total JS also grew 180 KB (5.6%) since the last fresh build (Aug 27), driven almost entirely by one dependency bump.
 
-- **Total JS**: 3,214 KB vs the new 4,000 KB budget = **80.4% utilized**, down from 91.8% last cycle purely because the ceiling moved, not because the bundle shrank. 786 KB of headroom now, versus 286 KB before.
-- **Per-route gzip budgets** (`npm run check-bundle-budget`, the authoritative per-visitor-download metric): ran fresh against this build — **all 84 routes pass**, with every route's KB figure byte-identical to the Aug 24 run (`/admin` 320.6/377.9 KB, `/immersive` 279.3/342.8 KB, `/favorites` 260.4/300.8 KB, `/pricing/checkout` 246.5/283.2 KB, the 68 story-detail routes at 243.6/274.4 KB each). This confirms zero drift at the route level, not just at the aggregate-chunk level.
-- **Build provenance**: fresh Turbopack production build (`.next/BUILD_ID` present, postdates the last source commit `ef475937`, 2026-08-24). This run's numbers are authoritative for both the raw-total and per-route metrics.
-- No new production dependency (34 → 34, unchanged since Aug 24). No largest-chunk-list entry changed size versus Aug 24's confirmed chunk-to-source mapping.
+- **Total JS**: 3,394 KB vs 4,000 KB budget = **84.8% utilized** (up from 80.4% on Aug 27 — real bundle growth, not a budget change).
+- **Root cause of growth, isolated by chunk-content grep**: `@elevenlabs/react` was bumped `1.13.0 -> 1.15.0` (commit `e76ce949`, "bump the production group with 18 updates", 2026-08-2x). The ElevenLabs chunk grew `586,584 B -> 746,426 B` (**+159,842 B, +27.2%**) — this single change accounts for **89% of the entire 180 KB total-JS increase**. The remaining ~20 KB traces to `posthog-js` (`1.418.6 -> 1.422.5`) plus `@sentry/core`/`@sentry/nextjs` (`10.70.0 -> 10.72.0`), which grew the PostHog+Sentry chunk by 23,523 B (+8.2%).
+- **Build provenance**: fresh build, `.next` postdates the last src/package.json commit (`7ceb429e`, "fix(deps): keep Sentry on verified version", 2026-09-01). Numbers are authoritative.
+- Production dependencies: 34/40 (unchanged). node_modules: 1,027 MB / 1,100 MB budget (93.4%), actually **down 6 MB** from Aug 27's 1,033 MB despite the version bumps above — improvement, not a concern.
 
 ## Key Metrics
 
 | Metric | Value | Budget | Status |
 |---|---|---|---|
-| Total JS (raw, all chunks) | 3,214 KB | 4,000 KB | Pass (80.4%) |
+| Total JS (raw, all chunks) | 3,394 KB | 4,000 KB | Pass (84.8%) |
 | Total CSS | 135 KB | — | Pass |
+| **Largest single chunk (ElevenLabs, deferred)** | **746,426 B (729 KB)** | **650 KB** | **FAIL (112%, +79 KB over)** — not caught by scripted checks |
 | Production dependencies | 34 | 40 | Pass (85%) |
-| node_modules | 1,033 MB | 1,100 MB | Pass (93.9%) — tightest tracked budget, but flat/declining trend |
-| Largest single chunk (ElevenLabs, deferred) | 586,584 B (573 KB) | 650 KB | Pass (88.1%) |
-| `/admin` (gzip, per-route) | 320.6 KB | 377.9 KB | Pass (84.8%) |
-| `/immersive` (gzip, per-route) | 279.3 KB | 342.8 KB | Pass (81.5%) |
-| `/favorites` (gzip, per-route) | 260.4 KB | 300.8 KB | Pass (86.6%) |
-| `/pricing/checkout` (gzip, per-route) | 246.5 KB | 283.2 KB | Pass (87.0%) |
-| Story detail pages (68 routes, gzip) | 243.6 KB | 274.4 KB | Pass (88.8%) — tightest per-route margin, most routes affected |
-| `/`, `/coming-soon`, `/_not-found` (gzip) | 233.3 KB | 274.4 KB | Pass (85.0%) |
-| `.next` build output | 369 MB | — | Informational (includes build cache; not a shipped artifact) |
+| node_modules | 1,027 MB | 1,100 MB | Pass (93.4%) — improved vs Aug 27 |
+| Sentry+Supabase chunk | 343,150 B (335 KB) | — | Flat (+743 B vs Aug 27, negligible) |
+| PostHog+Sentry chunk | 310,032 B (303 KB) | — | +23,523 B (+8.2%) vs Aug 27 |
+| react-dom chunk | 238,815 B (233 KB) | — | Byte-identical to Aug 27 |
+| framework-runtime chunk | 175,652 B (172 KB) | — | -159 B, negligible |
+| polyfill chunk | 112,594 B (110 KB) | — | Byte-identical to Aug 27 |
 
-`npm run check-bundle-budget` output: **"All 84 routes within budget."** (re-run live for this report, not carried from the metrics header, which omitted per-route data this cycle.)
+Chunk-to-source mapping was independently verified this cycle by grepping each of the top-6 largest chunk files for library-identifying strings (`elevenlabs`, `sentry`, `posthog`, `supabase`, `stripe`, `react-dom`), not carried forward from memory.
 
 ## Budget Status
 
-Nothing is exceeded, and for the first time in several cycles both tracked JS budgets have comfortable headroom:
-
-1. **Per-route gzip budgets** (what a visitor actually downloads) — 11–19% headroom everywhere, unchanged from Aug 24.
-2. **Raw total-JS budget** — 80.4% utilized (786 KB headroom), now the healthier of the two aggregate JS metrics after the Aug 24 budget correction.
-
-The one budget now running the tightest is **node_modules at 93.9%** (1,033 / 1,100 MB) — see P1 below. It is informational only (doesn't gate CI) but is worth a preemptive look given an incoming dependency batch.
+1. **Total JS budget (4,000 KB)** — Pass, 84.8% utilized. Headroom shrank from 786 KB to 606 KB this cycle; worth watching if another SDK-sized dependency bump lands before the next report.
+2. **Production deps (40)** — Pass, unchanged at 34.
+3. **node_modules (1,100 MB)** — Pass, 93.4%, improved 6 MB vs last cycle.
+4. **Largest single chunk (650 KB, defined in `scripts/performance-agent.sh:61`)** — **FAIL**. The ElevenLabs chunk is now 729 KB, 79 KB over. This budget exists in the script's config and header comment but is never compared against `LARGEST_CHUNKS` in the `VIOLATIONS` logic (`scripts/performance-agent.sh:182-192` only checks `TOTAL_JS_KB`, `PROD_DEPS`, `NODE_MODULES_MB`) — so this regression produced no alert.
 
 ## Top Optimization Opportunities
 
-### P1 (informational, no regression) — node_modules is now the tightest-margin budget; flat trend means no urgent action, but watch the next dependency batch
+### P1 (High impact, real regression) — ElevenLabs chunk exceeded its budget after a 2-minor-version bump
 
-At 1,033 / 1,100 MB (93.9%), `node_modules` has less headroom than either JS budget. Unlike the total-JS metric's climb before Aug 24, this one has been **flat-to-declining** across the last several cycles (1,047 MB May 9 -> 1,036 MB Jul 17 -> 1,033 MB Aug 24 -> 1,033 MB today), so there's no active drift to correct. The reason to flag it now: the security agent's Aug 27 report lists 25 outdated packages queued for the next batch, including `@elevenlabs/react` (3 minor versions behind) and the Stripe/`@supabase/ssr` trio. A batch of that size could plausibly add 10-30 MB. Recommendation: after the next dependency batch lands, re-run this agent (or `du -sh node_modules`) once — if it crosses ~1,080 MB, raise `BUDGET_NODE_MODULES_MB` in `scripts/performance-agent.sh:62` proactively rather than waiting for a violation, following the same pattern used for the total-JS budget on Aug 24. No action needed today.
+`@elevenlabs/react` went `1.13.0 -> 1.15.0` and added 159,842 B (156 KB) to its own chunk — a 27% jump for two minor releases, and enough on its own to push the chunk 79 KB past its documented 650 KB ceiling. This chunk remains fully deferred/click-to-mount (confirmed unchanged from the May 2026 optimization — it does not appear in any route's initial HTML), so it does not affect first-load performance for the ~100% of current sessions that never touch voice. But it does mean:
 
-### P2 (informational, unchanged) — Story-detail template remains the tightest per-route margin
+- Any user who *does* click into the voice widget now downloads 729 KB instead of 605 KB for that one interaction.
+- Given the Cost Analyst's Sep 3 report describes an overdue decision on whether to keep, throttle, or shelve ElevenLabs entirely (overage crisis, Sep 1 deadline passed), it is worth sequencing: if the decision is to shelve/separate the service, this bundle growth becomes moot. If ElevenLabs stays, this bump should be diffed before the next dependency batch.
 
-The 68 story-detail routes (`/story/*`) sit at 88.8% of their per-route gzip budget (243.6 / 274.4 KB) — unchanged byte-for-byte since Jul 17/Aug 24. This is not a regression; it's flagged because it's the largest route class (68 of 84 routes) and the one most likely to cross its line first if `src/components/immersive/story-viewer.tsx` or its 16 shared chunks grow. No action needed now; next agent touching that component should run `npm run check-bundle-budget` before merging.
+Recommended actions, in order:
+1. Run `npm run build:analyze` (webpack analyzer) scoped to this chunk to see what `1.14.0`/`1.15.0` added — check the package's CHANGELOG for new default-imported features (new voice models, waveform visualizers, etc. are common sources of this kind of jump).
+2. If the added code isn't used by Pelayo's current configuration, check whether `@elevenlabs/react` supports a narrower entry point/subpath import instead of the full package.
+3. Coordinate with the pending ElevenLabs cost decision — don't invest further bundle-optimization effort here until that decision lands.
 
-### P3 (closed) — Total-JS budget reconciliation
+### P2 (Process gap, low effort, high leverage) — Wire up the missing largest-chunk budget check
 
-Last cycle's P1 (raw total-JS budget nearing its ceiling due to diffuse dependency drift, recommending the budget be reconciled with the more accurate per-route gzip check) was actioned by the Aug 24 triage: `BUDGET_TOTAL_JS_KB` raised 3,500 -> 4,000 in `scripts/performance-agent.sh:60`. Utilization dropped from 91.8% to 80.4% with zero code change. Closing this item — no further action.
+`BUDGET_LARGEST_CHUNK_KB=650` has existed in `scripts/performance-agent.sh:61` since at least the May 2026 ElevenLabs optimization, but the script never actually compares it against `LARGEST_CHUNKS` (`scripts/performance-agent.sh:136-137`) in the `VIOLATIONS` block. This is why a 12%-over-budget regression shipped silently this cycle. Fix:
+
+```bash
+# after LARGEST_CHUNKS is computed (scripts/performance-agent.sh:137)
+LARGEST_CHUNK_BYTES=$(echo "$LARGEST_CHUNKS" | head -1 | awk '{print $1}')
+LARGEST_CHUNK_KB=$((LARGEST_CHUNK_BYTES / 1024))
+if [[ $LARGEST_CHUNK_KB -gt $BUDGET_LARGEST_CHUNK_KB ]]; then
+  VIOLATIONS="$VIOLATIONS\n- Largest chunk (${LARGEST_CHUNK_KB} KB) exceeds budget (${BUDGET_LARGEST_CHUNK_KB} KB)"
+fi
+```
+
+This closes the gap for good — the same class of "budget exists in a comment but isn't enforced" issue should not recur for this metric.
+
+### P3 (Low priority, dependency-driven) — PostHog+Sentry chunk +8.2%
+
+`posthog-js` (`1.418.6 -> 1.422.5`, 3 patch/minor releases) and `@sentry/core`/`@sentry/nextjs` (`10.70.0 -> 10.72.0`) together added 23,523 B to their shared chunk. `optimizePackageImports: ["lucide-react", "posthog-js"]` (`next.config.ts:19`) is still active, so this is tree-shaken growth, not a regression in configuration. No action needed — flagging only because it's the second-largest mover this cycle.
 
 ### Closed items (confirmed still holding, no regression)
 
-- ElevenLabs SDK remains fully deferred (click-to-mount, landed 2026-05-10) — the 573 KB chunk does not appear in any route's initial HTML and stays under its own 650 KB per-chunk budget.
-- `pdfjs-dist` and `pdf-parse` remain in `devDependencies` (`package.json:132-133`) — cannot leak into client bundles.
+- ElevenLabs SDK remains fully deferred (click-to-mount) — not in any route's initial HTML despite the size increase.
+- `pdfjs-dist`, `pdf-parse`, and `canvas` remain in `devDependencies` (`package.json:134-135,145`) — cannot leak into client bundles.
 - `optimizePackageImports: ["lucide-react", "posthog-js"]` confirmed active in `next.config.ts:19`.
-- All six chunks with a confirmed source mapping from the Aug 24 report (ElevenLabs 586,584 B, Supabase client 342,407 B, PostHog+Sentry 286,509 B, react-dom 238,815 B, framework-runtime 175,811 B, polyfill 112,594 B) are byte-identical in this build — independent confirmation that nothing shifted between the two runs.
+- react-dom, framework-runtime, and polyfill chunks are unchanged (byte-identical or within noise) — confirms the growth is isolated to the two dependency-bumped chunks, not a broad regression.
+- node_modules trend is flat-to-improving (1,033 MB Aug 27 -> 1,027 MB today) despite the dependency bumps landing.
 
-## Comparison to Previous Run (2026-08-24)
+## Comparison to Previous Run (2026-08-27)
 
-| Metric | Aug 24 | Aug 27 | Change |
+| Metric | Aug 27 | Sep 3 | Change |
 |---|---|---|---|
-| Total JS (raw) | 3,214 KB | 3,214 KB | 0 |
-| Total JS budget | 3,500 KB | 4,000 KB | +500 KB (triage action) |
-| Total JS budget utilization | 91.8% | 80.4% | -11.4pp (budget change only) |
+| Total JS (raw) | 3,214 KB | 3,394 KB | **+180 KB (+5.6%)** |
+| Total JS budget utilization | 80.4% | 84.8% | +4.4pp |
+| Largest chunk (ElevenLabs) | 586,584 B (573 KB) | 746,426 B (729 KB) | **+159,842 B (+27.2%)** — now over its 650 KB budget |
+| PostHog+Sentry chunk | 286,509 B (280 KB) | 310,032 B (303 KB) | +23,523 B (+8.2%) |
+| Sentry+Supabase chunk | 342,407 B (334 KB) | 343,150 B (335 KB) | +743 B (negligible) |
+| react-dom chunk | 238,815 B | 238,815 B | 0 (byte-identical) |
 | Total CSS | 135 KB | 135 KB | 0 |
 | Production dependencies | 34 | 34 | 0 |
-| Per-route gzip (all 84 routes) | Pass | Pass | Unchanged, byte-identical |
-| node_modules | 1,033 MB | 1,033 MB | 0 |
-| `.next` | 292 MB | 369 MB | +77 MB (build-cache artifact, not shipped bytes — see note) |
+| node_modules | 1,033 MB | 1,027 MB | -6 MB (improved) |
 
-Note on `.next` growth: the +77 MB is almost certainly Turbopack's incremental build cache, not new shipped output — the actual `static/chunks` total (3,214 KB) and every per-route gzip figure are unchanged. Not actionable; flagging only so a future cycle doesn't mistake cache growth for a shipped-bundle regression.
-
-No regressions this cycle. The build is byte-identical to Aug 24 at every level checked (aggregate, per-chunk, and per-route); the only change is the budget correction already actioned by triage.
+Regression this cycle: the ElevenLabs chunk crossed its 650 KB per-chunk budget, driven by the `@elevenlabs/react` 1.13.0->1.15.0 bump. This was not caught by automation because the per-chunk budget check was never wired up (see P2). No other metric regressed materially.
 
 ---

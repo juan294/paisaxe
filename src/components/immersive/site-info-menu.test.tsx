@@ -213,7 +213,7 @@ describe("SiteInfoMenu", () => {
       expect(mockSignOut).toHaveBeenCalled();
     });
 
-    it("uses 'Avatar' as alt text when user has avatarUrl but no name (lines 48, 88)", () => {
+    it("uses 'Avatar' as alt text when the user has no name", () => {
       mockUseAuth.mockReturnValue({
         user: { ...mockUser, name: null },
         session: { access_token: "token" } as never,
@@ -413,6 +413,25 @@ describe("SiteInfoMenu", () => {
 
       fireEvent.keyDown(menu, { key: "ArrowUp" });
       expect(document.activeElement).toBe(items[0]);
+    });
+
+    it.each([
+      ["moves forward", 0, false, 1],
+      ["wraps forward", -1, false, 0],
+      ["moves backward", 1, true, 0],
+      ["wraps backward", 0, true, -1],
+    ])("%s with Tab", (_case, startIndex, shiftKey, expectedIndex) => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      const menu = screen.getByRole("menu");
+      const resolveIndex = (index: number) =>
+        index < 0 ? items.length + index : index;
+      items[resolveIndex(startIndex)].focus();
+
+      fireEvent.keyDown(menu, { key: "Tab", shiftKey });
+      expect(document.activeElement).toBe(items[resolveIndex(expectedIndex)]);
     });
   });
 });

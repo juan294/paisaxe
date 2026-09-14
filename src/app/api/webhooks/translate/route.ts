@@ -6,20 +6,12 @@ import { translateWebhookSchema } from "@/lib/schemas";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { translateStory } from "@/lib/translate-story";
 import type { StoryLocale } from "@/types/immersive";
+import { TRANSLATE_JOB_BATCH_SIZE } from "./config";
 
-// BE-H6: Reduced lease to 3 minutes (180s). Each job takes ~5-15s so a
-// 3-job batch fits in ~45s, well within the 60s budget this route assumes
-// (see `maxDuration` below). Shorter lease means crashed handlers are
-// reclaimed faster than the old 10min.
+// BE-H6: Reduced lease to 3 minutes (180s). The configured batch fits within
+// maxDuration below, and the shorter lease reclaims crashed handlers faster
+// than the old 10-minute lease.
 const TRANSLATE_JOB_LEASE_SECONDS = 3 * 60; // 180 seconds
-// BE-H6: Reduced from 10 to 3. Exported so tests can verify `maxDuration`
-// (below) stays ahead of the worst-case batch duration it implies.
-export const TRANSLATE_JOB_BATCH_SIZE = 3;
-// BE-M3 (#784): worst observed per-job translation time, used below to
-// derive the batch's worst-case wall-clock duration. Exported so tests can
-// verify `maxDuration` stays ahead of this assumption instead of drifting
-// from it silently.
-export const TRANSLATE_JOB_PER_JOB_MAX_SECONDS = 15;
 
 // BE-M3 (#784): explicit ceiling for this route, replacing Vercel's implicit
 // project default. The batch-size/lease-second tuning above was already
