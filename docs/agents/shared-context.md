@@ -938,14 +938,16 @@ QA agent aborted during phase 1 LLM quality tests with exit status 1. See /Users
 - Cost Analyst Agent: No change to your ElevenLabs decision status — QA did not probe ElevenLabs billing/usage this cycle.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-09-14T10:22:00Z -->
+<!-- ENTRY:START agent=triage timestamp=2026-09-14T11:02:00Z -->
 ## Triage -- 2026-09-14
 - **Reports processed**: 8
-- **Action items resolved**: dependency advisories, CI trust paths, coverage merge, bundle-budget enforcement, webpack route contracts, QA recovery, live cost verification, and simplify findings
-- **Summary**: `npm audit` is clean, 7,890 tests pass twice with clean typecheck/lint, QA is GREEN (12/12 LLM and 10/10 journeys), production health is GREEN, and the largest client chunk is 539,312 bytes under the 650 KiB budget. cc-rpi 2.0.2 adoption and private-repo code/secret scanning remain unavailable without separate owner/setup changes.
+- **Actions resolved**: Fixed all 15 default-branch dependency alerts on `develop`; repaired bot/fork CI trust paths; made coverage merge run after an intentionally skipped PR source gate; enforced the exact-byte chunk budget; fixed webpack route contracts; recovered QA; verified live provider costs; completed simplify cleanup; merged Dependabot #964 and #963 after full green checks; deferred Vitest 5 majors #959/#960; closed superseded main-target PR #956.
+- **Evidence**: Local gates passed 415 files and 7,890 tests, typecheck, lint, Knip, action workflow checks, and webpack analysis. QA passed 12/12 LLM and 10/10 executed journeys. Largest client chunk is 539,312 bytes under 650 KiB. Production health is GREEN. ElevenLabs is at 16,413/100,000 characters with zero Paisaxe-agent calls in seven days.
+- **Remaining gates**: GitHub continues to show 15 alerts until `develop` is separately released to default branch `main`. Private-repo code and secret scanning controls are unavailable under the current plan. cc-rpi 2.0.2 adoption stopped safely on ownership, setup, and Codex capability conflicts. Authenticated production QA and real Day Pass/Pelayo payment need production-data authorization.
+
 **Cross-agent recommendations:**
-- [security]: Recheck GitHub alerts after the next production release; all 15 open alerts are fixed on `develop` but remain open against `main` until release.
-- [performance]: Use the enforced exact-byte largest-chunk check; current webpack evidence is 539,312 bytes and `@elevenlabs/react` exposes no narrower supported subpath.
-- [cost]: Replace the stale ElevenLabs overage warning with live Sep 14 evidence: 16,413/100,000 characters, 39 conversations from other products, and zero Paisaxe-agent calls in seven days. Account separation remains a product/account decision.
-- [qa]: Current run is GREEN. Authenticated journey credentials exist locally but the wrapper does not load them; enabling that path would run production test-user cleanup and needs the production-data gate.
+- [security]: Recheck GitHub alerts after the next production release; the fixed dependency graph is already on `develop`.
+- [performance]: Use the enforced emitted-byte check; current largest client chunk is 539,312 bytes.
+- [cost]: Treat the prior ElevenLabs overage as cleared. Account separation remains an owner decision for the shared account.
+- [qa]: Current run is GREEN. Keep the authenticated production journey behind the production-data gate.
 <!-- ENTRY:END -->
