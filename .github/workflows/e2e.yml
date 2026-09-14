@@ -55,6 +55,12 @@ jobs:
           cache: 'npm'
 
       - name: Check authenticated QA secrets
+        if: >-
+          ${{
+            github.event_name != 'pull_request' ||
+            (github.event.pull_request.head.repo.fork != true &&
+             github.event.pull_request.user.login != 'dependabot[bot]')
+          }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -100,7 +106,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
 
-      - name: Run E2E tests
+      - name: Run E2E tests with authenticated journey
+        if: >-
+          ${{
+            github.event_name != 'pull_request' ||
+            (github.event.pull_request.head.repo.fork != true &&
+             github.event.pull_request.user.login != 'dependabot[bot]')
+          }}
         run: npm run test:e2e
         env:
           CI: true
@@ -114,6 +126,31 @@ jobs:
           STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
           QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
           QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+
+      # GitHub withholds Actions secrets from Dependabot and fork PRs. Run the
+      # deterministic anonymous suite with dummy Supabase values in that trust
+      # context. Authenticated coverage remains mandatory for ordinary PRs and
+      # branch pushes, and every dependency update receives it again after the
+      # vetted change is integrated onto develop.
+      - name: Run E2E tests without secret-backed authenticated journey
+        if: >-
+          ${{
+            github.event_name == 'pull_request' &&
+            (github.event.pull_request.head.repo.fork == true ||
+             github.event.pull_request.user.login == 'dependabot[bot]')
+          }}
+        run: >-
+          npm run test:e2e --
+          --grep-invert="QA Journey: Authenticated User"
+        env:
+          CI: true
+          ANTHROPIC_API_KEY: dummy_key_for_e2e
+          VOYAGE_API_KEY: dummy_key_for_e2e
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e
+          MAINTENANCE_MODE: "false"
+          STRIPE_SECRET_KEY: sk_test_dummy_for_e2e
+          STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
