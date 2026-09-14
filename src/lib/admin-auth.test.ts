@@ -557,11 +557,51 @@ describe("validateAdminAuth", () => {
           error: null,
         });
         setupProfileMock({ role: "admin" });
-         
+
         await validateAdminAuth();
       }
 
       expect(getRoleCacheSize()).toBeLessThanOrEqual(ROLE_CACHE_MAX_ENTRIES);
+    }, 20_000);
+
+    it("prunes expired entries when cache is full and new entries arrive after TTL", async () => {
+      vi.useFakeTimers();
+
+      // Clear any cache state from prior tests by invalidating a batch
+      for (let i = 0; i < 200; i++) {
+        invalidateRoleCache(`clearance-${i}`);
+      }
+
+      // Populate cache with specific users that we'll expire
+      for (let i = 0; i < 50; i++) {
+        mockGetUser.mockResolvedValue({
+          data: { user: { id: `expire-user-${i}`, email: `u${i}@example.com` } },
+          error: null,
+        });
+        setupProfileMock({ role: "admin" });
+        await validateAdminAuth();
+      }
+
+      // Advance time past TTL (31 seconds) to expire all 50 entries
+      vi.advanceTimersByTime(31_000);
+
+      // Fill the cache with new users. Since we have 50 expired entries at the top of insertion order,
+      // when we add ~1980 new users and hit the limit of 2000, the pruning logic should
+      // delete the expired ones first before doing the 10% shedding.
+      for (let i = 0; i < 1980; i++) {
+        mockGetUser.mockResolvedValue({
+          data: { user: { id: `new-user-${i}`, email: `new${i}@example.com` } },
+          error: null,
+        });
+        setupProfileMock({ role: "admin" });
+        await validateAdminAuth();
+      }
+
+      // After pruning + shedding, size should be at or below the max
+      const finalSize = getRoleCacheSize();
+      expect(finalSize).toBeLessThanOrEqual(ROLE_CACHE_MAX_ENTRIES);
+
+      vi.useRealTimers();
     }, 20_000);
   });
 

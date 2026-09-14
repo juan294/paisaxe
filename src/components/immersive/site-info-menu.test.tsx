@@ -414,5 +414,53 @@ describe("SiteInfoMenu", () => {
       fireEvent.keyDown(menu, { key: "ArrowUp" });
       expect(document.activeElement).toBe(items[0]);
     });
+
+    it("navigates with Tab key (lines 61-69 — Tab without shift)", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      const menu = screen.getByRole("menu");
+      items[0].focus();
+
+      fireEvent.keyDown(menu, { key: "Tab" });
+      expect(document.activeElement).toBe(items[1]);
+    });
+
+    it("wraps Tab from the last item to the first item", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      const menu = screen.getByRole("menu");
+      items[items.length - 1].focus();
+
+      fireEvent.keyDown(menu, { key: "Tab" });
+      expect(document.activeElement).toBe(items[0]);
+    });
+
+    it("navigates backward with Shift+Tab", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      const menu = screen.getByRole("menu");
+      items[1].focus();
+
+      fireEvent.keyDown(menu, { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(items[0]);
+    });
+
+    it("wraps Shift+Tab from the first item to the last item", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      const items = screen.getAllByRole("menuitem");
+      const menu = screen.getByRole("menu");
+      items[0].focus();
+
+      fireEvent.keyDown(menu, { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(items[items.length - 1]);
+    });
   });
 });
