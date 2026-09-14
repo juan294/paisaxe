@@ -1,3 +1,14 @@
-cc-rpi sync: already up to date as of v1.28.2.
+## cc-rpi sync report
 
-The paisaxe project was last synced to commit a7da821 (v1.28.2). The current cc-rpi HEAD is 2229ac2, which contains only CI workflow changes (.github/workflows/coverage.yml and scripts/report-coverage.sh) that fall outside the template-managed areas (commands, skills, rules, CLAUDE.md, AGENTS.md, settings.json). No template updates are needed.
+**Status:** Cannot proceed — invocation controls prevent scheduled execution.
+
+**Situation:**
+- **Paisaxe current sync:** v1.29.0 (last synced 2026-09-03)
+- **Blueprint current version:** v2.0.2
+- **Version gap:** Major upgrade available (v1.29.0 → v2.0.2)
+
+**Issue:**
+The `/rpi-update` workflow (the new, recommended sync mechanism) has `disable-model-invocation: true`, which prevents scheduled agents from executing it. This is an intentional security control — the skill is reserved for explicit user invocation only.
+
+**Next steps:**
+Run `/rpi-update` in an interactive session to sync paisaxe to the latest blueprint.

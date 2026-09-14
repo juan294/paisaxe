@@ -107,6 +107,17 @@ describe("sanitizeSentryEvent", () => {
     expect(event.request?.url).toBe("/api/chat");
   });
 
+  it("leaves request.url undefined when not provided (line 37 — normalizeUrlToPath no-op path)", async () => {
+    const event = await sanitizeSentryEvent({
+      request: {
+        headers: { "content-type": "application/json" },
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.request?.url).toBeUndefined();
+  });
+
   it("removes request.query_string entirely", async () => {
     const event = await sanitizeSentryEvent({
       request: {
