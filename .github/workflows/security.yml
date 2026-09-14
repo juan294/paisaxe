@@ -98,20 +98,22 @@ jobs:
       # assertion step and still report success on every push/schedule run —
       # "requiredness without evidence," the same pattern this project
       # rejected for Dependabot preview smoke tests (see the Dependabot
-      # branch in preview-smoke.yml). Skip-to-pass is now reserved for fork
-      # PRs, where GitHub genuinely withholds secrets (expected sandboxing,
-      # not a gap). On push/schedule/same-repo-PR runs, a missing token now
-      # fails the job loudly instead of silently passing.
+      # branch in preview-smoke.yml). Skip-to-pass is reserved for fork and
+      # Dependabot PRs, where GitHub genuinely withholds secrets (expected
+      # sandboxing, not a gap). On push, schedule, and ordinary same-repo PR
+      # runs, a missing token fails the job loudly instead of silently passing.
       #
       # ACTION REQUIRED (human, repo admin): add VERCEL_TOKEN under
       # Settings → Secrets and variables → Actions → Secrets. Until that is
       # done, this job is EXPECTED to fail on every push/schedule run — that
       # is the fix working as intended, not a regression.
-      - name: Fail when Vercel credentials are unavailable (not a fork PR)
+      - name: Fail when Vercel credentials are unavailable (trusted event)
         if: >-
           ${{
             (env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '') &&
-            !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true)
+            !(github.event_name == 'pull_request' &&
+              (github.event.pull_request.head.repo.fork == true ||
+               github.event.pull_request.user.login == 'dependabot[bot]'))
           }}
         run: |
           echo "::error::Vercel env safety check cannot run: VERCEL_TOKEN (secret) plus VERCEL_PROJECT_ID and VERCEL_ORG_ID (repo variables) are required."
@@ -119,15 +121,17 @@ jobs:
           echo "::error::This is the only automated check on deployed Vercel environment state in this repo (DO-M2 / issue #829) — it must fail rather than silently report success while checking nothing."
           exit 1
 
-      - name: Skip when Vercel credentials are unavailable (fork PR)
+      - name: Skip when Vercel credentials are unavailable (secret-withheld PR)
         if: >-
           ${{
             (env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '') &&
-            github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true
+            github.event_name == 'pull_request' &&
+            (github.event.pull_request.head.repo.fork == true ||
+             github.event.pull_request.user.login == 'dependabot[bot]')
           }}
         run: |
-          echo "Fork PRs cannot read repository secrets (GitHub withholds them from forked-repo workflow runs)."
-          echo "Skipping the Vercel env safety assertion — this is expected sandboxing, not a missing-secret gap."
+          echo "GitHub withholds repository secrets from fork and Dependabot PR workflow runs."
+          echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."
 
       - name: Assert legacy agent override is absent from Vercel env
         if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_PROJECT_ID != '' && env.VERCEL_ORG_ID != '' }}
