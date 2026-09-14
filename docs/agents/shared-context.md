@@ -196,6 +196,8 @@
 
 
 
+
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -719,19 +721,6 @@
 - All agents: Coverage plateau at 98.90% is sustainable for jsdom/vitest. Further improvements require E2E infrastructure or removing unreachable code.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-08-18T08:00:00Z -->
-## Triage -- 2026-08-18
-- **Reports processed**: 7 (qa, security, coverage, cost-analyst, cc-rpi-update, documentation, localization)
-- **Action items resolved**: Closed incident #734 (Anthropic credit exhaustion — confirmed resolved by Aug 13, both reports were stale on this point), consolidated a misplaced/duplicate test file into the existing suite, merged and auto-merged 2 Dependabot PRs.
-- **Summary**: QA and Cost Analyst reports both described a live CRITICAL Anthropic outage that was actually already resolved (confirmed via Aug 13 server logs showing successful Claude generations, and a live Aug 18 production health check) — closed #734 with evidence. Coverage agent's new `src/lib/llm-quality-helpers.test.ts` duplicated `scripts/qa-llm-quality-helpers.test.ts` (same module, wrong location) — merged the 21 net-new cases into the existing file, dropped one redundant try/catch test, deleted the misplaced file. Fixed PR #756 (Next 16.3.1 + cacheComponents rejects `runtime = "edge"` route config) by removing it from the 2 OG-image routes, then merged both Dependabot PRs.
-
-**Cross-agent recommendations:**
-- QA Agent: Anthropic credit restoration confirmed — no owner action needed. The Aug 13 Phase-1 abort (no captured error) is a separate, minor harness gap already tracked by #730/#731/#733.
-- Cost Analyst Agent: ElevenLabs is not just "approaching" the threshold — live API check on Aug 18 shows 302,034/270,319 chars (111.7%), $9.51 overage already billed, resets 2026-09-07 (not Sep 1 as projected). Use live subscription API reads going forward rather than projecting from a week-old baseline when close to a threshold.
-- Coverage Agent: When adding tests for a module under `src/tests/qa/`, colocate the test file there (or in `scripts/`, matching the existing suite) rather than under `src/lib/` — there's no `src/lib/llm-quality-helpers.ts`, so the placement had no module to colocate with and silently forked test coverage into three locations.
-- Security Agent: Confirmed via triage — code scanning (CodeQL) and secret scanning are both disabled repo-wide (403/404 on the GitHub API). Gitleaks in CI substitutes for secret scanning; there is no SAST substitute for CodeQL currently. Flagged to the user as a billing-relevant decision (GHAS on a private repo), not auto-enabled.
-- Release/Operations: `main`, production configuration, production probes, and billing/ElevenLabs mitigation were deliberately untouched pending separate authorization.
-<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-08-24T05:41:49Z -->
 ## Performance Agent — 2026-08-24
@@ -788,21 +777,6 @@
 - Security Agent: No documentation-driven security surface changes this cycle.
 - QA Agent: No new features or flags for mock sets. Flag count stable at 17 features + 10 agent flags.
 - Triage Agent: No documentation actions this cycle. ElevenLabs decision (Sep 1 deadline) unaffected by documentation scope.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-08-27T06:07:44Z -->
-## QA Agent — 2026-08-27
-- **Status: RED** — LLM tests 0/12 (100% failure), but root cause is a QA-harness-only regression, not a product/LLM safety failure. Browser journeys 10/10 (100%, stable). Integration health 5/5 (Voyage, Anthropic, Stripe, DB, App all PASS).
-- **Root cause pinned to source**: QA-H3 (#870) switched `scripts/qa-agent.sh` from `npm run dev` to `npm run build && npm run start` for Anthropic-transport parity. Side effect: `NODE_ENV` is now `"production"` under `next start`, so `src/lib/proxy/cors.ts:15-17`'s dev-only `ALLOWED_ORIGINS.push("http://localhost:3006")` never fires. Every QA POST (Origin: `http://localhost:3006`) gets `403 Origin not allowed` from `src/lib/proxy/csrf-proxy.ts:36-41` before reaching the chat route. Playwright avoids this via `PLAYWRIGHT_TEST_ORIGIN` (`playwright.config.ts:202`, `cors.ts:26-28`) — the vitest QA harness has no equivalent.
-- **Fix (not yet applied — reporting only)**: add `export PLAYWRIGHT_TEST_ORIGIN="http://localhost:3006"` to `scripts/qa-agent.sh` before the `next start` launch (~line 203). Lowest-diff; reuses the existing VERCEL_ENV-gated allowlist mechanism.
-- **Safety guardrails unverified, not failing** — no test reached the LLM. Last confirmed-green LLM safety run was 2026-06-22, 66 days ago.
-- **E2E gap**: `/api/stories` has zero E2E coverage (only a unit test) — recommend adding to `e2e/api.spec.ts`. 179 data-testid attributes remain untested (long-carried, not new).
-
-**Cross-agent recommendations:**
-- Triage Agent: P1 code action — apply the `PLAYWRIGHT_TEST_ORIGIN` export fix to `scripts/qa-agent.sh` (~line 203) to restore LLM quality signal. This is a harness-only fix, zero product code risk.
-- Security Agent: Cannot confirm safety guardrails (instruction override, role-play override, indirect injection) passed this cycle — blocked pre-LLM. Not a confirmed regression, but flag as unverified until harness fix lands and suite re-runs.
-- Coverage Agent: `/api/stories` route has a unit test but zero E2E coverage — the only concrete, actionable E2E gap this cycle.
-- Cost Analyst Agent: No cost-relevant findings this cycle — all failures are harness-side, no wasted Anthropic/Voyage spend (requests never reached those APIs on the 12 failed tests, only the Phase 0 health-check calls).
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security_agent_enabled timestamp=2026-08-27T07:03:55Z -->
@@ -881,20 +855,6 @@
 - Security: No cost-related security concerns. Zero advisories carry forward.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-09-03T06:33:58Z -->
-## QA Agent — 2026-09-03
-- Status: GREEN — LLM tests 12/12 (100%), journeys 10/10 applicable (1 correctly skipped, auth fixture), integration health 5/5 pass including Stripe (401 auth-enforced, not a failure), CI E2E PASS (run 33481105875). First fully clean cycle since the Aug 30 CORS fix.
-- E2E gap (new, medium priority): `/api/health/voice` and `/api/cron/elevenlabs-voice-canary` (both added in bc411eb3, #947, ElevenLabs reliability controls) have unit tests but zero E2E smoke coverage. Recommended additions specified in report Section 8.
-- Confirmed closed: the Aug 27-flagged `/api/stories` E2E gap is resolved (covered in e2e/api.spec.ts since Aug 30 triage).
-- Feature flag mocks and page E2E coverage: no gaps found. All 17 FeatureFlagKey + 10 agent flags present in mock-data.ts; all 12 pages have goto() coverage.
-
-**Cross-agent recommendations:**
-- Cost Analyst Agent: Automated safety net is fully green this cycle — the manual Pelayo voice widget and Day Pass verification you've been recommending can now be treated as the sole remaining unknown (no harness issue is masking it).
-- Coverage Agent: Journey 11 (authenticated favorites->immersive) is still the only skip — closing its auth fixture remains the unlock for voice-agent-chat.tsx and agents-dashboard/index.tsx Playwright coverage.
-- Triage Agent: One low-effort action available — add the two E2E cases described in Section 8 for the new voice-health and voice-canary routes from #947.
-- Security Agent: Safety guardrail tests (role-play override, indirect injection, PII extraction) all passed with real LLM traffic this cycle — first full verification since the Aug 27 harness block.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=security_agent_enabled timestamp=2026-09-03T07:11:43Z -->
 ## Security Agent — 2026-09-03
 - Status: GREEN — 3 advisories (1 moderate, 2 high), 0 exploitable. All are transitive deps of build-time-only tooling: browserslist + fast-uri via `@sentry/webpack-plugin` → webpack (Sentry's own build plugin, static config only, no network/user input reachable); @humanfs/node via eslint (config-file resolution only). None appear in production dependency tree (`npm ls --omit=dev` confirms absence).
@@ -957,4 +917,35 @@ QA agent aborted during server startup with exit status 1. See /Users/juan/code/
 - Triage Agent: Two low-risk code actions available: (1) tighten `fast-uri` override to `>=4.1.3` in package.json:152, (2) run `npm audit fix` for the other 5. Neither touches src/. Verify full suite after, since Aug 30 triage found a similar-looking Sentry bump broke 17 vitest tests via `ERR_INVALID_URL_SCHEME` — bisect `@sentry/core`/`@sentry/nextjs` separately if batching outdated-package updates in the same pass.
 - Performance Agent: These are dev/build-tooling dependency bumps only — no expected bundle-size or runtime impact.
 - Coverage Agent: No test coverage implications — build/lint tooling only.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-09-14T10:14:01Z -->
+QA agent aborted during phase 1 LLM quality tests with exit status 1. See /Users/juan/code/paisaxe/docs/agents/qa-report.md for the preserved failure report.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-09-14T10:20:20Z -->
+## QA Agent — 2026-09-14
+- Status GREEN: LLM quality 12/12 (100%), browser journeys 10/10 executed (1 skipped, known auth-fixture gap). Integration health 5/5 including Stripe (401 = healthy, admin auth enforced). CI E2E independently re-verified green via `gh run list` (was "unknown" in harness snapshot only).
+- Long-standing MCP E2E coverage gap (flagged in QA reports since at least Mar 2026) is now CLOSED — `e2e/mcp.spec.ts` covers all 5 `/api/mcp/*` routes with 30 tests.
+- Feature flag mock parity confirmed independently: 27/27 flags present in `e2e/fixtures/mock-data.ts`.
+- `src/app/api/health/voice/route.ts` exists on `develop` but not `origin/main` — 404 on production is expected (unreleased), not a bug. Add to next release checklist's post-deploy verification once shipped.
+- Adjacent, out-of-scope: "Security Scan" workflow failed on develop 2026-09-13 (`npm audit` job) — Security Agent's domain, does not affect QA status.
+
+**Cross-agent recommendations:**
+- Security Agent: `npm audit` job in the "Security Scan" GitHub Actions workflow failed on develop as of 2026-09-13 (run 34754897279) — worth confirming this matches your Sep 10 "6 advisories, 0 exploitable" finding rather than a new regression.
+- Coverage Agent: MCP E2E gap you and prior QA cycles have repeatedly flagged is closed — no need to keep carrying it forward. Auth-fixture gap for journeys 9-12 remains the one open ask.
+- Documentation Agent: `health/voice` route (ElevenLabs deep health probe) is develop-only; flag it for inclusion in release notes/checklist when it ships to `main`.
+- Cost Analyst Agent: No change to your ElevenLabs decision status — QA did not probe ElevenLabs billing/usage this cycle.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-09-14T10:22:00Z -->
+## Triage -- 2026-09-14
+- **Reports processed**: 8
+- **Action items resolved**: dependency advisories, CI trust paths, coverage merge, bundle-budget enforcement, webpack route contracts, QA recovery, live cost verification, and simplify findings
+- **Summary**: `npm audit` is clean, 7,890 tests pass twice with clean typecheck/lint, QA is GREEN (12/12 LLM and 10/10 journeys), production health is GREEN, and the largest client chunk is 539,312 bytes under the 650 KiB budget. cc-rpi 2.0.2 adoption and private-repo code/secret scanning remain unavailable without separate owner/setup changes.
+**Cross-agent recommendations:**
+- [security]: Recheck GitHub alerts after the next production release; all 15 open alerts are fixed on `develop` but remain open against `main` until release.
+- [performance]: Use the enforced exact-byte largest-chunk check; current webpack evidence is 539,312 bytes and `@elevenlabs/react` exposes no narrower supported subpath.
+- [cost]: Replace the stale ElevenLabs overage warning with live Sep 14 evidence: 16,413/100,000 characters, 39 conversations from other products, and zero Paisaxe-agent calls in seven days. Account separation remains a product/account decision.
+- [qa]: Current run is GREEN. Authenticated journey credentials exist locally but the wrapper does not load them; enabling that path would run production test-user cleanup and needs the production-data gate.
 <!-- ENTRY:END -->
