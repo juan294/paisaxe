@@ -173,7 +173,7 @@ jobs:
     # on develop_push_source. That source-validation job is intentionally
     # skipped on PRs, and GitHub's implicit success() would otherwise skip this
     # job even after all four matrix shards succeeded.
-    if: ${{ needs.coverage-shard.result == 'success' }}
+    if: ${{ always() && needs.coverage-shard.result == 'success' }}
 
     steps:
       - name: Checkout code

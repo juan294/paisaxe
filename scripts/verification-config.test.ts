@@ -93,7 +93,9 @@ describe("verification coverage config", () => {
   it("runs coverage merge after successful shards even when the push-source job is skipped", () => {
     const workflow = readText(".github/workflows/ci.yml");
 
-    expect(workflow).toContain("if: ${{ needs.coverage-shard.result == 'success' }}");
+    expect(workflow).toContain(
+      "if: ${{ always() && needs.coverage-shard.result == 'success' }}",
+    );
   });
 
   it("runs secret-free E2E coverage for Dependabot while preserving authenticated checks elsewhere", () => {
