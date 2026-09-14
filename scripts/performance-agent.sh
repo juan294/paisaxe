@@ -25,6 +25,7 @@ trap 'ec=$?; { printf "[ERROR] %s FATAL: command failed at line %s (exit %s) —
 
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
+source "$PROJECT_DIR/scripts/lib/performance-budget.sh"
 
 # Check if agent is enabled via feature flags
 log_info "=== Performance Agent starting ===" | tee -a "$LOG_FILE"
@@ -182,6 +183,7 @@ fi
 
 # Determine budget violations
 VIOLATIONS=""
+VIOLATIONS="${VIOLATIONS}$(largest_chunk_budget_violation "$LARGEST_CHUNKS" "$BUDGET_LARGEST_CHUNK_KB")"
 if [[ $TOTAL_JS_KB -gt $BUDGET_TOTAL_JS_KB ]]; then
   VIOLATIONS="$VIOLATIONS\n- Total JS ($TOTAL_JS_KB KB) exceeds budget ($BUDGET_TOTAL_JS_KB KB)"
 fi
