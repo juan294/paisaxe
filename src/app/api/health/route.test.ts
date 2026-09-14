@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "./route";
 import { PROBE_TIMEOUTS_MS } from "@/lib/health-timeouts";
 
+const makePublicHealthRequest = () =>
+  new Request("http://localhost/api/health");
+
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: vi.fn(),
@@ -161,7 +164,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -188,7 +191,7 @@ describe("GET /api/health", () => {
     mockSupabaseProbeError("Connection refused");
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -202,7 +205,7 @@ describe("GET /api/health", () => {
     mockStoryCount(0, null);
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -213,7 +216,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(6871954637);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -235,7 +238,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -255,7 +258,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -273,7 +276,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -284,7 +287,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSizeError("permission denied for function get_database_size");
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -301,7 +304,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseSize(129394278);
 
-      await GET();
+      await GET(makePublicHealthRequest());
 
       expect(getAdminClient).toHaveBeenCalled();
       expect(supabase.rpc).not.toHaveBeenCalled();
@@ -311,7 +314,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseSizeError("permission denied for function get_database_size");
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -323,7 +326,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseSizeError("permission denied for function get_database_size");
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -335,7 +338,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseRpc(abortable(Promise.reject(new Error("Unexpected DB error"))));
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -347,7 +350,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseRpc(abortable(new Promise(() => {})));
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -362,7 +365,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseSize(129394278);
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -373,7 +376,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseSizeError("permission denied for function get_database_size");
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(data).not.toHaveProperty("database");
@@ -394,7 +397,7 @@ describe("GET /api/health", () => {
       mockDatabaseSize(129394278);
       mockVoicePurchasesOk();
 
-      await GET();
+      await GET(makePublicHealthRequest());
 
       expect(adminFrom).toHaveBeenCalledWith("voice_purchases");
       expect(supabase.from).not.toHaveBeenCalledWith("voice_purchases");
@@ -405,7 +408,7 @@ describe("GET /api/health", () => {
       mockDatabaseSize(129394278);
       mockVoicePurchasesError("permission denied for table voice_purchases");
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -419,7 +422,7 @@ describe("GET /api/health", () => {
       mockDatabaseSize(129394278);
       mockVoicePurchasesError("permission denied for table voice_purchases");
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -435,7 +438,7 @@ describe("GET /api/health", () => {
         throw new Error("Unexpected admin client error");
       });
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -449,7 +452,7 @@ describe("GET /api/health", () => {
       mockDatabaseSize(129394278);
       mockVoicePurchasesOk();
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -461,7 +464,7 @@ describe("GET /api/health", () => {
       mockDatabaseSize(129394278);
       mockVoicePurchasesError("permission denied for table voice_purchases");
 
-      const response = await GET();
+      const response = await GET(makePublicHealthRequest());
       const data = await response.json();
 
       expect(data).not.toHaveProperty("voice_purchases");
@@ -489,7 +492,7 @@ describe("GET /api/health", () => {
     mockDatabaseSize(129394278);
 
     const start = Date.now();
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const elapsed = Date.now() - start;
     const data = await response.json();
 
@@ -528,7 +531,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
 
     expect(response.status).toBe(200);
     expect(capturedSignal).toBeInstanceOf(AbortSignal);
@@ -548,7 +551,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -559,7 +562,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseRpc(abortable(new Promise(() => {})));
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     // Database timeout returns null usage_percent → not over threshold → healthy
@@ -571,7 +574,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseRpc(abortable(Promise.reject(new Error("Unexpected DB error"))));
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -582,7 +585,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    await GET();
+    await GET(makePublicHealthRequest());
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -599,7 +602,7 @@ describe("GET /api/health", () => {
       reason: "upstash_missing",
     });
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     const allowedKeys = new Set(["status", "timestamp"]);
@@ -635,7 +638,7 @@ describe("GET /api/health", () => {
     mockSupabaseProbeError("Connection refused");
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     // DO-H1: degraded is 200
@@ -680,7 +683,7 @@ describe("GET /api/health", () => {
     // No CRON_SECRET means no caller can ever authorize — assert via the
     // internal escalation (overall status) rather than the gated field,
     // since an authorized request is impossible in this state.
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(data).not.toHaveProperty("cron_auth");
@@ -693,7 +696,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     // The smoke test gates on: HTTP 200 AND body.status === "healthy"
@@ -896,7 +899,7 @@ describe("GET /api/health", () => {
       throw new Error("Unexpected probe crash");
     });
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -912,7 +915,7 @@ describe("GET /api/health", () => {
     // 8192 MB * 0.8 threshold = 6553.6 MB → 6871954637 bytes is ~6553 MB which should degrade
     mockDatabaseSize(6871954637);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -925,7 +928,7 @@ describe("GET /api/health", () => {
     // 6871954637 bytes = ~6553 MB — below 80% of 16384 MB (13107 MB) → healthy
     mockDatabaseSize(6871954637);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -939,7 +942,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -952,7 +955,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -965,7 +968,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200); // always HTTP 200
@@ -978,7 +981,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     expect(response.status).toBe(200);
   });
 
@@ -1033,7 +1036,7 @@ describe("GET /api/health", () => {
     it("SE-M1: withholds the identity from an unauthenticated caller", async () => {
       const monitorRequest = new Request("https://paisaxe.es/api/health");
 
-      for (const response of [await GET(), await GET(monitorRequest)]) {
+      for (const response of [await GET(makePublicHealthRequest()), await GET(monitorRequest)]) {
         const data = await response.json();
         expect(data).not.toHaveProperty("build");
         expect(data.status).toBe("healthy");
@@ -1070,7 +1073,7 @@ describe("GET /api/health", () => {
     // real multibyte characters before handing it to route code. This test
     // reproduces that exact string shape via a minimal `Request`-shaped stub
     // whose `headers.get()` returns it directly, exercising the real
-    // `GET()` handler and `isReleaseIdentityAuthorized()` code path.
+    // `GET(makePublicHealthRequest())` handler and `isReleaseIdentityAuthorized()` code path.
     it("DO-H6: does not crash (RangeError) on a multibyte Authorization header of the same UTF-16 length as the expected value, and withholds the identity", async () => {
       const expected = "Bearer test-secret"; // matches the top-level `CRON_SECRET` stub
       const multibyteSameLength = "€".repeat(expected.length);

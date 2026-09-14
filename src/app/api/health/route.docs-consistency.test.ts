@@ -14,7 +14,7 @@ import { GET } from "./route";
 //   1. Extracts the literal jq path from any runbook line that pipes
 //      `/api/health` output through `jq '<path>'`.
 //   2. Resolves that same path against the *actual* runtime response body
-//      produced by the real GET() handler (mocked to a healthy state).
+//      produced by the real GET(new Request("http://localhost/api/health")) handler (mocked to a healthy state).
 // A path that doesn't resolve fails the test — keyed on the live response
 // shape (effectively PublicHealthResponse), not on matching doc text.
 
@@ -115,7 +115,7 @@ describe("docs-vs-code: /api/health jq references in docs/operations", () => {
     vi.clearAllMocks();
     vi.stubEnv("CRON_SECRET", "test-secret");
     mockHealthySupabase();
-    body = await (await GET()).json();
+    body = await (await GET(new Request("http://localhost/api/health"))).json();
   });
 
   afterEach(() => {

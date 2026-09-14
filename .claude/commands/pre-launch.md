@@ -40,9 +40,8 @@ synthesis emphasis — does not disable any specialist.
 Before spawning, run one read-only gate check for Specialist 9:
 
 ```bash
-grep -rlE 'modelContext|registerTool|toolname=' --include='*.ts' \
-  --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.html' . \
-  2>/dev/null | head -1
+git grep -IlE 'modelContext|registerTool|toolname=' -- \
+  '*.ts' '*.tsx' '*.js' '*.jsx' '*.html' | head -1
 ```
 
 Non-empty means spawn all 9. Empty means spawn 8 core specialists only,

@@ -43,6 +43,12 @@ jobs:
     timeout-minutes: 40
     env:
       PLAYWRIGHT_CHROME_CHANNEL: chrome
+      SECRETS_WITHHELD_PR: >-
+        ${{
+          github.event_name == 'pull_request' &&
+          (github.event.pull_request.head.repo.fork == true ||
+           github.event.pull_request.user.login == 'dependabot[bot]')
+        }}
 
     steps:
       - name: Checkout code
@@ -55,12 +61,7 @@ jobs:
           cache: 'npm'
 
       - name: Check authenticated QA secrets
-        if: >-
-          ${{
-            github.event_name != 'pull_request' ||
-            (github.event.pull_request.head.repo.fork != true &&
-             github.event.pull_request.user.login != 'dependabot[bot]')
-          }}
+        if: env.SECRETS_WITHHELD_PR != 'true'
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -107,12 +108,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
 
       - name: Run E2E tests with authenticated journey
-        if: >-
-          ${{
-            github.event_name != 'pull_request' ||
-            (github.event.pull_request.head.repo.fork != true &&
-             github.event.pull_request.user.login != 'dependabot[bot]')
-          }}
+        if: env.SECRETS_WITHHELD_PR != 'true'
         run: npm run test:e2e
         env:
           CI: true
@@ -133,12 +129,7 @@ jobs:
       # branch pushes, and every dependency update receives it again after the
       # vetted change is integrated onto develop.
       - name: Run E2E tests without secret-backed authenticated journey
-        if: >-
-          ${{
-            github.event_name == 'pull_request' &&
-            (github.event.pull_request.head.repo.fork == true ||
-             github.event.pull_request.user.login == 'dependabot[bot]')
-          }}
+        if: env.SECRETS_WITHHELD_PR == 'true'
         run: >-
           npm run test:e2e --
           --grep-invert="QA Journey: Authenticated User"

@@ -62,7 +62,7 @@ describe("sanitizeSentryEvent", () => {
     expect(event.tags?.request_id).toBe("req-context-5678");
   });
 
-  it("handles undefined request.headers gracefully (line 8 — redactHeaders no-op path)", async () => {
+  it("handles undefined request.headers gracefully", async () => {
     const event = await sanitizeSentryEvent({
       request: {
         cookies: { session: "abc" },
@@ -107,7 +107,7 @@ describe("sanitizeSentryEvent", () => {
     expect(event.request?.url).toBe("/api/chat");
   });
 
-  it("leaves request.url undefined when not provided (line 37 — normalizeUrlToPath no-op path)", async () => {
+  it("leaves request.url undefined when not provided", async () => {
     const event = await sanitizeSentryEvent({
       request: {
         headers: { "content-type": "application/json" },
