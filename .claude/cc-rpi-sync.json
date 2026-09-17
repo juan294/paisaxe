@@ -1,10 +1,11 @@
 {
-  "lastSyncCommit": "18129ae36942166175faa9726f750f5b61bd7b9f",
-  "lastSyncDate": "2026-09-03",
-  "blueprintVersion": "v1.29.0",
+  "lastSyncCommit": "0e786ccda5981566ce94ac74bc50937df3978c0c",
+  "lastSyncDate": "2026-09-17",
+  "blueprintVersion": "v2.0.2",
   "agentsTemplateSynced": true,
   "rulesSynced": ["rpi-details.md", "push-accountability.md", "deployment-safety.md", "supabase.md", "testing.md"],
   "rulesCustom": [],
+  "updated": ["Skills: ci-workflow, deployment-safety, error-patterns, git-workflow, github-cli, multi-agent, systematic-debugging", "Hooks: guard-bash.sh with rpi-policy.py engine", "RPI infrastructure: v2 policy engine"],
   "skipped": {
     "webmcp": "skill, rule, and quick-reference rules 85-92 skipped: no agent-facing tool surface in project source (detection grep matched only a compiled .next chunk)",
     "plan.md": "project version diverged from all historical blueprint versions (missing blueprint rule 10, executable-artifact preference); treated as customized, not replaced"
