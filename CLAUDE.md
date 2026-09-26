@@ -384,3 +384,6 @@ Workflow: Read issue → create worktree branch → write failing tests → impl
 ## Agent Teams
 
 Debug mode, large refactoring, and health check workflows are defined in `.claude/skills/` — loaded automatically when triggered.
+<!-- rpi:claude-import:start -->
+@AGENTS.md
+<!-- rpi:claude-import:end -->
