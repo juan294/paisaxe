@@ -1,14 +1,5 @@
-## cc-rpi sync report
+**cc-rpi-update: command renamed**
 
-**Status:** Cannot proceed — invocation controls prevent scheduled execution.
+The legacy `cc-rpi-update` command has been renamed to `/rpi-update`, which requires explicit user invocation. This scheduled agent cannot proceed.
 
-**Situation:**
-- **Paisaxe current sync:** v1.29.0 (last synced 2026-09-03)
-- **Blueprint current version:** v2.0.2
-- **Version gap:** Major upgrade available (v1.29.0 → v2.0.2)
-
-**Issue:**
-The `/rpi-update` workflow (the new, recommended sync mechanism) has `disable-model-invocation: true`, which prevents scheduled agents from executing it. This is an intentional security control — the skill is reserved for explicit user invocation only.
-
-**Next steps:**
-Run `/rpi-update` in an interactive session to sync paisaxe to the latest blueprint.
+**Next step:** Invoke `/rpi-update` directly in an interactive Claude Code session to sync paisaxe with the latest cc-rpi blueprint.

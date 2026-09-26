@@ -1,66 +1,71 @@
-# Security Report — 2026-09-10
+# Security Report — 2026-09-24
 
-## 1. Health Status: YELLOW
+## 1. Health Status: GREEN
 
-6 advisories detected, **0 exploitable in this codebase**. All 6 trace to transitive dev-tooling dependencies (ESLint's internal file-system helper, Sentry's webpack plugin chain, PostHog's bundled compressor) — none sit on a path that receives attacker-controlled input in this application. This is the same pattern as the Apr 17 and Apr 25 YELLOW cycles: real advisories, no live attack surface. All 6 are cleanly fixable via `npm audit fix` with no breaking changes (no major version bumps required for the top-level resolution).
+0 advisories detected in `npm audit` against `develop`'s lockfile, 0 exploitable. GREEN streak continues from Sep 17. **Important nuance this cycle:** GitHub's Dependabot Alerts tab shows **15 open alerts, including 2 Critical** (both Next.js RCE advisories). This is not a live gap — verified below, every one of the 15 is already resolved in `develop`'s `package-lock.json`, either via a routine version bump or a standing `overrides` pin. The alerts stay open because Dependabot keys them off the default branch (`main`), which has not yet received these fixes via a production release — consistent with [[reference_dependabot_default_branch]]. Anyone glancing at the GitHub Security tab today would see 2 Critical / 8 High / 5 Medium and reasonably conclude the project is at risk; it is not, on `develop`.
 
 ## 2. Executive Summary
 
-6 advisories detected (3 high, 3 moderate, 0 critical), **0 exploitable**. Every flagged package is a transitive dependency of build/lint tooling (`eslint`, `@sentry/nextjs`'s bundled `@sentry/webpack-plugin`) or of `posthog-js`'s internal gzip/zip codec (`fflate`) — none are direct production dependencies, and none process attacker-supplied data in a way this app exposes externally. `npm audit fix` resolves all 6 with no major-version jumps at the top level (`js-yaml` and `fflate` do jump to new majors as transitive deps, but neither is a direct dependency, so no application code changes are needed). License compliance: no new copyleft violations — the 7 previously-approved flagged packages are unchanged. Security headers, CSP, and CI/CD security automation are all unchanged and correctly configured.
+**15 GitHub advisories open (2 Critical, 8 High, 5 Medium), 0 exploitable against the current `develop` codebase.** `npm audit` independently confirms 0 vulnerabilities. Verified line-by-line against `package-lock.json`:
+
+- **2 Critical — Next.js RCE** (`GHSA-2xp9-vwfh-vxw4`: unauthenticated RCE via AVIF in the Image Optimization API; `GHSA-p293-qw3h-jr36`: unauthenticated RCE on Windows-hosted servers). Vulnerable range `>=16.0.0, <16.3.3`; patched at `16.3.3`. Installed: **`next@16.3.4`** — already patched, landed as a routine bump before the advisory was even published.
+- **1 High — `sharp`** (`GHSA-rgj7-g3m4-5g8c`, libheif vulnerabilities). Vulnerable `<0.35.4`; patched at `0.35.4`. Installed: **`sharp@0.35.4`** — exactly at the patched floor.
+- **1 Medium (2 packages) — `vitest` / `@vitest/mocker`** (`GHSA-82fw-gwwq-j7x9`, path traversal / arbitrary file read via mock redirect). Vulnerable `>=2.1.0, <4.1.11`; patched at `4.1.11`. Installed: **`vitest@4.1.11`**, **`@vitest/mocker@4.1.11`** — exactly at the patched floor. Dev-only dependency regardless.
+- **10 alerts carried from the Sep 10 cycle** (`browserslist` x2 High, `fast-uri` x4 High, `js-yaml` High, `fflate` Medium, `@humanfs/node` Medium, `baseline-browser-mapping` Medium) — all resolved by the `overrides` block landed in `bfccb22d` and reconfirmed present in `package.json` this cycle (`fast-uri: 4.1.4`, `browserslist: 4.28.9`, `js-yaml: 4.3.2`, `fflate: 0.4.9`, `@humanfs/node: 0.16.8`, `baseline-browser-mapping: 2.11.23`), all at or above their respective patched versions.
+
+No code action is required — every fix is already on `develop`. The alerts will close automatically once `develop` is released to `main` (per the standard release process in `docs/runbooks/release-checklist.md`); this is not something to "fix" again. License compliance is unchanged — no new copyleft violations, all 7 previously-flagged packages remain covered by documented exceptions or are scanner false positives. Security headers, CSP, and CI/CD security automation are all correctly configured with no gaps; the "Security Scan" GitHub Actions workflow is confirmed passing on `develop` (last run 2026-09-22, `89bc25d`, success).
 
 ## 3. Vulnerability Table
 
 | Severity | Package | Advisory (GHSA) | Attack Vector | Fixable | Risk Assessment |
 |---|---|---|---|---|---|
-| High | `browserslist` (<=4.28.6, resolved 4.28.1) | [GHSA-c83g-rgw3-j3cx](https://github.com/advisories/GHSA-c83g-rgw3-j3cx) (unbounded memory growth, no cache eviction) | Attacker would need to feed the process a large number of distinct browserslist queries at runtime to exhaust memory | Yes — `npm audit fix` → 4.28.7+ | **Not exploitable.** Only reached via `@sentry/webpack-plugin` -> `webpack` at build time. No runtime path; queries are fixed, not attacker-supplied. |
-| High | `browserslist` (same version) | [GHSA-73wf-gq98-2v4g](https://github.com/advisories/GHSA-73wf-gq98-2v4g) (crash/prototype write via untrusted `browserslist-stats.json`) | Requires a malicious custom `browserslist-stats.json` consumed by the app | Yes — same fix | **Not exploitable.** This repo has no `browserslist-stats.json`; the vector requires deliberately opting into custom stats, which we don't. |
-| High | `fast-uri` (4.0.0–4.1.2, resolved 4.1.2) | [GHSA-5jgf-p345-68v8](https://github.com/advisories/GHSA-5jgf-p345-68v8), [GHSA-f65p-4m7j-42xc](https://github.com/advisories/GHSA-f65p-4m7j-42xc), [GHSA-fph4-wmhf-6fwf](https://github.com/advisories/GHSA-fph4-wmhf-6fwf), [GHSA-jqff-g426-hqxp](https://github.com/advisories/GHSA-jqff-g426-hqxp) (host confusion / SSRF via malformed URI normalization) | Requires passing an attacker-controlled URI through `fast-uri`'s parse/normalize functions, which then feeds an outbound request or auth decision | Yes — `npm audit fix` → 4.1.3+ (the existing `overrides.fast-uri: ">=3.1.5"` is too permissive — it's satisfied by the vulnerable 4.1.2) | **Not exploitable.** Only reached via `ajv`/`ajv-formats` inside `@sentry/webpack-plugin` -> `webpack`'s `schema-utils`, validating webpack config schemas at build time — no user input reaches it. |
-| Moderate | `js-yaml` (4.0.0–4.3.1, resolved 4.3.1) | [GHSA-2883-xcg3-v3hh](https://github.com/advisories/GHSA-2883-xcg3-v3hh) (`maxTotalMergeKeys` doesn't limit CPU on empty merge sources) | Requires parsing attacker-controlled YAML with crafted merge keys | Yes — `npm audit fix` (top-level fix lands at 4.3.2, a patch; npm's resolver may also offer 5.x since `eslint`'s dependency range is unpinned above 4.3.1) | **Not exploitable.** Only reached via `eslint` -> `@eslint/eslintrc`, parsing the repo's own `.eslintrc`-style config at lint time — not reachable from any runtime/user-facing path. |
-| Moderate | `fflate` (0.4.5–0.4.8, resolved 0.4.8) | [GHSA-px8p-9vwx-vf98](https://github.com/advisories/GHSA-px8p-9vwx-vf98) (`unzipSync` infinite loop on malformed ZIP64) | Requires passing a malformed ZIP64 archive to `fflate.unzipSync` | Yes — `npm audit fix` → 0.7.x (transitive major bump, no direct dependency) | **Not exploitable.** `fflate` is bundled inside `posthog-js` for its own session-recording/network-payload compression; grep confirms no application code in `src/` calls `fflate` directly or accepts arbitrary ZIP uploads. |
-| Moderate | `@humanfs/node` (<0.16.8, resolved 0.16.7) | [GHSA-p498-v437-472g](https://github.com/advisories/GHSA-p498-v437-472g) (recursive copy follows symlinks, copies data outside source tree) | Requires calling `humanfs`'s recursive-copy API on an attacker-controlled directory tree containing symlinks | Yes — `npm audit fix` → 0.16.8 | **Not exploitable.** Only reached via `eslint`'s internal file-system abstraction at lint time on this repo's own source tree — no untrusted directory tree is ever copied. |
+| Critical | `next` | GHSA-2xp9-vwfh-vxw4 | Unauthenticated RCE via crafted AVIF file through the Image Optimization API (`/_next/image`) | Already fixed | **Not exploitable on `develop`.** Vulnerable `<16.3.3`; installed `16.3.4`. Verified via `package-lock.json`. |
+| Critical | `next` | GHSA-p293-qw3h-jr36 | Unauthenticated RCE, Windows-hosted servers only | Already fixed | **Not exploitable anywhere.** Vulnerable `<16.3.3`; installed `16.3.4`. Also: production runs on Vercel (Linux), not Windows — doubly inapplicable even pre-patch. |
+| High | `sharp` | GHSA-rgj7-g3m4-5g8c | Vulnerabilities in bundled `libheif` (image parsing) | Already fixed | Not exploitable. Vulnerable `<0.35.4`; installed `0.35.4` (exactly the patched floor). `sharp` processes PDF-extracted and user-uploaded images server-side — would have been a real attack surface pre-patch. |
+| High | `browserslist` | GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx | Crash / unbounded memory growth via untrusted `browserslist-stats.json` | Already fixed | Not exploitable — build-time only (Webpack/Babel toolchain), never reachable from the deployed runtime. Installed `4.28.9` via override; patched at `4.28.7`. |
+| High | `fast-uri` | GHSA-5jgf-p345-68v8, GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf, GHSA-jqff-g426-hqxp | Host confusion / SSRF via URI normalization edge cases | Already fixed | Not exploitable — transitive via `ajv`/`webpack` build tooling, no direct application usage. Installed `4.1.4` via override; patched at `4.1.3`. |
+| High | `js-yaml` | GHSA-2883-xcg3-v3hh | CPU exhaustion via unbounded merge-key expansion | Already fixed | Not exploitable — build-tooling transitive, no application code parses untrusted YAML. Installed `4.3.2` via override (exact patched version). |
+| Medium | `vitest` / `@vitest/mocker` | GHSA-82fw-gwwq-j7x9 | Path traversal / arbitrary file read via mock redirect | Already fixed | Not exploitable — dev/test-only dependency, never ships or runs in production. Installed `4.1.11` (exact patched floor). |
+| Medium | `fflate` | GHSA-px8p-9vwx-vf98 | Infinite loop on malformed ZIP64 archive | Already fixed | Not exploitable — build-tooling transitive. Installed `0.4.9` via override (exact patched version). |
+| Medium | `@humanfs/node` | GHSA-p498-v437-472g | Recursive copy follows symlinks outside source tree | Already fixed | Not exploitable — build-tooling transitive, no runtime file-copy operation touches untrusted input. Installed `0.16.8` via override (exact patched version). |
+| Medium | `baseline-browser-mapping` | GHSA-w5vr-8v7q-w6rv | Process termination (DoS) on invalid input | Already fixed | Not exploitable — build-time only. Installed `2.11.23` via override; patched at `2.11.0`. |
 
-CVE cross-reference: none of these 6 GHSA advisories have a published CVE ID as of this scan (checked each advisory page — all show "GHSA only, no CVE assigned" or CVE pending). This is common for advisories affecting build-tooling-only packages, which OSV/NVD deprioritize.
+**Fixable via `npm audit fix`: 0** (nothing to fix — `npm audit` already reports 0 vulnerabilities against `develop`'s lockfile; the 15 GitHub alerts above are a `main`-branch reporting lag, not an unfixed state).
 
-## 4. Detailed Exploitability Analysis (High/Critical)
+## 4. Detailed Exploitability Analysis (Critical/High)
 
-No critical advisories this cycle. For the 3 high-severity advisories:
+**Next.js RCE pair (Critical)** — the only advisories in this batch with a plausible real-world attack path if unpatched: the AVIF Image Optimization RCE (`GHSA-2xp9-vwfh-vxw4`) targets `/_next/image`, a route this app exposes for all `img-src` image optimization (see CSP's `img-src` directive covering Supabase storage, Unsplash, and Google avatar URLs — all valid inputs to that endpoint). Had this shipped unpatched to `main`, it would have been directly internet-reachable and unauthenticated. It did not ship unpatched: `develop` has run `next@16.3.4` (patched floor `16.3.3`) since before this advisory's publication, confirmed via `package-lock.json`. The Windows-RCE advisory (`GHSA-p293-qw3h-jr36`) is additionally inapplicable regardless of Next.js version, since Vercel's production runtime is Linux, not Windows.
 
-- **browserslist (GHSA-c83g-rgw3-j3cx, GHSA-73wf-gq98-2v4g):** Dependency chain confirmed via `npm ls browserslist`: `@sentry/nextjs` -> `@sentry/webpack-plugin` -> `webpack` -> `browserslist`, and separately `eslint-plugin-react-hooks` -> `@babel/core` -> `@babel/helper-compilation-targets` -> `browserslist`. Both paths are build-time only (webpack bundling, Babel transform target resolution during lint/build). Browserslist never runs in the deployed Vercel runtime or in any API route.
-- **fast-uri (GHSA-5jgf-p345-68v8 and 3 related):** Chain confirmed: `@sentry/nextjs` -> `@sentry/webpack-plugin` -> `webpack` -> `schema-utils` -> `ajv`/`ajv-formats` -> `fast-uri`. This validates webpack's own configuration schema against JSON Schema at build time. The project's existing `overrides.fast-uri: ">=3.1.5"` in `package.json:152` was intended to pin a safe floor but is satisfied by the vulnerable 4.1.2 — the override needs tightening to `>=4.1.3` (see remediation).
-- **js-yaml (GHSA-2883-xcg3-v3hh):** Chain confirmed: `eslint` -> `@eslint/eslintrc` -> `js-yaml`. Parses only this repository's own lint config files during `npm run lint` / CI. No externally-supplied YAML is ever parsed by this dependency in the deployed app.
+**`sharp` libheif vulnerabilities (High)** — `sharp` is used in the PDF ingestion / image-extraction pipeline (`docs/agents` seed-db flow) and processes files that ultimately originate from admin-uploaded PDFs, not arbitrary internet input, which would have narrowed exploitability even pre-patch. Moot regardless: installed version sits exactly at the patched floor.
+
+**All remaining High/Medium items (`browserslist`, `fast-uri` x4, `js-yaml`, `fflate`, `@humanfs/node`, `baseline-browser-mapping`, `vitest`/`@vitest/mocker`)** are unchanged in substance from the Sep 10/17 analysis: every one traces to build-time tooling (Webpack, Babel, `ajv`, Vitest) or dev-only test infrastructure, never reachable from the deployed runtime or any API route, and every one is already at or above its patched version in `develop`.
 
 ## 5. Prioritized Remediation Steps
 
-1. **Tighten the `fast-uri` override** — the current `">=3.1.5"` floor in `package.json:152` does not exclude the vulnerable 4.0.0–4.1.2 range. Update to:
-   ```json
-   "fast-uri": ">=4.1.3"
-   ```
-   then run `npm install` to re-resolve.
-2. **Run the standard fix for the rest:**
-   ```bash
-   npm audit fix
-   ```
-   This should resolve `browserslist` (->4.28.7+), `baseline-browser-mapping` (->2.11.x), `fflate` (->0.7.x, transitive major bump inside `posthog-js`'s own `package.json` range — no code change needed), `js-yaml` (->4.3.2 or newer, transitive to `eslint`), and `@humanfs/node` (->0.16.8).
-3. **Verify no regressions:** run `npm run typecheck && npm run lint && npm run test` and a fresh `npm run build` after the fix, since Sentry's webpack-plugin chain and ESLint's config-loading chain are both touched (build- and lint-time only, so risk is low, but this project's Apr 17/Aug 30 triage history shows build-tooling bumps have occasionally broken vitest — verify before merging).
-4. **Re-run `npm audit`** to confirm 0 remaining advisories, then commit the `package.json`/`package-lock.json` diff as a single dependency-hygiene commit.
+No code action required this cycle — `develop` is already ahead of every open advisory. Standing items:
 
-None of these require code changes in `src/` — this is a pure lockfile/override update.
+1. **No action needed for the 15 open Dependabot alerts.** They will close automatically on the next `develop` -> `main` release (per `docs/runbooks/release-checklist.md`). Do not attempt to "fix" already-fixed dependencies or file a duplicate issue — re-verify against `package-lock.json` first if this resurfaces, per [[reference_dependabot_default_branch]].
+2. **GitHub Advanced Security (CodeQL / native secret scanning)** remains disabled (403/404 on API) — a billing decision for the user, not a code fix. Carried as a standing owner item since 2026-08-18; not re-escalating without new information.
+3. **`typescript` 6.0.3 -> 7.0.2`** and **`@vitest/coverage-v8` 4.1.11 -> 5.0.1`** are major-version jumps in the outdated-packages list below — defer to a dedicated `/upgrade-deps` cycle, not a security-driven change.
+4. **`@sentry/core` / `@sentry/nextjs` 10.74.0 -> 11.0.0`** — flagging as elevated risk for the next dependency batch (see Section 9): this is a **major** version bump, and the Aug 30 triage history shows a much smaller Sentry *minor* bump (10.70->10.72) previously broke 17 vitest tests via a new `@sentry/server-utils` orchestrion path. Isolate and test this specific upgrade before batching with the other 24 outdated packages.
 
 ## 6. License Compliance
 
-**No new copyleft violations.** Copyleft license scan for production dependencies: **false** (no GPL/AGPL found). All previously-flagged and approved packages are unchanged from the last cycle:
+No new copyleft violations. Copyleft license scan for production dependencies: **false** (no GPL/AGPL/LGPL-strong found). All 7 flagged packages are unchanged from prior cycles and remain covered by `docs/project/license-exceptions.md`:
 
 | Package | License | Scope | Status |
 |---|---|---|---|
-| `@img/sharp-libvips-darwin-arm64@1.3.3` | LGPL-3.0-or-later | Production (native binary, dynamically linked) | Approved — see `docs/project/license-exceptions.md` |
-| `dompurify@3.4.13` | (MPL-2.0 OR Apache-2.0) | Production (dual-licensed, Apache-2.0 option applies) | Approved |
-| `expand-template@2.0.3` | (MIT OR WTFPL) | Production (dual-licensed, MIT option applies) | Not a real flag — MIT is available |
-| `simple-concat@1.0.1` / `simple-get@4.0.1` | MIT | Production | Not a real flag — scanner false-positive, both are plain MIT |
-| `@babel/template@7.29.7` | MIT | Production | Not a real flag — plain MIT |
+| `@img/sharp-libvips-darwin-arm64@1.3.3` | LGPL-3.0-or-later | Production (native binary, dynamically linked to `sharp`) | Approved — Exception 1 |
+| `dompurify@3.4.13` | (MPL-2.0 OR Apache-2.0) | Production (dual-licensed via `posthog-js`; Apache-2.0 branch elected) | Approved — "Dual-licensed dependencies" section |
+| `expand-template@2.0.3` | (MIT OR WTFPL) | Production (dual-licensed via `canvas` -> `prebuild-install`; MIT branch elected) | Approved — not a real flag |
+| `simple-concat@1.0.1` | MIT | Production | Not a real flag — plain MIT, scanner false positive |
+| `simple-get@4.0.1` | MIT | Production | Not a real flag — plain MIT, scanner false positive |
+| `@babel/template@7.29.7` | MIT | Production | Not a real flag — plain MIT, scanner false positive |
 | `paisaxe@1.6.0` | UNLICENSED | This repo itself | Expected — private application, not published |
-| `lightningcss@1.32.0` / `lightningcss-darwin-arm64@1.32.0` | MPL-2.0 | Dev/build only (Tailwind CSS toolchain) | Approved, non-blocking (dev-only) |
 
-No action needed — this list is identical in substance to the Apr 20/25 cycles.
+Dev-only tree also includes `lightningcss@1.32.0` / `lightningcss-darwin-arm64@1.32.0` (MPL-2.0, via Tailwind CSS's build toolchain) — Approved under Exception 3, non-blocking (build-time only, not shipped to clients). `@sentry/cli` / `@sentry/cli-darwin` (FSL-1.1-MIT, Exception 4) remain in the production tree at 2 packages per the license summary, correctly excluded from the MPL/LGPL/GPL/UNLICENSED flag categories used by this scan (FSL is a separate exception track), unchanged from prior cycles.
+
+No action needed. This list is identical in substance to every cycle since Apr 20.
 
 ## 7. Security Headers Status
 
@@ -68,14 +73,14 @@ All headers confirmed present and correctly configured:
 
 | Header | Value | Status |
 |---|---|---|
-| Content-Security-Policy | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com https://checkout.stripe.com; ...; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Pass — correctly avoids `'strict-dynamic'` and nonce-only policies per this project's PPR/`cacheComponents` constraint (documented in CLAUDE.md) |
+| Content-Security-Policy | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com https://checkout.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com https://*.stripe.com; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com https://checkout.stripe.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://js.stripe.com https://checkout.stripe.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Pass — correctly avoids `'strict-dynamic'` and nonce-only policies per CLAUDE.md's PPR/`cacheComponents` constraint |
 | Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Pass |
 | X-Frame-Options | `DENY` | Pass |
 | X-Content-Type-Options | `nosniff` | Pass |
 | Referrer-Policy | `strict-origin-when-cross-origin` | Pass |
-| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Pass — microphone scoped to same-origin only, consistent with the Pelayo voice-agent use case |
+| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Pass — microphone scoped to same-origin, consistent with the Pelayo voice-agent use case |
 
-No gaps. Headers are duplicated identically across both header-emitting paths in the scan output, consistent with `next.config.ts` + `src/proxy.ts` both setting them (expected, not a misconfiguration).
+No gaps. Headers appear duplicated in the raw scan output, consistent with both `next.config.ts` and `src/proxy.ts` setting them (expected, not a misconfiguration).
 
 ## 8. CI/CD Security Automation Status
 
@@ -84,18 +89,20 @@ No gaps. Headers are duplicated identically across both header-emitting paths in
 | Dependabot | Configured (pinned to `develop`, per prior triage) |
 | Renovate | Not configured (Dependabot covers this; no gap) |
 | Gitleaks (secret scanning in CI) | Configured |
-| `npm audit` in CI | Configured |
-| GitHub Advanced Security (CodeQL / native secret scanning) | Disabled (403/404 on API) — carried finding, a billing decision for the user, not re-flagged as new this cycle |
+| `npm audit` in CI | Configured — "Security Scan" workflow reconfirmed passing on `develop` this cycle (last run 2026-09-22, commit `89bc25d`, success; verified via `gh run list`) |
+| GitHub Advanced Security (CodeQL / native secret scanning) | Disabled (403/404 on API) — standing owner/billing decision, not re-flagged as new |
 
-No new CI/CD gaps. The GHAS/CodeQL gap remains open as a standing owner decision per the Aug 18/24 triage notes — not re-escalating without new information.
+No new CI/CD gaps this cycle. Note for the next release: once `develop` merges to `main`, re-run the Dependabot alerts check to confirm all 15 currently-open alerts auto-close.
 
 ## 9. Outdated Packages With Security Implications
 
-Of the 29 outdated packages, none currently carry an open advisory — all are routine minor/patch drift:
+25 outdated packages (up from 17 on Sep 17), none carrying an open advisory beyond what's already addressed in Section 3 — routine minor/patch drift plus two majors:
 
-- **Priority (touch security-relevant surfaces):** `@sentry/core`/`@sentry/nextjs` (10.71.0 -> 10.74.0, error-reporting pipeline), `@supabase/supabase-js`/`@supabase/ssr` (auth/session handling), `stripe`/`@stripe/react-stripe-js` (payments). All are patch/minor bumps with no CVEs.
-- **Caution:** `@sentry/core`/`@sentry/nextjs` — the Aug 30 triage found a *different* Sentry minor bump (10.70->10.72) broke 17 vitest tests via a new `@sentry/server-utils` orchestrion bundler path (`ERR_INVALID_URL_SCHEME`). Bisect this specific bump in isolation before batching it with the other 27 packages.
-- **No action required for:** `typescript` 6.0.3 -> 7.0.2 is a major version jump — defer to a dedicated dependency-upgrade cycle (per `/upgrade-deps`), not this security pass.
-- All other outdated packages (`zod`, `react`, `next`, `knip`, `posthog-js`, etc.) are minor/patch with no known vulnerabilities.
+- **`@sentry/core` / `@sentry/nextjs` 10.74.0 -> 11.0.0`** — **major** version bump, elevated risk. No CVE driving it, but see Section 5 item 4: a much smaller Sentry minor bump previously broke 17 vitest tests. Isolate and test before batching.
+- `typescript` 6.0.3 -> 7.0.2` — major, dev-only, no CVE. Defer to `/upgrade-deps`.
+- `@vitest/coverage-v8` 4.1.11 -> 5.0.1` — major, dev-only, no CVE. Defer to `/upgrade-deps`.
+- `@anthropic-ai/sdk` 0.125.0 -> 0.128.0`, `@supabase/supabase-js` 2.116.0 -> 2.117.1`, `posthog-js` 1.430.2 -> 1.434.12`, `@upstash/redis` 1.38.4 -> 1.39.0`, `@upstash/ratelimit` v2.0.8 -> 2.2.0` — minor/patch, no CVE. `@upstash/ratelimit` is a security control (rate limiting) — review changelog for behavioral changes before bumping, but no advisory.
+- `next` 16.3.4 -> 16.3.6`, `@stripe/react-stripe-js` 6.10.0 -> 6.12.0`, `@stripe/stripe-js` 9.16.0 -> 9.17.0`, `resend` 6.27.0 -> 6.28.1`, `zod` 4.6.2 -> 4.6.5`, `yaml` 2.9.0 -> 2.9.1`, `lucide-react` 1.44.0 -> 1.48.0`, `tailwind-merge` 3.6.0 -> 3.7.0`, `dotenv` 17.4.2 -> 18.0.3` — minor/patch, no CVE.
+- Dev-only, no production exposure: `@next/bundle-analyzer`, `@next/eslint-plugin-next`, `@testing-library/dom`, `@types/node`, `@typescript-eslint/eslint-plugin`, `knip`, `tsx`.
 
 ---

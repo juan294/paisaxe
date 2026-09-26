@@ -105,6 +105,12 @@ export default defineConfig({
       use: desktopChrome,
       testMatch: "qa-journey.spec.ts",
       timeout: 30_000,
+      // Local runs auto-detect worker count (undefined) and can hit 6+
+      // workers against one shared dev server, causing teardown timeouts
+      // that look like failures but are resource contention (QA 2026-09-24).
+      // CI already caps workers at 2 (see `isCI` above) so only local runs
+      // need the cap here.
+      workers: isCI ? undefined : 3,
     },
     {
       name: "stripe-integration",

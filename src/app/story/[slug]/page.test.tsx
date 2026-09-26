@@ -264,5 +264,46 @@ describe("StoryPage", () => {
 
       expect(mockNotFound).toHaveBeenCalledOnce();
     });
+
+    it("does not render image when story.image is missing (line 87-98 false branch)", async () => {
+      mockGetStoryBySlugFromDB.mockResolvedValue({
+        ...fullStory,
+        image: "", // falsy image
+      });
+
+      const element = await StoryPage({
+        params: Promise.resolve({ slug: "test-story" }),
+      });
+      render(element);
+
+      // Image element should not be present
+      const images = screen.queryAllByRole("img");
+      expect(images.length).toBe(0);
+
+      // But title, subtitle, and description should still render
+      expect(screen.getByRole("heading", { name: "Test Story" })).toBeInTheDocument();
+      expect(screen.getByText("A subtitle")).toBeInTheDocument();
+      expect(screen.getByText("A test description")).toBeInTheDocument();
+    });
+
+    it("does not render subtitle when story.subtitle is missing (line 106-108 false branch)", async () => {
+      mockGetStoryBySlugFromDB.mockResolvedValue({
+        ...fullStory,
+        subtitle: "", // falsy subtitle
+      });
+
+      const element = await StoryPage({
+        params: Promise.resolve({ slug: "test-story" }),
+      });
+      render(element);
+
+      // The subtitle paragraph should not be in the document
+      // (it's only rendered when subtitle is truthy)
+      expect(screen.queryByText("A subtitle")).not.toBeInTheDocument();
+
+      // But title and description should still render
+      expect(screen.getByRole("heading", { name: "Test Story" })).toBeInTheDocument();
+      expect(screen.getByText("A test description")).toBeInTheDocument();
+    });
   });
 });

@@ -1,14 +1,9 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-09-10
+> Auto-generated on 2026-09-24 06:00:04
 
-## Status
-GREEN — No documentation gaps found. All feature flags and external-consumption API routes documented.
+## Status: GREEN
 
-## Changes Made This Run
-- Verified all 17 feature flags (Features tab) present in Feature Flags Reference table
-- Verified all 10 agent flags (Agents tab) present in agent flag documentation  
-- Reviewed undocumented API routes: confirmed 51 routes are internal-only (admin, cron, webhooks, MCP tools, health probes) — no external-consumption gaps
-- CLAUDE.md documentation current as of 2026-08-30
+No documentation gaps found. Thirty-second consecutive clean run.
 
 ## CLAUDE.md Status
 
@@ -21,6 +16,14 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
+src/app/api/admin/costs-analytics/route.test.ts
+src/app/api/health/route.docs-consistency.test.ts
+src/app/api/health/route.test.ts
+src/app/api/health/route.ts
+src/app/api/webhooks/translate/config.ts
+src/app/api/webhooks/translate/route.test.ts
+src/app/api/webhooks/translate/route.ts
+src/app/story/[slug]/page.test.tsx
 src/components/immersive/site-info-menu.test.tsx
 src/lib/admin-auth.test.ts
 src/lib/i18n/coverage.test.ts
@@ -34,78 +37,35 @@ No new migrations since documentation update.
 ### Scripts
 
 ```
+scripts/lib/performance-budget.sh
+scripts/lib/performance-budget.test.ts
+scripts/performance-agent.sh
 scripts/qa-agent.sh
 scripts/release/candidate-identity.ts
 scripts/release/release-topology.test.ts
 scripts/release/what-would-ship.ts
+scripts/verification-config.test.ts
 ```
 
-## Documentation Gaps
+## Documentation Verification
 
-### Potentially Undocumented API Routes
+### API Routes Status
 
-These API routes may not be documented in CLAUDE.md:
+All 51 flagged routes confirmed as internal-only (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, internal health probes, client-side access checks). No external-consumption routes require documentation.
 
-```
-admin/agent-reports
-admin/agents-summary
-admin/agents/run
-admin/analytics
-admin/costs-analytics
-admin/costs-analytics/[id]
-admin/elevenlabs-analytics
-admin/feature-flags/[key]
-admin/github-analytics
-admin/marketing/accounts
-admin/marketing/agent
-admin/marketing/agent-logs
-admin/marketing/dashboard
-admin/marketing/posts
-admin/marketing/schedule
-admin/stories
-admin/stories/[id]
-admin/stories/[id]/content-images
-admin/stories/[id]/image
-admin/stories/[id]/image-source
-admin/stories/[id]/status
-admin/stories/[id]/translations
-admin/stories/approve-all
-admin/stories/bulk-delete
-admin/stories/bulk-status
-admin/stripe-analytics
-admin/suggestions
-admin/suggestions/[id]
-admin/tunnel
-admin/voice-session
-chat/stream
-checkout/embedded
-checkout/health
-cron/content-discovery
-cron/elevenlabs-voice-canary
-cron/fail-stale-bookings
-cron/fail-stale-translations
-cron/github-traffic-sync
-cron/retry-booking-sms
-cron/subscription-optimizer
-favorites
-feature-flags
-health/db
-health/live
-health/voice
-mcp/make-booking
-mcp/make-booking/status
-mcp/places
-mcp/save-favorite
-mcp/weather
-suggestions
-voice-access
-voice-session
-webhooks/elevenlabs
-webhooks/stripe
-webhooks/supabase
-webhooks/translate
+Examples verified:
+- `health/db` — internal QA diagnostic probe
+- `voice-access` — internal client-side voice purchase check
+- `mcp/*` — internal Pelayo voice agent tools
+- `admin/*` — admin-only authenticated endpoints
 
-```
+### Feature Flags Status
+
+All flags documented and current:
+- 17 feature flags (Features tab): complete with descriptions and controls
+- 10 agent flags (Agents tab): complete with schedules and purposes
+
+No undocumented feature flags found.
 
 ## Documentation File Ages
 
@@ -114,6 +74,17 @@ webhooks/translate
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-08-30 |
 | README.md | 2026-07-28 |
+
+---
+
+## Changes Made This Run
+
+No changes required. All documentation is current and complete:
+- Features reference: 27 flags (17 feature flags + 10 agent flags) all documented with descriptions
+- API routes: All 51 internal routes correctly classified as non-external
+- CLAUDE.md: Current as of 2026-08-30
+
+---
 
 ---
 
