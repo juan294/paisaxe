@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures/base-test";
-import type { APIRequestContext } from "@playwright/test";
+import type { APIRequestContext, APIResponse } from "@playwright/test";
 
 /**
  * Helper to get CSRF headers by visiting a page first.
@@ -17,6 +17,14 @@ async function getCsrfHeaders(request: APIRequestContext) {
     Cookie: `__csrf=${token}`,
     Origin: origin,
   };
+}
+
+/** Shared assertion for validateAdminAuth()'s standard rejection shape. */
+async function expectAuthRequired(response: APIResponse) {
+  expect(response.status()).toBe(401);
+
+  const body = await response.json();
+  expect(body.error).toBe("Authentication required");
 }
 
 test.describe("API route smoke tests", () => {
@@ -114,22 +122,6 @@ test.describe("API route smoke tests", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
-  test("GET /api/admin/* returns 401 without auth", async ({ request }) => {
-    const response = await request.get("/api/admin/agent-reports");
-    expect(response.status()).toBe(401);
-
-    const body = await response.json();
-    expect(body.error).toBe("Authentication required");
-  });
-
-  test("GET /api/cron/* rejects unauthenticated calls", async ({ request }) => {
-    const response = await request.get("/api/cron/retry-booking-sms");
-    expect([401, 403]).toContain(response.status());
-
-    const body = await response.json();
-    expect(body).toHaveProperty("error");
-  });
-
   test("POST /api/favorites returns 401 without auth", async ({ request }) => {
     const csrf = await getCsrfHeaders(request);
     const response = await request.post("/api/favorites", {
@@ -148,4 +140,128 @@ test.describe("API route smoke tests", () => {
     });
     expect(response.status()).toBe(401);
   });
+
+  // QA-M4 (2026-09-24): broaden smoke coverage to the admin/cron/health routes
+  // that had none. For every route below, the source was read to confirm
+  // validateAdminAuth() / verifyVercelCron() / verifyWebhookSecret() runs
+  // BEFORE any query-param, `[id]`/`[key]`, or body parsing — so a garbage
+  // placeholder id and an empty/missing body are safe: an unauthenticated
+  // request cannot reach that later parsing regardless of what it contains.
+
+  // GET routes guarded by validateAdminAuth()/withAdmin()/withAdminRead() with
+  // no CSRF concern (GET is not a CSRF-checked method — see
+  // src/lib/proxy/csrf-proxy.ts CSRF_METHODS).
+  const ADMIN_GET_ROUTES = [
+    "/api/admin/agent-reports",
+    "/api/admin/agents-summary",
+    "/api/admin/agents/run",
+    "/api/admin/analytics",
+    "/api/admin/costs-analytics",
+    "/api/admin/costs-analytics/test-id",
+    "/api/admin/elevenlabs-analytics",
+    "/api/admin/github-analytics",
+    "/api/admin/marketing/accounts",
+    "/api/admin/marketing/agent",
+    "/api/admin/marketing/agent-logs",
+    "/api/admin/marketing/dashboard",
+    "/api/admin/marketing/posts",
+    "/api/admin/marketing/schedule",
+    "/api/admin/stories",
+    "/api/admin/stories/test-id/content-images",
+    "/api/admin/stories/test-id/translations",
+    "/api/admin/stripe-analytics",
+    "/api/admin/suggestions",
+  ];
+
+  for (const path of ADMIN_GET_ROUTES) {
+    test(`GET ${path} returns 401 without auth`, async ({ request }) => {
+      const response = await request.get(path);
+      await expectAuthRequired(response);
+    });
+  }
+
+  // State-changing admin routes. Unlike /api/cron/* and /api/health*,
+  // /api/admin/* is NOT in the proxy's CSRF-exempt prefix list (src/lib/csrf.ts
+  // CSRF_EXEMPT_PREFIXES), so a POST/PUT/PATCH/DELETE without a valid
+  // Origin + CSRF token is rejected by the proxy (403 "Origin not allowed")
+  // before the route's own validateAdminAuth() ever runs. The CSRF headers
+  // here get past that proxy gate so the assertion below exercises the
+  // route's actual auth check, same as the existing POST/DELETE
+  // /api/favorites tests above.
+  const ADMIN_WRITE_ROUTES: Array<{
+    method: "post" | "put" | "patch" | "delete";
+    path: string;
+  }> = [
+    { method: "put", path: "/api/admin/feature-flags/test-key" },
+    { method: "patch", path: "/api/admin/stories/test-id" },
+    { method: "put", path: "/api/admin/stories/test-id/image" },
+    { method: "put", path: "/api/admin/stories/test-id/image-source" },
+    { method: "put", path: "/api/admin/stories/test-id/status" },
+    { method: "post", path: "/api/admin/stories/approve-all" },
+    { method: "delete", path: "/api/admin/stories/bulk-delete" },
+    { method: "put", path: "/api/admin/stories/bulk-status" },
+    { method: "delete", path: "/api/admin/suggestions/test-id" },
+    { method: "post", path: "/api/admin/voice-session" },
+  ];
+
+  for (const { method, path } of ADMIN_WRITE_ROUTES) {
+    test(`${method.toUpperCase()} ${path} returns 401 without auth`, async ({
+      request,
+    }) => {
+      const csrf = await getCsrfHeaders(request);
+      const response = await request[method](path, {
+        headers: csrf,
+        data: {},
+      });
+      await expectAuthRequired(response);
+    });
+  }
+
+  // Cron routes: /api/cron/* is CSRF-exempt (Vercel Cron and pg_cron callers
+  // can't present a browser-issued CSRF token), so GET reaches the route's
+  // own verifyVercelCron() check directly.
+  const CRON_GET_ROUTES = [
+    "/api/cron/content-discovery",
+    "/api/cron/elevenlabs-voice-canary",
+    "/api/cron/fail-stale-bookings",
+    "/api/cron/fail-stale-translations",
+    "/api/cron/github-traffic-sync",
+    "/api/cron/subscription-optimizer",
+    "/api/cron/retry-booking-sms",
+  ];
+
+  for (const path of CRON_GET_ROUTES) {
+    test(`GET ${path} rejects unauthenticated calls`, async ({ request }) => {
+      const response = await request.get(path);
+      expect([401, 403]).toContain(response.status());
+
+      const body = await response.json();
+      expect(body).toHaveProperty("error");
+    });
+  }
+
+  // /api/health/voice is a deep health probe gated by a HEALTH_PROBE_SECRET
+  // bearer header (src/app/api/health/voice/route.ts isAuthorized()) rather
+  // than admin auth or cron auth — confirmed it does require auth, unlike
+  // the public /api/health and /api/health/live probes above.
+  test("GET /api/health/voice returns 401 without the health-probe secret", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/health/voice");
+    expect(response.status()).toBe(401);
+
+    const body = await response.json();
+    expect(body.error).toBe("Unauthorized");
+  });
+
+  // Excluded from the loops above (QA-M4): both routes gate on the runtime
+  // environment BEFORE calling validateAdminAuth(), so an unauthenticated
+  // request never reaches the auth check at all — it always gets the same
+  // dev/prod-only 403 regardless of auth state, which would not actually
+  // verify authentication is enforced:
+  // - GET/PUT /api/admin/agent-config: 403 "Agent config is only available in
+  //   development" whenever NODE_ENV !== "development" (this E2E suite runs a
+  //   production build via `next build && next start`).
+  // - GET/POST/DELETE /api/admin/tunnel: 403 "Tunnel control is only available
+  //   in development" whenever NODE_ENV === "production".
 });
