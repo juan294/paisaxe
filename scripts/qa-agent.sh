@@ -3,8 +3,8 @@
 # Performs automated LLM testing and provides actionable analysis of failures
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/code/paisaxe"
-CLAUDE_BIN="/Users/juan/.local/bin/claude"
+PROJECT_DIR="${PROJECT_DIR:-/Users/juan/code/paisaxe}"
+CLAUDE_BIN="${CLAUDE_BIN:-/Users/juan/.local/bin/claude}"
 MODEL="sonnet"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/qa-agent-$(date +%Y-%m-%d).log"
@@ -128,7 +128,12 @@ write_abnormal_exit_report() {
     echo ""
     echo "The QA wrapper exited before its normal report-generation step. Review $LOG_FILE for the underlying failure."
   } > "$aborted_report"
-  mv "$aborted_report" "$REPORT_FILE"
+  if [[ "$CURRENT_PHASE" == "phase 5 report generation" ]]; then
+    cat "$aborted_report" >> "$LOG_FILE"
+    rm -f "$aborted_report"
+  else
+    mv "$aborted_report" "$REPORT_FILE"
+  fi
   write_shared_context "qa_agent_enabled" "$context" || true
 }
 
@@ -890,10 +895,7 @@ SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-ins
 SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run Claude to analyze and write report
-"$CLAUDE_BIN" -p \
-  --model "$MODEL" \
-  --allowedTools 'Read,Edit,Write,Glob,Grep' \
-  >> "$LOG_FILE" 2>&1 <<PROMPT
+PROMPT_TEXT=$(cat <<PROMPT
 $AGENT_PROMPT
 
 Additional context:
@@ -922,8 +924,11 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
+)
+run_scheduled_analysis "$REPORT_FILE" "$LOG_FILE" "# QA Report" \
+  "$MODEL" 'Read,Edit,Write,Glob,Grep' "$PROMPT_TEXT"
 
-log_success "Claude analysis complete" | tee -a "$LOG_FILE"
+log_success "Scheduled analysis complete" | tee -a "$LOG_FILE"
 
 # Extract and write shared context
 REPORT_CONTENT=$(cat "$REPORT_FILE")
