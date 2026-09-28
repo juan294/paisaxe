@@ -3,8 +3,8 @@
 # Performs npm audit, license checks, analyzes vulnerabilities, and provides remediation guidance
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/code/paisaxe"
-CLAUDE_BIN="/Users/juan/.local/bin/claude"
+PROJECT_DIR="${PROJECT_DIR:-/Users/juan/code/paisaxe}"
+CLAUDE_BIN="${CLAUDE_BIN:-/Users/juan/.local/bin/claude}"
 MODEL="sonnet"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/security-agent-$(date +%Y-%m-%d).log"
@@ -160,10 +160,7 @@ SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-ins
 SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run Claude to analyze and write report
-"$CLAUDE_BIN" -p \
-  --model "$MODEL" \
-  --allowedTools 'Read,Edit,Write,Glob,Grep' \
-  >> "$LOG_FILE" 2>&1 <<PROMPT
+PROMPT_TEXT=$(cat <<PROMPT
 $AGENT_PROMPT
 
 Additional context:
@@ -180,8 +177,11 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
+)
+run_scheduled_analysis "$REPORT_FILE" "$LOG_FILE" "# Security Report" \
+  "$MODEL" 'Read,Edit,Write,Glob,Grep' "$PROMPT_TEXT"
 
-log_success "Claude analysis complete" | tee -a "$LOG_FILE"
+log_success "Scheduled analysis complete" | tee -a "$LOG_FILE"
 
 # Extract and write shared context
 REPORT_CONTENT=$(cat "$REPORT_FILE")

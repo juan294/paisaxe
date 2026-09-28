@@ -36,6 +36,83 @@ log_error() {
   echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') $*" >&2
 }
 
+valid_scheduled_report() {
+  local report_file="$1" expected_title="$2"
+  [[ -s "$report_file" ]] || return 1
+  [[ $(head -n 1 "$report_file") == "$expected_title"* ]] || return 1
+  tail -n +2 "$report_file" | grep -Eq '[^[:space:]]' || return 1
+  ! grep -Eiq "you have hit your weekly limit|you've hit your weekly limit|^usage limit|^quota exceeded|^rate limit exceeded|^failed to authenticate" "$report_file"
+}
+
+find_codex_bin() {
+  if [[ -n ${CODEX_BIN:-} && -x $CODEX_BIN ]]; then return 0; fi
+  CODEX_BIN=$(command -v codex 2>/dev/null || true)
+  [[ -n $CODEX_BIN && -x $CODEX_BIN ]]
+}
+
+# Keep the previous report through provider failures and publish Codex's final
+# response only after validation. The last argument permits documentation's
+# prewritten metrics report to remain unchanged when Claude updates docs only.
+run_scheduled_analysis() {
+  local report_file="$1" log_file="$2" expected_title="$3"
+  local model="$4" claude_tools="$5" prompt="$6" allow_unchanged="${7:-0}"
+  local project_root="${PROJECT_DIR:?PROJECT_DIR is required}"
+  local backup draft attempt_log had_report=0
+  mkdir -p "$(dirname "$report_file")" "$(dirname "$log_file")"
+  backup=$(mktemp "${report_file}.backup.XXXXXX")
+  draft=$(mktemp "${report_file}.draft.XXXXXX")
+  attempt_log=$(mktemp "${log_file}.claude.XXXXXX")
+  if [[ -f "$report_file" ]]; then cp -p "$report_file" "$backup"; had_report=1; fi
+
+  if [[ -x ${CLAUDE_BIN:-} ]]; then
+    if (unset ANTHROPIC_API_KEY; "$CLAUDE_BIN" -p "$prompt" --model "$model" \
+      --allowedTools "$claude_tools") > "$attempt_log" 2>&1; then
+      if ! grep -Eiq "weekly limit|usage limit|quota exceeded|rate limit|too many requests|429|not logged in|failed to authenticate" "$attempt_log" && \
+        valid_scheduled_report "$report_file" "$expected_title" && \
+        { [[ $allow_unchanged == 1 ]] || [[ $had_report == 0 ]] || ! cmp -s "$backup" "$report_file"; }; then
+        cat "$attempt_log" >> "$log_file"
+        rm -f "$backup" "$draft" "$attempt_log"
+        return 0
+      fi
+    fi
+    if ! grep -Eiq "weekly limit|usage limit|quota exceeded|rate limit|too many requests|429|not logged in|failed to authenticate" "$attempt_log"; then
+      cat "$attempt_log" >> "$log_file"
+      log_error "Claude did not produce a new valid report; previous report preserved."
+      if [[ $had_report == 1 ]]; then cp -p "$backup" "$report_file"; else rm -f "$report_file"; fi
+      rm -f "$backup" "$draft" "$attempt_log"
+      return 1
+    fi
+  fi
+
+  cat "$attempt_log" >> "$log_file"
+  if [[ $had_report == 1 ]]; then cp -p "$backup" "$report_file"; else rm -f "$report_file"; fi
+  log_warn "Claude is unavailable or limited; trying Codex."
+  if ! find_codex_bin; then
+    log_error "Codex executable is unavailable; previous report preserved."
+    rm -f "$backup" "$draft" "$attempt_log"
+    return 1
+  fi
+
+  if (unset CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY OPENAI_API_KEY CODEX_API_KEY; \
+    "$CODEX_BIN" exec --ephemeral --ignore-user-config --sandbox workspace-write \
+      -c 'approval_policy="never"' -c 'sandbox_workspace_write.network_access=true' \
+      -C "$project_root" --output-last-message "$draft" \
+      "$prompt
+
+Scheduled-run instructions: Return the full report as your final response. Start with $expected_title. Do not write to $report_file directly; the runner validates and publishes your final text. Do not spawn subagents or request interactive input.") >> "$log_file" 2>&1 && \
+    valid_scheduled_report "$draft" "$expected_title"; then
+    mv "$draft" "$report_file"
+    rm -f "$backup" "$attempt_log"
+    log_success "Codex fallback published $report_file"
+    return 0
+  fi
+
+  if [[ $had_report == 1 ]]; then cp -p "$backup" "$report_file"; else rm -f "$report_file"; fi
+  rm -f "$backup" "$draft" "$attempt_log"
+  log_error "Codex fallback failed or returned an invalid report; previous report preserved."
+  return 1
+}
+
 # Configuration — local agent config (no HTTP dependency)
 # Reads from scripts/agent-config.json, auto-creates from defaults if missing.
 
