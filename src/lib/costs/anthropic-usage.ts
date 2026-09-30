@@ -20,11 +20,21 @@ export interface AnthropicResponseUsage {
   cache_read_input_tokens?: number | null;
 }
 
+/**
+ * anthropic_usage `source` label, one per call site. Required and closed so a
+ * missing or misspelled label cannot silently split a group in usage reports.
+ */
+export type UsageSource =
+  | "chat"
+  | "chat_stream"
+  | "translate"
+  | "content_discovery"
+  | `marketing_${string}`;
+
 export interface RecordUsageOptions {
   model: string;
   usage: AnthropicResponseUsage | null | undefined;
-  /** Coarse label for the call site, e.g. "chat" or "chat_stream". */
-  source?: string;
+  source: UsageSource;
 }
 
 /**
@@ -66,7 +76,7 @@ export async function recordAnthropicUsage(
       cache_creation_input_tokens: cacheCreation,
       cache_read_input_tokens: cacheRead,
       cost_usd: costUsd,
-      source: source ?? null,
+      source,
     });
 
     if (error) {

@@ -4,6 +4,7 @@ const { mockWarn } = vi.hoisted(() => ({ mockWarn: vi.fn() }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: mockWarn, error: vi.fn(), info: vi.fn() } }));
 
 import { getModelPricing, estimateCostUsd } from "./anthropic-pricing";
+import { CHAT_MODEL } from "@/lib/models";
 
 // Expected rates: https://platform.claude.com/docs/en/about-claude/pricing
 // (retrieved 2026-09-30).
@@ -94,6 +95,20 @@ describe("anthropic-pricing", () => {
       const p = getModelPricing("some-future-model");
       expect(p.input).toBeCloseTo(perM(2), 12);
       expect(p.output).toBeCloseTo(perM(10), 12);
+    });
+
+    it("uses the CHAT_MODEL row itself as the default, so the two cannot drift", () => {
+      expect(getModelPricing("some-other-future-model")).toBe(getModelPricing(CHAT_MODEL));
+    });
+
+    it("fails at import when CHAT_MODEL has no pricing row", async () => {
+      vi.resetModules();
+      vi.doMock("@/lib/models", () => ({ CHAT_MODEL: "unpriced-model-x" }));
+      await expect(import("./anthropic-pricing")).rejects.toThrow(
+        "No pricing row for CHAT_MODEL unpriced-model-x"
+      );
+      vi.doUnmock("@/lib/models");
+      vi.resetModules();
     });
 
     // An unpriced model is silently billed at the Sonnet 5 rate; warn once per
