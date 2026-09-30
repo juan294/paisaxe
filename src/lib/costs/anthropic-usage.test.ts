@@ -109,7 +109,7 @@ describe("recordAnthropicUsage", () => {
   it("does nothing when all token counts are zero", async () => {
     await recordAnthropicUsage({
       model: "claude-sonnet-5",
-        source: "chat",
+      source: "chat",
       usage: { input_tokens: 0, output_tokens: 0 },
     });
     expect(mockInsert).not.toHaveBeenCalled();
@@ -132,7 +132,7 @@ describe("recordAnthropicUsage", () => {
     // all-zero early-return guard and exercises the ?? 0 fallback at lines 42-43.
     await recordAnthropicUsage({
       model: "claude-sonnet-5",
-        source: "chat",
+      source: "chat",
       usage: { cache_creation_input_tokens: 1000 },
     });
     expect(mockInsert).toHaveBeenCalledTimes(1);
@@ -211,7 +211,7 @@ describe("recordAnthropicUsageInBackground", () => {
 
     const result = recordAnthropicUsageInBackground({
       model: "claude-sonnet-5",
-        source: "chat",
+      source: "chat",
       usage: { input_tokens: 10, output_tokens: 5 },
     });
 
