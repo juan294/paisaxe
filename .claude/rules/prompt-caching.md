@@ -134,7 +134,8 @@ unconditional; that is also an owner decision.
 
 `src/lib/claude.ts` uses curl in dev and test and the SDK in production (see
 the file header). Both transports send the same `system` blocks from
-`buildSystemBlocks`, so local runs exercise the production cache prefix. A
+`buildSystemBlocks` (`src/lib/cached-system.ts`, also used by the marketing
+route), so local runs exercise the production cache prefix. A
 test asserts the curl and SDK bodies carry identical `system` arrays.
 
 ### Short-prompt exceptions (left uncached on purpose)

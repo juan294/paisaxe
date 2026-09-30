@@ -47,21 +47,21 @@ const fsMode = vi.hoisted(() => ({ useRealFiles: false }));
 vi.mock("fs/promises", async () => {
   const actual = await vi.importActual<typeof import("fs/promises")>("fs/promises");
   return {
-  readFile: vi.fn().mockImplementation((path: string) => {
-    if (fsMode.useRealFiles) {
-      return actual.readFile(path, "utf-8");
-    }
-    if (path.includes("brand-voice.md")) {
-      return Promise.resolve("# Brand Voice Guidelines\nBe friendly and helpful.");
-    }
-    if (path.includes("xander-x-agent.md")) {
-      return Promise.resolve("# Xander - X Agent\nYou are Xander.");
-    }
-    if (path.includes("iris-instagram-agent.md")) {
-      return Promise.resolve("# Iris - Instagram Agent\nYou are Iris.");
-    }
-    return Promise.reject(new Error(`Could not read ${path}`));
-  }),
+    readFile: vi.fn().mockImplementation((path: string) => {
+      if (fsMode.useRealFiles) {
+        return actual.readFile(path, "utf-8");
+      }
+      if (path.includes("brand-voice.md")) {
+        return Promise.resolve("# Brand Voice Guidelines\nBe friendly and helpful.");
+      }
+      if (path.includes("xander-x-agent.md")) {
+        return Promise.resolve("# Xander - X Agent\nYou are Xander.");
+      }
+      if (path.includes("iris-instagram-agent.md")) {
+        return Promise.resolve("# Iris - Instagram Agent\nYou are Iris.");
+      }
+      return Promise.reject(new Error(`Could not read ${path}`));
+    }),
   };
 });
 

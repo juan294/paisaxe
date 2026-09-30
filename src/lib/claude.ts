@@ -20,6 +20,7 @@ import type { Chunk, ImageResult, Source } from "@/types";
 import { CHAT_MODEL } from "@/lib/models";
 import { logger } from "@/lib/logger";
 import { recordAnthropicUsageInBackground } from "@/lib/costs/anthropic-usage";
+import { buildSystemBlocks, type SystemBlock } from "@/lib/cached-system";
 
 /** Raw Anthropic usage block as it appears on streaming SSE events. */
 interface RawUsage {
@@ -51,25 +52,8 @@ type CallOptions = StreamOptions & {
   source?: string;
 };
 
-type SystemBlock = Anthropic.TextBlockParam;
-
-/**
- * Build the `system` blocks sent by BOTH transports (SDK and curl), so local
- * dev/test runs exercise the same cache prefix as production.
- *
- * The stable text carries the only explicit `cache_control` marker. Volatile
- * text (message index, per-request flags) goes in an unmarked block after it,
- * so it never changes the cached prefix. See .claude/rules/prompt-caching.md.
- */
-function buildSystemBlocks(stable: string, volatile?: string): SystemBlock[] {
-  const blocks: SystemBlock[] = [
-    { type: "text", text: stable, cache_control: { type: "ephemeral" } },
-  ];
-  if (volatile) {
-    blocks.push({ type: "text", text: volatile });
-  }
-  return blocks;
-}
+// Both transports (SDK and curl) send the same `system` blocks from
+// buildSystemBlocks, so local dev/test runs exercise the production cache prefix.
 
 // Use curl in development/test (Turbopack ECONNRESET workaround), SDK in production
 // Production is the only environment where Turbopack is not used
@@ -581,8 +565,7 @@ export function formatImagesForContext(images: ImageResult[] | undefined): strin
  * addition follow it unmarked.
  */
 function buildChatSystem(messageIndex: number, asturianEnabled: boolean): SystemBlock[] {
-  // Blocks are concatenated as-is: start the flow heading on its own line.
-  const flow = `\n\n${buildConversationFlow(messageIndex)}`;
+  const flow = buildConversationFlow(messageIndex);
   return buildSystemBlocks(
     buildSystemPrompt(),
     asturianEnabled ? flow + ASTURIANU_PROMPT_ADDITION : flow
