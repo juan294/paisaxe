@@ -13,6 +13,7 @@ import { agentChatRequestSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 import { CHAT_MODEL } from "@/lib/models";
 import { recordAnthropicUsageInBackground } from "@/lib/costs/anthropic-usage";
+import { buildSystemBlocks, type SystemBlock } from "@/lib/cached-system";
 
 // Agent chat response
 interface AgentChatResponse {
@@ -97,7 +98,7 @@ async function gatherContext(): Promise<string> {
  * DB context, which changes between requests, so it follows unmarked.
  * See .claude/rules/prompt-caching.md.
  */
-async function buildAgentSystem(agent: AgentConfig): Promise<Anthropic.TextBlockParam[]> {
+async function buildAgentSystem(agent: AgentConfig): Promise<SystemBlock[]> {
   const [agentPrompt, context] = await Promise.all([
     loadAgentPrompt(agent),
     gatherContext(),
@@ -121,11 +122,7 @@ Your limitations: ${agent.limitations.join(", ")}
 
 Respond helpfully while staying true to the Paisaxe brand voice.`;
 
-  return [
-    { type: "text", text: stable, cache_control: { type: "ephemeral" } },
-    // Blocks are concatenated as-is: start the context heading on its own line.
-    { type: "text", text: `\n\n${context}` },
-  ];
+  return buildSystemBlocks(stable, context);
 }
 
 /**
