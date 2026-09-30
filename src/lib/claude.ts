@@ -581,7 +581,8 @@ export function formatImagesForContext(images: ImageResult[] | undefined): strin
  * addition follow it unmarked.
  */
 function buildChatSystem(messageIndex: number, asturianEnabled: boolean): SystemBlock[] {
-  const flow = buildConversationFlow(messageIndex);
+  // Blocks are concatenated as-is: start the flow heading on its own line.
+  const flow = `\n\n${buildConversationFlow(messageIndex)}`;
   return buildSystemBlocks(
     buildSystemPrompt(),
     asturianEnabled ? flow + ASTURIANU_PROMPT_ADDITION : flow

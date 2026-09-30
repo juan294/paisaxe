@@ -118,17 +118,17 @@ tokenizer, and `CACHE_MIN_SAFETY_MARGIN` = 1.2).
 ### Marketing history: when cross-turn reads happen
 
 Block 2 (`gatherContext()`) sits between the last stable breakpoint and the
-history, so rule 3 applies. It renders the active-story count and the
-platform, type and status of the five latest `marketing_content` rows. It
-renders no timestamps (`scheduled_for` is only the sort key), and a test
-asserts two requests over unchanged data produce identical bytes. So the
-history is read across turns while that data is unchanged, and each turn
-after a change (a story activated, a post scheduled or its status moved)
-rewrites the history once. Unverified risk: the query orders by
-`scheduled_for` with no tiebreaker, so rows sharing a timestamp may come back
-in a different order and change block 2. Block 1 is read either way. Moving
-the context into the final user turn would make history reads unconditional;
-that change is an owner decision, not made here.
+history, so rule 3 applies. Today it renders only the active-story count:
+the `marketing_content` query (`route.ts`, `gatherContext`) targets a table
+that no migration creates (021 creates `marketing_content_bank`), and the
+query error is ignored, so that part of the block is always empty. The block
+is therefore deterministic until the story count changes, and a test asserts
+two requests over unchanged data produce identical bytes. The history is read
+across turns while the count holds, and rewritten once after it changes.
+Fixing the query is an owner follow-up. When it is fixed, recheck this: rows
+ordered by `scheduled_for` with no tiebreaker can swap order and change block
+2. Moving the context into the final user turn would make history reads
+unconditional; that is also an owner decision.
 
 ### Transport parity
 
@@ -148,6 +148,9 @@ test asserts the curl and SDK bodies carry identical `system` arrays.
 - **generate-stories:** the PDF name is interpolated first and about 600
   tokens of static instructions follow up to 50K chars of chunk text. The
   static part alone is below the minimum.
+- **QA health probe** (`scripts/qa-agent.sh`, Anthropic check): a
+  `max_tokens: 1` "Reply with OK" request that only reads the HTTP status. It
+  is not cached and records no usage (a few input tokens per QA run).
 
 ### Usage recorder
 
@@ -163,6 +166,8 @@ the row with `src/lib/costs/anthropic-pricing.ts`. Its failure tags are
 `[ANTHROPIC_USAGE_WRITE_FAILED]`.
 
 Cost prices all four fields (`cost_usd`, `src/lib/costs/anthropic-pricing.ts`).
+A model missing from that table is priced at the Sonnet 5 default and logs
+`[ANTHROPIC_PRICING_UNKNOWN_MODEL]` once per model per process.
 The marketing route's JSON `usage` is a display: it shows
 `cacheCreationInputTokens` and `cacheReadInputTokens` separately next to
 `inputTokens` (the uncached remainder). paisaxe has no token cap today; any

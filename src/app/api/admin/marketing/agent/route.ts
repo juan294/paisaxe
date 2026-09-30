@@ -123,7 +123,8 @@ Respond helpfully while staying true to the Paisaxe brand voice.`;
 
   return [
     { type: "text", text: stable, cache_control: { type: "ephemeral" } },
-    { type: "text", text: context },
+    // Blocks are concatenated as-is: start the context heading on its own line.
+    { type: "text", text: `\n\n${context}` },
   ];
 }
 

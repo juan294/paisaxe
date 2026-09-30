@@ -1551,7 +1551,8 @@ describe("claude", () => {
       expect(body.system).toHaveLength(2);
       expect(body.system[0].cache_control).toEqual({ type: "ephemeral" });
       expect(body.system[1].cache_control).toBeUndefined();
-      expect(body.system[1].text).toContain("# CONVERSATION FLOW");
+      // Blocks are concatenated as-is, so the flow heading needs its own line.
+      expect(body.system[1].text.startsWith("\n\n# CONVERSATION FLOW\n")).toBe(true);
     });
 
     it("produces identical stable-block bytes for messageIndex 0 vs 5, asturianu on and off", async () => {

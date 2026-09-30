@@ -502,7 +502,8 @@ describe("/api/admin/marketing/agent", () => {
       expect(params.system[0].text).toContain("## Important Instructions");
       expect(params.system[0].text).not.toContain("Current Context");
       expect(params.system[1].cache_control).toBeUndefined();
-      expect(params.system[1].text).toContain("## Current Context");
+      // Blocks are concatenated as-is, so the context heading needs its own line.
+      expect(params.system[1].text.startsWith("\n\n## Current Context\n")).toBe(true);
     });
 
     // Automatic caching reads the history across turns only if the unmarked
