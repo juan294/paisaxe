@@ -19,7 +19,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";
 import { CHAT_MODEL } from "@/lib/models";
 import { logger } from "@/lib/logger";
-import { recordAnthropicUsage } from "@/lib/costs/anthropic-usage";
+import { recordAnthropicUsageInBackground, type UsageSource } from "@/lib/costs/anthropic-usage";
+import { buildSystemBlocks, type SystemBlock } from "@/lib/cached-system";
 
 /** Raw Anthropic usage block as it appears on streaming SSE events. */
 interface RawUsage {
@@ -31,10 +32,10 @@ interface RawUsage {
 
 /**
  * Fire-and-forget usage recording (#138). Never awaited on the hot path and
- * never throws — recordAnthropicUsage swallows its own errors.
+ * never throws; after() keeps the insert alive past the streamed response.
  */
-function trackUsage(model: string, usage: RawUsage | null | undefined, source: string): void {
-  void recordAnthropicUsage({ model, usage, source });
+function trackUsage(model: string, usage: RawUsage | null | undefined, source: UsageSource): void {
+  recordAnthropicUsageInBackground({ model, usage, source });
 }
 
 interface AnthropicMessage {
@@ -45,6 +46,14 @@ interface AnthropicMessage {
 type StreamOptions = {
   signal?: AbortSignal;
 };
+
+type CallOptions = StreamOptions & {
+  /** anthropic_usage `source` label for this call site. */
+  source: UsageSource;
+};
+
+// Both transports (SDK and curl) send the same `system` blocks from
+// buildSystemBlocks, so local dev/test runs exercise the production cache prefix.
 
 // Use curl in development/test (Turbopack ECONNRESET workaround), SDK in production
 // Production is the only environment where Turbopack is not used
@@ -76,7 +85,7 @@ const USE_CURL = resolveUseCurl();
  * Uses curl in development (Turbopack workaround), SDK in production.
  */
 async function* streamAnthropicAPI(
-  system: string,
+  system: SystemBlock[],
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number,
@@ -109,7 +118,7 @@ function createAbortError() {
  * 2 * (1 + 1) = 4 upstream calls (was 2 * (1 + 3) = 8).
  */
 async function* streamWithSDK(
-  system: string,
+  system: SystemBlock[],
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number,
@@ -117,12 +126,10 @@ async function* streamWithSDK(
 ): AsyncGenerator<string, void, unknown> {
   const client = new AnthropicSDK({ maxRetries: 1 });
 
-  const systemBlock = [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }];
-
   const params = {
     model,
     max_tokens: maxTokens,
-    system: systemBlock,
+    system,
     messages,
   };
 
@@ -166,7 +173,7 @@ async function* streamWithSDK(
  * Stream using curl subprocess (development - Turbopack workaround).
  */
 async function* streamWithCurl(
-  system: string,
+  system: SystemBlock[],
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number,
@@ -331,20 +338,31 @@ const RETRY_DELAY_MS = 500;
 /**
  * Call the Anthropic API.
  * Uses curl in development (Turbopack workaround), SDK in production.
+ * A string system prompt is sent as one cache-marked block.
  */
 export async function callAnthropicAPI(
   system: string,
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number,
-  options: StreamOptions = {}
+  options: CallOptions
+): Promise<Anthropic.Message> {
+  return callWithSystemBlocks(buildSystemBlocks(system), messages, model, maxTokens, options);
+}
+
+async function callWithSystemBlocks(
+  system: SystemBlock[],
+  messages: AnthropicMessage[],
+  model: string,
+  maxTokens: number,
+  { source, ...options }: CallOptions
 ): Promise<Anthropic.Message> {
   const response = USE_CURL
     ? await callWithCurl(system, messages, model, maxTokens, options)
     : await callWithSDK(system, messages, model, maxTokens, options);
 
   // #138: record token usage + estimated cost (best-effort, non-blocking).
-  trackUsage(model, response.usage as RawUsage | undefined, "chat");
+  trackUsage(model, response.usage as RawUsage | undefined, source);
 
   return response;
 }
@@ -353,7 +371,7 @@ export async function callAnthropicAPI(
  * Call using the Anthropic SDK (production).
  */
 async function callWithSDK(
-  system: string,
+  system: SystemBlock[],
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number,
@@ -361,13 +379,11 @@ async function callWithSDK(
 ): Promise<Anthropic.Message> {
   const client = new AnthropicSDK({ maxRetries: 3 });
 
-  const systemBlock = [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }];
-
   return client.messages.create(
     {
       model,
       max_tokens: maxTokens,
-      system: systemBlock,
+      system,
       messages,
     },
     { signal: options.signal }
@@ -378,7 +394,7 @@ async function callWithSDK(
  * Call using curl subprocess (development - Turbopack workaround).
  */
 async function callWithCurl(
-  system: string,
+  system: SystemBlock[],
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number,
@@ -513,9 +529,9 @@ async function callWithCurl(
   throw lastError || new Error("Max retries exceeded");
 }
 
-// LOCATION-SPECIFIC: Import system prompt builder from chat-config.ts
+// LOCATION-SPECIFIC: Import system prompt builders from chat-config.ts
 // This is the canonical location for the guide persona prompt
-import { buildSystemPrompt } from "./chat-config";
+import { buildConversationFlow, buildSystemPrompt } from "./chat-config";
 
 // Maximum context size to keep Claude requests focused
 const MAX_CONTEXT_LENGTH = 4000;
@@ -541,6 +557,19 @@ export function formatImagesForContext(images: ImageResult[] | undefined): strin
     .join("\n");
 
   return `\n\n<available_images>\n${imageList}\n</available_images>`;
+}
+
+/**
+ * Chat system blocks: the persona prompt is identical for every visitor and
+ * carries the cache marker; the message-index flow and the optional asturianu
+ * addition follow it unmarked.
+ */
+function buildChatSystem(messageIndex: number, asturianEnabled: boolean): SystemBlock[] {
+  const flow = buildConversationFlow(messageIndex);
+  return buildSystemBlocks(
+    buildSystemPrompt(),
+    asturianEnabled ? flow + ASTURIANU_PROMPT_ADDITION : flow
+  );
 }
 
 /**
@@ -580,17 +609,12 @@ export async function generateChatResponse(
     ? `<context>\n${contextText}\n</context>${imageContext}\n\n<user_question>\n${userMessage}\n</user_question>`
     : `${imageContext ? imageContext + "\n\n" : ""}<user_question>\n${userMessage}\n</user_question>`;
 
-  const basePrompt = buildSystemPrompt(messageIndex);
-  const systemPrompt = asturianEnabled
-    ? basePrompt + ASTURIANU_PROMPT_ADDITION
-    : basePrompt;
-
-  const response = await callAnthropicAPI(
-    systemPrompt,
+  const response = await callWithSystemBlocks(
+    buildChatSystem(messageIndex, asturianEnabled),
     [{ role: "user", content: userContent }],
     CHAT_MODEL,
     1024,
-    options
+    { ...options, source: "chat" }
   );
 
   const textBlock = response.content.find(
@@ -618,13 +642,8 @@ export async function* streamChatResponse(
     ? `<context>\n${contextText}\n</context>${imageContext}\n\n<user_question>\n${userMessage}\n</user_question>`
     : `${imageContext ? imageContext + "\n\n" : ""}<user_question>\n${userMessage}\n</user_question>`;
 
-  const basePrompt = buildSystemPrompt(messageIndex);
-  const systemPrompt = asturianEnabled
-    ? basePrompt + ASTURIANU_PROMPT_ADDITION
-    : basePrompt;
-
   yield* streamAnthropicAPI(
-    systemPrompt,
+    buildChatSystem(messageIndex, asturianEnabled),
     [{ role: "user", content: userContent }],
     CHAT_MODEL,
     1024,
