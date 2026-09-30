@@ -1,10 +1,12 @@
+import { logger } from "@/lib/logger";
+
 /**
  * Published Anthropic per-model pricing (USD per token), used to estimate spend
  * from token usage recorded in the anthropic_usage table (#138).
  *
  * Rates are USD per 1M tokens divided by 1_000_000. Cache writes bill at 1.25x
  * the base input rate (5-minute ephemeral cache); cache reads bill at 0.1x,
- * except Opus 5.5 at 0.05x.
+ * except Opus 5.5 at 0.05x and Fable 5.1 / Mythos 5.1 at 0.025x.
  * Source: https://platform.claude.com/docs/en/about-claude/pricing
  * (retrieved 2026-09-30: Sonnet 5 is $2/$10 standard; the scheduled
  * September 2026 rise to $3/$15 was cancelled). Update when models or rates change.
@@ -40,6 +42,10 @@ function pricing(inputPerM: number, outputPerM: number, cacheReadMultiplier = 0.
  * "claude-sonnet-5"), so list more specific keys first.
  */
 const MODEL_PRICING: Array<{ prefix: string; pricing: ModelPricing }> = [
+  { prefix: "claude-fable-5-1", pricing: pricing(10, 50, 0.025) },
+  { prefix: "claude-fable-5", pricing: pricing(10, 50) },
+  { prefix: "claude-mythos-5-1", pricing: pricing(10, 50, 0.025) },
+  { prefix: "claude-mythos-5", pricing: pricing(10, 50) },
   { prefix: "claude-opus-5-5", pricing: pricing(4, 20, 0.05) },
   { prefix: "claude-opus-5", pricing: pricing(5, 25) },
   // Retired Opus 4.1 and Opus 4 ("claude-opus-4-0" alias, "claude-opus-4-2025…"
@@ -58,6 +64,9 @@ const MODEL_PRICING: Array<{ prefix: string; pricing: ModelPricing }> = [
 /** Default pricing when the model is unknown — use the chat model's tier (Sonnet 5). */
 const DEFAULT_PRICING = pricing(2, 10);
 
+/** Unknown models already warned about, so each is logged once per process. */
+const warnedUnknownModels = new Set<string>();
+
 /** Resolve the pricing for a model id, falling back to a sensible default. */
 export function getModelPricing(model: string): ModelPricing {
   const normalized = model.trim().toLowerCase();
@@ -65,6 +74,10 @@ export function getModelPricing(model: string): ModelPricing {
     if (normalized.startsWith(entry.prefix)) {
       return entry.pricing;
     }
+  }
+  if (!warnedUnknownModels.has(normalized)) {
+    warnedUnknownModels.add(normalized);
+    logger.warn("[ANTHROPIC_PRICING_UNKNOWN_MODEL]", { model });
   }
   return DEFAULT_PRICING;
 }

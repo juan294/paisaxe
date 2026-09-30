@@ -1,4 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const { mockWarn } = vi.hoisted(() => ({ mockWarn: vi.fn() }));
+vi.mock("@/lib/logger", () => ({ logger: { warn: mockWarn, error: vi.fn(), info: vi.fn() } }));
+
 import { getModelPricing, estimateCostUsd } from "./anthropic-pricing";
 
 // Expected rates: https://platform.claude.com/docs/en/about-claude/pricing
@@ -6,6 +10,10 @@ import { getModelPricing, estimateCostUsd } from "./anthropic-pricing";
 const perM = (usd: number) => usd / 1_000_000;
 
 describe("anthropic-pricing", () => {
+  beforeEach(() => {
+    mockWarn.mockClear();
+  });
+
   describe("getModelPricing", () => {
     it("matches a sonnet-5 model id at $2/$10", () => {
       const p = getModelPricing("claude-sonnet-5");
@@ -55,6 +63,27 @@ describe("anthropic-pricing", () => {
       expect(p.cacheRead).toBeCloseTo(perM(0.2), 12);
     });
 
+    it.each(["claude-fable-5-1", "claude-mythos-5-1"])(
+      "prices %s at 10/50 USD per MTok with its 0.025x cache read",
+      (model) => {
+        const p = getModelPricing(model);
+        expect(p.input).toBeCloseTo(perM(10), 12);
+        expect(p.output).toBeCloseTo(perM(50), 12);
+        expect(p.cacheWrite).toBeCloseTo(perM(12.5), 12);
+        expect(p.cacheRead).toBeCloseTo(perM(0.25), 12);
+      }
+    );
+
+    it.each(["claude-fable-5", "claude-mythos-5"])(
+      "prices %s at 10/50 USD per MTok with the standard 0.1x cache read",
+      (model) => {
+        const p = getModelPricing(model);
+        expect(p.input).toBeCloseTo(perM(10), 12);
+        expect(p.output).toBeCloseTo(perM(50), 12);
+        expect(p.cacheRead).toBeCloseTo(perM(1), 12);
+      }
+    );
+
     it("matches haiku 4.5 at $1/$5", () => {
       const p = getModelPricing("claude-haiku-4-5");
       expect(p.input).toBeCloseTo(perM(1), 12);
@@ -65,6 +94,28 @@ describe("anthropic-pricing", () => {
       const p = getModelPricing("some-future-model");
       expect(p.input).toBeCloseTo(perM(2), 12);
       expect(p.output).toBeCloseTo(perM(10), 12);
+    });
+
+    // An unpriced model is silently billed at the Sonnet 5 rate; warn once per
+    // model so the table gets updated without flooding the logs.
+    it("warns once per unknown model when the default pricing is used", () => {
+      getModelPricing("claude-unlisted-9");
+      getModelPricing("claude-unlisted-9");
+      getModelPricing("claude-unlisted-10");
+
+      expect(mockWarn).toHaveBeenCalledTimes(2);
+      expect(mockWarn).toHaveBeenNthCalledWith(1, "[ANTHROPIC_PRICING_UNKNOWN_MODEL]", {
+        model: "claude-unlisted-9",
+      });
+      expect(mockWarn).toHaveBeenNthCalledWith(2, "[ANTHROPIC_PRICING_UNKNOWN_MODEL]", {
+        model: "claude-unlisted-10",
+      });
+    });
+
+    it("does not warn for a priced model", () => {
+      getModelPricing("claude-sonnet-5");
+      getModelPricing("claude-fable-5-1");
+      expect(mockWarn).not.toHaveBeenCalled();
     });
 
     it("derives cache rates from the input rate", () => {
