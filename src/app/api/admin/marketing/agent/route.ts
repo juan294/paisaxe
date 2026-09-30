@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { agentChatRequestSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 import { CHAT_MODEL } from "@/lib/models";
+import { recordAnthropicUsageInBackground } from "@/lib/costs/anthropic-usage";
 
 // Agent chat response
 interface AgentChatResponse {
@@ -19,8 +20,11 @@ interface AgentChatResponse {
   agentId: string;
   agentName: string;
   usage?: {
+    /** Uncached input only; the full input adds the two cache fields. */
     inputTokens: number;
     outputTokens: number;
+    cacheCreationInputTokens: number;
+    cacheReadInputTokens: number;
   };
 }
 
@@ -69,7 +73,7 @@ async function gatherContext(): Promise<string> {
     .select("*", { count: "exact", head: true })
     .eq("active", true);
 
-  let context = "\n\n## Current Context\n\n";
+  let context = "## Current Context\n\n";
 
   if (storyCount) {
     context += `- There are ${storyCount} active stories in the Paisaxe database.\n`;
@@ -86,15 +90,20 @@ async function gatherContext(): Promise<string> {
 }
 
 /**
- * Build the complete system prompt for the agent.
+ * Build the system blocks for the agent.
+ *
+ * Block 1 (brand voice + persona + static instructions) is identical for every
+ * request to the same agent and carries the cache marker. Block 2 is the live
+ * DB context, which changes between requests, so it follows unmarked.
+ * See .claude/rules/prompt-caching.md.
  */
-async function buildSystemPrompt(agent: AgentConfig): Promise<string> {
+async function buildAgentSystem(agent: AgentConfig): Promise<Anthropic.TextBlockParam[]> {
   const [agentPrompt, context] = await Promise.all([
     loadAgentPrompt(agent),
     gatherContext(),
   ]);
 
-  return `${agentPrompt}${context}
+  const stable = `${agentPrompt}
 
 ## Important Instructions
 
@@ -111,6 +120,11 @@ Your capabilities: ${agent.capabilities.join(", ")}
 Your limitations: ${agent.limitations.join(", ")}
 
 Respond helpfully while staying true to the Paisaxe brand voice.`;
+
+  return [
+    { type: "text", text: stable, cache_control: { type: "ephemeral" } },
+    { type: "text", text: context },
+  ];
 }
 
 /**
@@ -148,8 +162,7 @@ export async function POST(
       );
     }
 
-    // Build system prompt
-    const systemPrompt = await buildSystemPrompt(agent);
+    const system = await buildAgentSystem(agent);
 
     // Build messages array
     const messages: Array<{ role: "user" | "assistant"; content: string }> = [
@@ -162,8 +175,17 @@ export async function POST(
     const response = await anthropic.messages.create({
       model: CHAT_MODEL,
       max_tokens: 2048,
-      system: systemPrompt,
+      system,
       messages,
+      // The full conversationHistory is re-sent every turn: automatic caching
+      // moves one breakpoint to the end of it (2 of 4 breakpoints in use).
+      cache_control: { type: "ephemeral" },
+    });
+
+    recordAnthropicUsageInBackground({
+      model: CHAT_MODEL,
+      usage: response.usage,
+      source: `marketing_${agent.id}`,
     });
 
     // Extract response text
@@ -179,6 +201,8 @@ export async function POST(
       usage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
+        cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+        cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
       },
     });
   } catch (error) {

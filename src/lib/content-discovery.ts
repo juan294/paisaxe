@@ -12,6 +12,7 @@ import type { StoryCategory } from "@/types/immersive";
 import { getPlaceholderForStory } from "@/lib/unsplash-placeholders";
 import { logger } from "@/lib/logger";
 import { CHAT_MODEL } from "@/lib/models";
+import { recordAnthropicUsageInBackground } from "@/lib/costs/anthropic-usage";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -278,6 +279,7 @@ export async function generateDescription(
     }
 
     const data = await response.json();
+    recordAnthropicUsageInBackground({ model: CHAT_MODEL, usage: data.usage, source: "content_discovery" });
     const text = data.content?.[0]?.text;
     if (text) return text.trim();
   } catch (error) {
