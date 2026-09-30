@@ -19,7 +19,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";
 import { CHAT_MODEL } from "@/lib/models";
 import { logger } from "@/lib/logger";
-import { recordAnthropicUsageInBackground } from "@/lib/costs/anthropic-usage";
+import { recordAnthropicUsageInBackground, type UsageSource } from "@/lib/costs/anthropic-usage";
 import { buildSystemBlocks, type SystemBlock } from "@/lib/cached-system";
 
 /** Raw Anthropic usage block as it appears on streaming SSE events. */
@@ -34,7 +34,7 @@ interface RawUsage {
  * Fire-and-forget usage recording (#138). Never awaited on the hot path and
  * never throws; after() keeps the insert alive past the streamed response.
  */
-function trackUsage(model: string, usage: RawUsage | null | undefined, source: string): void {
+function trackUsage(model: string, usage: RawUsage | null | undefined, source: UsageSource): void {
   recordAnthropicUsageInBackground({ model, usage, source });
 }
 
@@ -48,8 +48,8 @@ type StreamOptions = {
 };
 
 type CallOptions = StreamOptions & {
-  /** anthropic_usage `source` label for this call site. Defaults to "chat". */
-  source?: string;
+  /** anthropic_usage `source` label for this call site. */
+  source: UsageSource;
 };
 
 // Both transports (SDK and curl) send the same `system` blocks from
@@ -345,7 +345,7 @@ export async function callAnthropicAPI(
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number,
-  options: CallOptions = {}
+  options: CallOptions
 ): Promise<Anthropic.Message> {
   return callWithSystemBlocks(buildSystemBlocks(system), messages, model, maxTokens, options);
 }
@@ -355,7 +355,7 @@ async function callWithSystemBlocks(
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number,
-  { source = "chat", ...options }: CallOptions
+  { source, ...options }: CallOptions
 ): Promise<Anthropic.Message> {
   const response = USE_CURL
     ? await callWithCurl(system, messages, model, maxTokens, options)
@@ -614,7 +614,7 @@ export async function generateChatResponse(
     [{ role: "user", content: userContent }],
     CHAT_MODEL,
     1024,
-    options
+    { ...options, source: "chat" }
   );
 
   const textBlock = response.content.find(

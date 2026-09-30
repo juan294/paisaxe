@@ -18,7 +18,12 @@ vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => ({ from: mockFrom }),
 }));
 
-import { recordAnthropicUsage, recordAnthropicUsageInBackground } from "./anthropic-usage";
+import {
+  recordAnthropicUsage,
+  recordAnthropicUsageInBackground,
+  type RecordUsageOptions,
+  type UsageSource,
+} from "./anthropic-usage";
 
 describe("recordAnthropicUsage", () => {
   beforeEach(() => {
@@ -67,7 +72,7 @@ describe("recordAnthropicUsage", () => {
     });
   });
 
-  it.each(["chat", "chat_stream", "translate", "content_discovery", "marketing_xander"])(
+  it.each<UsageSource>(["chat", "chat_stream", "translate", "content_discovery", "marketing_xander"])(
     "labels the row with source %s",
     async (source) => {
       await recordAnthropicUsage({
@@ -79,22 +84,32 @@ describe("recordAnthropicUsage", () => {
     }
   );
 
-  it("stores a null source when the caller gives none", async () => {
-    await recordAnthropicUsage({
-      model: "claude-sonnet-5",
-      usage: { input_tokens: 1, output_tokens: 1 },
-    });
-    expect(mockInsert.mock.calls[0][0].source).toBeNull();
+  // A missing or misspelled label would silently split a group in the usage
+  // digest (the old "chat" fallback is what mislabelled translation), so both
+  // are compile errors. `npm run typecheck` fails if either directive is unused.
+  it("rejects a missing or unknown source label at compile time", () => {
+    // @ts-expect-error source is required
+    const unlabelled: RecordUsageOptions = { model: "claude-sonnet-5", usage: null };
+    // @ts-expect-error "translation" is not a UsageSource
+    const misspelled: RecordUsageOptions = { model: "claude-sonnet-5", usage: null, source: "translation" };
+    const marketing: RecordUsageOptions = { model: "claude-sonnet-5", usage: null, source: "marketing_penny" };
+
+    expect([unlabelled.source, misspelled.source, marketing.source]).toEqual([
+      undefined,
+      "translation",
+      "marketing_penny",
+    ]);
   });
 
   it("does nothing when usage is null", async () => {
-    await recordAnthropicUsage({ model: "claude-sonnet-5", usage: null });
+    await recordAnthropicUsage({ model: "claude-sonnet-5", usage: null, source: "chat" });
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it("does nothing when all token counts are zero", async () => {
     await recordAnthropicUsage({
       model: "claude-sonnet-5",
+        source: "chat",
       usage: { input_tokens: 0, output_tokens: 0 },
     });
     expect(mockInsert).not.toHaveBeenCalled();
@@ -105,6 +120,7 @@ describe("recordAnthropicUsage", () => {
     await expect(
       recordAnthropicUsage({
         model: "claude-sonnet-5",
+        source: "chat",
         usage: { input_tokens: 10, output_tokens: 5 },
       })
     ).resolves.toBeUndefined();
@@ -116,6 +132,7 @@ describe("recordAnthropicUsage", () => {
     // all-zero early-return guard and exercises the ?? 0 fallback at lines 42-43.
     await recordAnthropicUsage({
       model: "claude-sonnet-5",
+        source: "chat",
       usage: { cache_creation_input_tokens: 1000 },
     });
     expect(mockInsert).toHaveBeenCalledTimes(1);
@@ -132,6 +149,7 @@ describe("recordAnthropicUsage", () => {
     await expect(
       recordAnthropicUsage({
         model: "claude-sonnet-5",
+        source: "chat",
         usage: { input_tokens: 10, output_tokens: 5 },
       })
     ).resolves.toBeUndefined();
@@ -144,6 +162,7 @@ describe("recordAnthropicUsage", () => {
     await expect(
       recordAnthropicUsage({
         model: "claude-sonnet-5",
+        source: "chat",
         usage: { input_tokens: 10, output_tokens: 5 },
       })
     ).resolves.toBeUndefined();
@@ -179,6 +198,7 @@ describe("recordAnthropicUsageInBackground", () => {
     expect(() =>
       recordAnthropicUsageInBackground({
         model: "claude-sonnet-5",
+        source: "chat",
         usage: { input_tokens: 10, output_tokens: 5 },
       })
     ).not.toThrow();
@@ -191,6 +211,7 @@ describe("recordAnthropicUsageInBackground", () => {
 
     const result = recordAnthropicUsageInBackground({
       model: "claude-sonnet-5",
+        source: "chat",
       usage: { input_tokens: 10, output_tokens: 5 },
     });
 

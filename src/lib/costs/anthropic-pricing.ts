@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { CHAT_MODEL } from "@/lib/models";
 
 /**
  * Published Anthropic per-model pricing (USD per token), used to estimate spend
@@ -61,8 +62,20 @@ const MODEL_PRICING: Array<{ prefix: string; pricing: ModelPricing }> = [
   { prefix: "claude-3-haiku", pricing: pricing(0.25, 1.25) },
 ];
 
-/** Default pricing when the model is unknown — use the chat model's tier (Sonnet 5). */
-const DEFAULT_PRICING = pricing(2, 10);
+/** Plain prefix scan of MODEL_PRICING (first match wins). */
+function findPricing(normalizedModel: string): ModelPricing | undefined {
+  return MODEL_PRICING.find((entry) => normalizedModel.startsWith(entry.prefix))?.pricing;
+}
+
+/**
+ * Default pricing when the model is unknown: the chat model's own row, so the
+ * two cannot drift. Fails at import if the chat model is not priced.
+ */
+const chatModelPricing = findPricing(CHAT_MODEL);
+if (!chatModelPricing) {
+  throw new Error(`No pricing row for CHAT_MODEL ${CHAT_MODEL}`);
+}
+const DEFAULT_PRICING: ModelPricing = chatModelPricing;
 
 /** Unknown models already warned about, so each is logged once per process. */
 const warnedUnknownModels = new Set<string>();
@@ -70,10 +83,9 @@ const warnedUnknownModels = new Set<string>();
 /** Resolve the pricing for a model id, falling back to a sensible default. */
 export function getModelPricing(model: string): ModelPricing {
   const normalized = model.trim().toLowerCase();
-  for (const entry of MODEL_PRICING) {
-    if (normalized.startsWith(entry.prefix)) {
-      return entry.pricing;
-    }
+  const found = findPricing(normalized);
+  if (found) {
+    return found;
   }
   if (!warnedUnknownModels.has(normalized)) {
     warnedUnknownModels.add(normalized);

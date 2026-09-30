@@ -1609,11 +1609,21 @@ describe("claude", () => {
       expect(recordAnthropicUsageInBackground).toHaveBeenCalledWith(expect.objectContaining({ source: "translate" }));
     });
 
+    // The old silent "chat" default is what mislabelled translation; a missing
+    // label is now a compile error (`npm run typecheck` fails if unused).
+    it("requires a source label on callAnthropicAPI at compile time", async () => {
+      const { callAnthropicAPI } = await import("./claude");
+      const unlabelled = () =>
+        // @ts-expect-error options with a source label are required
+        callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100);
+      expect(typeof unlabelled).toBe("function");
+    });
+
     it("sends a string system prompt as one marked block on the curl path", async () => {
       const { callAnthropicAPI } = await import("./claude");
       setupMockAPIResponse({ content: [{ type: "text", text: "{}" }] });
 
-      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100);
+      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100, { source: "chat" });
 
       expect(getCurlBody().system).toEqual([
         { type: "text", text: "sys", cache_control: { type: "ephemeral" } },
@@ -1697,7 +1707,8 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         "system prompt",
         [{ role: "user", content: "Hello" }],
         "claude-sonnet-5",
-        1024
+        1024,
+        { source: "chat" }
       );
 
       expect(mockCreate).toHaveBeenCalledWith(
@@ -1722,7 +1733,8 @@ describe("claude SDK path (NODE_ENV=production)", () => {
           "system prompt",
           [{ role: "user", content: "Test" }],
           "claude-sonnet-5",
-          1024
+          1024,
+          { source: "chat" }
         )
       ).rejects.toThrow("SDK authentication failed");
     });
@@ -1740,7 +1752,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         [{ role: "user", content: "Hello" }],
         "claude-sonnet-5",
         1024,
-        { signal: controller.signal }
+        { signal: controller.signal, source: "chat" }
       );
 
       expect(mockCreate).toHaveBeenCalledWith(
@@ -1978,7 +1990,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       });
 
       const { callAnthropicAPI } = await import("./claude");
-      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 512);
+      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 512, { source: "chat" });
 
       expect(capturedConstructorOptions).toMatchObject({ maxRetries: 3 });
     });
@@ -2190,7 +2202,8 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         "my system prompt",
         [{ role: "user", content: "question" }],
         "claude-sonnet-5",
-        512
+        512,
+        { source: "chat" }
       );
 
       const callArgs = mockCreate.mock.calls[0][0];
@@ -2286,7 +2299,8 @@ describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
       "system",
       [{ role: "user", content: "hi" }],
       "claude-sonnet-5",
-      100
+      100,
+      { source: "chat" }
     );
 
     expect(mockCreate).toHaveBeenCalledTimes(1);
@@ -2308,7 +2322,8 @@ describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
       "system",
       [{ role: "user", content: "hi" }],
       "claude-sonnet-5",
-      100
+      100,
+      { source: "chat" }
     );
 
     expect(localMockExecFile).toHaveBeenCalledTimes(1);
@@ -2348,7 +2363,7 @@ describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
     mockCreate.mockResolvedValue({ content: [{ type: "text", text: "sdk response" }] });
 
     const { callAnthropicAPI } = await import("./claude");
-    await callAnthropicAPI("system", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100);
+    await callAnthropicAPI("system", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100, { source: "chat" });
 
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(localMockExecFile).not.toHaveBeenCalled();

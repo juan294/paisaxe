@@ -155,6 +155,10 @@ test asserts the curl and SDK bodies carry identical `system` arrays.
 
 ### Usage recorder
 
+`source` is the required `UsageSource` union (`src/lib/costs/anthropic-usage.ts`):
+`chat`, `chat_stream`, `translate`, `content_discovery`, `marketing_<agent id>`.
+There is no default, so a new call site must add its label to the union.
+
 Request handlers call `recordAnthropicUsageInBackground`, which starts the
 insert and hands it to next/server `after()` so Vercel does not freeze the
 function before a streamed response's insert finishes. Outside a request scope
