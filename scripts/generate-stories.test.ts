@@ -1,9 +1,39 @@
 import { describe, it, expect } from "vitest";
 import {
   validateGeneratedStories,
+  formatUsageLine,
   NON_ASTURIAN_BLOCKLIST,
   type GeneratedStoryWithQuote,
 } from "./generate-stories";
+
+// No database in this CLI: prompt-caching rule 7 says print the four usage
+// fields per call instead of persisting them.
+describe("formatUsageLine", () => {
+  it("prints all four usage fields for a call", () => {
+    expect(
+      formatUsageLine("Guia-cultura-ES.pdf", 2, {
+        input_tokens: 14000,
+        output_tokens: 3100,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      })
+    ).toBe(
+      "[usage] Guia-cultura-ES.pdf attempt 2: input_tokens=14000 output_tokens=3100 " +
+        "cache_creation_input_tokens=0 cache_read_input_tokens=0"
+    );
+  });
+
+  it("prints 0 for cache fields the API left null", () => {
+    expect(
+      formatUsageLine("a.pdf", 1, {
+        input_tokens: 5,
+        output_tokens: 6,
+        cache_creation_input_tokens: null,
+        cache_read_input_tokens: null,
+      })
+    ).toContain("cache_creation_input_tokens=0 cache_read_input_tokens=0");
+  });
+});
 
 describe("NON_ASTURIAN_BLOCKLIST", () => {
   it("contains known non-Asturian border places", () => {

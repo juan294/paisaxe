@@ -6,34 +6,41 @@
 import { describe, it, expect } from "vitest";
 import {
   buildSystemPrompt,
+  buildConversationFlow,
   GENERIC_REDIRECT_RESPONSE,
   GENERIC_REDIRECT_RESPONSE_ES,
   CHAT_CONFIG,
 } from "./chat-config";
 
 describe("buildSystemPrompt", () => {
-  it("should return a string for any messageIndex", () => {
-    expect(typeof buildSystemPrompt(0)).toBe("string");
-    expect(typeof buildSystemPrompt(5)).toBe("string");
+  it("should return a string", () => {
+    expect(typeof buildSystemPrompt()).toBe("string");
   });
 
-  describe("first message (messageIndex=0)", () => {
-    const prompt = buildSystemPrompt(0);
+  // The persona prompt is the cached prefix shared by every visitor, so it
+  // must not carry the per-message conversation flow (prompt-caching rule 2).
+  describe("stable persona prefix", () => {
+    const prompt = buildSystemPrompt();
+
+    it("should NOT contain the per-message conversation flow", () => {
+      expect(prompt).not.toContain("CONVERSATION FLOW");
+      expect(prompt).not.toContain("message #");
+      expect(prompt).not.toContain("greet the visitor warmly");
+      expect(prompt).not.toContain("Do NOT greet again");
+    });
+
+    it("should go straight from IDENTITY to SCOPE", () => {
+      expect(prompt).toContain(
+        "I know every corner of Asturias: its mountains, coast, villages, cider, and people.\n\n# SCOPE"
+      );
+    });
+  });
+
+  describe("persona content", () => {
+    const prompt = buildSystemPrompt();
 
     it("should be a non-empty string", () => {
       expect(prompt.length).toBeGreaterThan(0);
-    });
-
-    it("should indicate this is message #1", () => {
-      expect(prompt).toContain("message #1");
-    });
-
-    it("should instruct to greet warmly", () => {
-      expect(prompt).toContain("greet the visitor warmly");
-    });
-
-    it("should NOT contain follow-up instructions", () => {
-      expect(prompt).not.toContain("Do NOT greet again");
     });
 
     it("should contain IDENTITY section", () => {
@@ -163,7 +170,7 @@ describe("buildSystemPrompt", () => {
   });
 
   describe("image awareness", () => {
-    const prompt = buildSystemPrompt(0);
+    const prompt = buildSystemPrompt();
 
     it("should contain an IMAGES section", () => {
       expect(prompt).toContain("# IMAGES");
@@ -178,25 +185,65 @@ describe("buildSystemPrompt", () => {
     });
   });
 
+});
+
+describe("buildConversationFlow", () => {
+  describe("first message (messageIndex=0)", () => {
+    const flow = buildConversationFlow(0);
+
+    it("should indicate this is message #1", () => {
+      expect(flow).toContain("message #1");
+    });
+
+    it("should instruct to greet warmly", () => {
+      expect(flow).toContain("greet the visitor warmly");
+    });
+
+    it("should NOT contain follow-up instructions", () => {
+      expect(flow).not.toContain("Do NOT greet again");
+    });
+
+    // Greeting-rule wording is pinned byte-for-byte: only its position moved
+    // (out of the cached persona block), never its text.
+    it("should keep the first-message greeting rule text unchanged", () => {
+      expect(flow).toBe(
+        "# CONVERSATION FLOW\n" +
+          "This is message #1 in the conversation.\n" +
+          "- This is the FIRST message — greet the visitor warmly and introduce yourself briefly."
+      );
+    });
+  });
+
   describe("follow-up messages (messageIndex>0)", () => {
-    const prompt = buildSystemPrompt(3);
+    const flow = buildConversationFlow(3);
 
     it("should indicate the correct message number", () => {
-      expect(prompt).toContain("message #4");
+      expect(flow).toContain("message #4");
     });
 
     it("should instruct NOT to greet again", () => {
-      expect(prompt).toContain("Do NOT greet again");
+      expect(flow).toContain("Do NOT greet again");
     });
 
     it("should list specific greetings to avoid", () => {
-      expect(prompt).toContain("¡Hola!");
-      expect(prompt).toContain("Hello!");
-      expect(prompt).toContain("Welcome!");
+      expect(flow).toContain("¡Hola!");
+      expect(flow).toContain("Hello!");
+      expect(flow).toContain("Welcome!");
     });
 
     it("should NOT contain first-message greeting instruction", () => {
-      expect(prompt).not.toContain("greet the visitor warmly");
+      expect(flow).not.toContain("greet the visitor warmly");
+    });
+
+    it("should keep the follow-up greeting rule text unchanged", () => {
+      expect(flow).toBe(
+        "# CONVERSATION FLOW\n" +
+          "This is message #4 in the conversation.\n" +
+          "- This is a FOLLOW-UP message — the visitor already knows who I am.\n" +
+          '- Do NOT greet again. No "¡Hola!", "Hello!", "Hi!", "Welcome!", "¡Bienvenido!" or any greeting.\n' +
+          "- Do NOT re-introduce myself. Jump straight into answering their question.\n" +
+          '- Be brief and direct: "¿En qué más puedo ayudarte?" style, not "¡Hola de nuevo!" style.'
+      );
     });
   });
 });

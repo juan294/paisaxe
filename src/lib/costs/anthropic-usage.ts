@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { logger } from "@/lib/logger";
 import { estimateCostUsd } from "./anthropic-pricing";
@@ -75,5 +76,21 @@ export async function recordAnthropicUsage(
     logger.warn("[ANTHROPIC_USAGE_RECORD_ERROR]", {
       error: err instanceof Error ? err.message : String(err),
     });
+  }
+}
+
+/**
+ * Fire-and-forget variant for request handlers. The insert starts at once and
+ * is handed to next/server `after()`, so Vercel keeps the function alive until
+ * it finishes instead of freezing it when the (streamed) response ends.
+ * Outside a request scope (scripts, tests) `after()` throws; the insert then
+ * simply runs unawaited. Never blocks the caller and never throws.
+ */
+export function recordAnthropicUsageInBackground(options: RecordUsageOptions): void {
+  const pending = recordAnthropicUsage(options);
+  try {
+    after(pending);
+  } catch {
+    // No request scope to extend; `pending` still runs to completion.
   }
 }

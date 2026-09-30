@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { CHAT_MODEL } from "@/lib/models";
+import {
+  CACHE_MIN_SAFETY_MARGIN,
+  MAX_CACHE_BREAKPOINTS,
+  SONNET_5_MIN_CACHE_TOKENS,
+  countCacheBreakpoints,
+  estimateTokens,
+} from "@/test/prompt-cache";
 
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
@@ -26,9 +33,24 @@ vi.mock("@anthropic-ai/sdk", () => {
   };
 });
 
+// Usage recording is fire-and-forget; stub it so tests don't touch Supabase.
+const { mockRecordUsage } = vi.hoisted(() => ({ mockRecordUsage: vi.fn() }));
+vi.mock("@/lib/costs/anthropic-usage", () => ({
+  recordAnthropicUsageInBackground: (...args: unknown[]) => mockRecordUsage(...args),
+}));
+
+// When true, readFile serves the real persona and brand-voice files (used to
+// measure the real cached prefix against the model minimum).
+const fsMode = vi.hoisted(() => ({ useRealFiles: false }));
+
 // Mock fs/promises
-vi.mock("fs/promises", () => ({
+vi.mock("fs/promises", async () => {
+  const actual = await vi.importActual<typeof import("fs/promises")>("fs/promises");
+  return {
   readFile: vi.fn().mockImplementation((path: string) => {
+    if (fsMode.useRealFiles) {
+      return actual.readFile(path, "utf-8");
+    }
     if (path.includes("brand-voice.md")) {
       return Promise.resolve("# Brand Voice Guidelines\nBe friendly and helpful.");
     }
@@ -40,7 +62,8 @@ vi.mock("fs/promises", () => ({
     }
     return Promise.reject(new Error(`Could not read ${path}`));
   }),
-}));
+  };
+});
 
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
@@ -77,6 +100,7 @@ describe("/api/admin/marketing/agent", () => {
     vi.clearAllMocks();
 
     // Reset shared mock data
+    fsMode.useRealFiles = false;
     mockStoryCount = 10;
     mockScheduledContent = [
       { platform: "x", content_type: "photo_caption", status: "draft", scheduled_for: "2024-01-15T14:00:00Z" },
@@ -148,7 +172,41 @@ describe("/api/admin/marketing/agent", () => {
       expect(data.agentId).toBe("xander");
       expect(data.agentName).toBe("Xander");
       expect(data.response).toBeTruthy();
-      expect(data.usage).toEqual({ inputTokens: 100, outputTokens: 50 });
+      expect(data.usage).toEqual({
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheCreationInputTokens: 0,
+        cacheReadInputTokens: 0,
+      });
+    });
+
+    // input_tokens is only the uncached remainder once caching engages, so a
+    // token total without the cache fields under-reports the request.
+    it("reports cache write and read tokens alongside input and output", async () => {
+      mocks.anthropicCreate.mockResolvedValueOnce({
+        content: [{ type: "text", text: "ok" }],
+        usage: {
+          input_tokens: 12,
+          output_tokens: 40,
+          cache_creation_input_tokens: 150,
+          cache_read_input_tokens: 2600,
+        },
+      });
+
+      const response = await POST(
+        new NextRequest("http://localhost/api/admin/marketing/agent", {
+          method: "POST",
+          body: JSON.stringify({ agentId: "xander", message: "Hello" }),
+        })
+      );
+      const data = await response.json();
+
+      expect(data.usage).toEqual({
+        inputTokens: 12,
+        outputTokens: 40,
+        cacheCreationInputTokens: 150,
+        cacheReadInputTokens: 2600,
+      });
     });
 
     it("should include conversation history in the request", async () => {
@@ -368,11 +426,11 @@ describe("/api/admin/marketing/agent", () => {
 
       await POST(request);
 
-      // The system prompt should include context from gatherContext()
+      // The unmarked second system block carries gatherContext() output
       const callArgs = mocks.anthropicCreate.mock.calls[0][0];
-      expect(callArgs.system).toContain("10 active stories");
-      expect(callArgs.system).toContain("Recent marketing content");
-      expect(callArgs.system).toContain("x: photo_caption (draft)");
+      expect(callArgs.system[1].text).toContain("10 active stories");
+      expect(callArgs.system[1].text).toContain("Recent marketing content");
+      expect(callArgs.system[1].text).toContain("x: photo_caption (draft)");
     });
 
     it("should handle null story count gracefully", async () => {
@@ -389,9 +447,113 @@ describe("/api/admin/marketing/agent", () => {
       expect(response.status).toBe(200);
       // System prompt should NOT include story count text
       const callArgs = mocks.anthropicCreate.mock.calls[0][0];
-      expect(callArgs.system).not.toContain("active stories");
-      expect(callArgs.system).not.toContain("Recent marketing content");
+      const systemText = callArgs.system.map((b: { text: string }) => b.text).join("\n");
+      expect(systemText).not.toContain("active stories");
+      expect(systemText).not.toContain("Recent marketing content");
     });
+
+    it("records usage under source 'marketing_<agent>'", async () => {
+      const usage = { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+      mocks.anthropicCreate.mockResolvedValueOnce({
+        content: [{ type: "text", text: "ok" }],
+        usage,
+      });
+
+      const response = await POST(
+        new NextRequest("http://localhost/api/admin/marketing/agent", {
+          method: "POST",
+          body: JSON.stringify({ agentId: "iris", message: "Hello" }),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockRecordUsage).toHaveBeenCalledWith({
+        model: CHAT_MODEL,
+        usage,
+        source: "marketing_iris",
+      });
+    });
+  });
+
+  // ─── Prompt-cache prefix stability (.claude/rules/prompt-caching.md) ──
+
+  describe("prompt caching", () => {
+    async function requestFor(
+      agentId: string,
+      conversationHistory: Array<{ role: string; content: string }> = []
+    ) {
+      mocks.anthropicCreate.mockClear();
+      await POST(
+        new NextRequest("http://localhost/api/admin/marketing/agent", {
+          method: "POST",
+          body: JSON.stringify({ agentId, message: "Hello", conversationHistory }),
+        })
+      );
+      return mocks.anthropicCreate.mock.calls[0][0];
+    }
+
+    it("sends system as [persona + instructions (marked), DB context (unmarked)]", async () => {
+      const params = await requestFor("xander");
+
+      expect(params.system).toHaveLength(2);
+      expect(params.system[0].cache_control).toEqual({ type: "ephemeral" });
+      expect(params.system[0].text).toContain("# Brand Voice Guidelines");
+      expect(params.system[0].text).toContain("You are Xander.");
+      expect(params.system[0].text).toContain("## Important Instructions");
+      expect(params.system[0].text).not.toContain("Current Context");
+      expect(params.system[1].cache_control).toBeUndefined();
+      expect(params.system[1].text).toContain("## Current Context");
+    });
+
+    // Automatic caching reads the history across turns only if the unmarked
+    // context block before it is byte-identical between requests. It renders
+    // counts and platform/type/status only, never scheduled_for timestamps.
+    it("renders an identical DB-context block for two requests over unchanged data", async () => {
+      const first = await requestFor("xander");
+      const second = await requestFor("xander", [
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi there!" },
+      ]);
+
+      expect(second.system[1].text).toBe(first.system[1].text);
+      expect(first.system[1].text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    });
+
+    it("produces identical block-1 bytes for two different DB contexts", async () => {
+      const first = await requestFor("xander");
+
+      mockStoryCount = 42;
+      mockScheduledContent = [
+        { platform: "pinterest", content_type: "pin", status: "scheduled", scheduled_for: "2026-09-30T08:00:00Z" },
+      ];
+      const second = await requestFor("xander");
+
+      expect(second.system[1].text).not.toBe(first.system[1].text);
+      expect(JSON.stringify(second.system[0])).toBe(JSON.stringify(first.system[0]));
+    });
+
+    it("caches the re-sent conversation history with top-level automatic caching", async () => {
+      const params = await requestFor("xander", [
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi there!" },
+      ]);
+
+      expect(params.cache_control).toEqual({ type: "ephemeral" });
+      expect(countCacheBreakpoints(params)).toBe(2);
+      expect(countCacheBreakpoints(params)).toBeLessThanOrEqual(MAX_CACHE_BREAKPOINTS);
+    });
+
+    it.each(["xander", "iris", "penny"])(
+      "keeps the real %s persona prefix above the Sonnet 5 cache minimum with a 20 percent margin",
+      async (agentId) => {
+        fsMode.useRealFiles = true;
+        const params = await requestFor(agentId);
+
+        expect(estimateTokens(params.system[0].text)).toBeGreaterThanOrEqual(
+          SONNET_5_MIN_CACHE_TOKENS * CACHE_MIN_SAFETY_MARGIN
+        );
+      }
+    );
   });
 
   describe("GET", () => {
