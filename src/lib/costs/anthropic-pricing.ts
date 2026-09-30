@@ -3,8 +3,11 @@
  * from token usage recorded in the anthropic_usage table (#138).
  *
  * Rates are USD per 1M tokens divided by 1_000_000. Cache writes bill at 1.25x
- * the base input rate (5-minute ephemeral cache); cache reads bill at ~0.1x.
- * Source: platform.claude.com pricing. Update when models or rates change.
+ * the base input rate (5-minute ephemeral cache); cache reads bill at 0.1x,
+ * except Opus 5.5 at 0.05x.
+ * Source: https://platform.claude.com/docs/en/about-claude/pricing
+ * (retrieved 2026-09-30: Sonnet 5 is $2/$10 standard; the scheduled
+ * September 2026 rise to $3/$15 was cancelled). Update when models or rates change.
  */
 
 export interface ModelPricing {
@@ -20,14 +23,14 @@ export interface ModelPricing {
 
 const PER_MILLION = 1_000_000;
 
-function pricing(inputPerM: number, outputPerM: number): ModelPricing {
+function pricing(inputPerM: number, outputPerM: number, cacheReadMultiplier = 0.1): ModelPricing {
   const input = inputPerM / PER_MILLION;
   const output = outputPerM / PER_MILLION;
   return {
     input,
     output,
     cacheWrite: input * 1.25,
-    cacheRead: input * 0.1,
+    cacheRead: input * cacheReadMultiplier,
   };
 }
 
@@ -37,16 +40,23 @@ function pricing(inputPerM: number, outputPerM: number): ModelPricing {
  * "claude-sonnet-5"), so list more specific keys first.
  */
 const MODEL_PRICING: Array<{ prefix: string; pricing: ModelPricing }> = [
+  { prefix: "claude-opus-5-5", pricing: pricing(4, 20, 0.05) },
+  { prefix: "claude-opus-5", pricing: pricing(5, 25) },
+  // Retired Opus 4.1 and Opus 4 ("claude-opus-4-0" alias, "claude-opus-4-2025…"
+  // dated id) keep their launch price; Opus 4.5-4.8 fall through to $5/$25.
+  { prefix: "claude-opus-4-1", pricing: pricing(15, 75) },
+  { prefix: "claude-opus-4-0", pricing: pricing(15, 75) },
+  { prefix: "claude-opus-4-2025", pricing: pricing(15, 75) },
   { prefix: "claude-opus-4", pricing: pricing(5, 25) },
-  { prefix: "claude-sonnet-5", pricing: pricing(3, 15) },
+  { prefix: "claude-sonnet-5", pricing: pricing(2, 10) },
   { prefix: "claude-sonnet-4", pricing: pricing(3, 15) },
   { prefix: "claude-haiku-4", pricing: pricing(1, 5) },
   { prefix: "claude-3-5-haiku", pricing: pricing(0.8, 4) },
   { prefix: "claude-3-haiku", pricing: pricing(0.25, 1.25) },
 ];
 
-/** Default pricing when the model is unknown — use the chat model's tier (Sonnet). */
-const DEFAULT_PRICING = pricing(3, 15);
+/** Default pricing when the model is unknown — use the chat model's tier (Sonnet 5). */
+const DEFAULT_PRICING = pricing(2, 10);
 
 /** Resolve the pricing for a model id, falling back to a sensible default. */
 export function getModelPricing(model: string): ModelPricing {
