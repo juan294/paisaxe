@@ -62,6 +62,30 @@ export const NON_ASTURIAN_BLOCKLIST = [
   "Villablino",
 ];
 
+// --- Usage reporting ---
+
+/**
+ * One stdout line with the four usage fields of a Messages API call. This
+ * script has no database, so it prints usage instead of writing
+ * anthropic_usage (see .claude/rules/prompt-caching.md). Its prompt is not
+ * cached: the static instructions are below the model minimum on their own.
+ */
+export function formatUsageLine(
+  pdfName: string,
+  attempt: number,
+  usage: Pick<
+    Anthropic.Usage,
+    "input_tokens" | "output_tokens" | "cache_creation_input_tokens" | "cache_read_input_tokens"
+  >
+): string {
+  return (
+    `[usage] ${pdfName} attempt ${attempt}: ` +
+    `input_tokens=${usage.input_tokens} output_tokens=${usage.output_tokens} ` +
+    `cache_creation_input_tokens=${usage.cache_creation_input_tokens ?? 0} ` +
+    `cache_read_input_tokens=${usage.cache_read_input_tokens ?? 0}`
+  );
+}
+
 // --- Validation function ---
 
 /**
@@ -255,6 +279,7 @@ Generate up to ${maxStories} stories. Return ONLY valid JSON, no explanations.`;
           { role: "user", content: prompt }
         ]
       });
+      console.log(formatUsageLine(pdfName, attempt, response.usage));
 
       const content = response.content[0];
       if (content.type !== "text") {

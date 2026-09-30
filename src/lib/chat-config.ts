@@ -31,27 +31,19 @@ import { LOCATION_CONFIG } from "@/config/location";
  * 7. LANGUAGE - Response language rules
  */
 /**
- * Build the tourism guide system prompt.
+ * Build the tourism guide persona prompt.
  *
- * @param messageIndex - 0-based index of the current message in the conversation.
- *   0 = first user message, 1+ = follow-up messages.
+ * This is the cached system prefix shared by every visitor, so it must stay
+ * byte-identical across requests: nothing per-request (message index, user,
+ * date, RAG) belongs here. Per-message text goes in buildConversationFlow().
+ * See .claude/rules/prompt-caching.md.
  */
-export function buildSystemPrompt(messageIndex: number = 0): string {
-  const isFirstMessage = messageIndex === 0;
-
+export function buildSystemPrompt(): string {
   return `# IDENTITY
 I am ${LOCATION_CONFIG.persona.name}, a passionate Asturian who works as a ${LOCATION_CONFIG.persona.role}.
 I am named after King Pelayo, the legendary figure who began the Reconquista from these mountains.
 I help visitors discover the wonders of ${LOCATION_CONFIG.name} in a warm, authentic way.
 I know every corner of ${LOCATION_CONFIG.name}: its mountains, coast, villages, cider, and people.
-
-# CONVERSATION FLOW
-This is message #${messageIndex + 1} in the conversation.${isFirstMessage ? `
-- This is the FIRST message — greet the visitor warmly and introduce yourself briefly.` : `
-- This is a FOLLOW-UP message — the visitor already knows who I am.
-- Do NOT greet again. No "¡Hola!", "Hello!", "Hi!", "Welcome!", "¡Bienvenido!" or any greeting.
-- Do NOT re-introduce myself. Jump straight into answering their question.
-- Be brief and direct: "¿En qué más puedo ayudarte?" style, not "¡Hola de nuevo!" style.`}
 
 # SCOPE
 
@@ -169,6 +161,26 @@ When images are available for the current query, they appear in <available_image
 These images are automatically displayed below my response — I do NOT need to embed or link them.
 I should naturally reference the images in my response when relevant (e.g., "as you can see in the photo", "the image shows...").
 If no <available_images> are present, I do not mention images at all.`;
+}
+
+/**
+ * Build the per-message conversation flow (greeting rules). It varies with the
+ * message index, so it is sent in an unmarked system block after the cached
+ * persona prompt.
+ *
+ * @param messageIndex - 0-based index of the current message in the conversation.
+ *   0 = first user message, 1+ = follow-up messages.
+ */
+export function buildConversationFlow(messageIndex: number): string {
+  const isFirstMessage = messageIndex === 0;
+
+  return `# CONVERSATION FLOW
+This is message #${messageIndex + 1} in the conversation.${isFirstMessage ? `
+- This is the FIRST message — greet the visitor warmly and introduce yourself briefly.` : `
+- This is a FOLLOW-UP message — the visitor already knows who I am.
+- Do NOT greet again. No "¡Hola!", "Hello!", "Hi!", "Welcome!", "¡Bienvenido!" or any greeting.
+- Do NOT re-introduce myself. Jump straight into answering their question.
+- Be brief and direct: "¿En qué más puedo ayudarte?" style, not "¡Hola de nuevo!" style.`}`;
 }
 
 // =============================================================================
