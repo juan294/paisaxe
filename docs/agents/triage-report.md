@@ -62,7 +62,7 @@ Exposure note: `main` serves `src/app/opengraph-image.tsx` and `src/app/story/[s
 |---|----|----|----|----|
 | 977 | production group, 17 updates | minor/patch | Merged (squash) | CI green. Merged first because the undici fix sits on top of its lockfile. |
 | 975 | juan294/sutura 0.3.1 -> 0.3.3 | patch | Merged (squash) | CI green. |
-| 967 | dev-and-types, 2 updates | minor/patch | Attempt-fix: update-branch once | Red run was a CI infrastructure failure (Coverage shard 4 died in the apt step, "apt failed after 3 attempts"); not a code failure. |
+| 967 | dev-and-types, 2 updates | minor/patch | Attempt-fix succeeded: update-branch once, CI green, merged | Red run was a CI infrastructure failure (Coverage shard 4 died in the apt step, "apt failed after 3 attempts"); not a code failure. |
 | 968 | vitest 4 -> 5 | major | Deferred | Human review. |
 | 970 | @vitest/coverage-v8 4 -> 5 | major | Deferred | Human review. |
 | 969 | dotenv 17 -> 18 | major | Deferred | Imported in 5+ scripts; 18 changes preloading and stdout logging. |
@@ -73,7 +73,8 @@ Exposure note: `main` serves `src/app/opengraph-image.tsx` and `src/app/story/[s
 - [x] Typecheck clean (app, scripts, e2e, edge)
 - [x] Lint clean
 - [x] `check-verification-coverage`, `check-env`, `check-licenses` pass
-- [ ] CI green on pushed commit -- see end of report once the run completes
+- [x] CI green on pushed commit `af73811f` (VERIFIED: CI, E2E Tests, Lighthouse CI, Security Scan, Dead Code Detection all `success`; the CI run sat `pending` about 25 minutes before its jobs ran)
+- [x] #967 re-ran after `update-branch`, all checks passed, squash-merged (`7afd8524`)
 
 ## Carried Items
 - **Release decision**: `main` carries 3 critical Next.js RCE alerts; fixes are on `develop`. User-initiated only.
