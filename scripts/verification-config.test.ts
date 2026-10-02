@@ -222,6 +222,18 @@ describe("verification coverage config", () => {
     expect(securityAgent).toContain("remaining after npm audit fix dry run");
   });
 
+  // 2026-10-02: vitest 5 moved blob reports from .vitest-reports to .vitest/blob. The
+  // shard upload then found nothing (only warned) and the merge found no blobs.
+  it("uploads and merges coverage blobs from vitest's default blob directory and fails on a missing blob", () => {
+    const workflow = readText(".github/workflows/ci.yml");
+
+    expect(workflow).toContain("path: .vitest/blob/*");
+    expect(workflow).toContain("path: .vitest/blob\n");
+    expect(workflow).not.toContain(".vitest-reports");
+    expect(workflow).toContain("if-no-files-found: error");
+    expect(readText(".gitignore")).toContain(".vitest/");
+  });
+
   it("writes a report and shared-context entry when the QA wrapper aborts", () => {
     const qaAgent = readText("scripts/qa-agent.sh");
 

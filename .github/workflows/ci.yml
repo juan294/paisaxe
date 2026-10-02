@@ -144,7 +144,8 @@ jobs:
 
       # No positional path arg: vitest.config.ts's `include` already scopes
       # both src/** and scripts/** test files; a positional would override it.
-      # --reporter=blob writes .vitest-reports/blob-<shard>-4.json for merging.
+      # --reporter=blob writes .vitest/blob/blob-<shard>-4.json (vitest 5 default; vitest 4 used a
+      # different directory) and --merge-reports reads the same directory by default.
       - name: Run tests with coverage (sharded)
         run: >-
           npx vitest run
@@ -160,8 +161,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-blob-${{ matrix.shard }}
-          path: .vitest-reports/*
+          path: .vitest/blob/*
           include-hidden-files: true
+          # A missing blob must fail the shard, not warn: the merge job would
+          # otherwise fail later with an opaque ENOENT on the blob directory.
+          if-no-files-found: error
           retention-days: 1
 
   coverage-merge:
@@ -192,7 +196,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: coverage-blob-*
-          path: .vitest-reports
+          path: .vitest/blob
           merge-multiple: true
 
       # --merge-reports combines the shard blobs and reports/enforces the REAL
