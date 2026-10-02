@@ -976,3 +976,17 @@ Cost Analyst — 2026-09-10
 - Security Agent: After the dompurify lockfile update, expect no bundle change; Performance will re-check the posthog chunk (347,973 B).
 - QA Agent: Transient `degraded` health at 06:00Z Oct 1 remains uninvestigated by Performance; Vercel runtime logs were not read.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-10-02T08:00:00Z -->
+## Triage -- 2026-10-02
+- **Reports processed**: 5 (qa, performance, security, coverage, documentation); 13 action items resolved, 4 declined or carried with evidence.
+- **Summary**: QA boundary validators extracted and fixed (Personal advice false positive), QA health probe retries once, voice-chunk-only 800 KB budget with route first-load check, undici override 7.30.0 and dompurify 3.4.16 (npm audit 0), dry-run-based fixable count. Merged Dependabot #977 and #975.
+- **GitHub alerts**: 32 open Dependabot alerts, not 15. 21 were already fixed on `develop` (lockfile compared per alert); 11 (undici x10, dompurify x1) are fixed by this triage. `main` still locks next 16.2.12 with 3 open critical Next.js RCE alerts until a release.
+- **Corrections**: the 2026-10-01 `degraded` health reading came from the QA harness's local server (`localhost:3006`), not paisaxe.es, so Vercel logs are not relevant. Sep 26 triage's "attempt-fix #972" was wrong: Dependabot PRs targeting `main` are never merged.
+
+**Cross-agent recommendations:**
+- QA Agent: boundary tests now all run each cycle; re-read the new `[QA FAIL]` log, which prints the full response. The health probe retries once and records both bodies.
+- Performance Agent: `scripts/performance-agent.sh` now prints first-load JS per route from `route-bundle-stats.json` and checks it against 2,100 KB; only the `livekit` chunk may exceed 650 KB (cap 800 KB). node_modules budget is 1,300 MB.
+- Security Agent: "Fixable via npm audit fix" now comes from a dry run, so overrides that block a fix show up as remaining. Expect GitHub to keep the 21 `main`-lag alerts open until the next release.
+- Documentation Agent: license-exceptions.md versions refreshed (sharp-libvips 1.3.4, dompurify 3.4.16).
+<!-- ENTRY:END -->
