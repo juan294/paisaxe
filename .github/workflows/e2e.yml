@@ -3,20 +3,52 @@ name: E2E Tests
 on:
   push:
     branches: [develop, main]
+    # DO-M7 (#834): broadened from docs/research|plans|agents/** to the
+    # whole docs/** tree plus root prose files — a docs-only commit outside
+    # those three subfolders (e.g. docs/operations/**, docs/project/**)
+    # was still triggering the full E2E + Visual Regression suite. Filters
+    # `push` only; `pull_request` stays unfiltered because "Playwright E2E"
+    # is a required status check for the `main` branch protection rule —
+    # filtering it there could leave a docs-only release PR waiting forever
+    # on a required context that never runs.
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
+      - "AGENTS.md"
   pull_request:
     branches: [develop, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required_checks: '["Playwright E2E","Visual Regression"]'
+
   e2e:
     name: Playwright E2E
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
       PLAYWRIGHT_CHROME_CHANNEL: chrome
+      SECRETS_WITHHELD_PR: >-
+        ${{
+          github.event_name == 'pull_request' &&
+          (github.event.pull_request.head.repo.fork == true ||
+           github.event.pull_request.user.login == 'dependabot[bot]')
+        }}
 
     steps:
       - name: Checkout code
@@ -29,6 +61,7 @@ jobs:
           cache: 'npm'
 
       - name: Check authenticated QA secrets
+        if: env.SECRETS_WITHHELD_PR != 'true'
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -49,7 +82,7 @@ jobs:
           done
 
       - name: Install canvas system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+        uses: ./.github/actions/install-canvas-deps
 
       - name: Install dependencies
         run: npm ci
@@ -74,7 +107,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
 
-      - name: Run E2E tests
+      - name: Run E2E tests with authenticated journey
+        if: env.SECRETS_WITHHELD_PR != 'true'
         run: npm run test:e2e
         env:
           CI: true
@@ -88,6 +122,26 @@ jobs:
           STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
           QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
           QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+
+      # GitHub withholds Actions secrets from Dependabot and fork PRs. Run the
+      # deterministic anonymous suite with dummy Supabase values in that trust
+      # context. Authenticated coverage remains mandatory for ordinary PRs and
+      # branch pushes, and every dependency update receives it again after the
+      # vetted change is integrated onto develop.
+      - name: Run E2E tests without secret-backed authenticated journey
+        if: env.SECRETS_WITHHELD_PR == 'true'
+        run: >-
+          npm run test:e2e --
+          --grep-invert="QA Journey: Authenticated User"
+        env:
+          CI: true
+          ANTHROPIC_API_KEY: dummy_key_for_e2e
+          VOYAGE_API_KEY: dummy_key_for_e2e
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e
+          MAINTENANCE_MODE: "false"
+          STRIPE_SECRET_KEY: sk_test_dummy_for_e2e
+          STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
@@ -103,6 +157,8 @@ jobs:
   # meant visual diffs could never block a merge.
   visual-regression:
     name: Visual Regression
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -117,7 +173,7 @@ jobs:
           cache: 'npm'
 
       - name: Install canvas system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+        uses: ./.github/actions/install-canvas-deps
 
       - name: Install dependencies
         run: npm ci

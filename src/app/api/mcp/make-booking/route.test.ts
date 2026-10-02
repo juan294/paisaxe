@@ -11,18 +11,31 @@ vi.mock("@/lib/feature-flags-server", () => ({
   isFeatureFlagEnabled: (key: string) => mockIsFeatureFlagEnabled(key),
 }));
 
+// BE-B2/SE-H4: rate limiting — default to "allowed" so the ~40 existing
+// behavioral tests below are unaffected; individual tests override this.
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn(),
+}));
+import { checkRateLimit } from "@/lib/rate-limit";
+
 // Mock Supabase
 const mockInsert = vi.fn();
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
 const mockDbSelect = vi.fn();
+// BE-B2: claim_daily_booking_call_slot RPC (SQL-enforced daily cap)
+const mockRpc = vi.fn();
+// booking-service.ts (#787) — the only consumer of @/lib/supabase-admin in
+// this route's dependency graph — reads the admin client via the singleton
+// getAdminClient(), not createAdminClient().
 vi.mock("@/lib/supabase-admin", () => ({
-  createAdminClient: vi.fn(() => ({
+  getAdminClient: vi.fn(() => ({
     from: vi.fn(() => ({
       insert: mockInsert,
       update: mockUpdate,
       select: mockDbSelect,
     })),
+    rpc: mockRpc,
   })),
 }));
 
@@ -73,7 +86,17 @@ describe("/api/mcp/make-booking", () => {
         maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
     });
+    // Default: daily call cap RPC reports a slot is available
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    // Default: rate limiting allows the request through
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      allowed: true,
+      limit: 3,
+      remaining: 2,
+      resetAt: Date.now() + 60_000,
+    });
     process.env = { ...originalEnv };
+    delete process.env.VERCEL_ENV;
     process.env.MCP_API_SECRET = MCP_SECRET;
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_PHONE_NUMBER_ID;
@@ -212,6 +235,212 @@ describe("/api/mcp/make-booking", () => {
       expect(data.message).toContain("Invalid Spanish phone number");
     });
 
+    // BE-B2: reject Spanish premium-rate venue phone numbers so a leaked MCP
+    // secret can't turn this endpoint into an unmetered premium-rate dialer.
+    it("BE-B2: should return 400 for a premium-rate venue phone number", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "premium-rate-key" },
+        body: JSON.stringify({
+          venue_name: "Suspicious Line",
+          phone_number: "+34 905 123 456", // premium-rate range
+          party_size: 2,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Invalid Spanish phone number");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    // BE-B2/SE-H4: per-customer rate limit — caller IP can't be the key since
+    // every request originates from ElevenLabs' fixed egress (see
+    // /api/mcp/places, which keys on IP; that doesn't work here).
+    describe("BE-B2/SE-H4: per-customer rate limiting", () => {
+      it("returns 429 and does not call ElevenLabs when the per-customer limit is exceeded", async () => {
+        process.env.ELEVENLABS_API_KEY = "test-api-key";
+        process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+        process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+        vi.mocked(checkRateLimit).mockResolvedValueOnce({
+          allowed: false,
+          limit: 3,
+          remaining: 0,
+          resetAt: Date.now() + 60_000,
+          retryAfter: 42,
+        });
+
+        const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "rate-limited-key" },
+          body: JSON.stringify({
+            venue_name: "Casa Gerardo",
+            phone_number: "+34 985 88 77 97",
+            party_size: 2,
+            date: "hoy",
+            time: "21:00",
+            customer_name: "Juan García López",
+            customer_phone: "612345678",
+          }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(429);
+        expect(data.success).toBe(false);
+        expect(response.headers.get("Retry-After")).toBe("42");
+        expect(mockFetch).not.toHaveBeenCalled();
+        // The rate limit must be keyed on the customer's phone, not IP —
+        // this endpoint has no per-request IP to key on reliably.
+        expect(checkRateLimit).toHaveBeenCalledWith(
+          expect.stringContaining("+34612345678"),
+          expect.any(Object)
+        );
+      });
+
+      // Guards the invariant: legitimate requests under the limit must still
+      // succeed — the fix must not block normal booking traffic.
+      it("still allows a legitimate booking through when under the per-customer limit", async () => {
+        process.env.ELEVENLABS_API_KEY = "test-api-key";
+        process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+        process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ conversation_id: "conv_under_limit" }),
+        });
+
+        const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "under-limit-key" },
+          body: JSON.stringify({
+            venue_name: "Casa Gerardo",
+            phone_number: "+34 985 88 77 97",
+            party_size: 2,
+            date: "hoy",
+            time: "21:00",
+            customer_name: "Juan García López",
+            customer_phone: "612345678",
+          }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.success).toBe(true);
+        expect(data.status).toBe("initiated");
+      });
+    });
+
+    // BE-B2: SQL-enforced global daily cap — a second, independent layer
+    // beyond the per-customer Redis rate limit, so an outage/misconfiguration
+    // of one layer doesn't remove the cost ceiling entirely.
+    describe("BE-B2: global daily call cap", () => {
+      it("returns 429 and does not call ElevenLabs when the daily cap RPC reports the cap reached", async () => {
+        process.env.ELEVENLABS_API_KEY = "test-api-key";
+        process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+        process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+        mockRpc.mockResolvedValue({ data: false, error: null });
+
+        const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "daily-cap-key" },
+          body: JSON.stringify({
+            venue_name: "Casa Gerardo",
+            phone_number: "+34 985 88 77 97",
+            party_size: 2,
+            date: "hoy",
+            time: "21:00",
+            customer_name: "Juan García López",
+            customer_phone: "612345678",
+          }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(429);
+        expect(data.success).toBe(false);
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      // Fail CLOSED for calls: an RPC error must deny the call, not silently
+      // let it through and lose the cost ceiling.
+      it("returns 429 and does not call ElevenLabs when the daily cap RPC errors (fails closed)", async () => {
+        process.env.ELEVENLABS_API_KEY = "test-api-key";
+        process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+        process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+        mockRpc.mockResolvedValue({ data: null, error: { message: "DB unavailable" } });
+
+        const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "daily-cap-db-error-key" },
+          body: JSON.stringify({
+            venue_name: "Casa Gerardo",
+            phone_number: "+34 985 88 77 97",
+            party_size: 2,
+            date: "hoy",
+            time: "21:00",
+            customer_name: "Juan García López",
+            customer_phone: "612345678",
+          }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(429);
+        expect(data.success).toBe(false);
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      // Guards the invariant: legitimate requests under the cap must still succeed.
+      it("still allows a legitimate booking through when under the daily cap", async () => {
+        process.env.ELEVENLABS_API_KEY = "test-api-key";
+        process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+        process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+        mockRpc.mockResolvedValue({ data: true, error: null });
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ conversation_id: "conv_under_cap" }),
+        });
+
+        const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "under-cap-key" },
+          body: JSON.stringify({
+            venue_name: "Casa Gerardo",
+            phone_number: "+34 985 88 77 97",
+            party_size: 2,
+            date: "hoy",
+            time: "21:00",
+            customer_name: "Juan García López",
+            customer_phone: "612345678",
+          }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.success).toBe(true);
+        expect(data.status).toBe("initiated");
+      });
+    });
+
     it("should accept valid Spanish phone number in national format", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
@@ -245,6 +474,106 @@ describe("/api/mcp/make-booking", () => {
           phone_number: "+34 985 88 77 97", // International format
           party_size: 4,
           date: "mañana",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34 612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(data.status).toBe("not_configured");
+    });
+
+    // ─── BE-H4 (#779): customer_phone format validation ────────────────────
+    // customer_phone previously had bounds-only validation (9-20 chars at the
+    // Zod layer) and was NEVER passed to isValidSpanishPhone() — only
+    // phone_number (the venue) was. A malformed-but-in-bounds customer_phone
+    // (e.g. a French visitor's "0033612345678") silently became a garbled-
+    // but-valid-looking +34 number via normalizePhoneNumber()'s catch-all
+    // branch, so the booking confirmation SMS went nowhere or to an
+    // unrelated subscriber.
+    it("should return 400 for a malformed customer phone number that was previously silently normalized", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "0033612345678", // French number — 13 chars, passes the old bounds-only check
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Invalid customer phone number");
+      // Non-crashing, clear response — no stack trace leaked to the voice agent.
+      expect(data.message).not.toMatch(/at Object|at Module|\.ts:\d+/);
+      expect(typeof data.fallback_action).toBe("string");
+    });
+
+    it("should return 400 for a customer phone number with a non-Spanish mobile prefix", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "512345678", // starts with 5 — not a valid Spanish mobile/landline prefix
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.message).toContain("Invalid customer phone number");
+    });
+
+    it("should accept a legitimate Spanish customer phone number in national format", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Passes phone validation for both fields — falls through to the
+      // not_configured branch since ElevenLabs isn't set up in this test.
+      expect(data.status).toBe("not_configured");
+    });
+
+    it("should accept a legitimate Spanish customer phone number in international format", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
           time: "21:00",
           customer_name: "Juan García López",
           customer_phone: "+34 612 345 678",
@@ -843,6 +1172,9 @@ describe("/api/mcp/make-booking", () => {
         date: "mañana",
         time: "nueve de la noche", // Converted from 21:00
         special_requests: "Trona para bebé",
+        // BE-H2: the claimed pending_bookings row id, sent as a correlation
+        // key for webhook fallback reconciliation (see booking-service.ts).
+        booking_id: "pending-row-id",
       });
     });
 
@@ -1095,7 +1427,9 @@ describe("/api/mcp/make-booking", () => {
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           status: "failed",
-          outcome_message: expect.stringContaining("Network error"),
+          outcome_message: expect.stringContaining(
+            "ElevenLabs request unavailable"
+          ),
         })
       );
     });
@@ -1201,7 +1535,7 @@ describe("/api/mcp/make-booking", () => {
       );
     });
 
-    it("should handle ElevenLabs API error with message field (not detail)", async () => {
+    it("does not expose an ElevenLabs API error message field", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
@@ -1233,7 +1567,8 @@ describe("/api/mcp/make-booking", () => {
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
       expect(data.status).toBe("failed");
-      expect(data.message).toContain("Server error");
+      expect(data.message).toContain("ElevenLabs API error: 500");
+      expect(data.message).not.toContain("Server error");
     });
 
     it("should use correct date formatting in dynamic variables", async () => {
@@ -1920,7 +2255,7 @@ describe("/api/mcp/make-booking", () => {
       expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("dos menos cuarto de la tarde");
     });
 
-    it("should handle non-Error throw inside initiateCall catch", async () => {
+    it("does not expose a non-Error provider rejection", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
@@ -1947,7 +2282,8 @@ describe("/api/mcp/make-booking", () => {
 
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
-      expect(data.message).toContain("Unknown error");
+      expect(data.message).toContain("ElevenLabs request unavailable");
+      expect(data.message).not.toContain("non-error string");
     });
 
     // === #386 (BE-B1): pre-call row must be nullable + fatal on failure ===

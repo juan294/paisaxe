@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock environment module
@@ -372,5 +373,99 @@ describe("getStoriesServer", () => {
       "[TABLE_FALLBACK]",
       expect.objectContaining({ table: "stories", error: "Network error" })
     );
+  });
+
+  // PE-M5 (#813): the full catalogue is serialized into the LCP-critical
+  // initial /immersive payload and grows linearly with the content catalogue.
+  // The recommendation is to instrument payload size/growth first rather than
+  // restructure data loading (windowing would break the client-side Fisher-Yates
+  // shuffle and deep-link slug resolution, which both require the full array).
+  describe("payload size instrumentation (#813)", () => {
+    it("logs [STORIES_PAYLOAD_SIZE] with story_count, raw_bytes, and gzip_bytes on a successful fetch", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {
+            id: "story-1",
+            slug: "story-1",
+            title: "Story One",
+            subtitle: "Sub 1",
+            description: "Desc 1",
+            image_path: "/img1.png",
+            category: "nature",
+            display_order: 1,
+          },
+        ],
+      });
+
+      const loggerModule = await import("@/lib/logger");
+      const infoSpy = vi.spyOn(loggerModule.logger, "info");
+
+      const { getStoriesServer } = await import("./stories-server");
+      await getStoriesServer();
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        "[STORIES_PAYLOAD_SIZE]",
+        expect.objectContaining({
+          story_count: 1,
+          raw_bytes: expect.any(Number),
+          gzip_bytes: expect.any(Number),
+          threshold_gzip_bytes: expect.any(Number),
+        })
+      );
+    });
+
+    it("logs [STORIES_PAYLOAD_SIZE] at warn level when the gzip size exceeds the threshold", async () => {
+      // A large, high-entropy description pushes the serialized+gzipped
+      // payload past the documented 50KB threshold from issue #813. Random
+      // bytes (base64) are used instead of a repeated character so gzip
+      // can't compress it down to nothing.
+      const bigDescription = randomBytes(90_000).toString("base64");
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {
+            id: "story-1",
+            slug: "story-1",
+            title: "Story One",
+            subtitle: "Sub 1",
+            description: bigDescription,
+            image_path: "/img1.png",
+            category: "nature",
+            display_order: 1,
+          },
+        ],
+      });
+
+      const loggerModule = await import("@/lib/logger");
+      const warnSpy = vi.spyOn(loggerModule.logger, "warn");
+
+      const { getStoriesServer } = await import("./stories-server");
+      await getStoriesServer();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[STORIES_PAYLOAD_SIZE]",
+        expect.objectContaining({ story_count: 1 })
+      );
+    });
+
+    it("does NOT log [STORIES_PAYLOAD_SIZE] when falling back to FALLBACK_STORIES", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+      });
+
+      const loggerModule = await import("@/lib/logger");
+      const infoSpy = vi.spyOn(loggerModule.logger, "info");
+      infoSpy.mockClear();
+
+      const { getStoriesServer } = await import("./stories-server");
+      await getStoriesServer();
+
+      expect(infoSpy).not.toHaveBeenCalledWith(
+        "[STORIES_PAYLOAD_SIZE]",
+        expect.anything()
+      );
+    });
   });
 });

@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { logger } from "@/lib/logger";
 import { getMcpIdempotencyKey, validateMcpSecret } from "@/lib/mcp-auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { makeBookingRequestSchema } from "@/lib/schemas";
 import {
   ACTIVE_BOOKING_STATUSES,
+  claimDailyBookingCallSlot,
   claimPendingBooking,
   isValidSpanishPhone,
   markPendingBookingFailed,
@@ -14,6 +16,19 @@ import {
   type PendingBookingSnapshot,
 } from "@/lib/services/booking-service";
 import { initiateCall } from "@/lib/services/elevenlabs-call-service";
+
+// BE-B2/SE-H4: Rate limit real-money outbound calls. Caller IP is useless
+// here — unlike /api/mcp/places (which keys checkRateLimit on IP), every
+// make-booking request originates from ElevenLabs' fixed egress, so the
+// per-customer key is the visitor-supplied customer_phone instead. This is
+// a "call", not a "read": checkRateLimit already fails CLOSED in production
+// when Upstash is configured but unreachable, which is the right behavior
+// here (unlike a read endpoint, where failing open would be acceptable).
+const MAKE_BOOKING_PER_CUSTOMER_RATE_LIMIT = {
+  windowMs: 10 * 60_000, // 10 minutes
+  maxRequests: 3,
+  maxEntries: 10_000,
+};
 
 /**
  * MCP-compatible Make Booking API endpoint for ElevenLabs voice agents.
@@ -49,6 +64,26 @@ interface MakeBookingResponse {
   estimated_wait?: string;
   fallback_action?: string;
   recovery_action?: string;
+}
+
+function buildRateLimitedResponse(
+  venueName: string,
+  phoneNumber: string,
+  retryAfter: number | undefined,
+  message: string
+): NextResponse<MakeBookingResponse> {
+  return NextResponse.json<MakeBookingResponse>(
+    {
+      success: false,
+      message,
+      status: "failed",
+      fallback_action: `Tell the user they can call ${venueName} directly at ${phoneNumber} to make a reservation.`,
+    },
+    {
+      status: 429,
+      headers: { "Retry-After": String(retryAfter ?? 60) },
+    }
+  );
 }
 
 function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingResponse> {
@@ -175,6 +210,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    // BE-H4 (#779): customer_phone was previously bounds-checked only — it
+    // skipped this format gate entirely, so a malformed number (e.g. a
+    // French visitor's "0033612345678") silently became a garbled-but-valid-
+    // looking +34 number via normalizePhoneNumber()'s catch-all branch below,
+    // and the booking confirmation SMS went nowhere or to an unrelated
+    // subscriber. Gate it the same way as phone_number, symmetrically.
+    if (!isValidSpanishPhone(customer_phone)) {
+      return NextResponse.json<MakeBookingResponse>(
+        {
+          success: false,
+          message:
+            "Invalid customer phone number. Please provide a valid Spanish phone number for the visitor.",
+          status: "failed",
+          fallback_action:
+            "Ask the visitor to confirm their phone number before retrying the booking.",
+        },
+        { status: 400 }
+      );
+    }
+
     // Check if ElevenLabs outbound calling is configured
     if (
       !process.env.ELEVENLABS_API_KEY ||
@@ -204,6 +259,36 @@ export async function POST(request: Request): Promise<NextResponse> {
             "Retry the booking request with the same Idempotency-Key header to avoid duplicate calls.",
         },
         { status: 400 }
+      );
+    }
+
+    // BE-B2/SE-H4: per-customer rate limit — keyed on customer_phone, not IP
+    // (every request originates from ElevenLabs' fixed egress).
+    const perCustomerRate = await checkRateLimit(
+      `mcp-make-booking:customer:${normalizedCustomerPhone}`,
+      MAKE_BOOKING_PER_CUSTOMER_RATE_LIMIT
+    );
+    if (!perCustomerRate.allowed) {
+      return buildRateLimitedResponse(
+        venue_name,
+        phone_number,
+        perCustomerRate.retryAfter,
+        "Too many booking requests from this number. Please wait a few minutes before trying again."
+      );
+    }
+
+    // BE-B2: SQL-enforced global daily cap on outbound calls (defense in
+    // depth beyond the per-customer limit above; default cap lives with the
+    // RPC call in booking-service.ts). Fails closed: any DB error denies
+    // the slot rather than silently bypassing the cap.
+    const dailySlotClaimed = await claimDailyBookingCallSlot();
+    if (!dailySlotClaimed) {
+      logger.error("[MAKE_BOOKING_DAILY_CAP_REACHED]", { venue: venue_name });
+      return buildRateLimitedResponse(
+        venue_name,
+        phone_number,
+        3600,
+        "Daily booking call limit reached. Please try again tomorrow or call the venue directly."
       );
     }
 
@@ -241,6 +326,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       date,
       time,
       special_requests: params.special_requests,
+      // BE-H2: correlation key for webhook fallback reconciliation — see
+      // elevenlabs-call-service.ts and the webhook route's fallback lookup.
+      booking_id: pendingRowId,
     });
 
     if (result.success) {

@@ -12,7 +12,26 @@ const KNOWN_GAPS = new Set([
   5,  // 005 was never committed — schema at that point was managed via the Supabase dashboard
   23, // 023 was never committed — applied out-of-band during early development
   24, // 024 was never committed — applied out-of-band during early development
+  // 101 is RESERVED, not a permanent gap: remediate/se-h1 (#841) is a sibling
+  // Wave 1 worktree branched from the same develop base, adding
+  // 101_restrict_feature_flags_config_anon.sql, not yet merged into develop
+  // as of this branch (remediate/se-h2, #842, which adds 102). Harmless to
+  // leave once se-h1 merges (file 101 will exist, satisfying the check
+  // regardless of this entry) — remove this line at that point for hygiene.
+  101,
 ]);
+
+// The largest gap between two consecutive migration numbers we consider plausible.
+// The project's real historical gaps (see KNOWN_GAPS) are all a single missing number,
+// so this is a very generous margin. It exists to fail fast on a malformed filename —
+// e.g. a timestamp prefix like 20260818120000_revert_x.sql (~2e13) instead of the
+// documented sequential NNN prefix (docs/operations/migration-policy.md) — without
+// foreclosing on any future numbering scheme. Bounding the GAP SIZE between
+// consecutive present numbers (rather than an absolute ceiling on the migration
+// number itself) means this doesn't care about the numbering scheme's magnitude:
+// consistently-close timestamp prefixes would still pass; a single wildly-out-of-range
+// outlier fails immediately instead of forcing a scan across trillions of integers.
+const MAX_PLAUSIBLE_GAP = 1000;
 
 // Migration file must match NNN_description.sql (1+ digit prefix, underscore, description, .sql)
 const MIGRATION_PATTERN = /^(\d+)_[a-z0-9_]+\.sql$/;
@@ -38,12 +57,9 @@ const SENSITIVE_SERVICE_ROLE_TABLES = [
   "elevenlabs_webhook_events",
   "translate_webhook_events",
   "stripe_webhook_events",
-];
-
-const TRANSLATION_SECURITY_DEFINER_FUNCTIONS = [
-  "trigger_translation_webhook",
-  "fail_stale_story_translations",
-  "fail_stale_story_translations_locked",
+  // Highest-PII table in the schema (customer names, phones, venue phones,
+  // special requests) -- see migration 101 for the posture-parity migration.
+  "pending_bookings",
 ];
 
 const COMPLETE_BOOKING_SMS_JOB_SIGNATURE_ERROR =
@@ -84,28 +100,52 @@ function checkForDuplicates(migrations: MigrationFile[]): string[] {
 function checkForUnexpectedGaps(migrations: MigrationFile[]): string[] {
   if (migrations.length === 0) return [];
 
+  // Walk the sorted numbers pairwise instead of iterating the full integer range
+  // from min to max. This is behaviorally identical for legitimate input (every
+  // integer strictly between two consecutive present numbers is exactly the set
+  // of "missing" numbers — duplicates naturally produce a non-positive gapSize
+  // below and are skipped, since checkForDuplicates already reports them), but
+  // bounds each individual gap independently — so a single pathological outlier
+  // (e.g. a timestamp-prefixed filename parsed as ~2e13) fails fast with a clear
+  // error instead of forcing the scanner to iterate — and potentially crash on —
+  // an astronomical range.
   const numbers = migrations.map((m) => m.number).sort((a, b) => a - b);
-  const min = numbers[0];
-  const max = numbers[numbers.length - 1];
-  const present = new Set(numbers);
+  const errors: string[] = [];
 
-  const unexpectedGaps: number[] = [];
-  for (let i = min; i <= max; i++) {
-    if (!present.has(i) && !KNOWN_GAPS.has(i)) {
-      unexpectedGaps.push(i);
+  for (let i = 1; i < numbers.length; i++) {
+    const prev = numbers[i - 1];
+    const curr = numbers[i];
+    const gapSize = curr - prev - 1;
+
+    if (gapSize <= 0) continue;
+
+    if (gapSize > MAX_PLAUSIBLE_GAP) {
+      errors.push(
+        `Migration number ${curr} is implausibly large: it creates a gap of ${gapSize} after ` +
+          `${prev}, far beyond the ${MAX_PLAUSIBLE_GAP}-gap sanity margin. Migration filenames ` +
+          `must use a sequential NNN prefix (see docs/operations/migration-policy.md), not a ` +
+          `timestamp — refusing to scan this gap rather than iterating it.`
+      );
+      continue;
+    }
+
+    for (let missing = prev + 1; missing < curr; missing++) {
+      if (!KNOWN_GAPS.has(missing)) {
+        errors.push(
+          `Unexpected migration gap: missing ${String(missing).padStart(3, "0")} (not in KNOWN_GAPS)`
+        );
+      }
     }
   }
 
-  return unexpectedGaps.map(
-    (gap) => `Unexpected migration gap: missing ${String(gap).padStart(3, "0")} (not in KNOWN_GAPS)`
-  );
+  return errors;
 }
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function normalizeSql(sql: string): string {
+export function normalizeSql(sql: string): string {
   return sql
     .replace(/--.*$/gm, " ")
     .replace(/\/\*[\s\S]*?\*\//g, " ")
@@ -116,6 +156,11 @@ function normalizeSql(sql: string): string {
 function hasPattern(sql: string, pattern: RegExp): boolean {
   return pattern.test(sql);
 }
+
+// Shared by checkSensitiveTablePosture (per-table regex) and
+// checkPublicTableRlsPosture (generic table-name-capturing regex) so the two
+// REVOKE grammars stay in sync.
+const REVOKE_PREFIX_SOURCE = "revoke\\s+(?:all(?:\\s+privileges)?|select)\\s+on(?:\\s+table)?\\s+";
 
 function checkSensitiveTablePosture(sql: string): string[] {
   const errors: string[] = [];
@@ -143,9 +188,7 @@ function checkSensitiveTablePosture(sql: string): string[] {
       if (
         !hasPattern(
           sql,
-          new RegExp(
-            `revoke\\s+(?:all(?:\\s+privileges)?|select)\\s+on(?:\\s+table)?\\s+${qualifiedTable}\\s+from\\s+${role}\\b`
-          )
+          new RegExp(`${REVOKE_PREFIX_SOURCE}${qualifiedTable}\\s+from\\s+${role}\\b`)
         )
       ) {
         errors.push(`Sensitive table public.${table} must revoke privileges from ${role}`);
@@ -178,6 +221,123 @@ function checkSensitiveTablePosture(sql: string): string[] {
   return errors;
 }
 
+interface PublicTableRlsTracker {
+  exists: boolean;
+  rlsEnabled: boolean;
+  revokedRoles: Set<string>;
+}
+
+type TableEvent =
+  | { index: number; kind: "create"; name: string }
+  | { index: number; kind: "drop"; name: string }
+  | { index: number; kind: "rename"; from: string; to: string }
+  | { index: number; kind: "rls"; name: string; enabled: boolean }
+  | { index: number; kind: "revoke"; name: string; roles: string[] };
+
+const CREATE_TABLE_RE = /create\s+table(?:\s+if\s+not\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)/g;
+const DROP_TABLE_RE = /drop\s+table(?:\s+if\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)/g;
+const RENAME_TABLE_RE =
+  /alter\s+table\s+(?:public\.)?([a-z_][a-z0-9_]*)\s+rename\s+to\s+(?:public\.)?([a-z_][a-z0-9_]*)/g;
+const RLS_TOGGLE_RE =
+  /alter\s+table\s+(?:public\.)?([a-z_][a-z0-9_]*)\s+(enable|disable)\s+row\s+level\s+security/g;
+const REVOKE_ROLES_RE = new RegExp(
+  `${REVOKE_PREFIX_SOURCE}(?:public\\.)?([a-z_][a-z0-9_]*)\\s+from\\s+([^;]+);`,
+  "g"
+);
+
+// Walks the concatenated migration SQL once, collecting every table lifecycle
+// event (create/drop/rename/RLS toggle/revoke) tagged with its position, then
+// replays them in true chronological order. This keeps a renamed table's
+// history attached across the rename, unlike processing each event type as a
+// separate full pass.
+function collectTableEvents(sql: string): TableEvent[] {
+  const events: TableEvent[] = [];
+
+  for (const match of sql.matchAll(CREATE_TABLE_RE)) {
+    events.push({ index: match.index ?? 0, kind: "create", name: match[1] });
+  }
+  for (const match of sql.matchAll(DROP_TABLE_RE)) {
+    events.push({ index: match.index ?? 0, kind: "drop", name: match[1] });
+  }
+  for (const match of sql.matchAll(RENAME_TABLE_RE)) {
+    events.push({ index: match.index ?? 0, kind: "rename", from: match[1], to: match[2] });
+  }
+  for (const match of sql.matchAll(RLS_TOGGLE_RE)) {
+    events.push({ index: match.index ?? 0, kind: "rls", name: match[1], enabled: match[2] === "enable" });
+  }
+  for (const match of sql.matchAll(REVOKE_ROLES_RE)) {
+    events.push({
+      index: match.index ?? 0,
+      kind: "revoke",
+      name: match[1],
+      roles: match[2].split(",").map((role) => role.trim()),
+    });
+  }
+
+  return events.sort((a, b) => a.index - b.index);
+}
+
+// Tables whose RLS is deliberately disabled must document the exception with an
+// explicit REVOKE from both anon and authenticated (see migration 076's
+// admin_audit_log pattern) -- this is the only tolerated alternative to RLS.
+function checkPublicTableRlsPosture(sql: string): string[] {
+  const tables = new Map<string, PublicTableRlsTracker>();
+
+  const getTracker = (name: string): PublicTableRlsTracker => {
+    let tracker = tables.get(name);
+    if (!tracker) {
+      tracker = { exists: false, rlsEnabled: false, revokedRoles: new Set() };
+      tables.set(name, tracker);
+    }
+    return tracker;
+  };
+
+  for (const event of collectTableEvents(sql)) {
+    switch (event.kind) {
+      case "create":
+        getTracker(event.name).exists = true;
+        break;
+      case "drop": {
+        const tracker = tables.get(event.name);
+        if (tracker) tracker.exists = false;
+        break;
+      }
+      case "rename": {
+        const tracker = tables.get(event.from);
+        if (tracker) {
+          tables.delete(event.from);
+          tables.set(event.to, tracker);
+        }
+        break;
+      }
+      case "rls": {
+        const tracker = tables.get(event.name);
+        if (tracker) tracker.rlsEnabled = event.enabled;
+        break;
+      }
+      case "revoke": {
+        const tracker = tables.get(event.name);
+        if (!tracker) break;
+        for (const role of event.roles) tracker.revokedRoles.add(role);
+        break;
+      }
+    }
+  }
+
+  const errors: string[] = [];
+  for (const [name, tracker] of tables) {
+    if (!tracker.exists || tracker.rlsEnabled) continue;
+    if (tracker.revokedRoles.has("anon") && tracker.revokedRoles.has("authenticated")) continue;
+
+    errors.push(
+      `Table public.${name} has no RLS enabled and no documented anon/authenticated revoke exception -- ` +
+        "enable RLS or add explicit REVOKE ... FROM anon, authenticated with a comment explaining why"
+    );
+  }
+
+  return errors;
+}
+
 function checkMarketingCredentialShape(sql: string): string[] {
   const marketingAccountsCreated = hasPattern(
     sql,
@@ -199,29 +359,73 @@ function checkMarketingCredentialShape(sql: string): string[] {
   ];
 }
 
-function getFunctionHeader(sql: string, functionName: string): string | null {
+// A function header runs from its `CREATE [OR REPLACE] FUNCTION ...(` match up to
+// (but not including) the body's ` AS $$` delimiter -- shared by getFunctionHeader
+// (single-name lookup) and checkSecurityDefinerSearchPaths (scans every name) so
+// there is one place that knows the header/body boundary.
+function extractHeader(sql: string, startIndex: number): string {
+  const headerEnd = sql.indexOf(" as $$", startIndex);
+  return headerEnd === -1 ? sql.slice(startIndex) : sql.slice(startIndex, headerEnd);
+}
+
+export function getFunctionHeader(sql: string, functionName: string): string | null {
   const match = new RegExp(
     `create\\s+(?:or\\s+replace\\s+)?function\\s+public\\.${escapeRegExp(functionName)}\\s*\\(`
   ).exec(sql);
 
   if (!match) return null;
 
-  const headerEnd = sql.indexOf(" as $$", match.index);
-  return headerEnd === -1 ? sql.slice(match.index) : sql.slice(match.index, headerEnd);
+  return extractHeader(sql, match.index);
 }
 
-function checkTranslationFunctionSearchPaths(migrations: MigrationFile[]): string[] {
+// Matches every `CREATE [OR REPLACE] FUNCTION [public.]name(` header across all
+// migrations -- not a hard-coded allowlist of names (see #876/QA-M5, which found
+// the previous allowlist covered only 3 of 25+ real SECURITY DEFINER functions).
+// Deliberately anchored on "create function", so REVOKE ... ON FUNCTION statements
+// (which reference a function name but never start with "create") never match and
+// can't be mistaken for a definition.
+const FUNCTION_DEFINITION_RE =
+  /create\s+(?:or\s+replace\s+)?function\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(/g;
+
+// Matches `DROP FUNCTION [IF EXISTS] [public.]name(` so a function that is dropped
+// and never redefined stops being tracked, instead of leaving a stale cached header
+// (possibly non-compliant) that would wrongly flag a function that no longer exists.
+const FUNCTION_DROP_RE = /drop\s+function(?:\s+if\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(/g;
+
+// Every SECURITY DEFINER function in the schema must pin `SET search_path = ''`
+// (see CLAUDE.md's "Database function security" guardrail). Walks migrations in
+// filename order, replaying each migration's CREATE/DROP FUNCTION statements in
+// the order they appear in the file, and keeps only the last header seen per
+// function name -- so a function that was fixed in a later migration (or
+// redefined with a new signature) is judged on its current definition, not an
+// earlier draft, and a function dropped without a later recreation is judged on
+// nothing at all rather than a stale header.
+function checkSecurityDefinerSearchPaths(migrations: MigrationFile[]): string[] {
   const errors: string[] = [];
   const latestHeaders = new Map<string, string>();
 
   for (const migration of migrations) {
     const sql = normalizeSql(readFileSync(migration.path, "utf8"));
 
-    for (const functionName of TRANSLATION_SECURITY_DEFINER_FUNCTIONS) {
-      const header = getFunctionHeader(sql, functionName);
-      if (!header) continue;
+    const events = [
+      ...Array.from(sql.matchAll(FUNCTION_DEFINITION_RE), (match) => ({
+        index: match.index ?? 0,
+        kind: "create" as const,
+        name: match[1],
+      })),
+      ...Array.from(sql.matchAll(FUNCTION_DROP_RE), (match) => ({
+        index: match.index ?? 0,
+        kind: "drop" as const,
+        name: match[1],
+      })),
+    ].sort((a, b) => a.index - b.index);
 
-      latestHeaders.set(functionName, header);
+    for (const event of events) {
+      if (event.kind === "create") {
+        latestHeaders.set(event.name, extractHeader(sql, event.index));
+      } else {
+        latestHeaders.delete(event.name);
+      }
     }
   }
 
@@ -230,7 +434,7 @@ function checkTranslationFunctionSearchPaths(migrations: MigrationFile[]): strin
 
     if (!header.includes("set search_path = ''")) {
       errors.push(
-        `SECURITY DEFINER translation function public.${functionName} must use SET search_path = ''`
+        `SECURITY DEFINER function public.${functionName} must use SET search_path = ''`
       );
     }
   }
@@ -274,8 +478,9 @@ export function validateMigrations(
   errors.push(...checkForDuplicates(migrations));
   errors.push(...checkForUnexpectedGaps(migrations));
   errors.push(...checkSensitiveTablePosture(migrationSql));
+  errors.push(...checkPublicTableRlsPosture(migrationSql));
   errors.push(...checkMarketingCredentialShape(migrationSql));
-  errors.push(...checkTranslationFunctionSearchPaths(migrations));
+  errors.push(...checkSecurityDefinerSearchPaths(migrations));
   errors.push(...checkCompleteBookingSmsJobSignatureReferences(migrations));
 
   return {

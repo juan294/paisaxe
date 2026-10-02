@@ -11,10 +11,12 @@ import { useState, useEffect } from "react";
  * @returns `true` if the query currently matches, `false` otherwise.
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia(query).matches;
-  });
+  // FE-M6 (#768): always initialize to `false` — matching what the server
+  // renders (no `window`) — and set the real value in the effect below.
+  // Reading `window.matchMedia(query).matches` directly in the initializer
+  // returned the real value on the client's first render, diverging from
+  // the server-rendered `false` and causing a hydration mismatch.
+  const [matches, setMatches] = useState(false);
 
   useEffect(() => {
     const mql = window.matchMedia(query);

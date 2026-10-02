@@ -66,7 +66,7 @@
     </mxCell>
 
     <mxCell id="swim-api" value="API Layer (Next.js Route Handlers)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="380" width="1620" height="175" as="geometry"/>
+      <mxGeometry x="40" y="380" width="1620" height="225" as="geometry"/>
     </mxCell>
     <mxCell id="api-chat" value="/api/chat&#xa;(embed ‖ flags&#xa;→ Claude RAG)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
       <mxGeometry x="20" y="40" width="140" height="65" as="geometry"/>
@@ -107,9 +107,12 @@
     <mxCell id="api-mcp-status" value="/api/mcp/make-booking/status&#xa;(Twilio callback, no auth)" style="rounded=1;whiteSpace=wrap;fillColor=#cce5ff;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
       <mxGeometry x="1395" y="118" width="195" height="40" as="geometry"/>
     </mxCell>
+    <mxCell id="api-mcp-save-favorite" value="/api/mcp/save-favorite&#xa;(Pelayo bookmark tool)" style="rounded=1;whiteSpace=wrap;fillColor=#cce5ff;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="1265" y="168" width="160" height="45" as="geometry"/>
+    </mxCell>
 
     <mxCell id="swim-logic" value="Business Logic (src/lib/)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="575" width="1620" height="150" as="geometry"/>
+      <mxGeometry x="40" y="625" width="1620" height="150" as="geometry"/>
     </mxCell>
     <mxCell id="lib-chat" value="Chat Orchestration&#xa;(Claude RAG)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="swim-logic">
       <mxGeometry x="20" y="50" width="150" height="60" as="geometry"/>
@@ -143,7 +146,7 @@
     </mxCell>
 
     <mxCell id="swim-data" value="Data Layer" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="745" width="900" height="150" as="geometry"/>
+      <mxGeometry x="40" y="795" width="900" height="150" as="geometry"/>
     </mxCell>
     <mxCell id="db-postgres" value="Supabase&#xa;PostgreSQL" style="shape=cylinder3;whiteSpace=wrap;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-data">
       <mxGeometry x="40" y="45" width="140" height="80" as="geometry"/>
@@ -159,17 +162,14 @@
     </mxCell>
 
     <mxCell id="swim-edge" value="Edge Functions (Deno / Supabase)" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="980" y="745" width="680" height="150" as="geometry"/>
+      <mxGeometry x="980" y="795" width="680" height="150" as="geometry"/>
     </mxCell>
     <mxCell id="edge-keepalive" value="keep-alive" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-edge">
       <mxGeometry x="40" y="55" width="140" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="edge-cleanup" value="cleanup-analytics" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="swim-edge">
-      <mxGeometry x="230" y="55" width="160" height="60" as="geometry"/>
-    </mxCell>
 
     <mxCell id="swim-external" value="External Services" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="915" width="1620" height="260" as="geometry"/>
+      <mxGeometry x="40" y="965" width="1620" height="260" as="geometry"/>
     </mxCell>
     <mxCell id="ext-claude" value="Claude API&#xa;(Anthropic)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
       <mxGeometry x="20" y="50" width="130" height="60" as="geometry"/>
@@ -277,9 +277,6 @@
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
     <mxCell id="e-edge-db" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;dashed=1;" edge="1" source="edge-keepalive" target="db-postgres" parent="1">
-      <mxGeometry relative="1" as="geometry"/>
-    </mxCell>
-    <mxCell id="e-edge-db-2" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;dashed=1;" edge="1" source="edge-cleanup" target="db-postgres" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
 

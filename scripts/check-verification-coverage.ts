@@ -63,7 +63,10 @@ function main(): void {
 
   assertScriptIncludes(pkg.scripts, "lint", "npm run lint:src");
   assertScriptIncludes(pkg.scripts, "lint", "npm run lint:scripts");
-  assert(pkg.scripts["lint:src"] === "eslint src/", "lint:src must lint src/");
+  assert(
+    pkg.scripts["lint:src"] === "eslint src/ --max-warnings=0",
+    "lint:src must lint src/ with warnings as failures (AR-L1/#863)"
+  );
   assert(
     pkg.scripts["lint:scripts"] === "eslint scripts --max-warnings=0",
     "lint:scripts must lint scripts with warnings as failures"

@@ -62,7 +62,7 @@ describe("sanitizeSentryEvent", () => {
     expect(event.tags?.request_id).toBe("req-context-5678");
   });
 
-  it("handles undefined request.headers gracefully (line 8 — redactHeaders no-op path)", async () => {
+  it("handles undefined request.headers gracefully", async () => {
     const event = await sanitizeSentryEvent({
       request: {
         cookies: { session: "abc" },
@@ -72,6 +72,85 @@ describe("sanitizeSentryEvent", () => {
 
     expect(event.request?.headers).toBeUndefined();
     expect(event.request?.cookies).toBeUndefined();
+  });
+
+  it("normalizes request.url to its path, stripping query string and fragment", async () => {
+    const event = await sanitizeSentryEvent({
+      request: {
+        url: "https://paisaxe.es/api/chat?session=abc123&token=secret#section",
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.request?.url).toBe("/api/chat");
+  });
+
+  it("normalizes a relative request.url with a query string to its path", async () => {
+    const event = await sanitizeSentryEvent({
+      request: {
+        url: "/api/chat?session=abc123",
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.request?.url).toBe("/api/chat");
+  });
+
+  it("leaves a request.url without a query string untouched", async () => {
+    const event = await sanitizeSentryEvent({
+      request: {
+        url: "https://paisaxe.es/api/chat",
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.request?.url).toBe("/api/chat");
+  });
+
+  it("leaves request.url undefined when not provided", async () => {
+    const event = await sanitizeSentryEvent({
+      request: {
+        headers: { "content-type": "application/json" },
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.request?.url).toBeUndefined();
+  });
+
+  it("removes request.query_string entirely", async () => {
+    const event = await sanitizeSentryEvent({
+      request: {
+        query_string: "session=abc123&token=secret",
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.request?.query_string).toBeUndefined();
+  });
+
+  it("redacts user.ip_address instead of passing it through in plaintext", async () => {
+    const event = await sanitizeSentryEvent({
+      user: {
+        id: "user-123",
+        ip_address: "203.0.113.42",
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.user?.ip_address).toBeNull();
+    expect(event.user?.id).toBe("user-123");
+  });
+
+  it("does not choke when user.ip_address is absent", async () => {
+    const event = await sanitizeSentryEvent({
+      user: {
+        id: "user-123",
+      },
+      type: undefined,
+    } satisfies ErrorEvent);
+
+    expect(event.user?.ip_address).toBeUndefined();
   });
 
   it("keeps the repo package manager and direct sentry dependency aligned", () => {

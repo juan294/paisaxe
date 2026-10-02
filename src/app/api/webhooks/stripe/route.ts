@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { verifyWebhookSignature, calculateExpiryDate } from "@/lib/stripe";
 import type { PurchaseType } from "@/lib/stripe";
@@ -7,6 +8,18 @@ import type Stripe from "stripe";
 
 const VALID_PURCHASE_TYPES = new Set<string>(["day_pass", "weekly_pass", "monthly_pass"]);
 const RPC_TIMEOUT_MS = 10_000;
+
+// BE-M5/SE-M2: checkout.session.completed fires even for delayed-settlement
+// payment methods (SEPA, Bizum, Klarna) before funds actually clear — Stripe
+// reports payment_status "unpaid" at that point and follows up with
+// checkout.session.async_payment_succeeded once payment_status flips to
+// "paid". Card payments (the only method enabled today) settle synchronously,
+// so payment_status is already "paid" on checkout.session.completed and this
+// is a no-op for the existing path.
+const GRANTING_EVENT_TYPES = new Set<string>([
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+]);
 
 function resolvePurchaseType(raw: string | undefined): PurchaseType {
   if (raw && VALID_PURCHASE_TYPES.has(raw)) {
@@ -17,10 +30,24 @@ function resolvePurchaseType(raw: string | undefined): PurchaseType {
 
 type StripeUnrecoverableReason = "missing_user_id" | "missing_payment_intent";
 
+// QA-L4 (#883): the 200 response below is correct (Stripe must stop retrying
+// a malformed event that will never become processable), but that means the
+// log line is the ONLY signal a payment-taken-with-no-grant ever happened —
+// Stripe's own delivery/retry surface never sees a failure. Forward the
+// marker to Sentry (the project's configured error-tracking tool; see
+// docs/operations/alerting-runbook.md § Stripe Payment-Without-Grant for the
+// manual-grant remediation procedure operators follow when this fires) so it
+// reaches the same alert channel that other unhandled errors do, in addition
+// to the structured log line consumed via log-drain queries.
 function unrecoverableResponse(eventId: string, reason: StripeUnrecoverableReason) {
   logger.error("[STRIPE_UNRECOVERABLE]", {
     eventId,
     reason,
+  });
+  Sentry.captureMessage("[STRIPE_UNRECOVERABLE]", {
+    level: "error",
+    tags: { stripe_alert: "unrecoverable", reason },
+    extra: { eventId },
   });
   return NextResponse.json(
     { status: "unrecoverable", reason },
@@ -32,10 +59,20 @@ function unrecoverableResponse(eventId: string, reason: StripeUnrecoverableReaso
  * POST /api/webhooks/stripe
  *
  * Handles Stripe webhook events:
- * - checkout.session.completed: Creates voice purchase record atomically
+ * - checkout.session.completed: Creates voice purchase record atomically,
+ *   but only when session.payment_status is already "paid" (synchronous
+ *   payment methods, e.g. card).
+ * - checkout.session.async_payment_succeeded: Same grant path, for delayed-
+ *   settlement payment methods where payment_status flips to "paid" after
+ *   checkout.session.completed already fired with "unpaid".
  *
- * Idempotency and grant creation are wrapped in a single Postgres RPC so the
- * webhook never records the dedup row without also granting access.
+ * Idempotency and grant creation are wrapped in a single Postgres RPC keyed
+ * on the Stripe event id, so the webhook never records the dedup row without
+ * also granting access. checkout.session.completed and
+ * checkout.session.async_payment_succeeded carry distinct event ids for the
+ * same purchase, but at most one of them ever has payment_status "paid" for
+ * a given checkout session — so exactly one grant call is ever made per
+ * purchase regardless of which event triggers it.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -65,11 +102,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    // Only handle checkout.session.completed events
-    if (event.type !== "checkout.session.completed") {
+    // Only handle events that can result in a grant.
+    if (!GRANTING_EVENT_TYPES.has(event.type)) {
       return NextResponse.json({ received: true });
     }
     const session = event.data.object as Stripe.Checkout.Session;
+
+    // BE-M5/SE-M2: never grant before Stripe confirms payment actually
+    // settled. See GRANTING_EVENT_TYPES comment above for why both event
+    // types are handled here with the same guard.
+    if (session.payment_status !== "paid") {
+      logger.info("[STRIPE_WEBHOOK_PAYMENT_NOT_SETTLED]", {
+        eventId: event.id,
+        eventType: event.type,
+        paymentStatus: session.payment_status,
+      });
+      return NextResponse.json(
+        { received: true, status: "payment_not_settled" },
+        { status: 200 }
+      );
+    }
+
     const userId = session.metadata?.user_id;
 
     if (!userId) {
@@ -115,6 +168,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         logger.error("[STRIPE_RPC_TIMEOUT]", {
           eventId: event.id,
           purchaseType,
+        });
+        // QA-L4 (#883): same rationale as unrecoverableResponse() above — the
+        // 500 here makes Stripe retry (correct), but the retry surface can't
+        // distinguish "transient" from "systemic DB outage", so still forward
+        // the marker to Sentry as an explicit alert signal.
+        Sentry.captureMessage("[STRIPE_RPC_TIMEOUT]", {
+          level: "error",
+          tags: { stripe_alert: "rpc_timeout" },
+          extra: { eventId: event.id, purchaseType },
         });
         return NextResponse.json({ error: "Database timeout" }, { status: 500 });
       }

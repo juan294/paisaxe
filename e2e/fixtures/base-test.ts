@@ -13,6 +13,18 @@
 
 import { test as base, expect } from "@playwright/test";
 
+// QA-M1: NavigationHint (src/components/immersive/navigation-hint.tsx) shows a
+// full-viewport, click-intercepting overlay for ~3.5s on touch devices with
+// phone-sized viewports, unless sessionStorage already has this key set. The
+// old fix attempt was a config-level `storageState` JSON seed, but that only
+// writes localStorage — Playwright's storageState mechanism cannot restore
+// sessionStorage at all — so the seed was inert and every "mobile" project
+// test ate the overlay's ~3.5s of blocked pointer events (masked by retries).
+// `addInitScript` runs in every new document before any page script, is
+// origin-agnostic (unlike the old seed's hardcoded localhost:3100), and
+// writes to the right storage, so it actually suppresses the hint.
+const NAV_HINT_STORAGE_KEY = "paisaxe-nav-hint-seen";
+
 export const test = base.extend({
   page: async ({ page }, use) => {
     // Block ALL requests to the dummy Supabase host (example.supabase.co).
@@ -41,6 +53,10 @@ export const test = base.extend({
         });
       }
     );
+
+    await page.addInitScript((key) => {
+      window.sessionStorage.setItem(key, "true");
+    }, NAV_HINT_STORAGE_KEY);
 
     await use(page);
   },

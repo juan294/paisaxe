@@ -52,6 +52,21 @@ describe("sanitizeValue", () => {
     });
   });
 
+  describe("ElevenLabs credential redaction", () => {
+    it("redacts ElevenLabs API keys and xi-api-key fields", () => {
+      expect(sanitizeValue("key=sk-eleven-secret")).toBe("key=[REDACTED]");
+      expect(sanitizeValue({ "xi-api-key": "sk-eleven-secret" })).toEqual({
+        "xi-api-key": "[REDACTED]",
+      });
+    });
+
+    it("redacts signed WebSocket URLs", () => {
+      expect(
+        sanitizeValue("upstream=wss://signed.example/session?token=secret")
+      ).toBe("upstream=[REDACTED]");
+    });
+  });
+
   describe("Phone number redaction", () => {
     it("redacts international phone numbers", () => {
       const result = sanitizeValue("Call me at +34 612 345 678");

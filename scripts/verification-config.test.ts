@@ -29,7 +29,7 @@ describe("verification coverage config", () => {
   it("lints non-src TypeScript scripts through the default lint gate", () => {
     const pkg = readJson<{ scripts: Record<string, string> }>("package.json");
 
-    expect(pkg.scripts["lint:src"]).toBe("eslint src/");
+    expect(pkg.scripts["lint:src"]).toBe("eslint src/ --max-warnings=0");
     expect(pkg.scripts["lint:scripts"]).toBe("eslint scripts --max-warnings=0");
     expect(pkg.scripts.lint).toContain("npm run lint:src");
     expect(pkg.scripts.lint).toContain("npm run lint:scripts");
@@ -90,13 +90,49 @@ describe("verification coverage config", () => {
     expect(workflow).toContain("npm run check-verification-coverage");
   });
 
-  it("uses the body-parsing readiness monitor for Vercel health smoke checks", () => {
+  it("runs coverage merge after successful shards even when the push-source job is skipped", () => {
+    const workflow = readText(".github/workflows/ci.yml");
+
+    expect(workflow).toContain(
+      "if: ${{ always() && needs.coverage-shard.result == 'success' }}",
+    );
+  });
+
+  it("runs secret-free E2E coverage for Dependabot while preserving authenticated checks elsewhere", () => {
+    const workflow = readText(".github/workflows/e2e.yml");
+
+    expect(workflow).toContain("SECRETS_WITHHELD_PR:");
+    expect(workflow).toContain("github.event.pull_request.user.login == 'dependabot[bot]'");
+    expect(workflow).toContain("if: env.SECRETS_WITHHELD_PR != 'true'");
+    expect(workflow).toContain("if: env.SECRETS_WITHHELD_PR == 'true'");
+    expect(workflow).toContain("--grep-invert=\"QA Journey: Authenticated User\"");
+    expect(workflow).toContain("NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co");
+    expect(workflow).toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e");
+  });
+
+  it("uses the body-parsing readiness monitor for Vercel health smoke checks, and does not run the dead develop-push smoke job (DO-H1)", () => {
     const ciWorkflow = readText(".github/workflows/ci.yml");
     const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
 
-    expect(ciWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
     expect(previewSmokeWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
+    // DO-H4: --require-sentry deliberately stays off the required release gate.
+    // sentry.status: "configured" is derived purely from NEXT_PUBLIC_SENTRY_DSN
+    // being non-empty (src/app/api/health/route.ts checkSentry()) — it proves
+    // the env var is set, not that error delivery works (DO-B1: a 90-day Sentry
+    // query returned zero issues despite "configured", spanning a known outage).
+    // Hard-gating on an unverified signal would also be unsafe operationally:
+    // `vercel env ls preview` confirms the Preview environment does not carry
+    // NEXT_PUBLIC_SENTRY_DSN, so adding the flag today would fail this required
+    // check on every PR targeting main, including incident hotfixes. Revisit
+    // once DO-B1 confirms live Sentry delivery and Preview provisions the DSN.
     expect(previewSmokeWorkflow).not.toContain("--require-sentry");
+
+    // DO-H1: the develop-push smoke job waited on a Vercel preview that
+    // vercel.json's ignoreCommand ensures never exists, then always
+    // reported success via its timeout branch without probing anything.
+    // It was removed; assert it doesn't come back.
+    expect(ciWorkflow).not.toContain("Develop smoke check");
+    expect(ciWorkflow).not.toContain("develop-smoke");
   });
 
   it("preflights Voyage AI before running QA LLM tests", () => {
@@ -106,9 +142,35 @@ describe("verification coverage config", () => {
     expect(qaAgent).toContain("Checking Voyage AI embedding availability");
     expect(qaAgent).toContain("QA PREFLIGHT: Voyage AI embedding availability failed");
     expect(qaAgent.indexOf("export VOYAGE_API_KEY")).toBeLessThan(
-      qaAgent.indexOf("npm run dev")
+      qaAgent.indexOf("npm run build")
     );
-    expect(qaAgent).toContain('VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE" npm run dev');
+  });
+
+  // QA-H3 (#870): the weekly QA gate now runs a production build instead of
+  // `npm run dev`, so it exercises the Anthropic SDK transport (the code
+  // path production traffic actually takes) instead of the curl-subprocess
+  // dev/test transport. See src/lib/claude.ts USE_CURL.
+  it("runs the QA suite against a production build, not the dev server", () => {
+    const qaAgent = readText("scripts/qa-agent.sh");
+
+    expect(qaAgent).toContain('npm run build > "$SERVER_LOG"');
+    expect(qaAgent).toContain('npm run start -- --port 3006');
+    // Build must complete (and be checked for failure) before start is launched.
+    expect(qaAgent.indexOf("npm run build")).toBeLessThan(
+      qaAgent.indexOf("npm run start -- --port 3006")
+    );
+    expect(qaAgent).toContain("Production build failed");
+  });
+
+  // QA-H3 (#870): the SSE endpoint real users hit, not the legacy
+  // non-streaming JSON endpoint.
+  it("targets the streaming chat endpoint real users hit", () => {
+    const llmQualityTest = readText("src/tests/qa/llm-quality.test.ts");
+    const llmQualityHelpers = readText("src/tests/qa/llm-quality-helpers.ts");
+
+    expect(llmQualityTest).toContain("`${API_URL}/api/chat/stream`");
+    expect(llmQualityHelpers).toContain("parseStreamResponse");
+    expect(llmQualityHelpers).toContain("text/event-stream");
   });
 
   it("preflights Anthropic before running QA LLM tests", () => {
@@ -124,6 +186,73 @@ describe("verification coverage config", () => {
     );
   });
 
+  // 2026-10-01: a single `degraded` reading with no body detail could not be triaged.
+  it("retries a non-healthy app health probe once and keeps both full bodies", () => {
+    const qaAgent = readText("scripts/qa-agent.sh");
+
+    expect(qaAgent).toContain("App health probe not healthy — retrying once after 5s");
+    expect(qaAgent).toContain("HEALTH_RESPONSE_FIRST");
+    expect(qaAgent).toContain("first probe:");
+    expect(qaAgent.indexOf("HEALTH_RESPONSE_FIRST")).toBeLessThan(
+      qaAgent.indexOf("App health: FAILED")
+    );
+  });
+
+  it("holds only the voice-SDK chunk to the larger chunk budget and reads route first-load stats", () => {
+    const perfAgent = readText("scripts/performance-agent.sh");
+
+    expect(perfAgent).toContain("BUDGET_LARGEST_CHUNK_KB=650");
+    expect(perfAgent).toContain("BUDGET_VOICE_CHUNK_MARKER=livekit");
+    expect(perfAgent).toContain("BUDGET_VOICE_CHUNK_KB=800");
+    expect(perfAgent).toContain(
+      'largest_chunk_budget_violation "$LARGEST_CHUNKS" "$BUDGET_LARGEST_CHUNK_KB" "$BUDGET_VOICE_CHUNK_MARKER" "$BUDGET_VOICE_CHUNK_KB"'
+    );
+    expect(perfAgent).toContain(".next/diagnostics/route-bundle-stats.json");
+    expect(perfAgent).toContain('first_load_budget_violation "$ROUTE_STATS_FILE" "$BUDGET_INITIAL_JS_KB"');
+  });
+
+  // 2026-10-01: an exact-version override blocks `npm audit fix`, yet the audit's
+  // fixAvailable flag still said "fixable". The metric must come from a dry run.
+  it("counts fixable vulnerabilities from an npm audit fix dry run, not fixAvailable", () => {
+    const securityAgent = readText("scripts/security-agent.sh");
+
+    expect(securityAgent).toContain("npm audit fix --dry-run --json");
+    expect(securityAgent).toContain("REMAINING_AFTER_FIX");
+    expect(securityAgent).not.toContain("fixAvailable == true");
+    expect(securityAgent).toContain("remaining after npm audit fix dry run");
+  });
+
+  // 2026-10-02: vitest 5 moved blob reports from .vitest-reports to .vitest/blob. The
+  // shard upload then found nothing (only warned) and the merge found no blobs.
+  it("uploads and merges coverage blobs from vitest's default blob directory and fails on a missing blob", () => {
+    const workflow = readText(".github/workflows/ci.yml");
+
+    expect(workflow).toContain("path: .vitest/blob/*");
+    expect(workflow).toContain("path: .vitest/blob\n");
+    expect(workflow).not.toContain(".vitest-reports");
+    expect(workflow).toContain("if-no-files-found: error");
+    expect(readText(".gitignore")).toContain(".vitest/");
+  });
+
+  // 2026-10-02: Vercel Preview is not a place this project provisions secrets. The
+  // ElevenLabs preflight needs HEALTH_PROBE_SECRET on the target, so running it
+  // against a preview deployment made the required check unpassable. It is already a
+  // required deployed-readonly probe (quality/required-probes.yaml) run post-deploy
+  // against production (release checklist step 5), so the preview smoke keeps only
+  // the health-readiness and homepage checks.
+  it("keeps the required preview smoke free of the secret-dependent ElevenLabs preflight", () => {
+    const previewSmoke = readText(".github/workflows/preview-smoke.yml");
+    const probes = readText("quality/required-probes.yaml");
+
+    expect(previewSmoke).not.toContain("check-elevenlabs-voice-preflight");
+    expect(previewSmoke).not.toContain("HEALTH_PROBE_SECRET");
+    expect(previewSmoke).toContain("scripts/check-health-readiness.mjs");
+    expect(previewSmoke).toContain("Smoke test - homepage loads");
+    // The preflight must stay a required production probe, not disappear.
+    expect(probes).toContain("id: elevenlabs-voice-preflight");
+    expect(probes).toContain("npm run check-elevenlabs-voice");
+  });
+
   it("writes a report and shared-context entry when the QA wrapper aborts", () => {
     const qaAgent = readText("scripts/qa-agent.sh");
 
@@ -133,6 +262,44 @@ describe("verification coverage config", () => {
     expect(qaAgent).toContain("write_shared_context");
     expect(qaAgent).toContain("handle_exit");
     expect(qaAgent).toContain('CURRENT_PHASE="phase 5 report generation"');
+  });
+
+  it("fails the Vercel env safety job when its secret is missing outside secret-withheld PRs", () => {
+    const workflow = readText(".github/workflows/security.yml");
+
+    // DO-M2 (#829): the job used to skip its only assertion whenever
+    // VERCEL_TOKEN was unset and still report success on every push/
+    // schedule run — requiredness without evidence, the same pattern
+    // rejected for Dependabot in preview-smoke.yml. Skip-to-pass must now
+    // be scoped to PRs where GitHub genuinely withholds secrets: forks and
+    // Dependabot. Every other trigger with a missing secret must fail.
+    expect(workflow).toContain("Fail when Vercel credentials are unavailable (trusted event)");
+    expect(workflow).toContain("Skip when Vercel credentials are unavailable (secret-withheld PR)");
+
+    // The fail step's run body ends in `exit 1` right after its distinctive
+    // error line — proves the missing-secret/trusted-event path actually fails.
+    expect(workflow).toContain(
+      '          echo "::error::This is the only automated check on deployed Vercel environment state in this repo (DO-M2 / issue #829) — it must fail rather than silently report success while checking nothing."\n' +
+        "          exit 1"
+    );
+
+    // The skip step's last echo line is immediately followed by the next
+    // step (no `exit 1` in between) — proves the secret-withheld path passes.
+    expect(workflow).toContain(
+      '          echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."\n' +
+        "\n" +
+        "      - name: Assert legacy agent override is absent from Vercel env"
+    );
+
+    // The fail path must exclude only fork and Dependabot PRs; the skip path
+    // must accept only those same secret-withheld cases. If these conditions
+    // were ever widened, the job could silently pass on trusted events.
+    expect(workflow).toContain(
+      "github.event.pull_request.user.login == 'dependabot[bot]'"
+    );
+    expect(workflow).toContain(
+      "github.event.pull_request.head.repo.fork == true"
+    );
   });
 
   it("includes chat API response bodies in QA LLM failures", () => {

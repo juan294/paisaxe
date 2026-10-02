@@ -3,8 +3,8 @@
 # Checks for missing translations across all locales and fills gaps automatically
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/code/paisaxe"
-CLAUDE_BIN="/Users/juan/.local/bin/claude"
+PROJECT_DIR="${PROJECT_DIR:-/Users/juan/code/paisaxe}"
+CLAUDE_BIN="${CLAUDE_BIN:-/Users/juan/.local/bin/claude}"
 MODEL="claude-haiku-4-5-20251001"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/localization-agent-$(date +%Y-%m-%d).log"
@@ -42,10 +42,7 @@ SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-ins
 SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run the localization agent via Claude CLI in non-interactive mode
-"$CLAUDE_BIN" -p \
-  --model "$MODEL" \
-  --allowedTools 'Read,Write,Edit,Bash(npx tsc*),Bash(ls *),Bash(find *),Glob,Grep' \
-  >> "$LOG_FILE" 2>&1 <<PROMPT
+PROMPT_TEXT=$(cat <<PROMPT
 $AGENT_PROMPT
 
 Additional context:
@@ -59,6 +56,9 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
+)
+run_scheduled_analysis "$DOC_FILE" "$LOG_FILE" "# Localization Agent Report" \
+  "$MODEL" 'Read,Write,Edit,Bash(npx tsc*),Bash(ls *),Bash(find *),Glob,Grep' "$PROMPT_TEXT"
 
 # Extract and write shared context
 REPORT_CONTENT=$(cat "$DOC_FILE")

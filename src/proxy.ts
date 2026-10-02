@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleCanonicalDomain } from "@/lib/proxy/canonical-domain";
-import { handleStoryRewrite } from "@/lib/proxy/story-rewrite";
 import { handleMaintenanceMode } from "@/lib/proxy/maintenance";
 import { handleRootRedirect } from "@/lib/proxy/root-redirect";
 import { handleCORS, addCORSHeaders } from "@/lib/proxy/cors";
@@ -23,25 +22,28 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return canonicalRedirect;
   }
 
-  // 0b. Rewrite /story/:slug → /immersive?story=:slug (before maintenance check)
-  const storyRewrite = handleStoryRewrite(request);
-  if (storyRewrite) {
-    storyRewrite.headers.set("X-Request-ID", requestId);
-    return storyRewrite;
-  }
-
-  // 1. Check maintenance mode (applies to all routes)
-  const maintenanceResponse = await handleMaintenanceMode(request);
-  if (maintenanceResponse) {
-    maintenanceResponse.headers.set("X-Request-ID", requestId);
-    return maintenanceResponse;
-  }
-
-  // 2. Redirect root path to /immersive
+  // 1. Redirect root path to /immersive. Checked ahead of the
+  //    maintenance-mode lookup (PE-H2, #805): a redirect response renders
+  //    nothing itself, so evaluating maintenance status for / before
+  //    redirecting was a wasted Supabase round-trip (60-330ms) on every
+  //    first-time visit — the browser's follow-up request to /immersive
+  //    goes through this proxy again and is gated by the maintenance check
+  //    below like any other route (/immersive is intentionally NOT in
+  //    MAINTENANCE_BYPASS_PREFIXES; see lib/proxy/maintenance.ts, #824).
   const rootRedirect = handleRootRedirect(request);
   if (rootRedirect) {
     rootRedirect.headers.set("X-Request-ID", requestId);
     return rootRedirect;
+  }
+
+  // 2. Check maintenance mode (applies to all other routes)
+  // Note: /story/:slug is a real rendered App Router page (see src/app/story/[slug]/page.tsx,
+  // FE-H2 / #760) — it is NOT special-cased here, so it is subject to maintenance mode like
+  // any other visitor route.
+  const maintenanceResponse = await handleMaintenanceMode(request);
+  if (maintenanceResponse) {
+    maintenanceResponse.headers.set("X-Request-ID", requestId);
+    return maintenanceResponse;
   }
 
   // 3. Handle CORS preflight for API routes
@@ -66,7 +68,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // 6. Set static CSP header on page responses only.
   //    API responses (incl. high-frequency /api/chat/stream, /api/feature-flags) do not
   //    need CSP — it is a browser page protection header. Skipping the string-build on
-  //    every API call avoids pointless work on hot paths (PE-M2).
+  //    every API call avoids pointless work on hot paths (#678).
   if (!isApiRoute) {
     response.headers.set("Content-Security-Policy", buildCspHeader());
 

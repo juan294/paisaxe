@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
@@ -8,7 +8,23 @@ import PricingLoading from "./loading";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
-import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing";
+import { PRICING_TIERS, buildCheckoutUrl, type PricingTier, type PricingTierId } from "@/lib/pricing";
+import { toIntlLocale } from "@/lib/utils";
+
+/**
+ * Resolve the human-readable duration for a pricing tier, translated via
+ * `t(tier.durationKey)`. Falls back to `tier.fallbackLabel` only when the
+ * key is missing from the active locale (survives a locale shipping late).
+ */
+function resolveTierDuration(t: (key: string) => string, tier: PricingTier): string {
+  const translated = t(tier.durationKey);
+  return translated === tier.durationKey ? tier.fallbackLabel : translated;
+}
+
+/** UX-H4 (#890): allowlist check for a `tier` query param — never a passthrough. */
+function isValidTierId(value: string | null): value is PricingTierId {
+  return PRICING_TIERS.some((tier) => tier.id === value);
+}
 
 export default function PricingPage() {
   return (
@@ -21,23 +37,68 @@ export default function PricingPage() {
 function PricingPageContent() {
   const { user, session, signInWithGoogle } = useAuth();
   const { canUseVoice, isWhitelisted, expiresAt, isLoading } = useVoiceAccess();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
   const returnTo = searchParams.get("returnTo");
   const isResolvingAuthenticatedAccess = isLoading && !!user && !!session;
-  const encodedReturnTo = returnTo ? encodeURIComponent(returnTo) : null;
-  const pricingUrl = encodedReturnTo
-    ? `/pricing?returnTo=${encodedReturnTo}`
-    : "/pricing";
 
-  // #137: selected pass tier — defaults to the Day Pass.
-  const [selectedTier, setSelectedTier] = useState<PricingTierId>("day_pass");
+  // #137: selected pass tier — defaults to the Day Pass. UX-H4 (#890): seeded
+  // from the `tier` query param so a sign-in round trip (which lands back on
+  // this same route via signInWithGoogle's redirect) doesn't silently reset
+  // the user's choice back to the Day Pass.
+  const tierParam = searchParams.get("tier");
+  const [selectedTier, setSelectedTier] = useState<PricingTierId>(
+    isValidTierId(tierParam) ? tierParam : "day_pass"
+  );
+  const selectedTierData =
+    PRICING_TIERS.find((tier) => tier.id === selectedTier) ?? PRICING_TIERS[0];
 
-  const checkoutParams = new URLSearchParams();
-  if (returnTo) checkoutParams.set("returnTo", returnTo);
-  checkoutParams.set("tier", selectedTier);
-  const checkoutUrl = `/pricing/checkout?${checkoutParams.toString()}`;
+  // UX-M12 (#905): the tier selector declares role="radio"/"radiogroup" —
+  // that markup promises a roving-tabindex, arrow-key-navigable radiogroup.
+  // Without this, a screen-reader user is told "radio group, 1 of 3" and
+  // then finds arrow keys inert, which is worse than no ARIA role at all.
+  // Mirrors the roving-tabindex pattern already implemented in
+  // story-progress-bar.tsx.
+  const tierRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const handleTierKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      const count = PRICING_TIERS.length;
+      let nextIndex: number | null = null;
+
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        nextIndex = index < count - 1 ? index + 1 : 0;
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        nextIndex = index > 0 ? index - 1 : count - 1;
+      } else if (e.key === "Home") {
+        nextIndex = 0;
+      } else if (e.key === "End") {
+        nextIndex = count - 1;
+      }
+
+      if (nextIndex === null) return;
+
+      e.preventDefault();
+      setSelectedTier(PRICING_TIERS[nextIndex].id);
+      tierRefs.current[nextIndex]?.focus();
+    },
+    []
+  );
+  // UX-B1 (#886): the section label, feature bullet, and FAQ answer must
+  // describe the *selected* tier's duration — not be hardcoded to the Day
+  // Pass's "24 horas" regardless of which tier the user picked.
+  const selectedTierDuration = resolveTierDuration(t, selectedTierData);
+  const voicePassLabel = t("premium.voice_pass_label").replace("{duration}", selectedTierDuration);
+
+  // UX-H4 (#890): carry both `returnTo` and the selected `tier` through the
+  // sign-in redirect so the tier survives the OAuth round trip back to /pricing.
+  const pricingParams = new URLSearchParams();
+  if (returnTo) pricingParams.set("returnTo", returnTo);
+  pricingParams.set("tier", selectedTier);
+  const pricingUrl = `/pricing?${pricingParams.toString()}`;
+
+  const checkoutUrl = buildCheckoutUrl(selectedTier, returnTo ?? undefined);
 
   const handlePurchase = () => {
     if (!user || !session) {
@@ -102,7 +163,7 @@ function PricingPageContent() {
                 </p>
                 {expiresAt && (
                   <p className="text-xs text-green-500/60">
-                    {t("premium.success_expires")} {expiresAt.toLocaleString()}
+                    {t("premium.success_expires")} {expiresAt.toLocaleString(toIntlLocale(locale))}
                   </p>
                 )}
               </div>
@@ -122,22 +183,25 @@ function PricingPageContent() {
             {/* Price + tier selector (#137) */}
             <div className="p-6 text-center border-b border-neutral-800">
               <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-4">
-                {t("premium.voice_pass_label")}
+                {voicePassLabel}
               </p>
               <div
                 role="radiogroup"
-                aria-label={t("premium.voice_pass_label")}
+                aria-label={voicePassLabel}
                 className="grid grid-cols-3 gap-2"
               >
-                {PRICING_TIERS.map((tier) => {
+                {PRICING_TIERS.map((tier, index) => {
                   const selected = selectedTier === tier.id;
                   return (
                     <button
                       key={tier.id}
+                      ref={(el) => { tierRefs.current[index] = el; }}
                       type="button"
                       role="radio"
                       aria-checked={selected}
+                      tabIndex={selected ? 0 : -1}
                       onClick={() => setSelectedTier(tier.id)}
+                      onKeyDown={(e) => handleTierKeyDown(e, index)}
                       className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 ${
                         selected
                           ? "border-green-500 bg-green-500/10"
@@ -148,9 +212,7 @@ function PricingPageContent() {
                         {tier.price}
                       </span>
                       <span className="mt-1 text-[11px] text-neutral-400">
-                        {t(tier.durationKey) === tier.durationKey
-                          ? tier.fallbackLabel
-                          : t(tier.durationKey)}
+                        {resolveTierDuration(t, tier)}
                       </span>
                     </button>
                   );
@@ -163,7 +225,7 @@ function PricingPageContent() {
               <div className="flex items-center gap-3">
                 <Clock className="h-4 w-4 text-neutral-500 flex-shrink-0" />
                 <span className="text-sm text-neutral-300">
-                  {t("premium.feature_24h")}
+                  {t("premium.feature_duration").replace("{duration}", selectedTierDuration)}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -222,7 +284,7 @@ function PricingPageContent() {
                 {t("premium.faq_how_long")}
               </h3>
               <p className="text-xs text-neutral-500">
-                {t("premium.faq_how_long_answer")}
+                {t("premium.faq_how_long_answer").replace("{duration}", selectedTierDuration)}
               </p>
             </div>
           </div>

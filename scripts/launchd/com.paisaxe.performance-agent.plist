@@ -2,38 +2,45 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/Users/juan</string>
+		<key>PATH</key>
+		<string>/usr/local/bin:/opt/homebrew/bin:/Users/juan/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>TERM</key>
+		<string>xterm-256color</string>
+	</dict>
+	<key>HardResourceLimits</key>
+	<dict>
+		<key>NumberOfFiles</key>
+		<integer>122880</integer>
+	</dict>
 	<key>Label</key>
 	<string>com.paisaxe.performance-agent</string>
-
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/bash</string>
-		<string>/Users/juan/code/paisaxe/scripts/performance-agent.sh</string>
+		<string>-c</string>
+		<string>exec /usr/bin/caffeinate -dis /bin/bash /Users/juan/code/paisaxe/scripts/performance-agent.sh</string>
 	</array>
-
+	<key>SoftResourceLimits</key>
+	<dict>
+		<key>NumberOfFiles</key>
+		<integer>122880</integer>
+	</dict>
+	<key>StandardErrorPath</key>
+	<string>/Users/juan/Library/Logs/Paisaxe/performance-agent.error.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/juan/Library/Logs/Paisaxe/performance-agent.log</string>
 	<key>StartCalendarInterval</key>
 	<dict>
-		<key>Weekday</key>
-		<integer>6</integer>
 		<key>Hour</key>
 		<integer>10</integer>
 		<key>Minute</key>
 		<integer>0</integer>
-	</dict>
-
-	<key>StandardOutPath</key>
-	<string>/Users/juan/code/paisaxe/logs/performance-agent-launchd.log</string>
-
-	<key>StandardErrorPath</key>
-	<string>/Users/juan/code/paisaxe/logs/performance-agent-launchd-err.log</string>
-
-	<key>WorkingDirectory</key>
-	<string>/Users/juan/code/paisaxe</string>
-
-	<key>EnvironmentVariables</key>
-	<dict>
-		<key>PATH</key>
-		<string>/Users/juan/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>Weekday</key>
+		<integer>4</integer>
 	</dict>
 </dict>
 </plist>

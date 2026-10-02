@@ -8,7 +8,7 @@
 |---------|----------|-------|
 | PostHog Alerts | Error rate spikes, event anomalies | Juan Gonzalez |
 | Vercel email notifications | Build failures, deployment errors | Juan Gonzalez |
-| Sentry (if configured) | Unhandled exceptions, performance regressions | Juan Gonzalez |
+| Sentry (DSN configured; delivery unverified — see below) | Unhandled exceptions, performance regressions | Juan Gonzalez |
 | Manual monitoring | `/api/health` endpoint status | Juan Gonzalez |
 
 ## Escalation & On-Call SLO (accepted risk)
@@ -31,11 +31,40 @@ Paisaxe is operated by a **single developer** (Juan Gonzalez). There is **no on-
 
 ---
 
+## Sentry Delivery Unverified (DO-B1)
+
+**Status as of 2026-08-18:** The Sentry project `the-creative-token/paisaxe` exists and
+`NEXT_PUBLIC_SENTRY_DSN` is configured, so `/api/health` correctly reports
+`sentry.status: "configured"`. That only confirms the SDK was initialized with a DSN — it
+does **not** confirm events are reaching the project. A 90-day dashboard query returned
+zero issues, including across the 2026-07-20 outage window, where a real production
+failure left no trace in Sentry. Treat "configured" and "verified delivering" as two
+different claims until this is checked.
+
+This means every procedure below that says "check Sentry" or relies on Sentry as a
+signal may currently be checking a dashboard that never receives events. Cross-check with
+PostHog `$exception` events and the Vercel function logs / log drain (see
+`docs/operations/logging.md`) until delivery is confirmed.
+
+**Verification procedure (human action required):**
+
+1. Run `npm run verify-sentry-delivery` with the same DSN production uses. It fires a
+   synthetic exception tagged `do_b1_sentry_delivery_check:true` and prints a unique
+   marker — see `scripts/verify-sentry-delivery.ts` for details.
+2. Open the Sentry dashboard for `the-creative-token/paisaxe` and confirm an issue with
+   that tag/marker actually arrives (usually within ~1 minute).
+3. If nothing arrives after a few minutes, the pipeline is broken — this is a real
+   observability gap, not a docs issue. File/reopen an issue and keep #821 open.
+4. Only once a human has completed steps 1–3 successfully should this section (and #821)
+   be considered resolved.
+
+---
+
 ## Health Endpoint Degraded
 
 **Trigger:** `GET https://paisaxe.es/api/health` returns `status != "healthy"` in the JSON body (the endpoint always returns HTTP 200; degraded state is signalled via the body only).
 
-**Automated monitor:** CI uses `node scripts/check-health-readiness.mjs <base-url>` to parse `/api/health` and fail on any non-healthy body. The required `Smoke test Vercel preview` gate adds `--require-sentry`, so missing Sentry configuration is treated as release-blocking even though `/api/health/live` still returns liveness.
+**Automated monitor:** CI uses `node scripts/check-health-readiness.mjs <base-url>` to parse `/api/health` and fail on any non-healthy body. The required `Smoke test Vercel preview` gate does **not** currently pass `--require-sentry` — missing Sentry configuration is not release-blocking today. `sentry.status: "configured"` (see DO-B1) only proves `NEXT_PUBLIC_SENTRY_DSN` is non-empty, not that error delivery actually works, and the Preview environment does not carry that DSN — hard-gating on it now would fail every release PR. `/api/health/live` still returns liveness regardless.
 
 **Steps:**
 
@@ -96,8 +125,13 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 4. Test the route manually:
    ```bash
    curl -X POST https://paisaxe.es/api/cron/<route> \
-     -H "Authorization: Bearer $CRON_SECRET"
+     -H "x-webhook-secret: $WEBHOOK_SECRET"
    ```
+   (`GET` is what Vercel Cron itself sends, authenticated via `Authorization: Bearer $CRON_SECRET` — see
+   `verifyVercelCron` in `src/lib/cron-auth.ts`. The `POST` handler used for manual/pg_cron recovery
+   checks `verifyWebhookSecret` instead, which reads the `x-webhook-secret` header against
+   `WEBHOOK_SECRET`, falling back to admin-cookie auth. A `POST` with an `Authorization: Bearer` header
+   returns 401.)
 5. Check for dependency issues: Supabase connectivity, external API rate limits (PostHog, ElevenLabs, etc.)
 6. If the job is idempotent, trigger it manually once the root cause is resolved.
 7. If it cannot be recovered, log the missed run and resume on the next scheduled interval.
@@ -115,11 +149,12 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 
 1. Check the `cron_auth` field in `/api/health` — it surfaces the current cron secret validation state.
 2. For `missing_secret`: verify `CRON_SECRET` is set in Vercel environment variables → Settings → Environment Variables.
-3. For `header_missing` or `mismatch`: verify the Vercel cron configuration (`vercel.json`) is sending the correct Authorization header, or that the secret wasn't rotated without updating all call sites.
-4. Once the secret is correctly configured, trigger the affected cron manually to confirm:
+3. For `header_missing` or `mismatch`: verify the Vercel cron configuration (`vercel.json`) is sending the correct Authorization header, or that the secret wasn't rotated without updating all call sites — see [secret-inventory.md](secret-inventory.md#cron_secret-rotation-vercel-and-the-operators-local-copy) for `CRON_SECRET`'s multi-homed rotation order (Vercel's own Cron feature reads this env var, and the operator's local `.env.local` copy goes stale silently).
+4. Once the secret is correctly configured, trigger the affected cron manually to confirm (see the
+   `POST` auth note under [Cron Job Failure](#cron-job-failure) above):
    ```bash
    curl -X POST https://paisaxe.es/api/cron/<route> \
-     -H "Authorization: Bearer $CRON_SECRET"
+     -H "x-webhook-secret: $WEBHOOK_SECRET"
    ```
 
 ---
@@ -135,6 +170,33 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 1. For `backend: "blocked"` / `reason: "upstash_missing"`: verify `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set in Vercel environment variables → Settings → Environment Variables.
 2. For `reason: "upstash_unavailable"`: check the Upstash console for Redis instance health. The rate limiter has already failed closed — all chat/API requests are being denied until Redis recovers.
 3. Once credentials are corrected or Redis recovers, the `rate_limit.status` will return to `"ok"` on the next health probe without a redeploy.
+
+---
+
+## ElevenLabs Voice Credential Rejected
+
+**Trigger:** `[ELEVENLABS_CREDENTIAL_REJECTED]`, a failed
+`elevenlabs-voice-canary` monitor check-in, or `/api/health/voice` returning
+`provider: credential_rejected`.
+
+The event contains only the safe fingerprint, provider status, agent key, and
+failure class. It must never contain an API key, bearer, provider response
+body, or signed `wss://` URL.
+
+1. Treat this as an active voice outage. Visitor, admin, and booking paths use
+   the same production runtime key.
+2. Compare the reported fingerprint with
+   `ELEVENLABS_API_KEY_FINGERPRINT` in the affected Vercel environment.
+3. If the key was disabled, expired, or replaced, follow
+   [the credential rotation runbook](../runbooks/elevenlabs-credential-rotation.md).
+   Keep the old key enabled until the new candidate passes.
+4. Run `npm run check-elevenlabs-voice` against the candidate, then production,
+   with the appropriate `RELEASE_TARGET_URL` and `HEALTH_PROBE_SECRET`.
+5. Confirm a successful scheduled check-in after recovery.
+
+Sentry delivery is still unverified as documented above. Do not mark the voice
+alert ready until a success check-in and a test credential-rejection event both
+arrive at the operator destination.
 
 ---
 
@@ -185,21 +247,56 @@ This is informational only — the request was silently discarded with a fake 20
 
 ---
 
-## Develop Smoke Check Failure (DO-M5)
+## Develop Push Runtime Regressions (DO-H1)
 
-**Trigger:** The `Develop smoke check` job fails in CI on a direct `develop` push.
+**There is no smoke check on direct `develop` pushes.** A prior "Develop smoke check" job (DO-M5) was removed (DO-H1) because it could never probe anything — `vercel.json`'s `ignoreCommand` skips the Vercel build for direct `develop` pushes, so the job's wait loop always timed out, and its timeout branch always reported success anyway. Full rationale is in the comment header of `.github/workflows/ci.yml`. Building a real preview for `develop` pushes instead was rejected: Preview deployments share production Supabase and live Stripe keys, so a mutating probe there would be a production write.
 
-This job uses `continue-on-error: true` so it never blocks the push, but a failure indicates a runtime regression in the Vercel preview that was not caught by unit tests or the dummy-key build (e.g. a missing env var, a broken API route, or a Dependabot dependency bump with a breaking change).
+**What this means operationally:** a runtime regression introduced by a direct `develop` push (missing env var, broken API route, a Dependabot bump with a breaking change) is not caught until the next PR from `develop` to `main` runs `preview-smoke.yml` — the **"Smoke test Vercel preview"** required check, which has a genuine preview to probe. Until that PR runs:
 
-**Steps:**
+1. Assume `develop` HEAD's runtime health is unverified beyond what the dummy-key CI build (`Lint & Typecheck`, `Test`, `Build`) catches.
+2. If you need runtime confidence sooner, open a PR from `develop` to `main` (without merging) to trigger `preview-smoke.yml` early, or verify manually against a local Docker stack.
+3. If `preview-smoke.yml` fails on a release PR, fix on `develop`, push, and let the PR re-run before merging (see `docs/runbooks/release-checklist.md`).
 
-1. Check which step failed: `gh run list --branch develop --limit 3`, then `gh run view <run-id> --log-failed`
-2. Identify the failing probe:
-   - `Smoke check - liveness endpoint` (`/api/health/live`) — the process is not serving requests (startup crash, build error, or Vercel config issue)
-   - `Smoke check - health endpoint` (`/api/health`) — `scripts/check-health-readiness.mjs` parsed the body and found a non-200 response, invalid JSON, or `status != "healthy"`
-3. Check the Vercel preview URL from the workflow output and hit it manually to confirm the failure.
-4. Fix on `develop`, push, and verify the next smoke run passes before creating a release PR to `main`.
-5. If the failure is from a Dependabot dependency bump: check the dep changelog for breaking changes, then pin or revert as needed.
+---
+
+## Stripe Payment-Without-Grant (QA-L4)
+
+**Trigger:** `[STRIPE_UNRECOVERABLE]` or `[STRIPE_RPC_TIMEOUT]` log events from `src/app/api/webhooks/stripe/route.ts`. Both are logged at `error` level and also forwarded to Sentry via `Sentry.captureMessage()` (search the `stripe_alert` tag below), in addition to the structured log line.
+
+This is the highest-severity silent-failure class in the system: Stripe has taken payment, but the handler could not grant access, and — for `STRIPE_UNRECOVERABLE` specifically — the endpoint deliberately returns `200` so Stripe stops retrying (retrying a malformed event forever would be worse). **Do not change that 200 response** to force retries; a malformed event will never become processable no matter how many times Stripe redelivers it. If a reconciliation job is ever added to detect this class automatically, it must be strictly read-only against Stripe/the DB — remediation stays a manual, audited action (see Steps below).
+
+### Structured Telemetry Log Events
+
+| Event | Level | Fields | Sentry tag | Meaning |
+|-------|-------|--------|------------|---------|
+| `[STRIPE_UNRECOVERABLE]` | `error` | `eventId`, `reason` (`missing_user_id` \| `missing_payment_intent`) | `stripe_alert: "unrecoverable"` | Checkout session paid but carries no usable `user_id` / `payment_intent` in metadata — the grant RPC is never called. Returns `200` so Stripe stops retrying. |
+| `[STRIPE_RPC_TIMEOUT]` | `error` | `eventId`, `purchaseType` | `stripe_alert: "rpc_timeout"` | The `grant_day_pass_idempotent` RPC took longer than 10s (BE-L2 client-side timeout). Returns `500` so Stripe retries — the retry itself is safe (the RPC is idempotent on `eventId`), but repeated timeouts indicate a systemic DB issue, not a transient blip. |
+| `[STRIPE_RPC_FAILURE]` | `error` | `eventId`, `error` | — (not yet wired to Sentry; same remediation path applies) | The RPC returned a Postgres error. Returns `500` so Stripe retries. |
+
+**Example log drain query:**
+```
+msg:[STRIPE_UNRECOVERABLE] OR msg:[STRIPE_RPC_TIMEOUT] OR msg:[STRIPE_RPC_FAILURE]
+```
+
+### Manual-grant remediation procedure
+
+1. Find the event: search Vercel logs (or Sentry, tag `stripe_alert`) for the `eventId` in the marker, then look up that event in the Stripe dashboard → Developers → Events to confirm payment actually settled (`payment_status: "paid"`) and read `checkout.session.completed.data.object.metadata` for the intended `user_id` and `purchase_type`.
+2. Confirm no grant already exists for that payment: `SELECT * FROM public.stripe_webhook_events WHERE event_id = '<eventId>';` and `SELECT * FROM public.voice_purchases WHERE payment_provider_id = '<payment_intent id from Stripe>';` — if a row already exists, no action is needed (the grant succeeded on a later retry).
+3. If confirmed paid with no grant, call the same RPC the webhook would have called, using the Supabase SQL editor (or `psql` against production, service-role only) with the values recovered from Stripe:
+   ```sql
+   SELECT public.grant_day_pass_idempotent(
+     p_event_id           => '<Stripe event id>',
+     p_event_type         => '<Stripe event type>',
+     p_user_id            => '<user_id from session metadata>',
+     p_payment_provider_id => '<payment_intent id>',
+     p_expires_at         => '<now() + entitlement window for purchase_type>',
+     p_amount_paid        => <session.amount_total>,
+     p_purchase_type      => '<purchase_type from session metadata>'
+   );
+   ```
+   This is the exact idempotent path the webhook uses — safe to run even if a concurrent retry lands at the same time (it will simply report `'duplicate'`).
+4. Confirm the row now exists in `voice_purchases` and notify the affected user if there was a meaningful delay.
+5. File a post-mortem issue if this was caused by a code/config bug (e.g. a checkout session created without `metadata.user_id`) rather than a one-off DB blip: `gh issue create --title "Incident: Stripe payment-without-grant <date>" --label "type: bug,priority: high,area: payments"`.
 
 ---
 
@@ -226,3 +323,5 @@ This job uses `continue-on-error: true` so it never blocks the push, but a failu
 - [Operations overview](operations.md)
 - [Branch protection](branch-protection.md)
 - [Pending setup items](pending-setup.md)
+- [Secret inventory & rotation](secret-inventory.md) — for `Cron Auth Rejected` / `Stripe Webhook
+  Failure` where the fix is a credential rotation, not just a config check

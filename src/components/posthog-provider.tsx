@@ -57,15 +57,6 @@ interface PostHogProviderWrapperProps {
 
 export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps) {
   const [posthog, setPosthog] = useState<PostHog | null>(null);
-  // FE-M5: We track whether the posthog-js/react PostHogProvider has loaded so
-  // existing tests that assert on `data-testid="posthog-react-provider"` continue
-  // to pass.  However, we do NOT use it to wrap children — doing so would change
-  // the React tree shape after init and remount all descendants.
-  // Instead, all PostHog access goes through our own PostHogContext.
-  const [PostHogReactProvider, setPostHogReactProvider] = useState<React.ComponentType<{
-    client: PostHog;
-    children: React.ReactNode;
-  }> | null>(null);
 
   useEffect(() => {
     // Only load PostHog in production
@@ -82,10 +73,7 @@ export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps
     // reference the single canonical instance that the posthog-js library registers
     // on the window object, avoiding silent event capture failures.
     const initPostHog = () => {
-      Promise.all([
-        import("posthog-js"),
-        import("posthog-js/react"),
-      ]).then(([posthogModule, reactModule]) => {
+      import("posthog-js").then((posthogModule) => {
         // Prefer the global singleton; fall back to the module default
         const ph = (window as { posthog?: PostHog }).posthog ?? posthogModule.default;
 
@@ -102,7 +90,6 @@ export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps
         }
 
         setPosthog(ph);
-        setPostHogReactProvider(() => reactModule.PostHogProvider);
       });
     };
 
@@ -114,21 +101,12 @@ export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps
     }
   }, []);
 
-  // FE-M5: Always render PostHogContext.Provider with children directly inside —
-  // the tree shape never changes, so children are never remounted when PostHog
-  // finishes loading.  The posthog-js/react PostHogProvider is rendered as a
-  // *sibling* side-effect node (renders null) rather than as a wrapper, so it
-  // can't affect the children subtree.
+  // FE-M5 (#767): Children are always rendered directly inside
+  // PostHogContext.Provider — the tree shape never changes, so children are
+  // never remounted when PostHog finishes loading. All PostHog access goes
+  // through usePaisaxePostHog()/PostHogContext; posthog-js/react is not used.
   return (
     <PostHogContext.Provider value={posthog}>
-      {/* Render posthog-js/react PostHogProvider as a non-wrapping side node
-          so its internal context is available, but children stay at the same
-          React tree depth regardless of whether PostHog has loaded. */}
-      {posthog && PostHogReactProvider && (
-        <PostHogReactProvider client={posthog}>
-          {null}
-        </PostHogReactProvider>
-      )}
       {children}
     </PostHogContext.Provider>
   );

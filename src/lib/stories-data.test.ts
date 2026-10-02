@@ -13,7 +13,6 @@ import {
   getStoriesByLocationFromDB,
   getStoriesByDurationFromDB,
   getStoryBySlugFromDB,
-  getStoryMetadataBySlug,
   isBuildPhase,
 } from "./stories-data";
 import { supabase } from "./supabase";
@@ -742,92 +741,6 @@ describe("stories-data", () => {
     });
   });
 
-  describe("getStoryMetadataBySlug", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
-    });
-
-    it("selects only the slim metadata columns (not the full row, no select('*'))", async () => {
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { slug: "test-story", title: "Test Story", description: "A test description" },
-        error: null,
-      });
-      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
-      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
-      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
-
-      const result = await getStoryMetadataBySlug("test-story");
-
-      expect(mockSelect).not.toHaveBeenCalledWith("*");
-      const selectedFields = mockSelect.mock.calls[0][0].split(",");
-      expect(selectedFields).toEqual(["slug", "title", "description"]);
-      expect(result).toEqual({
-        slug: "test-story",
-        title: "Test Story",
-        description: "A test description",
-      });
-    });
-
-    it("falls back to slim metadata from FALLBACK_STORIES on DB error", async () => {
-      const mockSingle = vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } });
-      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
-      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
-      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
-
-      const fallback = FALLBACK_STORIES[0];
-      const result = await getStoryMetadataBySlug(fallback.slug || fallback.id);
-
-      expect(result).toEqual({
-        slug: fallback.slug || fallback.id,
-        title: fallback.title,
-        description: fallback.description ?? null,
-      });
-    });
-
-    it("returns null when the slug matches no DB row and no fallback", async () => {
-      const mockSingle = vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } });
-      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
-      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
-      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
-
-      const result = await getStoryMetadataBySlug("no-such-slug-xyz");
-
-      expect(result).toBeNull();
-    });
-
-    it("falls back to metadata and logs error when DB query throws — lines 260-263", async () => {
-      const mockSingle = vi.fn().mockRejectedValue(new Error("Network timeout"));
-      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
-      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
-      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
-
-      const mockLoggerError = logger.error as ReturnType<typeof vi.fn>;
-      mockLoggerError.mockClear();
-
-      const fallback = FALLBACK_STORIES[0];
-      const result = await getStoryMetadataBySlug(fallback.slug || fallback.id);
-
-      expect(result).toEqual({
-        slug: fallback.slug || fallback.id,
-        title: fallback.title,
-        description: fallback.description ?? null,
-      });
-      expect(mockLoggerError).toHaveBeenCalledWith(
-        "[TABLE_FALLBACK]",
-        expect.objectContaining({ table: "stories", filter: "metadata", error: "Network timeout" })
-      );
-    });
-  });
-
   describe("isBuildPhase", () => {
     const originalEnv = process.env;
 
@@ -1110,105 +1023,6 @@ describe("stories-data", () => {
         "[TABLE_FALLBACK]",
         expect.objectContaining({ filter: "slug", error: "supabase exploded (string)" })
       );
-    });
-
-    it("getStoryMetadataBySlug logs String(error) for a non-Error throw (line 272)", async () => {
-      const fallback = FALLBACK_STORIES[4];
-      const result = await getStoryMetadataBySlug(fallback.slug || fallback.id);
-
-      expect(result).toEqual({
-        slug: fallback.slug || fallback.id,
-        title: fallback.title,
-        description: fallback.description ?? null,
-      });
-      expect(logger.error).toHaveBeenCalledWith(
-        "[TABLE_FALLBACK]",
-        expect.objectContaining({ filter: "metadata", error: "supabase exploded (string)" })
-      );
-    });
-  });
-
-  describe("getStoryMetadataBySlug — remaining branch arms", () => {
-    const originalEnv = process.env;
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-      process.env = { ...originalEnv };
-      delete process.env.NEXT_PHASE;
-    });
-
-    afterEach(() => {
-      process.env = originalEnv;
-    });
-
-    function primeSingle(result: { data: unknown; error: unknown }) {
-      const mockSingle = vi.fn().mockResolvedValue(result);
-      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
-      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
-      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
-    }
-
-    it("falls back WITHOUT logging when data is null and error is null (line 258 error-falsy arm)", async () => {
-      primeSingle({ data: null, error: null });
-
-      const fallback = FALLBACK_STORIES[1];
-      const result = await getStoryMetadataBySlug(fallback.slug || fallback.id);
-
-      expect(result).toEqual({
-        slug: fallback.slug || fallback.id,
-        title: fallback.title,
-        description: fallback.description ?? null,
-      });
-      expect(logger.error).not.toHaveBeenCalled();
-    });
-
-    it("falls back WITHOUT logging on DB error during build phase (line 258 isBuildPhase arm)", async () => {
-      process.env.NEXT_PHASE = "phase-production-build";
-      primeSingle({ data: null, error: { message: "boom" } });
-
-      const fallback = FALLBACK_STORIES[2];
-      const result = await getStoryMetadataBySlug(fallback.slug || fallback.id);
-
-      expect(result).toEqual({
-        slug: fallback.slug || fallback.id,
-        title: fallback.title,
-        description: fallback.description ?? null,
-      });
-      expect(logger.error).not.toHaveBeenCalled();
-    });
-
-    it("returns null description when the DB row has a null description (line 268 ?? arm)", async () => {
-      primeSingle({
-        data: { slug: "desc-null-slug", title: "No Description Story", description: null },
-        error: null,
-      });
-
-      const result = await getStoryMetadataBySlug("desc-null-slug");
-
-      expect(result).toEqual({
-        slug: "desc-null-slug",
-        title: "No Description Story",
-        description: null,
-      });
-    });
-
-    it("suppresses exception logging during build phase (line 271 false arm)", async () => {
-      process.env.NEXT_PHASE = "phase-production-build";
-      mockSupabaseFrom.mockImplementation(() => {
-        throw new Error("Connection failed");
-      });
-
-      const fallback = FALLBACK_STORIES[3];
-      const result = await getStoryMetadataBySlug(fallback.slug || fallback.id);
-
-      expect(result).toEqual({
-        slug: fallback.slug || fallback.id,
-        title: fallback.title,
-        description: fallback.description ?? null,
-      });
-      expect(logger.error).not.toHaveBeenCalled();
     });
   });
 });

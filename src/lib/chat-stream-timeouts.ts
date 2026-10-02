@@ -1,11 +1,26 @@
 import { logger } from "@/lib/logger";
 
 export const CHAT_STREAM_STAGE_TIMEOUTS_MS = {
+  // PE-M3 (#811): the Upstash rate-limit check is the first I/O on this path
+  // and previously had no timeout at all — a slow (not failing) Upstash region
+  // added unbounded, invisible latency ahead of every other stage. A single
+  // Redis round-trip is normally well under a few hundred ms, so this budget
+  // is generous while still bounding the worst case.
+  rateLimit: 3_000,
   embedding: 12_000,
   search: 5_000,
   featureFlag: 2_000,
   response: 30_000,
 } as const;
+
+// PE-H5 (#808): `response` above is an IDLE window that the chat stream
+// route resets on every chunk, so a slow-but-alive trickle could reset it
+// forever and never trip. This is a separate, non-resetting ceiling on the
+// TOTAL generation duration, armed once and unaffected by chunk arrival.
+// Sized at 3x the idle window so a legitimately long streaming response has
+// room to complete, while a stream making no real progress is still capped.
+export const CHAT_STREAM_RESPONSE_TOTAL_CAP_MS =
+  CHAT_STREAM_STAGE_TIMEOUTS_MS.response * 3;
 
 export type ChatStreamStage = keyof typeof CHAT_STREAM_STAGE_TIMEOUTS_MS;
 
@@ -27,7 +42,8 @@ export function isChatStreamStageTimeout(
 
 export async function withChatStreamStageTiming<T>(
   stage: ChatStreamStage,
-  promise: Promise<T>
+  promise: Promise<T>,
+  abortController?: AbortController
 ): Promise<T> {
   const startedAt = Date.now();
   const timeoutMs = CHAT_STREAM_STAGE_TIMEOUTS_MS[stage];
@@ -37,6 +53,11 @@ export async function withChatStreamStageTiming<T>(
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       timedOut = true;
+      // AR-H2 (#856): a bare Promise.race leaves the losing promise running
+      // (and, for an Anthropic call, billing) after the caller has moved on.
+      // Abort the controller the caller wired into `promise`'s construction
+      // so the underlying call is actually cancelled, not just abandoned.
+      abortController?.abort();
       reject(new ChatStreamStageTimeoutError(stage, timeoutMs));
     }, timeoutMs);
   });

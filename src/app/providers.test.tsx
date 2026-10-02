@@ -100,8 +100,33 @@ describe("Providers", () => {
     expect(container.querySelector("p[data-testid='nested-child']")).not.toBeNull();
   });
 
-  it("defers auth bootstrap on anonymous-first public routes", () => {
-    mockUsePathname.mockReturnValue("/pricing");
+  // FE-B1 (#757): /immersive, /favorites, and /pricing are the authenticated
+  // revenue path (favorites, paid voice access, purchase CTA) — auth must
+  // NOT be deferred there, or getSession()/getUser() never runs and every
+  // signed-in feature on those routes is silently dead.
+  it.each(["/immersive", "/favorites", "/pricing"])(
+    "does NOT defer auth bootstrap on the authenticated route %s (FE-B1 #757)",
+    (path) => {
+      mockUsePathname.mockReturnValue(path);
+      const { container } = render(
+        <Providers>
+          <p data-testid="page-content">Content</p>
+        </Providers>
+      );
+
+      expect(container.querySelector("[data-testid='auth-provider']")).toHaveAttribute(
+        "data-defer-initial-auth",
+        "false"
+      );
+      // Children must still render regardless of the auth-defer decision —
+      // guards against the FE-M4/#338 hydration regression this deferral
+      // was originally meant to prevent.
+      expect(container.querySelector("p[data-testid='page-content']")).not.toBeNull();
+    }
+  );
+
+  it("still defers auth bootstrap on genuinely static, anonymous-only routes", () => {
+    mockUsePathname.mockReturnValue("/about");
     const { container } = render(
       <Providers>
         <p>Content</p>
@@ -141,6 +166,43 @@ describe("Providers", () => {
       "true"
     );
   });
+
+  // PE-L3 (#817): /pricing (and its subpaths) is the only root-level flag
+  // consumer outside /immersive — useVoiceAccess -> useVisitorVoiceAccess ->
+  // useFeatureFlags(). Every other static/content page reads no flag.
+  it.each(["/pricing", "/pricing/success", "/pricing/checkout", "/pricing/checkout/return"])(
+    "PE-L3 (#817): keeps the root feature flag fetch enabled on %s (useVoiceAccess consumes flags there)",
+    (path) => {
+      mockUsePathname.mockReturnValue(path);
+      const { container } = render(
+        <Providers>
+          <p>Content</p>
+        </Providers>
+      );
+
+      expect(container.querySelector("[data-testid='feature-flags-provider']")).toHaveAttribute(
+        "data-enabled",
+        "true"
+      );
+    }
+  );
+
+  it.each(["/about", "/privacy", "/terms", "/favorites", "/"])(
+    "PE-L3 (#817): disables the root feature flag fetch on %s (no flag consumer renders there)",
+    (path) => {
+      mockUsePathname.mockReturnValue(path);
+      const { container } = render(
+        <Providers>
+          <p>Content</p>
+        </Providers>
+      );
+
+      expect(container.querySelector("[data-testid='feature-flags-provider']")).toHaveAttribute(
+        "data-enabled",
+        "false"
+      );
+    }
+  );
 
   it.each(["/about", "/privacy", "/terms"])(
     "defers auth (but still mounts AuthProvider) on static route %s",

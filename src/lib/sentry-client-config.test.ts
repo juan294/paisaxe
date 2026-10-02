@@ -25,7 +25,10 @@ describe("sentry.client.config", () => {
 
     await import("../../sentry.client.config");
 
-    expect(initSpy).toHaveBeenCalledTimes(1);
+    // The SDK is loaded via a dynamic import() (see #818 — this keeps it out
+    // of the shared JS baseline when no DSN is configured), so init() lands
+    // a microtask after the module itself finishes evaluating.
+    await vi.waitFor(() => expect(initSpy).toHaveBeenCalledTimes(1));
     expect(initSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         dsn: "https://examplePublicKey@o0.ingest.sentry.io/0",

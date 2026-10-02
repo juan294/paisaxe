@@ -53,6 +53,17 @@ describe("POST /api/admin/voice-session", () => {
     expect(mocks.getElevenLabsSignedUrl).not.toHaveBeenCalled();
   });
 
+  it("handles invalid JSON in request body", async () => {
+    const req = new NextRequest("http://localhost/api/admin/voice-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not valid json {",
+    });
+    const response = await POST(req);
+    expect(response.status).toBe(400);
+    expect(mocks.getElevenLabsSignedUrl).not.toHaveBeenCalled();
+  });
+
   it("rejects visitor, booking, and arbitrary agent keys", async () => {
     for (const agentKey of ["pelayo", "booking", "agent_attacker"]) {
       const response = await POST(request(agentKey));
@@ -69,7 +80,10 @@ describe("POST /api/admin/voice-session", () => {
       await expect(response.json()).resolves.toEqual({
         signedUrl: "wss://signed.example/admin",
       });
-      expect(mocks.getElevenLabsSignedUrl).toHaveBeenCalledWith(agentKey);
+      expect(mocks.getElevenLabsSignedUrl).toHaveBeenCalledWith(
+        agentKey,
+        "admin-session"
+      );
     }
   );
 
@@ -81,6 +95,17 @@ describe("POST /api/admin/voice-session", () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
       error: "upstream_rate_limited",
+    });
+  });
+
+  it("returns 503 for unexpected errors", async () => {
+    mocks.getElevenLabsSignedUrl.mockRejectedValue(
+      new Error("Unexpected error")
+    );
+    const response = await POST(request("penny"));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "upstream_unavailable",
     });
   });
 });

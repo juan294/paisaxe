@@ -162,7 +162,7 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 | `api/mcp/weather/route.test.ts` | — | Weather endpoint for Pelayo |
 | `api/mcp/places/route.test.ts` | — | Places search for Pelayo |
 | `api/mcp/make-booking/route.test.ts` | — | Booking initiation via ElevenLabs + Twilio |
-| `api/checkout/day-pass/route.test.ts` | — | Stripe day-pass checkout |
+| `api/checkout/embedded/route.test.ts` | — | Stripe embedded checkout (day/weekly/monthly passes; day-pass's standalone route was removed as dead code, #898) |
 | `api/cron/content-discovery/route.test.ts` | — | Content discovery cron |
 | `api/cron/fail-stale-translations/route.test.ts` | — | Stale translation cleanup |
 | `api/cron/github-traffic-sync/route.test.ts` | — | GitHub traffic sync |
@@ -429,9 +429,19 @@ Playwright screenshots of key UI states compared against committed baselines.
 
 End-to-end Stripe test mode checkout. Runs in dedicated `e2e-stripe-integration.yml` workflow with real Stripe test credentials.
 
-#### `voice-agents.spec.ts` — Voice Agent Chat
+#### `voice-agents.spec.ts` — Visitor Voice Paywall Gate
 
-ElevenLabs voice-agent chat flow: widget open/close, session start, stream handling, and error states.
+The visitor-facing Pelayo voice flow: with no paid voice access, the chat
+header renders the upgrade CTA (not the voice-mode toggle) linking to
+`/pricing?returnTo=<slug>`. Mocked — does not cover the authenticated
+"access granted" path (voice toggle, `POST /api/voice-session`), which
+needs a real Supabase session; see #932.
+
+#### `admin-agents-gating.spec.ts` — Admin Voice/Agents Dashboard Gating
+
+Unauthenticated-access gating for two admin-only components: VoiceAgentChat
+(the Xander/Iris/Penny marketing agent chat) and AgentsDashboard. Formerly
+misfiled under `voice-agents.spec.ts` — see #878.
 
 #### `mcp.spec.ts` — MCP Tool Endpoints
 
@@ -475,7 +485,8 @@ e2e/
 ├── interactive-controls.spec.ts  # Keyboard + touch
 ├── mcp.spec.ts               # MCP tool endpoints
 ├── visual-regression.spec.ts # Screenshot baselines
-├── voice-agents.spec.ts      # ElevenLabs voice agent chat
+├── voice-agents.spec.ts      # Visitor voice paywall gate (Pelayo)
+├── admin-agents-gating.spec.ts   # Admin VoiceAgentChat/AgentsDashboard gating
 ├── stripe-real-checkout.spec.ts  # Stripe test mode (separate CI)
 ├── admin.spec.ts
 ├── favorites.spec.ts

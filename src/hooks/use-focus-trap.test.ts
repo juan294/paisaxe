@@ -25,6 +25,19 @@ function makeRef(el: HTMLElement | null): RefObject<HTMLElement | null> {
   return { current: el };
 }
 
+// Helper to create a real focusable element outside the trap's container
+// and focus it — used to simulate the "pre-trap" element (e.g. a chat
+// trigger button) whose focus must be restored when the trap deactivates.
+// Must be a real focusable element (not document.body, which is unfocusable
+// and makes `.focus()` a no-op).
+function createFocusedExternalButton(label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.textContent = label;
+  document.body.appendChild(button);
+  button.focus();
+  return button;
+}
+
 describe("useFocusTrap", () => {
   let container: HTMLDivElement;
   let rafSpy: ReturnType<typeof vi.spyOn>;
@@ -178,10 +191,7 @@ describe("useFocusTrap", () => {
 
   it("should restore focus to the previously focused element on unmount", () => {
     // Focus an element outside the container first
-    const externalButton = document.createElement("button");
-    externalButton.textContent = "External";
-    document.body.appendChild(externalButton);
-    externalButton.focus();
+    const externalButton = createFocusedExternalButton("External");
     expect(document.activeElement).toBe(externalButton);
 
     const ref = makeRef(container);
@@ -197,7 +207,9 @@ describe("useFocusTrap", () => {
   });
 
   it("should clean up event listener on unmount", () => {
-    const removeEventSpy = vi.spyOn(container, "removeEventListener");
+    // UX-H2: the listener is bound to `document`, not the container, so the
+    // trap can recapture focus that has escaped outside it.
+    const removeEventSpy = vi.spyOn(document, "removeEventListener");
     const ref = makeRef(container);
 
     const { unmount } = renderHook(() => useFocusTrap(ref, true));
@@ -206,6 +218,55 @@ describe("useFocusTrap", () => {
 
     expect(removeEventSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
     removeEventSpy.mockRestore();
+  });
+
+  it("UX-H2: recaptures focus on Tab when it has escaped the container", () => {
+    const ref = makeRef(container);
+    renderHook(() => useFocusTrap(ref, true));
+
+    // Simulate focus escaping the trap: some element outside the container
+    // becomes focused (e.g. a background control that stayed focusable
+    // because `inert` wasn't applied, or was focused before it became inert).
+    const escapedButton = document.createElement("button");
+    escapedButton.textContent = "Escaped";
+    document.body.appendChild(escapedButton);
+    escapedButton.focus();
+    expect(document.activeElement).toBe(escapedButton);
+
+    // The trap's listener is on `document`, so it still intercepts this Tab
+    // press even though focus is currently outside the container.
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(event);
+
+    const firstButton = container.querySelector("button");
+    expect(document.activeElement).toBe(firstButton);
+  });
+
+  it("UX-H2: recaptures focus on Shift+Tab when it has escaped the container", () => {
+    const ref = makeRef(container);
+    renderHook(() => useFocusTrap(ref, true));
+
+    const escapedButton = document.createElement("button");
+    escapedButton.textContent = "Escaped";
+    document.body.appendChild(escapedButton);
+    escapedButton.focus();
+    expect(document.activeElement).toBe(escapedButton);
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(event);
+
+    const buttons = container.querySelectorAll("button");
+    const lastButton = buttons[buttons.length - 1];
+    expect(document.activeElement).toBe(lastButton);
   });
 
   it("should handle container with no focusable elements", () => {
@@ -253,6 +314,63 @@ describe("useFocusTrap", () => {
 
     // Should NOT have prevented default — browser handles normal shift+tab
     expect(preventDefaultSpy).not.toHaveBeenCalled();
+  });
+
+  it("[FE-H3 regression] should keep focus inside the trap when onEscape's identity changes across a parent re-render", () => {
+    // Reproduces FE-H3: a parent re-render that produces a new onEscape/onClose
+    // function identity must NOT tear down and reinstall the trap — that
+    // teardown moves focus out of the dialog (via the cleanup's focus-restore
+    // to the pre-trap element, e.g. the chat trigger button), stealing focus
+    // from whatever the user was interacting with, even though the dialog
+    // never actually closed.
+    //
+    // The pre-trap element MUST be a real focusable element (not document.body,
+    // which is unfocusable and makes `.focus()` a no-op) to faithfully
+    // reproduce the bug, mirroring VoiceChat's real triggerRef button.
+    const trigger = createFocusedExternalButton("Open chat");
+    expect(document.activeElement).toBe(trigger);
+
+    const ref = makeRef(container);
+    const { rerender } = renderHook(
+      ({ onEscape }) => useFocusTrap(ref, true, onEscape),
+      { initialProps: { onEscape: () => {} } }
+    );
+
+    const input = container.querySelector("input")!;
+    input.focus();
+    expect(document.activeElement).toBe(input);
+
+    // Simulate the parent re-rendering and passing a brand new onEscape
+    // function reference (identity change only — active is still true).
+    rerender({ onEscape: () => {} });
+
+    // Focus must remain on the input the user was using — a re-render must
+    // not steal focus from inside the still-open dialog.
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("[FE-H3 invariant] should restore focus to the pre-trap element when the dialog genuinely closes (active -> false)", () => {
+    // Guards the a11y invariant that must survive the FE-H3 fix: when the
+    // dialog actually closes (active transitions to false, not just a
+    // re-render with a new callback identity), focus must still be restored
+    // to whatever had focus before the trap activated.
+    const externalButton = createFocusedExternalButton("External");
+    expect(document.activeElement).toBe(externalButton);
+
+    const ref = makeRef(container);
+    const { rerender } = renderHook(
+      ({ active }) => useFocusTrap(ref, active),
+      { initialProps: { active: true } }
+    );
+
+    // Focus should have moved inside the container on activation.
+    expect(document.activeElement).toBe(container.querySelector("button"));
+
+    // Genuine close: active flips to false.
+    rerender({ active: false });
+
+    // Focus must be restored to the pre-trap element.
+    expect(document.activeElement).toBe(externalButton);
   });
 
   it("should skip disabled buttons in focus trap", () => {

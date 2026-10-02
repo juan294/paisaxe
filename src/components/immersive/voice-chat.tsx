@@ -1,23 +1,37 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Story } from "@/types/immersive";
 import { PrivacyNotice } from "./privacy-notice";
 import { ChatActions } from "./chat-actions";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
+import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useStreamChat } from "@/hooks/use-stream-chat";
 import { useChatMode } from "@/hooks/use-chat-mode";
 import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { usePaisaxePostHog } from "@/components/posthog-provider";
+import { toIntlLocale } from "@/lib/utils";
 
 import { ChatHeader } from "./voice-chat/chat-header";
 import { ChatMessageList } from "./voice-chat/chat-message-list";
 import { ChatComposer } from "./voice-chat/chat-composer";
 import { ChatErrorBanner } from "./voice-chat/chat-error-banner";
+
+// FE-M1: the streaming hot path pushes a `messages` state update on every SSE
+// token, re-rendering VoiceChat every token. ChatComposer and ChatActions
+// don't need to re-render on every token (the composer's props are static
+// while streaming; ChatActions renders null while `isLoading`), so memoize
+// them here so React can bail out when their props are referentially
+// unchanged. This only pays off once VoiceChat itself stops handing them new
+// callback identities every render — see handleSubmit/submitMessage/
+// handleRetry below, which now read the live message count via `messagesRef`
+// instead of depending on `messages` directly.
+const MemoizedChatComposer = memo(ChatComposer);
+const MemoizedChatActions = memo(ChatActions);
 
 /**
  * Loading skeleton shown while the VoiceChatElevenLabs chunk is being fetched.
@@ -67,10 +81,24 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
   const [lastMessage, setLastMessage] = useState<string>("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
-  const localizedStory = getLocalizedStory(story, locale);
+  // FE-M1: getLocalizedStory returns a brand-new object every call. Without
+  // memoizing on [story, locale], `localizedStory` got a new identity on
+  // every render (including every streamed token) and fed straight into
+  // buildStoryContext's deps below, recreating it — and therefore
+  // submitMessage/handleSubmit/handleRetry — every token too, which defeated
+  // the ChatComposer memoization this fix depends on.
+  const localizedStory = useMemo(
+    () => getLocalizedStory(story, locale),
+    [story, locale]
+  );
   const posthog = usePaisaxePostHog();
-  const stableOnClose = useMemo(() => onClose, [onClose]);
-  useFocusTrap(dialogRef, open, stableOnClose);
+  // FE-H4: forward the signed-in user's session token so voice-mode MCP tool
+  // calls (bookings, favorites) can authenticate.
+  const { session } = useAuth();
+  // FE-H3: useFocusTrap holds onEscape in a ref internally, so passing
+  // onClose directly (rather than through a no-op stabilizing memo) is
+  // safe — the trap's install/teardown effect doesn't depend on it.
+  useFocusTrap(dialogRef, open, onClose);
 
   const handleClose = useCallback(() => {
     triggerRef?.current?.focus();
@@ -95,17 +123,27 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     sendMessage,
     resetMessages,
     dismissUpsell: handleUpsellDismiss,
+    // FE-M1: kept in sync by useStreamChat itself (synchronously, inside the
+    // same setState updater as every message mutation) — read this instead
+    // of `messages` in submitMessage/handleRetry below so those callbacks'
+    // identity doesn't change on every streamed token.
+    messagesRef,
   } = useStreamChat({ canUseVoice });
 
   // Voice/text mode state — extracted to useChatMode hook
   const { useElevenLabs, setUseElevenLabs, toggle: handleToggleMode } = useChatMode(false);
 
+  // Whether voice mode is/will be the active mode once access resolves — a
+  // single source shared by the mode-sync effect and the initial-message
+  // effect below so the two can't independently drift out of sync.
+  const willUseVoiceMode = canUseVoice && !!agentId;
+
   // Sync voice mode whenever access status resolves or changes (e.g., mid-session purchase)
   useEffect(() => {
-    if (!isVoiceAccessLoading && canUseVoice && agentId) {
+    if (!isVoiceAccessLoading && willUseVoiceMode) {
       setUseElevenLabs(true);
     }
-  }, [isVoiceAccessLoading, canUseVoice, agentId, setUseElevenLabs]);
+  }, [isVoiceAccessLoading, willUseVoiceMode, setUseElevenLabs]);
 
   // Don't render content until we've determined the default mode
   const isInitializing = isVoiceAccessLoading;
@@ -123,17 +161,58 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     }
   }, []);
 
-  // Auto-send initial message — one-shot on mount.
-  // Capture prop in a ref so the effect never re-runs when the prop changes later.
-  // messages.length and isLoading are always 0/false at mount, so not needed in deps.
+  // Story context passed to the chat API — shared by every message-sending
+  // path (submit, retry, initial-message auto-send) so it can't drift.
+  const buildStoryContext = useCallback(
+    () =>
+      `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+    [localizedStory, story]
+  );
+
+  // Sends a user message and tracks it in PostHog — shared by the composer's
+  // Send button and the initial-message auto-send effect below (UX-H1) so
+  // tracking/context logic lives in one place instead of being copy-pasted.
+  const submitMessage = useCallback(
+    async (message: string) => {
+      // FE-M1: read via messagesRef (not `messages`) so this callback's
+      // identity — and therefore handleSubmit's, and therefore
+      // ChatComposer's memoized props — stays stable while messages grows
+      // on every streamed token.
+      const currentMessages = messagesRef.current;
+      const isFirstMessage = currentMessages.length === 0;
+      const messageIndex = currentMessages.filter((m) => m.role === "user").length;
+      setLastMessage(message);
+      if (isFirstMessage) {
+        posthog?.capture("chat_conversation_started", { story_id: story.id });
+      }
+      posthog?.capture("chat_message_sent", { story_id: story.id, message_index: messageIndex });
+      await sendMessage(message, { context: buildStoryContext(), locale, messageIndex });
+    },
+    // messagesRef is a stable ref object (its identity never changes across
+    // renders), so including it doesn't affect how often this is recreated.
+    [posthog, story, sendMessage, buildStoryContext, locale, messagesRef]
+  );
+
+  // Auto-send initial message (e.g. a suggested-question chip) — one-shot,
+  // deferred until voice-access resolution settles so we know which mode will
+  // actually render:
+  //  - Voice mode: VoiceChatElevenLabs reads initialMessageRef.current directly
+  //    and forwards it as the `opening_question` dynamic variable (FE-H4/UX-H7),
+  //    so the ref is left untouched for it to read.
+  //  - Text mode: auto-submit here so a chip tap produces an answer instead of
+  //    silently prefilling `inputValue` and waiting for a second tap on Send
+  //    that ChatComposer (unmounted in voice mode) may never offer (UX-H1).
+  // Capture prop in a ref so the effect never re-runs when the prop changes
+  // later; clearing it after consuming doubles as the one-shot "handled" guard.
   const initialMessageRef = useRef(initialMessage);
   useEffect(() => {
-    if (initialMessageRef.current) {
-      setInputValue(initialMessageRef.current);
+    if (!initialMessageRef.current || isInitializing || willUseVoiceMode) {
+      return;
     }
-    // Intentionally empty — one-shot on mount. (#330: replaced eslint-disable with ref guard)
-
-  }, []);
+    const message = initialMessageRef.current;
+    initialMessageRef.current = undefined;
+    void submitMessage(message);
+  }, [isInitializing, willUseVoiceMode, submitMessage]);
 
   const handlePrivacyDismiss = useCallback(() => {
     setPrivacyAcknowledged(true);
@@ -144,39 +223,30 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     setUseElevenLabs(false);
   }, [setUseElevenLabs]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+  // FE-M1: memoized so ChatComposer (wrapped in memo below) can bail out of
+  // re-rendering on every streamed token — its identity now only changes
+  // when inputValue/isLoading actually change (i.e. when the user types or a
+  // send starts/stops), not on every setMessages call from the SSE stream.
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (!inputValue.trim() || isLoading) return;
 
-    const userMessage = inputValue.trim();
-    const isFirstMessage = messages.length === 0;
-    setInputValue("");
-    setLastMessage(userMessage);
-
-    // Track chat events in PostHog
-    if (isFirstMessage) {
-      posthog?.capture("chat_conversation_started", { story_id: story.id });
-    }
-    posthog?.capture("chat_message_sent", {
-      story_id: story.id,
-      message_index: messages.filter((m) => m.role === "user").length,
-    });
-
-    await sendMessage(userMessage, {
-      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
-      locale,
-      messageIndex: messages.filter((m) => m.role === "user").length,
-    });
-  };
+      const userMessage = inputValue.trim();
+      setInputValue("");
+      await submitMessage(userMessage);
+    },
+    [inputValue, isLoading, submitMessage]
+  );
 
   const handleRetry = useCallback(async () => {
     if (!lastMessage || isLoading) return;
     await sendMessage(lastMessage, {
-      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+      context: buildStoryContext(),
       locale,
-      messageIndex: messages.filter((m) => m.role === "user").length,
+      messageIndex: messagesRef.current.filter((m) => m.role === "user").length,
     });
-  }, [lastMessage, isLoading, sendMessage, localizedStory, story, locale, messages]);
+  }, [lastMessage, isLoading, sendMessage, buildStoryContext, locale, messagesRef]);
 
   if (!open) return null;
 
@@ -219,7 +289,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
             <p className="text-xs text-amber-200">
               {t("premium.voice_pass_expiry")
                 .replace("{hours}", String(Math.ceil(hoursUntilExpiry)))
-                .replace("{time}", expiresAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}
+                .replace("{time}", expiresAt.toLocaleTimeString(toIntlLocale(locale), { hour: '2-digit', minute: '2-digit' }))}
             </p>
           </div>
         )}
@@ -237,6 +307,8 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
             story={story}
             agentId={agentId}
             onFallbackToText={handleVoiceFallback}
+            userAccessToken={session?.access_token}
+            initialMessage={initialMessageRef.current}
           />
         ) : useElevenLabs && needsPurchase ? (
           /* Show purchase CTA when user wants voice but needs to pay */
@@ -259,9 +331,9 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
             )}
 
             {/* Context-aware action buttons */}
-            <ChatActions messages={messages} isLoading={isLoading} />
+            <MemoizedChatActions messages={messages} isLoading={isLoading} />
 
-            <ChatComposer
+            <MemoizedChatComposer
               value={inputValue}
               isLoading={isLoading}
               onChange={setInputValue}

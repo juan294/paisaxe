@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| Package | `@img/sharp-libvips-darwin-arm64@1.2.4` (and platform variants) |
+| Package | `@img/sharp-libvips-darwin-arm64@1.3.4` (and platform variants) |
 | License | LGPL-3.0-or-later |
 | Parent dependency | `sharp` (Apache-2.0) |
 | Added | 2026-03-07 |
@@ -29,7 +29,7 @@ Under these conditions, the LGPL imposes **no copyleft obligations** on Paisaxe'
 
 ### CI enforcement
 
-The CI license-check workflow (`license-check.yml`) blocks strong copyleft licenses (GPL, AGPL, SSPL) on all PRs. Weak copyleft (LGPL, MPL) triggers a warning but does not block, consistent with this policy exception.
+The production license check (`npm run check-licenses`, `scripts/check-production-licenses.ts`) enforces an allowlist — see "Allowlist enforcement (policy decision)" below. `LGPL-3.0-or-later` is listed in `EXCEPTION_LICENSES` specifically to admit `@img/sharp-libvips-*`; without that entry the build would fail on this package the same way it now fails on any unreviewed license.
 
 ### Review schedule
 
@@ -75,9 +75,7 @@ Under those conditions, the MPL-2.0 imposed **no copyleft obligations** on Paisa
 
 ### CI enforcement
 
-The CI license-check workflow (`license-check.yml`) blocks strong copyleft
-(GPL/AGPL/SSPL). `@vercel/analytics` should no longer appear in weak-copyleft
-warnings while it remains MIT-licensed.
+The production license check (`npm run check-licenses`) now enforces an allowlist rather than a denylist (see "Allowlist enforcement (policy decision)" below). `@vercel/analytics` needs no exception entry while it remains plain MIT-licensed — `MIT` is in `CORE_ALLOWED_LICENSES`.
 
 ---
 
@@ -107,7 +105,7 @@ Under these conditions, MPL-2.0 imposes **no copyleft obligations** on Paisaxe's
 
 ### CI enforcement
 
-The CI license-check workflow (`license-check.yml`) blocks strong copyleft (GPL/AGPL/SSPL). MPL-2.0 is weak copyleft and is allowed under this policy exception. Because `lightningcss` is a devDependency, it is only visible to the **dev-dependency** license scan (see "Dev-dependency scanning" below), not to a `--production`-only scan.
+`lightningcss` is a true devDependency (not reachable from any `dependencies` entry in `package.json`), so it is invisible to `scripts/check-production-licenses.ts` / `npm run check-licenses` (the blocking production allowlist) — it is only visible to the **dev-dependency** scan (see "Allowlist enforcement (policy decision)" below), which reports but does not block.
 
 ### Review schedule
 
@@ -121,10 +119,10 @@ Revisit this exception if Tailwind CSS or Vite drop `lightningcss`, if `lightnin
 |-------|-------|
 | Packages | `@sentry/cli@2.58.5`, `@sentry/cli-darwin@2.58.5` |
 | License | FSL-1.1-MIT (Functional Source License) |
-| Parent dependency | `@sentry/nextjs` build tooling |
-| Dependency type | **devDependency / build-time only** — not shipped to clients |
+| Parent dependency | `@sentry/nextjs` → `@sentry/webpack-plugin` → `@sentry/bundler-plugin-core` → `@sentry/cli` |
+| Dependency type | **Nested dependency of a production package, build-time-only in behavior.** `@sentry/cli` is a plain (non-optional) `dependency` of `@sentry/bundler-plugin-core`, which sits in `@sentry/nextjs`'s production dependency tree — it is **not** a top-level devDependency, and it **is** visible to `license-checker --production` / `scripts/check-production-licenses.ts`. It never ships in the built client or server output: it runs only during `next build` to upload source maps and release metadata to Sentry. |
 | Added | 2026-07-08 |
-| Identified by | Security agent license scan (2026-07-03) |
+| Identified by | Security agent license scan (2026-07-03); enforcement gap identified by pre-launch audit SE-M3 (2026-08-18, #847) |
 
 ### Why this is acceptable
 
@@ -140,11 +138,13 @@ Under these conditions, FSL-1.1-MIT imposes no obligations relevant to Paisaxe's
 
 ### CI enforcement
 
-The CI license-check workflow (`license-check.yml`) blocks strong copyleft (GPL/AGPL/SSPL) on production deps and reports (non-blocking) on dev deps. `@sentry/cli` is dev-only and is not a copyleft license, so it does not trigger either path — it is recorded here purely for policy transparency.
+`license-check.yml`'s production check (`npm run check-licenses`, backed by `scripts/check-production-licenses.ts`) enforces a **true allowlist** of exact SPDX license IDs — see "Allowlist enforcement (policy decision)" below. `FSL-1.1-MIT` is listed in `EXCEPTION_LICENSES` in that script specifically to admit `@sentry/cli`; without that entry the build fails (verified 2026-08-19 while implementing #847: removing the entry makes the check reject `@sentry/cli@2.58.5` and `@sentry/cli-darwin@2.58.5` by name, then passes again once restored).
+
+Before #847, the production check was a denylist of specific SPDX identifiers (`GPL`, `AGPL`, `SSPL`, ...). `FSL-1.1-MIT` was never on that list, so it passed CI silently — matching this doc, but not because the doc's exception was actually being *enforced*. The allowlist closes that gap: any future unreviewed license now fails the build by default instead of passing until someone happens to add it to a denylist.
 
 ### Review schedule
 
-Revisit if `@sentry/cli` is ever added as a production dependency, or if Sentry changes the license terms in a future release.
+Revisit if Sentry changes `@sentry/cli`'s license terms in a future release, or if `@sentry/cli` is ever invoked outside the build step (e.g. bundled into runtime output).
 
 ---
 
@@ -154,23 +154,26 @@ Some dependencies are published under an "OR" dual license where one branch is p
 
 | Package | Declared license | Permissive branch elected | Parent dependency | Notes |
 |---------|------------------|---------------------------|-------------------|-------|
-| `dompurify@3.4.11` | `(MPL-2.0 OR Apache-2.0)` | Apache-2.0 | `posthog-js` | Used internally by PostHog analytics; no application code calls DOMPurify directly. |
+| `dompurify@3.4.16` | `(MPL-2.0 OR Apache-2.0)` | Apache-2.0 | `posthog-js` | Used internally by PostHog analytics; no application code calls DOMPurify directly. |
 | `expand-template@2.0.3` | `(MIT OR WTFPL)` | MIT | `canvas` → `prebuild-install` | Build-time only (native binary prebuild install); not shipped to clients. |
 
 Because a permissive branch is available and elected, no weak-copyleft review is required. Identified by the security agent license scan (2026-07-01).
 
 ---
 
-## Dev-dependency scanning (policy decision)
+## Allowlist enforcement (policy decision)
 
-Historically the CI license check (`license-check.yml`) and the weekly security agent (`scripts/security-agent.sh`) ran `license-checker --production` only, so weak-copyleft devDependencies such as `lightningcss` (MPL-2.0) were invisible (gap noted in #576 / #623).
+The stated policy at the top of this document is **permissive-only, allowlist-based**: MIT, Apache-2.0, BSD, ISC, plus the exceptions recorded above. Until #847 (SE-M3, 2026-08-19), the production CI check (`license-check.yml`) actually enforced this as a **denylist** of specific strong-copyleft SPDX identifiers (`GPL`, `AGPL`, `SSPL`, `EUPL`, `BSL`, `CPAL`, `OSL`, `CPOL`). A denylist can only catch licenses someone anticipated — it silently passed `@sentry/cli`'s `FSL-1.1-MIT` (a source-available license, not in the four permissive families, not on the denylist, and not yet enumerated in code even though it was already documented above as Exception 4).
 
-**Decision:** both surfaces now also scan **dev dependencies**, but with different enforcement levels matching their risk:
+**Decision (#847):** the production check now runs `scripts/check-production-licenses.ts` (via `npm run check-licenses`), which is a real allowlist:
 
-- **Production deps** — strong copyleft (`GPL`, `AGPL`, `SSPL`, `EUPL`, `BSL`, `CPAL`, `OSL`, `CPOL`) **blocks** the build. These licenses would impose obligations on shipped code.
-- **Dev/build deps** — scanned and **reported** (non-blocking). Build-time-only tooling that never ships to clients (like `lightningcss`) does not impose copyleft obligations on Paisaxe, so a strong-copyleft *dev* dep is surfaced for review rather than hard-failing CI. Any new weak-copyleft dev dep that is acceptable should be recorded here as an exception.
+- It does **not** use `license-checker --onlyAllow` — that flag matches by substring (`license.includes(token)`), so an allowed `"MIT"` token also silently matches `"FSL-1.1-MIT"`, `"SUBMIT-1.0"`, or any other license string that merely contains "MIT". That would have recreated the exact silent-pass bug this fix exists to close.
+- Instead it parses each production dependency's exact SPDX expression (a single ID, or a parenthesized `AND`/`OR` compound) and matches every token by **strict equality** against `CORE_ALLOWED_LICENSES` (the four permissive families plus a handful of permissive-equivalent IDs already present in the tree — `BlueOak-1.0.0`, `Unlicense`, `MIT-0`, `0BSD`, `CC-BY-4.0`) union `EXCEPTION_LICENSES` (currently `LGPL-3.0-or-later` and `FSL-1.1-MIT`, mirroring Exceptions 1 and 4 above).
+- Any production license not covered by either set **fails the build** by default. Adding a new exception requires both a justification entry in this document AND the exact SPDX ID added to `EXCEPTION_LICENSES` in the script — a one-place denylist add is no longer sufficient (or possible).
 
-This keeps the strict permissive-only guarantee for everything we ship while giving visibility into the build toolchain.
+**Dev/build deps** are still scanned separately and only **reported** (non-blocking) — `license-check.yml`'s "Report dev-dependency licenses" step. Build-time-only tooling that never ships to clients (like `lightningcss`, MPL-2.0) does not impose copyleft obligations on Paisaxe, so this surfaces new dev-dep licenses for human review rather than hard-failing CI on them. Any new weak-copyleft dev dep that is acceptable should be recorded here as an exception (gap originally noted in #576 / #623).
+
+This keeps the strict permissive-only guarantee for everything we ship, actually enforced as an allowlist rather than assumed from denylist silence, while still giving visibility into the build toolchain.
 
 ---
 

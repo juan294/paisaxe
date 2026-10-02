@@ -12,7 +12,7 @@ const CONTEXTUALIZED_MODEL = "voyage-3.5";
 const EMBEDDING_DIMENSIONS = 512;
 const MAX_BATCH_SIZE = 128;
 
-const embeddingCache = new EmbeddingCache();
+const embeddingCache = new EmbeddingCache(EMBEDDING_MODEL, EMBEDDING_DIMENSIONS);
 
 interface BatchEmbeddingResult {
   embeddings: number[][];
@@ -23,20 +23,31 @@ interface BatchEmbeddingResult {
  * Generate embedding for a single text using Voyage AI.
  * Used at query time — uses the same model (voyage-3) as document
  * embeddings to ensure compatible vector spaces.
+ *
+ * BE-M4 (#785): accepts an optional `signal` so a caller-driven stage
+ * timeout (see chat-stream-timeouts.ts's `abortController.abort()`) can
+ * actually cancel the in-flight Voyage request instead of leaving it
+ * running — and billing — after the caller has moved on.
  */
-export async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(
+  text: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<number[]> {
   // Check cache first
   const cached = await embeddingCache.get(text);
   if (cached) {
     return cached;
   }
 
-  const result = await voyageClient.embed({
-    input: [text],
-    model: EMBEDDING_MODEL,
-    inputType: "query",
-    outputDimension: EMBEDDING_DIMENSIONS,
-  });
+  const result = await voyageClient.embed(
+    {
+      input: [text],
+      model: EMBEDDING_MODEL,
+      inputType: "query",
+      outputDimension: EMBEDDING_DIMENSIONS,
+    },
+    { abortSignal: options.signal }
+  );
 
   if (!result.data || result.data.length === 0 || !result.data[0].embedding) {
     throw new Error("No embedding returned from Voyage AI");

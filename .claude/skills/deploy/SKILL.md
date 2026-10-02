@@ -32,8 +32,8 @@ and authorization does **not** carry over from a previous conversation:
 1. Prepare the release summary and present it. **Stop.**
 2. On explicit authorization, create the release PR (`--base main --head develop`).
 3. Report check status. **Stop.**
-4. On explicit authorization to merge, `gh pr merge --squash`
-   (the repo has `allow_merge_commit: false`; `--merge` will fail).
+4. On explicit authorization to merge, `gh pr merge --merge`. Never squash a
+   `develop` -> `main` release PR; feature PRs into `develop` may still squash.
 5. Verify the deployed identity against the expected tree, then run the required probes.
 6. **Tag last** — only after evidence is complete and authorization is recorded.
 

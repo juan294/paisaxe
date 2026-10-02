@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { POST } from "./route";
+import {
+  POST,
+  maxDuration,
+} from "./route";
+import {
+  TRANSLATE_JOB_BATCH_SIZE,
+  TRANSLATE_JOB_PER_JOB_MAX_SECONDS,
+} from "./config";
 import { logger } from "@/lib/logger";
 
 vi.mock("@/lib/supabase-admin", () => ({
@@ -996,6 +1003,25 @@ describe("translate webhook", () => {
 
       expect(response.status).toBe(500);
       expect(json.error).toBe("Internal server error");
+    });
+  });
+
+  // BE-M3 (#784): the batch-size/lease-second tuning above is only sound if
+  // an explicit platform maxDuration actually leaves it room to run. This
+  // asserts the route declares one and that it stays strictly greater than
+  // the worst-case batch duration the tuning assumes, so maxDuration remains
+  // a ceiling above the real constraint rather than silently becoming it.
+  describe("BE-M3: maxDuration declaration (#784)", () => {
+    it("declares an explicit numeric maxDuration", () => {
+      expect(typeof maxDuration).toBe("number");
+      expect(Number.isFinite(maxDuration)).toBe(true);
+    });
+
+    it("keeps maxDuration strictly greater than the worst-case batch duration", () => {
+      const worstCaseBatchSeconds =
+        TRANSLATE_JOB_BATCH_SIZE * TRANSLATE_JOB_PER_JOB_MAX_SECONDS;
+
+      expect(maxDuration).toBeGreaterThan(worstCaseBatchSeconds);
     });
   });
 });

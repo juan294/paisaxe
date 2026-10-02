@@ -1,0 +1,47 @@
+# Paisaxe v1.6.0 production release evidence.
+#
+# Candidate gates ran before the squash merge. The deployed read-only probes
+# and identity verification ran after paisaxe.es was assigned to the exact
+# production deployment recorded below.
+
+version: 1
+
+candidate_tree: cfbd702979f83f043eee0c85c56dba5d018618b9
+shipped_tree: cfbd702979f83f043eee0c85c56dba5d018618b9
+deployed_tree: cfbd702979f83f043eee0c85c56dba5d018618b9
+deployed_commit: 784aa0d5efc4ed699007721314872e780102f1eb
+target_url: https://paisaxe.es
+generated_at: "2026-08-10T09:24:10Z"
+
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles: [identity]
+
+  - id: health-status
+    status: passed
+    oracles: [http]
+  - id: health-db
+    status: passed
+    oracles: [http]
+  - id: csp-canary
+    status: passed
+    oracles: [ui]
+  - id: story-read-path
+    status: passed
+    oracles: [http, ui]
+  - id: admin-denial
+    status: passed
+    oracles: [http]
+  - id: webhook-unsigned
+    status: passed
+    oracles: [http]
+
+  - id: favorite-roundtrip
+    status: passed
+    oracles: [ui, datastore, cleanup]
+    cleanup: removed
+
+  - id: migration-posture
+    status: passed
+    oracles: [static]

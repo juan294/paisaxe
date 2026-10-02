@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Performance Agent — Runs weekly on Saturday at 10:00 AM via launchd (com.paisaxe.performance-agent)
+# Performance Agent — Runs weekly on Thursday at 10:00 AM via launchd (com.paisaxe.performance-agent)
 # Analyzes bundle sizes, identifies optimization opportunities, tracks regressions
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/code/paisaxe"
-CLAUDE_BIN="/Users/juan/.local/bin/claude"
+PROJECT_DIR="${PROJECT_DIR:-/Users/juan/code/paisaxe}"
+CLAUDE_BIN="${CLAUDE_BIN:-/Users/juan/.local/bin/claude}"
 MODEL="sonnet"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/performance-agent-$(date +%Y-%m-%d).log"
@@ -15,8 +15,17 @@ METRICS_FILE="$PROJECT_DIR/.performance-metrics.tmp"
 mkdir -p "$LOG_DIR"
 trap 'rm -f "$METRICS_FILE"' EXIT
 
+# Every prior silent-death cycle (6 consecutive weeks, since 2026-07-18) left
+# NOTHING in either log — no error, no final "finished" line — yet launchd's
+# LastExitStatus stayed 0, so it read as healthy. This trap converts any
+# set -e abort, anywhere in the script, into a loud, non-zero, log-visible
+# failure instead of a silent one. Built manually (not via log_error | tee)
+# because log_error writes to fd 2, which a trailing `| tee` cannot capture.
+trap 'ec=$?; { printf "[ERROR] %s FATAL: command failed at line %s (exit %s) — aborting\n" "$(date "+%Y-%m-%d %H:%M:%S")" "$LINENO" "$ec"; } | tee -a "$LOG_FILE" >&2; exit "$ec"' ERR
+
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
+source "$PROJECT_DIR/scripts/lib/performance-budget.sh"
 
 # Check if agent is enabled via feature flags
 log_info "=== Performance Agent starting ===" | tee -a "$LOG_FILE"
@@ -42,10 +51,22 @@ restart_dev_server_if_needed() {
 # Raised 2026-06-10: ElevenLabs ConvAI SDK (~605 KB deferred, click-to-mount) is a hard
 # dependency and already fully lazy-loaded — no further reduction possible. Total budget
 # raised to 3,500 KB (100 KB headroom over current 3,398 KB). Initial-load budget unchanged.
+# Raised 2026-08-24 (triage, per performance-report.md P1): this raw sum-of-all-chunks
+# metric predates check-bundle-budget.ts's per-route gzip budget (PE-H3), which is the
+# authoritative, comfortably-passing signal (11-19% headroom on every route). This coarser
+# metric had climbed to 91.8% (286 KB headroom) purely from routine dependency-version
+# drift, at a pace that would trip it within 1-2 more batch cycles with no real regression.
+# Widened headroom to ~800 KB so dependency drift stops false-alarming this metric.
 BUDGET_INITIAL_JS_KB=2100    # 2.1 MB initial load JS (static chunks only, excl. deferred)
-BUDGET_TOTAL_JS_KB=3500      # 3.5 MB total JS (including deferred dynamic chunks)
-BUDGET_LARGEST_CHUNK_KB=650  # 650 KB per chunk (ElevenLabs deferred chunk is 605 KB)
-BUDGET_NODE_MODULES_MB=1100  # 1.1 GB node_modules (@sentry/nextjs 67 MB is permanent)
+BUDGET_TOTAL_JS_KB=4000      # 4.0 MB total JS (including deferred dynamic chunks)
+BUDGET_LARGEST_CHUNK_KB=650  # 650 KB per chunk, default for every chunk except the voice SDK's
+BUDGET_VOICE_CHUNK_MARKER=livekit  # string identifying the voice SDK chunk by content
+BUDGET_VOICE_CHUNK_KB=800    # 800 KB for the chunk containing livekit (ElevenLabs ConvAI SDK, 733 KB, click-to-mount, voice shelved per cost-analyst)
+# Raised 2026-10-02 (triage, per performance-report.md P1): 1,100 -> 1,300 MB. This measures the
+# developer-machine node_modules directory (95.5% used, mostly devDependencies: pdfjs-dist,
+# pdf-parse, canvas), which does not reach Vercel -- the deploy is bounded by
+# outputFileTracingExcludes in next.config.ts. The bundle metrics above stay authoritative.
+BUDGET_NODE_MODULES_MB=1300  # 1.3 GB node_modules (@sentry/nextjs 67 MB is permanent)
 BUDGET_PROD_DEPS=40          # Max production dependencies
 
 # Initialize metrics collection
@@ -168,6 +189,9 @@ fi
 
 # Determine budget violations
 VIOLATIONS=""
+VIOLATIONS="${VIOLATIONS}$(largest_chunk_budget_violation "$LARGEST_CHUNKS" "$BUDGET_LARGEST_CHUNK_KB" "$BUDGET_VOICE_CHUNK_MARKER" "$BUDGET_VOICE_CHUNK_KB")"
+ROUTE_STATS_FILE=".next/diagnostics/route-bundle-stats.json"
+VIOLATIONS="${VIOLATIONS}$(first_load_budget_violation "$ROUTE_STATS_FILE" "$BUDGET_INITIAL_JS_KB")"
 if [[ $TOTAL_JS_KB -gt $BUDGET_TOTAL_JS_KB ]]; then
   VIOLATIONS="$VIOLATIONS\n- Total JS ($TOTAL_JS_KB KB) exceeds budget ($BUDGET_TOTAL_JS_KB KB)"
 fi
@@ -211,8 +235,8 @@ fi
   echo "- Budget (split, since 2026-04-04): initial ${BUDGET_INITIAL_JS_KB} KB / total ${BUDGET_TOTAL_JS_KB} KB"
   echo ""
   if [[ "$FRESH_BUILD" == "true" ]]; then
-    echo "FIRST LOAD JS (per-route split, from next build):"
-    echo "$BUILD_OUTPUT" | grep -E "First Load JS" | head -10
+    echo "FIRST LOAD JS (per route, uncompressed, from .next/diagnostics/route-bundle-stats.json):"
+    first_load_summary "$ROUTE_STATS_FILE"
     echo ""
   fi
   echo "LARGEST JS CHUNKS:"
@@ -257,10 +281,7 @@ SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-ins
 SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run Claude to analyze and write report
-"$CLAUDE_BIN" -p \
-  --model "$MODEL" \
-  --allowedTools 'Read,Edit,Write,Glob,Grep' \
-  >> "$LOG_FILE" 2>&1 <<PROMPT
+PROMPT_TEXT=$(cat <<PROMPT
 $AGENT_PROMPT
 
 Additional context:
@@ -272,7 +293,7 @@ Current metrics:
 $(cat "$METRICS_FILE")
 
 Build output summary:
-$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30; else echo "(No build output — build was skipped or failed, used cached .next data)"; fi)
+$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30 || echo "(no matching lines in this build's output)"; else echo "(No build output — build was skipped or failed, used cached .next data)"; fi)
 
 $SHARED_CONTEXT_READ
 
@@ -280,8 +301,11 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
+)
+run_scheduled_analysis "$REPORT_FILE" "$LOG_FILE" "# Performance Agent Report" \
+  "$MODEL" 'Read,Edit,Write,Glob,Grep' "$PROMPT_TEXT"
 
-log_success "Claude analysis complete" | tee -a "$LOG_FILE"
+log_success "Scheduled analysis complete" | tee -a "$LOG_FILE"
 
 # Extract and write shared context
 REPORT_CONTENT=$(cat "$REPORT_FILE")

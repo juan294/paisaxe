@@ -20,6 +20,22 @@ and forwarded to Sentry.
 object as extra context. PII is stripped via `beforeSend` in `src/lib/logger-sanitize.ts` before
 events are transmitted.
 
+> **Sentry delivery status: configured but unverified (as of 2026-08-18).** The Sentry
+> project `the-creative-token/paisaxe` exists and `NEXT_PUBLIC_SENTRY_DSN` is set, so
+> `/api/health` correctly reports `sentry.status: "configured"` — but "configured" only
+> means the SDK was initialized with a DSN, not that events are reaching the project. A
+> 90-day issue query against the dashboard returned **zero results**, including across
+> the known 2026-07-20 outage window where a real production failure occurred and left
+> no trace in Sentry. Do not read "configured" as "verified working."
+>
+> **Verification procedure:** run `npm run verify-sentry-delivery` (see
+> `scripts/verify-sentry-delivery.ts`) with the same DSN production uses. It fires one
+> synthetic exception tagged `do_b1_sentry_delivery_check:true` and prints a unique
+> marker. A human must then open the Sentry dashboard and confirm an issue with that
+> tag/marker actually arrived — the script cannot check the live dashboard itself, so a
+> successful run only proves the SDK attempted delivery, not that Sentry received it.
+> Tracked in GitHub issue #821 until that dashboard check has actually been done.
+
 ---
 
 ## Using the Logger
@@ -86,17 +102,28 @@ Add new keys here when introducing new diagnostic log points.
 
 ## Vercel Log Drain Setup (BetterStack / Logtail)
 
-> **Status: NOT CONFIRMED — action required.**
+> **Status: UNVERIFIED — treat as not confirmed working.**
 >
-> As of 2026-04-28, no log drain has been verified as active. Vercel Pro plan retention
-> can be as short as 1 hour for function logs. Without a drain, logs from incidents may
-> be irrecoverably lost before you can investigate.
+> A "confirm and configure" task for this drain was tracked in #503, which was closed on
+> 2026-05-01 with **no recorded evidence** (no closing comment, no live-tail
+> confirmation) that a drain was actually observed receiving traffic. The closure is not
+> proof the drain works — as of 2026-08-18 there is still no independent confirmation
+> either way, and the 2026-07-20 outage left no trace in Sentry either (see the Sentry
+> section above), which is consistent with neither sink having ever been verified live.
 >
-> **Recommended action:** Configure BetterStack Starter (free) or Axiom (free tier) as a
-> Vercel log drain — see the step-by-step below.
+> Vercel Pro plan retention can be as short as 1 hour for function logs. Without a
+> confirmed-working drain, logs from an incident may be irrecoverably lost before anyone
+> can investigate.
 >
-> **How to verify:** Vercel dashboard → Project → Settings → Log Drains. If the list is
-> empty, no drain is active.
+> **How to verify (human dashboard action — no CLI equivalent exists for this check):**
+> Vercel dashboard → Project → Settings → Log Drains. If the list is empty, no drain is
+> active. If a drain IS listed, trigger a request against production and confirm a
+> matching JSON line appears in the drain destination's live tail within a minute or
+> two — a drain merely existing in the list is not the same as it delivering.
+>
+> **Tracking:** GitHub issue #821 is the live tracker for this until a human has
+> actually observed a production log line arrive at the drain destination. Do not close
+> #821 (or re-close a follow-up) on doc or config changes alone.
 >
 > **Impact of not doing it:** All runtime logs (errors, payment events, auth failures) are
 > lost after Vercel's retention window. Stripe dispute resolution requires payment audit

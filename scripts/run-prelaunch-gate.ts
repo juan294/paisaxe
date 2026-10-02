@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+
+import { isMain } from "./lib/is-main";
 
 type PackageJson = {
   scripts: Record<string, string>;
@@ -27,6 +28,24 @@ const root = process.cwd();
 
 export const LOCAL_PRELAUNCH_STEPS: readonly GateStep[] = [
   {
+    // QA-M3 (#874): typecheck, lint, and the unit suite are the cheapest
+    // steps in this gate — they must run first so a fast, local failure
+    // surfaces before the gate burns time on the ~4-minute build or the
+    // browser E2E suite. Previously this gate did not run them at all,
+    // so `npm run prelaunch` could pass with broken types, lint errors,
+    // or failing unit tests that were never checked.
+    name: "typecheck",
+    command: ["npm", "run", "typecheck"],
+  },
+  {
+    name: "lint",
+    command: ["npm", "run", "lint"],
+  },
+  {
+    name: "unit test suite",
+    command: ["npm", "run", "test"],
+  },
+  {
     name: "verification coverage",
     command: ["npm", "run", "check-verification-coverage"],
   },
@@ -43,8 +62,13 @@ export const LOCAL_PRELAUNCH_STEPS: readonly GateStep[] = [
     command: ["npm", "run", "build"],
   },
   {
+    // QA-M2 (#873): plain `npm run test:e2e` has no zero-test guard, so this
+    // gate must go through the gated runner (scripts/run-prelaunch-e2e.ts)
+    // instead — it wires the same assertTestsExecuted guard run-stripe-e2e.ts
+    // already uses, and forces REQUIRE_AUTH_JOURNEYS so the authenticated
+    // journeys can't silently skip under this gate.
     name: "browser E2E",
-    command: ["npm", "run", "test:e2e"],
+    command: ["npm", "run", "test:e2e:prelaunch"],
   },
 ] as const;
 
@@ -115,11 +139,7 @@ export async function runPrelaunchGate(
   console.log(`Run npm run ${LIVE_GATE_SCRIPT} separately when live QA credentials are available.`);
 }
 
-function isMain(): boolean {
-  return process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
-}
-
-if (isMain()) {
+if (isMain(import.meta.url)) {
   runPrelaunchGate().catch((error) => {
     console.error("[prelaunch-gate] Failed:", error);
     process.exit(1);

@@ -76,7 +76,7 @@ test.describe("Visual regression — public pages", () => {
     );
 
     // Mock voice access check — unauthenticated
-    await page.route("**/api/voice/access", (route) =>
+    await page.route("**/api/voice-access", (route) =>
       route.fulfill({ status: 401 })
     );
   });

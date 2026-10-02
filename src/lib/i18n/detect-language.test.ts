@@ -273,14 +273,13 @@ describe('detect-language', () => {
 
   describe('detectBrowserLanguage server-side (line 27)', () => {
     it('returns default locale "es" when navigator is undefined (server-side)', () => {
-      const originalNavigator = globalThis.navigator;
-      // Temporarily remove navigator to simulate server-side environment
-      // @ts-expect-error - deliberately setting navigator to undefined for test
-      globalThis.navigator = undefined;
+      // Temporarily remove navigator to simulate server-side environment.
+      // stubGlobal (not assignment): jsdom 30.1 defines navigator as getter-only.
+      vi.stubGlobal('navigator', undefined);
       try {
         expect(detectBrowserLanguage()).toBe('es');
       } finally {
-        globalThis.navigator = originalNavigator;
+        vi.unstubAllGlobals();
       }
     });
   });

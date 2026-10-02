@@ -183,27 +183,32 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
 
   const currentStory = filteredStories[currentIndex];
 
-  const handleAskAbout = (prefilledMessage?: string) => {
+  // FE-H3: stable identities across re-renders. handleCloseChat is passed as
+  // VoiceChat's onClose, which feeds useFocusTrap's onEscape — a plain
+  // function redeclared every render defeated the trap's dependency array
+  // and tore down/reinstalled the trap (stealing focus) on every unrelated
+  // parent re-render, including the useFeatureFlags 60s background refetch.
+  const handleAskAbout = useCallback((prefilledMessage?: string) => {
     setInitialMessage(prefilledMessage);
     setChatOpen(true);
-  };
+  }, []);
 
-  const handleCloseChat = () => {
+  const handleCloseChat = useCallback(() => {
     setChatOpen(false);
     setInitialMessage(undefined);
-  };
+  }, []);
 
-  const handleMoodSelect = (mood: Mood) => {
+  const handleMoodSelect = useCallback((mood: Mood) => {
     setSelectedMood(mood);
     setMoodDismissed(true);
     sessionStorage.setItem("paisaxe-mood-dismissed", "true");
     setCurrentIndex(0);
-  };
+  }, []);
 
-  const handleMoodDismiss = () => {
+  const handleMoodDismiss = useCallback(() => {
     setMoodDismissed(true);
     sessionStorage.setItem("paisaxe-mood-dismissed", "true");
-  };
+  }, []);
 
   // Show mood overlay if enabled, not dismissed, stories are loaded, and flags are ready
   // We wait for flagsReady to prevent the overlay from popping in after page render

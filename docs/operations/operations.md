@@ -10,7 +10,8 @@ Detailed documentation for database maintenance, monitoring, webhooks, and autom
 | `docs/operations/rollback.md` | Production is broken. Roll back first, investigate second |
 | `docs/operations/alerting-runbook.md` | Responding to a specific alert type |
 | `docs/operations/migration-policy.md` | Writing or applying a migration |
-| `docs/operations/pre-launch-security-checklist.md` | The 6 manual security gates before a release PR |
+| `docs/operations/pre-launch-security-checklist.md` | The 6 security gates before a release PR (5 manual, 1 CI-verified) |
+| `docs/operations/secret-inventory.md` | Rotating or revoking a credential; auditing what secrets exist |
 
 ## Health Check Endpoints
 
@@ -20,7 +21,14 @@ Two endpoints serve different consumers:
 
 **`GET /api/health`** — public release diagnostics endpoint. Always returns HTTP 200 with `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": { "status": "ok" | "misconfigured" }, "sentry": { "status": "configured" | "unconfigured" }, "rate_limit": { "status": "ok" | "degraded", "backend": "upstash" | "memory" | "blocked", "reason"?: "upstash_missing" | "upstash_unavailable" } }`. The body status becomes `"degraded"` when Supabase connectivity fails, approved stories are unavailable, database usage reaches the 80% warning threshold, `NEXT_PUBLIC_SENTRY_DSN` is missing in Vercel production, or the rate-limit backend is misconfigured in production. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
-Readiness monitors must parse the `/api/health` JSON body, not just the HTTP status. The shared CI monitor is `node scripts/check-health-readiness.mjs <base-url>`; it fails unless `/api/health` returns HTTP 200 and `status: "healthy"`. Use `--require-sentry` for release gates that must also prove `sentry.status: "configured"`.
+**`GET /api/health/voice`** — authorized ElevenLabs deep health. Requires
+`Authorization: Bearer <HEALTH_PROBE_SECRET>`, requests and discards signed
+URLs for all five owned agents, and returns only provider state, safe key
+fingerprint, binding state, agent keys, and the safe deployment commit. It
+returns 503 when the provider or credential check fails. Anonymous
+`/api/health` and `/api/health/live` never call ElevenLabs.
+
+Readiness monitors must parse the `/api/health` JSON body, not just the HTTP status. The shared CI monitor is `node scripts/check-health-readiness.mjs <base-url>`; it fails unless `/api/health` returns HTTP 200 and `status: "healthy"`. The monitor also accepts `--require-sentry` to additionally prove `sentry.status: "configured"`, but no CI workflow passes that flag today — see the Preview Smoke Test section below for why.
 
 ## Pre-Launch Checklist
 
@@ -95,14 +103,13 @@ curl -s https://paisaxe.es/robots.txt
 ### 5. Git Status
 
 ```bash
-# Check for unpushed commits on develop
-git log main..develop --oneline
-
-# Verify branches are in sync for release
-git diff develop main --stat
+# Commits + file-level diffstat since the last release. This handles the
+# historical squash-release ancestry described in DO-M8 and #835.
+npm run what-would-ship
 ```
 
-**For release:** `develop` and `main` should be in sync (no diff).
+**For release:** the file-level diffstat is the real scope of what would ship — see
+`docs/runbooks/release-checklist.md` step 2 for the full procedure and rationale.
 
 ### 6. Feature Flags Review
 
@@ -195,17 +202,25 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `analyze-main-tables` | Daily 4:00 AM UTC | 011 | ANALYZE on chunks, images, stories |
 | `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
 | `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Database activity safeguard |
-| `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
 | `content-discovery` | Weekly Monday 3:00 AM UTC (`0 3 * * 1`) | Vercel Cron | Discovers new Asturias places via Google Places API |
 | `fail-stale-translations` | Every 15 minutes (`*/15 * * * *`) | Vercel Cron | Mark stories stuck in `translating` state as failed |
 | `fail-stale-bookings` | Every 5 minutes (`*/5 * * * *`) | Vercel Cron | Mark bookings stuck in a pending/in-progress state as failed |
 | `github-traffic-sync` | Every 6 hours (`0 */6 * * *`) | Vercel Cron | Sync GitHub traffic stats to admin dashboard |
 | `subscription-optimizer` | Weekly Monday 4:00 AM UTC (`0 4 * * 1`) | Vercel Cron | Analyze service costs and spending |
 | `retry-booking-sms` | Every 10 minutes (`*/10 * * * *`) | Vercel Cron | Retry failed booking SMS confirmations (up to 3 attempts per job) |
+| `elevenlabs-voice-canary` | Every 15 minutes (`*/15 * * * *`) | Vercel Cron | Request and discard one Pelayo Visitor signed URL; report monitor and credential state |
 
 The Vercel Cron schedules above mirror `vercel.json` exactly — keep both in sync when adding or rescheduling a job.
 
-Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
+**`edge-keep-alive`** (migration `014`) was unscheduled on 2026-02-03 — it is **not** an
+active job, despite the migration still being applied. See
+[pending-setup.md](./pending-setup.md#3-configure-supabase-edge-function-settings) for why.
+Do not re-schedule it to make this table match the migration; the migration's presence is
+historical, not a signal that the job runs.
+
+Verify jobs (also the way to catch this table drifting from reality — a job listed above but
+absent from the query result, or vice versa, means this table is stale):
+`SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
 
 ## Database Webhooks (pg_net)
 
@@ -239,11 +254,11 @@ Utilities in `src/lib/realtime.ts` provide generic `subscribeToTable()` and spec
 
 ## Supabase Edge Functions
 
-Deno-based Edge Functions in `supabase/functions/` (500K invocations/month included). Scheduled via pg_cron + pg_net.
+Deno-based Edge Functions in `supabase/functions/` (500K invocations/month included).
 
 | Function | Purpose | Schedule |
 |----------|---------|----------|
-| `keep-alive` | Queries active stories to generate database activity | Every 3 days |
+| `keep-alive` | Queries active stories to generate database activity | Not scheduled — the `edge-keep-alive` pg_cron job that called it via pg_net was unscheduled on 2026-02-03 (see [pending-setup.md](./pending-setup.md#3-configure-supabase-edge-function-settings)); the function remains deployed and can be invoked manually |
 
 Deploy: `supabase functions deploy keep-alive`
 
@@ -320,7 +335,7 @@ Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Logs writte
 - **Documentation Agent**: Runs weekly. Checks for stale docs, new migrations needing documentation, undocumented API routes and feature flags.
 - **Performance Agent**: Runs weekly. Analyzes bundle sizes, Lighthouse scores, Core Web Vitals, dependency counts, and disk usage.
 - **QA Agent**: Runs weekly. Automated LLM testing for RAG quality, safety, content boundaries, and response quality. Budget-conscious sampling (configurable via `testsPerCategory` in feature flag config). See `docs/testbed.md` for full test catalog.
-- **Localization Agent**: Runs weekly. Ensures 100% translation coverage across all 5 locales (es, en, fr, de, pt). Detects missing UI strings and story translations, then auto-fills gaps. Spanish is source of truth.
+- **Localization Agent**: Runs weekly. Ensures 100% translation coverage across all 6 locales (es, en, fr, de, pt, ast). Detects missing UI strings and story translations, then auto-fills gaps. Spanish is source of truth.
 - **Cost Analyst Agent**: Runs daily. Queries billing APIs (Anthropic, ElevenLabs, Twilio), analyzes spending trends, detects anomalies (>20% spikes, tier proximity), forecasts costs at 1x/3x/10x growth, and writes a structured financial health report.
 
 ## CI/CD Workflows
@@ -345,7 +360,16 @@ Runs the real Stripe test-mode checkout path on nightly schedule, manual dispatc
 
 ### Preview Smoke Test (`preview-smoke.yml`)
 
-On PRs targeting `main`, waits for the Vercel preview deployment and runs `scripts/check-health-readiness.mjs "$PREVIEW_URL" --require-sentry` against real env vars before hitting the homepage. This is a **required status check** — `Smoke test Vercel preview` must pass before any merge to `main`. It catches runtime failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js 16.2.1 incident).
+On PRs targeting `main`, waits for the Vercel preview deployment, runs
+`scripts/check-health-readiness.mjs "$PREVIEW_URL"` (without
+`--require-sentry`), then checks the homepage. The authenticated five-agent
+ElevenLabs preflight is not part of this check; it runs post-deploy against
+production as a required probe (`docs/runbooks/release-checklist.md` step 5). This is a **required status check** — `Smoke test
+Vercel preview` must pass before any merge to `main`. It catches runtime
+failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js
+16.2.1 incident).
+
+**Sentry is not currently a hard release gate.** `sentry.status: "configured"` (see DO-B1) is derived purely from `NEXT_PUBLIC_SENTRY_DSN` being non-empty — it does not prove error delivery actually works. The Preview environment in Vercel also does not currently carry that DSN (confirmed via `vercel env ls preview`), so passing `--require-sentry` here would fail this required check on every PR targeting `main`, including hotfixes during an incident. Revisit once DO-B1 confirms live Sentry delivery and the Preview DSN is provisioned.
 
 ### Quality & Security Workflows
 
@@ -353,6 +377,7 @@ On PRs targeting `main`, waits for the Vercel preview deployment and runs `scrip
 |----------|---------|-------------|
 | **Security Audit** (`security.yml`) | Push/PR + daily 08:00 UTC | `npm audit --omit=dev --audit-level=moderate`; also runs `vercel-env-safety` |
 | **Gitleaks** (job in `security.yml`) | Push/PR + daily 08:00 UTC | Scans for secrets in git history |
+| **Vercel env safety** (job in `security.yml`) | Push/PR + daily 08:00 UTC | Asserts a legacy agent-runner override is absent from the deployed Vercel project's env vars. Requires `VERCEL_TOKEN` (repo **secret**, currently unset — **action required**: a human with repo admin access must add it under Settings → Secrets and variables → Actions → Secrets) plus `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID` (repo **variables**, already set). Without `VERCEL_TOKEN` the job **fails** on push/schedule/same-repo-PR runs — it no longer silently skips and reports success (DO-M2, issue #829: skip-to-pass was "requiredness without evidence," the same anti-pattern rejected for Dependabot preview smoke checks). The skip-to-pass path is kept only for PRs from forks, which cannot read repository secrets. |
 | **License Check** (`license-check.yml`) | PRs only | Blocks copyleft/GPL dependencies |
 | **Lighthouse CI** (`lighthouse.yml`) | PRs only | Performance & accessibility auditing |
 | **Bundle Size** (`bundle-size.yml`) | PRs only | Reports JS bundle sizes as PR comment |
@@ -371,7 +396,7 @@ On PRs targeting `main`, waits for the Vercel preview deployment and runs `scrip
 4. **Build failures**: Run `npm run build` locally, check for build-time errors
 5. **E2E failures**: Run `npm run test:e2e` locally, inspect `playwright-report/` for traces
 6. **License failures**: Run `npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"` to identify problematic deps
-7. **Gitleaks failures**: Remove the detected secret from code and rotate the exposed credential
+7. **Gitleaks failures**: Remove the detected secret from code and rotate the exposed credential — see [secret-inventory.md](./secret-inventory.md) for the storage locations and rotation order per secret
 
 ### Notes
 
@@ -382,13 +407,19 @@ On PRs targeting `main`, waits for the Vercel preview deployment and runs `scrip
 
 ## Stripe Payments
 
-Voice Pass purchases (24h voice access for €1.99) processed via Stripe.
+Voice Pass purchases processed via Stripe, three tiers (see `src/lib/pricing.ts`, the single source of truth for pricing):
+
+| Tier | Price | Duration |
+|------|-------|----------|
+| Day Pass | €1.99 | 24 hours |
+| Weekly Pass | €4.99 | 7 days |
+| Monthly Pass | €9.99 | 30 days |
 
 ### Setup
 
 1. Create a Stripe account at [stripe.com](https://stripe.com)
-2. Create a product "Voice Pass - 24h" at €1.99 in the Stripe Dashboard
-3. Copy the Price ID (starts with `price_`)
+2. Create three products in the Stripe Dashboard: "Voice Pass - 24h" at €1.99, "Voice Pass - 7 days" at €4.99, "Voice Pass - 30 days" at €9.99
+3. Copy each Price ID (starts with `price_`)
 4. Create a webhook endpoint pointing to `/api/webhooks/stripe`
 5. Select `checkout.session.completed` event
 6. Copy the webhook signing secret (starts with `whsec_`)
@@ -399,7 +430,9 @@ Voice Pass purchases (24h voice access for €1.99) processed via Stripe.
 STRIPE_SECRET_KEY=sk_live_...           # Server-side API key
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...  # Client-side key
 STRIPE_WEBHOOK_SECRET=whsec_...         # Webhook signature verification
-STRIPE_DAY_PASS_PRICE_ID=price_...      # Price ID for Day Pass
+STRIPE_DAY_PASS_PRICE_ID=price_...      # Price ID for Day Pass (24h, €1.99)
+STRIPE_WEEKLY_PRICE_ID=price_...        # Price ID for Weekly Pass (7 days, €4.99)
+STRIPE_MONTHLY_PRICE_ID=price_...       # Price ID for Monthly Pass (30 days, €9.99)
 ```
 
 ### Webhook Testing (Local)
@@ -418,7 +451,7 @@ Revenue analytics are available in the admin panel under Analytics → Revenue t
 
 ## Proxy Architecture
 
-Request interception uses `src/proxy.ts` (Next.js 16 replacement for `middleware.ts`). The middleware chain order is: canonical-domain → maintenance → CORS → CSP → CSRF → auth-refresh → request-id → story-rewrite.
+Request interception uses `src/proxy.ts` (Next.js 16 replacement for `middleware.ts`). The middleware chain order is: canonical-domain → maintenance → CORS → CSP → CSRF → auth-refresh → request-id. `/story/[slug]` is no longer proxy-rewritten (see FE-H2 / #760) — it is a real App Router page subject to the same chain as any other route.
 
 See [proxy-architecture.md](./proxy-architecture.md) for the full module map.
 
@@ -427,6 +460,10 @@ See [proxy-architecture.md](./proxy-architecture.md) for the full module map.
 ## ElevenLabs Voice Agents
 
 Voice agents for the Paisaxe experience. Configs are tracked in git via the ElevenLabs CLI — see [elevenlabs-agents-as-code.md](./elevenlabs-agents-as-code.md) for the workflow.
+
+Runtime credential binding, the five-agent preflight, the scheduled sentinel,
+and safe rotation are documented in
+[the ElevenLabs credential runbook](../runbooks/elevenlabs-credential-rotation.md).
 
 Configured in `src/config/elevenlabs-agents.ts`.
 

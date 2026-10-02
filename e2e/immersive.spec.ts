@@ -17,13 +17,16 @@ test.describe("Immersive story viewer", () => {
   test("renders a story with title and description", async ({ page }) => {
     // Fallback stories should load — first story is "Lagos de Covadonga"
     const title = page.getByTestId("story-title").first();
-    await expect(title).toBeVisible({ timeout: 15000 });
+    // QA-M8: fallback stories render from client-embedded data, not a
+    // network round trip — 8s is generous headroom without eating the
+    // entire 15s CI per-test budget on a single wait.
+    await expect(title).toBeVisible({ timeout: 8000 });
     await expect(title).not.toBeEmpty();
   });
 
   test("shows navigation arrows", async ({ page }) => {
     // Wait for the story to render
-    await expect(page.getByTestId("story-title").first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("story-title").first()).toBeVisible({ timeout: 8000 });
 
     // Navigation arrows — both enabled since carousel loops infinitely
     // Use .first() to avoid strict mode violations during i18n hydration overlap
@@ -36,7 +39,7 @@ test.describe("Immersive story viewer", () => {
 
   test("navigates to next story via arrow click", async ({ page }) => {
     const title = page.getByTestId("story-title").first();
-    await expect(title).toBeVisible({ timeout: 15000 });
+    await expect(title).toBeVisible({ timeout: 8000 });
     const firstTitle = await title.textContent();
 
     // Click next arrow
@@ -56,7 +59,7 @@ test.describe("Immersive story viewer", () => {
     test.skip(isMobile, "Keyboard navigation is desktop-only");
 
     const title = page.getByTestId("story-title").first();
-    await expect(title).toBeVisible({ timeout: 15000 });
+    await expect(title).toBeVisible({ timeout: 8000 });
     const firstTitle = await title.textContent();
 
     await page.evaluate(() => window.focus());
@@ -77,7 +80,7 @@ test.describe("Immersive story viewer", () => {
     test.skip(isMobile, "Keyboard shortcut 'i' toggle is desktop-only");
 
     const title = page.getByTestId("story-title").first();
-    await expect(title).toBeVisible({ timeout: 15000 });
+    await expect(title).toBeVisible({ timeout: 8000 });
 
     // Info is visible by default
     // Use .first() because the carousel may render multiple story panels simultaneously

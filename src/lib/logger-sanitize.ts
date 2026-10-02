@@ -3,7 +3,8 @@ const CIRCULAR = "[Circular]";
 const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const phonePattern = /\+?\d[\d\s().-]{7,}\d/g;
 const bearerPattern = /(Bearer\s+)[^\s",]+/gi;
-const stripeSecretPattern = /\b(?:sk|pk|rk|whsec)_[A-Za-z0-9_-]+\b/g;
+const providerSecretPattern = /\b(?:sk[-_]|pk_|rk_|whsec_)[A-Za-z0-9_-]+\b/g;
+const signedWebSocketPattern = /wss:\/\/[^\s"']+/gi;
 const sensitiveKeys = new Set([
   "authorization",
   "apikey",
@@ -22,6 +23,7 @@ const sensitiveKeys = new Set([
   "token",
   "userid",
   "xapikey",
+  "xiapikey",
 ]);
 
 function normalizeKey(key: string) {
@@ -60,7 +62,8 @@ function sanitizeString(value: string, key?: string, seen?: WeakSet<object>): st
     value
       .replace(emailPattern, REDACTED)
       .replace(bearerPattern, `$1${REDACTED}`)
-      .replace(stripeSecretPattern, REDACTED),
+      .replace(providerSecretPattern, REDACTED)
+      .replace(signedWebSocketPattern, REDACTED),
   );
 }
 

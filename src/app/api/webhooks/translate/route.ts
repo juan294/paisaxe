@@ -1,19 +1,37 @@
-import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
+import { safeEqual } from "@/lib/safe-equal";
 import { translateWebhookSchema } from "@/lib/schemas";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { translateStory } from "@/lib/translate-story";
 import type { StoryLocale } from "@/types/immersive";
+import { TRANSLATE_JOB_BATCH_SIZE } from "./config";
 
-// BE-H6: Reduced lease to 3 minutes (180s). Each job takes ~5-15s so a
-// 3-job batch fits in ~45s, well within Vercel's 60s function timeout.
-// Shorter lease means crashed handlers are reclaimed faster than the old 10min.
+// BE-H6: Reduced lease to 3 minutes (180s). The configured batch fits within
+// maxDuration below, and the shorter lease reclaims crashed handlers faster
+// than the old 10-minute lease.
 const TRANSLATE_JOB_LEASE_SECONDS = 3 * 60; // 180 seconds
-// BE-H6: Reduced from 10 to 3. Three jobs at up to 15s each = 45s max,
-// leaving 15s margin before Vercel's 60s function timeout.
-const TRANSLATE_JOB_BATCH_SIZE = 3;
+
+// BE-M3 (#784): explicit ceiling for this route, replacing Vercel's implicit
+// project default. The batch-size/lease-second tuning above was already
+// assuming a 60s budget ("well within Vercel's 60s function timeout") but
+// nothing declared or enforced that assumption — this makes it explicit.
+// Worst-case batch duration = TRANSLATE_JOB_BATCH_SIZE (3) *
+// TRANSLATE_JOB_PER_JOB_MAX_SECONDS (15s) = 45s, so 60s keeps a 15s margin
+// and remains the binding constraint that the batch size was tuned against,
+// not a new, looser ceiling.
+//
+// Per PE-H5 (#808), Vercel's currently documented default (Fluid Compute, on
+// by default) is 300s across all plan tiers — so 60s here is a deliberately
+// LOWER, explicit ceiling than that implicit default, consistent with the
+// existing tuning, rather than a relaxation of it. This could not be
+// confirmed against this project's actual dashboard setting (`vercel project
+// inspect` does not surface Function Max Duration); flagging for human
+// confirmation via Settings > Functions > Function Max Duration. If that
+// setting differs from 60s, TRANSLATE_JOB_BATCH_SIZE should be reconfirmed
+// against it, not just this constant.
+export const maxDuration = 60;
 
 const StrictTranslateWebhookSchema = z
   .object({
@@ -157,12 +175,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const secret = request.headers.get("x-webhook-secret");
     const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
 
-    if (
-      !secret ||
-      !expectedSecret ||
-      secret.length !== expectedSecret.length ||
-      !timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))
-    ) {
+    // DO-H6: safeEqual compares byte length before timingSafeEqual.
+    if (!secret || !expectedSecret || !safeEqual(secret, expectedSecret)) {
       logger.error("[TRANSLATE_WEBHOOK_UNAUTHORIZED]");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

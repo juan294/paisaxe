@@ -1,9 +1,11 @@
 "use client";
 
+import { useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { X, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 interface SignInPromptProps {
   open: boolean;
@@ -14,6 +16,12 @@ interface SignInPromptProps {
 export function SignInPrompt({ open, onClose, className }: SignInPromptProps) {
   const { signInWithGoogle } = useAuth();
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // UX-M2 (#895): this was the only one of the four visitor-facing modals
+  // with no focus trap, no Escape handler, no initial focus, and no focus
+  // restoration — the same hook already used by mood-overlay.tsx and
+  // voice-chat.tsx closes all four gaps at once.
+  useFocusTrap(dialogRef, open, onClose);
 
   if (!open) return null;
 
@@ -26,6 +34,7 @@ export function SignInPrompt({ open, onClose, className }: SignInPromptProps) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         className="relative w-full max-w-sm mx-4 bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl"

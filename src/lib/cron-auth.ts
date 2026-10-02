@@ -1,7 +1,8 @@
+import "server-only";
 import { NextRequest } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { logger } from "@/lib/logger";
 import { getEnv } from "@/lib/env";
+import { safeEqual } from "@/lib/safe-equal";
 
 // Module-level flag: warn once per process start if cron secrets are missing in production.
 let _cronAuthWarningEmitted = false;
@@ -69,10 +70,8 @@ export function verifyVercelCron(request: NextRequest): boolean {
   }
 
   const expected = `Bearer ${cronSecret}`;
-  if (
-    authHeader.length !== expected.length ||
-    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
-  ) {
+  // DO-H6: compare byte length, not string `.length`, before timingSafeEqual.
+  if (!safeEqual(authHeader, expected)) {
     logRejection("mismatch", { source: "vercel_cron" });
     return false;
   }
@@ -105,10 +104,8 @@ export function verifyWebhookSecret(request: NextRequest): boolean {
     return false;
   }
 
-  if (
-    secret.length !== expectedSecret.length ||
-    !timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))
-  ) {
+  // DO-H6: compare byte length, not string `.length`, before timingSafeEqual.
+  if (!safeEqual(secret, expectedSecret)) {
     logRejection("mismatch", { source: "webhook" });
     return false;
   }

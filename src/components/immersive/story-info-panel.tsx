@@ -5,6 +5,7 @@ import { Camera, Bookmark, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Story } from "@/types/immersive";
 import type { FeatureFlagKey } from "@/types/feature-flags";
+import type { Locale } from "@/lib/i18n/types";
 import { QuestionPrompts } from "./question-prompts";
 import { FreshnessBadge } from "./freshness-badge";
 import { UserSubmittedBadge } from "./user-submitted-badge";
@@ -25,7 +26,10 @@ interface StoryInfoPanelProps {
   t: TFunction;
   onAskAbout: ((prompt?: string) => void) | undefined;
   onToggleInfo: (() => void) | undefined;
+  /** Whether the asturianu_touches feature flag is enabled. */
   ast: boolean;
+  /** The visitor's actual selected locale — Asturian only renders when this is 'ast'. */
+  locale: Locale;
   isEnabled: (flag: FeatureFlagKey) => boolean;
   questionPrompts: string[];
   requiresAuth: boolean;
@@ -50,6 +54,7 @@ export const StoryInfoPanel = memo(function StoryInfoPanel({
   onAskAbout,
   onToggleInfo,
   ast,
+  locale,
   isEnabled,
   questionPrompts,
   requiresAuth,
@@ -57,6 +62,11 @@ export const StoryInfoPanel = memo(function StoryInfoPanel({
   onFavoritesNav,
   chatTriggerRef,
 }: StoryInfoPanelProps) {
+  // UX-H5 (#891): the Asturian mechanism must only activate when the flag is
+  // on AND the visitor has actually selected the Asturian locale — not on the
+  // flag alone. Otherwise an EN/FR/etc. visitor with the flag enabled would
+  // get Asturian text regardless of their chosen language.
+  const showAsturian = ast && locale === "ast";
   return (
     <article
       data-testid="story-info-panel"
@@ -98,12 +108,12 @@ export const StoryInfoPanel = memo(function StoryInfoPanel({
       </div>
 
       <p className="text-white/70 text-sm md:text-base font-medium mb-2 tracking-wider uppercase">
-        {ast && story.metadata?.asturianu_subtitle
+        {showAsturian && story.metadata?.asturianu_subtitle
           ? story.metadata.asturianu_subtitle
           : localizedStory.subtitle}
       </p>
       <h1 data-testid="story-title" className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
-        {ast && story.metadata?.asturianu_title
+        {showAsturian && story.metadata?.asturianu_title
           ? story.metadata.asturianu_title
           : localizedStory.title}
       </h1>
@@ -141,7 +151,7 @@ export const StoryInfoPanel = memo(function StoryInfoPanel({
           }}
           className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         >
-          {ast ? getLabel("ask_about", true) : t("stories.ask_about")}
+          {showAsturian ? getLabel("ask_about", true) : t("stories.ask_about")}
         </button>
         <button
           onClick={(e) => {
@@ -155,7 +165,11 @@ export const StoryInfoPanel = memo(function StoryInfoPanel({
           className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         >
           <Bookmark className="h-5 w-5" />
-          <span>{ast ? getLabel("bookmarks", true) : t("favorites.bookmarks")}</span>
+          {/* "saved" is the correct key here — ASTURIANU_LABELS has no
+              "bookmarks" entry, and "saved" is the semantically identical,
+              already-translated label ("Guardados"/"Guardaos") used by
+              favorites.bookmarks in every locale file. See UX-H5 (#891). */}
+          <span>{showAsturian ? getLabel("saved", true) : t("favorites.bookmarks")}</span>
         </button>
       </div>
     </article>

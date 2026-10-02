@@ -1,6 +1,15 @@
+import "server-only";
 import type { ServiceCost } from "@/types/costs-analytics";
 import { PLATFORM_SERVICES } from "@/types/costs-analytics";
 import { logger } from "@/lib/logger";
+import {
+  ElevenLabsCredentialError,
+  getElevenLabsRuntimeCredential,
+} from "@/lib/elevenlabs-credentials";
+import {
+  classifyElevenLabsProviderStatus,
+  logElevenLabsFailure,
+} from "@/lib/elevenlabs-observability";
 
 // ElevenLabs pricing tiers (as of 2026)
 // These are estimates based on public pricing
@@ -43,27 +52,29 @@ export async function fetchElevenLabsCosts(
   _startDate: string,
   _endDate: string
 ): Promise<ServiceCost | null> {
-  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-
-  if (!apiKey) {
+  if (!process.env.ELEVENLABS_API_KEY?.trim()) {
     return null;
   }
 
   try {
+    const credential = getElevenLabsRuntimeCredential();
     const response = await fetch(
       "https://api.elevenlabs.io/v1/user/subscription",
       {
         headers: {
-          "xi-api-key": apiKey,
+          "xi-api-key": credential.apiKey,
         },
         signal: AbortSignal.timeout(8_000),
       }
     );
 
     if (!response.ok) {
-      logger.error("ElevenLabs subscription API error", {
-        status: response.status,
-        body: await response.text(),
+      logElevenLabsFailure({
+        source: "cost-analytics",
+        failureClass: classifyElevenLabsProviderStatus(response.status),
+        providerStatus: response.status,
+        fingerprint: credential.fingerprint,
+        fingerprintMatches: credential.fingerprintMatches,
       });
       return null;
     }
@@ -110,9 +121,18 @@ export async function fetchElevenLabsCosts(
       notes: `${charactersRemaining.toLocaleString()} / ${charactersLimit.toLocaleString()} credits remaining (${usagePercent}% used)`,
     };
   } catch (error) {
-    logger.error("Error fetching ElevenLabs usage", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (error instanceof ElevenLabsCredentialError) {
+      logElevenLabsFailure({
+        source: "cost-analytics",
+        failureClass: error.code,
+        fingerprint: error.fingerprint,
+        fingerprintMatches: error.fingerprintMatches,
+      });
+    } else {
+      logger.error("Error fetching ElevenLabs usage", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return null;
   }
 }

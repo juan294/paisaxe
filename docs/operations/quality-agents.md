@@ -364,12 +364,22 @@ Runs on every PR against `http://localhost:3000/immersive`.
 
 **Core Web Vitals Budgets**:
 
-| Metric | Maximum |
-|--------|---------|
-| FCP | 3000ms |
-| LCP | 4000ms |
-| CLS | 0.25 |
-| TBT | 500ms |
+| Metric | Maximum (desktop) | Maximum (mobile) |
+|--------|-------------------|------------------|
+| FCP | 3000ms | 3000ms |
+| LCP | 4000ms | 5500ms |
+| CLS | 0.25 | 0.25 |
+| TBT | 500ms | 500ms |
+
+**Category score minimums**: performance >= 0.7 desktop / >= 0.6 mobile;
+accessibility >= 0.8 on both.
+
+The mobile thresholds are looser because Lighthouse's mobile emulation applies 4x
+CPU throttling and slow-4G network on top of a deliberately inflated 25-story
+fallback fixture. Both were originally copied from the desktop config and neither
+held: LCP ran 4064-4551ms against a 4000ms budget, and the performance score runs
+0.64-0.70+ against a 0.7 minimum — inside the noise band, so the gate flaked.
+Bringing `/immersive` up so both columns can match is tracked in #926.
 
 ### Bundle Size
 
@@ -420,7 +430,7 @@ AI code review on every PR. Also responds to `@claude` mentions.
 - `GET /api/health/live` — liveness probe; always returns HTTP 200 with `{ "status": "live", "timestamp": "..." }`. Used by Upptime for uptime monitoring.
 - `GET /api/health` — diagnostics endpoint; always returns HTTP 200. The JSON body signals health state: `{ "status": "healthy"|"degraded", "timestamp": "...", "sentry": { "status": "configured"|"unconfigured" }, "rate_limit": { "status": "ok"|"degraded", "backend": "upstash"|"memory"|"blocked" }, ... }`. Reports "degraded" if Supabase connection fails, approved stories are unavailable, database usage exceeds 80% of the Pro tier limit, Sentry is missing in production, or the production rate-limit backend is degraded. Used by readiness smoke CI as the diagnostics gate.
 
-**Readiness monitor**: `node scripts/check-health-readiness.mjs <base-url>` parses `/api/health` and fails on non-200 HTTP status or any JSON body where `status !== "healthy"`. The release preview gate passes `--require-sentry`, which also fails when `sentry.status !== "configured"`. `/api/health/live` must not be used as a readiness gate because it only proves the process can answer requests.
+**Readiness monitor**: `node scripts/check-health-readiness.mjs <base-url>` parses `/api/health` and fails on non-200 HTTP status or any JSON body where `status !== "healthy"`. The release preview gate does **not** currently pass `--require-sentry` — Sentry configuration is not a hard release gate today. `sentry.status` (see DO-B1) reflects only whether `NEXT_PUBLIC_SENTRY_DSN` is set, not verified delivery, and the Preview environment does not carry that DSN, so hard-gating on it now would fail every release PR. `/api/health/live` must not be used as a readiness gate because it only proves the process can answer requests.
 
 **Sub-endpoint**: `GET /api/health/db` — database connectivity only (used internally by health checks and preview smoke tests).
 

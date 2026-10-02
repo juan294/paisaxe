@@ -479,138 +479,54 @@ test.describe("QA Journey: New Features", () => {
  *
  * Setup: Run `./scripts/setup-qa-test-user.sh` to create the test user.
  *
- * Note: These tests use the API directly to add favorites since the current UI
- * doesn't have a direct "save to favorites" button on the immersive view.
- * This approach tests the favorites system end-to-end while being more robust.
+ * QA-H1 (#868): this project shares a webServer built with a dummy Supabase
+ * anon key (see playwright.config.ts). auth-provider.tsx inlines
+ * `NEXT_PUBLIC_SUPABASE_ANON_KEY` at build time and skips its whole auth
+ * bootstrap whenever that key isn't a real JWT, so `useAuth()` — and
+ * therefore `useFavorites()` — reports `user = null` here no matter what
+ * session the `authenticatedPage` fixture injects server-side. Three tests
+ * that used to live here ("can access favorites page", "add favorite via
+ * API", "localStorage favorites persistence") were removed because they
+ * could never fail in this build:
+ *   - The "access favorites page" assertion (`/saved|favorites/i` visible)
+ *     was satisfied by the always-rendered header AND by the anonymous
+ *     sign-in wall's copy, so it passed whether or not real auth worked.
+ *   - The two "add favorite" tests wrote directly to
+ *     `localStorage.paisaxe_favorites` and then asserted localStorage
+ *     contained what they had just written — a tautology that never
+ *     touched `/api/favorites` or Postgres, and would pass even if the real
+ *     persistence path (e.g. FE-B1) were completely broken.
+ *
+ * The real, UI-driven authenticated favorite round-trip (click the bookmark
+ * button -> POST /api/favorites -> Postgres -> reload -> GET /api/favorites)
+ * now lives in e2e/favorites-real.spec.ts, run via the `auth-integration`
+ * Playwright project against a build with real Supabase credentials. See
+ * that spec for how to run it. This suite keeps only the one test below,
+ * which exercises real navigation and doesn't depend on client-side auth
+ * state to pass or fail.
  */
 authTest.describe("QA Journey: Authenticated User", () => {
-  // Skip entire suite if auth credentials not configured
+  // Skip entire suite if auth credentials not configured — but fail closed
+  // (QA-M2, #873) under CI or an explicit REQUIRE_AUTH_JOURNEYS flag, so a
+  // release gate can never report "passed" while this whole suite silently
+  // didn't execute. A credential-less local run without either signal still
+  // skips, so a developer without QA credentials keeps a usable anonymous-only
+  // E2E run.
   authTest.beforeAll(() => {
     if (!hasAuthCredentials()) {
+      if (process.env.CI || process.env.REQUIRE_AUTH_JOURNEYS) {
+        throw new Error(
+          "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD), " +
+            "but CI or REQUIRE_AUTH_JOURNEYS requires this authenticated-journey suite to run. " +
+            "Refusing to silently skip a suite this gate depends on."
+        );
+      }
       authTest.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
     }
   });
 
   authTest(
-    "Journey 9: Authenticated user can access favorites page",
-    async ({ authenticatedPage }) => {
-      const page = authenticatedPage;
-
-      // Navigate to favorites page as authenticated user
-      await page.goto("/favorites");
-
-      // Should see the favorites header (not a sign-in wall)
-      await authExpect(page.getByText(/saved|favorites/i).first()).toBeVisible({
-        timeout: 10000,
-      });
-
-      // Should see either content or empty state (but not an error)
-      const pageContent = await page.locator("main").textContent();
-      authExpect(pageContent).toBeTruthy();
-    }
-  );
-
-  authTest(
-    "Journey 10: Add favorite via API and verify on favorites page",
-    async ({ authenticatedPage }) => {
-      const page = authenticatedPage;
-
-      // First, get the first story ID from the stories API
-      await page.goto("/immersive");
-      const title = page.getByTestId("story-title").first();
-      await authExpect(title).toContainText(/\S+/, { timeout: 10000 });
-
-      const storyTitle = await title.textContent();
-      authExpect(storyTitle).toBeTruthy();
-
-      // Get a story ID - we'll use a known fallback story ID
-      // The fallback stories have predictable IDs
-      const testStoryId = "lagos-de-covadonga";
-
-      // Add favorite via localStorage (simulating what the UI would do)
-      await page.evaluate((storyId) => {
-        const existing = JSON.parse(
-          localStorage.getItem("paisaxe_favorites") || "[]"
-        );
-        if (!existing.includes(storyId)) {
-          existing.push(storyId);
-          localStorage.setItem("paisaxe_favorites", JSON.stringify(existing));
-        }
-      }, testStoryId);
-
-      // Navigate to favorites page and wait for it to load
-      await page.goto("/favorites");
-      const mainContent = page.locator("main");
-      await authExpect(mainContent).toBeVisible({ timeout: 5000 });
-
-      // Should see content (not just empty state)
-      // The favorites page should show the saved story
-
-      // Check we're not seeing just the empty state
-      const hasContent = await page
-        .getByText(/lagos|covadonga/i)
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-
-      // If the specific story isn't visible, at least verify we have some favorites state
-      if (!hasContent) {
-        // Check localStorage was updated
-        const favorites = await page.evaluate(() => {
-          return localStorage.getItem("paisaxe_favorites");
-        });
-        authExpect(favorites).toContain(testStoryId);
-      }
-    }
-  );
-
-  authTest(
-    "Journey 11: Verify localStorage favorites persistence across navigation",
-    async ({ authenticatedPage }) => {
-      const page = authenticatedPage;
-
-      // Test that favorites persist across page navigation
-      const testStoryId = "test-story-persistence";
-
-      await page.goto("/immersive");
-      await authExpect(page.getByTestId("story-title").first()).toContainText(/\S+/, { timeout: 10000 });
-
-      // Add favorite via localStorage
-      await page.evaluate((storyId) => {
-        const existing = JSON.parse(
-          localStorage.getItem("paisaxe_favorites") || "[]"
-        );
-        if (!existing.includes(storyId)) {
-          existing.push(storyId);
-          localStorage.setItem("paisaxe_favorites", JSON.stringify(existing));
-        }
-      }, testStoryId);
-
-      // Navigate away and back — wait for each page to be fully loaded
-      await page.goto("/favorites");
-      await page.waitForLoadState("networkidle");
-      await page.goto("/immersive");
-      await page.waitForLoadState("networkidle");
-
-      // Verify localStorage persisted across navigation
-      const favorites = await page.evaluate(() => {
-        return JSON.parse(localStorage.getItem("paisaxe_favorites") || "[]");
-      });
-      authExpect(favorites).toContain(testStoryId);
-
-      // Clean up - remove the test entry
-      await page.evaluate((storyId) => {
-        const existing = JSON.parse(
-          localStorage.getItem("paisaxe_favorites") || "[]"
-        );
-        const filtered = existing.filter((id: string) => id !== storyId);
-        localStorage.setItem("paisaxe_favorites", JSON.stringify(filtered));
-      }, testStoryId);
-    }
-  );
-
-  authTest(
-    "Journey 12: Navigate from favorites back to immersive",
+    "Navigate from favorites back to immersive",
     async ({ authenticatedPage }) => {
       const page = authenticatedPage;
 

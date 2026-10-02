@@ -34,8 +34,8 @@ probes:
       command: npx tsx scripts/release/candidate-identity.ts --verify
     oracles: [identity]
     notes: >-
-      Binds the release to a tree hash rather than a commit SHA, because
-      squash merges do not preserve the tested SHA (plan D-A).
+      Binds the release to a tree hash rather than a commit SHA. The promotion
+      merge has a new SHA but must preserve the tested tree (plan D-A).
 
   - id: health-status
     title: "/api/health returns 200 and status healthy"
@@ -58,6 +58,21 @@ probes:
       project: release-required
       selector: "@release-required health-db"
     oracles: [http]
+
+  - id: elevenlabs-voice-preflight
+    title: ElevenLabs runtime credential and five owned agents are reachable
+    owner: voice
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: script
+      command: npm run check-elevenlabs-voice
+    oracles: [http]
+    notes: >-
+      Authenticated with HEALTH_PROBE_SECRET. Requests and discards signed URLs
+      for all five owned agents, then records only the safe key fingerprint,
+      binding state, agent keys, custom-LLM not-applicable state, and the exact
+      target, commit, deployment, and check time.
 
   - id: csp-canary
     title: Homepage renders and client JS executes
@@ -108,6 +123,23 @@ probes:
     notes: >-
       Read-only in effect: the payload is rejected before any handler side
       effect.
+
+  - id: chat-smoke
+    title: Chat/RAG pipeline responds with retrieved sources
+    owner: release
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required chat-smoke"
+    oracles: [http]
+    notes: >-
+      QA-H2 (#869): full rationale in scripts/release/chat-smoke.ts's module
+      docblock. Consumes real Anthropic + Voyage credits per run, so this
+      selector belongs solely to the release-required Playwright project,
+      never desktop/mobile (which build with dummy Anthropic/Voyage keys —
+      see playwright.config.ts webServer.env).
 
   - id: favorite-roundtrip
     title: Favorite create, datastore read-back, cleanup

@@ -18,6 +18,12 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
+// Usage recording is fire-and-forget; stub it so tests don't touch Supabase.
+const { mockRecordUsage } = vi.hoisted(() => ({ mockRecordUsage: vi.fn() }));
+vi.mock("@/lib/costs/anthropic-usage", () => ({
+  recordAnthropicUsageInBackground: (...args: unknown[]) => mockRecordUsage(...args),
+}));
+
 import {
   generateSlug,
   normalizeName,
@@ -32,6 +38,7 @@ import {
   type DiscoverySupabaseClient,
 } from "./content-discovery";
 import { logger } from "@/lib/logger";
+import { CHAT_MODEL } from "@/lib/models";
 
 // ---------------------------------------------------------------------------
 // generateSlug
@@ -312,6 +319,40 @@ describe("generateDescription", () => {
 
     const result = await generateDescription("Playa de Gulpiyuri", "test-key");
     expect(result).toBe("Una playa escondida en el interior de Asturias.");
+  });
+
+  it("records usage under source 'content_discovery'", async () => {
+    mockRecordUsage.mockClear();
+    const usage = {
+      input_tokens: 48,
+      output_tokens: 70,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    };
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ type: "text", text: "Una playa escondida." }],
+        usage,
+      }),
+    });
+
+    await generateDescription("Playa de Gulpiyuri", "test-key");
+
+    expect(mockRecordUsage).toHaveBeenCalledWith({
+      model: CHAT_MODEL,
+      usage,
+      source: "content_discovery",
+    });
+  });
+
+  it("does not record usage when the API call fails", async () => {
+    mockRecordUsage.mockClear();
+    global.fetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 500 });
+
+    await generateDescription("Playa de Gulpiyuri", "test-key");
+
+    expect(mockRecordUsage).not.toHaveBeenCalled();
   });
 
   it("returns fallback on API error", async () => {

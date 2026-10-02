@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POST } from "./route";
 import { NextRequest } from "next/server";
 
@@ -310,6 +310,130 @@ describe("POST /api/admin/stories/approve-all", () => {
         "[APPROVE_ALL_WEBHOOK_PING_FAILED]",
         { story_id: "story-x", error: "raw string rejection" }
       );
+    });
+  });
+
+  describe("BE-L2: VERCEL_URL fallback (#795)", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("constructs an absolute https URL from VERCEL_URL when NEXT_PUBLIC_APP_URL is unset and VERCEL_ENV is production", async () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+      vi.stubEnv("VERCEL_URL", "my-app-abc123.vercel.app");
+      vi.stubEnv("VERCEL_ENV", "production");
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: "story-1" }],
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ success: true }), { status: 200 })
+      );
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+      await POST(request);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://my-app-abc123.vercel.app/api/webhooks/translate",
+        expect.any(Object)
+      );
+    });
+
+    it("does not use the VERCEL_URL fallback outside production (e.g. preview shares production Supabase)", async () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+      vi.stubEnv("VERCEL_URL", "my-app-preview-xyz.vercel.app");
+      vi.stubEnv("VERCEL_ENV", "preview");
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: "story-1" }],
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data.approvedCount).toBe(1);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("logs the missing base URL once for the whole batch, not once per approved story", async () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+      vi.stubEnv("VERCEL_URL", "");
+      vi.stubEnv("VERCEL_ENV", "");
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+
+      const storyIds = ["story-1", "story-2", "story-3"];
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: storyIds.map((id) => ({ id })),
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+      await POST(request);
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      const skipLogCalls = logger.warn.mock.calls.filter(
+        ([msg]) => msg === "[APPROVE_ALL_WEBHOOK_BASE_URL_MISSING]"
+      );
+      expect(skipLogCalls).toHaveLength(1);
+      expect(skipLogCalls[0][1]).toEqual({ approved_count: 3 });
+    });
+  });
+
+  describe("PE-L2: webhook ping fetch timeout (#816)", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("includes an AbortSignal timeout on the translate-webhook ping fetch", async () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [{ id: "story-1" }],
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ success: true }), { status: 200 })
+      );
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+      await POST(request);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [, init] = mockFetch.mock.calls[0];
+      expect(init.signal).toBeInstanceOf(AbortSignal);
     });
   });
 

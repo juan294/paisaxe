@@ -78,4 +78,9 @@ describe("NotFound", () => {
     const link = screen.getByRole("link", { name: "Volver al inicio" });
     expect(link.className).toMatch(/bg-primary|text-primary|border-primary/);
   });
+
+  it("UX-M4: wrapper has role=alert for screen reader announcement", () => {
+    renderWithI18n(<NotFound />);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
 });

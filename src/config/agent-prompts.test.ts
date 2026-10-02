@@ -85,7 +85,7 @@ describe("AGENT_PROMPT_DEFAULTS", () => {
       {
         "cost_analyst_agent_enabled": {
           "outputFile": "docs/agents/cost-analyst-report.md",
-          "promptLength": 3638,
+          "promptLength": 4804,
           "schedule": "Daily at 3:00 AM",
         },
         "coverage_agent_enabled": {

@@ -12,6 +12,7 @@ import {
   ChatStreamStageTimeoutError,
   isChatStreamStageTimeout,
   CHAT_STREAM_STAGE_TIMEOUTS_MS,
+  CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
 } from "./chat-stream-timeouts";
 
 const mockLogger = vi.hoisted(() => ({
@@ -173,5 +174,85 @@ describe("withChatStreamStageTiming", () => {
     expect(isChatStreamStageTimeout(null)).toBe(false);
     expect(isChatStreamStageTimeout(undefined)).toBe(false);
     expect(isChatStreamStageTimeout("string")).toBe(false);
+  });
+
+  // ─── AR-H2 (#856): timeout must actually cancel the underlying call ────
+  //
+  // Previously this was a bare Promise.race: when the timer won, the losing
+  // `promise` kept running (and, for an Anthropic call, kept billing) even
+  // though the caller had already moved on. An optional AbortController lets
+  // the caller thread cancellation into whatever constructed `promise`.
+
+  describe("AR-H2: AbortController cancellation on timeout", () => {
+    it("aborts the given AbortController when the stage times out", async () => {
+      const controller = new AbortController();
+      const neverSettles = new Promise<never>(() => {
+        /* intentionally empty */
+      });
+      neverSettles.catch(() => {});
+
+      const racePromise = withChatStreamStageTiming(
+        "response",
+        neverSettles,
+        controller
+      );
+      racePromise.catch(() => {});
+
+      expect(controller.signal.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(
+        CHAT_STREAM_STAGE_TIMEOUTS_MS.response + 1
+      );
+
+      await expect(racePromise).rejects.toBeInstanceOf(ChatStreamStageTimeoutError);
+      expect(controller.signal.aborted).toBe(true);
+    });
+
+    it("does not abort the controller when the promise settles before the timeout", async () => {
+      const controller = new AbortController();
+
+      await withChatStreamStageTiming(
+        "featureFlag",
+        Promise.resolve("value"),
+        controller
+      );
+
+      expect(controller.signal.aborted).toBe(false);
+    });
+
+    it("remains backward compatible when no AbortController is passed", async () => {
+      const neverSettles = new Promise<never>(() => {
+        /* intentionally empty */
+      });
+      neverSettles.catch(() => {});
+
+      const racePromise = withChatStreamStageTiming("search", neverSettles);
+      racePromise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.search + 1);
+
+      // Must reject exactly as before — no controller means no abort call,
+      // and no crash from a missing controller.
+      await expect(racePromise).rejects.toBeInstanceOf(ChatStreamStageTimeoutError);
+    });
+  });
+});
+
+// PE-H5 (#808): the generation stage's idle window resets on every chunk, so
+// it alone cannot bound total stream duration. CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
+// is a separate, non-resetting ceiling for that stage.
+describe("CHAT_STREAM_RESPONSE_TOTAL_CAP_MS", () => {
+  it("is strictly greater than the resetting idle window it bounds", () => {
+    expect(CHAT_STREAM_RESPONSE_TOTAL_CAP_MS).toBeGreaterThan(
+      CHAT_STREAM_STAGE_TIMEOUTS_MS.response
+    );
+  });
+
+  it("is derived from the idle window constant, not an independent literal", () => {
+    // Guards against the cap and the idle window drifting apart silently if
+    // the idle window is retuned later.
+    expect(CHAT_STREAM_RESPONSE_TOTAL_CAP_MS).toBe(
+      CHAT_STREAM_STAGE_TIMEOUTS_MS.response * 3
+    );
   });
 });

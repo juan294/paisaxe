@@ -1,5 +1,10 @@
 # ElevenLabs Pelayo Agent Configuration
 
+<!-- contract:allow-emoji -->
+<!-- The SMS Templates section below reproduces literal message content sent by
+     src/lib/twilio-sms.ts (verified against twilio-sms.test.ts) — the glyphs
+     are required, accurate examples of real customer-facing text, not decoration. -->
+
 > **Last Updated:** 2026-04-24
 > **Agent ID (Guide):** `agent_1201kgqhsdzxfkk9x7m1bjaew9mv` (recreated 2026-02-05)
 > **Agent ID (Booking):** `agent_5201kgm2956ge8ct95yxjas867z5`
@@ -17,22 +22,22 @@ Pelayo is the primary voice agent for Paisaxe immersive stories - a warm and kno
 | **Role** | Tourism storytelling guide for Asturias |
 | **Interaction Style** | Conversational, warm, informative |
 | **Languages** | Spanish (primary), English (secondary) |
-| **Budget Tier** | ElevenLabs Starter ($5/month) |
+| **Budget Tier** | ElevenLabs Creator (annual, $22.18/month effective) |
 | **Cost Target** | ~$0.10/minute |
 
 ---
 
 ## LLM Configuration
 
-### Primary LLM: Gemini 2.5 Flash
+### Primary LLM: Gemini 2.5 Flash Lite
 
 | Model | Latency | Cost/min | Use Case |
 |-------|---------|----------|----------|
-| **Gemini 2.5 Flash** | ~1.1s | ~$0.0015 | Default - best balance |
-| Gemini 2.0 Flash Lite | ~568ms | ~$0.0007 | Ultra-fast, simpler responses |
+| **Gemini 2.5 Flash Lite** | ~568ms | ~$0.0007 | Configured default (`agent_configs/Paisaxe-Pelayo-(Visitor-Guide).json`) — fastest, lowest cost |
+| Gemini 2.5 Flash | ~1.1s | ~$0.0015 | Stronger reasoning, higher latency |
 | GPT-4o Mini | ~932ms | ~$0.0015 | Backup option |
 
-**Why Gemini 2.5 Flash:**
+**Why Gemini 2.5 Flash Lite:**
 - Recommended default by ElevenLabs for enterprise agents
 - Strong multilingual support (Spanish + English)
 - Enhanced reasoning for contextual tourism knowledge

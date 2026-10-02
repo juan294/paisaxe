@@ -11,28 +11,59 @@ name: CI
 # that dummy-key builds cannot detect (see incident: Next.js 16.2.1).
 # The health probe fails on non-200 or JSON status != "healthy".
 #
-# DO-M5: On direct `develop` pushes (the default dev workflow), a
-# lightweight runtime smoke check runs after build, hitting /api/health
-# and /api/health/live on the Vercel preview for the pushed commit.
-# This catches the same class of Dependabot-style regressions that the
-# 2026-03-24 incident exposed (broken build not caught until PR time).
-# The smoke job uses continue-on-error: true — it never blocks the push,
-# but failures are visible in the CI summary and GH notification emails.
+# DO-H1: Direct `develop` pushes do NOT get an equivalent runtime smoke
+# check. `vercel.json`'s ignoreCommand skips the Vercel build for every
+# non-production deploy with no PR id — i.e. every direct `develop` push —
+# so no preview deployment is ever created for these commits. A prior
+# develop-push smoke job (DO-M5) waited up to 5 minutes for a preview that
+# could never appear, then reported SUCCESS via its timeout branch without
+# having probed anything. It was removed rather than fixed to fail-on-
+# timeout, since deleting it also reclaims the ~5.3 min of runner time it
+# burned on every push for zero signal. Runtime regressions on `develop`
+# commits are now only caught when a PR from `develop` to `main` runs
+# `preview-smoke.yml` ("Smoke test Vercel preview"), which has a real
+# preview to probe. See docs/operations/alerting-runbook.md.
 
 on:
   push:
     branches: [develop, main]
+    # DO-M7 (#834): skip the full lint/test/build suite for commits that
+    # touch only prose. Filters the `push` trigger ONLY — `pull_request`
+    # below stays unfiltered because "Lint & Typecheck", "Test", and
+    # "Build" are required status checks for the `main` branch protection
+    # rule. Filtering pull_request too could leave a docs-only release PR
+    # waiting forever on a required context that never runs. See
+    # e2e.yml/lighthouse.yml for the same convention.
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
+      - "AGENTS.md"
   pull_request:
     branches: [develop, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required_checks: '["Lint & Typecheck","Test","Build"]'
+
   lint-and-typecheck:
     name: Lint & Typecheck
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -45,7 +76,7 @@ jobs:
           cache: 'npm'
 
       - name: Install canvas system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+        uses: ./.github/actions/install-canvas-deps
 
       - name: Install dependencies
         run: npm ci
@@ -85,7 +116,10 @@ jobs:
   # -----------------------------------------------------------------------
   coverage-shard:
     name: Coverage (shard ${{ matrix.shard }}/4)
-    runs-on: ubuntu-latest
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    runs-on: [self-hosted, linux, x64, cirujano-baseline-actions_linux]
+    timeout-minutes: 30
     strategy:
       # Don't cancel sibling shards when one fails — we want the full picture.
       fail-fast: false
@@ -103,14 +137,15 @@ jobs:
           cache: 'npm'
 
       - name: Install canvas system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+        uses: ./.github/actions/install-canvas-deps
 
       - name: Install dependencies
         run: npm ci
 
       # No positional path arg: vitest.config.ts's `include` already scopes
       # both src/** and scripts/** test files; a positional would override it.
-      # --reporter=blob writes .vitest-reports/blob-<shard>-4.json for merging.
+      # --reporter=blob writes .vitest/blob/blob-<shard>-4.json (vitest 5 default; vitest 4 used a
+      # different directory) and --merge-reports reads the same directory by default.
       - name: Run tests with coverage (sharded)
         run: >-
           npx vitest run
@@ -126,14 +161,23 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-blob-${{ matrix.shard }}
-          path: .vitest-reports/*
+          path: .vitest/blob/*
           include-hidden-files: true
+          # A missing blob must fail the shard, not warn: the merge job would
+          # otherwise fail later with an opaque ENOENT on the blob directory.
+          if-no-files-found: error
           retention-days: 1
 
   coverage-merge:
     name: Coverage merge
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: coverage-shard
+    # An explicit condition is required because coverage-shard itself depends
+    # on develop_push_source. That source-validation job is intentionally
+    # skipped on PRs, and GitHub's implicit success() would otherwise skip this
+    # job even after all four matrix shards succeeded.
+    if: ${{ always() && needs.coverage-shard.result == 'success' }}
 
     steps:
       - name: Checkout code
@@ -152,7 +196,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: coverage-blob-*
-          path: .vitest-reports
+          path: .vitest/blob
           merge-multiple: true
 
       # --merge-reports combines the shard blobs and reports/enforces the REAL
@@ -167,12 +211,17 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: [coverage-shard, coverage-merge]
+    timeout-minutes: 15
+    needs: [develop_push_source, coverage-shard, coverage-merge]
     if: always()
 
     steps:
       - name: Verify test/coverage suite succeeded
         run: |
+          if [ "${{ needs.develop_push_source.outputs.validated_by_pr }}" = "true" ]; then
+            echo "Exact merge SHA already passed every required PR check."
+            exit 0
+          fi
           shards='${{ needs.coverage-shard.result }}'
           merge='${{ needs.coverage-merge.result }}'
           echo "coverage-shard=$shards coverage-merge=$merge"
@@ -184,7 +233,10 @@ jobs:
 
   build:
     name: Build
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -197,7 +249,7 @@ jobs:
           cache: 'npm'
 
       - name: Install canvas system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+        uses: ./.github/actions/install-canvas-deps
 
       - name: Install dependencies
         run: npm ci
@@ -210,130 +262,3 @@ jobs:
           VOYAGE_API_KEY: dummy_key_for_build
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
-
-  # -----------------------------------------------------------------------
-  # DO-M5: Lightweight runtime smoke check for direct `develop` pushes.
-  #
-  # Waits for the Vercel preview deployment created by the push, then hits
-  # /api/health and /api/health/live to verify the real runtime is healthy.
-  #
-  # Uses continue-on-error: true — a smoke failure is surfaced in the CI
-  # summary and via GitHub notification email, but never blocks the push.
-  # This mirrors how we catch runtime regressions on main (preview-smoke.yml)
-  # but applies to every develop push, not just PRs.
-  #
-  # Required secrets (already configured):
-  #   VERCEL_AUTOMATION_BYPASS_SECRET — bypass Vercel preview protection
-  # -----------------------------------------------------------------------
-  develop-smoke:
-    name: Develop smoke check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # Only run on direct develop pushes — not PRs, not main.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    needs: [build]
-    # Never block the push — surface failures visibly but don't fail the run.
-    continue-on-error: true
-
-    permissions:
-      contents: read
-      deployments: read
-      statuses: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-
-      - name: Wait for Vercel preview deployment
-        id: vercel-wait
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          echo "Looking for Vercel preview deployment for commit $HEAD_SHA"
-          for attempt in $(seq 1 20); do
-            deployment_id=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/deployments" \
-              -f sha="$HEAD_SHA" \
-              --jq '[.[] | select(.creator.login == "vercel[bot]" and .environment == "Preview")][0].id // empty')
-
-            if [ -n "$deployment_id" ]; then
-              state=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
-                --jq '.[0].state // empty')
-              preview_url=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
-                --jq '.[0].environment_url // .[0].target_url // empty')
-              echo "Vercel deployment state: ${state:-unknown}"
-
-              if [ "$state" = "success" ] && [ -n "$preview_url" ]; then
-                echo "url=$preview_url" >> "$GITHUB_OUTPUT"
-                echo "vercel_outcome=success" >> "$GITHUB_OUTPUT"
-                echo "Preview URL: $preview_url"
-                exit 0
-              fi
-
-              if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
-                echo "::warning::Vercel preview deployment FAILED (state=$state) — smoke probes skipped. Check Vercel dashboard for build logs."
-                echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
-                echo ":x: **Vercel preview deployment failed** (state=\`$state\`). Smoke probes were not run." >> "$GITHUB_STEP_SUMMARY"
-                echo "Check the [Vercel dashboard](https://vercel.com/dashboard) for build error details." >> "$GITHUB_STEP_SUMMARY"
-                echo "url=" >> "$GITHUB_OUTPUT"
-                echo "vercel_outcome=failed" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-            else
-              echo "No Vercel preview deployment found yet (attempt $attempt / 20)"
-            fi
-
-            sleep 15
-          done
-
-          echo "::warning::Timed out waiting for Vercel preview deployment after 5 minutes — smoke probes skipped. Verify the deployment manually."
-          echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
-          echo ":warning: **Vercel preview deployment timed out** after 5 minutes. Smoke probes were not run." >> "$GITHUB_STEP_SUMMARY"
-          echo "Verify the deployment at the [Vercel dashboard](https://vercel.com/dashboard) manually." >> "$GITHUB_STEP_SUMMARY"
-          echo "url=" >> "$GITHUB_OUTPUT"
-          echo "vercel_outcome=timeout" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke check - liveness endpoint
-        if: steps.vercel-wait.outputs.url != ''
-        id: smoke-live
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
-          echo "Testing: $PREVIEW_URL/api/health/live"
-          response=$(curl -sS \
-            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
-            "$PREVIEW_URL/api/health/live" \
-            -o /tmp/live.json -w "%{http_code}")
-          if [ "$response" != "200" ]; then
-            echo "::warning::Smoke probe FAILED: /api/health/live returned HTTP $response on $PREVIEW_URL"
-            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
-            echo ":x: **Liveness probe failed**: \`/api/health/live\` returned HTTP $response on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
-            cat /tmp/live.json
-            exit 1
-          fi
-          echo "Liveness check passed (HTTP 200)"
-          cat /tmp/live.json
-
-      - name: Smoke check - health endpoint
-        if: steps.vercel-wait.outputs.url != ''
-        id: smoke-health
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
-          if node scripts/check-health-readiness.mjs "$PREVIEW_URL"; then
-            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
-            echo ":white_check_mark: **Smoke probes passed** — \`/api/health/live\` and \`/api/health\` returned healthy on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "::warning::Smoke probe FAILED: /api/health returned unhealthy on $PREVIEW_URL — check Sentry/logs for runtime errors."
-            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
-            echo ":x: **Health probe failed**: \`/api/health\` returned unhealthy on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "Check Sentry and Vercel function logs for runtime errors." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi

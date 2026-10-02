@@ -1,28 +1,78 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useStories } from "@/hooks/use-stories";
+import { useAuth } from "@/hooks/use-auth";
 import { Bookmark, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { getLocalizedStory, trimStoriesTranslations } from "@/lib/localize-story";
 import type { Story } from "@/types/immersive";
 
 const ITEMS_PER_PAGE = 20;
+// UX-L2 (#907): how long the undo affordance stays visible after a removal.
+const UNDO_TIMEOUT_MS = 6000;
 
 export default function FavoritesPage() {
   const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth } = useFavorites();
   const { stories: allStories, isLoading } = useStories();
+  const { signInWithGoogle } = useAuth();
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+
+  // UX-L2 (#907): the delete button removed a saved place immediately with
+  // no confirmation, undo, or announcement — the only destructive action in
+  // the visitor app had the least protection. Show a brief, announced undo
+  // toast; undo re-adds via the same toggle rather than delaying the
+  // original write (which would change ordering if the backend sorts by
+  // creation time — see the issue's regression-risk note).
+  const [undoState, setUndoState] = useState<{ storyId: string; title: string } | null>(null);
+  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearUndoTimeout = useCallback(() => {
+    if (undoTimeoutRef.current !== null) {
+      clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => clearUndoTimeout, [clearUndoTimeout]);
+
+  const handleRemove = useCallback(
+    (storyId: string, title: string) => {
+      toggleFavorite(storyId);
+      clearUndoTimeout();
+      setUndoState({ storyId, title });
+      undoTimeoutRef.current = setTimeout(() => {
+        setUndoState(null);
+        undoTimeoutRef.current = null;
+      }, UNDO_TIMEOUT_MS);
+    },
+    [toggleFavorite, clearUndoTimeout]
+  );
+
+  const handleUndo = useCallback(() => {
+    if (!undoState) return;
+    toggleFavorite(undoState.storyId);
+    setUndoState(null);
+    clearUndoTimeout();
+  }, [undoState, toggleFavorite, clearUndoTimeout]);
 
   // requiresAuth is true for anonymous users — they can never have saved favorites.
   const canWaitForStories = !requiresAuth || favorites.length > 0;
-  const stories = canWaitForStories ? allStories : [];
+  // UX-H6 (#892): favorites/layout.tsx's StoriesProvider (unlike the immersive
+  // page) doesn't trim story translations to the active locale — it fetches
+  // full untrimmed stories. Trim here, mirroring immersive-page-content.tsx's
+  // PE-M1 pattern, so the in-memory/localStorage-cached representation only
+  // carries the locale actually rendered below via getLocalizedStory.
+  const stories = useMemo(
+    () => trimStoriesTranslations(canWaitForStories ? allStories : [], locale),
+    [canWaitForStories, allStories, locale]
+  );
 
   // Filter to only favorited stories
   const favoriteStories = stories.filter((story) =>
@@ -35,18 +85,16 @@ export default function FavoritesPage() {
 
   // Load more items
   const loadMore = useCallback(() => {
-    if (isLoadingMore || !hasMore) return;
+    if (!hasMore) return;
 
-    setIsLoadingMore(true);
     setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, favoriteStories.length));
-    setIsLoadingMore(false);
-  }, [isLoadingMore, hasMore, favoriteStories.length]);
+  }, [hasMore, favoriteStories.length]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+        if (entries[0].isIntersecting && hasMore) {
           loadMore();
         }
       },
@@ -66,7 +114,7 @@ export default function FavoritesPage() {
         observer.unobserve(currentRef);
       }
     };
-  }, [hasMore, isLoadingMore, loadMore]);
+  }, [hasMore, loadMore]);
 
   // Reset display count when favorites change significantly
   useEffect(() => {
@@ -77,9 +125,17 @@ export default function FavoritesPage() {
 
   if (favoritesLoading || (canWaitForStories && isLoading)) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
-        <p className="mt-3 text-sm text-neutral-500">{t("common.loading")}</p>
+      <div
+        role="status"
+        aria-live="polite"
+        className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center"
+      >
+        {/* UX-M8 (#901): the reduced-motion reset freezes this spinner into a
+            static icon for reduced-motion users — explicitly opt it out via
+            motion-reduce:animate-none and keep the text label below so a
+            frozen icon still reads as "loading", not "hung". */}
+        <RefreshCw aria-hidden="true" className="h-5 w-5 animate-spin motion-reduce:animate-none text-neutral-400" />
+        <p className="mt-3 text-sm text-neutral-400">{t("common.loading")}</p>
       </div>
     );
   }
@@ -121,17 +177,37 @@ export default function FavoritesPage() {
               {t("favorites.empty_title")}
             </h2>
             {requiresAuth ? (
-              <p className="text-neutral-500 mb-6 max-w-sm text-sm">
-                {t("favorites.sign_in_to_save")}
-              </p>
+              <>
+                <p className="text-neutral-400 mb-6 max-w-sm text-sm">
+                  {t("favorites.sign_in_to_save")}
+                </p>
+                {/* UX-L2 (#907): the message explained sign-in was needed but
+                    offered no control to do it — a conversion dead end on the
+                    exact screen where the visitor showed intent to save. */}
+                <button
+                  type="button"
+                  onClick={() => signInWithGoogle("/favorites")}
+                  className="mb-3 px-5 py-2.5 bg-white text-neutral-900 rounded-full text-sm font-medium transition-all hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+                >
+                  {t("auth.sign_in")}
+                </button>
+              </>
             ) : (
-              <p className="text-neutral-500 mb-6 max-w-sm text-sm">
+              <p className="text-neutral-400 mb-6 max-w-sm text-sm">
                 {t("favorites.empty_description")}
               </p>
             )}
             <Link
               href="/immersive"
-              className="px-5 py-2.5 bg-white text-neutral-900 rounded-full text-sm font-medium transition-all hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              className={cn(
+                "rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950",
+                // When signed out, sign-in is the primary action above —
+                // keep this as a lighter secondary action rather than a
+                // second competing solid-white button.
+                requiresAuth
+                  ? "px-5 py-2.5 text-neutral-400 hover:text-white"
+                  : "px-5 py-2.5 bg-white text-neutral-900 hover:bg-neutral-200"
+              )}
             >
               {t("favorites.explore")}
             </Link>
@@ -144,7 +220,7 @@ export default function FavoritesPage() {
                   key={story.id}
                   story={story}
                   isFeature={index === 0 && favoriteStories.length > 2}
-                  onRemove={() => toggleFavorite(story.id)}
+                  onRemove={handleRemove}
                 />
               ))}
             </div>
@@ -154,14 +230,8 @@ export default function FavoritesPage() {
               ref={loadMoreRef}
               className="flex justify-center py-8"
             >
-              {isLoadingMore && (
-                <div className="flex items-center gap-2 text-neutral-500">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">{t("favorites.loading_more")}</span>
-                </div>
-              )}
               {!hasMore && favoriteStories.length > ITEMS_PER_PAGE && (
-                <span className="text-sm text-neutral-600">
+                <span className="text-sm text-neutral-400">
                   {t("favorites.all_viewed")}
                 </span>
               )}
@@ -169,6 +239,28 @@ export default function FavoritesPage() {
           </>
         )}
       </main>
+
+      {/* UX-L2 (#907): undo toast for a just-removed favorite. Announced via
+          role="status" so screen-reader users learn the removal happened,
+          not just visually-sighted users watching the card disappear. */}
+      {undoState && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-x-0 bottom-6 z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-full border border-neutral-700 bg-neutral-800/95 px-4 py-2.5 text-sm text-white shadow-lg backdrop-blur-sm"
+        >
+          <span className="truncate">
+            {undoState.title} — {t("favorites.removed")}
+          </span>
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="shrink-0 rounded font-medium text-white underline underline-offset-2 hover:text-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            {t("favorites.undo")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -177,14 +269,20 @@ export default function FavoritesPage() {
 interface GalleryItemProps {
   story: Story;
   isFeature: boolean;
-  onRemove: () => void;
+  /** UX-L2 (#907): passes the story id and its localized title so the
+   *  parent can show an announced undo toast naming what was removed. */
+  onRemove: (storyId: string, title: string) => void;
 }
 
 function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
   const [isVisible, setIsVisible] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const storyHref = `/immersive?story=${story.slug || story.id}`;
+  // UX-H6 (#892): route title/subtitle through getLocalizedStory so a
+  // non-Spanish visitor's saved gallery shows their own language, not the
+  // raw Spanish text stored on the story.
+  const localizedStory = getLocalizedStory(story, locale);
 
   // Intersection Observer for lazy rendering
   useEffect(() => {
@@ -230,7 +328,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
           <>
             <Image
               src={story.image}
-              alt={story.title}
+              alt={localizedStory.title}
               fill
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               sizes={isFeature
@@ -254,11 +352,11 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
                   {t(`stories.categories.${story.category}`)}
                 </p>
                 <h3 className="mt-1 text-base font-semibold text-white">
-                  {story.title}
+                  {localizedStory.title}
                 </h3>
-                {story.subtitle && (
+                {localizedStory.subtitle && (
                   <p className="mt-0.5 line-clamp-1 text-sm text-white/70">
-                    {story.subtitle}
+                    {localizedStory.subtitle}
                   </p>
                 )}
               </div>
@@ -277,7 +375,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
               <>
                 <Bookmark className="h-8 w-8 text-neutral-600" />
                 <p className="text-sm font-medium text-neutral-400">
-                  {story.title}
+                  {localizedStory.title}
                 </p>
               </>
             )}
@@ -289,7 +387,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onRemove();
+            onRemove(story.id, localizedStory.title);
           }}
           className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 opacity-100 shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-red-500 md:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
           aria-label={t("favorites.remove_from_saved")}

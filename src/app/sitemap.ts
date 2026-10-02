@@ -11,8 +11,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl();
   const stories = await getStoriesFromDB();
 
+  // FE-H2 (#760): /story/:slug is a real rendered page with per-story
+  // metadata — link to it directly (not /immersive?story=) so each story is
+  // individually indexable with its own title/description/OG image.
   const storyEntries: MetadataRoute.Sitemap = stories.map((story) => ({
-    url: `${siteUrl}/immersive?story=${story.slug || story.id}`,
+    url: `${siteUrl}/story/${story.slug || story.id}`,
     lastModified: new Date(),
     changeFrequency: "weekly" as const,
     priority: 0.8,

@@ -26,12 +26,16 @@ verified in production. Tag before step 6 and the tag asserts something nobody c
 
 ## 1. Identify the candidate
 
-The repo squash-merges, so the commit SHA that CI tested never reaches `main`. The **tree** does:
-`strict: true` branch protection forces the PR branch up to date before merging, so the squashed
-commit carries the tested tree. Releases are therefore identified by tree hash.
+Release PRs use merge commits so `main` remains an ancestor of `develop`. The merge commit has a
+new SHA, but its **tree** must match the tested `develop` head. Releases therefore keep using tree
+identity from candidate selection through deployed verification.
 
 ```bash
 git fetch --all
+git merge-base --is-ancestor origin/main origin/develop || {
+  echo "STOP: main ancestry is missing from develop; a release PR was probably squashed"
+  exit 1
+}
 CANDIDATE_TREE=$(npx tsx scripts/release/candidate-identity.ts --tree origin/develop)
 echo "$CANDIDATE_TREE"
 ```
@@ -41,7 +45,7 @@ Record `CANDIDATE_TREE`. Every later step refers to it.
 ## 2. Pre-deployment gates
 
 ```bash
-git log main..develop --oneline      # what would ship
+npm run what-would-ship              # commits + file-level diffstat since the last release
 gh run list --branch develop --limit 3
 
 npm run test && npm run typecheck && npm run lint
@@ -49,6 +53,18 @@ npm run check-migrations             # required probe: migration-posture
 npm run check-required-probes        # manifest and Playwright must agree
 npm run prelaunch
 ```
+
+`HEALTH_PROBE_SECRET` must be set in Vercel Production and in the local operator
+environment: the post-deploy ElevenLabs preflight (step 5) authenticates with it. The
+Preview smoke does not run that preflight (Vercel Preview is not provisioned with this
+secret); it only checks health readiness and the homepage. Configuration is an explicit
+production boundary; do not weaken or skip the step 5 probe when a value is missing.
+
+`what-would-ship` (`scripts/release/what-would-ship.ts`) resolves the `develop` commit whose tree
+matches the last release tag's recorded tree (see step 8) and diffs from there. This remains
+compatible with the historical squash releases whose ancestry cannot be repaired retroactively.
+It falls back explicitly to the `main`/`develop` merge-base — and says so — when no release tag
+resolves yet.
 
 Mutating verification runs against the local Docker stack, never a deployed environment —
 Preview shares the production Supabase project and holds live-mode Stripe keys.
@@ -77,7 +93,7 @@ Required contexts: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`,
 Report status and **stop**. Only after the user says "merge it":
 
 ```bash
-gh pr merge --squash                  # allow_merge_commit is false; --merge fails
+gh pr merge --merge                   # never squash a develop -> main release PR
 ```
 
 Never `--auto`: it merges unattended and bypasses the authorization gate.
@@ -110,7 +126,20 @@ read-only.
 
 ```bash
 RELEASE_TARGET_URL=https://paisaxe.es npx playwright test --project=release-required
+RELEASE_TARGET_URL=https://paisaxe.es \
+RELEASE_CANDIDATE_COMMIT="$DEPLOYED_COMMIT" \
+RELEASE_GITHUB_DEPLOYMENT_ID="$GITHUB_DEPLOYMENT_ID" \
+npm run check-elevenlabs-voice
 ```
+
+The ElevenLabs command also requires `HEALTH_PROBE_SECRET` locally. Set
+`DEPLOYED_COMMIT` from the successful candidate-identity check and
+`GITHUB_DEPLOYMENT_ID` to the immutable numeric GitHub Deployment API ID. The check requires HTTPS,
+rejects redirects, has a 45-second timeout, and fails unless the authenticated
+voice endpoint reports the same commit. It requests
+and discards signed URLs for Pelayo Visitor, Pelayo Booking, Penny, Iris, and
+Xander. It prints one safe JSON object that is ready to copy into the evidence
+manifest.
 
 No probe may be skipped. A probe whose prerequisites are missing fails — that is deliberate, and
 a skipped required probe blocks the release exactly like a failed one.
@@ -126,7 +155,12 @@ npm run analyze-release -- --evidence "docs/release/evidence/${CANDIDATE_TREE}.y
 
 The analyzer blocks on: zero passes; any required probe failed, skipped or absent; disagreeing
 candidate/shipped/deployed trees; a required probe missing its declared oracle evidence; fixture
-data left behind; and any exception covering a required probe. Exit 0 is the only green.
+data left behind; incomplete or unsafe ElevenLabs credential evidence; and any exception covering
+a required probe. The `elevenlabs-voice-preflight` evidence must include `provider: ok`, a valid
+fingerprint, `fingerprint_matches: true`, all five agent keys, and
+`custom_llm: not_applicable`. Its target URL, response URL, GitHub deployment ID,
+deployed commit, and timestamp must also match the release manifest. Exit 0 is
+the only green.
 
 The analyzer runs locally, not in CI — it consumes no CI minutes.
 

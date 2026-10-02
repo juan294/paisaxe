@@ -49,8 +49,10 @@ Supabase continuously archives PostgreSQL write-ahead log (WAL) segments to obje
 10. Once the restore is complete, verify the health endpoint:
 
 ```bash
-curl -s https://paisaxe.es/api/health | jq
-# Expected: "status": "healthy", supabase: "connected"
+curl -s https://paisaxe.es/api/health | jq '.status'
+# Expected: "healthy"
+# Note: no separate `supabase` field exists (removed in SE-M1's response
+# minimization) — connectivity failures roll up into top-level `status`.
 ```
 
 11. Run a spot-check query in the Supabase SQL Editor to confirm data integrity:
@@ -112,7 +114,7 @@ After any restore (PITR or daily snapshot), complete this checklist before consi
   SELECT jobname, schedule FROM cron.job ORDER BY jobname;
   ```
 
-  If jobs are missing, re-apply migration `011_pg_cron_jobs.sql` via `supabase db push`.
+  If jobs are missing, re-apply migration `011_pg_cron_maintenance.sql` via `supabase db push`.
 
 - [ ] **Database webhooks are configured** — verify `webhook_config` contains the correct `base_url`:
 
