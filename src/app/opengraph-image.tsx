@@ -17,7 +17,6 @@ import { LOCATION_CONFIG } from "@/config/location";
 export const alt = `${LOCATION_CONFIG.siteName} — ${LOCATION_CONFIG.tagline}`;
 export const size = OG_IMAGE_SIZE;
 export const contentType = OG_IMAGE_CONTENT_TYPE;
-export const runtime = "edge";
 
 export default async function Image() {
   return new ImageResponse(
