@@ -276,6 +276,17 @@ CI_E2E_RUN_ID=""
 # Check 1: App Health Endpoint
 log_info "Checking app health..." | tee -a "$LOG_FILE"
 HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3006/api/health" 2>&1 || true)
+if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
+  # A single transient `degraded` (2026-10-01, no component detail) cannot be
+  # triaged. Retry once and keep both full bodies for the report.
+  HEALTH_RESPONSE_FIRST="$HEALTH_RESPONSE"
+  log_warn "App health probe not healthy — retrying once after 5s: $HEALTH_RESPONSE_FIRST" | tee -a "$LOG_FILE"
+  sleep 5
+  HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3006/api/health" 2>&1 || true)
+  if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
+    HEALTH_RESPONSE="$HEALTH_RESPONSE (first probe: $HEALTH_RESPONSE_FIRST)"
+  fi
+fi
 if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
   log_success "App health: OK" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))

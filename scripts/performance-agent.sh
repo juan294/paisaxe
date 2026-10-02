@@ -59,8 +59,14 @@ restart_dev_server_if_needed() {
 # Widened headroom to ~800 KB so dependency drift stops false-alarming this metric.
 BUDGET_INITIAL_JS_KB=2100    # 2.1 MB initial load JS (static chunks only, excl. deferred)
 BUDGET_TOTAL_JS_KB=4000      # 4.0 MB total JS (including deferred dynamic chunks)
-BUDGET_LARGEST_CHUNK_KB=800  # 800 KB per chunk (ElevenLabs deferred chunk is 733 KB, click-to-mount, voice shelved per cost-analyst)
-BUDGET_NODE_MODULES_MB=1100  # 1.1 GB node_modules (@sentry/nextjs 67 MB is permanent)
+BUDGET_LARGEST_CHUNK_KB=650  # 650 KB per chunk, default for every chunk except the voice SDK's
+BUDGET_VOICE_CHUNK_MARKER=livekit  # string identifying the voice SDK chunk by content
+BUDGET_VOICE_CHUNK_KB=800    # 800 KB for the chunk containing livekit (ElevenLabs ConvAI SDK, 733 KB, click-to-mount, voice shelved per cost-analyst)
+# Raised 2026-10-02 (triage, per performance-report.md P1): 1,100 -> 1,300 MB. This measures the
+# developer-machine node_modules directory (95.5% used, mostly devDependencies: pdfjs-dist,
+# pdf-parse, canvas), which does not reach Vercel -- the deploy is bounded by
+# outputFileTracingExcludes in next.config.ts. The bundle metrics above stay authoritative.
+BUDGET_NODE_MODULES_MB=1300  # 1.3 GB node_modules (@sentry/nextjs 67 MB is permanent)
 BUDGET_PROD_DEPS=40          # Max production dependencies
 
 # Initialize metrics collection
@@ -183,7 +189,9 @@ fi
 
 # Determine budget violations
 VIOLATIONS=""
-VIOLATIONS="${VIOLATIONS}$(largest_chunk_budget_violation "$LARGEST_CHUNKS" "$BUDGET_LARGEST_CHUNK_KB")"
+VIOLATIONS="${VIOLATIONS}$(largest_chunk_budget_violation "$LARGEST_CHUNKS" "$BUDGET_LARGEST_CHUNK_KB" "$BUDGET_VOICE_CHUNK_MARKER" "$BUDGET_VOICE_CHUNK_KB")"
+ROUTE_STATS_FILE=".next/diagnostics/route-bundle-stats.json"
+VIOLATIONS="${VIOLATIONS}$(first_load_budget_violation "$ROUTE_STATS_FILE" "$BUDGET_INITIAL_JS_KB")"
 if [[ $TOTAL_JS_KB -gt $BUDGET_TOTAL_JS_KB ]]; then
   VIOLATIONS="$VIOLATIONS\n- Total JS ($TOTAL_JS_KB KB) exceeds budget ($BUDGET_TOTAL_JS_KB KB)"
 fi
@@ -227,15 +235,8 @@ fi
   echo "- Budget (split, since 2026-04-04): initial ${BUDGET_INITIAL_JS_KB} KB / total ${BUDGET_TOTAL_JS_KB} KB"
   echo ""
   if [[ "$FRESH_BUILD" == "true" ]]; then
-    echo "FIRST LOAD JS (per-route split, from next build):"
-    # Turbopack's route table (Next 16+) no longer prints a "First Load JS"
-    # column — this is now reliably empty. Under `set -o pipefail`, a grep
-    # with zero matches makes the whole pipeline (and this `{ } > file`
-    # block) exit non-zero, which silently killed the script here every
-    # single run for 6 weeks (2026-07-18 to 2026-08-20) before this guard.
-    # The filesystem-measured BUNDLE SIZES/LARGEST JS CHUNKS sections above
-    # already cover this data from `.next/static`, so this is best-effort.
-    echo "$BUILD_OUTPUT" | grep -E "First Load JS" | head -10 || echo "(not present in this build's output — see BUNDLE SIZES above for authoritative numbers)"
+    echo "FIRST LOAD JS (per route, uncompressed, from .next/diagnostics/route-bundle-stats.json):"
+    first_load_summary "$ROUTE_STATS_FILE"
     echo ""
   fi
   echo "LARGEST JS CHUNKS:"
