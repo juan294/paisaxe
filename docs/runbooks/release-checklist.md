@@ -54,10 +54,11 @@ npm run check-required-probes        # manifest and Playwright must agree
 npm run prelaunch
 ```
 
-Before a release candidate can pass Preview smoke, configure the same
-`HEALTH_PROBE_SECRET` in Vercel Preview and GitHub Actions. Production must use
-the corresponding Vercel Production value. Configuration is an explicit
-production boundary; do not weaken or skip the check when a value is missing.
+`HEALTH_PROBE_SECRET` must be set in Vercel Production and in the local operator
+environment: the post-deploy ElevenLabs preflight (step 5) authenticates with it. The
+Preview smoke does not run that preflight (Vercel Preview is not provisioned with this
+secret); it only checks health readiness and the homepage. Configuration is an explicit
+production boundary; do not weaken or skip the step 5 probe when a value is missing.
 
 `what-would-ship` (`scripts/release/what-would-ship.ts`) resolves the `develop` commit whose tree
 matches the last release tag's recorded tree (see step 8) and diffs from there. This remains
