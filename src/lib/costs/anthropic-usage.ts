@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { logger } from "@/lib/logger";
 import { estimateCostUsd } from "./anthropic-pricing";
@@ -19,11 +20,21 @@ export interface AnthropicResponseUsage {
   cache_read_input_tokens?: number | null;
 }
 
+/**
+ * anthropic_usage `source` label, one per call site. Required and closed so a
+ * missing or misspelled label cannot silently split a group in usage reports.
+ */
+export type UsageSource =
+  | "chat"
+  | "chat_stream"
+  | "translate"
+  | "content_discovery"
+  | `marketing_${string}`;
+
 export interface RecordUsageOptions {
   model: string;
   usage: AnthropicResponseUsage | null | undefined;
-  /** Coarse label for the call site, e.g. "chat" or "chat_stream". */
-  source?: string;
+  source: UsageSource;
 }
 
 /**
@@ -65,7 +76,7 @@ export async function recordAnthropicUsage(
       cache_creation_input_tokens: cacheCreation,
       cache_read_input_tokens: cacheRead,
       cost_usd: costUsd,
-      source: source ?? null,
+      source,
     });
 
     if (error) {
@@ -75,5 +86,21 @@ export async function recordAnthropicUsage(
     logger.warn("[ANTHROPIC_USAGE_RECORD_ERROR]", {
       error: err instanceof Error ? err.message : String(err),
     });
+  }
+}
+
+/**
+ * Fire-and-forget variant for request handlers. The insert starts at once and
+ * is handed to next/server `after()`, so Vercel keeps the function alive until
+ * it finishes instead of freezing it when the (streamed) response ends.
+ * Outside a request scope (scripts, tests) `after()` throws; the insert then
+ * simply runs unawaited. Never blocks the caller and never throws.
+ */
+export function recordAnthropicUsageInBackground(options: RecordUsageOptions): void {
+  const pending = recordAnthropicUsage(options);
+  try {
+    after(pending);
+  } catch {
+    // No request scope to extend; `pending` still runs to completion.
   }
 }

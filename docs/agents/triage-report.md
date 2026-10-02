@@ -1,68 +1,84 @@
 # Triage Report
-> Generated on 2026-09-26 | 7 reports processed | 5 action items | 6 Dependabot PRs
+> Generated on 2026-10-02 | 5 reports processed | 13 action items | 7 Dependabot PRs
+
+Claim labels: VERIFIED = run or read this session. INFERRED = not directly checked.
 
 ## Agent Failures
-None — all agents ran successfully. One agent (`cc-rpi-update`) intentionally stopped: the legacy `cc-rpi-update` command was renamed to `/rpi-update`, which now requires explicit interactive invocation and cannot run headlessly. This is not a crash; the user needs to invoke `/rpi-update` directly when a blueprint sync is wanted.
+None -- no `*.error.log` modified in the last 24h (VERIFIED: `find logs -name "*.error.log" -mtime -1` returned nothing).
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | qa-report.md | QA | GREEN | 3 (workers cap, dead mock fix, 27-route E2E coverage) |
-| 2 | performance-report.md | Performance | YELLOW | 1 (raise BUDGET_LARGEST_CHUNK_KB) |
-| 3 | coverage-report.md | Coverage | GREEN | 0 (tests already written, just needed committing) |
-| 4 | security-report.md | Security | GREEN | 0 (all 15 GitHub alerts already fixed on develop) |
-| 5 | cost-analyst-report.md | Cost Analyst | WATCH | 0 (ElevenLabs overage deferred by user 2026-08-30, not re-escalated) |
-| 6 | documentation-report.md | Documentation | GREEN | 0 |
-| 7 | cc-rpi-update-report.md | cc-rpi-update | N/A | 0 (requires manual `/rpi-update` invocation) |
+| 1 | qa-report.md | QA | YELLOW | 6 done, 2 declined with evidence |
+| 2 | performance-report.md | Performance | GREEN (watch item) | 3 done, 1 informational |
+| 3 | security-report.md | Security | YELLOW | 5 done |
+| 4 | coverage-report.md | Coverage | GREEN | 0 |
+| 5 | documentation-report.md | Documentation | GREEN | 0 |
 
 ## Overall Status: YELLOW
 
-Local code/report fixes are complete and verified, but this cycle could not push to the remote or process any Dependabot PRs due to an incomplete tooling migration (see "Blocked This Cycle" below) — that gap, not the report findings themselves, is why this isn't GREEN.
+All report findings are fixed on `develop`. YELLOW because (a) production (`main`) still runs next 16.2.12 with three open critical Next.js RCE advisories until a release, and (b) code scanning and secret scanning remain disabled.
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Cap `qa-journey` Playwright workers to 3, CI-only (`isCI ? undefined : 3`) | qa-report.md | N/A (config) | Done |
-| 2 | Fix dead `**/api/voice/access` mock -> `**/api/voice-access` | qa-report.md | N/A (existing test now exercises the real path) | Done |
-| 3 | Add 401/403 smoke coverage for 27 admin/cron routes + `health/voice`; 2 routes (`admin/agent-config`, `admin/tunnel`) excluded with inline comments (dev/prod gate runs before auth) | qa-report.md | 46 E2E tests (net, after deduping 2 pre-existing standalone tests into the new loops) | Done |
-| 4 | Raise `BUDGET_LARGEST_CHUNK_KB` 650 -> 800 in `scripts/performance-agent.sh` | performance-report.md | N/A (config; existing `performance-budget.test.ts` unaffected, uses its own default) | Done |
-| 5 | Commit already-written story-detail branch tests | coverage-report.md | 2 tests (already written, now committed) | Done |
+| 1 | Fix "Personal advice" validator (refusal wording no longer scored as advice; bilingual; directive-advice detection) -> `src/tests/qa/llm-quality-validators.ts` | qa | 12 (`src/tests/qa-boundary-validators.test.ts`) | Done |
+| 2 | Tighten "Booking request" validator (claim detection no longer matches "booked" inside a refusal; vague replies fail) | qa | (same file) | Done |
+| 3 | Log the full response for failed QA tests, not a 500-char preview | qa | N/A | Done |
+| 4 | Run all 4 Content Boundaries tests every cycle (was a random 3 of 4) | qa | N/A | Done |
+| 5 | QA harness retries a non-healthy `/api/health` once after 5s and keeps both bodies | qa | 1 (`scripts/verification-config.test.ts`) | Done |
+| 6 | Voice-SDK chunk only gets the 800 KB budget (default 650 KB), identified by the `livekit` marker; every listed chunk is checked | performance | 5 | Done |
+| 7 | `performance-agent.sh` reads `.next/diagnostics/route-bundle-stats.json` and checks the 2,100 KB initial-load budget per route | performance | 4 + 1 | Done |
+| 8 | `BUDGET_NODE_MODULES_MB` 1,100 -> 1,300 with rationale (dev-directory measure, not the Vercel deploy) | performance | N/A | Done |
+| 9 | undici override 7.29.0 -> 7.30.0 (clears 10 alerts, dev-only via jsdom) | security | N/A (`npm audit`: 0 vulnerabilities) | Done |
+| 10 | dompurify 3.4.13 -> 3.4.16, lockfile only (clears alert #136) | security | N/A | Done |
+| 11 | Security metrics count fixable vulnerabilities from `npm audit fix --dry-run`, not `fixAvailable`; skipped when there are 0 vulnerabilities | security | 1 | Done |
+| 12 | Refresh version drift in `docs/project/license-exceptions.md` (sharp-libvips 1.3.4, dompurify 3.4.16) | security | N/A | Done |
+| 13 | Live security-header check of paisaxe.es | security | N/A | Done -- see below |
 
-All changes verified: `/simplify` ran across 4 parallel review angles (reuse, simplification, efficiency, altitude) on the full diff. Applied: deduped 2 redundant standalone admin/cron tests into the new route loops, extracted a shared `expectAuthRequired()` helper, and corrected the `workers: 3` override to be CI-conditional (matching the file's existing `isCI` convention). Skipped: hoisting `getCsrfHeaders()` out of the `ADMIN_WRITE_ROUTES` loop (matches the file's own established per-test pattern elsewhere; restructuring would deviate from convention for marginal gain) and redesigning the chunk-size budget as a per-chunk-name exemption instead of a global raise (good idea, but a larger design change to shared script + test file, out of scope for this pass — flagged to Performance Agent in shared-context.md).
+Declined with evidence:
+- **E2E assertion that `/api/health` is `healthy`** (QA rec.): `e2e/api.spec.ts:43-45` runs on dummy keys and accepts `degraded` by design; readiness is enforced by `scripts/check-health-readiness.mjs` in CI. The assertion would break that suite. The deterministic refusal check is covered by the new validator unit tests instead.
+- **Vercel runtime logs for 2026-10-01 06:00Z** (QA/Performance rec.): moot. VERIFIED from `scripts/qa-agent.sh:278` that the `degraded` reading came from the harness's own local production build (`http://localhost:3006/api/health`), not paisaxe.es, so Vercel logs cannot contain it. Four later production re-probes were healthy.
+- **Performance P4/P5** (`/admin`, `/immersive` first-load size): informational, no defect. Not actioned.
+- **Authenticated Playwright fixture for journeys 9-12**: larger scope (auth fixture against live Supabase auth). Carried, not done.
 
-Full verification suite (test, typecheck, lint) passed both before and after `/simplify`.
+Live header check (VERIFIED: `curl -sIL https://paisaxe.es/`, 2026-10-02): HSTS, nosniff, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy and CSP all present; CSP has `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`, no `strict-dynamic`. Closes the item carried since Apr 25.
+
+`/simplify` (4 parallel angles) applied: skip content `grep` for chunks under the default budget, skip the audit dry run at 0 vulnerabilities, one bash helper in the budget test, a positive-int helper, a named voice-chunk marker. Skipped: LLM-as-judge validators (changes approach and cost), per-component `/api/health` detail (production endpoint, outside this diff), regex factoring, `it.each` tables, reusing `retry_curl_probe` (retries only on curl failure, not on a `degraded` body).
 
 ## GitHub Security & Quality Alerts
 | # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
 |---|------|----------|--------------|---------------|----------|--------|-------|
-| 1 | Code scanning (CodeQL) | — | — | — | API query | Disabled (403) | Standing billing/owner decision since 2026-08-18, not new |
-| 2 | Secret scanning | — | — | — | API query | Disabled (404) | Same standing decision |
-| 3-17 | Dependabot security (15 alerts) | 2 Critical, 8 High, 5 Medium | next, sharp, browserslist, fast-uri (x4), js-yaml, fflate, @humanfs/node, baseline-browser-mapping, vitest/@vitest/mocker | GHSA-2xp9-vwfh-vxw4, GHSA-p293-qw3h-jr36, GHSA-rgj7-g3m4-5g8c, GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx, GHSA-5jgf-p345-68v8, GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf, GHSA-jqff-g426-hqxp, GHSA-2883-xcg3-v3hh, GHSA-82fw-gwwq-j7x9, GHSA-px8p-9vwx-vf98, GHSA-p498-v437-472g, GHSA-w5vr-8v7q-w6rv | package-lock.json | Already fixed on develop | Independently re-verified this cycle via direct `package.json`/`package-lock.json` diff of `develop` vs `main` — `main` still carries the vulnerable versions (e.g. `next@16.2.12`, `fast-uri: ">=3.1.5"`); `develop` already has patched versions (`next@16.3.4`, `fast-uri: "4.1.4"`, etc). This is the documented main-branch reporting-lag pattern; alerts will auto-close on the next `develop` -> `main` release. No code action taken. |
+| 1 | Code scanning | -- | -- | -- | API query | Disabled (403) | Standing billing decision, not new |
+| 2 | Secret scanning | -- | -- | -- | API query | Disabled (404) | Same |
+| 3-23 | Dependabot (21 alerts) | 3 Critical (next #117, #118, #135), High/Medium others | next, fast-uri, brace-expansion, sharp, browserslist, js-yaml, vitest, @vitest/mocker, fflate, @humanfs/node, baseline-browser-mapping | various | package-lock.json | Fixed on `develop`, open on `main` | VERIFIED by comparing each alert's patched version to `develop`'s lockfile (next 16.3.6, fast-uri 4.1.5, brace-expansion 5.0.12, ...). `main` still locks next 16.2.12 (VERIFIED: `git show origin/main:package-lock.json`). Clears on release to `main`. |
+| 24-33 | Dependabot (10 alerts) | 2 High, 4 Medium, 4 Low | undici | #121, #123-#131 | package-lock.json | Fixed on `develop` (override 7.30.0) | Dev-only via jsdom. Closes after push + `main` release. |
+| 34 | Dependabot | Low | dompurify | #136, GHSA-p98j-92pf-mc4p | package-lock.json | Fixed on `develop` (3.4.16) | posthog-js transitive |
+
+Exposure note: `main` serves `src/app/opengraph-image.tsx` and `src/app/story/[slug]/opengraph-image.tsx` (ImageResponse) on next 16.2.12, which the open critical alert #135 (next/og) names. Whether that is exploitable here is INFERRED; the advisory text was not read. Releasing `develop` to `main` is the only fix and is a user decision.
 
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| 966 | chore(deps): bump the production group with 15 updates | minor/patch | Determined: auto-merge | CI green. **Not executed** — `gh pr merge` is hard-blocked by `.rpi/scripts/rpi-policy.py` this cycle (see below). |
-| 967 | chore(deps-dev): bump the dev-and-types group with 2 updates | minor/patch | Determined: auto-merge | CI green. **Not executed**, same block. |
-| 972 | chore(deps): bump the npm_and_yarn group with 9 updates | mixed (includes transitive `@vitest/mocker` 4.1.10->5.0.1, a major) | Determined: attempt-fix (rebase, then pin `@vitest/mocker` back if the vitest 4.x peer conflict persists) | CI red (`ERESOLVE`: `@vitest/mocker@5.0.1` vs `vitest@4.x`/`@vitest/coverage-v8@4.x`). Its security value is moot — all advisories it would fix are already independently fixed on develop. **Not executed**, `gh pr update-branch`/`gh pr merge` both blocked. |
-| 968 | chore(deps-dev): bump vitest from 4.1.11 to 5.0.1 | major | Determined: defer | CI red. Not actioned (correctly deferred either way). |
-| 969 | chore(deps-dev): bump dotenv from 17.4.2 to 18.0.0 | major | Determined: defer | CI green, but major bump requires human review regardless of CI per policy. Not actioned. |
-| 970 | chore(deps-dev): bump @vitest/coverage-v8 from 4.1.11 to 5.0.1 | major | Determined: defer | CI red. Not actioned. |
-
-## Blocked This Cycle: Local Publication Policy Incomplete
-
-`.rpi/scripts/rpi-policy.py` (added in the `c378d525` "sync paisaxe with cc-rpi v2.0.2 blueprint" commit) is a PreToolUse hook that hard-blocks `git push`, `gh pr merge`/`create`/`update-branch`, and `gh workflow run`/`run rerun` from this session. It requires a companion `.rpi/policy.json` (declaring the integration branch, verification checks, and verification command) plus a setup tool at `.rpi/scripts/rpi-distribution.py` to generate it — **neither exists in the repository**. Only `rpi-policy.py` itself landed in that sync commit. This looks like an incomplete migration, not an intentional lockdown, and lines up with this cycle's `cc-rpi-update-report.md` finding that the sync mechanism itself is now broken.
-
-**Net effect:** all 5 code fixes plus the 8 updated agent reports are committed to local `develop` (commit `00178c0d`) but **not pushed**, and none of the 6 Dependabot PRs could be merged, rebased, or commented on. The user is aware and fixing the `.rpi` setup themselves; once resolved, push the commit and process the PRs per the dispositions table above.
+| 977 | production group, 17 updates | minor/patch | Merged (squash) | CI green. Merged first because the undici fix sits on top of its lockfile. |
+| 975 | juan294/sutura 0.3.1 -> 0.3.3 | patch | Merged (squash) | CI green. |
+| 967 | dev-and-types, 2 updates | minor/patch | Attempt-fix: update-branch once | Red run was a CI infrastructure failure (Coverage shard 4 died in the apt step, "apt failed after 3 attempts"); not a code failure. |
+| 968 | vitest 4 -> 5 | major | Deferred | Human review. |
+| 970 | @vitest/coverage-v8 4 -> 5 | major | Deferred | Human review. |
+| 969 | dotenv 17 -> 18 | major | Deferred | Imported in 5+ scripts; 18 changes preloading and stdout logging. |
+| 972 | npm_and_yarn group, **base main** | mixed | Deferred, not touched | Correction: the Sep 26 triage listed "attempt-fix (rebase)". That contradicts the standing rule never to merge Dependabot PRs to `main` (merge = production deploy). Its advisories are already fixed on `develop`. Closing it needs user OK. |
 
 ## Verification
-- [x] All tests passing (7,879 passed, 13 skipped, 0 failures — full vitest suite; 46/46 new/refactored Playwright API tests)
+- [x] All tests passing (7,957 passed, 13 skipped, 0 failures; 412 files) -- before `/simplify`; the commit hook re-ran lint and the full suite after it
 - [x] Typecheck clean (app, scripts, e2e, edge)
-- [x] Lint clean (src, scripts, e2e)
-- [ ] CI green — not applicable this cycle, nothing pushed
-- [ ] Local commit pushed to remote — **blocked**, see above
+- [x] Lint clean
+- [x] `check-verification-coverage`, `check-env`, `check-licenses` pass
+- [ ] CI green on pushed commit -- see end of report once the run completes
 
 ## Carried Items
-- **`.rpi/policy.json` + `.rpi/scripts/rpi-distribution.py` setup gap** — blocks all push/PR-merge automation until the user completes it. Highest-priority carried item; will re-block every future triage cycle until fixed.
-- **Performance budget design**: a per-chunk-name exemption mechanism (vs. the global `BUDGET_LARGEST_CHUNK_KB` raise applied this cycle) was recommended by this cycle's altitude review — worth a dedicated follow-up to `scripts/lib/performance-budget.sh` + its test file, not urgent.
-- **ElevenLabs overage decision** — still deferred by explicit user choice (2026-08-30); not re-escalated, per standing project memory.
+- **Release decision**: `main` carries 3 critical Next.js RCE alerts; fixes are on `develop`. User-initiated only.
+- **Authenticated E2E fixture** for journeys 9-12 (main outstanding E2E gap).
+- **Code scanning / secret scanning disabled**: standing billing decision.
+- **ElevenLabs overage decision**: deferred by user 2026-08-30, not re-escalated.
+- **PR #972**: close, pending user OK.
+- **Corrected claim**: the Sep 24/26 statement "all 15 alerts fixed on develop" covered only those 15; the set is now 32, of which 11 needed a fix (done in this triage).

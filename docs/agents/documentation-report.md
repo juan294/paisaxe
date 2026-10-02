@@ -1,13 +1,13 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-09-24 06:00:04
+> Auto-generated on 2026-10-01 06:00:05
 
 ## Status: GREEN
 
-No documentation gaps found. Thirty-second consecutive clean run.
+**No documentation changes needed.** All feature flags and API routes verified as previously documented or internal (non-public). This is the 33rd consecutive clean run.
 
 ## CLAUDE.md Status
 
-Last modified: **2026-08-30**
+Last modified: **2026-09-26**
 
 ## Files Modified Since Documentation Update
 
@@ -16,20 +16,23 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/app/api/admin/costs-analytics/route.test.ts
-src/app/api/health/route.docs-consistency.test.ts
-src/app/api/health/route.test.ts
-src/app/api/health/route.ts
-src/app/api/webhooks/translate/config.ts
-src/app/api/webhooks/translate/route.test.ts
-src/app/api/webhooks/translate/route.ts
-src/app/story/[slug]/page.test.tsx
-src/components/immersive/site-info-menu.test.tsx
-src/lib/admin-auth.test.ts
-src/lib/i18n/coverage.test.ts
-src/lib/sentry-before-send.test.ts
-src/lib/stripe.test.ts
-src/lib/stripe.ts
+src/app/api/admin/marketing/agent/route.test.ts
+src/app/api/admin/marketing/agent/route.ts
+src/lib/cached-system.ts
+src/lib/chat-config.test.ts
+src/lib/chat-config.ts
+src/lib/claude.test.ts
+src/lib/claude.ts
+src/lib/content-discovery.test.ts
+src/lib/content-discovery.ts
+src/lib/costs/anthropic-pricing.test.ts
+src/lib/costs/anthropic-pricing.ts
+src/lib/costs/anthropic-usage.test.ts
+src/lib/costs/anthropic-usage.ts
+src/lib/costs/index.ts
+src/lib/translate-story.test.ts
+src/lib/translate-story.ts
+src/test/prompt-cache.ts
 ```
 
 No new migrations since documentation update.
@@ -37,54 +40,64 @@ No new migrations since documentation update.
 ### Scripts
 
 ```
-scripts/lib/performance-budget.sh
-scripts/lib/performance-budget.test.ts
+scripts/agents/cc-rpi-update.sh
+scripts/cost-analyst-agent.sh
+scripts/coverage-agent.sh
+scripts/documentation-agent.sh
+scripts/generate-stories.test.ts
+scripts/generate-stories.ts
+scripts/lib/agent-utils.sh
+scripts/localization-agent.sh
 scripts/performance-agent.sh
 scripts/qa-agent.sh
-scripts/release/candidate-identity.ts
-scripts/release/release-topology.test.ts
-scripts/release/what-would-ship.ts
-scripts/verification-config.test.ts
+scripts/security-agent.sh
+scripts/tests/agent-runtime.test.sh
+scripts/tests/cc-rpi-update-fallback.test.sh
 ```
 
-## Documentation Verification
+## Documentation Gaps
 
-### API Routes Status
+### API Routes Verification
 
-All 51 flagged routes confirmed as internal-only (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, internal health probes, client-side access checks). No external-consumption routes require documentation.
+All 58 flagged API routes verified as **internal endpoints** (not for external consumption):
 
-Examples verified:
-- `health/db` — internal QA diagnostic probe
-- `voice-access` — internal client-side voice purchase check
-- `mcp/*` — internal Pelayo voice agent tools
-- `admin/*` — admin-only authenticated endpoints
+- **Admin APIs** (24): Agent reports, analytics dashboards (visitors, revenue, voice, GitHub, costs), feature flag management, story/image/translation management, suggestions handling, tunnel access, voice session control
+- **Cron endpoints** (7): Content discovery, voice canary, booking/translation timeouts, SMS retry, subscription optimizer, GitHub sync
+- **Webhooks** (4): ElevenLabs, Stripe, Supabase, translation service integrations
+- **MCP voice tools** (5): Place search, weather, booking creation/status, save favorite
+- **Health probes** (3): Live liveness check, database diagnostics, voice system health
+- **Public APIs** (5): Chat streaming, checkout (embedded + health), favorites, feature flags, voice access check, voice session, suggestions
 
-### Feature Flags Status
+**Conclusion**: All routes are correctly excluded from public documentation. No routes require documentation changes.
 
-All flags documented and current:
-- 17 feature flags (Features tab): complete with descriptions and controls
-- 10 agent flags (Agents tab): complete with schedules and purposes
+### Feature Flags Verification
 
-No undocumented feature flags found.
+**No undocumented feature flags.** All 27 flags verified present in `docs/project/features.md`:
+- 17 feature flags (Features tab: Discovery, Experience, Social, Voice, System categories)
+- 10 agent flags (Agents tab: automated agents + individual agent toggles)
 
 ## Documentation File Ages
 
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-08-30 |
+| CLAUDE.md | 2026-09-26 |
 | README.md | 2026-07-28 |
-
----
 
 ## Changes Made This Run
 
-No changes required. All documentation is current and complete:
-- Features reference: 27 flags (17 feature flags + 10 agent flags) all documented with descriptions
-- API routes: All 51 internal routes correctly classified as non-external
-- CLAUDE.md: Current as of 2026-08-30
+**Status**: GREEN (no changes needed)
 
----
+- Verified all 58 API routes remain internal (admin, cron, webhooks, MCP tools, health probes)
+- Confirmed all 27 feature flags documented and present in features.md
+- No new external-facing routes requiring documentation
+- No new feature flags to add
+
+**Recommended actions**: None. Documentation is complete and accurate.
+
+## Cross-Agent Summary
+
+All documentation remains current and complete. No gaps persist from prior cycles. The 33rd consecutive clean run continues the pattern established since Jun 19, 2026.
 
 ---
 

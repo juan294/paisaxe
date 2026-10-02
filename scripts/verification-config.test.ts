@@ -186,6 +186,42 @@ describe("verification coverage config", () => {
     );
   });
 
+  // 2026-10-01: a single `degraded` reading with no body detail could not be triaged.
+  it("retries a non-healthy app health probe once and keeps both full bodies", () => {
+    const qaAgent = readText("scripts/qa-agent.sh");
+
+    expect(qaAgent).toContain("App health probe not healthy — retrying once after 5s");
+    expect(qaAgent).toContain("HEALTH_RESPONSE_FIRST");
+    expect(qaAgent).toContain("first probe:");
+    expect(qaAgent.indexOf("HEALTH_RESPONSE_FIRST")).toBeLessThan(
+      qaAgent.indexOf("App health: FAILED")
+    );
+  });
+
+  it("holds only the voice-SDK chunk to the larger chunk budget and reads route first-load stats", () => {
+    const perfAgent = readText("scripts/performance-agent.sh");
+
+    expect(perfAgent).toContain("BUDGET_LARGEST_CHUNK_KB=650");
+    expect(perfAgent).toContain("BUDGET_VOICE_CHUNK_MARKER=livekit");
+    expect(perfAgent).toContain("BUDGET_VOICE_CHUNK_KB=800");
+    expect(perfAgent).toContain(
+      'largest_chunk_budget_violation "$LARGEST_CHUNKS" "$BUDGET_LARGEST_CHUNK_KB" "$BUDGET_VOICE_CHUNK_MARKER" "$BUDGET_VOICE_CHUNK_KB"'
+    );
+    expect(perfAgent).toContain(".next/diagnostics/route-bundle-stats.json");
+    expect(perfAgent).toContain('first_load_budget_violation "$ROUTE_STATS_FILE" "$BUDGET_INITIAL_JS_KB"');
+  });
+
+  // 2026-10-01: an exact-version override blocks `npm audit fix`, yet the audit's
+  // fixAvailable flag still said "fixable". The metric must come from a dry run.
+  it("counts fixable vulnerabilities from an npm audit fix dry run, not fixAvailable", () => {
+    const securityAgent = readText("scripts/security-agent.sh");
+
+    expect(securityAgent).toContain("npm audit fix --dry-run --json");
+    expect(securityAgent).toContain("REMAINING_AFTER_FIX");
+    expect(securityAgent).not.toContain("fixAvailable == true");
+    expect(securityAgent).toContain("remaining after npm audit fix dry run");
+  });
+
   it("writes a report and shared-context entry when the QA wrapper aborts", () => {
     const qaAgent = readText("scripts/qa-agent.sh");
 
