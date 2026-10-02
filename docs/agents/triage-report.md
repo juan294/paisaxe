@@ -17,7 +17,7 @@ None -- no `*.error.log` modified in the last 24h (VERIFIED: `find logs -name "*
 
 ## Overall Status: YELLOW
 
-All report findings are fixed on `develop`. YELLOW because (a) production (`main`) still runs next 16.2.12 with three open critical Next.js RCE advisories until a release, and (b) code scanning and secret scanning remain disabled.
+All report findings are fixed on `develop`, and the three critical Next.js RCEs are fixed in production (see Follow-up). YELLOW because the full `develop` -> `main` release (including DB migrations 101-109) has not shipped, and code scanning and secret scanning remain disabled.
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
@@ -83,3 +83,28 @@ Exposure note: `main` serves `src/app/opengraph-image.tsx` and `src/app/story/[s
 - **ElevenLabs overage decision**: deferred by user 2026-08-30, not re-escalated.
 - **PR #972**: close, pending user OK.
 - **Corrected claim**: the Sep 24/26 statement "all 15 alerts fixed on develop" covered only those 15; the set is now 32, of which 11 needed a fix (done in this triage).
+
+## Follow-up 2026-10-02: critical Next.js RCEs, dependency updates, hotfix
+
+Authorized by the user in this conversation: update to latest; hotfix PR to `main` and merge when the 5 required checks pass; move the `paisaxe.es` and `www.paisaxe.es` aliases. A full `develop` -> `main` release was NOT authorized or done.
+
+| Step | Result | Evidence |
+|---|---|---|
+| Update dependencies on `develop` | next 16.3.8, vitest 5.0.3, coverage-v8 5.0.3, dotenv 18.0.5 plus all in-range updates; Dependabot #968, #969, #970 applied directly (PRs closed as superseded by Dependabot, not merged) | `npm audit`: 0 vulnerabilities; 7,957 tests, typecheck, lint, build pass |
+| `detect-language.test.ts` | Fixed for jsdom 30.1 (`navigator` getter-only) with `vi.stubGlobal` | 46/46 pass |
+| `develop` CI failure (run 36985885545) | Root cause: vitest 5 writes blobs to `.vitest/blob`, workflow uploaded `.vitest-reports/*` (warned, no files), Coverage merge failed with ENOENT. Workflow now uses `.vitest/blob`, fails the shard on a missing blob, regression test added | CI on `58aa4483`: Test, Coverage merge, Build, Playwright E2E all `success` |
+| Hotfix PR #980 (base `main`) | next 16.2.12 -> 16.3.8 plus lockfile-only fixes (sharp, fast-uri, brace-expansion, dompurify, js-yaml); `package.json` unchanged; `npm audit --omit=dev`: 0 vulnerabilities | 5 required checks green on `5472ea4a`; merged as `a6444328` |
+| Hotfix build break | Next 16.3.x rejects `runtime = "edge"` with `cacheComponents`; the two `opengraph-image` routes drop it (same as `develop` #756). OG images now render on the Node runtime | Build passes; live root OG `200 image/png`; `/story/covadonga/opengraph-image` `200` |
+| Required check `Smoke test Vercel preview` failed first time | Branch was pushed before the PR existed; `vercel.json` ignoreCommand skipped the build, so no preview deployment existed (INFERRED from ignoreCommand and the absent GitHub deployment record). A new commit after PR creation triggered it | Passed on the second head commit |
+| Go live | **Merging to `main` did not update the live domain.** `paisaxe.es` stayed on the v1.6.0 deployment of Aug 10 (`dpl_jXCx...`, source CLI) and `www.paisaxe.es` on an older one; five main deployments, including the hotfix, were never aliased. Both aliases were moved by hand to `paisaxe-mst7zeeko-thecreativetoken.vercel.app` | `list_aliases` before; `vercel alias set` succeeded for both; live HTML carries `data-dpl-id="dpl_5u6vBhrJ5WqkQjGik1LbNYZauefg"` |
+| Live verification (after alias) | `/api/health` healthy, `www` -> apex 200, CSP/HSTS/X-Frame-Options present, cache `age: 4` | curl, 2026-10-02 |
+| Ancestry | `main` had four Sutura CI-pin commits (#962, #971, #973, #979) missing from `develop`; merged `origin/main` into `develop` (Sutura pin v0.3.5, `develop` lockfile kept) | `git merge-base --is-ancestor origin/main HEAD` OK |
+
+Rollback if needed: alias `paisaxe.es` and `www.paisaxe.es` back to `paisaxe-1o6aakv33-thecreativetoken.vercel.app` (v1.6.0).
+
+Alerts after this follow-up: the Dependabot alerts that were open on `main` for the production tree (next x3, sharp, fast-uri, brace-expansion, dompurify, js-yaml) are fixed on `main`; GitHub should close them on its next scan (not re-queried after the merge, so this is INFERRED). Dev-only advisories remain on `main` until the full release (5 per `npm audit` on the hotfix branch).
+
+### Not done, needs the user
+- **Full `develop` -> `main` release.** Candidate is 729 files, about 80k added lines, and migrations 101-109, which are NOT applied in production (the `asturias` project is at migration 100, VERIFIED via `list_migrations`). `booking-service.ts` references the new objects. Needs local Docker migration testing, an authorization to apply them, and the manual security gates below.
+- **Security checklist gates 2 and 6** need a QA-user token and live Stripe test credentials, which an agent cannot handle. Gates 3, 4, 5 were probed against current production on 2026-10-02 and all returned 401 as required. Gate 1 (Gitleaks) is green on `develop`.
+- **Tag/evidence** (checklist steps 6-8) belong to the full release.
