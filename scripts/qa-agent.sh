@@ -3,8 +3,8 @@
 # Performs automated LLM testing and provides actionable analysis of failures
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/code/paisaxe"
-CLAUDE_BIN="/Users/juan/.local/bin/claude"
+PROJECT_DIR="${PROJECT_DIR:-/Users/juan/code/paisaxe}"
+CLAUDE_BIN="${CLAUDE_BIN:-/Users/juan/.local/bin/claude}"
 MODEL="sonnet"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/qa-agent-$(date +%Y-%m-%d).log"
@@ -23,6 +23,14 @@ QA_TEST_USER_EMAIL="${QA_TEST_USER_EMAIL:-}"
 QA_TEST_USER_PASSWORD="${QA_TEST_USER_PASSWORD:-}"
 
 mkdir -p "$LOG_DIR"
+
+# The 2026-08-20 run aborted mid-Phase-1 with nothing in the log beyond the
+# phase header — same silent-death class as performance-agent's 6-week bug
+# (fixed in c4a3d559): a `set -e` abort produces no error line by default.
+# This trap logs the failing line number before the existing EXIT trap
+# (handle_exit) writes the ABORTED report, so the next failure is diagnosable
+# from the log alone instead of requiring bisection.
+trap 'ec=$?; { printf "[ERROR] %s FATAL: command failed at line %s (exit %s) — aborting\n" "$(date "+%Y-%m-%d %H:%M:%S")" "$LINENO" "$ec"; } | tee -a "$LOG_FILE" >&2; exit "$ec"' ERR
 
 trim_value() {
   local value="${1:-}"
@@ -120,7 +128,12 @@ write_abnormal_exit_report() {
     echo ""
     echo "The QA wrapper exited before its normal report-generation step. Review $LOG_FILE for the underlying failure."
   } > "$aborted_report"
-  mv "$aborted_report" "$REPORT_FILE"
+  if [[ "$CURRENT_PHASE" == "phase 5 report generation" ]]; then
+    cat "$aborted_report" >> "$LOG_FILE"
+    rm -f "$aborted_report"
+  else
+    mv "$aborted_report" "$REPORT_FILE"
+  fi
   write_shared_context "qa_agent_enabled" "$context" || true
 }
 
@@ -168,23 +181,61 @@ CURRENT_PHASE="server startup"
 PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3006/api/health 2>/dev/null || true)
 [[ -z "$PRECHECK_CODE" ]] && PRECHECK_CODE="000"
 if [[ "$PRECHECK_CODE" != "000" ]]; then
-  log_info "Dev server already running on port 3006 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
+  log_info "Server already running on port 3006 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
 else
-  log_info "Starting Next.js dev server..." | tee -a "$LOG_FILE"
+  # QA-H3 (#870): this used to run `npm run dev`, which forces
+  # NODE_ENV=development and routes every Anthropic call through the curl
+  # subprocess transport (see src/lib/claude.ts USE_CURL) instead of the
+  # Anthropic SDK production actually uses — different prompt structure (no
+  # cache_control) and different retry semantics. The only weekly gate that
+  # talks to a live model was validating a code path no real request takes.
+  # Build and run the same production artifact `next start` serves in prod.
+  log_info "Building production bundle (QA-H3: run the QA gate against a production build for parity with real traffic)..." | tee -a "$LOG_FILE"
+
+  # VOYAGE_API_KEY (and ANTHROPIC_API_KEY) are already exported above when
+  # present — no need to re-prefix them per-command.
+  npm run build > "$SERVER_LOG" 2>&1
+  BUILD_EXIT=$?
+  if [[ $BUILD_EXIT -ne 0 ]]; then
+    log_error "Production build failed (exit $BUILD_EXIT) — see $SERVER_LOG" | tee -a "$LOG_FILE"
+    exit 1
+  fi
+  log_success "Production build complete" | tee -a "$LOG_FILE"
+
+  log_info "Starting Next.js production server..." | tee -a "$LOG_FILE"
+
+  # QA-H4 (2026-08-30 triage, docs/agents/qa-report.md 2026-08-27): QA-H3
+  # switched this harness from `npm run dev` to `npm run build && npm run
+  # start` for Anthropic-transport parity. Side effect: `next start` sets
+  # NODE_ENV=production, so src/lib/proxy/cors.ts's dev-only
+  # `NODE_ENV === "development"` branch never allowlists localhost:3006 --
+  # every Phase 1 POST then fails identically with 403 "Origin not allowed"
+  # before reaching the LLM. cors.ts already allowlists PLAYWRIGHT_TEST_ORIGIN
+  # independent of NODE_ENV (gated on VERCEL_ENV being unset instead) for
+  # exactly this "local production build, not real prod" case -- Playwright
+  # already relies on it (playwright.config.ts). Reuse it here.
+  export PLAYWRIGHT_TEST_ORIGIN="http://localhost:3006"
 
   # Start the server in the background
-  if [[ -n "$VOYAGE_API_KEY_VALUE" ]]; then
-    VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE" npm run dev > "$SERVER_LOG" 2>&1 &
-  else
-    npm run dev > "$SERVER_LOG" 2>&1 &
-  fi
+  npm run start -- --port 3006 >> "$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
 
-  # Wait for server to respond (max 240 seconds)
+  # Wait for server to respond.
   # Accept any HTTP response (200 or 503) — both mean the server is up.
   # A 503 from /api/health means Supabase is degraded, not that the server failed to start.
   # Phase 0 health checks below will properly report Supabase degradation.
-  MAX_WAIT=240
+  #
+  # QA-H3 (#870): MAX_WAIT only bounds the `next start` boot itself — the
+  # build above already completed synchronously and is not part of this
+  # budget. 240s was previously enough for `npm run dev`'s lazy/incremental
+  # compile-on-first-request. This repo already runs the exact "build then
+  # start, poll a health endpoint" pattern locally for Playwright E2E (see
+  # `getWebServerCommand()` in playwright.config.ts: `npm run build && npm
+  # run start`, 240_000ms webServer timeout, same machine class) — that
+  # combined build+start budget is proven sufficient at 240s. `next start`
+  # itself boots in seconds once built, so 120s here is a comfortable margin
+  # above that precedent for the boot step alone.
+  MAX_WAIT=120
   WAITED=0
   while true; do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3006/api/health" 2>/dev/null || true)
@@ -201,7 +252,7 @@ else
     fi
   done
 
-  log_success "Dev server ready (HTTP $HTTP_CODE, took ${WAITED}s)" | tee -a "$LOG_FILE"
+  log_success "Production server ready (HTTP $HTTP_CODE, took ${WAITED}s)" | tee -a "$LOG_FILE"
 fi
 
 # =============================================================================
@@ -225,6 +276,17 @@ CI_E2E_RUN_ID=""
 # Check 1: App Health Endpoint
 log_info "Checking app health..." | tee -a "$LOG_FILE"
 HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3006/api/health" 2>&1 || true)
+if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
+  # A single transient `degraded` (2026-10-01, no component detail) cannot be
+  # triaged. Retry once and keep both full bodies for the report.
+  HEALTH_RESPONSE_FIRST="$HEALTH_RESPONSE"
+  log_warn "App health probe not healthy — retrying once after 5s: $HEALTH_RESPONSE_FIRST" | tee -a "$LOG_FILE"
+  sleep 5
+  HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3006/api/health" 2>&1 || true)
+  if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
+    HEALTH_RESPONSE="$HEALTH_RESPONSE (first probe: $HEALTH_RESPONSE_FIRST)"
+  fi
+fi
 if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
   log_success "App health: OK" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
@@ -466,6 +528,23 @@ CURRENT_PHASE="phase 1 LLM quality tests"
 export QA_TESTS_PER_CATEGORY="$TESTS_PER_CATEGORY"
 export NEXT_PUBLIC_SITE_URL="http://localhost:3006"
 
+# QA-H4 (2026-08-30 triage): probe the origin allowlist with a single request
+# before running all 12 tests. Without this, a CORS/origin misconfiguration
+# makes every test fail identically with a pre-LLM 403, indistinguishable
+# from "the model failed every safety/quality check" -- a materially scarier
+# and wrong signal (docs/agents/qa-report.md, 2026-08-27). Uses
+# retry_curl_probe (defined above) for consistency with the Phase 0 probes;
+# --max-time 2 overrides its 15s default since this is a loopback call to a
+# server already confirmed up. The literal error text is produced by
+# handleCsrfValidation() in src/lib/proxy/csrf-proxy.ts when the Origin
+# header isn't in cors.ts's ALLOWED_ORIGINS -- that's the array to fix.
+ORIGIN_PREFLIGHT_BODY=$(retry_curl_probe "http://localhost:3006/api/chat/stream" \
+  --max-time 2 \
+  -X POST \
+  -H "Origin: http://localhost:3006" \
+  -H "Content-Type: application/json" \
+  -d '{}' || true)
+
 # Run vitest and capture both output and exit code
 TEST_EXIT_CODE=0
 if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
@@ -473,6 +552,9 @@ if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
   TEST_EXIT_CODE=1
 elif [[ "$ANTHROPIC_HEALTH_STATUS" != "PASS" ]]; then
   TEST_OUTPUT="QA PREFLIGHT: Anthropic generation availability failed - ${ANTHROPIC_HEALTH_DETAILS}. Set ANTHROPIC_API_KEY in the QA environment or .env.local before running npm run test:qa."
+  TEST_EXIT_CODE=1
+elif printf '%s' "$ORIGIN_PREFLIGHT_BODY" | grep -q '"error":"Origin not allowed"'; then
+  TEST_OUTPUT="QA PREFLIGHT: /api/chat/stream rejected this harness's own origin (http://localhost:3006) with 403 'Origin not allowed' (thrown by handleCsrfValidation in src/lib/proxy/csrf-proxy.ts) -- this is a harness/CORS misconfiguration, not an LLM or safety failure. Check src/lib/proxy/cors.ts's ALLOWED_ORIGINS (PLAYWRIGHT_TEST_ORIGIN / NODE_ENV / VERCEL_ENV) before trusting any LLM quality result."
   TEST_EXIT_CODE=1
 else
   TEST_OUTPUT=$(NO_COLOR=1 npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
@@ -489,8 +571,13 @@ TEST_OUTPUT_PLAIN=$(printf '%s' "$TEST_OUTPUT" | sed -E 's/\x1b\[[0-9;]*m//g')
 # "Test Files  N passed" line and a "Tests  M passed" line; without anchoring
 # to "Tests" specifically, grep matches the Test Files line first and reports
 # the file count instead of the test count.
-PASSED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}')
-FAILED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}')
+# A vitest crash before it prints the summary line (or an output-format
+# change) makes this grep match nothing. Under `set -o pipefail`, a
+# zero-match grep inside a `VAR=$(...)` assignment aborts the whole script
+# via `set -e` with nothing on stderr — this silently killed the 2026-08-20
+# run right here, identical to the performance-agent bug fixed in c4a3d559.
+PASSED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || true)
+FAILED_TESTS=$(printf '%s' "$TEST_OUTPUT_PLAIN" | grep -E '^ *Tests ' | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || true)
 PASSED_TESTS=${PASSED_TESTS:-0}
 FAILED_TESTS=${FAILED_TESTS:-0}
 TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
@@ -819,10 +906,7 @@ SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-ins
 SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run Claude to analyze and write report
-"$CLAUDE_BIN" -p \
-  --model "$MODEL" \
-  --allowedTools 'Read,Edit,Write,Glob,Grep' \
-  >> "$LOG_FILE" 2>&1 <<PROMPT
+PROMPT_TEXT=$(cat <<PROMPT
 $AGENT_PROMPT
 
 Additional context:
@@ -851,8 +935,11 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
+)
+run_scheduled_analysis "$REPORT_FILE" "$LOG_FILE" "# QA Report" \
+  "$MODEL" 'Read,Edit,Write,Glob,Grep' "$PROMPT_TEXT"
 
-log_success "Claude analysis complete" | tee -a "$LOG_FILE"
+log_success "Scheduled analysis complete" | tee -a "$LOG_FILE"
 
 # Extract and write shared context
 REPORT_CONTENT=$(cat "$REPORT_FILE")

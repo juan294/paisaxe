@@ -23,8 +23,12 @@ const DEFAULT_CONFIG: MaintenanceConfig = {
 async function getMaintenanceConfig(): Promise<MaintenanceConfig> {
   try {
     const environment = getEnvironment();
+    // SE-H1/BE-M9: anon no longer has column-level SELECT on feature_flags.config
+    // directly (migration 101) — read through the public-safe view instead. The
+    // view passes maintenance_mode's config through unmodified (only
+    // visitor_voice_agent's config is masked), so this is behavior-identical.
     const { data, error } = await supabase
-      .from("feature_flags")
+      .from("feature_flags_public")
       .select("config")
       .eq("flag_key", "maintenance_mode")
       .eq("environment", environment)

@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { Play, Pause, Share2, Shuffle } from "lucide-react";
+import { Play, Pause, Shuffle } from "lucide-react";
 import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { SiteInfoMenu } from "./site-info-menu";
@@ -16,7 +16,6 @@ import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { getRelatedStories } from "@/lib/related-stories";
 import { LanguageSwitcher } from "./language-switcher";
-import { SuggestPlaceDialog } from "./suggest-place-dialog";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
 
 // #569: Flag-gated tools are dynamically imported so their code only loads when
@@ -42,6 +41,13 @@ const FullscreenButton = dynamic(
   () => import("./fullscreen-button").then((m) => m.FullscreenButton),
   { ssr: false, loading: () => null }
 );
+// FE-M7 (#769): was a static import mounted unconditionally regardless of the
+// user_story_suggestions flag — now dynamic like its sibling tools, and
+// rendered only once the flag is on (see the isEnabled(...) guard below).
+const SuggestPlaceDialog = dynamic(
+  () => import("./suggest-place-dialog").then((m) => m.SuggestPlaceDialog),
+  { ssr: false, loading: () => null }
+);
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { NavigationHint } from "./navigation-hint";
@@ -49,6 +55,7 @@ import { AuthorTypewriter } from "./author-typewriter";
 import { StoryProgressBar } from "./story-progress-bar";
 import { StoryToolbar } from "./story-toolbar";
 import { StoryInfoPanel } from "./story-info-panel";
+import { getLocalizedQuestionPrompts } from "./question-prompts";
 import { useStoryKeyboardNav } from "@/hooks/use-story-keyboard-nav";
 import { Button } from "@/components/ui/button";
 
@@ -203,10 +210,12 @@ export function StoryViewer({
     [story, allStories]
   );
 
-  // Story titles for progress bar screen reader announcements
+  // Story titles for progress bar screen reader announcements.
+  // UX-H6 (#892): route through getLocalizedStory so a non-Spanish visitor
+  // hears the translated title, not the raw Spanish one, for every segment.
   const storyTitles = useMemo(
-    () => stories.map((s) => s.title),
-    [stories]
+    () => stories.map((s) => getLocalizedStory(s, locale).title),
+    [stories, locale]
   );
 
   // PE-M4 (#615): prefetch the adjacent (next & prev) story images so navigation
@@ -228,8 +237,14 @@ export function StoryViewer({
   // Asturianu labels
   const ast = isEnabled("asturianu_touches");
 
-  // Get localized story text based on current locale (falls back to Spanish)
-  const localizedStory = story ? getLocalizedStory(story, locale) : null;
+  // Get localized story text based on current locale (falls back to Spanish).
+  // FE-M2 (#764): useMemo so this object keeps its identity across renders that
+  // don't change story/locale — otherwise it's a fresh object every render,
+  // which defeats StoryInfoPanel's memo (getLocalizedStory itself stays pure).
+  const localizedStory = useMemo(
+    () => (story ? getLocalizedStory(story, locale) : null),
+    [story, locale]
+  );
 
   // FE-L1: Stable callback for StoryInfoPanel props — prevents re-renders when
   // only the index changes (story/id change is reflected via the story prop itself).
@@ -239,18 +254,38 @@ export function StoryViewer({
 
   if (!story || !localizedStory) return null;
 
-  // Question prompts from metadata
-  const questionPrompts = story.metadata?.question_prompts || [];
+  // Question prompts from metadata.
+  // UX-H6 (#892): resolve the translated prompts for the active locale,
+  // falling back to Spanish when no translation exists (see getLocalizedQuestionPrompts).
+  // FE-M2 (#764): getLocalizedQuestionPrompts returns a module-level constant
+  // empty array (not a fresh `[]`) when there are no prompts, so this stays
+  // referentially stable across renders without needing its own useMemo.
+  const questionPrompts = getLocalizedQuestionPrompts(story, locale);
 
   return (
     <main
       className="relative h-dvh w-screen overflow-hidden bg-black"
       aria-hidden={chatOpen ? "true" : undefined}
+      // UX-H2 (#888): aria-hidden alone doesn't stop keyboard focus — nav,
+      // toggles, and arrows inside stayed Tab-reachable while announced as
+      // non-existent to assistive tech. `inert` additionally removes the
+      // subtree from the tab order and blocks pointer interaction. The chat
+      // modal (VoiceChat) is rendered as a sibling of this <main>, not inside
+      // it, so its own backdrop/close controls are unaffected.
+      inert={chatOpen}
     >
-      {/* PE-M4 (#615): preload adjacent story images for instant navigation.
-          React hoists these <link> tags into <head>. */}
+      {/* PE-H1/FE-M3 (#804, #765): adjacent story images, rendered as hidden,
+          `priority` next/image elements so Next.js itself generates the
+          preload — a hand-built <link rel="preload" href={rawUrl}> pointed at
+          the raw origin URL while the real <Image> below requests the
+          optimizer URL, so nothing was ever actually warmed (~350KB wasted
+          per navigation). `sizes` must match the visible <Image> ("100vw")
+          so the computed optimizer URL/srcset is identical to what gets
+          requested once this image becomes current. */}
       {adjacentImages.map((src) => (
-        <link key={src} rel="preload" as="image" href={src} />
+        <div key={src} aria-hidden="true" className="sr-only pointer-events-none">
+          <Image src={src} alt="" fill sizes="100vw" priority />
+        </div>
       ))}
 
       {/* Screen reader announcement for story changes */}
@@ -291,7 +326,12 @@ export function StoryViewer({
           alt={localizedStory.title}
           fill
           sizes="100vw"
-          className={cn("object-cover", zoomClass)}
+          // FE-M6 (#768): motion-reduce:animate-none is a CSS-layer backstop —
+          // it suppresses the zoom animation immediately regardless of JS
+          // timing, so reduced-motion visitors never see the one-frame flash
+          // that can occur between the hydration-safe `false` initial state
+          // and the effect that corrects prefersReducedMotion.
+          className={cn("object-cover", zoomClass, "motion-reduce:animate-none")}
           priority={currentIndex === 0}
           placeholder="blur"
           blurDataURL={story.blurDataUrl || darkPlaceholder}
@@ -345,6 +385,7 @@ export function StoryViewer({
         onAskAbout={onAskAbout}
         onToggleInfo={toggleInfo}
         ast={ast}
+        locale={locale}
         isEnabled={isEnabled}
         questionPrompts={questionPrompts}
         requiresAuth={requiresAuth}
@@ -452,25 +493,14 @@ export function StoryViewer({
               }}
             />
           )}
+          {/* #908/#771: was a standalone inline handler that skipped error
+              feedback and never handled share-cancellation/clipboard-failure
+              rejections. Now reuses the exact same ShareButton + useShareStory
+              hook as the desktop control ("menu" variant renders as a
+              ToolbarOverflowItem-style row), so there is one share behaviour
+              with consistent localization and feedback everywhere. */}
           {isEnabled("story_sharing") && (
-            <ToolbarOverflowItem
-              icon={<Share2 className="h-4 w-4" />}
-              label={t("share.share")}
-              onClick={() => {
-                // UX-B1: route is `/story/[slug]` (singular, by slug) — using the
-                // plural `/stories/<id>` path would 404. Mirrors share-button.tsx.
-                const shareUrl = `${window.location.origin}/story/${story.slug || story.id}`;
-                if (navigator.share) {
-                  navigator.share({
-                    title: localizedStory.title,
-                    text: localizedStory.description,
-                    url: shareUrl,
-                  });
-                } else {
-                  navigator.clipboard.writeText(shareUrl);
-                }
-              }}
-            />
+            <ShareButton story={story} variant="menu" />
           )}
           {isEnabled("user_story_suggestions") && (
             <SuggestPlaceButton
@@ -510,11 +540,17 @@ export function StoryViewer({
       {/* First-visit navigation hint for mobile users */}
       <NavigationHint />
 
-      {/* Suggest Place dialog — state lifted here (#328: no DOM coupling) */}
-      <SuggestPlaceDialog
-        isOpen={isSuggestDialogOpen}
-        onClose={() => setIsSuggestDialogOpen(false)}
-      />
+      {/* Suggest Place dialog — state lifted here (#328: no DOM coupling).
+          FE-M7 (#769): only mounted when the flag is on — SuggestPlaceButton
+          already returns null when the flag is off, so isSuggestDialogOpen
+          can never become true in that case anyway; this also keeps the
+          dialog's code out of the bundle until the flag is enabled. */}
+      {isEnabled("user_story_suggestions") && (
+        <SuggestPlaceDialog
+          isOpen={isSuggestDialogOpen}
+          onClose={() => setIsSuggestDialogOpen(false)}
+        />
+      )}
     </main>
   );
 }

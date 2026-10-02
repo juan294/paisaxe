@@ -34,7 +34,7 @@ export const pt: Translations = {
     source: 'Fonte',
     // LOCATION-SPECIFIC: Location name in privacy notice
     privacy_notice: 'As suas perguntas são processadas com inteligência artificial para lhe oferecer as melhores respostas sobre as Astúrias. Não guardamos as suas conversas.',
-    understood: 'Entendido',
+    understood: 'Entendi',
     call: 'Ligar',
     directions: 'Como chegar',
     copy_conversation: 'Copiar conversa',
@@ -131,11 +131,11 @@ export const pt: Translations = {
     // LOCATION-SPECIFIC: Location name
     empty_description: 'Explore as histórias das Astúrias e guarde as que mais gostar para ver depois.',
     explore: 'Explorar histórias',
-    loading_more: 'A carregar mais...',
     all_viewed: 'Já viu todos os seus guardados',
     remove_from_saved: 'Remover dos guardados',
     removed: 'Removido dos favoritos',
     saved_toast: 'Guardado nos favoritos',
+    undo: 'Desfazer',
   },
 
   accessibility: {
@@ -210,6 +210,7 @@ export const pt: Translations = {
     error: 'Erro de conexão',
     error_not_configured: 'Agente de voz não configurado',
     no_permission: 'Acesso ao microfone necessário',
+    no_permission_retry: 'Se o seu navegador bloqueou o acesso, ative-o nas configurações do site e tente novamente.',
     you: 'Você',
     loading: 'Carregando assistente de voz...',
   },
@@ -261,12 +262,13 @@ export const pt: Translations = {
 
   premium: {
     premium_access: 'Acesso Premium',
-    voice_pass_label: 'Passe de Voz · 24h',
+    voice_pass_label: 'Passe de Voz · {duration}',
     voice_locked: 'O chat de voz é uma função premium',
     get_day_pass: 'Obter Passe Diário',
     voice_title: 'Fale com o Seu Guia',
     voice_description: 'Pelayo sabe mais do que está na tela. É só perguntar.',
     feature_24h: '24 horas de conversas ilimitadas',
+    feature_duration: '{duration} de conversas ilimitadas',
     feature_unlimited: 'Perguntas ilimitadas',
     feature_realtime: 'Clima e recomendações em tempo real',
     feature_booking: 'Pelayo reserva restaurantes e hotéis por si',
@@ -289,8 +291,11 @@ export const pt: Translations = {
     faq_what_included_answer: '24 horas com Pelayo. Pergunte sobre o tempo antes de ir aos Lagos, onde encontrar a melhor fabada, qual sidraria visitar —',
     faq_what_included_highlight: 'e ele liga para reservar a sua mesa!',
     faq_how_long: 'Quanto tempo dura?',
-    faq_how_long_answer: '24 horas a partir da compra. Perfeito para planear um dia de viagem ou explorar.',
+    faq_how_long_answer: '{duration} a partir da compra. Perfeito para planear um dia de viagem ou explorar.',
     voice_pass_expiry: 'O seu passe de voz expira em {hours}h ({time})',
+    tier_day: '24 horas',
+    tier_week: '7 dias',
+    tier_month: '30 dias',
   },
 
   fullscreen: {
@@ -474,7 +479,7 @@ export const pt: Translations = {
       withImages: 'com imagens',
       noStories: 'Nenhuma história encontrada',
       loading: 'A carregar...',
-      all: 'Todas',
+      all: 'Tudo',
       noImage: 'Sem imagem',
       clickToAdd: 'Clique para adicionar',
       needsCuration: 'Necessita curadoria',

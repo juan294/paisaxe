@@ -200,6 +200,70 @@ describe("/api/admin/suggestions", () => {
       expect(mockGetUserById).toHaveBeenCalledWith("user-2");
     });
 
+    // ─── PE-L1 (#815): bounded concurrency, not a sequential N+1 loop ───────
+    it("fetches user emails with bounded concurrency instead of one at a time", async () => {
+      const uniqueUserCount = 12;
+      const mockData: StorySuggestionRow[] = Array.from(
+        { length: uniqueUserCount },
+        (_, i) => ({
+          id: `suggestion-${i}`,
+          user_id: `concurrent-user-${i}`,
+          place_name: "Somewhere",
+          comment: null,
+          location: "eastern",
+          status: "pending",
+          admin_notes: null,
+          converted_story_id: null,
+          attribution: null,
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z",
+        })
+      );
+
+      let concurrent = 0;
+      let maxConcurrent = 0;
+
+      mockCreateAdminClient.mockReturnValueOnce({
+        from: () => ({
+          select: () => ({
+            order: () => ({
+              then: (resolve: (result: { data: StorySuggestionRow[]; error: null }) => void) => {
+                resolve({ data: mockData, error: null });
+              },
+            }),
+          }),
+        }),
+        auth: {
+          admin: {
+            getUserById: async (userId: string) => {
+              concurrent++;
+              maxConcurrent = Math.max(maxConcurrent, concurrent);
+              // Yield so overlapping in-flight calls are observable.
+              await new Promise((resolve) => setTimeout(resolve, 5));
+              concurrent--;
+              return { data: { user: { email: `${userId}@example.com` } } };
+            },
+          },
+        },
+      });
+
+      const request = new NextRequest("http://localhost/api/admin/suggestions");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toHaveLength(uniqueUserCount);
+      // Every suggestion resolved an email — not just a subset.
+      expect(
+        data.data.every((s: { userEmail?: string }) =>
+          typeof s.userEmail === "string" && s.userEmail.endsWith("@example.com")
+        )
+      ).toBe(true);
+      // Bounded: some overlap (not sequential), but capped well below N.
+      expect(maxConcurrent).toBeGreaterThan(1);
+      expect(maxConcurrent).toBeLessThanOrEqual(5);
+    });
+
     it("should return 500 when Supabase query returns an error", async () => {
       mockCreateAdminClient.mockReturnValueOnce({
         from: () => ({

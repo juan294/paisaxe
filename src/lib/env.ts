@@ -6,7 +6,7 @@
  * - Presence validation with helpful error messages
  * - A single choke-point for configuration debugging
  *
- * See: https://github.com/juanmgonzalez/paisaxe/issues/289 (AR-M1)
+ * See: https://github.com/juan294/paisaxe/issues/289
  *
  * ─── SECURITY BOUNDARY ────────────────────────────────────────────────────────
  * This file is imported by client components (e.g. auth-provider.tsx) for the
@@ -75,10 +75,20 @@ export const getSupabaseUrl = () =>
 export const getSupabaseAnonKey = () =>
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || undefined;
 
-/** Supabase service role key (server-only, trimmed) */
-export const getSupabaseServiceRoleKey = () => getEnv("SUPABASE_SERVICE_ROLE_KEY");
-
-/** Legacy Supabase service key (server-only, trimmed) */
+/**
+ * Supabase service-role key (server-only, trimmed).
+ *
+ * AR-L3 (#865): this was previously resolved via
+ * `getSupabaseServiceRoleKey() ?? getSupabaseServiceKey()` across two
+ * differently-named env vars for the same credential. `vercel env ls`
+ * against production and preview, plus the local `.env.local`, confirmed
+ * only `SUPABASE_SERVICE_KEY` is actually ever set anywhere — the
+ * `SUPABASE_SERVICE_ROLE_KEY` accessor had no live value in any real
+ * environment, so the `??` fallback was silently doing all the work. The
+ * dead accessor and the fallback are removed; a misconfigured deployment
+ * now fails loudly (createAdminClient throws) instead of silently
+ * resolving through an unused name.
+ */
 export const getSupabaseServiceKey = () => getEnv("SUPABASE_SERVICE_KEY");
 
 /** Stripe secret key (server-only, trimmed) */

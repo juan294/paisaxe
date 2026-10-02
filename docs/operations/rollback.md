@@ -135,8 +135,15 @@ Reasons:
 A compensation migration is a new, forward-applied migration that reverses the effect of a previous one.
 
 ```bash
-# Generate a new migration file
-touch supabase/migrations/$(date +%Y%m%d%H%M%S)_revert_<description>.sql
+# Find the next sequential number — migrations use a zero-padded NNN prefix
+# incremented from the last migration (see docs/operations/migration-policy.md).
+# NEVER use a timestamp prefix: it still parses as a migration number and can
+# make check-migrations.ts's gap scan hang or OOM (see #828).
+ls supabase/migrations | sort | tail -1
+
+# Generate the new migration file using the next sequential number
+# (e.g. if the last file is 100_..., the new file is 101_...)
+touch supabase/migrations/<NNN>_revert_<description>.sql
 ```
 
 Examples:

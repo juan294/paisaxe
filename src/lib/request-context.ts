@@ -10,6 +10,16 @@ interface AsyncLocalStorageLike<T> {
 function createRequestContextStorage():
   | AsyncLocalStorageLike<RequestContext>
   | undefined {
+  // FE-H1 (#759): never attempt Node's require() when this module has been
+  // reached by a browser bundle. `window` only ever exists in a real browser
+  // or in jsdom-based tests — genuine server runtimes (Node, Edge) never
+  // define it. Without this guard, `Function("return require")()` below
+  // triggers a CSP `unsafe-eval` violation on every page load when a client
+  // component transitively imports this module.
+  if (typeof window !== "undefined") {
+    return undefined;
+  }
+
   if (
     typeof (globalThis as { EdgeRuntime?: string }).EdgeRuntime !== "undefined"
   ) {
@@ -29,14 +39,31 @@ function createRequestContextStorage():
   }
 }
 
-const requestContextStorage = createRequestContextStorage();
+// FE-H1 (#759): lazily initialized so a browser bundle that merely reaches
+// this module (without ever calling into request-context APIs) never runs
+// the guard-and-require logic above at import time either.
+let requestContextStorage:
+  | AsyncLocalStorageLike<RequestContext>
+  | undefined
+  | null = null;
+
+function getRequestContextStorage():
+  | AsyncLocalStorageLike<RequestContext>
+  | undefined {
+  if (requestContextStorage === null) {
+    requestContextStorage = createRequestContextStorage();
+  }
+  return requestContextStorage;
+}
+
 let fallbackRequestContext: RequestContext | undefined;
 
 export function runWithRequestContext<T>(
   context: RequestContext,
   fn: () => T
 ): T {
-  if (!requestContextStorage) {
+  const storage = getRequestContextStorage();
+  if (!storage) {
     const previousContext = fallbackRequestContext;
     fallbackRequestContext = context;
     try {
@@ -46,12 +73,12 @@ export function runWithRequestContext<T>(
     }
   }
 
-  return requestContextStorage.run(context, fn);
+  return storage.run(context, fn);
 }
 
 export function getRequestId(): string | undefined {
   return (
-    requestContextStorage?.getStore()?.requestId ??
+    getRequestContextStorage()?.getStore()?.requestId ??
     fallbackRequestContext?.requestId
   );
 }

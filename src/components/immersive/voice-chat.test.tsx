@@ -16,6 +16,20 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
+// Mutable mock state for useAuth (FE-H4: userAccessToken forwarding)
+const mockAuthState: { session: { access_token: string } | null } = {
+  session: null,
+};
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({
+    user: mockAuthState.session ? { id: "user-1" } : null,
+    session: mockAuthState.session,
+    isLoading: false,
+    signInWithGoogle: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
+
 // Mutable mock state for useVoiceAccess
 const mockVoiceAccess = {
   canUseVoice: false,
@@ -120,11 +134,23 @@ vi.mock("next/dynamic", async () => {
 });
 
 // Mock VoiceChatElevenLabs component (to avoid navigator.mediaDevices issues in tests)
-// Store onFallbackToText so tests can invoke it
+// Store onFallbackToText and forwarded props so tests can invoke/assert them
 let capturedOnFallbackToText: (() => void) | undefined;
+let capturedVoiceChatProps: { userAccessToken?: string | null; initialMessage?: string } = {};
 vi.mock("./voice-chat-elevenlabs", () => ({
-  VoiceChatElevenLabs: ({ story, onFallbackToText }: { story: { title: string }; onFallbackToText?: () => void }) => {
+  VoiceChatElevenLabs: ({
+    story,
+    onFallbackToText,
+    userAccessToken,
+    initialMessage,
+  }: {
+    story: { title: string };
+    onFallbackToText?: () => void;
+    userAccessToken?: string | null;
+    initialMessage?: string;
+  }) => {
     capturedOnFallbackToText = onFallbackToText;
+    capturedVoiceChatProps = { userAccessToken, initialMessage };
     return (
       <div data-testid="elevenlabs-voice-chat">
         Voice chat active for {story.title}
@@ -220,6 +246,7 @@ vi.mock("@/components/premium/voice-purchase-cta", () => ({
 
 // Helper to reset mock voice access state
 const resetMockVoiceAccess = () => {
+  mockAuthState.session = null;
   mockVoiceAccess.canUseVoice = false;
   mockVoiceAccess.needsSignIn = false;
   mockVoiceAccess.needsPurchase = false;
@@ -545,6 +572,45 @@ describe("VoiceChat", () => {
         expect(callBody.context).toContain("Picos de Europa");
         expect(callBody.context).toContain("nature-guide.pdf");
       });
+    });
+
+    it("FE-M1: memoized ChatComposer keeps the input fully controlled (no dropped keystrokes)", async () => {
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
+      await userEvent.type(input, "Hola, que tal?");
+
+      expect(input.value).toBe("Hola, que tal?");
+    });
+
+    it("FE-M1: composer accepts input again after a stream completes, unaffected by memoization", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("Streaming reply with several words in it")
+      );
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
+      await userEvent.type(input, "First question");
+
+      const form = input.closest("form");
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
+
+      // Cleared immediately on submit, then disabled while streaming.
+      await waitFor(() => {
+        expect(input.value).toBe("");
+      });
+
+      // Once the stream resolves, the (memoized) composer must still be
+      // wired to the live onChange/onSubmit handlers — not stuck on a stale
+      // closure from before the stream started.
+      await waitFor(() => {
+        expect(input).not.toBeDisabled();
+      });
+
+      await userEvent.type(input, "Second question");
+      expect(input.value).toBe("Second question");
     });
   });
 
@@ -1218,7 +1284,8 @@ describe("VoiceChat dynamic loading fallback", () => {
   });
 });
 
-// Tests for initialMessage prop
+// Tests for initialMessage prop (UX-H1: chip-tap prompts must not be silently
+// discarded — text mode auto-submits; voice mode forwards via FE-H4/UX-H7).
 describe("VoiceChat initialMessage", () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -1231,7 +1298,52 @@ describe("VoiceChat initialMessage", () => {
     vi.clearAllMocks();
   });
 
-  it("should populate input with initialMessage when provided", async () => {
+  it("should auto-submit initialMessage in text mode instead of just prefilling the input (UX-H1)", async () => {
+    mockFetch.mockResolvedValueOnce(
+      createStreamingResponse("The Lagos de Covadonga trail is a great choice.")
+    );
+
+    render(
+      <VoiceChat
+        story={mockStory}
+        open={true}
+        onClose={() => {}}
+        initialMessage="What are the best hiking trails?"
+      />
+    );
+
+    // The question should appear as a sent user message, not sit in the input
+    // box waiting for a second tap on Send.
+    await waitFor(() => {
+      expect(screen.getByText("What are the best hiking trails?")).toBeInTheDocument();
+    });
+
+    // And the assistant's response should stream in as a result of the
+    // automatic send.
+    await waitFor(() => {
+      expect(screen.getByText(/Lagos de Covadonga trail is a great choice/)).toBeInTheDocument();
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const requestBody = JSON.parse(
+      (mockFetch.mock.calls[0][1] as RequestInit).body as string
+    );
+    expect(requestBody.message).toBe("What are the best hiking trails?");
+
+    // Input box remains empty — the chip's text was submitted, not prefilled.
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
+    expect(input.value).toBe("");
+  });
+
+  it("should not auto-submit through the text pipeline when voice mode will be active (UX-H1)", async () => {
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.needsSignIn = false;
+    mockVoiceAccess.needsPurchase = false;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.isLoading = false;
+    mockVoiceAccess.isWhitelisted = true;
+    mockVoiceAccess.hasAccess = true;
+
     render(
       <VoiceChat
         story={mockStory}
@@ -1242,9 +1354,78 @@ describe("VoiceChat initialMessage", () => {
     );
 
     await waitFor(() => {
-      const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
-      expect(input.value).toBe("What are the best hiking trails?");
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
     });
+
+    // The text-mode auto-submit path (useStreamChat -> fetch) must not fire —
+    // VoiceChatElevenLabs is responsible for forwarding the prompt in voice
+    // mode (see FE-H4/UX-H7's `opening_question` dynamic variable).
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+// FE-H4: the ElevenLabs voice agent never received the user's access token or
+// the prompt-chip question. VoiceChat must forward both down to
+// VoiceChatElevenLabs so voice-mode MCP tool calls can authenticate and a
+// tapped prompt chip is not silently discarded in voice mode.
+describe("VoiceChat FE-H4: userAccessToken and initialMessage forwarding", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCapture.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.isWhitelisted = true;
+    mockVoiceAccess.hasAccess = true;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    resetMockVoiceAccess();
+  });
+
+  it("should forward the session access_token as userAccessToken when signed in", async () => {
+    mockAuthState.session = { access_token: "test-supabase-token-abc" };
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    expect(capturedVoiceChatProps.userAccessToken).toBe("test-supabase-token-abc");
+  });
+
+  it("should not forward a userAccessToken when there is no session", async () => {
+    mockAuthState.session = null;
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    expect(capturedVoiceChatProps.userAccessToken).toBeFalsy();
+  });
+
+  it("should forward a prompt-chip initialMessage into voice mode instead of discarding it", async () => {
+    render(
+      <VoiceChat
+        story={mockStory}
+        open={true}
+        onClose={() => {}}
+        initialMessage="Cuales son las mejores rutas de senderismo?"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    expect(capturedVoiceChatProps.initialMessage).toBe(
+      "Cuales son las mejores rutas de senderismo?"
+    );
   });
 });
 
@@ -1454,6 +1635,31 @@ describe("VoiceChat upgrade and expiry", () => {
     // The expiry warning should appear
     const warning = screen.getByText(/premium\.voice_pass_expiry/);
     expect(warning).toBeInTheDocument();
+  });
+
+  // UX-M11 (#904): the expiry-warning time must be formatted using the app's
+  // active locale (mapped to an explicit Intl tag), not the browser default.
+  it("formats the expiry warning time using the app's active locale", () => {
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.hoursUntilExpiry = 3;
+    mockVoiceAccess.expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
+    mockVoiceAccess.isWhitelisted = false;
+    mockVoiceAccess.hasAccess = true;
+
+    const toLocaleTimeStringSpy = vi.spyOn(Date.prototype, "toLocaleTimeString");
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    // The i18n mock at the top of this file fixes locale to "es" — mapped to
+    // the explicit BCP-47 tag "es-ES" via toIntlLocale, not left undefined
+    // (which would fall back to the browser's own locale).
+    expect(toLocaleTimeStringSpy).toHaveBeenCalledWith("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    toLocaleTimeStringSpy.mockRestore();
   });
 
   it("should show loading state during initialization", () => {

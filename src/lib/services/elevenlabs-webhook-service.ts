@@ -1,3 +1,4 @@
+import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
 import { logger } from "@/lib/logger";
 import { isCallSuccessful } from "@/lib/elevenlabs-call-status";

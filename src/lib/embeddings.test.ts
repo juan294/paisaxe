@@ -53,12 +53,30 @@ describe("embeddings", () => {
       const result = await generateEmbedding("test text");
 
       expect(result).toEqual(mockEmbedding);
-      expect(mockEmbed).toHaveBeenCalledWith({
-        input: ["test text"],
-        model: "voyage-3.5",
-        inputType: "query",
-        outputDimension: 512,
-      });
+      expect(mockEmbed).toHaveBeenCalledWith(
+        {
+          input: ["test text"],
+          model: "voyage-3.5",
+          inputType: "query",
+          outputDimension: 512,
+        },
+        { abortSignal: undefined }
+      );
+    });
+
+    // ─── BE-M4 (#785): AbortSignal threading ────────────────────────────
+    it("should pass a provided AbortSignal through to the Voyage embed call", async () => {
+      const mockEmbedding = Array(512).fill(0.1);
+      mockEmbed.mockResolvedValue({ data: [{ embedding: mockEmbedding }] });
+
+      const controller = new AbortController();
+      const { generateEmbedding } = await import("./embeddings");
+      await generateEmbedding("test text", { signal: controller.signal });
+
+      expect(mockEmbed).toHaveBeenCalledWith(
+        expect.objectContaining({ input: ["test text"] }),
+        { abortSignal: controller.signal }
+      );
     });
 
     it("should throw error when no embedding is returned", async () => {

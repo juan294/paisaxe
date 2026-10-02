@@ -122,6 +122,85 @@ describe("instrumentation register", () => {
     expect(typeof parsed.msg).toBe("string");
   });
 
+  // DO-M4 (#831): boot-time credential manifest — warns in production when
+  // any of the ~15 service credentials /api/health never checks are missing.
+  describe("DO-M4: production env manifest", () => {
+    it("warns when production is missing expected credentials", async () => {
+      vi.stubEnv("NEXT_RUNTIME", "nodejs");
+      vi.stubEnv("NODE_ENV", "test");
+      vi.stubEnv("VERCEL_ENV", "production");
+      vi.stubEnv("STRIPE_SECRET_KEY", "");
+      vi.stubEnv("ELEVENLABS_API_KEY", "");
+      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { register } = await import("./instrumentation");
+      await register();
+
+      const written = spy.mock.calls.flatMap((args) => args).join("\n");
+      expect(written).toContain("ENV_MANIFEST_MISSING");
+      expect(written).toContain("STRIPE_SECRET_KEY");
+      expect(written).toContain("ELEVENLABS_API_KEY");
+    });
+
+    it("does not warn in preview even when credentials are missing", async () => {
+      vi.stubEnv("NEXT_RUNTIME", "nodejs");
+      vi.stubEnv("NODE_ENV", "test");
+      vi.stubEnv("VERCEL_ENV", "preview");
+      vi.stubEnv("STRIPE_SECRET_KEY", "");
+      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { register } = await import("./instrumentation");
+      await register();
+
+      const written = spy.mock.calls.flatMap((args) => args).join("\n");
+      expect(written).not.toContain("ENV_MANIFEST_MISSING");
+    });
+
+    it("does not warn in development even when credentials are missing", async () => {
+      vi.stubEnv("NEXT_RUNTIME", "nodejs");
+      vi.stubEnv("NODE_ENV", "test");
+      // VERCEL_ENV intentionally left unset — local/CI runs have no value here.
+      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { register } = await import("./instrumentation");
+      await register();
+
+      const written = spy.mock.calls.flatMap((args) => args).join("\n");
+      expect(written).not.toContain("ENV_MANIFEST_MISSING");
+    });
+
+    it("does not warn in production when all required credentials are present", async () => {
+      vi.stubEnv("NEXT_RUNTIME", "nodejs");
+      vi.stubEnv("NODE_ENV", "test");
+      vi.stubEnv("VERCEL_ENV", "production");
+      vi.stubEnv("SUPABASE_SERVICE_KEY", "test-service-key");
+      vi.stubEnv("ELEVENLABS_API_KEY", "test-key");
+      vi.stubEnv("ELEVENLABS_API_KEY_FINGERPRINT", "sha256:1234567890abcdef");
+      vi.stubEnv("STRIPE_SECRET_KEY", "test-key");
+      vi.stubEnv("STRIPE_WEBHOOK_SECRET", "test-key");
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_test");
+      vi.stubEnv("STRIPE_WEEKLY_PRICE_ID", "price_test");
+      vi.stubEnv("STRIPE_MONTHLY_PRICE_ID", "price_test");
+      vi.stubEnv("TWILIO_ACCOUNT_SID", "test-sid");
+      vi.stubEnv("TWILIO_AUTH_TOKEN", "test-token");
+      vi.stubEnv("RESEND_API_KEY", "test-key");
+      vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://test.upstash.io");
+      vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-token");
+      vi.stubEnv("GOOGLE_CLIENT_ID", "test-client-id");
+      vi.stubEnv("GOOGLE_CLIENT_SECRET", "test-client-secret");
+      vi.stubEnv("CRON_SECRET", "test-cron-secret");
+      vi.stubEnv("HEALTH_PROBE_SECRET", "test-health-probe-secret");
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
+      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { register } = await import("./instrumentation");
+      await register();
+
+      const written = spy.mock.calls.flatMap((args) => args).join("\n");
+      expect(written).not.toContain("ENV_MANIFEST_MISSING");
+    });
+  });
+
   it("stringifies object messages that the sanitizer keeps as objects", async () => {
     vi.stubEnv("NEXT_RUNTIME", "nodejs");
     vi.stubEnv("NODE_ENV", "test");

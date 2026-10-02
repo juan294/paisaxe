@@ -1,4 +1,5 @@
-import { randomBytes, timingSafeEqual } from "crypto";
+import { randomBytes } from "crypto";
+import { safeEqual } from "@/lib/safe-equal";
 
 export const CSRF_COOKIE_NAME = "__csrf";
 export const CSRF_HEADER_NAME = "x-csrf-token";
@@ -48,7 +49,13 @@ export function csrfCookieOptions(isProduction: boolean) {
 /**
  * Paths exempt from CSRF validation.
  * Webhooks use signature verification, MCP uses secret verification,
- * cron uses webhook secret or admin auth.
+ * cron uses webhook secret or admin auth. The admin-auth fallback is a
+ * browser-cookie session, so it is NOT exempt from CSRF in practice —
+ * cron route handlers call `validateCsrfForAdminFallback` (below) on that
+ * branch specifically (BE-H5 / SE-M1). This prefix list only controls the
+ * proxy-level short-circuit for the machine-to-machine paths (webhook
+ * secret, Vercel Cron bearer token) that never send Origin or a CSRF
+ * cookie.
  */
 const CSRF_EXEMPT_PREFIXES = [
   "/api/webhooks/",
@@ -136,10 +143,31 @@ export function validateCsrfToken(request: Request): boolean {
   const cookieToken = parseCookieValue(cookieHeader, CSRF_COOKIE_NAME);
 
   if (!headerToken || !cookieToken) return false;
-  if (headerToken.length !== cookieToken.length) return false;
 
-  return timingSafeEqual(
-    Buffer.from(headerToken),
-    Buffer.from(cookieToken)
-  );
+  // DO-H6: safeEqual compares byte length before timingSafeEqual, so
+  // multibyte tokens can't trigger an unhandled RangeError.
+  return safeEqual(headerToken, cookieToken);
+}
+
+/**
+ * Validate CSRF token + Origin for the admin-cookie-session fallback on
+ * `/api/cron/*` routes (BE-H5 / SE-M1).
+ *
+ * Cron routes are CSRF-exempt at the proxy layer because pg_cron and Vercel
+ * Cron authenticate via `x-webhook-secret` / a bearer `CRON_SECRET` and never
+ * send an Origin header or a CSRF cookie. But those same routes also accept
+ * `validateAdminAuth()` (a browser session cookie) as a fallback when the
+ * webhook secret is absent or wrong — exactly the request shape CSRF
+ * protection exists for. Route handlers must call this on that fallback
+ * branch specifically, before trusting the admin session, so a hostile page
+ * can't ride a logged-in admin's cookies to trigger a cron job cross-site.
+ *
+ * Legitimate webhook-secret / Vercel-Cron callers never reach this check —
+ * it only runs after the webhook-secret check has already failed.
+ */
+export function validateCsrfForAdminFallback(
+  request: Request,
+  allowedOrigins: string[]
+): boolean {
+  return validateOrigin(request, allowedOrigins) && validateCsrfToken(request);
 }

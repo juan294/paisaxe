@@ -230,7 +230,8 @@ export async function translateStory(
       "You are a professional translator. Return only valid JSON, no other text.",
       [{ role: "user", content: prompt }],
       CHAT_MODEL,
-      2048
+      2048,
+      { source: "translate" }
     );
 
     const textBlock = response.content.find(

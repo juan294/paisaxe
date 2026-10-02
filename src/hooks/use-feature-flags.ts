@@ -185,7 +185,7 @@ function useFeatureFlagsState(
     [flags, isReady]
   );
 
-  // FE-M1: memoize the returned value so that FeatureFlagsProvider consumers
+  // #673: memoize the returned value so that FeatureFlagsProvider consumers
   // only re-render when flags, readiness, or the stable callbacks actually change.
   return useMemo(
     () => ({

@@ -222,7 +222,7 @@ Test the voice access purchase flow using real/test Stripe credentials.
 | 11.1 | **Pricing page displays correctly** | Visit `/pricing` while logged out | Shows Day Pass offer (€1.99), login prompt for purchase | | |
 | 11.2 | **Auth required for purchase** | Click "Get Day Pass" while logged out | Redirects to sign-in, then back to pricing | | |
 | 11.3 | **Checkout session created** | Sign in, click "Get Day Pass" | Redirects to Stripe Checkout page | | |
-| 11.4 | **Successful payment flow** | Complete payment with test card `4242...` | Redirected to `/pricing/success`, webhook received | | |
+| 11.4 | **Successful payment flow** | Complete payment with test card `4242...` | Redirected to `/pricing/checkout/return`, webhook received | | |
 | 11.5 | **Voice access granted after purchase** | After payment, check `/api/voice-access` | Returns `{ hasAccess: true, expiresAt: "..." }` with 24hr expiry | | |
 | 11.6 | **Premium status shown on pricing** | Return to `/pricing` after purchase | Shows "Premium Access" with expiration time | | |
 | 11.7 | **Declined card handling** | Use card `4000 0000 0000 0002` | Stripe shows decline message, no purchase created | | |
@@ -506,7 +506,7 @@ Test the pricing page display and success page (not payment processing).
 | 22.4 | **Back button works** | Click back arrow | Returns to `/immersive` | | |
 | 22.5 | **FAQ section visible** | Scroll pricing page | FAQ questions and answers visible | | |
 | 22.6 | **Login required message** | View pricing while logged out | Sign-in prompt shown for purchase | | |
-| 22.7 | **Success page layout** | Visit `/pricing/success` | Shows success icon, status message, CTA button | | |
+| 22.7 | **Success page layout** | Complete a purchase, land on `/pricing/checkout/return` | Shows success icon, status message, CTA button | | |
 | 22.8 | **Animated hero** | Load pricing page | Animated sound bars icon visible | | |
 
 ---

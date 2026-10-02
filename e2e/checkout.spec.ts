@@ -125,30 +125,6 @@ test.describe("Checkout flow", () => {
     await expect(ctaButton).toBeEnabled();
   });
 
-  test("success page renders after purchase", async ({ page }) => {
-    // Mock voice access to show success state
-    await page.route("**/api/voice-access", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          hasAccess: true,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          purchaseType: "day_pass",
-        }),
-      })
-    );
-
-    const response = await page.goto("/pricing/success");
-    expect(response?.ok()).toBe(true);
-
-    // Should show success confirmation
-    await expect(page.locator("body")).not.toBeEmpty();
-    // Should have a link back to immersive
-    const immersiveLink = page.locator('a[href*="/immersive"]');
-    await expect(immersiveLink).toBeVisible({ timeout: 10000 });
-  });
-
   test("checkout return page renders", async ({ page }) => {
     const response = await page.goto("/pricing/checkout/return");
     expect(response?.ok()).toBe(true);

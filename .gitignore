@@ -54,6 +54,7 @@ coverage/
 coverage-*/
 .coverage-*/
 .vitest-reports/
+.vitest/
 test-results/
 playwright-report/
 blob-report/

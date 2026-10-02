@@ -113,6 +113,12 @@ describe("RootError", () => {
     expect(mockCaptureException).toHaveBeenCalledWith(error);
   });
 
+  // UX-M4: converged error-boundary treatment across all four boundaries
+  it("UX-M4: wrapper has role=alert for screen reader announcement", () => {
+    renderWithI18n(<RootError {...defaultProps} />);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
   it("DO-M3: calls Sentry.captureException again when error prop changes", () => {
     const error1 = new Error("First error");
     const error2 = new Error("Second error");

@@ -29,14 +29,15 @@ vi.mock("@/lib/admin-auth", () => ({
 
 vi.mock("@/lib/content-discovery", () => ({
   runDiscovery: vi.fn(),
+  MAX_DISCOVERIES_PER_RUN: 5,
 }));
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({ from: vi.fn(), rpc: mockRpc })),
 }));
 
-import { GET, POST } from "./route";
-import { runDiscovery } from "@/lib/content-discovery";
+import { GET, POST, maxDuration } from "./route";
+import { runDiscovery, MAX_DISCOVERIES_PER_RUN } from "@/lib/content-discovery";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
 function makeRequest(headers: Record<string, string> = {}, method = "POST") {
@@ -143,7 +144,7 @@ describe("POST /api/cron/content-discovery", () => {
     expect(body.created).toBe(0);
   });
 
-  it("runs discovery when admin auth succeeds (no webhook secret)", async () => {
+  it("runs discovery when admin auth succeeds with valid CSRF token + Origin (no webhook secret)", async () => {
     (validateAdminAuth as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       valid: true,
     });
@@ -155,11 +156,52 @@ describe("POST /api/cron/content-discovery", () => {
       stories: [{ id: "uuid-1", title: "Place 1", slug: "place-1", category: "nature" }],
     });
 
-    // No webhook secret — falls through to admin auth which is valid
-    const res = await POST(makeRequest());
+    // No webhook secret — falls through to admin auth which is valid, and
+    // carries a matching Origin + CSRF token (the admin dashboard's shape).
+    const res = await POST(
+      makeRequest({
+        origin: "https://paisaxe.es",
+        "x-csrf-token": "test-csrf-token",
+        cookie: "__csrf=test-csrf-token",
+      })
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
+  });
+
+  // BE-H5/SE-M1: the admin-cookie fallback is exactly the CSRF attack
+  // surface — a hostile cross-site page riding a logged-in admin's session
+  // cookie must NOT be able to trigger discovery without a valid CSRF token
+  // and Origin.
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with no CSRF token or Origin", async () => {
+    (validateAdminAuth as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      valid: true,
+    });
+
+    // No webhook secret, no Origin, no CSRF token — simulates a cross-site
+    // POST riding the victim admin's session cookie.
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/csrf/i);
+    expect(runDiscovery).not.toHaveBeenCalled();
+  });
+
+  it("BE-H5/SE-M1: rejects admin-session fallback requests with a disallowed Origin", async () => {
+    (validateAdminAuth as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      valid: true,
+    });
+
+    const res = await POST(
+      makeRequest({
+        origin: "https://evil.example",
+        "x-csrf-token": "test-csrf-token",
+        cookie: "__csrf=test-csrf-token",
+      })
+    );
+    expect(res.status).toBe(403);
+    expect(runDiscovery).not.toHaveBeenCalled();
   });
 
   it("returns 500 with error details when runDiscovery throws an Error", async () => {
@@ -450,5 +492,28 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — content-discovery", () => {
         error: expect.stringContaining("Google Places API rate limit exceeded"),
       })
     );
+  });
+});
+
+// DO-M6 (#833): explicit ceiling, replacing Vercel's implicit platform
+// default, kept strictly above the worst-case network budget the discovery
+// pipeline can run up: one Google Places search
+// (AbortSignal.timeout(8_000) — src/lib/content-discovery.ts:219) plus up to
+// MAX_DISCOVERIES_PER_RUN sequential Claude description calls
+// (AbortSignal.timeout(8_000) each — src/lib/content-discovery.ts:273).
+describe("DO-M6: maxDuration (#833)", () => {
+  it("declares an explicit numeric maxDuration", () => {
+    expect(typeof maxDuration).toBe("number");
+    expect(Number.isFinite(maxDuration)).toBe(true);
+  });
+
+  it("keeps maxDuration strictly greater than the worst-case network budget", () => {
+    const PLACES_SEARCH_TIMEOUT_SECONDS = 8;
+    const DESCRIPTION_TIMEOUT_SECONDS = 8;
+    const worstCaseNetworkSeconds =
+      PLACES_SEARCH_TIMEOUT_SECONDS +
+      MAX_DISCOVERIES_PER_RUN * DESCRIPTION_TIMEOUT_SECONDS;
+
+    expect(maxDuration).toBeGreaterThan(worstCaseNetworkSeconds);
   });
 });

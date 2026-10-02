@@ -58,9 +58,12 @@ async function flushUntil(query: () => HTMLElement | null): Promise<HTMLElement>
 
 // Mock i18n
 const mockT = createMockT();
+// UX-H6 (#892): mutable so individual tests can exercise non-Spanish locales
+// (e.g. localized screen-reader labels). Reset to "es" in afterEach below.
+let mockLocale = "es";
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
-    locale: "es",
+    locale: mockLocale,
     setLocale: vi.fn(),
     t: (key: string) => mockT(key),
   }),
@@ -147,7 +150,7 @@ const renderWithAuth = async (ui: ReactNode) => {
 
 // Mock next/image — captures blur placeholder props for verification
 vi.mock("next/image", () => ({
-  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL }: {
+  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL, sizes }: {
     src: string;
     alt: string;
     className?: string;
@@ -155,6 +158,7 @@ vi.mock("next/image", () => ({
     priority?: boolean;
     placeholder?: string;
     blurDataURL?: string;
+    sizes?: string;
   }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -165,9 +169,48 @@ vi.mock("next/image", () => ({
       data-priority={priority}
       data-placeholder={placeholder}
       data-blur-data-url={blurDataURL}
+      data-sizes={sizes}
     />
   ),
 }));
+
+// FE-M2 (#764): capture the exact `localizedStory`/`questionPrompts` prop
+// references StoryViewer passes down on every render, so a regression test can
+// assert they stay referentially stable across unrelated re-renders. Renders
+// the real component underneath (via importActual) so every other test that
+// asserts on StoryInfoPanel's markup (story-title, ask-button, etc.) is
+// unaffected.
+const capturedLocalizedStoryRefs: unknown[] = [];
+const capturedQuestionPromptsRefs: unknown[] = [];
+vi.mock("./story-info-panel", async () => {
+  const actual = await vi.importActual<typeof import("./story-info-panel")>(
+    "./story-info-panel"
+  );
+  function CapturingStoryInfoPanel(props: Record<string, unknown>) {
+    capturedLocalizedStoryRefs.push(props.localizedStory);
+    capturedQuestionPromptsRefs.push(props.questionPrompts);
+    const Real = actual.StoryInfoPanel;
+    return <Real {...(props as unknown as Parameters<typeof actual.StoryInfoPanel>[0])} />;
+  }
+  return { ...actual, StoryInfoPanel: CapturingStoryInfoPanel };
+});
+
+// FE-M7 (#769): SuggestPlaceDialog must be dynamically imported and only
+// mounted when the user_story_suggestions flag is on — track how many times
+// the component actually gets instantiated so a test can assert it is never
+// mounted while the flag is disabled (not just visually hidden).
+let suggestPlaceDialogMountCount = 0;
+vi.mock("./suggest-place-dialog", async () => {
+  const actual = await vi.importActual<typeof import("./suggest-place-dialog")>(
+    "./suggest-place-dialog"
+  );
+  function CapturingSuggestPlaceDialog(props: Record<string, unknown>) {
+    suggestPlaceDialogMountCount++;
+    const Real = actual.SuggestPlaceDialog;
+    return <Real {...(props as unknown as Parameters<typeof actual.SuggestPlaceDialog>[0])} />;
+  }
+  return { ...actual, SuggestPlaceDialog: CapturingSuggestPlaceDialog };
+});
 
 const mockStories: Story[] = [
   {
@@ -235,6 +278,8 @@ describe("StoryViewer", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    // UX-H6 (#892): reset the mutable locale mock so per-test overrides don't bleed
+    mockLocale = "es";
     // Reset matchMedia mock to default (matches: false for all queries)
     vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
       matches: false,
@@ -1189,7 +1234,9 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      expect(screen.getByText("Compartir")).toBeInTheDocument();
+      // #908/#771: the mobile share row is now the dynamically-imported
+      // ShareButton ("menu" variant) — flush its import microtask.
+      await flushUntil(() => screen.queryByText("Compartir"));
     });
 
     it("should copy to clipboard when navigator.share unavailable", async () => {
@@ -1214,7 +1261,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // UX-B1: must use singular `/story/<slug>` to match the actual route,
@@ -1261,7 +1308,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       expect(mockWriteText).toHaveBeenCalledWith(
@@ -1292,7 +1339,7 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // Falls back to id under the singular `/story/` path
@@ -1401,6 +1448,28 @@ describe("StoryViewer", () => {
       const mainEl = screen.getByRole("main");
       expect(mainEl).not.toHaveAttribute("aria-hidden");
     });
+
+    // UX-H2 (#888): aria-hidden alone doesn't stop keyboard focus — everything
+    // inside stayed Tab-reachable while announced as non-existent to AT.
+    // `inert` additionally removes the subtree from the tab order and blocks
+    // pointer interaction.
+    it("UX-H2: should set inert on <main> when chatOpen is true", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: true })} />
+      );
+
+      const mainEl = screen.getByRole("main", { hidden: true });
+      expect(mainEl).toHaveAttribute("inert");
+    });
+
+    it("UX-H2: should NOT set inert on <main> when chatOpen is false", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: false })} />
+      );
+
+      const mainEl = screen.getByRole("main");
+      expect(mainEl).not.toHaveAttribute("inert");
+    });
   });
 
   describe("auto-play when chat is open", () => {
@@ -1451,13 +1520,34 @@ describe("StoryViewer", () => {
         writable: true,
         configurable: true,
       });
+      // #908/#771: the consolidated useShareStory hook picks native share vs.
+      // clipboard based on the input device (pointer: coarse), same as the
+      // desktop ShareButton always did — simulate a touch device so this
+      // exercises the native-share branch.
+      Object.defineProperty(navigator, "canShare", {
+        value: () => true,
+        writable: true,
+        configurable: true,
+      });
+      vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
-      const shareItem = screen.getByText("Compartir");
+      // #908/#771: the mobile share row is now the dynamically-imported
+      // ShareButton ("menu" variant) — flush its import microtask.
+      const shareItem = await flushUntil(() => screen.queryByText("Compartir"));
       fireEvent.click(shareItem);
 
       // UX-B1: must use singular `/story/<slug-or-id>`, not plural `/stories/<id>`
@@ -1474,6 +1564,11 @@ describe("StoryViewer", () => {
 
       // Clean up
       Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "canShare", {
         value: undefined,
         writable: true,
         configurable: true,
@@ -1618,6 +1713,96 @@ describe("StoryViewer", () => {
       expect(onAskAbout).toHaveBeenCalledWith("What is the best time to visit?");
 
       mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  // UX-H6 (#892): getLocalizedStory was bypassed for the progress-bar screen-reader
+  // labels and the sr-only story-change announcement, and question_prompts had no
+  // translated form at all — every locale rendered raw Spanish at these surfaces.
+  describe("UX-H6 (#892): locale-aware text", () => {
+    const storiesWithTranslations: Story[] = [
+      {
+        ...mockStories[0],
+        metadata: {
+          question_prompts: ["¿Cuándo ir?", "¿Cómo llegar?"],
+          translations: {
+            fr: {
+              title: "Lacs de Covadonga",
+              subtitle: "Pics d'Europe",
+              description: "De magnifiques lacs glaciaires dans les montagnes",
+              question_prompts: ["Quand y aller ?", "Comment y arriver ?"],
+            },
+          },
+        },
+      },
+      mockStories[1],
+      mockStories[2],
+    ];
+
+    afterEach(() => {
+      mockLocale = "es";
+      mockIsEnabled.mockReturnValue(false);
+    });
+
+    it("uses the localized title in the progress bar screen-reader labels for a non-Spanish locale", async () => {
+      mockLocale = "fr";
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ stories: storiesWithTranslations, allStories: storiesWithTranslations })}
+        />
+      );
+
+      const progressBars = within(
+        screen.getByRole("navigation", { name: "Progreso de historias" })
+      ).getAllByRole("button");
+
+      expect(progressBars[0]?.getAttribute("aria-label")).toContain("Lacs de Covadonga");
+      expect(progressBars[0]?.getAttribute("aria-label")).not.toContain("Lagos de Covadonga");
+    });
+
+    it("uses the localized title/subtitle in the sr-only story-change announcement", async () => {
+      mockLocale = "fr";
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ stories: storiesWithTranslations, allStories: storiesWithTranslations })}
+        />
+      );
+
+      // Multiple elements may have role="status" (e.g. bookmark toast) — find the
+      // sr-only aria-live="polite" region that announces the current story.
+      const statusElements = screen.getAllByRole("status");
+      const liveRegion = statusElements.find(
+        (el) => el.getAttribute("aria-live") === "polite" && el.classList.contains("sr-only")
+      );
+      expect(liveRegion).toBeInTheDocument();
+      expect(liveRegion!.textContent).toContain("Lacs de Covadonga — Pics d'Europe");
+    });
+
+    it("renders translated question prompts for a non-Spanish locale", async () => {
+      mockLocale = "fr";
+      mockIsEnabled.mockImplementation((flag: string) => flag === "contextual_prompts");
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ stories: storiesWithTranslations, allStories: storiesWithTranslations })}
+        />
+      );
+
+      expect(screen.getByText("Quand y aller ?")).toBeInTheDocument();
+      expect(screen.queryByText("¿Cuándo ir?")).not.toBeInTheDocument();
+    });
+
+    it("falls back to Spanish question prompts when the active locale has no translated prompts", async () => {
+      mockLocale = "de";
+      mockIsEnabled.mockImplementation((flag: string) => flag === "contextual_prompts");
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ stories: storiesWithTranslations, allStories: storiesWithTranslations })}
+        />
+      );
+
+      expect(screen.getByText("¿Cuándo ir?")).toBeInTheDocument();
     });
   });
 
@@ -2033,6 +2218,28 @@ describe("StoryViewer", () => {
     }, 30000);
   });
 
+  describe("FE-M7 (#769): SuggestPlaceDialog code-splitting", () => {
+    beforeEach(() => {
+      suggestPlaceDialogMountCount = 0;
+    });
+
+    it("never mounts the SuggestPlaceDialog module when user_story_suggestions is disabled", async () => {
+      mockIsEnabled.mockReturnValue(false);
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Drain any pending dynamic-import microtasks — the component must
+      // still never mount, even after the loader has had a chance to settle.
+      for (let i = 0; i < 10; i++) {
+        await act(async () => {
+          await Promise.resolve();
+        });
+      }
+
+      expect(suggestPlaceDialogMountCount).toBe(0);
+    });
+  });
+
   describe("suggest place dialog lifecycle (lines 388, 490)", () => {
     it("should invoke onOpen on SuggestPlaceButton click and onClose when dialog Cancel is pressed", async () => {
       mockIsEnabled.mockImplementation(
@@ -2042,18 +2249,18 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // Trigger onOpen (line 388): click the desktop SuggestPlaceButton.
-      // #569: SuggestPlaceButton is dynamically imported — flush the import
-      // microtask before querying (fake timers block findBy* polling).
-      await act(async () => { await Promise.resolve(); });
-      const suggestBtn = screen.getByRole("button", {
-        name: "suggestions.suggest_place",
-      });
+      // #569/#769: SuggestPlaceButton and SuggestPlaceDialog are both
+      // dynamically imported — flush the import microtasks before querying
+      // (fake timers block findBy* polling).
+      const suggestBtn = await flushUntil(() =>
+        screen.queryByRole("button", { name: "suggestions.suggest_place" })
+      );
       fireEvent.click(suggestBtn);
 
       // Verify dialog opened (Cancel button appears)
-      const cancelBtn = screen.getByRole("button", {
-        name: "suggestions.cancel",
-      });
+      const cancelBtn = await flushUntil(() =>
+        screen.queryByRole("button", { name: "suggestions.cancel" })
+      );
       expect(cancelBtn).toBeInTheDocument();
 
       // Trigger onClose (line 490): click Cancel in the dialog
@@ -2285,45 +2492,74 @@ describe("StoryViewer", () => {
     });
   });
 
-  describe("PE-M4 (#615): adjacent image prefetch", () => {
-    it("renders preload links for the next and previous story images", async () => {
+  describe("PE-H1/FE-M3 (#804, #765): adjacent image preload matches next/image request", () => {
+    // A hand-built <link rel="preload" as="image" href={rawUrl}> pointed at
+    // the raw origin URL, while the real <Image> requests the optimizer URL —
+    // the two never coincided, so the preload warmed nothing and ~350KB of
+    // origin image bytes were wasted per navigation. Adjacent images are now
+    // rendered as hidden, `priority` next/image elements instead, so Next.js
+    // itself owns generating the (correct) preload for the exact URL it will
+    // reuse once that image becomes the current one.
+    it("does not render a hand-built preload link for adjacent images", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
       );
 
-      const preloads = Array.from(
-        document.querySelectorAll('link[rel="preload"][as="image"]')
-      ).map((l) => l.getAttribute("href"));
+      const manualPreloadLinks = document.querySelectorAll(
+        'link[rel="preload"][as="image"]'
+      );
+      expect(manualPreloadLinks.length).toBe(0);
+    });
+
+    it("renders the next and previous story images as hidden, priority next/image elements", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
+      );
 
       // currentIndex 1 → prev = story-1 (lagos), next = story-3 (sidra)
-      expect(preloads).toContain("/images/lagos.jpg");
-      expect(preloads).toContain("/images/sidra.jpg");
+      const lagosImg = document.querySelector(
+        'img[src="/images/lagos.jpg"][data-priority="true"]'
+      );
+      const sidraImg = document.querySelector(
+        'img[src="/images/sidra.jpg"][data-priority="true"]'
+      );
+
+      expect(lagosImg).not.toBeNull();
+      expect(sidraImg).not.toBeNull();
+      // `sizes` must match the real, visible <Image> (sizes="100vw") so
+      // next/image computes the identical optimizer URL/srcset that will
+      // actually be requested once this image becomes the current one.
+      expect(lagosImg).toHaveAttribute("data-sizes", "100vw");
+      expect(sidraImg).toHaveAttribute("data-sizes", "100vw");
     });
 
-    it("wraps around: prefetches next and previous images from index 0", async () => {
+    it("wraps around: renders preload images for next and previous from index 0", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
       );
-
-      const preloads = Array.from(
-        document.querySelectorAll('link[rel="preload"][as="image"]')
-      ).map((l) => l.getAttribute("href"));
 
       // currentIndex 0 → next = story-2 (cathedral), prev wraps to story-3 (sidra)
-      expect(preloads).toContain("/images/cathedral.jpg");
-      expect(preloads).toContain("/images/sidra.jpg");
+      const cathedralImg = document.querySelector(
+        'img[src="/images/cathedral.jpg"][data-priority="true"]'
+      );
+      const sidraImg = document.querySelector(
+        'img[src="/images/sidra.jpg"][data-priority="true"]'
+      );
+
+      expect(cathedralImg).not.toBeNull();
+      expect(sidraImg).not.toBeNull();
     });
 
-    it("does not preload the current story image", async () => {
+    it("does not render a duplicate preload image for the current story", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
       );
 
-      const preloads = Array.from(
-        document.querySelectorAll('link[rel="preload"][as="image"]')
-      ).map((l) => l.getAttribute("href"));
-
-      expect(preloads).not.toContain("/images/lagos.jpg");
+      // lagos.jpg (current, index 0) should appear exactly once — as the
+      // real, visible background <Image> — not a second time as a hidden
+      // preload copy.
+      const lagosImgs = document.querySelectorAll('img[src="/images/lagos.jpg"]');
+      expect(lagosImgs.length).toBe(1);
     });
   });
 
@@ -2383,8 +2619,13 @@ describe("StoryViewer", () => {
   describe("FE-L1: StoryInfoPanel and StoryToolbar memoization", () => {
     it("StoryInfoPanel export is a memo component (has $$typeof or displayName)", async () => {
       // Verify the component is wrapped in memo by checking it renders correctly
-      // and checking the module export type via dynamic import
-      const mod = await import("./story-info-panel");
+      // and checking the module export type. FE-M2's capturing mock above
+      // wraps the exported StoryInfoPanel in a plain (non-memo) passthrough
+      // function for prop-capture purposes, so bypass it via importActual to
+      // check the real, unmocked module export.
+      const mod = await vi.importActual<typeof import("./story-info-panel")>(
+        "./story-info-panel"
+      );
       // memo returns an object with $$typeof = Symbol(react.memo)
       const comp = mod.StoryInfoPanel as unknown as { $$typeof?: symbol; type?: unknown };
       expect(comp.$$typeof?.toString()).toContain("react.memo");
@@ -2394,6 +2635,40 @@ describe("StoryViewer", () => {
       const mod = await import("./story-toolbar");
       const comp = mod.StoryToolbar as unknown as { $$typeof?: symbol; type?: unknown };
       expect(comp.$$typeof?.toString()).toContain("react.memo");
+    });
+  });
+
+  describe("FE-M2 (#764): StoryInfoPanel receives referentially stable props", () => {
+    beforeEach(() => {
+      capturedLocalizedStoryRefs.length = 0;
+      capturedQuestionPromptsRefs.length = 0;
+    });
+
+    it("passes the same localizedStory and questionPrompts object across an unrelated re-render", async () => {
+      // autoplay_button only — toggling it changes unrelated `autoPlay` state,
+      // it does not touch story/locale, so localizedStory/questionPrompts
+      // should not need to change identity.
+      mockIsEnabled.mockImplementation((flag: string) => flag === "autoplay_button");
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const countBefore = capturedLocalizedStoryRefs.length;
+      expect(countBefore).toBeGreaterThan(0);
+      const localizedBefore = capturedLocalizedStoryRefs[countBefore - 1];
+      const promptsBefore = capturedQuestionPromptsRefs[countBefore - 1];
+
+      // Trigger a re-render unrelated to story/locale: toggle autoplay.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("ambient-toggle"));
+      });
+
+      expect(capturedLocalizedStoryRefs.length).toBeGreaterThan(countBefore);
+      const localizedAfter = capturedLocalizedStoryRefs.at(-1);
+      const promptsAfter = capturedQuestionPromptsRefs.at(-1);
+
+      // Memoization is defeated if these were freshly allocated every render.
+      expect(localizedAfter).toBe(localizedBefore);
+      expect(promptsAfter).toBe(promptsBefore);
     });
   });
 

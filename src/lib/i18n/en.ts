@@ -131,11 +131,11 @@ export const en: Translations = {
     // LOCATION-SPECIFIC: Location name
     empty_description: 'Explore the stories of Asturias and save the ones you like to view later.',
     explore: 'Explore stories',
-    loading_more: 'Loading more...',
     all_viewed: 'You have seen all your saved stories',
     remove_from_saved: 'Remove from saved',
     removed: 'Removed from favorites',
     saved_toast: 'Saved to favorites',
+    undo: 'Undo',
   },
 
   accessibility: {
@@ -210,6 +210,7 @@ export const en: Translations = {
     error: 'Connection error',
     error_not_configured: 'Voice agent not configured',
     no_permission: 'Microphone access needed',
+    no_permission_retry: "If your browser blocked access, enable it in the site's settings and try again.",
     you: 'You',
     loading: 'Loading voice assistant...',
   },
@@ -261,12 +262,13 @@ export const en: Translations = {
 
   premium: {
     premium_access: 'Premium Access',
-    voice_pass_label: 'Voice Pass · 24h',
+    voice_pass_label: 'Voice Pass · {duration}',
     voice_locked: 'Voice chat is a premium feature',
     get_day_pass: 'Get Day Pass',
     voice_title: 'Talk to Your Guide',
     voice_description: 'Pelayo knows more than what\'s on screen. Just ask.',
     feature_24h: '24 hours of unlimited conversations',
+    feature_duration: '{duration} of unlimited conversations',
     feature_unlimited: 'Ask unlimited questions',
     feature_realtime: 'Real-time weather and recommendations',
     feature_booking: 'Pelayo books restaurants and hotels for you',
@@ -289,8 +291,11 @@ export const en: Translations = {
     faq_what_included_answer: '24 hours with Pelayo. Ask about the weather before hiking the Lakes, where to find the best fabada, which cider house to visit —',
     faq_what_included_highlight: 'and he calls ahead to book your table!',
     faq_how_long: 'How long does it last?',
-    faq_how_long_answer: '24 hours from purchase. Perfect for a day of trip planning or exploring.',
+    faq_how_long_answer: '{duration} from purchase. Perfect for a day of trip planning or exploring.',
     voice_pass_expiry: 'Your voice pass expires in {hours}h ({time})',
+    tier_day: '24 hours',
+    tier_week: '7 days',
+    tier_month: '30 days',
   },
 
   fullscreen: {

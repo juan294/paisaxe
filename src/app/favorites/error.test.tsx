@@ -2,6 +2,10 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import * as Sentry from "@sentry/nextjs";
 import { LanguageProvider } from "@/lib/i18n";
+import {
+  GLASS_RETRY_BUTTON_CLASS,
+  GLASS_HOME_LINK_CLASS,
+} from "@/lib/error-boundary-styles";
 import FavoritesError from "./error";
 
 vi.mock("@sentry/nextjs", () => ({
@@ -93,5 +97,35 @@ describe("FavoritesError", () => {
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper.className).toContain("bg-neutral-950");
     expect(wrapper.className).toContain("min-h-screen");
+  });
+
+  // UX-M4: converged error-boundary treatment across all four boundaries
+  it("UX-M4: wrapper has role=alert for screen reader announcement", () => {
+    renderWithI18n(<FavoritesError {...defaultProps} />);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
+  it("UX-M4: retry button has a visible focus ring", () => {
+    renderWithI18n(<FavoritesError {...defaultProps} />);
+    const btn = screen.getByRole("button", { name: "Reintentar" });
+    expect(btn.className).toMatch(/focus-visible:ring-2/);
+  });
+
+  it("UX-M4: retry button uses the shared glass treatment (matches immersive/global-error)", () => {
+    renderWithI18n(<FavoritesError {...defaultProps} />);
+    const btn = screen.getByRole("button", { name: "Reintentar" });
+    expect(btn.className).toBe(GLASS_RETRY_BUTTON_CLASS);
+  });
+
+  it("UX-M4: home link has a visible focus ring", () => {
+    renderWithI18n(<FavoritesError {...defaultProps} />);
+    const link = screen.getByRole("link", { name: "Volver al inicio" });
+    expect(link.className).toMatch(/focus-visible:ring-2/);
+  });
+
+  it("UX-M4: home link uses the shared glass treatment (matches immersive/global-error)", () => {
+    renderWithI18n(<FavoritesError {...defaultProps} />);
+    const link = screen.getByRole("link", { name: "Volver al inicio" });
+    expect(link.className).toBe(GLASS_HOME_LINK_CLASS);
   });
 });

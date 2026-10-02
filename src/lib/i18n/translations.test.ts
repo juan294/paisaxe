@@ -6,6 +6,8 @@ import { de } from './de';
 import { pt } from './pt';
 import { ast } from './ast';
 import type { Translations } from './types';
+import { resolveTranslation } from './resolve';
+import { PRICING_TIERS } from '@/lib/pricing';
 
 /**
  * Recursively collect all keys from a translation object using dot-notation.
@@ -142,7 +144,7 @@ describe('locale files', () => {
 
       const favorites = es.favorites as Record<string, string>;
       expect(favorites.empty_title).toContain('todavía');
-      expect(favorites.loading_more).toContain('más');
+      expect(favorites.undo).toContain('Deshacer');
 
       const premium = es.premium as Record<string, string>;
       expect(premium.voice_title).toContain('Guía');
@@ -213,9 +215,9 @@ describe('locale files', () => {
       'favorites.empty_title',
       'favorites.empty_description',
       'favorites.explore',
-      'favorites.loading_more',
       'favorites.all_viewed',
       'favorites.remove_from_saved',
+      'favorites.undo',
       'accessibility.related_stories',
       'accessibility.language_switcher',
       'accessibility.go_back',
@@ -243,6 +245,26 @@ describe('locale files', () => {
           expect(keys, `Missing in ${code}`).toContain(key);
         }
       });
+    }
+  });
+
+  // UX-B1 (#886): the existing parity tests above only compare locales
+  // against each other, so a duration key referenced by PRICING_TIERS but
+  // missing from ALL SIX locale files would never be caught — which is
+  // exactly how the pricing page ended up rendering hardcoded "24 horas"
+  // to every visitor regardless of locale or selected tier. This test
+  // instead checks locale files against the actual code reference
+  // (PRICING_TIERS[].durationKey) and asserts each key resolves to a real
+  // translation, not the `t(key) === key` identity fallback.
+  describe('UX-B1: pricing tier duration keys resolve in every locale', () => {
+    for (const [code, { name, data }] of Object.entries(allLocales)) {
+      for (const tier of PRICING_TIERS) {
+        it(`resolves ${tier.durationKey} (tier "${tier.id}") to a real translation in ${name}`, () => {
+          const resolved = resolveTranslation(tier.durationKey, data);
+          expect(resolved, `${tier.durationKey} is missing in ${code} — falls back to the key itself`).not.toBe(tier.durationKey);
+          expect(resolved.length, `${tier.durationKey} resolved to an empty string in ${code}`).toBeGreaterThan(0);
+        });
+      }
     }
   });
 });

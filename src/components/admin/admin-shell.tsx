@@ -17,7 +17,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
-import { StoriesTabPanel } from "@/components/admin/stories-tab-panel";
 import { AdminTabs, TABS, type AdminTab } from "@/components/admin/admin-tabs";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -34,6 +33,17 @@ function TabPanelFallback() {
     </div>
   );
 }
+
+// FE-M7 (#769): StoriesTabPanel is the largest admin tab panel (~500 lines) —
+// it was the only static import among the six tab panels, defeating the
+// "load tab code on demand" intent that motivated dynamic-importing the rest.
+const StoriesTabPanel = dynamic(
+  () =>
+    import("@/components/admin/stories-tab-panel").then((m) => ({
+      default: m.StoriesTabPanel,
+    })),
+  { ssr: false, loading: TabPanelFallback }
+);
 
 const FeatureTogglesPanel = dynamic(
   () =>

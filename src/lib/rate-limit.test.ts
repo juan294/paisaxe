@@ -150,8 +150,11 @@ describe("rate-limit", () => {
     let checkRateLimit: typeof import("./rate-limit").checkRateLimit;
     let resetRateLimit: typeof import("./rate-limit").resetRateLimit;
     let getRateLimitBackendStatus: typeof import("./rate-limit").getRateLimitBackendStatus;
+    let probeRateLimitBackend: typeof import("./rate-limit").probeRateLimitBackend;
 
     const mockLimit = vi.fn();
+    const mockPing = vi.fn();
+    const mockRedisCtor = vi.fn();
 
     beforeEach(async () => {
       vi.useFakeTimers();
@@ -169,7 +172,10 @@ describe("rate-limit", () => {
       }));
       vi.doMock("@upstash/redis", () => ({
         Redis: class MockRedis {
-          constructor() {}
+          ping = mockPing;
+          constructor(...args: unknown[]) {
+            mockRedisCtor(...args);
+          }
         },
       }));
 
@@ -177,6 +183,7 @@ describe("rate-limit", () => {
       checkRateLimit = mod.checkRateLimit;
       resetRateLimit = mod.resetRateLimit;
       getRateLimitBackendStatus = mod.getRateLimitBackendStatus;
+      probeRateLimitBackend = mod.probeRateLimitBackend;
     });
 
     afterEach(() => {
@@ -184,6 +191,8 @@ describe("rate-limit", () => {
       delete process.env.UPSTASH_REDIS_REST_URL;
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
       mockLimit.mockReset();
+      mockPing.mockReset();
+      mockRedisCtor.mockReset();
     });
 
     it("delegates to Upstash when env vars are set", async () => {
@@ -433,6 +442,61 @@ describe("rate-limit", () => {
       const { Ratelimit: MockRatelimit } = await import("@upstash/ratelimit");
       expect(MockRatelimit.slidingWindow).toHaveBeenCalledTimes(1);
     });
+
+    // DO-H2 (#823): the health probe must reflect LIVE Redis reachability
+    // rather than the per-process `_rateLimitDegraded` flag, which can never
+    // be observed across Vercel's separate serverless isolates.
+    describe("probeRateLimitBackend (DO-H2 live health probe)", () => {
+      it("reports not degraded when the PING succeeds", async () => {
+        mockPing.mockResolvedValue("PONG");
+
+        const status = await probeRateLimitBackend();
+
+        expect(status).toEqual({
+          backend: "upstash",
+          configured: true,
+          degraded: false,
+        });
+      });
+
+      it("reports degraded when the PING rejects (a live outage), independent of any prior in-process state", async () => {
+        mockPing.mockRejectedValue(new Error("Redis connection refused"));
+
+        const status = await probeRateLimitBackend();
+
+        expect(status).toEqual({
+          backend: "upstash",
+          configured: true,
+          degraded: true,
+          reason: "upstash_unavailable",
+        });
+      });
+
+      it("does not depend on _rateLimitDegraded / checkRateLimit ever having run in this process", async () => {
+        // No checkRateLimit call has happened in this test — simulating a
+        // fresh serverless isolate that only ever runs /api/health. The old
+        // implementation (reading getRateLimitBackendStatus()) would report
+        // "ok" here even during a real outage, because _rateLimitDegraded
+        // starts false and is never set outside of checkRateLimit's own
+        // process. The live probe must not have this blind spot.
+        mockPing.mockRejectedValue(new Error("ECONNREFUSED"));
+
+        const status = await probeRateLimitBackend();
+
+        expect(status.degraded).toBe(true);
+      });
+
+      it("propagates an AbortSignal into the Redis client so a caller-side timeout actually cancels the PING", async () => {
+        mockPing.mockResolvedValue("PONG");
+        const controller = new AbortController();
+
+        await probeRateLimitBackend(controller.signal);
+
+        expect(mockRedisCtor).toHaveBeenCalledWith(
+          expect.objectContaining({ signal: controller.signal })
+        );
+      });
+    });
   });
 
   describe("backend auto-detection", () => {
@@ -468,6 +532,41 @@ describe("rate-limit", () => {
       const result = await checkRateLimit("user1");
       expect(result.allowed).toBe(true);
       expect(getRateLimitStore().size).toBe(1);
+    });
+
+    it("DO-H2: probeRateLimitBackend reports blocked/degraded in production when Upstash is not configured, without doing any I/O", async () => {
+      vi.resetModules();
+      vi.stubEnv("VERCEL_ENV", "production");
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      const { probeRateLimitBackend } = await import("./rate-limit");
+
+      const status = await probeRateLimitBackend();
+
+      expect(status).toEqual({
+        backend: "blocked",
+        configured: false,
+        degraded: true,
+        reason: "upstash_missing",
+      });
+    });
+
+    it("DO-H2: probeRateLimitBackend reports memory/not-degraded outside production when Upstash is not configured", async () => {
+      vi.resetModules();
+      vi.stubEnv("VERCEL_ENV", "preview");
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      const { probeRateLimitBackend } = await import("./rate-limit");
+
+      const status = await probeRateLimitBackend();
+
+      expect(status).toEqual({
+        backend: "memory",
+        configured: false,
+        degraded: false,
+      });
     });
 
     it("AR-M2: fails closed in production when Upstash credentials are missing", async () => {
@@ -539,6 +638,64 @@ describe("rate-limit", () => {
 
       const { isRateLimitDegraded } = await import("./rate-limit");
       expect(isRateLimitDegraded()).toBe(false);
+    });
+  });
+
+  // BE-L5 (#798): `getClientIp` returns IPv6 addresses verbatim. A /64
+  // residential allocation gives one subscriber 2^64 distinct source
+  // addresses, each hashing to its own Upstash bucket, so the full address
+  // must never be used as the rate-limit key. IPv4 stays untouched.
+  describe("normalizeIpForRateLimit (BE-L5)", () => {
+    it("collapses a full IPv6 address to its /64 prefix", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("2001:db8:85a3:0000:0000:8a2e:0370:7334")).toBe(
+        "2001:db8:85a3:0::/64"
+      );
+    });
+
+    it("gives two addresses from the same /64 the same bucket key", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      // Same subscriber, two different suffixes (e.g. IPv6 privacy extensions
+      // rotating the host portion on every request).
+      const a = normalizeIpForRateLimit("2001:db8:85a3::8a2e:370:7334");
+      const b = normalizeIpForRateLimit("2001:db8:85a3::1111:2222:3333");
+      expect(a).toBe(b);
+    });
+
+    it("gives addresses from different /64s different bucket keys", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      const a = normalizeIpForRateLimit("2001:db8:85a3::1");
+      const b = normalizeIpForRateLimit("2001:db8:85a4::1");
+      expect(a).not.toBe(b);
+    });
+
+    it("expands a leading :: correctly", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("::1")).toBe("0:0:0:0::/64");
+    });
+
+    it("strips a zone/scope id before normalizing", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("fe80::1%eth0")).toBe(
+        normalizeIpForRateLimit("fe80::1")
+      );
+    });
+
+    it("leaves IPv4 addresses untouched", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("203.0.113.50")).toBe("203.0.113.50");
+    });
+
+    it('leaves non-IP sentinels like "unknown" untouched', async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      expect(normalizeIpForRateLimit("unknown")).toBe("unknown");
+    });
+
+    it("falls back to the raw string for a malformed IPv6-looking value", async () => {
+      const { normalizeIpForRateLimit } = await import("./rate-limit");
+      // Too many groups once "::" is expanded — not a valid IPv6 address.
+      const malformed = "1:2:3:4:5:6:7:8:9::";
+      expect(normalizeIpForRateLimit(malformed)).toBe(malformed);
     });
   });
 });

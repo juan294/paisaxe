@@ -284,17 +284,18 @@ branch -- the integration branch already holds the changes.
    gh run list --branch develop --limit 1
    ```
 
-4. Merge with squash + auto-merge. NEVER pass `--delete-branch` -- `develop` is permanent:
+4. Merge with a merge commit. NEVER squash the release PR and NEVER pass
+   `--delete-branch` -- `develop` is permanent:
 
    ```bash
-   gh pr merge --squash --auto
+   gh pr merge --merge
    ```
 
    Repos standardized per Rule #76 enable delete-branch-on-merge, but that only removes
    ordinary feature heads; deleting the permanent integration branch would be destructive.
 
 5. **STOP.** Wait for the PR to merge (confirm with `gh pr view --json state`). After it lands,
-   tag the squashed release commit on `main`:
+   tag the release merge commit on `main`:
 
    ```bash
    git checkout main && git pull --rebase

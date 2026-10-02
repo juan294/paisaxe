@@ -131,7 +131,7 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
 
 interface ToolbarOverflowItemProps {
   icon: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
   onClick?: () => void;
   active?: boolean;
 }
@@ -145,7 +145,8 @@ export function ToolbarOverflowItem({ icon, label, onClick, active }: ToolbarOve
         onClick?.();
       }}
       className={cn(
-        "flex items-center gap-3 w-full px-3 py-2 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors text-sm",
+        // UX-M6 (#899): min-h-11 (44px) touch-target floor.
+        "flex items-center gap-3 w-full px-3 py-2 min-h-11 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors text-sm",
         active && "text-white bg-white/10"
       )}
     >

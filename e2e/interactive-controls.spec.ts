@@ -91,6 +91,14 @@ test.describe("Ambient toggle behavior", () => {
   });
 
   test("auto-rotation advances to next story", async ({ page }) => {
+    // QA-M8: ambient mode's auto-advance interval is a real 12s client
+    // timer, not a render/network wait — it can't be shrunk to "a few
+    // seconds" without breaking the assertion. The 15s wait below already
+    // claims the entire default 15s CI per-test budget, leaving zero
+    // headroom for setup/click before it and the assertion after it. Give
+    // this test its own extended budget instead of tightening the wait.
+    test.setTimeout(20_000);
+
     // Get the initial story title
     const title = page.getByTestId("story-title").first();
     const initialTitle = await title.textContent();
@@ -376,8 +384,11 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     const initialTitle = await title.textContent();
 
     // Open the suggest place dialog
+    // QA-M8: the trigger renders alongside the already-visible story title
+    // (see beforeEach) — 5s is generous without claiming the entire 15s
+    // CI per-test budget on a single wait.
     const suggestButton = page.locator("[data-suggest-place-trigger]");
-    await expect(suggestButton).toBeVisible({ timeout: 15000 });
+    await expect(suggestButton).toBeVisible({ timeout: 5000 });
     await suggestButton.click();
 
     // Wait for the dialog to open
@@ -397,9 +408,9 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     const title = page.getByTestId("story-title").first();
     const initialTitle = await title.textContent();
 
-    // Open the suggest place dialog
+    // Open the suggest place dialog (see QA-M8 note above)
     const suggestButton = page.locator("[data-suggest-place-trigger]");
-    await expect(suggestButton).toBeVisible({ timeout: 15000 });
+    await expect(suggestButton).toBeVisible({ timeout: 5000 });
     await suggestButton.click();
 
     const commentArea = page.locator("#comment");

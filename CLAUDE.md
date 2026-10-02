@@ -36,7 +36,7 @@ develop   # Active development (DEFAULT)
 
 1. All development happens on `develop`
 2. Never commit directly to `main` — it is protected with required status checks
-3. Release to production via PR: `develop` → `main` (see Production Release below)
+3. Release to production via a **merge-commit** PR: `develop` → `main` (see Production Release below). Never squash a release PR; feature PRs may still squash.
 4. Always run tests before committing
 5. **No PRs for `develop`** — commit/merge directly, verify CI, done
 6. **PRs required for `main`** — branch protection enforces CI must pass before merge
@@ -74,18 +74,18 @@ develop   # Active development (DEFAULT)
 `main` is protected with branch protection rules:
 - **Required status checks**: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Smoke test Vercel preview` must all pass
 - **Force pushes blocked**, **deletion blocked**
-- **PRs required with 1 approval** (solo dev self-approval is allowed, but the approval click is required before merge)
+- **PRs required with 0 approvals** (solo-developer repository; explicit user authorization in the current conversation and green required checks are the human release gate)
 
 #### Release Process
 
 **`docs/runbooks/release-checklist.md` is the single procedural authority.** Follow it; do not
 improvise a different sequence here or in any other file. Its ordering is:
 
-1. Identify the candidate (by **tree hash** — squash merges do not preserve the tested SHA)
+1. Identify the candidate by **tree hash** so the same proof works across the promotion merge and deployment
 2. Pre-deployment gates — full suite, `npm run check-migrations`, `npm run check-required-probes`,
-   `npm run prelaunch`, the 6 manual gates in `docs/operations/pre-launch-security-checklist.md`,
-   and the mutating probes against the **local Docker** stack
-3. Merge and deploy — user says "go ahead", then `gh pr merge --squash`
+   `npm run prelaunch`, the 6 gates in `docs/operations/pre-launch-security-checklist.md` (5
+   manual, 1 CI-verified), and the mutating probes against the **local Docker** stack
+3. Merge and deploy — user says "go ahead", then `gh pr merge --merge`
 4. Verify the deployed identity matches the candidate tree
 5. Run the required probes (`quality/required-probes.yaml`)
 6. Analyze the evidence — `npm run analyze-release`
@@ -261,7 +261,7 @@ Core tables (see `supabase/migrations/` for full DDL):
 
 1. **No secrets in code** — Use env vars. Gitleaks scans git history.
 2. **No copyleft dependencies** — MIT, Apache-2.0, BSD, ISC only. See `docs/project/license-exceptions.md` for approved exceptions.
-3. **Performance budgets** — Lighthouse: Perf >= 70%, A11y >= 80%, LCP < 4s.
+3. **Performance budgets** — Lighthouse: A11y >= 80%; desktop Perf >= 70% and LCP < 4s; mobile Perf >= 60% and LCP < 5.5s. Mobile emulation throttles CPU 4x and the network to slow 4G, so its thresholds are calibrated separately — see `.github/workflows/lighthouse.yml` and #926.
 4. **No dead code** — Knip reports unused exports on PRs.
 5. **Health endpoint is sacred** — `/api/health` monitored 24/7. Don't break it.
 6. **Database function security** — All functions need explicit `SET search_path`. Use `search_path = ''` with fully qualified refs for security-definer functions.
@@ -367,7 +367,7 @@ Go directly to these paths — never search the codebase for them.
 | Release procedure | `docs/runbooks/release-checklist.md` | Single procedural authority — all release docs delegate to it |
 | Rollback | `docs/operations/rollback.md` | Roll back first, investigate second. `vercel rollback`, never `vercel deploy --prod` |
 | Incident alerting | `docs/operations/alerting-runbook.md` | Per-alert-type response procedures |
-| Security gates | `docs/operations/pre-launch-security-checklist.md` | 6 manual gates required before a release PR |
+| Security gates | `docs/operations/pre-launch-security-checklist.md` | 6 gates required before a release PR (5 manual, 1 CI-verified) |
 
 ## Issue Tracking (GitHub Issues)
 
@@ -384,3 +384,6 @@ Workflow: Read issue → create worktree branch → write failing tests → impl
 ## Agent Teams
 
 Debug mode, large refactoring, and health check workflows are defined in `.claude/skills/` — loaded automatically when triggered.
+<!-- rpi:claude-import:start -->
+@AGENTS.md
+<!-- rpi:claude-import:end -->

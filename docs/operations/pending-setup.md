@@ -19,6 +19,9 @@ Tasks to complete once the domain (paisaxe.com / paisaxe.es) is fully configured
 | 7 | Add ELEVENLABS_API_KEY to Vercel | COMPLETED (2026-01-31) |
 | 8 | Trigger redeployment | COMPLETED (site live since 2026-01-31) |
 | 9 | Verify Everything Works | COMPLETED (site live and monitored by Upptime) |
+| 10 | Create dedicated `paisaxe-production-runtime` ElevenLabs key | PENDING — production change requires authorization |
+| 11 | Set runtime fingerprint and `HEALTH_PROBE_SECRET` in Vercel/GitHub | PENDING — external configuration requires authorization |
+| 12 | Verify canary check-in and credential-rejection alert delivery | PENDING — Sentry delivery is not yet proven |
 
 ---
 
@@ -39,7 +42,12 @@ Tasks to complete once the domain (paisaxe.com / paisaxe.es) is fully configured
 **REMOVED** (2026-02-03) - This configuration is not needed on the Pro tier:
 
 1. Pro tier databases don't auto-pause (that's only a free tier limitation)
-2. Upptime pings `/api/health` every 5 minutes, which queries the database
+2. Upptime already pings `/api/health/live` every 5 minutes (see `.github/upptime/.upptimerc.yml`)
+   for uptime purposes, and the app itself queries the database on every real request to
+   `/immersive` and other story pages — regular traffic already generates activity without
+   needing a dedicated keep-alive ping. (`/api/health/live` itself is liveness-only and
+   intentionally runs no database check — see the Health Check Endpoints section above — so it
+   was never the source of the activity this decision relied on.)
 3. The `ALTER DATABASE ... SET` command requires superuser privileges not available in Supabase's SQL Editor
 
 The `edge-keep-alive` cron job was unscheduled:
@@ -101,7 +109,7 @@ supabase functions list
 
 ## 9. Verify Everything Works
 
-**COMPLETED** — Site has been live and verified since 2026-01-31. Ongoing health monitoring is handled by Upptime (pings `/api/health` every 5 minutes). For a re-verification checklist, see the Pre-Launch Checklist in [operations.md](./operations.md).
+**COMPLETED** — Site has been live and verified since 2026-01-31. Ongoing health monitoring is handled by Upptime (pings `paisaxe.es` and `/api/health/live` every 5 minutes — see the Upptime Status Page section in [operations.md](./operations.md)). For a re-verification checklist, see the Pre-Launch Checklist in [operations.md](./operations.md).
 
 ---
 
@@ -118,4 +126,7 @@ supabase functions list
 
 ---
 
-*All tasks completed. This file is retained as a historical record of the initial launch setup.*
+Initial launch tasks are complete. ElevenLabs reliability activation tasks
+10–12 remain pending; use
+`docs/runbooks/elevenlabs-credential-rotation.md` and do not weaken the release
+gate while they are incomplete.

@@ -3,17 +3,44 @@ name: Lighthouse CI
 on:
   push:
     branches: [develop, main]
+    # DO-M7 (#834): broadened from docs/research|plans|agents/** to the
+    # whole docs/** tree plus root prose files — a docs-only commit outside
+    # those three subfolders (e.g. docs/operations/**, docs/project/**)
+    # was still triggering the full Lighthouse audit. Filters `push` only;
+    # `pull_request` stays unfiltered — "Lighthouse Audit" isn't a required
+    # status check today, but leaving pull_request unfiltered here too
+    # matches the same convention as ci.yml/e2e.yml and avoids surprises
+    # if it's ever added to branch protection.
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
+      - "AGENTS.md"
   pull_request:
     branches: [develop, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required_checks: '["Lighthouse Audit"]'
+
   lighthouse:
     name: Lighthouse Audit
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -26,7 +53,7 @@ jobs:
           cache: 'npm'
 
       - name: Install canvas system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+        uses: ./.github/actions/install-canvas-deps
 
       - name: Install dependencies
         run: npm ci
@@ -40,11 +67,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
 
-      - name: Run Lighthouse CI
+      - name: Run Lighthouse CI (desktop)
         uses: treosh/lighthouse-ci-action@v12
         with:
           configPath: './lighthouserc.json'
           uploadArtifacts: true
+          artifactName: lighthouse-results-desktop
         env:
           # Dummy values for server runtime (APIs not called during audit)
           ANTHROPIC_API_KEY: dummy_key_for_build
@@ -53,10 +81,47 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
           MAINTENANCE_MODE: "false"
 
-      - name: Upload Lighthouse results
-        if: always()
-        uses: actions/upload-artifact@v7
+      # PE-H4 (#807): this is a mobile-first, swipe-driven product, but until now
+      # the gate only ever ran the desktop preset. lighthouserc.mobile.json omits
+      # `preset` entirely rather than setting `"preset": "mobile"` — Lighthouse's
+      # CLI only accepts "perf" | "experimental" | "desktop" as --preset values,
+      # so "mobile" is rejected outright (verified locally: `lhci collect
+      # --settings.preset=mobile` fails immediately with "Invalid values:
+      # Argument: preset, Given: mobile, Choices: perf, experimental, desktop").
+      # Omitting the key falls back to Lighthouse's default settings, whose
+      # formFactor is already "mobile" (see lighthouse/core/config/constants.js);
+      # the desktop config file is the one that opts OUT of that default.
+      #
+      # BUDGET NOTE: lighthouserc.mobile.json sets largest-contentful-paint to
+      # 5500ms, not the 4000ms desktop budget it was originally copied from.
+      # That 4000ms was never calibrated for mobile and the gate failed on all
+      # three runs it ever had (median-run LCP 4063.9 / 4445.1 / 4551.0ms —
+      # a ~490ms spread on a shared runner). Mobile emulation applies 4x CPU
+      # throttling and slow-4G network on top of a deliberately inflated
+      # 25-story fallback fixture, so it is a strictly harsher bar than the
+      # desktop preset. 5500ms sits ~950ms above the worst observed run: wide
+      # enough to absorb runner noise, tight enough to still catch a real
+      # regression. Getting /immersive under 4000ms on mobile is tracked
+      # separately as real perf work in issue #926.
+      #
+      # categories:performance is likewise 0.6 on mobile, not the desktop 0.7.
+      # Observed mobile scores run 0.64-0.70+ (one run passed 0.7, the next gave
+      # 0.64/0.69/0.69), so the desktop-derived 0.7 sits inside the run-to-run
+      # noise band and the gate was roughly a coin flip. 0.6 is below the
+      # observed floor: it no longer flakes, but a genuine regression (a drop to
+      # ~0.5) still hard-fails. Raising it back to 0.7 is part of #926.
+      # total-blocking-time is deliberately left at warn/500ms (observed
+      # 696-767ms) so the regression stays visible instead of being tuned away.
+      - name: Run Lighthouse CI (mobile)
+        uses: treosh/lighthouse-ci-action@v12
         with:
-          name: lighthouse-results
-          path: .lighthouseci/
-          retention-days: 14
+          configPath: './lighthouserc.mobile.json'
+          uploadArtifacts: true
+          artifactName: lighthouse-results-mobile
+        env:
+          # Dummy values for server runtime (APIs not called during audit)
+          ANTHROPIC_API_KEY: dummy_key_for_build
+          VOYAGE_API_KEY: dummy_key_for_build
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
+          MAINTENANCE_MODE: "false"

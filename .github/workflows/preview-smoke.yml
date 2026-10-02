@@ -67,6 +67,7 @@ jobs:
 
               if [ "$state" = "success" ] && [ -n "$preview_url" ]; then
                 echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+                echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
 

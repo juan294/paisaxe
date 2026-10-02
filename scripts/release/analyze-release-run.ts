@@ -28,16 +28,29 @@ import { join } from "path";
 import { fileURLToPath } from "url";
 import { parse } from "yaml";
 import { loadManifest, type RequiredProbeManifest } from "./required-probes";
+import { validateElevenLabsVoiceEvidence } from "./elevenlabs-voice-evidence.mjs";
 
 const FULL_HASH_PATTERN = /^[0-9a-f]{40}$/i;
+const ELEVENLABS_VOICE_PROBE_ID = "elevenlabs-voice-preflight";
 
 export type ProbeStatus = "passed" | "failed" | "skipped";
 
 export interface ProbeEvidence {
+  [key: string]: unknown;
   id: string;
   status: ProbeStatus;
   oracles?: string[];
   cleanup?: string;
+  provider?: string;
+  fingerprint?: string;
+  fingerprint_matches?: boolean;
+  agents?: string[];
+  custom_llm?: string;
+  target_url?: string;
+  response_url?: string;
+  github_deployment_id?: string;
+  deployment_commit?: string;
+  checked_at?: string;
 }
 
 export interface ReleaseException {
@@ -54,6 +67,7 @@ export interface EvidenceManifest {
   deployed_commit?: string;
   target_url?: string;
   generated_at?: string;
+  github_deployment_id?: string;
   probes?: ProbeEvidence[];
   exceptions?: ReleaseException[];
 }
@@ -94,6 +108,30 @@ function checkIdentity(evidence: EvidenceManifest): string[] {
     );
   }
 
+  if (
+    typeof evidence.deployed_commit !== "string" ||
+    !FULL_HASH_PATTERN.test(evidence.deployed_commit)
+  ) {
+    blockers.push("D06: deployed_commit is missing or is not a full commit hash");
+  }
+  if (!/^[1-9][0-9]*$/.test(evidence.github_deployment_id ?? "")) {
+    blockers.push("D06: github_deployment_id is missing or invalid");
+  }
+  try {
+    const target = new URL(evidence.target_url ?? "");
+    if (target.protocol !== "https:") {
+      blockers.push("D06: target_url must use HTTPS");
+    }
+  } catch {
+    blockers.push("D06: target_url is missing or invalid");
+  }
+  if (
+    !evidence.generated_at ||
+    Number.isNaN(new Date(evidence.generated_at).getTime())
+  ) {
+    blockers.push("D06: generated_at is missing or invalid");
+  }
+
   return blockers;
 }
 
@@ -129,6 +167,45 @@ function checkExceptions(
     }
   }
 
+  return blockers;
+}
+
+function checkElevenLabsVoiceEvidence(
+  observed: ProbeEvidence,
+  evidence: EvidenceManifest
+): string[] {
+  const blockers = validateElevenLabsVoiceEvidence(observed).map(
+    (error: string) => `Required probe "${ELEVENLABS_VOICE_PROBE_ID}" ${error}`
+  );
+  if (observed.target_url !== evidence.target_url) {
+    blockers.push(
+      `Required probe "${ELEVENLABS_VOICE_PROBE_ID}" target does not match the release target`
+    );
+  }
+  let expectedResponseUrl: string | undefined;
+  try {
+    expectedResponseUrl = new URL(
+      "/api/health/voice",
+      evidence.target_url
+    ).toString();
+  } catch {
+    // Global identity validation reports the invalid target.
+  }
+  if (observed.response_url !== expectedResponseUrl) {
+    blockers.push(
+      `Required probe "${ELEVENLABS_VOICE_PROBE_ID}" response URL is not bound to the release target`
+    );
+  }
+  if (observed.github_deployment_id !== evidence.github_deployment_id) {
+    blockers.push(
+      `Required probe "${ELEVENLABS_VOICE_PROBE_ID}" GitHub deployment id does not match`
+    );
+  }
+  if (observed.deployment_commit !== evidence.deployed_commit) {
+    blockers.push(
+      `Required probe "${ELEVENLABS_VOICE_PROBE_ID}" deployment commit does not match`
+    );
+  }
   return blockers;
 }
 
@@ -176,6 +253,10 @@ export function analyzeRelease(
           `Required probe "${required.id}" does not evidence cleanup (cleanup: ${observed.cleanup ?? "absent"})`
         );
       }
+    }
+
+    if (required.id === ELEVENLABS_VOICE_PROBE_ID) {
+      blockers.push(...checkElevenLabsVoiceEvidence(observed, evidence));
     }
   }
 

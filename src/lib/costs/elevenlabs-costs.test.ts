@@ -23,6 +23,19 @@ describe("elevenlabs-costs", () => {
       expect(result).toBeNull();
     });
 
+    it("does not call the provider when the production key fingerprint is missing", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-key";
+      process.env.ELEVENLABS_API_KEY_FINGERPRINT = "";
+      process.env.VERCEL_ENV = "production";
+      const fetchMock = vi.fn();
+      global.fetch = fetchMock;
+
+      const result = await fetchElevenLabsCosts("2024-01-01", "2024-01-31");
+
+      expect(result).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("returns estimated cost based on character usage", async () => {
       process.env.ELEVENLABS_API_KEY = "test-key";
 

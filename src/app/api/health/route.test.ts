@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "./route";
 import { PROBE_TIMEOUTS_MS } from "@/lib/health-timeouts";
 
+const makePublicHealthRequest = () =>
+  new Request("http://localhost/api/health");
+
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: vi.fn(),
@@ -9,25 +12,36 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
+// The database-size and voice_purchases probes both run on the admin
+// (service-role) client — migrations 091/092 revoked EXECUTE on
+// get_database_size() from anon/authenticated, and voice_purchases has no
+// anon-role grant at all (migration 075).
+vi.mock("@/lib/supabase-admin", () => ({
+  getAdminClient: vi.fn(),
+}));
+
 vi.mock("@/lib/rate-limit", () => ({
-  getRateLimitBackendStatus: vi.fn(() => ({
-    backend: "memory",
-    configured: false,
-    degraded: false,
-  })),
+  probeRateLimitBackend: vi.fn(() =>
+    Promise.resolve({
+      backend: "memory",
+      configured: false,
+      degraded: false,
+    })
+  ),
 }));
 
 import { supabase } from "@/lib/supabase";
-import { getRateLimitBackendStatus } from "@/lib/rate-limit";
+import { getAdminClient } from "@/lib/supabase-admin";
+import { probeRateLimitBackend } from "@/lib/rate-limit";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 
 /**
- * #528 (DO-L2): probes now terminate their Supabase query chains in
- * `.abortSignal(signal)`. These helpers wrap a terminal value so the chain ends
- * in an `.abortSignal()` that yields the original Promise (resolve/reject/hang).
+ * #528: probes terminate their Supabase query chains in `.abortSignal(signal)`.
+ * These helpers wrap a terminal value so the chain ends in an `.abortSignal()`
+ * that yields the original Promise (resolve/reject/hang).
  */
 function abortable(promise: unknown) {
   return { abortSignal: vi.fn().mockReturnValue(promise) };
@@ -93,16 +107,37 @@ function mockStoryCount(count: number | null, error: { message: string } | null)
   });
 }
 
+// The admin (service-role) client backs both checkDatabaseSize (.rpc()) and
+// checkVoicePurchases (.from()) — a single persistent mock object is reused
+// across every test so configuring one probe never clobbers the other's mock.
+const adminRpc = vi.fn();
+const adminFrom = vi.fn();
+
+function mockDatabaseRpc(rpcReturnValue: unknown) {
+  adminRpc.mockReturnValue(rpcReturnValue);
+  return adminRpc;
+}
+
 function mockDatabaseSize(sizeBytes: number) {
-  vi.mocked(supabase.rpc).mockReturnValue(
-    resolved({ data: sizeBytes, error: null }) as never
-  );
+  mockDatabaseRpc(resolved({ data: sizeBytes, error: null }));
 }
 
 function mockDatabaseSizeError(message: string) {
-  vi.mocked(supabase.rpc).mockReturnValue(
-    resolved({ data: null, error: { message } }) as never
-  );
+  mockDatabaseRpc(resolved({ data: null, error: { message } }));
+}
+
+function mockVoicePurchasesOk() {
+  adminFrom.mockReturnValue(createChainMock({ error: null }) as never);
+}
+
+function mockVoicePurchasesError(message: string) {
+  adminFrom.mockReturnValue(createChainMock({ error: { message } }) as never);
+}
+
+function authorizedRequest(secret = "test-secret"): Request {
+  return new Request("https://paisaxe.es/api/health", {
+    headers: { authorization: `Bearer ${secret}` },
+  });
 }
 
 describe("GET /api/health", () => {
@@ -110,11 +145,15 @@ describe("GET /api/health", () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     vi.stubEnv("CRON_SECRET", "test-secret");
-    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
       backend: "memory",
       configured: false,
       degraded: false,
     });
+    // Healthy by default so tests that don't care about voice_purchases
+    // aren't affected by it.
+    mockVoicePurchasesOk();
+    vi.mocked(getAdminClient).mockReturnValue({ rpc: adminRpc, from: adminFrom } as never);
   });
 
   afterEach(() => {
@@ -122,29 +161,29 @@ describe("GET /api/health", () => {
   });
 
   it("returns HTTP 200 with a minimal public payload when healthy", async () => {
-    const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
 
-    try {
-      mockHealthySupabase();
-      mockDatabaseSize(129394278);
+    const response = await GET(makePublicHealthRequest());
+    const data = await response.json();
 
-      const response = await GET();
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.status).toBe("healthy");
-      expect(data.timestamp).toEqual(expect.any(String));
-      expect(data.sentry).toEqual({ status: "unconfigured" });
-      expect(data).not.toHaveProperty("services");
-      expect(data).not.toHaveProperty("uptime");
-      expect(data).not.toHaveProperty("version");
-      expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
-    } finally {
-      if (savedDsn !== undefined) {
-        process.env.NEXT_PUBLIC_SENTRY_DSN = savedDsn;
-      }
-    }
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+    expect(data.timestamp).toEqual(expect.any(String));
+    // SE-L2 (#850): cron_auth/sentry/rate_limit/build are all gated behind
+    // the authorized-caller check — an unauthenticated caller gets only
+    // status/timestamp.
+    expect(data).not.toHaveProperty("sentry");
+    expect(data).not.toHaveProperty("cron_auth");
+    expect(data).not.toHaveProperty("rate_limit");
+    expect(data).not.toHaveProperty("build");
+    expect(data).not.toHaveProperty("services");
+    expect(data).not.toHaveProperty("uptime");
+    expect(data).not.toHaveProperty("version");
+    expect(data).not.toHaveProperty("fingerprint");
+    expect(data).not.toHaveProperty("fingerprint_matches");
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
   });
 
   // DO-H1 regression: HTTP status must be 200 even when degraded
@@ -152,7 +191,7 @@ describe("GET /api/health", () => {
     mockSupabaseProbeError("Connection refused");
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -166,7 +205,7 @@ describe("GET /api/health", () => {
     mockStoryCount(0, null);
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -177,7 +216,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(6871954637);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -199,7 +238,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -219,7 +258,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -237,7 +276,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -248,11 +287,189 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSizeError("permission denied for function get_database_size");
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.status).toBe("healthy");
+  });
+
+  // BE-H1: checkDatabaseSize() must run on the admin (service-role) client —
+  // migrations 091/092 revoked EXECUTE on get_database_size() from
+  // anon/authenticated, so the anon client's call always failed and was
+  // silently swallowed into usage_percent: null, permanently disabling the
+  // 80%-storage alarm.
+  describe("BE-H1: database-size probe uses the admin client", () => {
+    it("calls the admin client's rpc(), never the anon client's rpc()", async () => {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+
+      await GET(makePublicHealthRequest());
+
+      expect(getAdminClient).toHaveBeenCalled();
+      expect(supabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it("does NOT degrade in non-production when the probe errors (distinguishable from over-threshold)", async () => {
+      mockHealthySupabase();
+      mockDatabaseSizeError("permission denied for function get_database_size");
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
+    });
+
+    it("degrades in production when the probe errors — the failure is distinguishable, not a silently healthy null", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      mockHealthySupabase();
+      mockDatabaseSizeError("permission denied for function get_database_size");
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
+    });
+
+    it("degrades in production when the probe throws unexpectedly", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      mockHealthySupabase();
+      mockDatabaseRpc(abortable(Promise.reject(new Error("Unexpected DB error"))));
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
+    });
+
+    it("degrades in production when the probe hangs past its timeout", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      mockHealthySupabase();
+      mockDatabaseRpc(abortable(new Promise(() => {})));
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
+    }, 10000);
+
+    it("stays healthy in production when the probe succeeds under the threshold", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      // Isolate the database probe: satisfy the other production-only gates
+      // (Sentry DSN, rate-limit backend) so only checkDatabaseSize is under test.
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
+    });
+
+    it("does not expose usage_percent, probe_status, or any database field in the public response", async () => {
+      mockHealthySupabase();
+      mockDatabaseSizeError("permission denied for function get_database_size");
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(data).not.toHaveProperty("database");
+      expect(data).not.toHaveProperty("usage_percent");
+      expect(data).not.toHaveProperty("probe_status");
+      expect(JSON.stringify(data)).not.toContain("usage_percent");
+    });
+  });
+
+  // QA-L3 (#882): /api/health previously probed chunks, stories, and
+  // database size — never the paid-access table. A broken voice_purchases
+  // read path (RLS/grant regression, schema drift) would go unnoticed by
+  // monitoring even though it decides whether a paying customer gets the
+  // feature they bought.
+  describe("QA-L3: voice_purchases probe uses the admin client", () => {
+    it("calls the admin client's from('voice_purchases'), never the anon client's", async () => {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+      mockVoicePurchasesOk();
+
+      await GET(makePublicHealthRequest());
+
+      expect(adminFrom).toHaveBeenCalledWith("voice_purchases");
+      expect(supabase.from).not.toHaveBeenCalledWith("voice_purchases");
+    });
+
+    it("does NOT degrade in non-production when the probe errors", async () => {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+      mockVoicePurchasesError("permission denied for table voice_purchases");
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
+    });
+
+    it("degrades in production when the probe errors", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+      mockVoicePurchasesError("permission denied for table voice_purchases");
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
+    });
+
+    it("degrades in production when the probe throws unexpectedly", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+      adminFrom.mockImplementation(() => {
+        throw new Error("Unexpected admin client error");
+      });
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
+    });
+
+    it("stays healthy in production when the probe succeeds", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+      mockVoicePurchasesOk();
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
+    });
+
+    it("does not expose any voice_purchases field in the public response", async () => {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+      mockVoicePurchasesError("permission denied for table voice_purchases");
+
+      const response = await GET(makePublicHealthRequest());
+      const data = await response.json();
+
+      expect(data).not.toHaveProperty("voice_purchases");
+      expect(JSON.stringify(data)).not.toContain("voice_purchases");
+    });
   });
 
   it("fails fast when the chunks probe hangs", async () => {
@@ -275,7 +492,7 @@ describe("GET /api/health", () => {
     mockDatabaseSize(129394278);
 
     const start = Date.now();
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const elapsed = Date.now() - start;
     const data = await response.json();
 
@@ -314,7 +531,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
 
     expect(response.status).toBe(200);
     expect(capturedSignal).toBeInstanceOf(AbortSignal);
@@ -334,7 +551,7 @@ describe("GET /api/health", () => {
     });
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -343,9 +560,9 @@ describe("GET /api/health", () => {
 
   it("stays healthy when the database size probe hangs past its timeout", async () => {
     mockHealthySupabase();
-    vi.mocked(supabase.rpc).mockReturnValue(abortable(new Promise(() => {})) as never);
+    mockDatabaseRpc(abortable(new Promise(() => {})));
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     // Database timeout returns null usage_percent → not over threshold → healthy
@@ -355,9 +572,9 @@ describe("GET /api/health", () => {
 
   it("does not degrade when the database size probe throws unexpectedly", async () => {
     mockHealthySupabase();
-    vi.mocked(supabase.rpc).mockReturnValue(abortable(Promise.reject(new Error("Unexpected DB error"))) as never);
+    mockDatabaseRpc(abortable(Promise.reject(new Error("Unexpected DB error"))));
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -368,27 +585,27 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    await GET();
+    await GET(makePublicHealthRequest());
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  // SE-M1 regression: public endpoint must never leak operational recon data
-  it("SE-M1: public response contains only allow-listed top-level fields", async () => {
+  // SE-M1 / SE-L2 (#850) regression: public endpoint must never leak
+  // operational recon data to an unauthenticated caller.
+  it("SE-M1/SE-L2: unauthenticated public response contains only status and timestamp", async () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
-    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
       backend: "blocked",
       configured: false,
       degraded: true,
       reason: "upstash_missing",
     });
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
-    // Allow-list: status, timestamp, cron_auth (BE-B1), sentry (DO-H2)
-    const allowedKeys = new Set(["status", "timestamp", "cron_auth", "sentry", "rate_limit"]);
+    const allowedKeys = new Set(["status", "timestamp"]);
     for (const key of Object.keys(data)) {
       expect(allowedKeys).toContain(key);
     }
@@ -404,44 +621,54 @@ describe("GET /api/health", () => {
       "env",
       "keys",
       "config",
+      "cron_auth",
+      "sentry",
+      "rate_limit",
+      "build",
     ];
     for (const field of sensitiveFields) {
       expect(data).not.toHaveProperty(field);
     }
 
-    // cron_auth must never expose the secret itself, only a status label.
-    expect(JSON.stringify(data.cron_auth)).not.toContain("test-secret");
-    expect(data.rate_limit).toEqual({
-      status: "degraded",
-      backend: "blocked",
-      reason: "upstash_missing",
-    });
-    expect(data.rate_limit).not.toHaveProperty("configured");
+    // Never leaks the cron secret itself even indirectly.
+    expect(JSON.stringify(data)).not.toContain("test-secret");
   });
 
-  it("SE-M1: degraded response also exposes no recon fields", async () => {
+  it("SE-M1/SE-L2: degraded response also exposes no recon fields to an unauthenticated caller", async () => {
     mockSupabaseProbeError("Connection refused");
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     // DO-H1: degraded is 200
     expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
-    const allowedKeys = new Set(["status", "timestamp", "cron_auth", "sentry", "rate_limit"]);
+    const allowedKeys = new Set(["status", "timestamp"]);
     for (const key of Object.keys(data)) {
       expect(allowedKeys).toContain(key);
     }
   });
 
+  it("SE-L2: an authorized caller receives cron_auth, sentry, and rate_limit", async () => {
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET(authorizedRequest());
+    const data = await response.json();
+
+    expect(data).toHaveProperty("cron_auth");
+    expect(data).toHaveProperty("sentry");
+    expect(data).toHaveProperty("rate_limit");
+  });
+
   // BE-B1: cron_auth observability — silent CRON_SECRET misconfiguration
-  it("BE-B1: includes cron_auth.status='ok' when CRON_SECRET is configured", async () => {
+  it("BE-B1: includes cron_auth.status='ok' when CRON_SECRET is configured, for an authorized caller", async () => {
     vi.stubEnv("CRON_SECRET", "configured-secret");
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(authorizedRequest("configured-secret"));
     const data = await response.json();
 
     expect(data.cron_auth).toEqual({ status: "ok" });
@@ -453,14 +680,14 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    // No CRON_SECRET means no caller can ever authorize — assert via the
+    // internal escalation (overall status) rather than the gated field,
+    // since an authorized request is impossible in this state.
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
-    expect(data.cron_auth).toEqual({
-      status: "misconfigured",
-      message: "CRON_SECRET not set",
-    });
-    // Informational only — must NOT change overall health
+    expect(data).not.toHaveProperty("cron_auth");
+    // Informational only — must NOT change overall health outside production
     expect(data.status).toBe("healthy");
   });
 
@@ -469,7 +696,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     // The smoke test gates on: HTTP 200 AND body.status === "healthy"
@@ -478,7 +705,7 @@ describe("GET /api/health", () => {
   });
 
   // DO-H2 regression: Sentry unconfigured state must be visible in health response
-  it("DO-H2: health response includes sentry.status=unconfigured when DSN is not set", async () => {
+  it("DO-H2: health response includes sentry.status=unconfigured when DSN is not set, for an authorized caller", async () => {
     const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
     delete process.env.NEXT_PUBLIC_SENTRY_DSN;
 
@@ -486,7 +713,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseSize(129394278);
 
-      const response = await GET();
+      const response = await GET(authorizedRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -504,7 +731,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(authorizedRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -514,7 +741,7 @@ describe("GET /api/health", () => {
 
   it("DO-H2: keeps deployed preview health healthy when only Upstash is missing", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
-    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
       backend: "blocked",
       configured: false,
       degraded: true,
@@ -523,7 +750,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(authorizedRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -541,7 +768,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(authorizedRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -551,7 +778,7 @@ describe("GET /api/health", () => {
 
   it("DO-H2: marks deployed production health degraded when Upstash is missing", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
       backend: "blocked",
       configured: false,
       degraded: true,
@@ -560,7 +787,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(authorizedRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -572,6 +799,77 @@ describe("GET /api/health", () => {
     });
   });
 
+  // DO-H2 (#823): the health probe must reflect a LIVE Upstash outage, not
+  // cross-process state. This is the regression test for the actual bug:
+  // previously /api/health only ever read a same-process flag and could never
+  // observe a failure from a different serverless isolate, so it always
+  // reported "ok" no matter what was happening to real chat traffic.
+  it("DO-H2: reports rate_limit degraded when the live Upstash probe fails, and stays HTTP 200", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
+      backend: "upstash",
+      configured: true,
+      degraded: true,
+      reason: "upstash_unavailable",
+    });
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET(authorizedRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    expect(data.rate_limit).toEqual({
+      status: "degraded",
+      backend: "upstash",
+      reason: "upstash_unavailable",
+    });
+  });
+
+  // DO-H2: a hung Redis PING must not hang the health endpoint. The probe is
+  // raced against PROBE_TIMEOUTS_MS.rateLimit and degrades on timeout, the same
+  // way the Supabase/stories/database probes already do.
+  it("DO-H2: degrades rate_limit and stays fast when the live Upstash probe hangs past its timeout", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.mocked(probeRateLimitBackend).mockReturnValue(new Promise(() => {}));
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const start = Date.now();
+    const response = await GET(authorizedRequest());
+    const elapsed = Date.now() - start;
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    expect(data.rate_limit).toEqual({
+      status: "degraded",
+      backend: "upstash",
+      reason: "upstash_unavailable",
+    });
+    expect(elapsed).toBeLessThan(PROBE_TIMEOUTS_MS.rateLimit + 400);
+  }, 10000);
+
+  it("DO-H2: health stays healthy when the live Upstash probe succeeds", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://test@o123.ingest.sentry.io/456");
+    vi.mocked(probeRateLimitBackend).mockResolvedValue({
+      backend: "upstash",
+      configured: true,
+      degraded: false,
+    });
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET(authorizedRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+    expect(data.rate_limit).toEqual({ status: "ok", backend: "upstash" });
+  });
+
   it("DO-H2: health response includes sentry.status=configured when DSN is set", async () => {
     const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
     process.env.NEXT_PUBLIC_SENTRY_DSN = "https://test@o123.ingest.sentry.io/456";
@@ -580,7 +878,7 @@ describe("GET /api/health", () => {
       mockHealthySupabase();
       mockDatabaseSize(129394278);
 
-      const response = await GET();
+      const response = await GET(authorizedRequest());
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -601,7 +899,7 @@ describe("GET /api/health", () => {
       throw new Error("Unexpected probe crash");
     });
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -617,7 +915,7 @@ describe("GET /api/health", () => {
     // 8192 MB * 0.8 threshold = 6553.6 MB → 6871954637 bytes is ~6553 MB which should degrade
     mockDatabaseSize(6871954637);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -630,7 +928,7 @@ describe("GET /api/health", () => {
     // 6871954637 bytes = ~6553 MB — below 80% of 16384 MB (13107 MB) → healthy
     mockDatabaseSize(6871954637);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -644,11 +942,10 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.cron_auth.status).toBe("misconfigured");
     expect(data.status).toBe("healthy");
   });
 
@@ -658,11 +955,10 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.cron_auth.status).toBe("misconfigured");
     expect(data.status).toBe("healthy");
   });
 
@@ -672,11 +968,10 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200); // always HTTP 200
-    expect(data.cron_auth.status).toBe("misconfigured");
     expect(data.status).toBe("degraded");
   });
 
@@ -686,7 +981,7 @@ describe("GET /api/health", () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
-    const response = await GET();
+    const response = await GET(makePublicHealthRequest());
     expect(response.status).toBe(200);
   });
 
@@ -694,12 +989,6 @@ describe("GET /api/health", () => {
   // built from, but only to an authorized caller — SE-M1 keeps the public shape.
   describe("build identity", () => {
     const COMMIT = "9411eada1c2b3d4e5f60718293a4b5c6d7e8f901";
-
-    function authorizedRequest(secret = "test-secret"): Request {
-      return new Request("https://paisaxe.es/api/health", {
-        headers: { authorization: `Bearer ${secret}` },
-      });
-    }
 
     beforeEach(() => {
       mockHealthySupabase();
@@ -747,7 +1036,7 @@ describe("GET /api/health", () => {
     it("SE-M1: withholds the identity from an unauthenticated caller", async () => {
       const monitorRequest = new Request("https://paisaxe.es/api/health");
 
-      for (const response of [await GET(), await GET(monitorRequest)]) {
+      for (const response of [await GET(makePublicHealthRequest()), await GET(monitorRequest)]) {
         const data = await response.json();
         expect(data).not.toHaveProperty("build");
         expect(data.status).toBe("healthy");
@@ -765,6 +1054,46 @@ describe("GET /api/health", () => {
 
       const data = await (await GET(authorizedRequest(""))).json();
 
+      expect(data).not.toHaveProperty("build");
+    });
+
+    // DO-H6: a multibyte Authorization header value (e.g. "€") is a single
+    // UTF-16 code unit but three UTF-8 bytes. The pre-fix code guarded
+    // timingSafeEqual with `provided.length !== expected.length` (UTF-16
+    // code units) — such a header could slip past that guard while its
+    // actual byte length still differed, crashing timingSafeEqual with an
+    // unhandled RangeError before the route's try block even opened.
+    //
+    // The Fetch `Headers` class enforces ByteString on values passed through
+    // its own constructor/set/append (so `new Request(url, { headers })`
+    // can't carry a raw multibyte JS string here), but that restriction is a
+    // property of constructing a `Headers` object — not of every code path
+    // that reads an incoming request's headers. Node's HTTP layer can still
+    // decode a client's raw UTF-8 header bytes into a JS string containing
+    // real multibyte characters before handing it to route code. This test
+    // reproduces that exact string shape via a minimal `Request`-shaped stub
+    // whose `headers.get()` returns it directly, exercising the real
+    // `GET(makePublicHealthRequest())` handler and `isReleaseIdentityAuthorized()` code path.
+    it("DO-H6: does not crash (RangeError) on a multibyte Authorization header of the same UTF-16 length as the expected value, and withholds the identity", async () => {
+      const expected = "Bearer test-secret"; // matches the top-level `CRON_SECRET` stub
+      const multibyteSameLength = "€".repeat(expected.length);
+      expect(multibyteSameLength.length).toBe(expected.length);
+      expect(Buffer.from(multibyteSameLength).length).not.toBe(
+        Buffer.from(expected).length
+      );
+
+      const request = {
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === "authorization" ? multibyteSameLength : null,
+        },
+      } as unknown as Request;
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
       expect(data).not.toHaveProperty("build");
     });
 

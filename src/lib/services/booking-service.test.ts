@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock Supabase before importing the service
 vi.mock("@/lib/supabase-admin", () => ({
-  createAdminClient: vi.fn(),
+  getAdminClient: vi.fn(),
 }));
 
-import { createAdminClient } from "@/lib/supabase-admin";
+import { getAdminClient } from "@/lib/supabase-admin";
 import {
   ACTIVE_BOOKING_STATUSES,
+  claimDailyBookingCallSlot,
   claimPendingBooking,
   formatDateNatural,
   formatTimeNatural,
@@ -38,6 +39,29 @@ describe("booking-service", () => {
       expect(isValidSpanishPhone("123-456-7890")).toBe(false);
       expect(isValidSpanishPhone("12345")).toBe(false);
       expect(isValidSpanishPhone("512345678")).toBe(false); // starts with 5
+    });
+
+    // BE-B2: premium-rate ranges must be rejected so a leaked MCP secret
+    // can't turn this endpoint into an unmetered premium-rate dialer.
+    it("rejects Spanish premium-rate number ranges (803/806/807/905/907)", () => {
+      expect(isValidSpanishPhone("803123456")).toBe(false);
+      expect(isValidSpanishPhone("806123456")).toBe(false);
+      expect(isValidSpanishPhone("807123456")).toBe(false);
+      expect(isValidSpanishPhone("905123456")).toBe(false);
+      expect(isValidSpanishPhone("907123456")).toBe(false);
+      // Same ranges with international prefixes must also be rejected.
+      expect(isValidSpanishPhone("+34803123456")).toBe(false);
+      expect(isValidSpanishPhone("34905123456")).toBe(false);
+    });
+
+    // Guard the invariant: the premium-range blocklist must not collateral-damage
+    // legitimate Spanish mobile/geographic numbers that merely share a leading digit.
+    it("still accepts legitimate mobile and geographic numbers near the blocked ranges", () => {
+      expect(isValidSpanishPhone("985887797")).toBe(true); // Asturias landline (98x)
+      expect(isValidSpanishPhone("900123456")).toBe(true); // 900 freephone, not 905/907
+      expect(isValidSpanishPhone("800123456")).toBe(true); // 800 freephone, not 803/806/807
+      expect(isValidSpanishPhone("612345678")).toBe(true); // mobile
+      expect(isValidSpanishPhone("712345678")).toBe(true); // mobile (7xx range)
     });
   });
 
@@ -119,13 +143,13 @@ describe("booking-service", () => {
         }),
       });
 
-      vi.mocked(createAdminClient).mockReturnValue({
+      vi.mocked(getAdminClient).mockReturnValue({
         from: vi.fn(() => ({
           insert: mockInsert,
           update: mockUpdate,
           select: mockDbSelect,
         })),
-      } as unknown as ReturnType<typeof createAdminClient>);
+      } as unknown as ReturnType<typeof getAdminClient>);
     });
 
     describe("getPriorBookingByIdempotencyKey", () => {
@@ -360,6 +384,55 @@ describe("booking-service", () => {
         ).resolves.toBeUndefined();
       });
     });
+
+    // BE-B2: SQL-enforced daily cap on outbound booking calls, independent of
+    // the Redis-based per-customer rate limit in the route handler. This is a
+    // "call", not a "read" — it must fail CLOSED on any DB error so an
+    // Upstash/Postgres hiccup cannot silently remove the cost ceiling.
+    describe("claimDailyBookingCallSlot", () => {
+      let mockRpc: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        mockRpc = vi.fn().mockResolvedValue({ data: true, error: null });
+        vi.mocked(getAdminClient).mockReturnValue({
+          from: vi.fn(() => ({
+            insert: mockInsert,
+            update: mockUpdate,
+            select: mockDbSelect,
+          })),
+          rpc: mockRpc,
+        } as unknown as ReturnType<typeof getAdminClient>);
+      });
+
+      it("returns true and calls the RPC with the default cap when under the limit", async () => {
+        await expect(claimDailyBookingCallSlot()).resolves.toBe(true);
+        expect(mockRpc).toHaveBeenCalledWith("claim_daily_booking_call_slot", {
+          p_max_per_day: 100,
+        });
+      });
+
+      it("passes a custom cap through to the RPC", async () => {
+        await claimDailyBookingCallSlot(5);
+        expect(mockRpc).toHaveBeenCalledWith("claim_daily_booking_call_slot", {
+          p_max_per_day: 5,
+        });
+      });
+
+      it("returns false when the RPC reports the cap has been reached", async () => {
+        mockRpc.mockResolvedValue({ data: false, error: null });
+        await expect(claimDailyBookingCallSlot()).resolves.toBe(false);
+      });
+
+      it("fails closed (returns false) when the RPC errors", async () => {
+        mockRpc.mockResolvedValue({ data: null, error: { message: "DB error" } });
+        await expect(claimDailyBookingCallSlot()).resolves.toBe(false);
+      });
+
+      it("fails closed (returns false) when the RPC call throws", async () => {
+        mockRpc.mockRejectedValue(new Error("connection lost"));
+        await expect(claimDailyBookingCallSlot()).resolves.toBe(false);
+      });
+    });
   });
 
   it("ACTIVE_BOOKING_STATUSES holds the in-progress states", () => {
@@ -367,5 +440,9 @@ describe("booking-service", () => {
     expect(ACTIVE_BOOKING_STATUSES.has("pending")).toBe(true);
     expect(ACTIVE_BOOKING_STATUSES.has("confirmed")).toBe(true);
     expect(ACTIVE_BOOKING_STATUSES.has("failed")).toBe(false);
+    // BE-H2: 'orphaned' means "uncertain, needs reconciliation" — not a
+    // confirmed in-progress booking, so callers should get fallback
+    // messaging rather than being told a booking is actively underway.
+    expect(ACTIVE_BOOKING_STATUSES.has("orphaned")).toBe(false);
   });
 });

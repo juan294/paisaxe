@@ -6,8 +6,9 @@
  * anthropic-usage, twilio-costs, elevenlabs-costs). Importing this barrel in
  * a client-side bundle will fail the Next.js build.
  *
- * For client-safe pricing helpers (pure arithmetic, no secrets), import
- * directly from the leaf module instead:
+ * The pricing helpers are not re-exported here; import them from the leaf
+ * module. It holds no secrets but is also SERVER ONLY, because it logs
+ * unknown models through @/lib/logger (which imports `server-only`):
  *   import { estimateCostUsd, getModelPricing } from "@/lib/costs/anthropic-pricing";
  */
 export { fetchAnthropicCosts, fetchAnthropicCostsByDay } from "./anthropic-costs";

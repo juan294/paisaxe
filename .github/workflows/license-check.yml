@@ -12,6 +12,7 @@ jobs:
   license-check:
     name: License Compliance Check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -26,9 +27,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Production deps: strong copyleft is a hard failure (these ship to clients).
-      - name: Check production licenses (blocking)
-        run: npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-1.0;AGPL-3.0;EUPL-1.1;EUPL-1.2;SSPL-1.0;BSL-1.1;CPAL-1.0;OSL-3.0;CPOL-1.02"
+      # Production deps: enforced as a true allowlist (permissive-only + documented
+      # exceptions), not a denylist. `license-checker --onlyAllow` matches by substring
+      # (e.g. an allowed "MIT" token also silently matches "FSL-1.1-MIT"), so it cannot
+      # actually enforce this policy — see scripts/check-production-licenses.ts for the
+      # exact-SPDX-token matching this uses instead, and docs/project/license-exceptions.md
+      # for the exception list. (#847 / SE-M3)
+      - name: Check production licenses (blocking allowlist)
+        run: npm run check-licenses
 
       # Dev/build deps: scan the full tree and report strong-copyleft findings.
       # Build-time-only tooling (e.g. lightningcss MPL-2.0) never ships to clients,

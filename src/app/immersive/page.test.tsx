@@ -4,6 +4,7 @@ import { ImmersivePageContent } from "./immersive-page-content";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ReactNode } from "react";
 import { createMockT } from "@/test/i18n-mock";
+import { FALLBACK_STORIES } from "@/lib/stories-fallback";
 
 // Mock i18n
 const mockT = createMockT();
@@ -110,25 +111,28 @@ vi.mock("next/image", () => ({
   ),
 }));
 
-// Mock getStoriesFromDB to return fallback stories immediately
-vi.mock("@/lib/stories-data", async (importOriginal) => {
-  const actual = await importOriginal() as Record<string, unknown>;
-  return {
-    ...actual,
-    getStoriesFromDB: vi.fn().mockResolvedValue(actual.FALLBACK_STORIES),
-  };
-});
-
-// Mock fetch for VoiceChat
+// FE-H1 (#759): use-stories.ts fetches stories via GET /api/stories instead of
+// calling getStoriesFromDB directly, so the shared fetch mock below must
+// special-case that URL (returning fallback stories immediately) alongside
+// VoiceChat's own fetch calls.
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 describe("ImmersivePageContent", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ message: "Test response" }),
+    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/stories")) {
+        return {
+          ok: true,
+          json: async () => ({ data: FALLBACK_STORIES }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ message: "Test response" }),
+      };
     });
   });
 

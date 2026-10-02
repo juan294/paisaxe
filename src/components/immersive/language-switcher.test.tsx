@@ -31,10 +31,11 @@ describe("LanguageSwitcher", () => {
       expect(within(toggleButton).getByText("ES")).toBeInTheDocument();
 
       // Dropdown is hidden via CSS (opacity-0, pointer-events-none)
-      // UX-M3: options are filtered by coverage threshold. 'ast' is gated
-      // (coverage 40% < 70% threshold), so 5 options: es, en, fr, de, pt.
+      // UX-M10 (#903): coverage is computed from the real locale files.
+      // 'ast' is genuinely ~81% translated (above the 70% threshold), so
+      // all 6 locales are visible: es, ast, en, fr, de, pt.
       const allOptions = screen.getAllByRole("option");
-      expect(allOptions).toHaveLength(5); // 5 language options (ast gated)
+      expect(allOptions).toHaveLength(6);
     });
 
     it("should show FR when locale is fr", () => {
@@ -69,10 +70,9 @@ describe("LanguageSwitcher", () => {
       expect(within(toggleButton).getByText("PT")).toBeInTheDocument();
     });
 
-    it("should show AST in the toggle button when locale is ast (even though ast is gated from dropdown)", () => {
-      // UX-M3: ast is below coverage threshold so it's NOT in the dropdown,
-      // but if the user already has ast selected (e.g. from localStorage),
-      // the toggle button still shows the current locale's label.
+    it("should show AST in the toggle button when locale is ast", () => {
+      // UX-M10 (#903): ast now meets the coverage threshold and is a
+      // regular, always-computed entry — the toggle still reflects it.
       mockLocale = "ast";
       render(<LanguageSwitcher />);
 
@@ -82,7 +82,7 @@ describe("LanguageSwitcher", () => {
   });
 
   describe("expanded state", () => {
-    it("should expand and show coverage-gated languages when toggle is clicked", () => {
+    it("should expand and show all locales that meet the coverage threshold when toggle is clicked", () => {
       mockLocale = "es";
       render(<LanguageSwitcher />);
 
@@ -90,9 +90,10 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // UX-M3: 'ast' is gated (coverage 40% < 70% threshold) — 5 options: es, en, fr, de, pt
+      // UX-M10 (#903): coverage is computed from the real locale files —
+      // all 6 locales currently meet the threshold: es, ast, en, fr, de, pt.
       const allOptions = screen.getAllByRole("option");
-      expect(allOptions).toHaveLength(5);
+      expect(allOptions).toHaveLength(6);
     });
 
     it("should highlight the current language in the dropdown", () => {
@@ -158,17 +159,29 @@ describe("LanguageSwitcher", () => {
       expect(mockSetLocale).toHaveBeenCalledWith("pt");
     });
 
-    it("should NOT show ast option in dropdown (gated by coverage threshold)", () => {
-      // UX-M3: 'ast' has 40% coverage which is below the 70% threshold.
-      // It must not appear as a selectable option in the dropdown.
+    it("should show the ast option in the dropdown (UX-M10 #903: real coverage is ~81%, above threshold)", () => {
+      // Regression test for #903: 'ast' was hidden behind a stale hardcoded
+      // 40% coverage constant even though the locale file is genuinely
+      // ~81% translated. Coverage is now computed from the real file, so
+      // 'ast' must appear as a selectable option.
       mockLocale = "es";
       render(<LanguageSwitcher />);
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // ast option should not be present in the dropdown
-      expect(screen.queryByRole("option", { name: /Asturianu/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /Asturianu/ })).toBeInTheDocument();
+    });
+
+    it("should call setLocale with ast when AST is clicked", () => {
+      mockLocale = "es";
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+      fireEvent.click(screen.getByRole("option", { name: /Asturianu/ }));
+
+      expect(mockSetLocale).toHaveBeenCalledWith("ast");
     });
 
     it("should call setLocale with es when ES is clicked from different locale", () => {
@@ -421,8 +434,8 @@ describe("LanguageSwitcher", () => {
 
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
-      // UX-M3: visible list is [es, en, fr, de, pt] — EN is at index 1 (ast gated)
-      options[1].focus();
+      // UX-M10 (#903): visible list is [es, ast, en, fr, de, pt] — EN is at index 2
+      options[2].focus();
 
       fireEvent.keyDown(listbox, { key: "Enter" });
       expect(mockSetLocale).toHaveBeenCalledWith("en");
@@ -461,8 +474,8 @@ describe("LanguageSwitcher", () => {
       fireEvent.click(toggleButton);
 
       const options = screen.getAllByRole("option");
-      // UX-M3: visible list is [es, en, fr, de, pt] — EN is at index 1 (ast gated)
-      expect(options[1]).toHaveAttribute("aria-selected", "true");
+      // UX-M10 (#903): visible list is [es, ast, en, fr, de, pt] — EN is at index 2
+      expect(options[2]).toHaveAttribute("aria-selected", "true");
       expect(options[0]).toHaveAttribute("aria-selected", "false");
     });
 
@@ -513,9 +526,9 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // UX-M3: 'ast' is gated — listbox contains 5 option elements (es, en, fr, de, pt)
+      // UX-M10 (#903): listbox contains 6 option elements (es, ast, en, fr, de, pt)
       const options = screen.getAllByRole("option");
-      expect(options).toHaveLength(5);
+      expect(options).toHaveLength(6);
 
       // Arrow key navigation works, proving listboxRef.current is valid
       const listbox = screen.getByRole("listbox");
@@ -538,9 +551,10 @@ describe("LanguageSwitcher", () => {
         mockLocale = "es";
         render(<LanguageSwitcher />);
 
-        // fr now has no coverage entry → gated; ast already gated → 4 options
+        // UX-M10 (#903): fr now has no coverage entry → gated; the other 5
+        // locales (es, ast, en, de, pt) remain visible → 5 options
         const options = screen.getAllByRole("option");
-        expect(options).toHaveLength(4);
+        expect(options).toHaveLength(5);
         expect(
           screen.queryByRole("option", { name: /Français/ })
         ).not.toBeInTheDocument();
@@ -616,4 +630,60 @@ describe("LanguageSwitcher", () => {
   // - `if (options.length === 0) return;` — guard for when no [role="option"] elements exist.
   //   Unreachable because coverage-gated languages always include at least es + en (>= 2 options).
   // Both are structurally sound defensive patterns that cannot be exercised via jsdom/vitest.
+
+  // UX-M3 (#896): the closed dropdown panel stays mounted (required for the
+  // open/close CSS transition) but must be removed from the accessibility
+  // tree and tab order via `inert` — it must not expose options while hidden.
+  describe("inert on closed panel (UX-M3, #896)", () => {
+    it("marks the dropdown panel inert when collapsed", () => {
+      render(<LanguageSwitcher />);
+
+      const listbox = screen.getByRole("listbox");
+      expect(listbox).toHaveAttribute("inert");
+    });
+
+    it("removes inert from the dropdown panel once expanded", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      expect(listbox).not.toHaveAttribute("inert");
+    });
+
+    it("re-applies inert after the panel is closed again", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      expect(listbox).toHaveAttribute("inert");
+    });
+  });
+
+  // UX-M6 (#899): toggle and option buttons must meet the 44×44 touch-target
+  // convention already used by other toolbar controls (e.g. glassIcon).
+  describe("touch target sizing (UX-M6, #899)", () => {
+    it("gives the toggle button a 44px (min-h-11) touch-target floor", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      expect(toggleButton.className).toContain("min-h-11");
+    });
+
+    it("gives each dropdown option a 44px (min-h-11) touch-target floor", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const options = screen.getAllByRole("option");
+      for (const option of options) {
+        expect(option.className).toContain("min-h-11");
+      }
+    });
+  });
 });

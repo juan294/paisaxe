@@ -26,15 +26,16 @@ describe("sitemap", () => {
       expect.objectContaining({ url: `${SITE_URL}/favorites` })
     );
 
-    // Story pages
+    // Story pages — FE-H2 (#760): each story links to its own /story/:slug
+    // page (real per-story metadata), not the generic /immersive?story=.
     expect(entries).toContainEqual(
       expect.objectContaining({
-        url: `${SITE_URL}/immersive?story=lagos-covadonga`,
+        url: `${SITE_URL}/story/lagos-covadonga`,
       })
     );
     expect(entries).toContainEqual(
       expect.objectContaining({
-        url: `${SITE_URL}/immersive?story=ruta-cares`,
+        url: `${SITE_URL}/story/ruta-cares`,
       })
     );
   });
@@ -46,7 +47,7 @@ describe("sitemap", () => {
     const immersive = entries.find(
       (e) => e.url === `${SITE_URL}/immersive`
     );
-    const storyEntry = entries.find((e) => e.url?.includes("story="));
+    const storyEntry = entries.find((e) => e.url?.includes("/story/"));
 
     expect(home?.priority).toBe(1);
     expect(immersive?.priority).toBe(0.9);
@@ -101,7 +102,7 @@ describe("sitemap", () => {
       const entries = await sitemap();
       expect(entries).toContainEqual(
         expect.objectContaining({
-          url: `${SITE_URL}/immersive?story=story-no-slug`,
+          url: `${SITE_URL}/story/story-no-slug`,
         })
       );
     });

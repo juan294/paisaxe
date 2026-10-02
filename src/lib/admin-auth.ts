@@ -13,7 +13,67 @@ type AuthResult =
 
 /** BE-M2: In-process cache keyed by user_id. 30-second TTL. */
 const ROLE_CACHE_TTL_MS = 30_000;
+
+/**
+ * BE-L7 (#800): Bound the cache so a high-cardinality user population can't
+ * grow it unboundedly — entries were previously only ever overwritten, never
+ * removed. Mirrors the prune-then-shed pattern used by the in-memory
+ * rate-limit store (src/lib/rate-limit.ts: checkInMemory).
+ */
+export const ROLE_CACHE_MAX_ENTRIES = 2_000;
 const roleCache = new Map<string, { role: string; expiresAt: number }>();
+
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/** Test-only visibility into the cache size (mirrors getRateLimitStore()). */
+export function getRoleCacheSize(): number {
+  return roleCache.size;
+}
+
+/**
+ * SE-M4 (#848): Escape hatch to evict a single user's cached role immediately.
+ * Call this wherever a role changes so the change takes effect before the
+ * 30s TTL would otherwise expire.
+ *
+ * Regression risk: the cache is per-instance (module-level Map), so this only
+ * clears the instance that handles the call — it is NOT a global revocation
+ * mechanism across every warm Vercel instance. A demoted user's other warm
+ * instances keep honoring their own cached entry until its TTL lapses. No
+ * in-app flow currently mutates user_profiles.role (role changes are applied
+ * directly in Supabase today), so this is the documented hook for whenever
+ * such a flow is added.
+ */
+export function invalidateRoleCache(userId: string): void {
+  roleCache.delete(userId);
+}
+
+function pruneExpiredRoleCacheEntries(now: number): void {
+  for (const [key, entry] of roleCache) {
+    if (entry.expiresAt <= now) {
+      roleCache.delete(key);
+    }
+  }
+}
+
+function setRoleCache(userId: string, role: string): void {
+  const now = Date.now();
+  if (!roleCache.has(userId) && roleCache.size >= ROLE_CACHE_MAX_ENTRIES) {
+    pruneExpiredRoleCacheEntries(now);
+    if (roleCache.size >= ROLE_CACHE_MAX_ENTRIES) {
+      // Still full after pruning expired entries — shed the oldest 10%
+      // (Map iteration order = insertion order), same load-shed behavior
+      // as the rate-limit in-memory store.
+      const keysToDelete = Array.from(roleCache.keys()).slice(
+        0,
+        Math.floor(ROLE_CACHE_MAX_ENTRIES * 0.1)
+      );
+      for (const key of keysToDelete) {
+        roleCache.delete(key);
+      }
+    }
+  }
+  roleCache.set(userId, { role, expiresAt: now + ROLE_CACHE_TTL_MS });
+}
 
 /**
  * Validates admin authentication via Supabase session cookie + role check.
@@ -22,8 +82,14 @@ const roleCache = new Map<string, { role: string; expiresAt: number }>();
  * BE-M2: The user_profiles DB lookup is skipped on cache hit (30s TTL).
  * Non-PGRST116 errors from the profile query log [ADMIN_PROFILE_LOOKUP_FAILED]
  * and return 500 rather than silently returning 401/403.
+ *
+ * SE-M4 (#848): Pass `{ skipCache: true }` (as withAdmin/withAdminRead do for
+ * mutating HTTP methods) to force a fresh DB check instead of trusting a
+ * cached role that may be up to 30s stale.
  */
-export async function validateAdminAuth(): Promise<AuthResult> {
+export async function validateAdminAuth(options?: {
+  skipCache?: boolean;
+}): Promise<AuthResult> {
   try {
     const cookieStore = await cookies();
 
@@ -64,7 +130,10 @@ export async function validateAdminAuth(): Promise<AuthResult> {
     }
 
     // BE-M2: Check the in-process cache before hitting the DB.
-    const cached = roleCache.get(user.id);
+    // SE-M4 (#848): mutating requests explicitly opt out (see withAdmin /
+    // withAdminRead) so a stale cached role can't authorize a write.
+    const skipCache = options?.skipCache ?? false;
+    const cached = skipCache ? undefined : roleCache.get(user.id);
     if (cached && cached.expiresAt > Date.now()) {
       if (cached.role !== "admin") {
         return {
@@ -115,10 +184,7 @@ export async function validateAdminAuth(): Promise<AuthResult> {
     if (!profile || profile.role !== "admin") {
       // Populate cache even for non-admin so repeat lookups are fast.
       if (profile) {
-        roleCache.set(user.id, {
-          role: profile.role,
-          expiresAt: Date.now() + ROLE_CACHE_TTL_MS,
-        });
+        setRoleCache(user.id, profile.role);
       }
       return {
         valid: false,
@@ -130,13 +196,16 @@ export async function validateAdminAuth(): Promise<AuthResult> {
     }
 
     // Populate cache for admin user.
-    roleCache.set(user.id, {
-      role: profile.role,
-      expiresAt: Date.now() + ROLE_CACHE_TTL_MS,
-    });
+    setRoleCache(user.id, profile.role);
 
     return { valid: true, userId: user.id };
-  } catch {
+  } catch (error) {
+    // BE-L7 (#800): a total auth failure was previously silent — logger.error
+    // routes through the sanitizer (src/lib/logger-sanitize.ts), which is
+    // required here since Supabase auth errors can carry token fragments.
+    logger.error("[ADMIN_AUTH_UNHANDLED_ERROR]", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       valid: false,
       error: NextResponse.json(
@@ -145,6 +214,14 @@ export async function validateAdminAuth(): Promise<AuthResult> {
       ),
     };
   }
+}
+
+/**
+ * SE-M4 (#848): true when `request.method` is a write verb, so callers can
+ * skip the 30s role cache and check the DB fresh before allowing a mutation.
+ */
+function isMutatingRequest(request?: Pick<Request, "method">): boolean {
+  return Boolean(request?.method && MUTATING_METHODS.has(request.method.toUpperCase()));
 }
 
 /**
@@ -158,10 +235,10 @@ export async function validateAdminAuth(): Promise<AuthResult> {
  */
 export async function withAdmin<T>(
   handler: (supabase: SupabaseClient) => Promise<T>,
-  request?: Pick<Request, "headers">
+  request?: Pick<Request, "headers" | "method">
 ): Promise<T | NextResponse> {
   const run = async (): Promise<T | NextResponse> => {
-    const auth = await validateAdminAuth();
+    const auth = await validateAdminAuth({ skipCache: isMutatingRequest(request) });
     if (!auth.valid) {
       return auth.error;
     }
@@ -181,10 +258,10 @@ export async function withAdmin<T>(
  */
 export async function withAdminRead<T>(
   handler: (supabase: SupabaseClient) => Promise<T>,
-  request?: Pick<Request, "headers">
+  request?: Pick<Request, "headers" | "method">
 ): Promise<T | NextResponse> {
   const run = async (): Promise<T | NextResponse> => {
-    const auth = await validateAdminAuth();
+    const auth = await validateAdminAuth({ skipCache: isMutatingRequest(request) });
     if (!auth.valid) {
       return auth.error;
     }

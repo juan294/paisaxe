@@ -1,70 +1,59 @@
 "use client";
 
-import { useState, useRef } from "react";
 import { Share2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { ToolbarOverflowItem } from "./toolbar-overflow-menu";
+import { useShareStory } from "@/hooks/use-share-story";
 import type { Story } from "@/types/immersive";
 
 interface ShareButtonProps {
   story: Story;
+  /**
+   * #908/#771: "icon" is the standalone glass icon button (desktop nav).
+   * "menu" renders as a ToolbarOverflowItem-style row so it can be dropped
+   * directly into the mobile overflow menu, reusing the exact same share
+   * logic and feedback instead of a separate, weaker inline implementation.
+   */
+  variant?: "icon" | "menu";
 }
 
-export function ShareButton({ story }: ShareButtonProps) {
+export function ShareButton({ story, variant = "icon" }: ShareButtonProps) {
   const { t } = useTranslation();
-  const [toast, setToast] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toast, handleShare } = useShareStory(story);
 
-  const showToast = (message: string) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setToast(message);
-    timerRef.current = setTimeout(() => setToast(null), 1500);
-  };
-
-  const handleShare = async (e: React.MouseEvent) => {
+  const onClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    const shareUrl = `${window.location.origin}/story/${story.slug || story.id}`;
-    const shareData = {
-      title: story.title,
-      text: `${story.title} - ${story.subtitle}`,
-      url: shareUrl,
-    };
-
-    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-
-    try {
-      if (isTouchDevice && navigator.share && navigator.canShare?.(shareData)) {
-        await navigator.share(shareData);
-      } else {
-        try {
-          await navigator.clipboard.writeText(shareUrl);
-          showToast(t("share.link_copied"));
-        } catch {
-          // UX-L3 (#523): Show error feedback when clipboard fails on desktop
-          showToast(t("share.copy_error"));
-        }
-      }
-    } catch (err) {
-      // User cancelled share or clipboard failed - try clipboard as fallback
-      if ((err as Error).name !== "AbortError") {
-        try {
-          await navigator.clipboard.writeText(shareUrl);
-          showToast(t("share.link_copied"));
-        } catch {
-          // UX-L3 (#523): Show error feedback instead of silently ignoring
-          showToast(t("share.copy_error"));
-        }
-      }
-    }
+    handleShare();
   };
+
+  if (variant === "menu") {
+    return (
+      <ToolbarOverflowItem
+        icon={
+          toast ? (
+            <Check className="h-4 w-4 animate-in fade-in zoom-in duration-200" />
+          ) : (
+            <Share2 className="h-4 w-4" />
+          )
+        }
+        // Regression risk from #908: the icon variant's toast is an
+        // absolutely-positioned popover anchored to its own trigger button,
+        // which would clip inside the overflow menu's constrained popover.
+        // Swapping the row's own label in place — instead of layering a
+        // second popover — avoids that clipping without needing a portal.
+        label={<span role="status">{toast || t("share.share")}</span>}
+        onClick={handleShare}
+      />
+    );
+  }
 
   return (
     <div className="relative">
       <Button
         variant="glassIcon"
-        onClick={handleShare}
+        onClick={onClick}
         aria-label={t("share.share")}
         title={t("share.share")}
       >

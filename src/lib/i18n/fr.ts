@@ -131,11 +131,11 @@ export const fr: Translations = {
     // LOCATION-SPECIFIC: Location name
     empty_description: 'Explorez les histoires des Asturies et enregistrez celles qui vous plaisent pour les consulter plus tard.',
     explore: 'Explorer les histoires',
-    loading_more: 'Chargement...',
     all_viewed: 'Vous avez vu tous vos enregistrements',
     remove_from_saved: 'Retirer des enregistrés',
     removed: 'Retiré des favoris',
     saved_toast: 'Ajouté aux favoris',
+    undo: 'Annuler',
   },
 
   accessibility: {
@@ -210,6 +210,7 @@ export const fr: Translations = {
     error: 'Erreur de connexion',
     error_not_configured: 'Agent vocal non configuré',
     no_permission: 'Accès au micro requis',
+    no_permission_retry: "Si votre navigateur a bloqué l'accès, activez-le dans les paramètres du site et réessayez.",
     you: 'Vous',
     loading: "Chargement de l'assistant vocal...",
   },
@@ -261,12 +262,13 @@ export const fr: Translations = {
 
   premium: {
     premium_access: 'Accès Premium',
-    voice_pass_label: 'Pass Vocal · 24h',
+    voice_pass_label: 'Pass Vocal · {duration}',
     voice_locked: 'Le chat vocal est une fonction premium',
     get_day_pass: 'Obtenir un Pass Jour',
     voice_title: 'Parlez à Votre Guide',
     voice_description: 'Pelayo en sait plus que ce qui est à l\'écran. Demandez-lui.',
     feature_24h: '24 heures de conversations illimitées',
+    feature_duration: '{duration} de conversations illimitées',
     feature_unlimited: 'Questions illimitées',
     feature_realtime: 'Météo et recommandations en temps réel',
     feature_booking: 'Pelayo réserve restaurants et hôtels pour vous',
@@ -289,8 +291,11 @@ export const fr: Translations = {
     faq_what_included_answer: '24 heures avec Pelayo. Demandez la météo avant d\'aller aux Lacs, où trouver la meilleure fabada, quelle cidrerie visiter —',
     faq_what_included_highlight: 'et il appelle pour réserver votre table !',
     faq_how_long: 'Combien de temps ça dure ?',
-    faq_how_long_answer: '24 heures à partir de l\'achat. Parfait pour planifier une journée de voyage ou explorer.',
+    faq_how_long_answer: '{duration} à partir de l\'achat. Parfait pour planifier une journée de voyage ou explorer.',
     voice_pass_expiry: 'Votre passe vocal expire dans {hours}h ({time})',
+    tier_day: '24 heures',
+    tier_week: '7 jours',
+    tier_month: '30 jours',
   },
 
   fullscreen: {

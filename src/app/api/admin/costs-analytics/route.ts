@@ -21,6 +21,19 @@ import type {
 import { queryPostHog, formatForHogQL } from "@/lib/posthog-query";
 import { ELEVENLABS_API_BASE } from "@/config/elevenlabs-agents";
 import { logger } from "@/lib/logger";
+import {
+  ElevenLabsCredentialError,
+  getElevenLabsRuntimeCredential,
+  type ElevenLabsRuntimeCredential,
+} from "@/lib/elevenlabs-credentials";
+import {
+  classifyElevenLabsProviderStatus,
+  logElevenLabsFailure,
+} from "@/lib/elevenlabs-observability";
+
+// PE-L2: bound each ElevenLabs call so a hung upstream can't hold this admin
+// route open until the platform's default function timeout.
+const ELEVENLABS_FETCH_TIMEOUT_MS = 8_000;
 
 function formatUsd(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -191,7 +204,22 @@ async function fetchUsageMetrics(
   try {
     const projectId = getEnv("POSTHOG_PROJECT_ID");
     const posthogKey = getEnv("POSTHOG_PERSONAL_API_KEY");
-    const elevenLabsKey = getEnv("ELEVENLABS_API_KEY");
+    const configuredElevenLabsKey = getEnv("ELEVENLABS_API_KEY");
+    let elevenLabsCredential: ElevenLabsRuntimeCredential | undefined;
+    if (configuredElevenLabsKey) {
+      try {
+        elevenLabsCredential = getElevenLabsRuntimeCredential();
+      } catch (error) {
+        const credentialError =
+          error instanceof ElevenLabsCredentialError ? error : undefined;
+        logElevenLabsFailure({
+          source: "costs-usage-analytics",
+          failureClass: credentialError?.code ?? "unknown",
+          fingerprint: credentialError?.fingerprint,
+          fingerprintMatches: credentialError?.fingerprintMatches,
+        });
+      }
+    }
 
     const periodDays = Math.max(
       1,
@@ -240,17 +268,40 @@ async function fetchUsageMetrics(
     }
 
     // Fetch ElevenLabs voice metrics (filtered to Paisaxe agents only)
-    if (elevenLabsKey) {
+    if (elevenLabsCredential) {
       try {
         // First fetch agents list to identify Paisaxe agents
         const agentsResponse = await fetch(
           `${ELEVENLABS_API_BASE}/convai/agents`,
           {
             headers: {
-              "xi-api-key": elevenLabsKey,
+              "xi-api-key": elevenLabsCredential.apiKey,
             },
+            signal: AbortSignal.timeout(ELEVENLABS_FETCH_TIMEOUT_MS),
           }
         );
+
+        if (!agentsResponse.ok) {
+          logElevenLabsFailure({
+            source: "costs-usage-analytics",
+            failureClass: classifyElevenLabsProviderStatus(
+              agentsResponse.status
+            ),
+            providerStatus: agentsResponse.status,
+            fingerprint: elevenLabsCredential.fingerprint,
+            fingerprintMatches: elevenLabsCredential.fingerprintMatches,
+          });
+          if (agentsResponse.status === 401 || agentsResponse.status === 403) {
+            return {
+              visitors,
+              chatConversations,
+              voiceConversations,
+              voiceMinutes,
+              periodDays,
+              posthogEvents,
+            };
+          }
+        }
 
         let paisaxeAgentIds = new Set<string>();
         if (agentsResponse.ok) {
@@ -279,10 +330,21 @@ async function fetchUsageMetrics(
           `${ELEVENLABS_API_BASE}/convai/conversations?page_size=100`,
           {
             headers: {
-              "xi-api-key": elevenLabsKey,
+              "xi-api-key": elevenLabsCredential.apiKey,
             },
+            signal: AbortSignal.timeout(ELEVENLABS_FETCH_TIMEOUT_MS),
           }
         );
+
+        if (!response.ok) {
+          logElevenLabsFailure({
+            source: "costs-usage-analytics",
+            failureClass: classifyElevenLabsProviderStatus(response.status),
+            providerStatus: response.status,
+            fingerprint: elevenLabsCredential.fingerprint,
+            fingerprintMatches: elevenLabsCredential.fingerprintMatches,
+          });
+        }
 
         if (response.ok) {
           const data = await response.json();
@@ -312,7 +374,21 @@ async function fetchUsageMetrics(
           voiceMinutes = Math.round(voiceMinutes * 10) / 10;
         }
       } catch (error) {
-        logger.warn("[COSTS_ANALYTICS_ELEVENLABS_USAGE_FETCH_FAILED]", { error });
+        // PE-L2: distinguish a timeout/abort (AbortError / TimeoutError
+        // emitted by AbortSignal.timeout) from a definitive ElevenLabs
+        // error, since this call already degrades to partial data — a
+        // hung upstream should be visible separately from a real failure.
+        // We check .name directly (not just instanceof Error) because
+        // DOMException may not extend Error in all JS runtimes/environments.
+        const errorName = (error as { name?: string } | null)?.name;
+        const isTimeout = errorName === "AbortError" || errorName === "TimeoutError";
+
+        logElevenLabsFailure({
+          source: "costs-usage-analytics",
+          failureClass: isTimeout ? "upstream_timeout" : "upstream_unavailable",
+          fingerprint: elevenLabsCredential.fingerprint,
+          fingerprintMatches: elevenLabsCredential.fingerprintMatches,
+        });
       }
     }
 

@@ -4,6 +4,8 @@ import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 import { acquireCronJobLease, releaseCronJobLease } from "@/lib/cron-job-lock";
+import { validateCsrfForAdminFallback } from "@/lib/csrf";
+import { ALLOWED_ORIGINS } from "@/lib/proxy/cors";
 
 const GITHUB_API_BASE = "https://api.github.com";
 const REPO = "juan294/paisaxe";
@@ -233,6 +235,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const auth = await validateAdminAuth();
     if (!auth.valid) {
       return auth.error;
+    }
+    // BE-H5/SE-M1: admin-cookie fallback is exactly the CSRF attack surface —
+    // require a valid CSRF token + Origin before trusting the session cookie.
+    if (!validateCsrfForAdminFallback(request, ALLOWED_ORIGINS)) {
+      return NextResponse.json(
+        { error: "CSRF token missing or invalid" },
+        { status: 403 }
+      );
     }
     // BE-M1: webhook secret was absent/wrong but admin auth succeeded — log for ops visibility
     logger.warn("[CRON_AUTH_FALLBACK]", { source: "webhook", fellBackTo: "admin_auth" });

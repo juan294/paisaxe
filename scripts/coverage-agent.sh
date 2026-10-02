@@ -3,8 +3,8 @@
 # Checks test coverage, writes missing tests, updates docs/coverage-report.md
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/code/paisaxe"
-CLAUDE_BIN="/Users/juan/.local/bin/claude"
+PROJECT_DIR="${PROJECT_DIR:-/Users/juan/code/paisaxe}"
+CLAUDE_BIN="${CLAUDE_BIN:-/Users/juan/.local/bin/claude}"
 MODEL="claude-haiku-4-5-20251001"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/coverage-agent-$(date +%Y-%m-%d).log"
@@ -59,10 +59,7 @@ done
 LOCK_ACQUIRED=true
 trap 'if [[ "$LOCK_ACQUIRED" == "true" ]]; then rmdir "$LOCK_DIR" 2>/dev/null || true; fi' EXIT
 
-"$CLAUDE_BIN" -p \
-  --model "$MODEL" \
-  --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' \
-  >> "$LOG_FILE" 2>&1 <<PROMPT
+PROMPT_TEXT=$(cat <<PROMPT
 $AGENT_PROMPT
 
 Additional context:
@@ -76,6 +73,9 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
+)
+run_scheduled_analysis "$DOC_FILE" "$LOG_FILE" "# Coverage Agent Report" \
+  "$MODEL" 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' "$PROMPT_TEXT"
 
 rmdir "$LOCK_DIR" 2>/dev/null || true
 LOCK_ACQUIRED=false

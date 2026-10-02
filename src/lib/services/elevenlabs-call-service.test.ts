@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { initiateCall } from "./elevenlabs-call-service";
+import { logger } from "@/lib/logger";
+import { fingerprintElevenLabsApiKey } from "@/lib/elevenlabs-credentials";
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -22,7 +24,10 @@ describe("elevenlabs-call-service.initiateCall", () => {
       ...originalEnv,
       ELEVENLABS_API_KEY: "test-api-key",
       ELEVENLABS_PHONE_NUMBER_ID: "test-phone-id",
-      ELEVENLABS_BOOKING_AGENT_ID: "test-booking-agent-id",
+      ELEVENLABS_BOOKING_AGENT_ID:
+        "agent_5201kgm2956ge8ct95yxjas867z5",
+      ELEVENLABS_API_KEY_FINGERPRINT: "",
+      VERCEL_ENV: "preview",
     };
   });
 
@@ -37,6 +42,63 @@ describe("elevenlabs-call-service.initiateCall", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("not configured");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("fails before an outbound call when the production key is not fingerprint-bound", async () => {
+    process.env.VERCEL_ENV = "production";
+
+    const result = await initiateCall("+34985887797", baseRequest);
+
+    expect(result).toEqual({
+      success: false,
+      error: "ElevenLabs runtime credential rejected",
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("accepts the bound production key and owned booking-agent identity", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.ELEVENLABS_API_KEY_FINGERPRINT =
+      fingerprintElevenLabsApiKey("test-api-key");
+    process.env.ELEVENLABS_BOOKING_AGENT_ID =
+      "agent_5201kgm2956ge8ct95yxjas867z5";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ conversation_id: "conv_bound" }),
+    });
+
+    await expect(initiateCall("+34985887797", baseRequest)).resolves.toEqual({
+      success: true,
+      callSid: undefined,
+      conversationId: "conv_bound",
+    });
+  });
+
+  it("rejects production booking-agent identity drift before provider I/O", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.ELEVENLABS_API_KEY_FINGERPRINT =
+      fingerprintElevenLabsApiKey("test-api-key");
+    process.env.ELEVENLABS_BOOKING_AGENT_ID = "agent_wrong";
+
+    const result = await initiateCall("+34985887797", baseRequest);
+
+    expect(result).toEqual({
+      success: false,
+      error: "ElevenLabs booking agent identity mismatch",
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects preview booking-agent identity drift before provider I/O", async () => {
+    process.env.ELEVENLABS_BOOKING_AGENT_ID = "agent_wrong";
+
+    const result = await initiateCall("+34985887797", baseRequest);
+
+    expect(result).toEqual({
+      success: false,
+      error: "ElevenLabs booking agent identity mismatch",
+    });
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -63,7 +125,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
     expect(options.signal).toBeInstanceOf(AbortSignal);
 
     const body = JSON.parse(options.body);
-    expect(body.agent_id).toBe("test-booking-agent-id");
+    expect(body.agent_id).toBe("agent_5201kgm2956ge8ct95yxjas867z5");
     expect(body.agent_phone_number_id).toBe("test-phone-id");
     expect(body.to_number).toBe("+34985887797");
     expect(body.conversation_initiation_client_data.dynamic_variables).toEqual({
@@ -74,6 +136,42 @@ describe("elevenlabs-call-service.initiateCall", () => {
       time: "nueve de la noche", // 21:00 converted
       special_requests: "Trona para bebé",
     });
+  });
+
+  // BE-H2: the pending_bookings row id is persisted (claimed) before this call
+  // is placed. Sending it as an extra dynamic variable means ElevenLabs echoes
+  // it back in the post_call_transcription webhook even when our own fetch to
+  // ElevenLabs times out and we never learn the conversation_id — giving the
+  // webhook handler an unambiguous (primary-key) fallback correlation key.
+  it("BE-H2: includes booking_id as an extra dynamic variable when provided", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ conversation_id: "conv_with_booking_id" }),
+    });
+
+    await initiateCall("+34985887797", {
+      ...baseRequest,
+      booking_id: "pending-row-abc-123",
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.conversation_initiation_client_data.dynamic_variables.booking_id).toBe(
+      "pending-row-abc-123"
+    );
+  });
+
+  it("omits booking_id from dynamic variables when not provided (unchanged shape)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ conversation_id: "conv_no_booking_id" }),
+    });
+
+    await initiateCall("+34985887797", baseRequest);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(
+      "booking_id" in body.conversation_initiation_client_data.dynamic_variables
+    ).toBe(false);
   });
 
   it("defaults special_requests to 'ninguna' when omitted", async () => {
@@ -93,35 +191,19 @@ describe("elevenlabs-call-service.initiateCall", () => {
     ).toBe("ninguna");
   });
 
-  it("surfaces detail.message on a non-ok response", async () => {
+  it("does not return or log the raw provider error body", async () => {
+    const logSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     mockFetch.mockResolvedValueOnce({
       ok: false,
-      status: 400,
-      json: () => Promise.resolve({ detail: { message: "Invalid number" } }),
+      status: 401,
+      json: () => Promise.resolve({ detail: { message: "raw provider detail" } }),
     });
 
     const result = await initiateCall("+34985887797", baseRequest);
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Invalid number");
-  });
-
-  it("falls back to message, then to status code, for error text", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: () => Promise.resolve({ message: "Server error" }),
-    });
-    expect((await initiateCall("+34985887797", baseRequest)).error).toBe(
-      "Server error"
-    );
-
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 502,
-      json: () => Promise.resolve({ unrelated: true }),
-    });
-    expect((await initiateCall("+34985887797", baseRequest)).error).toBe(
-      "ElevenLabs API error: 502"
+    expect(result.error).toBe("ElevenLabs API error: 401");
+    expect(JSON.stringify(logSpy.mock.calls)).not.toContain(
+      "raw provider detail"
     );
   });
 
@@ -141,7 +223,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
 
     const result = await initiateCall("+34985887797", baseRequest);
     expect(result.success).toBe(false);
-    expect(result.error).toBe("connection refused");
+    expect(result.error).toBe("ElevenLabs request unavailable");
   });
 
   it("handles fetch throwing a non-Error value", async () => {
@@ -149,7 +231,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
 
     const result = await initiateCall("+34985887797", baseRequest);
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Unknown error");
+    expect(result.error).toBe("ElevenLabs request unavailable");
   });
 
   // BE-H2: timeout/abort must set timedOut=true so callers can leave the row in
@@ -162,7 +244,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
     const result = await initiateCall("+34985887797", baseRequest);
     expect(result.success).toBe(false);
     expect(result.timedOut).toBe(true);
-    expect(result.error).toContain("aborted");
+    expect(result.error).toBe("ElevenLabs request timed out");
   });
 
   it("BE-H2: sets timedOut=true when fetch throws a TimeoutError", async () => {

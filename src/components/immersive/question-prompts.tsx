@@ -1,12 +1,37 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, type Locale } from "@/lib/i18n";
+import type { Story, StoryLocale } from "@/types/immersive";
 
 interface QuestionPromptsProps {
   prompts: string[];
   storyId: string;
   onSelectPrompt: (prompt: string) => void;
+}
+
+// FE-M2 (#764): a shared, stable empty array so callers that receive "no
+// prompts" get the same reference every time instead of a fresh `[]` — a
+// fresh array each render defeats StoryInfoPanel's memo on `questionPrompts`.
+const EMPTY_PROMPTS: string[] = [];
+
+/**
+ * UX-H6 (#892): resolve the suggested-question chips for the active locale.
+ *
+ * `StoryTranslation.question_prompts` is optional — a translation may exist
+ * for title/subtitle/description without ever having translated prompts (or
+ * the field may be missing entirely on older translation entries). This
+ * falls back gracefully to the story's Spanish `question_prompts` rather
+ * than rendering an empty/undefined list.
+ */
+export function getLocalizedQuestionPrompts(story: Story, locale: Locale): string[] {
+  const spanishPrompts = story.metadata?.question_prompts || EMPTY_PROMPTS;
+
+  if (locale === "es") return spanishPrompts;
+
+  const translatedPrompts = story.metadata?.translations?.[locale as StoryLocale]?.question_prompts;
+
+  return translatedPrompts && translatedPrompts.length > 0 ? translatedPrompts : spanishPrompts;
 }
 
 export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: QuestionPromptsProps) {
@@ -28,7 +53,8 @@ export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: 
             handleClick(prompt);
           }}
           className={cn(
-            "px-3 py-1.5 text-xs font-medium rounded-full",
+            // UX-M6 (#899): min-h-11 (44px) touch-target floor.
+            "px-3 py-1.5 min-h-11 inline-flex items-center text-xs font-medium rounded-full",
             "bg-white/10 hover:bg-white/20 backdrop-blur-sm",
             "text-white/80 hover:text-white",
             "transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100",

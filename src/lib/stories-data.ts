@@ -1,7 +1,9 @@
+import "server-only";
 import { cache } from "react";
 import type { PublicStoryRow, Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
 import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
 import { logger } from "@/lib/logger";
+import { FALLBACK_STORIES } from "@/lib/stories-fallback";
 
 // In the browser, reuse the existing createBrowserClient singleton to avoid
 // a duplicate GoTrueClient instance (which would share the same storage key
@@ -20,13 +22,10 @@ async function getClient() {
   return supabase;
 }
 
-// LOCATION-SPECIFIC: Import fallback stories from content directory
-// When replicating, replace content/fallback-stories.json with location-specific stories
-import fallbackStoriesData from "@content/fallback-stories.json";
-
-// LOCATION-SPECIFIC: Hardcoded fallback stories (used when database is unavailable)
-// These stories are loaded from content/fallback-stories.json for easy content management
-export const FALLBACK_STORIES: Story[] = fallbackStoriesData.stories as Story[];
+// FE-H1 (#759): FALLBACK_STORIES now lives in the client-safe `stories-fallback`
+// module (no logger/Supabase imports) and is re-exported here for backward
+// compatibility with existing server-side callers and tests.
+export { FALLBACK_STORIES };
 
 /**
  * Detect if we're in Next.js build/prerender phase.
@@ -184,94 +183,39 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
 }
 
 /**
- * Get a single story by slug from the database
- */
-export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> {
-  try {
-    const client = await getClient();
-    const { data, error } = await client
-      .from("stories")
-      .select(PUBLIC_STORY_SELECT)
-      .eq("slug", slug)
-      .eq("is_active", true)
-      .eq("curation_status", "approved")
-      .single();
-
-    if (error) {
-      if (!isBuildPhase()) {
-        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "slug", error: error.message });
-      }
-      return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
-    }
-
-    return data ? rowToPublicStory(data as unknown as PublicStoryRow) : null;
-  } catch (error) {
-    if (!isBuildPhase()) {
-      logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "slug", error: error instanceof Error ? error.message : String(error) });
-    }
-    return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
-  }
-}
-
-/**
- * Slim story metadata used by `generateMetadata`.
- * Only the columns required to build <title>/<meta> tags.
- */
-export interface StoryMetadataSlim {
-  slug: string;
-  title: string;
-  description: string | null;
-}
-
-const STORY_METADATA_SELECT = ["slug", "title", "description"].join(",");
-
-function fallbackStoryMetadata(slug: string): StoryMetadataSlim | null {
-  const fallback = FALLBACK_STORIES.find((s) => s.slug === slug || s.id === slug);
-  if (!fallback) return null;
-  return {
-    slug: fallback.slug || fallback.id,
-    title: fallback.title,
-    description: fallback.description ?? null,
-  };
-}
-
-/**
- * Fetch ONLY the slim metadata (slug, title, description) for a single story.
+ * Get a single story by slug from the database.
  *
- * Wrapped in React `cache` so that within a single request the metadata query
- * is deduplicated. This avoids `generateMetadata` pulling the entire story row
- * (select('*')) just to read the title/description (#573 / PE-M2).
+ * Wrapped in React `cache()` so that within a single request this is
+ * deduplicated to one Supabase query — `generateMetadata` and the page body
+ * of `src/app/story/[slug]/page.tsx` both need the full story and now share
+ * this same cached call instead of each making their own query (FE-H2 / #760,
+ * follow-up to the slim-query approach from #573 / PE-M2).
  */
-export const getStoryMetadataBySlug = cache(
-  async (slug: string): Promise<StoryMetadataSlim | null> => {
+export const getStoryBySlugFromDB = cache(
+  async (slug: string): Promise<Story | null> => {
     try {
       const client = await getClient();
       const { data, error } = await client
         .from("stories")
-        .select(STORY_METADATA_SELECT)
+        .select(PUBLIC_STORY_SELECT)
         .eq("slug", slug)
         .eq("is_active", true)
         .eq("curation_status", "approved")
         .single();
 
-      if (error || !data) {
-        if (error && !isBuildPhase()) {
-          logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "metadata", error: error.message });
+      if (error) {
+        if (!isBuildPhase()) {
+          logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "slug", error: error.message });
         }
-        return fallbackStoryMetadata(slug);
+        return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
       }
 
-      const row = data as unknown as StoryMetadataSlim;
-      return {
-        slug: row.slug,
-        title: row.title,
-        description: row.description ?? null,
-      };
+      return data ? rowToPublicStory(data as unknown as PublicStoryRow) : null;
     } catch (error) {
       if (!isBuildPhase()) {
-        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "metadata", error: error instanceof Error ? error.message : String(error) });
+        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "slug", error: error instanceof Error ? error.message : String(error) });
       }
-      return fallbackStoryMetadata(slug);
+      return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
     }
   }
 );

@@ -369,6 +369,49 @@ describe("POST /api/checkout/embedded", () => {
     );
   });
 
+  // DO-M5 (#832): `??` only falls back on null/undefined, so a
+  // whitespace-contaminated NEXT_PUBLIC_SITE_URL (which Vercel CLI can
+  // introduce per CLAUDE.md) must still be trimmed/rejected via getSiteUrl(),
+  // not passed through raw.
+  it("DO-M5: should fall back to the hardcoded default when NEXT_PUBLIC_SITE_URL is whitespace-only", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "   ");
+
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+
+    const request = createRequest();
+    await POST(request);
+
+    expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        returnUrl: "https://paisaxe.es/pricing/checkout/return?session_id={CHECKOUT_SESSION_ID}",
+      })
+    );
+  });
+
+  it("DO-M5: should trim a whitespace-contaminated NEXT_PUBLIC_SITE_URL instead of embedding it raw", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://staging.paisaxe.es \n");
+
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+
+    const request = createRequest();
+    await POST(request);
+
+    expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        returnUrl:
+          "https://staging.paisaxe.es/pricing/checkout/return?session_id={CHECKOUT_SESSION_ID}",
+      })
+    );
+  });
+
   describe("ALLOWED_ORIGINS in development mode (module-level branch)", () => {
     // ALLOWED_ORIGINS is computed once at module load time, so exercising the
     // NODE_ENV === "development" branch requires resetting modules and

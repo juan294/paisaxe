@@ -31,4 +31,20 @@ describe("getLabel", () => {
       expect(getLabel("navigate", true)).toBe("navegar");
     });
   });
+
+  describe("UX-H5 (#891): bookmarks button must never render a raw key", () => {
+    it("has no 'bookmarks' entry — callers must use the existing 'saved' key instead", () => {
+      // ASTURIANU_LABELS intentionally has no 'bookmarks' entry: 'saved' is the
+      // semantically identical, already-translated key ("Guardados"/"Guardaos",
+      // matching favorites.bookmarks in every locale file). A call site that
+      // still asks for "bookmarks" would silently get the raw key back.
+      expect(getLabel("bookmarks", false)).toBe("bookmarks");
+      expect(getLabel("bookmarks", true)).toBe("bookmarks");
+    });
+
+    it("'saved' returns real Asturian text, never a raw key", () => {
+      expect(getLabel("saved", true)).toBe("Guardaos");
+      expect(getLabel("saved", true)).not.toBe("saved");
+    });
+  });
 });

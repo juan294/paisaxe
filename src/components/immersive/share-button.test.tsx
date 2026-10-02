@@ -5,11 +5,14 @@ import { ShareButton } from "./share-button";
 import { createMockT } from "@/test/i18n-mock";
 import type { Story } from "@/types/immersive";
 
-// Mock i18n
+// Mock i18n. UX-H6 (#892): mutable locale so a test can exercise a
+// non-Spanish visitor sharing a story (share text must be localized, not
+// the raw Spanish title/subtitle).
 const mockT = createMockT();
+let mockLocale = "es";
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
-    locale: "es",
+    locale: mockLocale,
     setLocale: vi.fn(),
     t: (key: string) => mockT(key),
   }),
@@ -32,6 +35,7 @@ describe("ShareButton", () => {
   let writeTextMock = vi.fn<(data: string) => Promise<void>>();
 
   beforeEach(() => {
+    mockLocale = "es";
     writeTextMock = vi.fn<(data: string) => Promise<void>>().mockResolvedValue(undefined);
     // Default: no native share, clipboard available, desktop pointer
     Object.defineProperty(navigator, "share", {
@@ -388,5 +392,162 @@ describe("ShareButton", () => {
       expect(screen.getByRole("status")).toHaveClass("opacity-100");
     });
     expect(screen.getByRole("status")).toHaveTextContent("No se pudo copiar");
+  });
+
+  // UX-H6 (#892): getLocalizedStory was bypassed here — a French visitor
+  // sharing a story got the raw Spanish title/subtitle in the native share
+  // sheet instead of their own language.
+  it("UX-H6: shares the localized title/subtitle for a non-Spanish locale", async () => {
+    mockLocale = "fr";
+    const storyWithFrenchTranslation: Story = {
+      ...mockStory,
+      metadata: {
+        translations: {
+          fr: {
+            title: "Histoire de Test",
+            subtitle: "Sous-titre de Test",
+            description: "Une histoire de test",
+          },
+        },
+      },
+    };
+
+    const shareFn = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", {
+      value: shareFn,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: () => true,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window, "matchMedia", {
+      value: (query: string) => ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      }),
+      writable: true,
+      configurable: true,
+    });
+
+    const user = userEvent.setup();
+    render(<ShareButton story={storyWithFrenchTranslation} />);
+
+    await user.click(screen.getByTitle("Compartir"));
+
+    expect(shareFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Histoire de Test",
+        text: "Histoire de Test - Sous-titre de Test",
+      })
+    );
+  });
+
+  it("UX-H6: falls back to Spanish share text when no translation exists for the active locale", async () => {
+    mockLocale = "de";
+
+    const shareFn = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", {
+      value: shareFn,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: () => true,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window, "matchMedia", {
+      value: (query: string) => ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      }),
+      writable: true,
+      configurable: true,
+    });
+
+    const user = userEvent.setup();
+    render(<ShareButton story={mockStory} />);
+
+    await user.click(screen.getByTitle("Compartir"));
+
+    expect(shareFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Test Story",
+        text: "Test Story - Test Subtitle",
+      })
+    );
+  });
+
+  // #908/#771: the "menu" variant renders the mobile overflow-menu row using
+  // the exact same useShareStory hook as the desktop icon variant, so it
+  // gets the same localization, clipboard-failure feedback, and share-
+  // cancellation handling — instead of the old, weaker inline handler that
+  // lived in story-viewer.tsx.
+  describe("menu variant (#908, #771)", () => {
+    it("renders as a menuitem row with the share label and icon", () => {
+      render(<ShareButton story={mockStory} variant="menu" />);
+
+      const item = screen.getByRole("menuitem");
+      expect(item).toHaveTextContent("Compartir");
+    });
+
+    it("swaps the label text to the toast message instead of a popover (avoids clipping in the overflow menu)", async () => {
+      const user = userEvent.setup();
+      render(<ShareButton story={mockStory} variant="menu" />);
+
+      await user.click(screen.getByRole("menuitem"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("status")).toHaveTextContent("Enlace copiado");
+      });
+      // No absolutely-positioned popover toast should exist for this variant.
+      expect(screen.queryByText("Compartir")).not.toBeInTheDocument();
+    });
+
+    it("shows error feedback inline when clipboard fails (no native share)", async () => {
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+        writable: true,
+        configurable: true,
+      });
+
+      const { fireEvent: fe } = await import("@testing-library/react");
+      render(<ShareButton story={mockStory} variant="menu" />);
+      fe.click(screen.getByRole("menuitem"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("status")).toHaveTextContent("No se pudo copiar");
+      });
+    });
+
+    it("stops event propagation on click", async () => {
+      const parentClick = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <div onClick={parentClick}>
+          <ShareButton story={mockStory} variant="menu" />
+        </div>
+      );
+
+      await user.click(screen.getByRole("menuitem"));
+
+      expect(parentClick).not.toHaveBeenCalled();
+    });
   });
 });

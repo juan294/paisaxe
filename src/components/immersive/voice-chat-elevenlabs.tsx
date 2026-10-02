@@ -28,6 +28,8 @@ interface VoiceChatElevenLabsProps {
   agentId: string;
   onFallbackToText: () => void;
   userAccessToken?: string | null;
+  /** FE-H4: a prompt-chip question captured before voice mode became active. */
+  initialMessage?: string;
 }
 
 // Stable identifiers for the 5 fixed sound-visualizer bars (#479: avoid index-as-key).
@@ -118,6 +120,7 @@ export function VoiceChatElevenLabs({
   agentId,
   onFallbackToText,
   userAccessToken,
+  initialMessage,
 }: VoiceChatElevenLabsProps) {
   // @elevenlabs/react 1.12 scopes callback registration and conversation state
   // to this provider. Calling useConversation without it crashes as soon as
@@ -129,6 +132,7 @@ export function VoiceChatElevenLabs({
         agentId={agentId}
         onFallbackToText={onFallbackToText}
         userAccessToken={userAccessToken}
+        initialMessage={initialMessage}
       />
     </ConversationProvider>
   );
@@ -139,6 +143,7 @@ function VoiceChatElevenLabsContent({
   agentId,
   onFallbackToText,
   userAccessToken,
+  initialMessage,
 }: VoiceChatElevenLabsProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -294,6 +299,10 @@ function VoiceChatElevenLabsContent({
 
           // Auth token for MCP tools (conditional)
           ...(userAccessToken ? { user_access_token: userAccessToken } : {}),
+
+          // FE-H4: prompt-chip question carried into voice mode so the agent's
+          // first turn addresses it instead of silently discarding it.
+          ...(initialMessage ? { opening_question: initialMessage } : {}),
         },
         overrides: {
           agent: {
@@ -343,7 +352,21 @@ function VoiceChatElevenLabsContent({
           className="mx-4 mt-4 flex items-center gap-2 rounded-lg bg-red-500/20 p-3 text-sm text-red-200"
         >
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <p>{t("voice.no_permission")}</p>
+          <div className="flex-1">
+            <p>{t("voice.no_permission")}</p>
+            {/* UX-H7: denied mic is recoverable — explain the browser control
+                and let the user retry instead of dead-ending. */}
+            <p className="mt-1 text-xs text-red-200/80">
+              {t("voice.no_permission_retry")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={startConversation}
+            className="shrink-0 text-xs font-medium text-red-100 underline hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            {t("chat.retry")}
+          </button>
         </div>
       )}
 
@@ -364,11 +387,12 @@ function VoiceChatElevenLabsContent({
         {!isConnected ? (
           <button
             onClick={startConversation}
-            disabled={hasPermission === false || isConnecting}
+            disabled={isConnecting}
             aria-label={t("voice.talk_to_me")}
             className={cn(
-              "mb-6 transition-transform hover:scale-105 active:scale-95",
-              (hasPermission === false || isConnecting) && "cursor-not-allowed opacity-50"
+              "mb-6 rounded-full transition-transform hover:scale-105 active:scale-95",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950",
+              isConnecting && "cursor-not-allowed opacity-50"
             )}
           >
             <VoiceOrb
@@ -387,8 +411,10 @@ function VoiceChatElevenLabsContent({
           </div>
         )}
 
-        {/* Status Text */}
-        <p className="mb-6 text-sm text-white/60">{getStatusText()}</p>
+        {/* Status Text — UX-H7: announced to assistive tech as connection state changes */}
+        <p role="status" aria-live="polite" className="mb-6 text-sm text-white/60">
+          {getStatusText()}
+        </p>
 
         {/* Controls when connected */}
         {isConnected && (
@@ -399,6 +425,7 @@ function VoiceChatElevenLabsContent({
               aria-label={isMuted ? t("voice.unmute") : t("voice.mute")}
               className={cn(
                 "flex h-11 w-11 items-center justify-center rounded-full transition-all",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950",
                 isMuted
                   ? "bg-red-500/50 text-white hover:bg-red-500/60"
                   : "bg-white/10 text-white hover:bg-white/20"
@@ -415,7 +442,7 @@ function VoiceChatElevenLabsContent({
             <button
               onClick={endConversation}
               aria-label={t("voice.stop")}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             >
               <X className="h-5 w-5" />
             </button>

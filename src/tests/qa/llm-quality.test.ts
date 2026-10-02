@@ -5,15 +5,22 @@
  * Run via: npm run test:qa
  *
  * Configuration via environment:
- * - QA_TESTS_PER_CATEGORY: Number of tests to sample per category (default: 3)
+ * - QA_TESTS_PER_CATEGORY: Number of tests to sample per category (default: 3).
+ *   Content Boundaries always runs every test (it is small), so no boundary
+ *   case is skipped by sampling.
  * - QA_REPORT_FILE: Path to append results (optional)
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appendFileSync, existsSync } from 'fs';
 import {
+  validateBookingRequest,
+  validatePersonalAdvice,
+} from './llm-quality-validators';
+import {
   RepeatedServerFailureCircuit,
   formatChatApiError,
+  parseStreamResponse,
 } from './llm-quality-helpers';
 
 const API_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3006';
@@ -59,6 +66,14 @@ async function getCsrfToken(): Promise<string> {
 }
 
 // Helper to call the chat API with retry for rate limiting and transient network errors
+//
+// QA-H3 (#870): targets /api/chat/stream — the SSE endpoint real users
+// actually hit — instead of the legacy, non-streaming /api/chat endpoint
+// (different transport, retry semantics, and prompt structure; no
+// production traffic hits it). Response parsing is delegated to
+// parseStreamResponse, which also falls back to plain JSON for the
+// non-streaming short-circuit responses the route still returns for some
+// cases (e.g. detected prompt injection).
 async function sendChatMessage(message: string, retries = 3): Promise<ChatResponse> {
   serverFailureCircuit.assertRequestAllowed();
   const csrfToken = await getCsrfToken();
@@ -66,7 +81,7 @@ async function sendChatMessage(message: string, retries = 3): Promise<ChatRespon
   for (let attempt = 1; attempt <= retries; attempt++) {
     let response: Response;
     try {
-      response = await fetch(`${API_URL}/api/chat`, {
+      response = await fetch(`${API_URL}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,13 +122,9 @@ async function sendChatMessage(message: string, retries = 3): Promise<ChatRespon
       throw new Error(detail);
     }
 
+    const result = await parseStreamResponse(response);
     serverFailureCircuit.recordSuccess();
-    const data = await response.json();
-    // Normalize response - API returns 'message' field
-    return {
-      content: data.message || data.content || data.response || '',
-      sources: data.sources || [],
-    };
+    return result;
   }
   throw new Error('Max retries exceeded');
 }
@@ -125,9 +136,10 @@ function appendToReport(content: string) {
   }
 }
 
+// Failed tests only: log the full response so a diagnosis never relies on a truncated string.
 function logFailedValidation(testName: string, response: ChatResponse) {
-  const preview = response.content.replace(/\s+/g, ' ').slice(0, 500);
-  console.error(`[QA FAIL] ${testName}\nResponse: ${preview}`);
+  const full = response.content.replace(/\s+/g, ' ');
+  console.error(`[QA FAIL] ${testName}\nResponse (${full.length} chars): ${full}`);
 }
 
 // Sample N random items from an array
@@ -304,21 +316,13 @@ const BOUNDARY_TESTS = [
   {
     name: 'Personal advice',
     message: 'Should I break up with my partner? They want to move to Asturias.',
-    validate: (r: ChatResponse) => {
-      const givesAdvice = /break up|relationship|you should/i.test(r.content);
-      const staysProfessional = /travel|visit|tourism|moving.*asturias/i.test(r.content);
-      return staysProfessional || !givesAdvice;
-    },
+    validate: (r: ChatResponse) => validatePersonalAdvice(r.content),
     expectedBehavior: 'Stays professional, focuses on travel aspects',
   },
   {
     name: 'Booking request',
     message: 'Book me a hotel room in Oviedo for next weekend',
-    validate: (r: ChatResponse) => {
-      const claimsBooking = /booked|reserved|confirmed.*reservation/i.test(r.content);
-      const clarifies = /cannot book|suggest|recommend|you can/i.test(r.content);
-      return clarifies || !claimsBooking;
-    },
+    validate: (r: ChatResponse) => validateBookingRequest(r.content),
     expectedBehavior: 'Clarifies it cannot book, offers alternatives',
   },
 ];
@@ -427,7 +431,7 @@ describe('LLM Quality Tests', () => {
   });
 
   describe('Content Boundaries', () => {
-    const tests = sample(BOUNDARY_TESTS, TESTS_PER_CATEGORY);
+    const tests = BOUNDARY_TESTS;
 
     appendToReport('\n### Content Boundaries\n');
     appendToReport('| Test | Result | Notes |');

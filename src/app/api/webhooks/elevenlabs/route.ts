@@ -9,7 +9,9 @@ import {
   buildElevenLabsEventKey,
   getSMSMessage,
   verifySignature,
+  type TranscriptEntry,
 } from "@/lib/services/elevenlabs-webhook-service";
+import { getUnknownFields } from "@/lib/webhook-schema-utils";
 
 /**
  * POST /api/webhooks/elevenlabs
@@ -34,39 +36,97 @@ const SMS_JOB_LEASE_SECONDS = 15 * 60;
  * The analysis field has two possible nesting paths:
  *   1. Top-level: { analysis: { call_successful, transcript_summary } }
  *   2. Nested in data: { data: { analysis: { call_successful, transcript_summary } } }
+ *
+ * BE-H3 (#778): two variants of the same shape are built from these shared
+ * field definitions:
+ *   - `ElevenLabsWebhookSchema` (`.passthrough()`) is the ENFORCED schema —
+ *     safeParse'd, gated on (400 on failure), and its `.data` is the only
+ *     thing downstream code reads. Unknown/added fields pass through
+ *     instead of failing the parse, because this is a live, signature-
+ *     verified webhook — a provider adding or renaming a field must not
+ *     cause a real booking outcome to be silently rejected with no replay.
+ *   - `StrictElevenLabsWebhookSchema` (`.strict()`) is an OBSERVABILITY-ONLY
+ *     probe — never gates the request, only logs `[WEBHOOK_UNKNOWN_SHAPE]`
+ *     on unrecognized fields. Mirrors the pattern in
+ *     src/app/api/webhooks/translate/route.ts (StrictTranslateWebhookSchema).
  */
-const TranscriptEntrySchema = z
-  .object({
-    role: z.enum(["user", "agent"]),
-    message: z.string().optional(),
-    time_in_call_secs: z.number().optional(),
-  })
-  .strict();
+// Field types are intentionally loose (nullable, `role` untyped) because
+// none of them are actually read by name except `message`/`call_successful`/
+// `transcript_summary` — see analyzeOutcome() / extractTranscriptText() /
+// isCallSuccessful(), all of which already tolerate arbitrary or missing
+// values. Tightening these to an aspirational shape (e.g. `role` limited to
+// "user" | "agent") would risk a hard 400 on a real event the moment
+// ElevenLabs adds a role value or omits a field we don't otherwise need.
+const TranscriptEntryShape = z.object({
+  role: z.string().optional(),
+  message: z.string().nullable().optional(),
+  time_in_call_secs: z.number().optional(),
+});
 
-const AnalysisSchema = z
-  .object({
-    call_successful: z.union([z.string(), z.boolean()]).optional(),
-    transcript_summary: z.string().optional(),
-  })
-  .strict();
+const AnalysisShape = z.object({
+  call_successful: z.union([z.string(), z.boolean()]).nullable().optional(),
+  transcript_summary: z.string().nullable().optional(),
+});
 
-const ElevenLabsWebhookSchema = z
-  .object({
+// `.strict()`/`.passthrough()` are applied at every nesting level (entry,
+// analysis, data, top) so a field added anywhere in the tree can't
+// hard-reject a real event — only the enforced ("passthrough") variant is
+// gated on; the "strict" variant is the observability-only probe.
+function buildElevenLabsWebhookSchema(mode: "strict" | "passthrough") {
+  const transcriptEntry =
+    mode === "strict" ? TranscriptEntryShape.strict() : TranscriptEntryShape.passthrough();
+  const analysisSchema =
+    mode === "strict" ? AnalysisShape.strict() : AnalysisShape.passthrough();
+  // BE-H2: dynamic_variables carries whatever we sent when placing the call
+  // (customer_name, party_size, ..., and our own `booking_id` correlation
+  // key) — always passthrough() regardless of mode, since we only care
+  // about reading `booking_id` back out and don't want to reject/warn on
+  // the other echoed variables.
+  const conversationInitiationClientDataSchema = z
+    .object({
+      dynamic_variables: z.record(z.string(), z.unknown()).optional(),
+    })
+    .passthrough();
+
+  const dataShape = z.object({
+    conversation_id: z.string().optional(),
+    transcript: z.union([z.array(transcriptEntry), z.string()]).optional(),
+    analysis: analysisSchema.optional(),
+    conversation_initiation_client_data: conversationInitiationClientDataSchema.optional(),
+  });
+
+  const topShape = z.object({
     conversation_id: z.string().optional(),
     event_type: z.string().optional(),
     type: z.string().optional(),
-    transcript: z.union([z.array(TranscriptEntrySchema), z.string()]).optional(),
-    analysis: AnalysisSchema.optional(),
-    data: z
-      .object({
-        conversation_id: z.string().optional(),
-        transcript: z.union([z.array(TranscriptEntrySchema), z.string()]).optional(),
-        analysis: AnalysisSchema.optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
+    transcript: z.union([z.array(transcriptEntry), z.string()]).optional(),
+    analysis: analysisSchema.optional(),
+    conversation_initiation_client_data: conversationInitiationClientDataSchema.optional(),
+    data: (mode === "strict" ? dataShape.strict() : dataShape.passthrough()).optional(),
+  });
+
+  return mode === "strict" ? topShape.strict() : topShape.passthrough();
+}
+
+const ElevenLabsWebhookSchema = buildElevenLabsWebhookSchema("passthrough");
+const StrictElevenLabsWebhookSchema = buildElevenLabsWebhookSchema("strict");
+
+/**
+ * BE-H2: Extract the `booking_id` correlation key we sent as an extra
+ * dynamic variable when placing the call (see elevenlabs-call-service.ts).
+ * Checks both the top-level and data-wrapped payload shapes, matching the
+ * pattern already used for conversation_id/transcript/analysis above.
+ */
+function extractBookingIdHint(body: {
+  conversation_initiation_client_data?: { dynamic_variables?: Record<string, unknown> };
+  data?: { conversation_initiation_client_data?: { dynamic_variables?: Record<string, unknown> } };
+}): string | null {
+  const dynamicVars =
+    body.conversation_initiation_client_data?.dynamic_variables ??
+    body.data?.conversation_initiation_client_data?.dynamic_variables;
+  const bookingId = dynamicVars?.booking_id;
+  return typeof bookingId === "string" && bookingId.trim() ? bookingId : null;
+}
 
 interface ClaimedSMSJob {
   booking_id: string;
@@ -106,27 +166,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Parse payload
     const body = JSON.parse(rawBody);
 
-    // Zod schema validation — warn on unexpected/missing fields
+    // BE-H3 (#778): enforce the passthrough schema and consume `.data`
+    // exclusively below — this used to safeParse, warn on failure, and then
+    // read the raw unvalidated `body` regardless of the parse outcome.
     const parseResult = ElevenLabsWebhookSchema.safeParse(body);
     if (!parseResult.success) {
-      const unknownFields = parseResult.error.issues.flatMap((i) =>
-        "keys" in i && Array.isArray(i.keys)
-          ? (i.keys as string[])
-          : i.path.length > 0
-          ? [i.path.join(".")]
-          : []
+      logger.error("[ELEVENLABS_WEBHOOK_INVALID_PAYLOAD]", {
+        field_errors: parseResult.error.flatten().fieldErrors,
+      });
+      return NextResponse.json(
+        { error: "Bad request: invalid payload" },
+        { status: 400 }
       );
-      logger.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "elevenlabs", fields: unknownFields });
+    }
+
+    const payload = parseResult.data;
+
+    // Observability-only: never gates the request, just logs shape drift.
+    const shapeResult = StrictElevenLabsWebhookSchema.safeParse(body);
+    if (!shapeResult.success) {
+      logger.warn("[WEBHOOK_UNKNOWN_SHAPE]", {
+        webhook: "elevenlabs",
+        fields: getUnknownFields(shapeResult.error),
+      });
     }
 
     // ElevenLabs sends different event types - only handle post_call_transcription
-    const eventType = body.event_type || body.type;
+    const eventType = payload.event_type || payload.type;
     if (eventType && eventType !== "post_call_transcription") {
       return NextResponse.json({ success: true, ignored: true });
     }
 
     // Extract conversation_id from webhook payload
-    const conversationId = body.conversation_id || body.data?.conversation_id;
+    const conversationId = payload.conversation_id || payload.data?.conversation_id;
 
     if (!conversationId) {
       logger.error("[ELEVENLABS_WEBHOOK_CONVERSATION_ID_MISSING]");
@@ -140,7 +212,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const supabase = createAdminClient();
 
     // maybeSingle() returns {data: null, error: null} when no row is found
-    const { data: booking, error: fetchError } = await supabase
+    let { data: booking, error: fetchError } = await supabase
       .from("pending_bookings")
       .select("*")
       .eq("conversation_id", conversationId)
@@ -157,6 +229,70 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       logger.warn("[ELEVENLABS_WEBHOOK_BOOKING_NOT_FOUND]", {
         conversation_id: conversationId,
       });
+
+      // BE-H2: A call that timed out on our side before ElevenLabs responded
+      // never got a conversation_id persisted, so it's invisible to the
+      // lookup above even though the call may have actually happened. We
+      // sent our own pending_bookings.id as a `booking_id` dynamic variable
+      // when placing the call (see initiateCall/elevenlabs-call-service.ts)
+      // specifically so it comes back here — matching on our own primary
+      // key makes this fallback unambiguous by construction (it cannot let
+      // one webhook event resolve two different bookings, so the unique
+      // index on conversation_id is unaffected).
+      const bookingIdHint = extractBookingIdHint(body);
+
+      if (bookingIdHint) {
+        const { data: fallbackBooking, error: fallbackFetchError } = await supabase
+          .from("pending_bookings")
+          .select("*")
+          .eq("id", bookingIdHint)
+          .maybeSingle();
+
+        if (fallbackFetchError) {
+          logger.error("[ELEVENLABS_WEBHOOK_ORPHAN_LOOKUP_FAILED]", {
+            booking_id: bookingIdHint,
+            conversation_id: conversationId,
+            error: fallbackFetchError,
+          });
+        }
+
+        // Only reconcile rows that are actually still reconcilable: no
+        // conversation_id linked yet, and in a state that means "we don't
+        // know the outcome" ('initiating' or 'orphaned'). This guards
+        // against a stale/replayed booking_id resolving an already-settled
+        // or already-linked row.
+        const isReconcilable =
+          fallbackBooking &&
+          fallbackBooking.conversation_id == null &&
+          ["initiating", "orphaned"].includes(fallbackBooking.status);
+
+        if (isReconcilable) {
+          logger.warn("[ELEVENLABS_WEBHOOK_ORPHAN_RECONCILED]", {
+            booking_id: bookingIdHint,
+            conversation_id: conversationId,
+          });
+          booking = fallbackBooking;
+
+          // Best-effort: link conversation_id now so any later duplicate
+          // webhook for this conversation matches directly. Non-fatal on
+          // failure — elevenlabs_webhook_events.event_key is the actual
+          // source of truth for dedup, not this column.
+          const { error: linkError } = await supabase
+            .from("pending_bookings")
+            .update({ conversation_id: conversationId })
+            .eq("id", bookingIdHint);
+          if (linkError) {
+            logger.warn("[ELEVENLABS_WEBHOOK_ORPHAN_LINK_FAILED]", {
+              booking_id: bookingIdHint,
+              conversation_id: conversationId,
+              error: linkError,
+            });
+          }
+        }
+      }
+    }
+
+    if (!booking) {
       // Return 200 to acknowledge receipt - this might be a call we didn't initiate
       return NextResponse.json({
         success: true,
@@ -167,9 +303,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Analyze call outcome
     // ElevenLabs may send transcript/analysis at top level or nested in data
+    // Cast: the enforced schema validates *shape* (analysis is an object;
+    // transcript is an array or string) without pinning call_successful /
+    // message to exact types, since analyzeOutcome/isCallSuccessful already
+    // accept and safely normalize arbitrary or null values for these
+    // fields (src/lib/elevenlabs-call-status.ts).
     const outcome = analyzeOutcome({
-      analysis: body.analysis ?? body.data?.analysis,
-      transcript: body.transcript ?? body.data?.transcript,
+      analysis: (payload.analysis ?? payload.data?.analysis) as
+        | { call_successful?: string | boolean; transcript_summary?: string }
+        | undefined,
+      transcript: (payload.transcript ?? payload.data?.transcript) as
+        | TranscriptEntry[]
+        | string
+        | undefined,
     });
 
     const eventKey = buildElevenLabsEventKey(conversationId);

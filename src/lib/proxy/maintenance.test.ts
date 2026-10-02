@@ -41,6 +41,23 @@ describe("shouldBypassMaintenanceMode", () => {
     expect(shouldBypassMaintenanceMode("/")).toBe(false);
     expect(shouldBypassMaintenanceMode("/favorites")).toBe(false);
   });
+
+  it("does NOT bypass /immersive (DO-H3: maintenance mode must gate the main app)", () => {
+    expect(shouldBypassMaintenanceMode("/immersive")).toBe(false);
+    expect(shouldBypassMaintenanceMode("/immersive?story=oviedo-catedral")).toBe(false);
+  });
+
+  it("bypasses the exact PostHog reverse-proxy path (PE-M6)", () => {
+    expect(shouldBypassMaintenanceMode("/a/static/array.js")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/a/e/")).toBe(true);
+  });
+
+  it("does NOT bypass unrelated routes starting with 'a' (PE-M6)", () => {
+    expect(shouldBypassMaintenanceMode("/about")).toBe(false);
+    expect(shouldBypassMaintenanceMode("/agenda")).toBe(false);
+    // /auth is a distinct, intentional bypass entry — unaffected by the /a narrowing
+    expect(shouldBypassMaintenanceMode("/auth/callback")).toBe(true);
+  });
 });
 
 describe("resetMaintenanceModeCache", () => {
@@ -234,7 +251,7 @@ describe("isMaintenanceModeEnabled", () => {
       nowSpy.mockRestore();
     });
 
-    it("does not cache when DB response is not ok", async () => {
+    it("does not cache when DB response is not ok and there is no prior last-known value", async () => {
       const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       mockFetch.mockResolvedValue({ ok: false, status: 500 });
       await isMaintenanceModeEnabled();
@@ -246,6 +263,68 @@ describe("isMaintenanceModeEnabled", () => {
       const result = await isMaintenanceModeEnabled();
       expect(result).toBe(true);
       expect(mockFetch).toHaveBeenCalledTimes(2);
+      consoleError.mockRestore();
+    });
+
+    it("DO-H3: falls back to the last-known TRUE value past TTL when the refresh fails (not ok)", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy.mockReturnValue(1_000_000);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ enabled: true }],
+      });
+      const primed = await isMaintenanceModeEnabled();
+      expect(primed).toBe(true);
+
+      // Advance past the 30s TTL, then make the refresh fail.
+      nowSpy.mockReturnValue(1_000_000 + 31_000);
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 503 });
+      const result = await isMaintenanceModeEnabled();
+
+      // Must serve the last-known value (true), NOT default to false.
+      expect(result).toBe(true);
+      nowSpy.mockRestore();
+      consoleError.mockRestore();
+    });
+
+    it("DO-H3: falls back to the last-known FALSE value past TTL when the refresh throws", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy.mockReturnValue(1_000_000);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ enabled: false }],
+      });
+      const primed = await isMaintenanceModeEnabled();
+      expect(primed).toBe(false);
+
+      // Advance past the 30s TTL, then make the refresh throw (e.g. connectivity outage).
+      nowSpy.mockReturnValue(1_000_000 + 31_000);
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+      const result = await isMaintenanceModeEnabled();
+
+      // Still false here, but via the last-known fallback, not an unconditional default.
+      expect(result).toBe(false);
+      nowSpy.mockRestore();
+      consoleError.mockRestore();
+    });
+
+    it("DO-H3: does not use a last-known value from a different Supabase project", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ enabled: true }],
+      });
+      await isMaintenanceModeEnabled();
+
+      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://different.supabase.co";
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+      const result = await isMaintenanceModeEnabled();
+
+      // No last-known value for this (different) project — must default to false, not leak
+      // the previous project's cached value.
+      expect(result).toBe(false);
       consoleError.mockRestore();
     });
   });

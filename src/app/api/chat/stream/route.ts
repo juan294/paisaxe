@@ -5,20 +5,42 @@ import { chatRequestSchema } from "@/lib/schemas";
 // Static here so they are resolved once at module load, not on every request.
 // This removes 100-300 ms of cold-start dynamic-import cost for rejected
 // requests (rate-limit, validation, injection) that never need the AI stack.
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, normalizeIpForRateLimit } from "@/lib/rate-limit";
 import { withRouteContext } from "@/lib/request-validation";
 import { getClientIp } from "@/lib/request-utils";
-import { detectInjectionAttempt, sanitizeInput } from "@/lib/chat-safety";
+import {
+  detectInjectionAttempt,
+  detectPromptLeakage,
+  sanitizeInput,
+} from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import {
   CHAT_STREAM_STAGE_TIMEOUTS_MS,
+  CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
   ChatStreamStageTimeoutError,
   isChatStreamStageTimeout,
   withChatStreamStageTiming,
 } from "@/lib/chat-stream-timeouts";
 import { encodeSseEvent } from "@/types/sse";
+
+// PE-H5 (#808): explicit ceiling, replacing Vercel's implicit default, kept
+// strictly above the worst-case internal budget (embedding 12s + search 5s +
+// featureFlag 2s + CHAT_STREAM_RESPONSE_TOTAL_CAP_MS 90s = 109s) so the
+// internal timeouts below — not this platform ceiling — always fire first.
+// Vercel's currently documented default (Fluid Compute, on by default) is
+// 300s for every plan tier, so 120s tightens that ceiling rather than
+// raising it. Assumes Fluid Compute is active for this project; reconfirm
+// against Settings > Functions > Function Max Duration if not.
+export const maxDuration = 120;
+
+function rateLimitedResponse(headers: Record<string, string>): Response {
+  return new Response(
+    JSON.stringify({ error: "Too many requests. Please try again later." }),
+    { status: 429, headers: { "Content-Type": "application/json", ...headers } }
+  );
+}
 
 function isAbortError(error: unknown): boolean {
   return (
@@ -55,22 +77,45 @@ async function handlePost(request: NextRequest) {
         reason: "no_vercel_forwarded_for",
       });
     }
-    const rateLimit = await checkRateLimit(
-      ip === "unknown" ? "untrusted" : ip,
-      ip === "unknown" ? UNTRUSTED_RATE_LIMIT : undefined
-    );
+    let rateLimit: Awaited<ReturnType<typeof checkRateLimit>>;
+    try {
+      // PE-M3 (#811): checkRateLimit's own catch only fires when the Upstash
+      // call REJECTS. A degraded-but-not-failing Upstash region instead just
+      // hangs, and this is the first I/O on the chat path — ahead of every
+      // other stage timeout — so an unbounded hang here is invisible in the
+      // stage-timing logs used to diagnose the pipeline. Bound it the same way
+      // as the other stages.
+      // BE-L5 (#798): normalize IPv6 to its /64 prefix before it becomes the
+      // bucket key — otherwise a residential /64 allocation gives one
+      // subscriber 2^64 distinct buckets (trivially rotated via IPv6 privacy
+      // extensions), making the limit effectively unenforceable. IPv4 and
+      // the "untrusted" sentinel pass through unchanged.
+      rateLimit = await withChatStreamStageTiming(
+        "rateLimit",
+        checkRateLimit(
+          ip === "unknown" ? "untrusted" : normalizeIpForRateLimit(ip),
+          ip === "unknown" ? UNTRUSTED_RATE_LIMIT : undefined
+        )
+      );
+    } catch (rateLimitErr) {
+      // Only the stage TIMEOUT is handled here — checkRateLimit() itself never
+      // rejects (it has its own internal try/catch, see rate-limit.ts), so any
+      // other rejection is a genuinely unexpected bug and should fall through
+      // to the outer catch's generic 500, not be silently swallowed here.
+      if (!isChatStreamStageTimeout(rateLimitErr)) {
+        throw rateLimitErr;
+      }
+      // Fail CLOSED on timeout — same direction as checkRateLimit's own
+      // production error path. Letting the request through here would turn a
+      // slow Upstash into a rate-limit bypass.
+      logger.warn("[CHAT_STREAM_RATE_LIMIT_TIMEOUT]", {
+        stage: rateLimitErr.stage,
+      });
+      return rateLimitedResponse({ "Retry-After": "60" });
+    }
 
     if (!rateLimit.allowed) {
-      return new Response(
-        JSON.stringify({ error: "Too many requests. Please try again later." }),
-        {
-          status: 429,
-          headers: {
-            "Content-Type": "application/json",
-            ...buildRateLimitHeaders(rateLimit, true),
-          },
-        }
-      );
+      return rateLimitedResponse(buildRateLimitHeaders(rateLimit, true));
     }
 
     // Input validation — single Zod parse path (BE-L3 #524).
@@ -144,9 +189,16 @@ async function handlePost(request: NextRequest) {
     let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
     let images: Awaited<ReturnType<typeof search>>["images"] = [];
     try {
+      // BE-M4 (#785): wire an AbortController into the embedding stage so a
+      // stage timeout actually cancels the in-flight Voyage call instead of
+      // leaving it running (and billing) after withChatStreamStageTiming has
+      // already rejected and moved on. Mirrors the AbortSignal threading
+      // already applied to the Anthropic generation stage below (AR-H2, #856).
+      const embeddingAbortController = new AbortController();
       const queryEmbedding = await withChatStreamStageTiming(
         "embedding",
-        generateEmbedding(cleanMessage)
+        generateEmbedding(cleanMessage, { signal: embeddingAbortController.signal }),
+        embeddingAbortController
       );
       ({ chunks, images } = await withChatStreamStageTiming(
         "search",
@@ -196,9 +248,15 @@ async function handlePost(request: NextRequest) {
     // hang the connection indefinitely. We reset an idle timer on every chunk
     // and abort the stream if no chunk arrives within the configured window.
     const IDLE_TIMEOUT_MS = CHAT_STREAM_STAGE_TIMEOUTS_MS.response;
-    let idleTimer: ReturnType<typeof setTimeout> | undefined;
-    let idleTimedOut = false;
 
+    // PE-H5 (#808): `responseTimeoutReason` is the single source of truth for
+    // which of the two generation timers fired, used both to build the
+    // thrown error below and to pick the log line in the catch block — so
+    // the two never have to be re-derived independently.
+    type ResponseTimeoutReason = "idle_window" | "total_duration_cap";
+    let responseTimeoutReason: ResponseTimeoutReason | undefined;
+
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
     const clearIdleTimer = () => {
       if (idleTimer !== undefined) {
         clearTimeout(idleTimer);
@@ -208,13 +266,36 @@ async function handlePost(request: NextRequest) {
     const resetIdleTimer = () => {
       clearIdleTimer();
       idleTimer = setTimeout(() => {
-        idleTimedOut = true;
+        responseTimeoutReason = "idle_window";
         streamAbortController.abort();
       }, IDLE_TIMEOUT_MS);
     };
 
+    // The idle timer above resets on every chunk, so a slow-but-alive
+    // trickle (a chunk arriving just under IDLE_TIMEOUT_MS, forever) can keep
+    // resetting it and never trip. This second timer is armed once, at
+    // generation start, and is never reset by chunk arrival — it bounds the
+    // TOTAL generation duration regardless of chunk cadence, keeping this
+    // route's internal budget below the `maxDuration` declared above.
+    const totalCapTimer = setTimeout(() => {
+      responseTimeoutReason = "total_duration_cap";
+      streamAbortController.abort();
+    }, CHAT_STREAM_RESPONSE_TOTAL_CAP_MS);
+
     const stream = new ReadableStream({
       async start(controller) {
+        // BE-H6/AR-H1 (#781, #855): this is the only chat route any real
+        // client calls, so the prompt-leakage output filter must run here.
+        // Detection runs on the FULL accumulated output BEFORE each chunk is
+        // flushed — never after. Once a chunk is enqueued it has already
+        // reached the client and been rendered (use-stream-chat.ts applies
+        // each "text" event to component state immediately), so checking
+        // after enqueue would only degrade to "truncate mid-delivery" with
+        // the leaked text already visible. Checking before enqueue keeps the
+        // original invariant: leaked content never reaches the rendered chat.
+        let accumulatedText = "";
+        let leakDetected = false;
+
         try {
           // Arm the idle timer before the first chunk so a stream that never
           // yields is still bounded.
@@ -233,19 +314,48 @@ async function handlePost(request: NextRequest) {
               break;
             }
 
-            // A chunk arrived — reset the idle window.
+            // A chunk arrived — reset the idle window (the total cap timer
+            // is untouched here by design).
             resetIdleTimer();
 
-            // Send text chunk as SSE event
+            accumulatedText += chunk;
+            if (detectPromptLeakage(accumulatedText)) {
+              leakDetected = true;
+              logger.error("[CHAT_STREAM_SECURITY]", {
+                timestamp: new Date().toISOString(),
+                outputPreview: accumulatedText.slice(0, 200),
+              });
+              break;
+            }
+
+            // Send text chunk as SSE event — only after it has passed the
+            // leak check above.
             controller.enqueue(encoder.encode(
               encodeSseEvent({ type: "text", content: chunk })
             ));
           }
 
           clearIdleTimer();
+          clearTimeout(totalCapTimer);
 
-          if (idleTimedOut) {
-            throw new ChatStreamStageTimeoutError("response", IDLE_TIMEOUT_MS);
+          if (leakDetected) {
+            streamAbortController.abort();
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({
+                type: "error",
+                message: "output_filtered",
+              })
+            ));
+            return;
+          }
+
+          if (responseTimeoutReason) {
+            throw new ChatStreamStageTimeoutError(
+              "response",
+              responseTimeoutReason === "idle_window"
+                ? IDLE_TIMEOUT_MS
+                : CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
+            );
           }
 
           // Send final event with images and sources
@@ -261,10 +371,22 @@ async function handlePost(request: NextRequest) {
           }
 
         } catch (error) {
-          if (idleTimedOut || isChatStreamStageTimeout(error)) {
-            logger.warn("[CHAT_STREAM_RESPONSE_TIMEOUT]", {
-              timeoutMs: IDLE_TIMEOUT_MS,
-            });
+          if (responseTimeoutReason || isChatStreamStageTimeout(error)) {
+            // Distinct log names per reason so platform kills (which never
+            // log anything) and each internal timeout stay distinguishable.
+            const reason = responseTimeoutReason ?? "idle_window";
+            logger.warn(
+              reason === "total_duration_cap"
+                ? "[CHAT_STREAM_RESPONSE_TOTAL_CAP]"
+                : "[CHAT_STREAM_RESPONSE_TIMEOUT]",
+              {
+                timeoutMs:
+                  reason === "total_duration_cap"
+                    ? CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
+                    : IDLE_TIMEOUT_MS,
+                reason,
+              }
+            );
             controller.enqueue(encoder.encode(
               encodeSseEvent({
                 type: "error",
@@ -288,6 +410,7 @@ async function handlePost(request: NextRequest) {
           }
         } finally {
           clearIdleTimer();
+          clearTimeout(totalCapTimer);
           request.signal.removeEventListener("abort", handleRequestAbort);
           try {
             controller.close();
@@ -298,6 +421,7 @@ async function handlePost(request: NextRequest) {
       },
       cancel() {
         clearIdleTimer();
+        clearTimeout(totalCapTimer);
         streamAbortController.abort();
         request.signal.removeEventListener("abort", handleRequestAbort);
       },

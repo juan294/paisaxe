@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BasicMarkdown } from "./basic-markdown";
+import * as ParseBlocksModule from "./parse-blocks";
 
 describe("BasicMarkdown", () => {
   it("renders blockquotes as <blockquote> elements", () => {
@@ -87,5 +88,68 @@ describe("BasicMarkdown", () => {
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText(/https:\/\/paisaxe\.es\/visit/)).toBeInTheDocument();
+  });
+
+  describe("FE-M1: parseBlocks memoization", () => {
+    it("does not re-parse content on re-render when `content` is unchanged", () => {
+      // Spying on the extracted parse-blocks module (rather than embedding a
+      // call counter in production code) — this works because BasicMarkdown
+      // calls `parseBlocks` via a cross-module import binding, which
+      // vi.spyOn can intercept.
+      const parseBlocksSpy = vi.spyOn(ParseBlocksModule, "parseBlocks");
+
+      const { rerender } = render(<BasicMarkdown content="Hello world" />);
+      expect(parseBlocksSpy).toHaveBeenCalledTimes(1);
+
+      // Re-render with an unrelated prop change but the SAME content string —
+      // without useMemo([content]), parseBlocks would run again here.
+      rerender(<BasicMarkdown content="Hello world" allowLinks />);
+      expect(parseBlocksSpy).toHaveBeenCalledTimes(1);
+
+      parseBlocksSpy.mockRestore();
+    });
+
+    it("re-parses when `content` actually changes (e.g. a new streamed token)", () => {
+      const parseBlocksSpy = vi.spyOn(ParseBlocksModule, "parseBlocks");
+
+      const { rerender } = render(<BasicMarkdown content="Hello" />);
+      expect(parseBlocksSpy).toHaveBeenCalledTimes(1);
+
+      rerender(<BasicMarkdown content="Hello world" />);
+      expect(parseBlocksSpy).toHaveBeenCalledTimes(2);
+
+      parseBlocksSpy.mockRestore();
+    });
+  });
+
+  describe("FE-M1: block keys are content-derived, not index-based", () => {
+    it("keeps a frozen block's DOM node stable when a new block boundary appears mid-stream", () => {
+      // Simulates streaming: first render has a single paragraph; the next
+      // token completes a heading marker, splitting the accumulated text
+      // into two blocks. The paragraph's key must be derived from its own
+      // content, not from its (now-shifted) position, so React reuses the
+      // same <p> node instead of remounting it.
+      const { container, rerender } = render(
+        <BasicMarkdown content={"Intro paragraph"} />
+      );
+      const firstP = container.querySelector("p");
+      expect(firstP).not.toBeNull();
+      firstP!.setAttribute("data-marker", "kept");
+
+      rerender(<BasicMarkdown content={"Intro paragraph\n\n# New Heading"} />);
+
+      const pAfter = container.querySelector("p");
+      expect(pAfter?.getAttribute("data-marker")).toBe("kept");
+      expect(container.querySelector("h1")?.textContent).toBe("New Heading");
+    });
+
+    it("renders duplicate-content blocks without a duplicate-key warning", () => {
+      const { container } = render(
+        <BasicMarkdown content={"Yes.\n\nYes.\n\nYes."} />
+      );
+      const paragraphs = container.querySelectorAll("p");
+      expect(paragraphs).toHaveLength(3);
+      paragraphs.forEach((p) => expect(p.textContent).toBe("Yes."));
+    });
   });
 });

@@ -321,6 +321,8 @@ describe("translate-story", () => {
 
       expect(callAnthropicAPI).toHaveBeenCalled();
       expect(vi.mocked(callAnthropicAPI).mock.calls[0][2]).toBe(CHAT_MODEL);
+      // Usage lands in anthropic_usage under its own label, not "chat".
+      expect(vi.mocked(callAnthropicAPI).mock.calls[0][4]).toEqual({ source: "translate" });
       expect(result.success).toBe(true);
       expect(result.results?.en?.success).toBe(true);
     });

@@ -136,7 +136,8 @@ describe("/api/mcp/weather", () => {
 
       expect(response.status).toBe(404);
       const data = await response.json();
-      expect(data.error).toBe("City not found");
+      expect(data.error).not.toBe("City not found");
+      expect(data.code).toBe("WEATHER_CITY_NOT_FOUND");
     });
 
     it("should default to Spanish units (metric)", async () => {
@@ -345,7 +346,8 @@ describe("/api/mcp/weather", () => {
 
       expect(response.status).toBe(404);
       const data = await response.json();
-      expect(data.error).toBe("City not found");
+      expect(data.error).not.toBe("City not found");
+      expect(data.code).toBe("WEATHER_CITY_NOT_FOUND");
     });
 
     it("should handle general API errors", async () => {
@@ -362,9 +364,12 @@ describe("/api/mcp/weather", () => {
 
       const response = await POST(request);
 
+      // BE-M8 (#789): the upstream status/vendor detail must not be spoken
+      // back to the visitor verbatim.
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toContain("Weather API error: 500");
+      expect(data.error).not.toContain("Weather API error");
+      expect(data.code).toBe("WEATHER_LOOKUP_FAILED");
     });
 
     it("should handle fetch throwing", async () => {
@@ -380,7 +385,8 @@ describe("/api/mcp/weather", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toContain("Network error");
+      expect(data.error).not.toContain("Network error");
+      expect(data.code).toBe("WEATHER_LOOKUP_FAILED");
     });
 
     it("should return 429 when rate limited on POST", async () => {
@@ -406,6 +412,139 @@ describe("/api/mcp/weather", () => {
     });
   });
 
+  describe("BE-M1 (#782) - rate-limit key differentiation", () => {
+    it("keys the per-caller bucket on the conversationId when the request supplies one", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            name: "Oviedo",
+            main: { temp: 15, feels_like: 14, humidity: 70 },
+            weather: [{ description: "clear", icon: "01d" }],
+            wind: { speed: 1 },
+          }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo", conversationId: "conv-alpha" }),
+      });
+      await POST(request);
+
+      const keys = vi.mocked(checkRateLimit).mock.calls.map((call) => call[0]);
+      expect(keys.some((key) => key.includes("conv-alpha"))).toBe(true);
+    });
+
+    it("keys two different conversations into two different per-caller buckets even from the same IP", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            name: "Oviedo",
+            main: { temp: 15, feels_like: 14, humidity: 70 },
+            weather: [{ description: "clear", icon: "01d" }],
+            wind: { speed: 1 },
+          }),
+      });
+
+      const makeRequest = (conversationId: string) =>
+        new Request("http://localhost:3000/api/mcp/weather", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-mcp-secret": MCP_SECRET,
+            "x-vercel-forwarded-for": "1.2.3.4",
+          },
+          body: JSON.stringify({ city: "Oviedo", conversationId }),
+        });
+
+      await POST(makeRequest("conv-a"));
+      await POST(makeRequest("conv-b"));
+
+      const keys = vi.mocked(checkRateLimit).mock.calls.map((call) => call[0]);
+      const convAKeys = keys.filter((key) => key.includes("conv-a") && !key.includes("conv-b"));
+      const convBKeys = keys.filter((key) => key.includes("conv-b"));
+      expect(convAKeys.length).toBeGreaterThan(0);
+      expect(convBKeys.length).toBeGreaterThan(0);
+      expect(convAKeys).not.toEqual(convBKeys);
+    });
+
+    it("falls back to the IP-keyed bucket when no conversationId is supplied", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            name: "Oviedo",
+            main: { temp: 15, feels_like: 14, humidity: 70 },
+            weather: [{ description: "clear", icon: "01d" }],
+            wind: { speed: 1 },
+          }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "x-vercel-forwarded-for": "9.9.9.9",
+        },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+      await POST(request);
+
+      const keys = vi.mocked(checkRateLimit).mock.calls.map((call) => call[0]);
+      expect(keys.some((key) => key.includes("9.9.9.9"))).toBe(true);
+    });
+
+    it("checks a separate global cost-cap bucket independent of the per-caller key", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            name: "Oviedo",
+            main: { temp: 15, feels_like: 14, humidity: 70 },
+            weather: [{ description: "clear", icon: "01d" }],
+            wind: { speed: 1 },
+          }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo", conversationId: "conv-global-check" }),
+      });
+      await POST(request);
+
+      const keys = vi.mocked(checkRateLimit).mock.calls.map((call) => call[0]);
+      expect(keys.some((key) => key.includes("global"))).toBe(true);
+      const globalKey = keys.find((key) => key.includes("global"));
+      expect(globalKey).not.toContain("conv-global-check");
+    });
+
+    it("returns 429 when only the global bucket is exhausted, even with a fresh conversationId", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 12,
+        limit: 180,
+        resetAt: Date.now() + 12000,
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo", conversationId: "conv-brand-new" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(429);
+      const data = await response.json();
+      expect(data.error).toBe("Too many requests");
+      expect(response.headers.get("Retry-After")).toBe("12");
+    });
+  });
+
   describe("GET - additional coverage", () => {
     it("should handle general Weather API errors", async () => {
       mockFetch.mockResolvedValueOnce({
@@ -421,7 +560,8 @@ describe("/api/mcp/weather", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toBe("Weather API error: 500");
+      expect(data.error).not.toContain("Weather API error");
+      expect(data.code).toBe("WEATHER_LOOKUP_FAILED");
     });
 
     it("should return 429 when rate limited on GET", async () => {
@@ -513,7 +653,7 @@ describe("/api/mcp/weather", () => {
   });
 
   describe("GET - non-Error throw coverage", () => {
-    it("should return 'Unknown error' when GET catch receives a non-Error object", async () => {
+    it("should return the safe generic message when GET catch receives a non-Error object", async () => {
       mockFetch.mockRejectedValueOnce("string error");
 
       const request = new Request(
@@ -524,12 +664,12 @@ describe("/api/mcp/weather", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toBe("Unknown error");
+      expect(data.code).toBe("WEATHER_LOOKUP_FAILED");
     });
   });
 
   describe("POST - non-Error throw coverage", () => {
-    it("should return 'Unknown error' when POST catch receives a non-Error object", async () => {
+    it("should return the safe generic message when POST catch receives a non-Error object", async () => {
       mockFetch.mockRejectedValueOnce(null);
 
       const request = new Request("http://localhost:3000/api/mcp/weather", {
@@ -542,7 +682,45 @@ describe("/api/mcp/weather", () => {
 
       expect(response.status).toBe(500);
       const data = await response.json();
-      expect(data.error).toBe("Unknown error");
+      expect(data.code).toBe("WEATHER_LOOKUP_FAILED");
+    });
+  });
+
+  describe("BE-M8 (#789) - safe error messages", () => {
+    const INTERNAL_DETAIL = "connect ECONNREFUSED internal-weather-cache.paisaxe.internal:6379";
+
+    it("does not leak internal error detail in production mode (GET)", async () => {
+      mockFetch.mockRejectedValueOnce(new Error(INTERNAL_DETAIL));
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(JSON.stringify(data)).not.toContain("internal-weather-cache");
+      expect(data.code).toBe("WEATHER_LOOKUP_FAILED");
+      expect(data.debug).toBeUndefined();
+    });
+
+    it("reveals internal error detail only in development mode (POST)", async () => {
+      vi.stubEnv("NODE_ENV", "development");
+      mockFetch.mockRejectedValueOnce(new Error(INTERNAL_DETAIL));
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.code).toBe("WEATHER_LOOKUP_FAILED");
+      expect(data.debug?.message).toContain("internal-weather-cache");
+      expect(data.error).not.toContain("internal-weather-cache");
     });
   });
 

@@ -1,4 +1,13 @@
-import { logger } from "@/lib/logger";
+import "server-only";
+import { ELEVENLABS_BOOKING_AGENT_ID } from "@/config/elevenlabs-owned-agents";
+import {
+  ElevenLabsCredentialError,
+  getElevenLabsRuntimeCredential,
+} from "@/lib/elevenlabs-credentials";
+import {
+  classifyElevenLabsProviderStatus,
+  logElevenLabsFailure,
+} from "@/lib/elevenlabs-observability";
 import { formatDateNatural, formatTimeNatural } from "./booking-service";
 
 /**
@@ -17,6 +26,15 @@ export interface InitiateCallInput {
   date: string;
   time: string;
   special_requests?: string;
+  /**
+   * BE-H2: the pending_bookings row id, claimed BEFORE this call is placed.
+   * Sent as an extra dynamic variable (not referenced by the agent prompt,
+   * same pattern as customer_phone) purely so ElevenLabs echoes it back in
+   * the post_call_transcription webhook's conversation_initiation_client_data
+   * — an unambiguous fallback correlation key for calls whose fetch to
+   * ElevenLabs times out before we learn the conversation_id.
+   */
+  booking_id?: string;
 }
 
 export interface InitiateCallResult {
@@ -38,16 +56,54 @@ export async function initiateCall(
   phoneNumber: string,
   request: InitiateCallInput
 ): Promise<InitiateCallResult> {
-  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   const phoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID?.trim();
   // Use dedicated booking agent - NOT the tourism guide Pelayo
   const bookingAgentId = process.env.ELEVENLABS_BOOKING_AGENT_ID?.trim();
 
-  if (!apiKey || !phoneNumberId || !bookingAgentId) {
+  if (!process.env.ELEVENLABS_API_KEY?.trim() || !phoneNumberId || !bookingAgentId) {
     return {
       success: false,
       error:
         "ElevenLabs booking agent not configured. Set ELEVENLABS_BOOKING_AGENT_ID in environment.",
+    };
+  }
+
+  let apiKey: string;
+  let fingerprint: string;
+  let fingerprintMatches: boolean;
+  try {
+    ({ apiKey, fingerprint, fingerprintMatches } =
+      getElevenLabsRuntimeCredential());
+  } catch (error) {
+    const credentialError =
+      error instanceof ElevenLabsCredentialError ? error : undefined;
+    logElevenLabsFailure({
+      source: "booking-call",
+      agentKey: "booking",
+      failureClass: credentialError?.code ?? "unknown",
+      fingerprint: credentialError?.fingerprint,
+      fingerprintMatches: credentialError?.fingerprintMatches ?? false,
+    });
+    return {
+      success: false,
+      error: "ElevenLabs runtime credential rejected",
+    };
+  }
+
+  if (
+    process.env.VERCEL_ENV &&
+    bookingAgentId !== ELEVENLABS_BOOKING_AGENT_ID
+  ) {
+    logElevenLabsFailure({
+      source: "booking-call",
+      agentKey: "booking",
+      failureClass: "agent_identity_mismatch",
+      fingerprint,
+      fingerprintMatches,
+    });
+    return {
+      success: false,
+      error: "ElevenLabs booking agent identity mismatch",
     };
   }
 
@@ -69,6 +125,10 @@ export async function initiateCall(
           // Convert 24h time to natural Spanish: "21:00" → "nueve de la noche"
           time: formatTimeNatural(request.time),
           special_requests: request.special_requests || "ninguna",
+          // BE-H2: correlation key for webhook fallback reconciliation — omit
+          // entirely when absent rather than sending an empty string, so the
+          // webhook handler can tell "no hint" apart from "empty hint".
+          ...(request.booking_id ? { booking_id: request.booking_id } : {}),
         },
       },
     };
@@ -89,21 +149,22 @@ export async function initiateCall(
       }
     );
 
-    const data = await response.json();
-
     if (!response.ok) {
-      logger.error("[MAKE_BOOKING_ELEVENLABS_REQUEST_FAILED]", {
-        response_status: response.status,
-        error_body: data,
+      logElevenLabsFailure({
+        source: "booking-call",
+        agentKey: "booking",
+        failureClass: classifyElevenLabsProviderStatus(response.status),
+        providerStatus: response.status,
+        fingerprint,
+        fingerprintMatches,
       });
       return {
         success: false,
-        error:
-          data.detail?.message ||
-          data.message ||
-          `ElevenLabs API error: ${response.status}`,
+        error: `ElevenLabs API error: ${response.status}`,
       };
     }
+
+    const data = await response.json();
 
     return {
       success: true,
@@ -127,14 +188,19 @@ export async function initiateCall(
     const isTimeout =
       errorName === "AbortError" || errorName === "TimeoutError";
 
-    logger.error("[MAKE_BOOKING_CALL_INITIATION_FAILED]", {
-      error,
-      timed_out: isTimeout,
+    logElevenLabsFailure({
+      source: "booking-call",
+      agentKey: "booking",
+      failureClass: isTimeout ? "upstream_timeout" : "upstream_unavailable",
+      fingerprint,
+      fingerprintMatches,
     });
 
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: isTimeout
+        ? "ElevenLabs request timed out"
+        : "ElevenLabs request unavailable",
       ...(isTimeout ? { timedOut: true as const } : {}),
     };
   }

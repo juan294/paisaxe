@@ -6,11 +6,16 @@ import { getEnvironment } from "@/lib/environment";
 import { logger } from "@/lib/logger";
 
 /**
- * SE-H1: Scrub sensitive fields from specific flag configs before sending to clients.
+ * Scrub sensitive fields from specific flag configs before sending to clients.
  *
  * visitor_voice_agent may contain whitelisted_emails and agent_id in its config.
  * These must never reach the browser — authorization is performed server-side by
  * /api/voice-access.
+ *
+ * Defense in depth: the same masking is now also enforced at the DB layer by the
+ * feature_flags_public view (migration 101) that this route reads from, so a direct
+ * PostgREST call can no longer bypass it. This app-layer scrub stays as a second,
+ * independent layer — it's a no-op once the view has already stripped the keys.
  */
 const SENSITIVE_CONFIG_KEYS: Partial<Record<FeatureFlag["flagKey"], string[]>> = {
   visitor_voice_agent: ["whitelisted_emails", "agent_id"],
@@ -36,7 +41,7 @@ export async function GET() {
     return NextResponse.json({ data: [] }, {
       headers: {
         "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
-        // BE-M4: Vary: Host prevents CDN from serving wrong flags across deployments/subdomains.
+        // #491: Vary: Host prevents CDN from serving wrong flags across deployments/subdomains.
         "Vary": "Host",
       },
     });
@@ -45,10 +50,13 @@ export async function GET() {
   try {
     const environment = getEnvironment();
 
-    // PE-L2: select only the columns that rowToFeatureFlag + scrubSensitiveConfig actually
+    // #696: select only the columns that rowToFeatureFlag + scrubSensitiveConfig actually
     // consume, avoiding unnecessary wire transfer of any future wide columns.
+    //
+    // Reads through feature_flags_public, not the base table — see migration
+    // 101 and the SENSITIVE_CONFIG_KEYS comment above for why.
     const { data, error } = await supabase
-      .from("feature_flags")
+      .from("feature_flags_public")
       .select("id, flag_key, enabled, label, description, config, environment, created_at, updated_at")
       .eq("environment", environment)
       .order("flag_key", { ascending: true });
@@ -66,7 +74,7 @@ export async function GET() {
     return NextResponse.json({ data: flags }, {
       headers: {
         "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
-        // BE-M4: Vary: Host prevents CDN from serving wrong flags across deployments/subdomains.
+        // #491: Vary: Host prevents CDN from serving wrong flags across deployments/subdomains.
         "Vary": "Host",
       },
     });

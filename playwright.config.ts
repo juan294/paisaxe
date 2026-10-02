@@ -63,12 +63,18 @@ export default defineConfig({
     },
   },
 
+  // QA-M1: No config-level `storageState` seed here. The old file-based seed
+  // (e2e/storage-state.json) wrote a localStorage key, but NavigationHint
+  // reads/writes sessionStorage (see src/components/immersive/navigation-hint.tsx),
+  // which Playwright's storageState mechanism cannot restore at all — the seed
+  // had been inert since that change, and was also hardcoded to localhost:3100
+  // (mismatching the port-3101 stripe-e2e server). Suppression now happens via
+  // an origin-agnostic `addInitScript` in e2e/fixtures/base-test.ts.
   use: {
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: isCI ? "off" : "retain-on-failure",
-    storageState: "e2e/storage-state.json",
   },
 
   projects: [
@@ -79,6 +85,7 @@ export default defineConfig({
         "**/qa-journey.spec.ts",
         "**/visual-regression.spec.ts",
         "**/stripe-real-checkout.spec.ts",
+        "**/favorites-real.spec.ts",
         ...releaseSpecs,
       ],
     },
@@ -89,6 +96,7 @@ export default defineConfig({
         "**/qa-journey.spec.ts",
         "**/visual-regression.spec.ts",
         "**/stripe-real-checkout.spec.ts",
+        "**/favorites-real.spec.ts",
         ...releaseSpecs,
       ],
     },
@@ -97,6 +105,12 @@ export default defineConfig({
       use: desktopChrome,
       testMatch: "qa-journey.spec.ts",
       timeout: 30_000,
+      // Local runs auto-detect worker count (undefined) and can hit 6+
+      // workers against one shared dev server, causing teardown timeouts
+      // that look like failures but are resource contention (QA 2026-09-24).
+      // CI already caps workers at 2 (see `isCI` above) so only local runs
+      // need the cap here.
+      workers: isCI ? undefined : 3,
     },
     {
       name: "stripe-integration",
@@ -105,6 +119,23 @@ export default defineConfig({
       timeout: 120_000,
       // This is a release gate: a Playwright retry would turn a flaky payment
       // into a green check that does not satisfy the pre-launch contract.
+      retries: 0,
+    },
+    {
+      // FE-B2: the only project that exercises a client-side authenticated
+      // journey through the real UI (bookmark toggle) rather than an API
+      // bypass. Meaningless with the shared webServer's default dummy
+      // credentials — see e2e/favorites-real.spec.ts for the required
+      // invocation. Never selected by `npm run test:e2e`; local Docker /
+      // release-candidate verification only, matching FE-B2's regression
+      // guidance not to add stateful checks to routine CI.
+      name: "auth-integration",
+      use: { ...desktopChrome, locale: "en-US" },
+      testMatch: "favorites-real.spec.ts",
+      // Does two full navigations (initial load + reload) plus two
+      // API round trips against the sign-in fixture's cold-started server —
+      // matches release-required-local's budget, not the default 30s.
+      timeout: 60_000,
       retries: 0,
     },
     {

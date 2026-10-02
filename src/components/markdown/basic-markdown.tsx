@@ -1,13 +1,7 @@
 "use client";
 
-import type { ElementType, ReactNode } from "react";
-
-type Block =
-  | { type: "paragraph"; text: string }
-  | { type: "heading"; level: 1 | 2 | 3 | 4; text: string }
-  | { type: "blockquote"; text: string }
-  | { type: "unordered-list"; items: string[] }
-  | { type: "ordered-list"; items: string[] };
+import { useMemo, type ElementType, type ReactNode } from "react";
+import { parseBlocks, type Block } from "./parse-blocks";
 
 interface BasicMarkdownProps {
   content: string;
@@ -163,81 +157,9 @@ function parseInline(
   return nodes;
 }
 
-function parseBlocks(content: string): Block[] {
-  const blocks: Block[] = [];
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
-  let paragraph: string[] = [];
-  let list: Extract<Block, { type: "unordered-list" | "ordered-list" }> | null = null;
-
-  const flushParagraph = () => {
-    const text = paragraph.join(" ").trim();
-    if (text) blocks.push({ type: "paragraph", text });
-    paragraph = [];
-  };
-
-  const flushList = () => {
-    if (list && list.items.length > 0) blocks.push(list);
-    list = null;
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-
-    const heading = line.match(/^(#{1,4})\s+(.+)$/);
-    if (heading) {
-      flushParagraph();
-      flushList();
-      blocks.push({ type: "heading", level: heading[1].length as 1 | 2 | 3 | 4, text: heading[2] });
-      continue;
-    }
-
-    const blockquote = line.match(/^>\s+(.+)$/);
-    if (blockquote) {
-      flushParagraph();
-      flushList();
-      blocks.push({ type: "blockquote", text: blockquote[1] });
-      continue;
-    }
-
-    const unordered = line.match(/^[-*]\s+(.+)$/);
-    if (unordered) {
-      flushParagraph();
-      if (list?.type !== "unordered-list") {
-        flushList();
-        list = { type: "unordered-list", items: [] };
-      }
-      list.items.push(unordered[1]);
-      continue;
-    }
-
-    const ordered = line.match(/^\d+\.\s+(.+)$/);
-    if (ordered) {
-      flushParagraph();
-      if (list?.type !== "ordered-list") {
-        flushList();
-        list = { type: "ordered-list", items: [] };
-      }
-      list.items.push(ordered[1]);
-      continue;
-    }
-
-    flushList();
-    paragraph.push(line);
-  }
-
-  flushParagraph();
-  flushList();
-
-  return blocks;
-}
-
 function renderList(
   block: Extract<Block, { type: "unordered-list" | "ordered-list" }>,
+  blockKey: string,
   index: number,
   options: MarkdownOptions
 ) {
@@ -247,12 +169,45 @@ function renderList(
     : options.orderedListClassName;
 
   return (
-    <ListTag key={index} className={className}>
+    <ListTag key={blockKey} className={className}>
       {block.items.map((item, itemIndex) => (
         <li key={itemIndex}>{parseInline(item, `${index}-${itemIndex}`, options)}</li>
       ))}
     </ListTag>
   );
+}
+
+// FE-M1: derives a React key from a block's own content rather than its
+// array index. During streaming, `parseBlocks` re-tokenizes the whole
+// accumulated string on every token; a block that has already finished
+// growing keeps producing the same content (and therefore the same key)
+// regardless of how many more blocks appear after it. Index-based keys, by
+// contrast, only stay stable when block *count* never changes ahead of a
+// given position — any mid-stream boundary shift (e.g. a run of plain text
+// splitting into a paragraph + a list) shifts every following index and
+// forces React to remount those subtrees even though their content didn't
+// change.
+function blockIdentity(block: Block): string {
+  if (block.type === "unordered-list" || block.type === "ordered-list") {
+    return `${block.type}:${block.items.join(" ")}`;
+  }
+  if (block.type === "heading") {
+    return `heading-${block.level}:${block.text}`;
+  }
+  return `${block.type}:${block.text}`;
+}
+
+// Two blocks can legitimately share identical content (e.g. the model
+// repeats a short line); disambiguate same-content blocks by occurrence
+// order so keys stay unique without falling back to raw array index.
+function computeBlockKeys(blocks: Block[]): string[] {
+  const seen = new Map<string, number>();
+  return blocks.map((block) => {
+    const identity = blockIdentity(block);
+    const occurrence = seen.get(identity) ?? 0;
+    seen.set(identity, occurrence + 1);
+    return occurrence === 0 ? identity : `${identity}#${occurrence}`;
+  });
 }
 
 export function BasicMarkdown({
@@ -263,7 +218,12 @@ export function BasicMarkdown({
   unorderedListClassName,
   orderedListClassName,
 }: BasicMarkdownProps) {
-  const blocks = parseBlocks(content);
+  // FE-M1: `parseBlocks` re-tokenizes the whole accumulated message string
+  // (O(n) per call, O(n^2) over a streamed response's lifetime) — memoize on
+  // `content` so a render triggered by an unrelated prop/parent update
+  // doesn't re-parse text that hasn't changed.
+  const blocks = useMemo(() => parseBlocks(content), [content]);
+  const blockKeys = useMemo(() => computeBlockKeys(blocks), [blocks]);
   const options = {
     allowLinks,
     orderedListClassName,
@@ -274,14 +234,16 @@ export function BasicMarkdown({
   return (
     <>
       {blocks.map((block, index) => {
+        const key = blockKeys[index];
+
         if (block.type !== "paragraph" && block.type !== "heading" && block.type !== "blockquote") {
-          return renderList(block, index, options);
+          return renderList(block, key, index, options);
         }
 
         if (block.type === "heading") {
           const HeadingTag = `h${block.level}` as ElementType;
           return (
-            <HeadingTag key={index}>
+            <HeadingTag key={key}>
               {parseInline(block.text, `${index}`, options)}
             </HeadingTag>
           );
@@ -289,14 +251,14 @@ export function BasicMarkdown({
 
         if (block.type === "blockquote") {
           return (
-            <blockquote key={index}>
+            <blockquote key={key}>
               {parseInline(block.text, `${index}`, options)}
             </blockquote>
           );
         }
 
         return (
-          <p key={index} className={paragraphClassName}>
+          <p key={key} className={paragraphClassName}>
             {parseInline(block.text, `${index}`, options)}
           </p>
         );

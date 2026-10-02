@@ -114,7 +114,7 @@ describe("PricingPage", () => {
     expect(screen.getByText("premium.pricing_title")).toBeInTheDocument();
     expect(screen.getByText("€1.99")).toBeInTheDocument();
     expect(screen.getByText("premium.faq_title")).toBeInTheDocument();
-    expect(screen.getByText("premium.feature_24h")).toBeInTheDocument();
+    expect(screen.getByText("premium.feature_duration")).toBeInTheDocument();
   });
 
   it("isolates search params behind a route shell when they suspend", () => {
@@ -230,7 +230,7 @@ describe("PricingPage", () => {
     });
     fireEvent.click(button);
 
-    expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing");
+    expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing?tier=day_pass");
   });
 
   it("preserves returnTo when starting sign-in from pricing", () => {
@@ -245,8 +245,63 @@ describe("PricingPage", () => {
     }));
 
     expect(mockSignInWithGoogle).toHaveBeenCalledWith(
-      "/pricing?returnTo=oviedo-walking-tour"
+      "/pricing?returnTo=oviedo-walking-tour&tier=day_pass"
     );
+  });
+
+  describe("UX-H4 (#890): selected tier survives the sign-in round trip", () => {
+    it("carries the selected (non-default) tier into the sign-in redirect URL", () => {
+      render(<PricingPage />);
+
+      // Select the monthly tier, then attempt to purchase while signed out.
+      fireEvent.click(screen.getByRole("radio", { name: /9\.99/ }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "premium.sign_in_to_purchase" })
+      );
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing?tier=monthly_pass"
+      );
+    });
+
+    it("re-selects the tier carried in the URL after the OAuth round trip", () => {
+      // Simulates landing back on /pricing?tier=monthly_pass after Google
+      // OAuth redirects the user back — the tier must not silently reset to
+      // the (cheaper) Day Pass default.
+      mockUseSearchParams.mockReturnValue(
+        new URLSearchParams([["tier", "monthly_pass"]])
+      );
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-123", email: "test@example.com" },
+        session: { access_token: "token" },
+        signInWithGoogle: mockSignInWithGoogle,
+        isLoading: false,
+      });
+
+      render(<PricingPage />);
+
+      const monthlyRadio = screen.getByRole("radio", { name: /9\.99/ });
+      expect(monthlyRadio).toHaveAttribute("aria-checked", "true");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "premium.pricing_cta" })
+      );
+
+      expect(mockPush).toHaveBeenCalledWith(
+        "/pricing/checkout?tier=monthly_pass"
+      );
+    });
+
+    it("ignores an invalid tier query param and falls back to the Day Pass", () => {
+      mockUseSearchParams.mockReturnValue(
+        new URLSearchParams([["tier", "not-a-real-tier"]])
+      );
+
+      render(<PricingPage />);
+
+      const dayPassRadio = screen.getByRole("radio", { name: /1\.99/ });
+      expect(dayPassRadio).toHaveAttribute("aria-checked", "true");
+    });
   });
 
   it("should show purchase button when user is authenticated", () => {
@@ -284,6 +339,43 @@ describe("PricingPage", () => {
     expect(screen.getByText(/premium.success_expires/)).toBeInTheDocument();
   });
 
+  // UX-M11 (#904): the expiry timestamp is the single most consequential
+  // piece of formatted data on this page (it's on a paid pass) and must
+  // render in the app's active locale, not the browser's.
+  it("formats the expiry date with the app's active locale, not the default browser locale", async () => {
+    vi.doMock("@/lib/i18n", () => ({
+      useTranslation: () => ({
+        t: (key: string) => key,
+        locale: "fr",
+      }),
+    }));
+    vi.resetModules();
+    const { default: FreshPricingPage } = await import("./page");
+
+    const toLocaleStringSpy = vi.spyOn(Date.prototype, "toLocaleString");
+
+    mockUseVoiceAccess.mockReturnValue({
+      hasAccess: true,
+      isWhitelisted: false,
+      canUseVoice: true,
+      needsSignIn: false,
+      needsPurchase: false,
+      expiresAt: new Date("2024-12-31T23:59:59Z"),
+      hoursUntilExpiry: 24,
+      agentId: "test-agent",
+      isLoading: false,
+      refresh: mockRefresh,
+    });
+
+    render(<FreshPricingPage />);
+
+    expect(toLocaleStringSpy).toHaveBeenCalledWith("fr-FR");
+
+    toLocaleStringSpy.mockRestore();
+    vi.doUnmock("@/lib/i18n");
+    vi.resetModules();
+  });
+
   it("should show Premium Access for whitelisted users", () => {
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: false,
@@ -313,7 +405,7 @@ describe("PricingPage", () => {
   it("should render features list", () => {
     render(<PricingPage />);
 
-    expect(screen.getByText("premium.feature_24h")).toBeInTheDocument();
+    expect(screen.getByText("premium.feature_duration")).toBeInTheDocument();
     expect(screen.getByText("premium.feature_booking")).toBeInTheDocument();
   });
 
@@ -487,6 +579,97 @@ describe("PricingPage", () => {
     });
   });
 
+  // UX-M12 (#905): the tier selector declared role="radio"/"radiogroup" but
+  // had no roving tabindex and no arrow-key handler — a screen reader user
+  // is told "radio group, 1 of 3" and then finds arrow keys inert.
+  describe("UX-M12 (#905): tier radiogroup keyboard behavior", () => {
+    it("gives only the selected tier a tab stop; the other two are not tab stops", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      expect(radios).toHaveLength(3);
+      // Day pass (index 0) is selected by default.
+      expect(radios[0]).toHaveAttribute("tabindex", "0");
+      expect(radios[1]).toHaveAttribute("tabindex", "-1");
+      expect(radios[2]).toHaveAttribute("tabindex", "-1");
+    });
+
+    it("ArrowRight moves selection to the next tier and moves the tab stop with it", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[0].focus();
+      fireEvent.keyDown(radios[0], { key: "ArrowRight" });
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[1]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[1]).toHaveAttribute("tabindex", "0");
+      expect(radiosAfter[0]).toHaveAttribute("tabindex", "-1");
+      expect(radiosAfter[1]).toHaveFocus();
+    });
+
+    it("ArrowLeft from the first tier wraps to the last tier", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[0].focus();
+      fireEvent.keyDown(radios[0], { key: "ArrowLeft" });
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[2]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[2]).toHaveFocus();
+    });
+
+    it("ArrowRight from the last tier wraps to the first tier", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[0].focus();
+      fireEvent.keyDown(radios[0], { key: "ArrowRight" }); // -> weekly
+      fireEvent.keyDown(screen.getAllByRole("radio")[1], { key: "ArrowRight" }); // -> monthly
+      fireEvent.keyDown(screen.getAllByRole("radio")[2], { key: "ArrowRight" }); // wraps -> day
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[0]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[0]).toHaveFocus();
+    });
+
+    it("Home moves selection and focus to the first tier", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[2].focus();
+      fireEvent.keyDown(radios[2], { key: "Home" });
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[0]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[0]).toHaveFocus();
+    });
+
+    it("End moves selection and focus to the last tier", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      radios[0].focus();
+      fireEvent.keyDown(radios[0], { key: "End" });
+
+      const radiosAfter = screen.getAllByRole("radio");
+      expect(radiosAfter[2]).toHaveAttribute("aria-checked", "true");
+      expect(radiosAfter[2]).toHaveFocus();
+    });
+
+    it("one further Tab from the selected tier still reaches the purchase CTA (regression risk noted in #905)", () => {
+      render(<PricingPage />);
+
+      const radios = screen.getAllByRole("radio");
+      // Only one radio is a tab stop (tabindex=0); the CTA button is the
+      // very next element in source order with a positive/default tabindex.
+      expect(radios[0]).toHaveAttribute("tabindex", "0");
+      const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
+      expect(button.getAttribute("tabindex")).not.toBe("-1");
+    });
+  });
+
   describe("UX-M4: responsive heading type scale", () => {
     it("should apply responsive text scale classes to the h1 heading", () => {
       render(<PricingPage />);
@@ -577,6 +760,56 @@ describe("PricingPage", () => {
       // opacity-50 alone is insufficient for WCAG AA; the button must use
       // the gray gradient instead of (or in addition to replacing) opacity-50
       expect(button.className).not.toContain("disabled:opacity-50");
+    });
+  });
+
+  describe("UX-B1 (#886): section label, feature bullet, and FAQ answer track the selected tier", () => {
+    it("renders the day-pass duration by default, then switches to the monthly duration when that tier is selected — never staying stuck on '24 horas'", async () => {
+      // Simulate real (non-identity) translations so the derived copy is
+      // exercised, not just the `t(key) => key` passthrough used elsewhere
+      // in this file.
+      vi.doMock("@/lib/i18n", () => ({
+        useTranslation: () => ({
+          t: (key: string) => {
+            const translations: Record<string, string> = {
+              "premium.tier_day": "24 horas",
+              "premium.tier_week": "7 días",
+              "premium.tier_month": "30 días",
+              "premium.voice_pass_label": "Pase de Voz · {duration}",
+              "premium.feature_duration": "{duration} de conversaciones ilimitadas",
+              "premium.faq_how_long_answer": "{duration} desde la compra. Perfecto para explorar.",
+            };
+            return translations[key] ?? key;
+          },
+        }),
+      }));
+      vi.resetModules();
+      const { default: FreshPricingPage } = await import("./page");
+
+      render(<FreshPricingPage />);
+
+      // Day pass is selected by default — copy describes 24 hours.
+      expect(screen.getByText("Pase de Voz · 24 horas")).toBeInTheDocument();
+      expect(screen.getByText("24 horas de conversaciones ilimitadas")).toBeInTheDocument();
+      expect(screen.getByText("24 horas desde la compra. Perfecto para explorar.")).toBeInTheDocument();
+
+      // Selecting the monthly tier (€9.99) must update all three surfaces —
+      // this is the exact material misdescription UX-B1 flags: a user
+      // buying the monthly pass must not keep reading "24 horas".
+      fireEvent.click(screen.getByRole("radio", { name: /9\.99/ }));
+
+      expect(screen.getByText("Pase de Voz · 30 días")).toBeInTheDocument();
+      expect(screen.getByText("30 días de conversaciones ilimitadas")).toBeInTheDocument();
+      expect(screen.getByText("30 días desde la compra. Perfecto para explorar.")).toBeInTheDocument();
+      // The label, feature bullet, and FAQ answer must no longer describe
+      // "24 horas" (the Day Pass's own tier pill legitimately still shows
+      // "24 horas" — that pill always describes itself, tier-independent).
+      expect(screen.queryByText("Pase de Voz · 24 horas")).not.toBeInTheDocument();
+      expect(screen.queryByText("24 horas de conversaciones ilimitadas")).not.toBeInTheDocument();
+      expect(screen.queryByText("24 horas desde la compra. Perfecto para explorar.")).not.toBeInTheDocument();
+
+      vi.doUnmock("@/lib/i18n");
+      vi.resetModules();
     });
   });
 

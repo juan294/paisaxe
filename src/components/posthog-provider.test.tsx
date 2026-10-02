@@ -1,6 +1,30 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { PostHogPageView, PostHogProviderWrapper } from "./posthog-provider";
+import {
+  PostHogPageView,
+  PostHogProviderWrapper,
+  usePaisaxePostHog,
+} from "./posthog-provider";
+
+// Renders the live PostHogContext value so tests can assert on it directly
+// instead of a DOM testid (FE-M5, #767): the posthog-js/react wrapper node
+// this file used to assert on was removed as dead code.
+function ContextProbe() {
+  const posthog = usePaisaxePostHog();
+  return (
+    <div data-testid="posthog-context-value">
+      {posthog ? "loaded" : "null"}
+    </div>
+  );
+}
+
+// Shared by every test that renders <ContextProbe /> and waits for PostHog
+// to finish loading into context.
+async function waitForPostHogLoaded() {
+  await vi.waitFor(() => {
+    expect(screen.getByTestId("posthog-context-value")).toHaveTextContent("loaded");
+  });
+}
 
 // Mock next/navigation
 const mockUsePathname = vi.fn();
@@ -12,7 +36,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock posthog-js — dynamic import, so we mock the module entirely.
-// PostHogProviderWrapper uses `import("posthog-js")` and `import("posthog-js/react")`.
+// PostHogProviderWrapper uses `import("posthog-js")`.
 // We mock at the module level so the dynamic import resolves our mock.
 const mockCapture = vi.fn();
 const mockInit = vi.fn();
@@ -28,15 +52,6 @@ const mockPosthog = {
 
 vi.mock("posthog-js", () => ({
   default: mockPosthog,
-}));
-
-vi.mock("posthog-js/react", () => ({
-  PostHogProvider: ({
-    children,
-  }: {
-    client: unknown;
-    children: React.ReactNode;
-  }) => <div data-testid="posthog-react-provider">{children}</div>,
 }));
 
 describe("PostHogProviderWrapper", () => {
@@ -347,19 +362,18 @@ describe("PostHog production initialization (non-localhost)", () => {
     expect(screen.getByTestId("app")).toBeInTheDocument();
   });
 
-  it("renders PostHogProvider wrapper after initialization", async () => {
+  it("provides the PostHog instance via context after initialization", async () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
 
     render(
       <PostHogProviderWrapper>
         <div data-testid="app">Content</div>
+        <ContextProbe />
       </PostHogProviderWrapper>
     );
 
-    // After PostHog loads, it should render through the posthog-js/react PostHogProvider
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
-    });
+    // After PostHog loads, usePaisaxePostHog() should return the instance.
+    await waitForPostHogLoaded();
 
     expect(screen.getByTestId("app")).toBeInTheDocument();
   });
@@ -378,15 +392,12 @@ describe("PostHog production initialization (non-localhost)", () => {
     render(
       <PostHogProviderWrapper>
         <ChildWithMountCounter />
+        <ContextProbe />
       </PostHogProviderWrapper>
     );
 
     // Wait for PostHog to fully initialise so the tree settles.
-    // The posthog-react-provider node appears (rendered as a sibling side-node,
-    // not as a wrapper around children).
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
-    });
+    await waitForPostHogLoaded();
 
     // Child must have been mounted exactly once — no remount from tree reshaping
     expect(mountCount).toBe(1);
@@ -400,13 +411,12 @@ describe("PostHog production initialization (non-localhost)", () => {
     render(
       <PostHogProviderWrapper>
         <div>Content</div>
+        <ContextProbe />
       </PostHogProviderWrapper>
     );
 
     // Wait for dynamic import to resolve
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
-    });
+    await waitForPostHogLoaded();
 
     // init should NOT be called because __loaded is true
     expect(mockInit).not.toHaveBeenCalled();
@@ -428,12 +438,11 @@ describe("PostHog production initialization (non-localhost)", () => {
     render(
       <PostHogProviderWrapper>
         <div>Content</div>
+        <ContextProbe />
       </PostHogProviderWrapper>
     );
 
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
-    });
+    await waitForPostHogLoaded();
 
     // Should NOT have called init on either mock — window.posthog was already __loaded
     expect(mockInit).not.toHaveBeenCalled();
@@ -545,13 +554,12 @@ describe("PostHogPageViewTracker with loaded PostHog", () => {
     render(
       <PostHogProviderWrapper>
         <PostHogPageView />
+        <ContextProbe />
       </PostHogProviderWrapper>
     );
 
     // Wait for PostHog to load
-    await vi.waitFor(() => {
-      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
-    });
+    await waitForPostHogLoaded();
 
     // capture should NOT be called with null pathname
     expect(mockCapture).not.toHaveBeenCalled();
