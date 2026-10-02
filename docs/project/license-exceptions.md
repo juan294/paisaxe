@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| Package | `@img/sharp-libvips-darwin-arm64@1.2.4` (and platform variants) |
+| Package | `@img/sharp-libvips-darwin-arm64@1.3.4` (and platform variants) |
 | License | LGPL-3.0-or-later |
 | Parent dependency | `sharp` (Apache-2.0) |
 | Added | 2026-03-07 |
@@ -154,7 +154,7 @@ Some dependencies are published under an "OR" dual license where one branch is p
 
 | Package | Declared license | Permissive branch elected | Parent dependency | Notes |
 |---------|------------------|---------------------------|-------------------|-------|
-| `dompurify@3.4.11` | `(MPL-2.0 OR Apache-2.0)` | Apache-2.0 | `posthog-js` | Used internally by PostHog analytics; no application code calls DOMPurify directly. |
+| `dompurify@3.4.16` | `(MPL-2.0 OR Apache-2.0)` | Apache-2.0 | `posthog-js` | Used internally by PostHog analytics; no application code calls DOMPurify directly. |
 | `expand-template@2.0.3` | `(MIT OR WTFPL)` | MIT | `canvas` → `prebuild-install` | Build-time only (native binary prebuild install); not shipped to clients. |
 
 Because a permissive branch is available and elected, no weak-copyleft review is required. Identified by the security agent license scan (2026-07-01).
