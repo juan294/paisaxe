@@ -69,8 +69,25 @@ OUTDATED_OUTPUT=$(npm outdated --json 2>/dev/null || true)
 FILTERED_OUTDATED_OUTPUT=$(printf '%s' "$OUTDATED_OUTPUT" | npx tsx scripts/lib/filter-npm-outdated.ts json 2>/dev/null || printf '%s' "$OUTDATED_OUTPUT")
 OUTDATED_COUNT=$(echo "$FILTERED_OUTDATED_OUTPUT" | jq 'keys | length' 2>/dev/null || echo "0")
 
-# Check for packages with security updates available
-SECURITY_UPDATES=$(echo "$AUDIT_OUTPUT" | jq -r '.vulnerabilities | to_entries | map(select(.value.fixAvailable == true)) | length' 2>/dev/null || echo "0")
+# Count what `npm audit fix` can really clear. The audit's own fixAvailable flag
+# stays true when an override pins the vulnerable version (2026-10-01: undici),
+# so dry-run the fix and subtract what would remain. npm prints a stray
+# "change ..." line before the JSON object, hence the sed.
+REMAINING_AFTER_FIX=""
+if (( TOTAL_VULNS > 0 )); then
+  FIX_DRY_RUN_JSON=$(npm audit fix --dry-run --json 2>/dev/null | sed -n '/^{/,$p' || true)
+  REMAINING_AFTER_FIX=$(echo "$FIX_DRY_RUN_JSON" | jq -r '.audit.metadata.vulnerabilities.total // empty' 2>/dev/null || true)
+else
+  REMAINING_AFTER_FIX=0
+fi
+if [[ "$REMAINING_AFTER_FIX" =~ ^[0-9]+$ ]]; then
+  SECURITY_UPDATES=$((TOTAL_VULNS - REMAINING_AFTER_FIX))
+  (( SECURITY_UPDATES < 0 )) && SECURITY_UPDATES=0
+  SECURITY_UPDATES_NOTE="$REMAINING_AFTER_FIX remaining after npm audit fix dry run"
+else
+  SECURITY_UPDATES="unknown"
+  SECURITY_UPDATES_NOTE="npm audit fix dry run did not return a result"
+fi
 
 # Check CI/CD security automation
 log_info "Checking CI/CD security automation..." | tee -a "$LOG_FILE"
@@ -105,7 +122,7 @@ fi
   echo "- Moderate: $MODERATE"
   echo "- Low: $LOW"
   echo "- Total: $TOTAL_VULNS"
-  echo "- Fixable via npm audit fix: $SECURITY_UPDATES"
+  echo "- Fixable via npm audit fix: $SECURITY_UPDATES ($SECURITY_UPDATES_NOTE)"
   echo ""
   echo "NPM AUDIT OUTPUT:"
   echo "$AUDIT_TEXT"
