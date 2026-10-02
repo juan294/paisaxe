@@ -113,15 +113,6 @@ jobs:
           fi
           node scripts/check-health-readiness.mjs "$PREVIEW_URL"
 
-      - name: Smoke test - ElevenLabs voice credential and agents
-        env:
-          RELEASE_TARGET_URL: ${{ steps.vercel-wait.outputs.url }}
-          HEALTH_PROBE_SECRET: ${{ secrets.HEALTH_PROBE_SECRET }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          RELEASE_CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha }}
-          RELEASE_GITHUB_DEPLOYMENT_ID: ${{ steps.vercel-wait.outputs.deployment_id }}
-        run: node scripts/release/check-elevenlabs-voice-preflight.mjs
-
       # ------------------------------------------------------------------ #
       # Homepage — must serve HTTP 200.                                     #
       # Catches build/runtime errors that would produce a 500 on Vercel     #

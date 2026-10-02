@@ -362,8 +362,9 @@ Runs the real Stripe test-mode checkout path on nightly schedule, manual dispatc
 
 On PRs targeting `main`, waits for the Vercel preview deployment, runs
 `scripts/check-health-readiness.mjs "$PREVIEW_URL"` (without
-`--require-sentry`), runs the authenticated five-agent ElevenLabs preflight,
-then checks the homepage. This is a **required status check** — `Smoke test
+`--require-sentry`), then checks the homepage. The authenticated five-agent
+ElevenLabs preflight is not part of this check; it runs post-deploy against
+production as a required probe (`docs/runbooks/release-checklist.md` step 5). This is a **required status check** — `Smoke test
 Vercel preview` must pass before any merge to `main`. It catches runtime
 failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js
 16.2.1 incident).

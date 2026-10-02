@@ -234,6 +234,25 @@ describe("verification coverage config", () => {
     expect(readText(".gitignore")).toContain(".vitest/");
   });
 
+  // 2026-10-02: Vercel Preview is not a place this project provisions secrets. The
+  // ElevenLabs preflight needs HEALTH_PROBE_SECRET on the target, so running it
+  // against a preview deployment made the required check unpassable. It is already a
+  // required deployed-readonly probe (quality/required-probes.yaml) run post-deploy
+  // against production (release checklist step 5), so the preview smoke keeps only
+  // the health-readiness and homepage checks.
+  it("keeps the required preview smoke free of the secret-dependent ElevenLabs preflight", () => {
+    const previewSmoke = readText(".github/workflows/preview-smoke.yml");
+    const probes = readText("quality/required-probes.yaml");
+
+    expect(previewSmoke).not.toContain("check-elevenlabs-voice-preflight");
+    expect(previewSmoke).not.toContain("HEALTH_PROBE_SECRET");
+    expect(previewSmoke).toContain("scripts/check-health-readiness.mjs");
+    expect(previewSmoke).toContain("Smoke test - homepage loads");
+    // The preflight must stay a required production probe, not disappear.
+    expect(probes).toContain("id: elevenlabs-voice-preflight");
+    expect(probes).toContain("npm run check-elevenlabs-voice");
+  });
+
   it("writes a report and shared-context entry when the QA wrapper aborts", () => {
     const qaAgent = readText("scripts/qa-agent.sh");
 
