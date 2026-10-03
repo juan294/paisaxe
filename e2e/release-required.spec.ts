@@ -1,6 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { requireReleaseTarget } from "../scripts/release/probe-guards";
-import { parseChatSmokeEvents, assertChatSmokeShape } from "../scripts/release/chat-smoke";
+import {
+  parseChatSmokeEvents,
+  assertChatSmokeShape,
+  chatRequestHeaders,
+} from "../scripts/release/chat-smoke";
 
 /**
  * Release-required probes — deployed environment, READ-ONLY.
@@ -113,15 +117,18 @@ test("@release-required webhook-unsigned: webhook rejects an unsigned payload", 
 test("@release-required chat-smoke: chat/RAG pipeline responds with retrieved sources", async ({
   request,
 }) => {
-  // BE-H1: a caller with no trusted Vercel IP header shares the tight
-  // "untrusted" bucket (3 req/60s, shared across every such caller). Setting
-  // our own x-vercel-forwarded-for value gives this probe its own bucket
-  // under the default per-IP limit (10 req/60s in src/lib/rate-limit.ts)
-  // instead of contending with, or exhausting, that shared bucket.
-  // 203.0.113.0/24 is reserved for documentation/testing (RFC 5737) and will
-  // never collide with a real visitor's IP.
+  // The app requires, on state-changing /api requests: a double-submit CSRF token
+  // (a page request makes it issue the `__csrf` cookie, kept in this request
+  // context's jar), the target's own Origin, and, per BE-H1, our own rate-limit
+  // bucket via x-vercel-forwarded-for. See chatRequestHeaders in chat-smoke.ts.
+  await request.get("/");
+  const { cookies } = await request.storageState();
+
   const response = await request.post("/api/chat/stream", {
-    headers: { "x-vercel-forwarded-for": "203.0.113.42" },
+    headers: chatRequestHeaders(
+      cookies,
+      requireReleaseTarget(process.env.RELEASE_TARGET_URL)
+    ),
     data: { message: "¿Qué se puede ver en los Lagos de Covadonga?" },
   });
 

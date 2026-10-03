@@ -20,6 +20,52 @@
  * not just that Claude answered from nothing.
  */
 
+const CSRF_COOKIE_NAME = "__csrf";
+const CSRF_HEADER_NAME = "x-csrf-token";
+
+/**
+ * Builds the double-submit CSRF header the deployed app requires on every
+ * state-changing /api request (src/lib/csrf.ts): the `__csrf` cookie, set on any
+ * page response, echoed in `x-csrf-token`. Without it /api/chat/stream answers
+ * 403 before any chat logic runs, so a probe that skips this step can never pass.
+ * Fails loudly when no token was issued rather than sending a doomed request.
+ */
+export function csrfHeadersFromCookies(
+  cookies: ReadonlyArray<{ name: string; value: string }>
+): Record<string, string> {
+  const token = cookies.find((cookie) => cookie.name === CSRF_COOKIE_NAME)?.value;
+  if (!token) {
+    throw new Error(
+      `chat-smoke: no ${CSRF_COOKIE_NAME} cookie was set by the page request, so a CSRF-valid chat request cannot be built`
+    );
+  }
+  return { [CSRF_HEADER_NAME]: token };
+}
+
+// BE-H1: a caller with no trusted Vercel IP header shares the tight "untrusted"
+// rate-limit bucket (3 req/60s, shared by every such caller). Supplying our own
+// x-vercel-forwarded-for gives this probe its own bucket under the default per-IP
+// limit. 203.0.113.0/24 is reserved for documentation (RFC 5737) and never
+// collides with a real visitor's IP.
+const PROBE_FORWARDED_FOR = "203.0.113.42";
+
+/**
+ * Every header the deployed app needs to accept the probe's POST to
+ * /api/chat/stream: the double-submit CSRF token, the target's own Origin (a
+ * state-changing /api request with no Origin gets 403 "Origin not allowed"), and
+ * the probe's rate-limit bucket. Throws on a non-URL target or a missing token.
+ */
+export function chatRequestHeaders(
+  cookies: ReadonlyArray<{ name: string; value: string }>,
+  targetUrl: string
+): Record<string, string> {
+  return {
+    ...csrfHeadersFromCookies(cookies),
+    Origin: new URL(targetUrl).origin,
+    "x-vercel-forwarded-for": PROBE_FORWARDED_FOR,
+  };
+}
+
 export type ChatSmokeEvent =
   | { type: "text"; content: string }
   | { type: "done"; images: unknown[]; sources: unknown[] }
