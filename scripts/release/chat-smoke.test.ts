@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseChatSmokeEvents, assertChatSmokeShape } from "./chat-smoke";
+import {
+  parseChatSmokeEvents,
+  assertChatSmokeShape,
+  csrfHeadersFromCookies,
+  chatRequestHeaders,
+} from "./chat-smoke";
 
 function sseBody(...events: unknown[]): string {
   return events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
@@ -82,5 +87,59 @@ describe("assertChatSmokeShape", () => {
         { type: "done", images: [], sources: [] },
       ])
     ).toThrow(/zero sources/);
+  });
+});
+
+// The deployed app rejects state-changing /api requests without a double-submit
+// CSRF token (cookie `__csrf` echoed in the `x-csrf-token` header). The probe
+// never sent one, so it got 403 on every deployment (found 2026-10-02).
+describe("csrfHeadersFromCookies", () => {
+  it("echoes the __csrf cookie value as the x-csrf-token header", () => {
+    expect(
+      csrfHeadersFromCookies([
+        { name: "other", value: "x" },
+        { name: "__csrf", value: "abc123" },
+      ])
+    ).toEqual({ "x-csrf-token": "abc123" });
+  });
+
+  it("fails loudly when the page request did not set a CSRF cookie", () => {
+    expect(() => csrfHeadersFromCookies([{ name: "other", value: "x" }])).toThrow(
+      /__csrf/
+    );
+  });
+
+  it("does not accept an empty token", () => {
+    expect(() => csrfHeadersFromCookies([{ name: "__csrf", value: "" }])).toThrow(
+      /__csrf/
+    );
+  });
+});
+
+// The app also rejects state-changing /api requests that carry no Origin header
+// ("Origin not allowed"), so the probe must send the target's own origin.
+describe("chatRequestHeaders", () => {
+  const cookies = [{ name: "__csrf", value: "abc123" }];
+
+  it("combines the CSRF token, the target's origin and the per-probe IP bucket", () => {
+    expect(chatRequestHeaders(cookies, "https://paisaxe.es")).toEqual({
+      "x-csrf-token": "abc123",
+      Origin: "https://paisaxe.es",
+      "x-vercel-forwarded-for": "203.0.113.42",
+    });
+  });
+
+  it("reduces a target URL with a path to its origin", () => {
+    expect(chatRequestHeaders(cookies, "https://paisaxe.es/immersive?x=1").Origin).toBe(
+      "https://paisaxe.es"
+    );
+  });
+
+  it("still fails loudly without a CSRF cookie", () => {
+    expect(() => chatRequestHeaders([], "https://paisaxe.es")).toThrow(/__csrf/);
+  });
+
+  it("rejects a target that is not a URL", () => {
+    expect(() => chatRequestHeaders(cookies, "not a url")).toThrow();
   });
 });
