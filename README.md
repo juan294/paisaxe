@@ -198,7 +198,7 @@ paisaxe/
 │   │   └── i18n/               # Internationalization
 │   └── types/                  # TypeScript definitions
 ├── content/
-│   └── pdfs/                   # Source tourism guides (37 PDFs)
+│   └── pdfs/                   # Source tourism guides (not tracked; see Content Sources)
 ├── scripts/                    # Data processing & automation
 ├── supabase/
 │   ├── functions/              # Edge Functions (Deno)
@@ -259,7 +259,9 @@ Deno-based functions on Supabase for background tasks:
 
 ## Content Sources
 
-Tourism information sourced from 37 official Asturias guides:
+Tourism information is sourced from 37 official Asturias tourism guides published by
+Turismo Asturias (Sociedad Pública de Gestión y Promoción Turística y Cultural del
+Principado de Asturias). Topics covered:
 - City guides (Oviedo, Gijon, Aviles)
 - Outdoor activities (hiking, cycling)
 - Culture (pre-Romanesque art, museums, festivals)
@@ -267,6 +269,16 @@ Tourism information sourced from 37 official Asturias guides:
 - Camino de Santiago planning
 - Family activities and seasonal events
 
+The guides are the property of their publisher and are **not distributed with this
+repository**. To run the content pipeline locally, download the guides from
+[turismoasturias.es](https://www.turismoasturias.es) into `content/pdfs/` (gitignored)
+and run `npm run process-pdfs`. Story photographs are attributed to their sources in each
+story's `image_source` field; most come from Unsplash.
+
 ## License
 
-MIT
+The source code in this repository is released under the MIT License.
+
+The license covers the code only. Tourism guide content, photographs and other
+third-party material referenced or processed by this project remain the property of
+their respective owners and are not covered by the MIT License.
