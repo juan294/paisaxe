@@ -8,11 +8,19 @@ const voyageClient = new VoyageAIClient({
 });
 
 const EMBEDDING_MODEL = "voyage-3.5";
-const CONTEXTUALIZED_MODEL = "voyage-3.5";
+// The corpus in production (all chunks, seeded 2026-01-27) is embedded with
+// voyage-context-3 through the contextualized endpoint, so every vector that is
+// compared against it - documents at ingest AND queries at search time - must use
+// that same model and endpoint. Plain voyage-3.5 vectors live in a different space
+// (cosine ~0.05 against the corpus), which made match_chunks return nothing and
+// every chat answer ship with zero sources.
+const CONTEXTUALIZED_MODEL = "voyage-context-3";
 const EMBEDDING_DIMENSIONS = 512;
 const MAX_BATCH_SIZE = 128;
 
-const embeddingCache = new EmbeddingCache(EMBEDDING_MODEL, EMBEDDING_DIMENSIONS);
+// The cache key is derived from this id: it must differ from the old plain voyage-3.5
+// entries (wrong-space vectors, cached for 24h) so none of them can be served again.
+const embeddingCache = new EmbeddingCache(`${CONTEXTUALIZED_MODEL}:query`, EMBEDDING_DIMENSIONS);
 
 interface BatchEmbeddingResult {
   embeddings: number[][];
@@ -21,8 +29,9 @@ interface BatchEmbeddingResult {
 
 /**
  * Generate embedding for a single text using Voyage AI.
- * Used at query time — uses the same model (voyage-3) as document
- * embeddings to ensure compatible vector spaces.
+ * Used at query time. Embeds the query through the contextualized endpoint with
+ * voyage-context-3 (inputs: [[query]]), the same model and endpoint that produced the
+ * stored document embeddings, to ensure compatible vector spaces.
  *
  * BE-M4 (#785): accepts an optional `signal` so a caller-driven stage
  * timeout (see chat-stream-timeouts.ts's `abortController.abort()`) can
@@ -39,26 +48,25 @@ export async function generateEmbedding(
     return cached;
   }
 
-  const result = await voyageClient.embed(
+  const result = await voyageClient.contextualizedEmbed(
     {
-      input: [text],
-      model: EMBEDDING_MODEL,
+      inputs: [[text]],
+      model: CONTEXTUALIZED_MODEL,
       inputType: "query",
       outputDimension: EMBEDDING_DIMENSIONS,
     },
     { abortSignal: options.signal }
   );
 
-  if (!result.data || result.data.length === 0 || !result.data[0].embedding) {
+  const embedding = result.results?.[0]?.embeddings?.[0] as number[] | undefined;
+  if (!embedding) {
     throw new Error("No embedding returned from Voyage AI");
   }
 
-  const embedding = result.data[0].embedding as number[];
-
   // Log token usage
-  if (result.usage?.totalTokens) {
+  if (result.totalTokens) {
     logger.debug("[Voyage AI] generateEmbedding", {
-      total_tokens: result.usage.totalTokens,
+      total_tokens: result.totalTokens,
     });
   }
 
