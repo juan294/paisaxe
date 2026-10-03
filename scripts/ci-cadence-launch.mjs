@@ -27,7 +27,7 @@ const PINS = {
   "tests/fixtures/ci-cadence/policy.json": "7f290ed3791c910948e489e297e4df1bf87b57ac8e4dc4e071b0fe44f9661e76",
   "tests/fixtures/ci-cadence/contract.json": "dc4d409ef86f17cd212e9d9b9de554dd324bafffebe4762af09929b3832feb16",
   "scripts/ci-cadence-native.mjs": "3d570d2624d653496c38c0430ea3d6b20bb8507e383f1cad9233def089ce44a5",
-  "scripts/ci-fast.mjs": "0dba2914770c4d676a5ac98abe730f59ef4a5869396f1acfbd30514d9e8b4190",
+  "scripts/ci-fast.mjs": "310c126bc7feca8b4a138c730056b0cdef9c98420892aac850361a4c7eedf853",
   "scripts/ci-cadence-scanner.mjs": "6cf7da7f0c59020aaeed179131051fff931e2ff4ce1f8264a990a15916719e6b"
 };
 const record = x => x !== null && typeof x === 'object' && !Array.isArray(x);

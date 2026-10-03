@@ -10,7 +10,7 @@ export async function fastFixture() {
     const put = async (path, bytes) => { await mkdir(dirname(join(f.root, path)), { recursive: true }); await writeFile(join(f.root, path), bytes); };
     const root = new URL('../../../../', import.meta.url);
     const manifest = JSON.parse(await readFile(new URL('tests/fixtures/ci-cadence/contract.json', root)));
-    for (const path of [...manifest.files, 'tests/fixtures/ci-cadence/contract.json', 'package.json', 'package-lock.json', '.nvmrc', '.gitleaks.toml']) await put(path, await readFile(new URL(path, root)));
+    for (const path of [...manifest.files, 'tests/fixtures/ci-cadence/contract.json', 'package.json', 'package-lock.json', '.nvmrc', '.github/gitleaks-ci-fast.toml']) await put(path, await readFile(new URL(path, root)));
     f.git('add', '.');
     const base = f.git('commit-tree', f.git('write-tree'), '-p', f.installed, '-m', 'Fast protected inputs');
     f.git('update-ref', `refs/ci-cadence/protected/${base}`, base);

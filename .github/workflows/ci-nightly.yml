@@ -62,7 +62,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-launch.mjs" > "$private/ci-cadence-launch.mjs"
           printf '%s  %s
-          ' '2add6aee55aeccb476b5ffec96742e426d951ba23a416f11141a91cc8ab3f5ce' "$private/ci-cadence-launch.mjs" | sha256sum --check --status
+          ' 'a2304a07baf2950be19648c054b90dd550e07eda408b6b13fc3115561a0f233e' "$private/ci-cadence-launch.mjs" | sha256sum --check --status
           node "$private/ci-cadence-launch.mjs" > "$RUNNER_TEMP/B-native.json"
           python3 - <<'PY' >> "$GITHUB_ENV"
           import json,os,re

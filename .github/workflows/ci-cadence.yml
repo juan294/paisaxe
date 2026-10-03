@@ -277,7 +277,7 @@ jobs:
       - name: Acquire reviewed protected launcher
         id: entry
         env:
-          LAUNCHER_SHA256: 2add6aee55aeccb476b5ffec96742e426d951ba23a416f11141a91cc8ab3f5ce
+          LAUNCHER_SHA256: a2304a07baf2950be19648c054b90dd550e07eda408b6b13fc3115561a0f233e
           GITHUB_TOKEN: ${{ github.token }}
           CI_CADENCE_MODE: lean
           ROUTING_MODE: ${{ vars.CI_CADENCE_MODE }}

@@ -9,6 +9,8 @@ const WORK = ['commit-secret-scan', 'policy-validation', 'lockfile-validation', 
 const scannerDigests = () => process.platform === 'linux' && process.arch === 'x64' ? ['88f91962aa2f93ac6ab281d553b9e125f5197bbbce38f9f2437f7299c32e5509'] : process.platform === 'darwin' && process.arch === 'arm64' ? ['ba52fb1bfabbcde42f032afad3d6e0b19dff8ed105229a16e7caa338bbc0e84f', 'f414bc2fb952be6c9072b75cb411e3368614ef4b16d48dbd9ad238034afd2302'] : [];
 const CONTRACT_SHA = '3c6a2a44caa1cfbfda2a4ffd2c5e3ad56e0814c5def7aedc717fa16fecf93b57';
 const FROZEN = ['scripts/ci-cadence.mjs', 'scripts/ci-cadence.test.mjs', 'scripts/measure-ci-cadence.mjs', 'scripts/measure-ci-cadence.test.mjs', 'scripts/validate-ci-cadence-fixtures.mjs', 'scripts/validate-ci-cadence-fixtures.test.mjs', ...['events', 'graph', 'history', 'jobs', 'policy'].map(name => `tests/fixtures/ci-cadence/${name}.json`)].sort();
+// CI Fast's own default-rules config; the repository history scan keeps .gitleaks.toml.
+const SCANNER_CONFIG = '.github/gitleaks-ci-fast.toml';
 const MAX_BYTES = 16 * 1024 * 1024;
 const MAX_SCANNER_BYTES = 32 * 1024 * 1024;
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -64,11 +66,11 @@ export async function runFastChecks(input, { scannerExecutor } = {}) {
     const policy = JSON.parse(readProtectedBlobs(input.root, definition, ['.github/ci-cadence.json'], remaining())['.github/ci-cadence.json']);
     const manifest = JSON.parse(readProtectedBlobs(input.root, definition, [manifestPath], remaining())[manifestPath]);
     if (manifest.schemaVersion !== 1 || manifest.checksum !== CONTRACT_SHA || JSON.stringify(manifest.files) !== JSON.stringify(FROZEN)) throw Error('protected frozen manifest invalid');
-    const paths = [...FROZEN, manifestPath, '.gitleaks.toml', 'package.json', 'package-lock.json', '.nvmrc', ...policy.workflows.map(w => w.path)];
+    const paths = [...FROZEN, manifestPath, SCANNER_CONFIG, 'package.json', 'package-lock.json', '.nvmrc', ...policy.workflows.map(w => w.path)];
     const blobs = readProtectedBlobs(input.root, definition, paths, remaining());
     const hash = createHash('sha256'); for (const path of FROZEN) hash.update(path).update('\0').update(blobs[path]).update('\0'); if (hash.digest('hex') !== CONTRACT_SHA) throw Error('protected frozen bytes mismatch');
     temporary = await mkdtemp(join(tmpdir(), 'b-fast-protected-'));
-    for (const path of [...FROZEN, manifestPath, '.gitleaks.toml']) { await mkdir(dirname(join(temporary, path)), { recursive: true }); await writeFile(join(temporary, path), blobs[path], { mode: 0o600, flag: 'wx' }); }
+    for (const path of [...FROZEN, manifestPath, SCANNER_CONFIG]) { await mkdir(dirname(join(temporary, path)), { recursive: true }); await writeFile(join(temporary, path), blobs[path], { mode: 0o600, flag: 'wx' }); }
     const ignore = protectedRecords.some(record => record.endsWith('\t.gitleaksignore')) ? readProtectedBlobs(input.root, definition, ['.gitleaksignore'], remaining())['.gitleaksignore'] : '';
     await writeFile(join(temporary, '.gitleaksignore'), ignore, { mode: 0o600, flag: 'wx' });
     const scannerPath = input.scanner?.executable; const scannerDigest = input.scanner?.sha256;
@@ -81,7 +83,7 @@ export async function runFastChecks(input, { scannerExecutor } = {}) {
     const scannerEnv = { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_NO_REPLACE_OBJECTS: '1' };
     const execute = scannerExecutor ?? ((exe, args, text) => { try { return { status: 0, stdout: command(exe, args, { cwd: temporary, env: scannerEnv, ...(text === undefined ? {} : { input: text }) }), stderr: '' }; } catch (error) { return { status: error.status, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }; } });
     const version = execute(executable, ['version']); if (version.status !== 0 || version.stdout.trim() !== '8.30.1') throw Error('scanner version mismatch');
-    const scan = (args, text, expected = 0) => { const r = execute(executable, [...args, `--config=${join(temporary, '.gitleaks.toml')}`, `--gitleaks-ignore-path=${temporary}`, '--ignore-gitleaks-allow', '--redact=100', '--no-banner', '--no-color', '--exit-code', '2'], text); if (r.status !== expected || (text?.startsWith('ghp_') && `${r.stdout}${r.stderr}`.includes(text))) throw Error('introduced secret scan failed or scanner canary/redaction invalid'); };
+    const scan = (args, text, expected = 0) => { const r = execute(executable, [...args, `--config=${join(temporary, SCANNER_CONFIG)}`, `--gitleaks-ignore-path=${temporary}`, '--ignore-gitleaks-allow', '--redact=100', '--no-banner', '--no-color', '--exit-code', '2'], text); if (r.status !== expected || (text?.startsWith('ghp_') && `${r.stdout}${r.stderr}`.includes(text))) throw Error('introduced secret scan failed or scanner canary/redaction invalid'); };
     scan(['stdin'], 'ordinary repository text'); scan(['stdin'], `ghp_${randomBytes(18).toString('hex')}`, 2);
     const bare = join(temporary, 'source.git'); git('init', '--bare', bare);
     const objects = git('rev-parse', '--path-format=absolute', '--git-path', 'objects').trim(); if (/[\r\n]/.test(objects)) throw Error('introduced object path invalid');

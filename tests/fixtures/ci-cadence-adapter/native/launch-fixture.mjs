@@ -8,7 +8,7 @@ export async function launchFixture() {
     const project = new URL('../../../../', import.meta.url);
     const manifest = JSON.parse(await readFile(new URL('tests/fixtures/ci-cadence/contract.json', project)));
     f.git('checkout', '--quiet', '--force', '--detach', f.installed);
-    for (const path of [...manifest.files, 'tests/fixtures/ci-cadence/contract.json', 'scripts/ci-cadence-native.mjs', 'scripts/ci-fast.mjs', 'scripts/ci-cadence-scanner.mjs', 'package.json', 'package-lock.json', '.nvmrc', '.gitleaks.toml']) await put(path, await readFile(new URL(path, project)));
+    for (const path of [...manifest.files, 'tests/fixtures/ci-cadence/contract.json', 'scripts/ci-cadence-native.mjs', 'scripts/ci-fast.mjs', 'scripts/ci-cadence-scanner.mjs', 'package.json', 'package-lock.json', '.nvmrc', '.github/gitleaks-ci-fast.toml']) await put(path, await readFile(new URL(path, project)));
     f.git('add', '.'); const definition = f.git('commit-tree', f.git('write-tree'), '-p', f.installed, '-m', 'reviewed protected modules');
     f.git('remote', 'add', 'origin', 'https://github.com/juan294/paisaxe.git');
     const requests = []; const fetches = [];
