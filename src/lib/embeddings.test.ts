@@ -41,47 +41,67 @@ describe("embeddings", () => {
     });
   });
 
+  // The corpus (all 3,212 chunks, seeded 2026-01-27) was embedded with voyage-context-3
+  // through the contextualized endpoint. Queries must use the same model and endpoint:
+  // plain voyage-3.5 queries live in a different vector space (cosine ~0.05 against the
+  // corpus), so match_chunks returned nothing and every answer shipped with zero sources.
   describe("generateEmbedding", () => {
-    it("should return embedding for a single text", async () => {
+    const ctxResult = (embedding: number[] | undefined, totalTokens = 7) => ({
+      results: [{ embeddings: [embedding] }],
+      totalTokens,
+    });
+
+    it("embeds the query with voyage-context-3 through the contextualized endpoint", async () => {
       const mockEmbedding = Array(512).fill(0.1);
       mockGet.mockResolvedValue(null);
-      mockEmbed.mockResolvedValue({
-        data: [{ embedding: mockEmbedding }],
-      });
+      mockContextualizedEmbed.mockResolvedValue(ctxResult(mockEmbedding));
 
       const { generateEmbedding } = await import("./embeddings");
       const result = await generateEmbedding("test text");
 
       expect(result).toEqual(mockEmbedding);
-      expect(mockEmbed).toHaveBeenCalledWith(
+      expect(mockContextualizedEmbed).toHaveBeenCalledWith(
         {
-          input: ["test text"],
-          model: "voyage-3.5",
+          inputs: [["test text"]],
+          model: "voyage-context-3",
           inputType: "query",
           outputDimension: 512,
         },
         { abortSignal: undefined }
       );
+      expect(mockEmbed).not.toHaveBeenCalled();
+    });
+
+    it("keys the embedding cache by the contextualized query model, never the plain voyage-3.5 entries", async () => {
+      await import("./embeddings");
+      const { EmbeddingCache } = await import("./embedding-cache");
+
+      expect(EmbeddingCache).toHaveBeenCalledWith("voyage-context-3:query", 512);
     });
 
     // ─── BE-M4 (#785): AbortSignal threading ────────────────────────────
-    it("should pass a provided AbortSignal through to the Voyage embed call", async () => {
-      const mockEmbedding = Array(512).fill(0.1);
-      mockEmbed.mockResolvedValue({ data: [{ embedding: mockEmbedding }] });
+    it("passes a provided AbortSignal through to the Voyage call", async () => {
+      mockContextualizedEmbed.mockResolvedValue(ctxResult(Array(512).fill(0.1)));
 
       const controller = new AbortController();
       const { generateEmbedding } = await import("./embeddings");
       await generateEmbedding("test text", { signal: controller.signal });
 
-      expect(mockEmbed).toHaveBeenCalledWith(
-        expect.objectContaining({ input: ["test text"] }),
+      expect(mockContextualizedEmbed).toHaveBeenCalledWith(
+        expect.objectContaining({ inputs: [["test text"]] }),
         { abortSignal: controller.signal }
       );
     });
 
-    it("should throw error when no embedding is returned", async () => {
+    it.each([
+      ["no results", { results: [] }],
+      ["null results", { results: null }],
+      ["no embeddings array", { results: [{}] }],
+      ["an empty embeddings array", { results: [{ embeddings: [] }] }],
+      ["an undefined embedding", { results: [{ embeddings: [undefined] }] }],
+    ])("throws when Voyage returns %s", async (_label, response) => {
       mockGet.mockResolvedValue(null);
-      mockEmbed.mockResolvedValue({ data: [] });
+      mockContextualizedEmbed.mockResolvedValue(response);
 
       const { generateEmbedding } = await import("./embeddings");
 
@@ -90,31 +110,7 @@ describe("embeddings", () => {
       );
     });
 
-    it("should throw error when data is null", async () => {
-      mockGet.mockResolvedValue(null);
-      mockEmbed.mockResolvedValue({ data: null });
-
-      const { generateEmbedding } = await import("./embeddings");
-
-      await expect(generateEmbedding("test text")).rejects.toThrow(
-        "No embedding returned from Voyage AI"
-      );
-    });
-
-    it("should throw error when embedding is undefined", async () => {
-      mockGet.mockResolvedValue(null);
-      mockEmbed.mockResolvedValue({
-        data: [{ embedding: undefined }],
-      });
-
-      const { generateEmbedding } = await import("./embeddings");
-
-      await expect(generateEmbedding("test text")).rejects.toThrow(
-        "No embedding returned from Voyage AI"
-      );
-    });
-
-    it("should return cached embedding without API call", async () => {
+    it("returns a cached embedding without an API call", async () => {
       const cachedEmbedding = Array(512).fill(0.5);
       mockGet.mockResolvedValue(cachedEmbedding);
 
@@ -122,16 +118,14 @@ describe("embeddings", () => {
       const result = await generateEmbedding("cached text");
 
       expect(result).toEqual(cachedEmbedding);
+      expect(mockContextualizedEmbed).not.toHaveBeenCalled();
       expect(mockEmbed).not.toHaveBeenCalled();
     });
 
-    it("should cache embedding after API call", async () => {
+    it("caches the embedding after the API call", async () => {
       const mockEmbedding = Array(512).fill(0.1);
       mockGet.mockResolvedValue(null);
-      mockEmbed.mockResolvedValue({
-        data: [{ embedding: mockEmbedding }],
-        usage: { totalTokens: 10 },
-      });
+      mockContextualizedEmbed.mockResolvedValue(ctxResult(mockEmbedding, 10));
 
       const { generateEmbedding } = await import("./embeddings");
       await generateEmbedding("new text");
@@ -139,14 +133,10 @@ describe("embeddings", () => {
       expect(mockSet).toHaveBeenCalledWith("new text", mockEmbedding);
     });
 
-    it("should log token usage", async () => {
+    it("logs token usage", async () => {
       const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-      const mockEmbedding = Array(512).fill(0.1);
       mockGet.mockResolvedValue(null);
-      mockEmbed.mockResolvedValue({
-        data: [{ embedding: mockEmbedding }],
-        usage: { totalTokens: 42 },
-      });
+      mockContextualizedEmbed.mockResolvedValue(ctxResult(Array(512).fill(0.1), 42));
 
       const { generateEmbedding } = await import("./embeddings");
       await generateEmbedding("test");
@@ -343,7 +333,7 @@ describe("embeddings", () => {
 
       expect(mockContextualizedEmbed).toHaveBeenCalledWith({
         inputs: [["chunk A", "chunk B"]],
-        model: "voyage-3.5",
+        model: "voyage-context-3",
         inputType: "document",
         outputDimension: 512,
       });
