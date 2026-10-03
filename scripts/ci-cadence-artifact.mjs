@@ -13,7 +13,6 @@ async function inventory(root){
  async function walk(directory){
   for(const name of (await readdir(directory)).sort()){
    const path=join(directory,name),local=relative(root,path).split('\\').join('/');
-   if(local==='.next/cache')continue;
    check(!/[\x00-\x1f\x7f]/.test(local),'unrepresentable artifact path');
    const stat=await lstat(path);check(!stat.isSymbolicLink(),'artifact symlink');
    if(stat.isDirectory())await walk(path);
@@ -23,7 +22,9 @@ async function inventory(root){
    }
   }
  }
- await walk(join(root,'.next'));check(files.some(f=>f.path.startsWith('.next/static/')&&f.path.endsWith('.js')),'served client asset missing');return files;
+ // Only the served client assets are inventoried: they are what the smoke
+ // compares byte-for-byte. Server output holds bundler symlinks into node_modules.
+ await walk(join(root,'.next/static'));check(files.some(f=>f.path.startsWith('.next/static/')&&f.path.endsWith('.js')),'served client asset missing');return files;
 }
 
 /** A real completed build in a clean committed candidate checkout is required.
