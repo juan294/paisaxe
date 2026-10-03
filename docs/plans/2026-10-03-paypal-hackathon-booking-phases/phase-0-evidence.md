@@ -115,8 +115,8 @@ Desk survey counts, out of ten:
 
 | Item | Status |
 | --- | --- |
-| AG Studio half-day trial (decision 6) | Not started; needs the owner's trial sign-up. Default if not done by Phase 5: native operator view |
-| APIMatic plugin (`npx context-plugins install paypal`) | Not installed; it writes into every local AI assistant's configuration, so it waits for the owner's go-ahead |
+| AG Studio half-day trial (decision 6) | **Skipped by the owner on 2026-10-03.** Native operator view in Phase 5 |
+| APIMatic plugin (`npx context-plugins install paypal`) | **Installed on 2026-10-03 with the owner's go-ahead**, Claude Code only, telemetry off; skills only. Register its use on the sponsor's form before submission (Phase 7) |
 | PayPal webinar Oct 6 18:00 Madrid; APIMatic webinar Oct 7 18:00 Madrid | Owner |
 
 ## Automated gate (phase-0.md acceptance)

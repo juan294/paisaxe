@@ -43,7 +43,8 @@
    description, the change summary since baseline, the validation results with their
    stated limits (Phase 5b), and the private testing
    instructions from `docs/hackathon/testing-instructions.md` filled with the voucher,
-   sandbox buyer credentials and operator link. APIMatic form if required. Submit
+   sandbox buyer credentials and operator link. APIMatic form: register that the Context Plugin was used to build the PayPal integration
+   (the plugin was installed on 2026-10-03; Phase 4 records how it was used). Submit
    with margin; record the receipt.
 
 8. **Judging continuity (F13).** On Nov 30 and Dec 8, from a fresh browser: redeem the

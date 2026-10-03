@@ -76,7 +76,9 @@ risk: expectedRefundCents is an expectation to verify, never authority: the refu
   (increments `link_version` and shows the new visitor link once). Both CSRF-protected
   and logged without the capability.
 - Daily capacity view: for the next 14 days, per start time, availability from the RPC.
-- If Phase 0 recorded an AG Studio "yes": replace the table with the Studio grid plus
+- **AG Studio was skipped by the owner on 2026-10-03; build the native view only.** The
+  following bullet is kept for the record and does not apply. If Phase 0 recorded an AG
+  Studio "yes": replace the table with the Studio grid plus
   one custom widget (booking timeline) and the Studio agent reading the same server
   payload; license key in `AG_STUDIO_LICENSE_KEY`, registered in `.env.example`, never
   committed. Otherwise skip this bullet.

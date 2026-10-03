@@ -46,3 +46,17 @@ Plan: [2026-10-03-paypal-hackathon-booking.md](2026-10-03-paypal-hackathon-booki
    - Found: the first evidence write-up said PayPal never generated one capture event. PayPal's event log, recorded afterwards, shows it was generated about 90 seconds late.
    - Chose: record the event log as evidence and re-derive findings 2 to 4 from it.
    - Why: a claim drawn from a query run too early was presented as verified (review finding P0-08).
+
+## Owner decisions after Phase 0
+
+Recorded 2026-10-03, when the owner accepted Phase 0.
+
+1. **AG Studio: skipped.** The operator view is the plain native view in Phase 5. The
+   conditional AG Studio bullet in `phase-5.md` no longer applies, and there is no AG Grid
+   sponsor-prize entry. APIMatic remains the sponsor prize target.
+2. **APIMatic PayPal context plugin: installed** with `npx context-plugins@0.12.0 install
+   paypal --targets claude` (telemetry off), Claude Code user scope, plugin `paypal@context-plugins`
+   version 0.3.3. It contains only skills (TypeScript, Python, .NET) for the
+   APIMatic-generated PayPal Server SDK; no hooks, no MCP servers. It loads in new Claude Code
+   sessions. Phase 4 decides whether `src/lib/paypal` uses that SDK (`@paypal/paypal-server-sdk`)
+   or plain `fetch` (see `phase-4.md`, Unit [adapter]).

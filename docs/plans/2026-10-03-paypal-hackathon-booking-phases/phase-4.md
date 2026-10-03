@@ -35,6 +35,16 @@ reported as dead code.
 
 ## Unit [adapter]: `src/lib/paypal/`
 
+**First decision of this unit (owner installed the APIMatic plugin on 2026-10-03):** load the
+plugin's `typescript-getting-started` and `typescript-integrate-paypal` skills and decide
+whether the adapter wraps the official `@paypal/paypal-server-sdk` or keeps plain `fetch`.
+Criteria: the SDK must support `PayPal-Request-Id` on create, capture and refund; the
+webhook verification call; a configurable base URL for the mock server; and the
+exact-hostname sandbox guard. Check its license against
+`docs/project/license-exceptions.md` (MIT, Apache-2.0, BSD or ISC only). Prefer the SDK
+if it meets all of these: it is the integration the APIMatic plugin documents, which is
+what that sponsor prize asks for. Record the choice and the reason in the notes file.
+
 `client.ts` (token cache), `orders.ts`, `refunds.ts`, `webhooks.ts`, `types.ts`,
 `env.ts`, each with tests against a local mock server (`src/test/paypal-mock-server.ts`,
 a small `node:http` server that records requests and serves canned responses; also
