@@ -130,7 +130,7 @@ Desk survey counts, out of ten:
 | `npm run check-required-probes` | exit 0 | same |
 | `npm run lint:scripts`, `typecheck:scripts`, `check-env` | exit 0 | final tree, after the quality pass (it changed only scripts, the guard test, `.env.example` and plan text) |
 | `scripts/release/release-topology.test.ts` | 12 passed | final tree |
-| Full suite, lint and Knip (pre-commit hook) | recorded in the handoff below | the final Phase 0 commit |
+| Full suite, lint and Knip (pre-commit hook) | 413 files passed, 6 skipped; 7,975 tests passed, 20 skipped; lint and Knip clean | commit `985f570d` |
 
 ## Review dispositions
 
