@@ -237,6 +237,13 @@ production Supabase data, Vercel env vars, DNS, or external service config.
 
 ## Cadence evidence at the release boundary
 
+Phase 4 required-context list (changing branch protection is separately authorized):
+
+- `develop`: `CI Fast` and `CI Fast recovery`. `CI Fast recovery` is skipped, and therefore satisfied, unless `CI Fast` demanded full validation under lean; then it must succeed.
+- `main`: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, and `Release artifact smoke` once it has passed on an eligible release PR (until then `Smoke test Vercel preview`).
+
+`claude-review` stays ungated: automatic model review is outside the cadence change.
+
 A green `CI Fast` or unchanged nightly disposition does not satisfy this checklist. Require the original full release contexts and every applicable child, the existing Stripe proof and the post-deploy proof. Any required failure, cancellation or skipped leaf blocks release.
 
 `Release artifact smoke` (`.github/workflows/preview-smoke.yml`) runs on the release PR without secrets or a deployment: it builds the PR candidate, serves the production build on loopback against local Supabase and fails unless `/api/health` reports the candidate commit and tree, the datastore is healthy, the homepage hydrates and the `release-required-local` probes pass. It is local artifact evidence only; steps 4-5 (deployed identity and required probes) remain mandatory. Until main's branch protection is changed under separate authorization, `Smoke test Vercel preview` remains the registered required context. Reproduce locally:
