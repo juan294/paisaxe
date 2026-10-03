@@ -1,142 +1,59 @@
-name: Preview Smoke Test
+name: Release artifact smoke
 
-# Runs only on PRs targeting main.
-# Waits for the Vercel preview deployment, then hits /api/health and
-# the homepage to verify the real Vercel runtime (real env vars, edge
-# config, etc.) before any merge is allowed.
-#
-# This is a SEPARATE check from the standard CI suite (ci.yml / e2e.yml).
-# Those jobs build with dummy env vars and catch compile/test regressions.
-# This job catches runtime failures that only surface on Vercel — the
-# kind that passed CI but crashed production (see incident: Next.js 16.2.1).
-#
-# Required secret: VERCEL_AUTOMATION_BYPASS_SECRET
-#
-# DO-H2: Branch protection on `main` requires this workflow's check as a
-# required status check. The check name that must be registered in GitHub
-# Settings → Branches → main → Required status checks is:
-#   Smoke test Vercel preview
-# (This matches the job `name:` field below.)
-# As of 2026-04-25 this check IS registered. Verify with:
-#   gh api repos/juan294/paisaxe/branches/main/protection \
-#     --jq '.required_status_checks.checks[].context'
-
+# Native definition/YAML review is the pre-import trust boundary. This local
+# production artifact gate makes no Vercel deployment/runtime assertion.
 on:
   pull_request:
     branches: [main]
-
 permissions:
   contents: read
-  deployments: read
   pull-requests: read
-  statuses: read
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   preview-smoke:
-    name: Smoke test Vercel preview
+    name: Release artifact smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Setup Node.js
+      - name: Preserve original physical PR merge
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup reviewed bootstrap Node
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-
-      - name: Wait for Vercel preview deployment
-        id: vercel-wait
+          node-version: '24.21.0'
+      - name: Acquire protected local artifact smoke before candidate code
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
         env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASH_ENV: ''
+          ENV: ''
+          LD_PRELOAD: ''
+          LD_LIBRARY_PATH: ''
+          LD_AUDIT: ''
+          LD_ORIGIN_PATH: ''
+          NODE_OPTIONS: ''
+          NODE_PATH: ''
+          GITHUB_TOKEN: ${{ github.token }}
+          candidate_sha: ${{ github.sha }}
+          base_sha: ${{ github.event.pull_request.base.sha }}
+          head_sha: ${{ github.event.pull_request.head.sha }}
+          CI_CADENCE_SMOKE_EVIDENCE: ${{ runner.temp }}/B-release-smoke-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
-          for attempt in $(seq 1 20); do
-            deployment_id=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/deployments" \
-              -f sha="$HEAD_SHA" \
-              --jq '[.[] | select(.creator.login == "vercel[bot]" and .environment == "Preview")][0].id // empty')
-
-            if [ -n "$deployment_id" ]; then
-              state=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" --jq '.[0].state // empty')
-              preview_url=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" --jq '.[0].environment_url // .[0].target_url // empty')
-              echo "Vercel deployment state: ${state:-unknown}"
-
-              if [ "$state" = "success" ] && [ -n "$preview_url" ]; then
-                echo "url=$preview_url" >> "$GITHUB_OUTPUT"
-                echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-
-              if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
-                echo "Vercel deployment failed with state=$state"
-                exit 1
-              fi
-            else
-              echo "No Vercel preview deployment found yet (attempt $attempt / 20)"
-            fi
-
-            sleep 15
-          done
-
-          echo "Timed out waiting for Vercel preview deployment"
-          exit 1
-
-      # ------------------------------------------------------------------ #
-      # Health endpoint — must return HTTP 200 and JSON status "healthy".   #
-      # A non-healthy body means a backend dependency or runtime config     #
-      # required in this Vercel environment is broken, so fail the preview  #
-      # gate instead of silently merging it.                                #
-      # ------------------------------------------------------------------ #
-      - name: Smoke test - health endpoint
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
-          if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
-            if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
-              # This is a REQUIRED check on main. Exiting 0 here reported the
-              # gate as satisfied while probing nothing — requiredness without
-              # evidence. Dependabot PRs cannot read Actions secrets, so the
-              # check genuinely cannot be satisfied; it must block rather than
-              # pass. Dependency updates reach production by being cherry-picked
-              # onto develop and released from there, never by merging a
-              # Dependabot PR into main.
-              echo "::error::Preview smoke cannot run on Dependabot PRs (Actions secrets are unavailable). Cherry-pick this update onto develop and release it from there."
-              exit 1
-            fi
-            echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
-            exit 1
-          fi
-          node scripts/check-health-readiness.mjs "$PREVIEW_URL"
-
-      # ------------------------------------------------------------------ #
-      # Homepage — must serve HTTP 200.                                     #
-      # Catches build/runtime errors that would produce a 500 on Vercel     #
-      # even though the local build with dummy keys succeeded.              #
-      # ------------------------------------------------------------------ #
-      - name: Smoke test - homepage loads
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
-          if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
-            if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
-              # Same reasoning as the health step: a required check must not
-              # report success without having probed anything.
-              echo "::error::Preview smoke cannot run on Dependabot PRs (Actions secrets are unavailable). Cherry-pick this update onto develop and release it from there."
-              exit 1
-            fi
-            echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
-            exit 1
-          fi
-          echo "Testing: $PREVIEW_URL"
-          response=$(curl -sfL -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL" -o /dev/null -w "%{http_code}")
-          if [ "$response" != "200" ]; then
-            echo "Homepage failed: HTTP $response"
-            exit 1
-          fi
-          echo "Homepage smoke test passed"
+          set -euo pipefail
+          while IFS= read -r name; do unset "$name"; done < <(compgen -v | /usr/bin/sed -n '/^GIT_/p')
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null
+          [[ "$base_sha" =~ ^[a-f0-9]{40}$ ]]
+          private="$(mktemp -d "$RUNNER_TEMP/B-smoke-launch.XXXXXXXX")"
+          chmod 700 "$private"
+          trap 'rm -rf "$private"' EXIT
+          /usr/bin/git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$base_sha:scripts/ci-cadence-smoke-launch.mjs" > "$private/ci-cadence-smoke-launch.mjs"
+          printf '%s  %s\n' '918e58b16abeae1d511c2d28b811c1599d86ef6d67fde6c81a9e9e54012f0f65' "$private/ci-cadence-smoke-launch.mjs" | /usr/bin/sha256sum --check --status
+          node "$private/ci-cadence-smoke-launch.mjs"

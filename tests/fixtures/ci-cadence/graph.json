@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "jobs": {
+    "lint": {
+      "result": "success",
+      "needs": []
+    },
+    "test": {
+      "result": "success",
+      "needs": [
+        "lint"
+      ]
+    },
+    "build": {
+      "result": "success",
+      "needs": [
+        "test"
+      ]
+    }
+  },
+  "contexts": {
+    "check": "success"
+  },
+  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "targetBranch": "main",
+  "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "definitionSha": "cccccccccccccccccccccccccccccccccccccccc",
+  "privileged": false,
+  "deploy": false,
+  "fastWork": [
+    "commit-secret-scan",
+    "policy-validation",
+    "lockfile-validation",
+    "cadence-contracts"
+  ]
+}

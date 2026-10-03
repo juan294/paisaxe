@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    "scripts/ci-cadence.mjs",
+    "scripts/ci-cadence.test.mjs",
+    "scripts/measure-ci-cadence.mjs",
+    "scripts/measure-ci-cadence.test.mjs",
+    "scripts/validate-ci-cadence-fixtures.mjs",
+    "scripts/validate-ci-cadence-fixtures.test.mjs",
+    "tests/fixtures/ci-cadence/events.json",
+    "tests/fixtures/ci-cadence/graph.json",
+    "tests/fixtures/ci-cadence/history.json",
+    "tests/fixtures/ci-cadence/jobs.json",
+    "tests/fixtures/ci-cadence/policy.json"
+  ],
+  "checksum": "3c6a2a44caa1cfbfda2a4ffd2c5e3ad56e0814c5def7aedc717fa16fecf93b57",
+  "helperSha256": "9f2da9ab55525a3ca4acc311feaf5426fc86d83258c5dda7754dc05405c9a7ab"
+}

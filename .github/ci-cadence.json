@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 1,
+  "repository": "juan294/paisaxe",
+  "integrationBranch": "develop",
+  "defaultBranch": "main",
+  "productionBranch": "main",
+  "owners": [
+    "juan294"
+  ],
+  "refreshHours": 168,
+  "coverageMaxAgeHours": 192,
+  "changedHeadDeadlineHours": 36,
+  "workflows": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "definitionSha": "5de82ed57eeb7745c32da861f4fefa45b6482f5d",
+      "jobs": [
+        {
+          "id": "ci-lint-and-typecheck",
+          "needs": []
+        },
+        {
+          "id": "ci-coverage-shard-1",
+          "needs": []
+        },
+        {
+          "id": "ci-coverage-shard-2",
+          "needs": []
+        },
+        {
+          "id": "ci-coverage-shard-3",
+          "needs": []
+        },
+        {
+          "id": "ci-coverage-shard-4",
+          "needs": []
+        },
+        {
+          "id": "ci-coverage-merge",
+          "needs": [
+            "ci-coverage-shard-1",
+            "ci-coverage-shard-2",
+            "ci-coverage-shard-3",
+            "ci-coverage-shard-4"
+          ]
+        },
+        {
+          "id": "ci-test",
+          "needs": [
+            "ci-coverage-shard-1",
+            "ci-coverage-shard-2",
+            "ci-coverage-shard-3",
+            "ci-coverage-shard-4",
+            "ci-coverage-merge"
+          ]
+        },
+        {
+          "id": "ci-build",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Lint & Typecheck": [
+          "ci-lint-and-typecheck"
+        ],
+        "Coverage merge": [
+          "ci-coverage-merge"
+        ],
+        "Test": [
+          "ci-test"
+        ],
+        "Build": [
+          "ci-build"
+        ],
+        "Coverage (shard 1/4)": [
+          "ci-coverage-shard-1"
+        ],
+        "Coverage (shard 2/4)": [
+          "ci-coverage-shard-2"
+        ],
+        "Coverage (shard 3/4)": [
+          "ci-coverage-shard-3"
+        ],
+        "Coverage (shard 4/4)": [
+          "ci-coverage-shard-4"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/e2e.yml",
+      "definitionSha": "c66fc800be4ce65a6bb4967c55c66eaa20fd3484",
+      "jobs": [
+        {
+          "id": "e2e-e2e",
+          "needs": []
+        },
+        {
+          "id": "e2e-visual-regression",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Playwright E2E": [
+          "e2e-e2e"
+        ],
+        "Visual Regression": [
+          "e2e-visual-regression"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/coverage.yml",
+      "definitionSha": "010641213896270e79ef2c951b6d3284710fcfab",
+      "jobs": [
+        {
+          "id": "coverage-coverage",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Coverage report": [
+          "coverage-coverage"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/lighthouse.yml",
+      "definitionSha": "a98512d42dd8335f539efb295827e9ba07bf51fa",
+      "jobs": [
+        {
+          "id": "lighthouse-lighthouse",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Lighthouse Audit": [
+          "lighthouse-lighthouse"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/bundle-size.yml",
+      "definitionSha": "52ff12e5748262ef06500cadb5b6d8afa88aaaf1",
+      "jobs": [
+        {
+          "id": "bundle-size-analyze",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Analyze Bundle Size": [
+          "bundle-size-analyze"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/knip.yml",
+      "definitionSha": "c7e14e078572ce9febe072fec56016e53735929a",
+      "jobs": [
+        {
+          "id": "knip-knip",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Knip Dead Code Analysis": [
+          "knip-knip"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/license-check.yml",
+      "definitionSha": "40d976dbcc77fa24a67081a451ecfdd6112c022a",
+      "jobs": [
+        {
+          "id": "license-check-license-check",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "License Compliance Check": [
+          "license-check-license-check"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/security.yml",
+      "definitionSha": "0ce18d79dfba182250024d45fa23fdcc45f5d475",
+      "jobs": [
+        {
+          "id": "security-gitleaks",
+          "needs": []
+        },
+        {
+          "id": "security-audit",
+          "needs": []
+        },
+        {
+          "id": "security-vercel-env-safety",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Gitleaks secret scan": [
+          "security-gitleaks"
+        ],
+        "npm audit": [
+          "security-audit"
+        ],
+        "Vercel env safety": [
+          "security-vercel-env-safety"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/e2e-stripe-integration.yml",
+      "definitionSha": "48cd7d1c92d3e0cb6ccca3d99b1bd1b4307cb1ee",
+      "jobs": [
+        {
+          "id": "e2e-stripe-integration-e2e-stripe",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Real Stripe Checkout": [
+          "e2e-stripe-integration-e2e-stripe"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/preview-smoke.yml",
+      "definitionSha": "3bc1f261d61cf6dc4741074a20651f9519367321",
+      "jobs": [
+        {
+          "id": "preview-smoke-preview-smoke",
+          "needs": []
+        }
+      ],
+      "contexts": {
+        "Smoke test Vercel preview": [
+          "preview-smoke-preview-smoke"
+        ]
+      }
+    }
+  ]
+}

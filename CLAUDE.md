@@ -394,3 +394,11 @@ Debug mode, large refactoring, and health check workflows are defined in `.claud
 <!-- rpi:claude-import:start -->
 @AGENTS.md
 <!-- rpi:claude-import:end -->
+
+## Local CI cadence adapter
+
+The cadence source is installed locally with legacy routing by default. `CI_CADENCE_MODE=lean` is an explicit later activation; `CI_CADENCE_REPAIR_ENABLED` remains off unless separately authorized. Regenerate/check native definitions with `node scripts/ci-cadence-native-workflows.mjs [--check]`. The protected entry acquires immutable push-before/PR-base/default modules before imports; contributor helper, policy, Git metadata and YAML do not grant authority.
+
+`CI Fast` requires four actual cheap checks or every full recovery child. It never supplies release/main proof. The original main and release contexts, Stripe/provider prerequisites and post-deploy probes remain mandatory. Lean integration nightly resolves develop once, authenticates every original attempt/job/artifact and never publishes main coverage. Main coverage retains its own complete suite; lean periodic refresh is weekly and its completed finalizer signs the original measuring run/attempt after native success. Calendar/unchanged skips do not refresh coverage or create reusable receipts.
+
+Local qualification uses `scripts/ci-cadence-qualification-cli.mjs` with the actual private live acquisition controller and nonce-bound Linux profile; it preserves ordinary Chrome, visual Chromium baselines, original browser selection, Lighthouse floors and authenticated fixture cleanup. Source fixture passes do not prove runtime containment, native reusable job names, hosted timing or deployed behavior. No local source change authorizes provider calls, remote variable/settings changes, publication, paid repair or automatic reruns.

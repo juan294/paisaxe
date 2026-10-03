@@ -234,3 +234,9 @@ Push to `main` · create or merge a PR into `main` · run production `vercel` de
 production Supabase data, Vercel env vars, DNS, or external service config.
 
 "Fix this bug" is not authorization. "Ship it" about a feature means merge to `develop`.
+
+## Cadence evidence at the release boundary
+
+A green `CI Fast` or unchanged nightly disposition does not satisfy this checklist. Require the original full release contexts and every applicable child, actual candidate build SHA/tree/BUILD_ID and immutable artifact manifest, the complete applicable authenticated/browser/visual/Lighthouse local qualification, and the existing Stripe, preview and post-deploy proof. Any required failure, cancellation or skipped leaf blocks release.
+
+`node scripts/ci-cadence-qualification-cli.mjs` runs against a real task-owned nonce profile and live private acquisition inspector. Preserve its original selection and cleanup journal; Linux image preparation, mocks, static profile receipts or provider-denial assertions alone are not runtime acceptance. Main-only coverage publication names the original measuring attempt and actual app completion, while develop nightly and calendar skips remain nonpublishing. Default-main schedule/workflow_run installation is a later authorized release operation; local develop adapter work does not activate it.

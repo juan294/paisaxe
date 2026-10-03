@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "localOnly": true,
+  "requiresVerifiedEgressDenialBeforeMigrations": true,
+  "allowedServices": [
+    "exact inspected Supabase Auth/REST",
+    "exact inspected app origin",
+    "reviewed owned static assets"
+  ],
+  "defaultExternalDisposition": "deny and record",
+  "providerCredentials": "blank; dummy is not a network guard",
+  "originalBrowserMocks": "preserve existing chat SSE/feature flags/checkout mocks unchanged",
+  "forbiddenProviders": [
+    "Anthropic",
+    "Voyage",
+    "ElevenLabs",
+    "Google Places",
+    "OpenWeather",
+    "Stripe",
+    "Twilio",
+    "Resend",
+    "PostHog",
+    "Sentry",
+    "Vercel analytics"
+  ],
+  "unqualifiedPrerequisites": [
+    "root-owned network containment",
+    "original visual baseline compatible owned assets",
+    "complete observed browser/app/DB network manifest"
+  ],
+  "syntheticProviderSuccess": "unavailable; no product transport overrides authored"
+}

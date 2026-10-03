@@ -35,6 +35,8 @@
     "verify-sentry-delivery": "tsx scripts/verify-sentry-delivery.ts",
     "analyze-release": "tsx scripts/release/analyze-release-run.ts",
     "test": "vitest run",
+    "test:ci-cadence": "node --test scripts/ci-cadence.test.mjs scripts/ci-cadence-native.test.mjs scripts/measure-ci-cadence.test.mjs scripts/validate-ci-cadence-fixtures.test.mjs",
+    "check:ci-cadence": "node scripts/validate-ci-cadence-fixtures.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",

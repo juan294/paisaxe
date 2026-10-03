@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "interval": {
+    "start": "2026-10-02T00:00:00Z",
+    "end": "2026-10-03T00:00:00Z"
+  },
+  "collection": {
+    "start": "2026-10-01T00:00:00Z",
+    "end": "2026-10-03T00:00:00Z",
+    "fetchedAt": "2026-10-03T00:01:00Z",
+    "complete": true,
+    "earlierCreatedCoverage": true,
+    "accountScopeComplete": true,
+    "errors": [],
+    "pages": [
+      {
+        "alias": "A",
+        "kind": "runs",
+        "expected": 1,
+        "observed": 1,
+        "complete": true
+      },
+      {
+        "alias": "B",
+        "kind": "runs",
+        "expected": 1,
+        "observed": 1,
+        "complete": true
+      },
+      {
+        "alias": "A",
+        "kind": "jobs",
+        "runId": 1,
+        "attempt": 1,
+        "expected": 2,
+        "observed": 2,
+        "complete": true
+      },
+      {
+        "alias": "B",
+        "kind": "jobs",
+        "runId": 2,
+        "attempt": 1,
+        "expected": 2,
+        "observed": 2,
+        "complete": true
+      }
+    ]
+  },
+  "repositories": [
+    {
+      "alias": "A",
+      "visibility": "private"
+    },
+    {
+      "alias": "B",
+      "visibility": "private"
+    }
+  ],
+  "runs": [
+    {
+      "alias": "A",
+      "id": 1,
+      "event": "push",
+      "lane": "fast",
+      "created_at": "2026-10-02T00:00:00Z",
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 101,
+          "run_attempt": 1,
+          "name": "unit",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "sku": "linux",
+          "conclusion": "success",
+          "started_at": "2026-10-01T23:59:00Z",
+          "completed_at": "2026-10-02T00:00:30Z"
+        },
+        {
+          "id": 102,
+          "run_attempt": 1,
+          "name": "lint",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "sku": "linux",
+          "conclusion": "success",
+          "started_at": "2026-10-02T00:00:00Z",
+          "completed_at": "2026-10-02T00:00:30Z"
+        }
+      ]
+    },
+    {
+      "alias": "B",
+      "id": 2,
+      "event": "schedule",
+      "lane": "monitoring",
+      "created_at": "2026-10-01T12:00:00Z",
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "id": 201,
+          "run_attempt": 1,
+          "name": "probe",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "sku": "large",
+          "conclusion": "success",
+          "started_at": "2026-10-02T00:01:00Z",
+          "completed_at": "2026-10-02T00:02:30Z"
+        },
+        {
+          "id": 202,
+          "run_attempt": 1,
+          "name": "self",
+          "labels": [
+            "self-hosted",
+            "linux"
+          ],
+          "sku": null,
+          "conclusion": "success",
+          "started_at": "2026-10-02T00:01:00Z",
+          "completed_at": "2026-10-02T00:02:00Z"
+        }
+      ]
+    }
+  ],
+  "rates": {
+    "observedAt": "2026-10-03T00:01:00Z",
+    "source": "synthetic dated export",
+    "start": "2026-10-01T00:00:00Z",
+    "end": "2026-10-04T00:00:00Z",
+    "skus": {
+      "linux": {
+        "kind": "hosted",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "usdPerMinute": 0.006,
+        "weight": 1,
+        "publicDiscount": 1
+      },
+      "large": {
+        "kind": "hosted",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "usdPerMinute": 0.01,
+        "weight": 2,
+        "publicDiscount": 0
+      }
+    }
+  },
+  "billing": null,
+  "provider": null,
+  "baseline": null
+}

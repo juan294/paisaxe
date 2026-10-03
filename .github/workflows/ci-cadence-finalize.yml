@@ -1,0 +1,56 @@
+name: CI cadence completed evidence
+on:
+  workflow_run:
+    workflows:
+      - CI nightly
+      - CI cadence
+      - Coverage
+    types:
+      - completed
+permissions: &a1
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: read
+concurrency:
+  group: B-finalize-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+jobs:
+  finalize:
+    if: vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118'
+    runs-on: ubuntu-latest
+    permissions: *a1
+    timeout-minutes: 6
+    steps:
+      - name: Checkout native definition
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup reviewed Node runtime
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+      - name: Authenticate original completed attempt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
+          CI_CADENCE_DEFINITION_SHA: ${{ github.sha }}
+          CI_CADENCE_EVIDENCE_DIR: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          NODE_OPTIONS: ""
+          NODE_PATH: ""
+          COVERAGE_SECRET: ${{ github.event.workflow_run.path == '.github/workflows/coverage.yml' && secrets.COVERAGE_SECRET || '' }}
+        run: |
+          set -euo pipefail
+          unset NODE_OPTIONS NODE_PATH
+          while IFS= read -r name; do unset "$name"; done < <(compgen -v | sed -n '/^GIT_/p')
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null
+          [[ "$CI_CADENCE_DEFINITION_SHA" =~ ^[a-f0-9]{40}$ ]]
+          private="$(mktemp -d "$RUNNER_TEMP/B-control.XXXXXXXX")"
+          chmod 700 "$private"
+          trap 'rm -rf "$private"' EXIT
+          git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
+          printf '%s  %s
+          ' 'c6d807cbc020cce7f8469e6e16d69c1c73ef493e68bfbb2020822a5c02aa2cbb' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          node "$private/ci-cadence-control-launch.mjs" finalize

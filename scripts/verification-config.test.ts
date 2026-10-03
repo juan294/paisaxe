@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
+import vm from "node:vm";
 
 const root = process.cwd();
 
@@ -93,9 +95,22 @@ describe("verification coverage config", () => {
   it("runs coverage merge after successful shards even when the push-source job is skipped", () => {
     const workflow = readText(".github/workflows/ci.yml");
 
-    expect(workflow).toContain(
-      "if: ${{ always() && needs.coverage-shard.result == 'success' }}",
-    );
+    const parsed = parse(workflow) as { jobs: Record<string, { needs: string[]; if: string }> };
+    const merge = parsed.jobs["coverage-merge"];
+    expect(merge.needs).toContain("coverage-shard");
+    const expression = merge.if.replace(/^\$\{\{\s*|\s*\}\}$/g, "")
+      .replace(/needs\.([A-Za-z_][A-Za-z0-9_-]*)/g, (_match: string, key: string) => `needs[${JSON.stringify(key)}]`);
+    for (const result of ["success", "failure", "skipped", "cancelled"]) {
+      const actual = vm.runInNewContext(expression, {
+        always: () => true,
+        format: (template: string, ref: string) => template.replace("{0}", ref),
+        inputs: { profile: "", source_sha: "", invocation_id: "" },
+        vars: { CI_CADENCE_MODE: "legacy" },
+        github: { event_name: "push", ref: "refs/heads/develop", workflow_ref: "juan294/paisaxe/.github/workflows/ci.yml@refs/heads/develop" },
+        needs: { "coverage-shard": { result }, "callable-source": { result: "skipped" }, "cadence-route": { result: "skipped", outputs: {} } },
+      }, { timeout: 100 });
+      expect(Boolean(actual)).toBe(result === "success");
+    }
   });
 
   it("runs secret-free E2E coverage for Dependabot while preserving authenticated checks elsewhere", () => {
@@ -114,7 +129,22 @@ describe("verification coverage config", () => {
     const ciWorkflow = readText(".github/workflows/ci.yml");
     const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
 
-    expect(previewSmokeWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
+    const parsed = parse(previewSmokeWorkflow) as { on: { pull_request: { branches: string[] } }; jobs: Record<string, { name: string; permissions: Record<string, string>; steps: { run?: string; env?: Record<string, string> }[] }> };
+    const job = parsed.jobs["preview-smoke"];
+    expect(parsed.on.pull_request.branches).toEqual(["main"]);
+    expect(job.name).toBe("Release artifact smoke");
+    expect(job.permissions).toEqual({ contents: "read", "pull-requests": "read" });
+    const acquisition = job.steps.find(step => step.run?.includes("ci-cadence-smoke-launch.mjs"));
+    expect(acquisition?.env?.candidate_sha).toBe("${{ github.sha }}");
+    expect(acquisition?.env?.base_sha).toBe("${{ github.event.pull_request.base.sha }}");
+    expect(acquisition?.run).toContain("$base_sha:scripts/ci-cadence-smoke-launch.mjs");
+    expect(acquisition?.run).toContain("sha256sum --check --status");
+    expect(previewSmokeWorkflow).not.toContain("VERCEL_AUTOMATION_BYPASS_SECRET");
+    const actualProbe = readText("tests/fixtures/ci-cadence-adapter/local-qa/artifact-smoke.spec.ts");
+    expect(actualProbe).toContain("const measured = await health.json()");
+    expect(actualProbe).toContain("expect(measured.status).toBe('healthy')");
+    expect(actualProbe).toContain("manifest.candidateSha");
+    expect(actualProbe).toContain("manifest.treeSha.slice(0, 12)");
     // DO-H4: --require-sentry deliberately stays off the required release gate.
     // sentry.status: "configured" is derived purely from NEXT_PUBLIC_SENTRY_DSN
     // being non-empty (src/app/api/health/route.ts checkSentry()) — it proves
@@ -246,8 +276,21 @@ describe("verification coverage config", () => {
 
     expect(previewSmoke).not.toContain("check-elevenlabs-voice-preflight");
     expect(previewSmoke).not.toContain("HEALTH_PROBE_SECRET");
-    expect(previewSmoke).toContain("scripts/check-health-readiness.mjs");
-    expect(previewSmoke).toContain("Smoke test - homepage loads");
+    expect(previewSmoke).toContain("Release artifact smoke");
+    expect(previewSmoke).toContain("ci-cadence-smoke-launch.mjs");
+    const artifact = readText("tests/fixtures/ci-cadence-adapter/local-qa/artifact-smoke.spec.ts");
+    expect(artifact).toContain("await page.goto('/')");
+    expect(artifact).toContain("await page.waitForURL('**/immersive')");
+    expect(artifact).toContain("verifyServedArtifact(manifest");
+    expect(artifact).toContain("await verifyCandidateManifest(process.cwd(), manifest)");
+    const auth = readText("tests/fixtures/ci-cadence-adapter/local-qa/auth-proof.spec.ts");
+    expect(auth).toContain("CI_CADENCE_LOCAL_QA");
+    expect(readText("scripts/ci-cadence-local-qa.mjs")).toContain("REQUIRE_AUTH_JOURNEYS: 'true'");
+    expect(auth).toContain("QA_TEST_USER_EMAIL");
+    expect(auth).toContain("CI_CADENCE_QA_USER_ID");
+    const host = readText("scripts/ci-cadence-smoke-host.mjs");
+    expect(host).toContain("DENIAL_PROVED_BEFORE_CANDIDATE_SQL_AND_HOOKS");
+    expect(host).toContain("/trusted/scripts/ci-cadence-qualification-cli.mjs");
     // The preflight must stay a required production probe, not disappear.
     expect(probes).toContain("id: elevenlabs-voice-preflight");
     expect(probes).toContain("npm run check-elevenlabs-voice");
@@ -285,11 +328,21 @@ describe("verification coverage config", () => {
 
     // The skip step's last echo line is immediately followed by the next
     // step (no `exit 1` in between) — proves the secret-withheld path passes.
-    expect(workflow).toContain(
-      '          echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."\n' +
-        "\n" +
-        "      - name: Assert legacy agent override is absent from Vercel env"
-    );
+    const parsed = parse(workflow) as { jobs: Record<string, { steps: { name: string; if?: string; run?: string }[] }> };
+    const steps = parsed.jobs["vercel-env-safety"].steps;
+    const skipIndex = steps.findIndex(step => step.name === "Skip when Vercel credentials are unavailable (secret-withheld PR)");
+    const skip = steps[skipIndex];
+    const fail = steps.find(step => step.name === "Fail when Vercel credentials are unavailable (trusted event)")!;
+    expect(skip.run).toContain('echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."');
+    expect(skip.run).not.toMatch(/exit\s+1/);
+    expect(fail.run?.trim()).toMatch(/exit 1$/);
+    expect(steps[skipIndex + 1].name).toBe("Assert legacy agent override is absent from Vercel env");
+    for (const withheld of ["true", "false"]) {
+      const context = { env: { VERCEL_TOKEN: "", VERCEL_PROJECT_ID: "", VERCEL_ORG_ID: "", SECRETS_WITHHELD_PR: withheld } };
+      const evaluate = (condition: string) => Boolean(vm.runInNewContext(condition.replace(/^\$\{\{\s*|\s*\}\}$/g, ""), context, { timeout: 100 }));
+      expect(evaluate(fail.if!)).toBe(withheld === "false");
+      expect(evaluate(skip.if!)).toBe(withheld === "true");
+    }
 
     // The fail path must exclude only fork and Dependabot PRs; the skip path
     // must accept only those same secret-withheld cases. If these conditions

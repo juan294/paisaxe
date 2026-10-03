@@ -1,0 +1,320 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "name": "owner integration",
+      "event": {
+        "kind": "push",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/develop",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "fast"
+    },
+    {
+      "name": "owner PR",
+      "event": {
+        "kind": "pull_request",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/pull/1/merge",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "headRepository": "example/fleet-A",
+        "baseBranch": "develop",
+        "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "fast"
+    },
+    {
+      "name": "docs only",
+      "event": {
+        "kind": "pull_request",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/pull/1/merge",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "headRepository": "example/fleet-A",
+        "baseBranch": "develop",
+        "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "changedPaths": [
+          "README.md"
+        ]
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "fast"
+    },
+    {
+      "name": "missing mode",
+      "event": {
+        "kind": "push",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/develop",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": null,
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "full"
+    },
+    {
+      "name": "invalid mode",
+      "event": {
+        "kind": "push",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/develop",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "LEAn",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "full"
+    },
+    {
+      "name": "legacy",
+      "event": {
+        "kind": "push",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/develop",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "legacy",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "full"
+    },
+    {
+      "name": "production PR",
+      "event": {
+        "kind": "pull_request",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/pull/1/merge",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "headRepository": "example/fleet-A",
+        "baseBranch": "main",
+        "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "release"
+    },
+    {
+      "name": "production push",
+      "event": {
+        "kind": "push",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/main",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "release"
+    },
+    {
+      "name": "fork",
+      "event": {
+        "kind": "pull_request",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/pull/1/merge",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "headRepository": "other/fork",
+        "baseBranch": "develop",
+        "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "untrusted"
+    },
+    {
+      "name": "bot",
+      "event": {
+        "kind": "pull_request",
+        "repository": "example/fleet-A",
+        "actor": "dependabot[bot]",
+        "author": "dependabot[bot]",
+        "ref": "refs/pull/1/merge",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "headRepository": "example/fleet-A",
+        "baseBranch": "develop",
+        "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "untrusted"
+    },
+    {
+      "name": "other author",
+      "event": {
+        "kind": "pull_request",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "someone",
+        "ref": "refs/pull/1/merge",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "headRepository": "example/fleet-A",
+        "baseBranch": "develop",
+        "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "untrusted"
+    },
+    {
+      "name": "schedule",
+      "event": {
+        "kind": "schedule",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/main",
+        "sourceSha": "cccccccccccccccccccccccccccccccccccccccc",
+        "resolvedHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resolvedBranch": "develop"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "nightly"
+    },
+    {
+      "name": "manual unapproved",
+      "event": {
+        "kind": "workflow_dispatch",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/develop",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "blocked"
+    },
+    {
+      "name": "manual approved",
+      "event": {
+        "kind": "workflow_dispatch",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/develop",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "manualAuthorized": true
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": true
+      },
+      "expectedLane": "full"
+    },
+    {
+      "name": "initial install",
+      "event": {
+        "kind": "push",
+        "repository": "example/fleet-A",
+        "actor": "example-owner",
+        "author": "example-owner",
+        "ref": "refs/heads/develop",
+        "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "mode": "lean",
+      "trustedDefinition": {
+        "repository": "example/fleet-A",
+        "branch": "main",
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "helperInstalled": false
+      },
+      "expectedLane": "full"
+    }
+  ]
+}

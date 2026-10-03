@@ -1,21 +1,21 @@
 name: Security Scan
-
 on:
   push:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
   pull_request:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
   schedule:
-    # Run daily at 8:00 UTC (was weekly — CVE detection latency reduced from ~6 days to <24h)
-    - cron: '0 8 * * *'
-
+    - cron: 0 8 * * *
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 jobs:
   develop_push_source:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326) || (github.event_name == 'schedule' && github.ref == 'refs/heads/main'))) || needs.cadence-route.outputs.run_legacy == 'true') && (github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
     permissions:
       contents: read
       pull-requests: read
@@ -23,11 +23,14 @@ jobs:
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
       required_checks: '["Gitleaks secret scan","npm audit","Vercel env safety"]'
-
+    needs:
+      - cadence-route
   gitleaks:
     name: Gitleaks secret scan
-    needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    needs:
+      - develop_push_source
+      - cadence-route
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326) || (github.event_name == 'schedule' && github.ref == 'refs/heads/main'))) || needs.cadence-route.outputs.run_legacy == 'true') && (always() && needs.develop_push_source.outputs.validated_by_pr != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -35,86 +38,60 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
       - name: Install Gitleaks
         run: |
           GITLEAKS_VERSION="8.21.2"
           wget -q "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           tar xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           chmod +x gitleaks
-
       - name: Run Gitleaks
         run: ./gitleaks detect --source . --verbose
-
+    permissions:
+      contents: read
   audit:
     name: npm audit
-    needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    needs:
+      - develop_push_source
+      - cadence-route
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326) || (github.event_name == 'schedule' && github.ref == 'refs/heads/main'))) || needs.cadence-route.outputs.run_legacy == 'true') && (always() && needs.develop_push_source.outputs.validated_by_pr != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install dependencies
         run: npm ci
-
       - name: Run security audit (production deps)
-        # Audit production dependencies only (dev vulns don't affect the deployed
-        # application). Threshold is "moderate" so medium-severity issues are caught
-        # before they accumulate into high/critical ones.
         run: npm audit --omit=dev --audit-level=moderate
-
       - name: Report all vulnerabilities (informational)
         if: always()
         run: npm audit || true
-
+    permissions:
+      contents: read
   vercel-env-safety:
     name: Vercel env safety
-    needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    needs:
+      - develop_push_source
+      - cadence-route
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326) || (github.event_name == 'schedule' && github.ref == 'refs/heads/main'))) || needs.cadence-route.outputs.run_legacy == 'true') && (always() && needs.develop_push_source.outputs.validated_by_pr != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TOKEN: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)) && secrets.VERCEL_TOKEN || '' }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-      SECRETS_WITHHELD_PR: >-
-        ${{
-          github.event_name == 'pull_request' &&
+      SECRETS_WITHHELD_PR: |-
+        ${{ !(github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))) || (github.event_name == 'pull_request' &&
           (github.event.pull_request.head.repo.fork == true ||
-           github.event.pull_request.user.login == 'dependabot[bot]')
-        }}
-
+           github.event.pull_request.user.login == 'dependabot[bot]')) }}
     steps:
-      # `.vercel/project.json` is gitignored, so project/org IDs must come
-      # from repository variables instead of a checked-in metadata file.
-      # Configure `VERCEL_PROJECT_ID` and `VERCEL_ORG_ID` under
-      # Settings → Secrets and variables → Actions → Variables.
-      #
-      # VERCEL_TOKEN (a secret) is REQUIRED for this job to do anything.
-      # DO-M2 (#829): it has never been set, so this job used to skip its one
-      # assertion step and still report success on every push/schedule run —
-      # "requiredness without evidence," the same pattern this project
-      # rejected for Dependabot preview smoke tests (see the Dependabot
-      # branch in preview-smoke.yml). Skip-to-pass is reserved for fork and
-      # Dependabot PRs, where GitHub genuinely withholds secrets (expected
-      # sandboxing, not a gap). On push, schedule, and ordinary same-repo PR
-      # runs, a missing token fails the job loudly instead of silently passing.
-      #
-      # ACTION REQUIRED (human, repo admin): add VERCEL_TOKEN under
-      # Settings → Secrets and variables → Actions → Secrets. Until that is
-      # done, this job is EXPECTED to fail on every push/schedule run — that
-      # is the fix working as intended, not a regression.
       - name: Fail when Vercel credentials are unavailable (trusted event)
-        if: >-
+        if: |-
           ${{
             (env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '') &&
             env.SECRETS_WITHHELD_PR != 'true'
@@ -124,9 +101,8 @@ jobs:
           echo "::error::VERCEL_TOKEN is missing. A human with repo admin access must add it under Settings > Secrets and variables > Actions > Secrets before this job can pass again."
           echo "::error::This is the only automated check on deployed Vercel environment state in this repo (DO-M2 / issue #829) — it must fail rather than silently report success while checking nothing."
           exit 1
-
       - name: Skip when Vercel credentials are unavailable (secret-withheld PR)
-        if: >-
+        if: |-
           ${{
             (env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '') &&
             env.SECRETS_WITHHELD_PR == 'true'
@@ -134,7 +110,6 @@ jobs:
         run: |
           echo "GitHub withholds repository secrets from fork and Dependabot PR workflow runs."
           echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."
-
       - name: Assert legacy agent override is absent from Vercel env
         if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_PROJECT_ID != '' && env.VERCEL_ORG_ID != '' }}
         run: |
@@ -143,9 +118,119 @@ jobs:
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&limit=100")"
 
-          echo "$response" | jq -r '.envs[]?.key' > env-keys.txt
+          # A visible partial list cannot establish absence. Keep this parser
+          # inline: token-bearing validation must not import candidate helpers.
+          printf '%s' "$response" | node -e '
+            let input = "";
+            function fail() {
+              console.error("::error::Vercel env safety requires a complete, valid environment list.");
+              process.exit(1);
+            }
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", chunk => {
+              input += chunk;
+              if (Buffer.byteLength(input) > 8 * 1024 * 1024) fail();
+            });
+            process.stdin.on("error", fail);
+            process.stdin.on("end", () => {
+              let body;
+              try { body = JSON.parse(input); } catch { fail(); }
+              const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
+              if (!object(body) || !Array.isArray(body.envs)) fail();
+              if (Object.hasOwn(body, "error") || Object.hasOwn(body, "errors")) fail();
+              const hasPagination = Object.hasOwn(body, "pagination");
+              const hasHiddenCount = Object.hasOwn(body, "hiddenProductionEnvCount");
+              if (!hasPagination && !hasHiddenCount) fail();
+              if (hasHiddenCount && body.hiddenProductionEnvCount !== 0) fail();
+              if (hasPagination) {
+                const page = body.pagination;
+                if (!object(page) || !Number.isSafeInteger(page.count) || page.count !== body.envs.length
+                  || page.next !== null || !(page.prev === null || Number.isSafeInteger(page.prev))) fail();
+              }
+              for (const variable of body.envs) {
+                if (!object(variable) || typeof variable.key !== "string" || variable.key.length === 0
+                  || variable.key.length > 1024 || /[\u0000-\u001f\u007f]/.test(variable.key)) fail();
+              }
+              for (const variable of body.envs) process.stdout.write(variable.key + "\n");
+            });
+          ' > env-keys.txt
 
           if grep -Fxq "$legacy_key" env-keys.txt; then
             echo "::error::Legacy agent runner override is still configured in Vercel. Remove it before deploy."
             exit 1
           fi
+    permissions:
+      contents: read
+  cadence-route:
+    name: Protected cadence routing
+    if: ${{ vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326) || (github.event_name == 'schedule' && github.ref == 'refs/heads/main')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      run_legacy: ${{ steps.route.outputs.run_legacy }}
+    steps:
+      - name: Checkout actual native event
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup reviewed Node runtime
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+      - name: Classify protected native routing
+        id: route
+        env:
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
+          NODE_OPTIONS: ""
+          NODE_PATH: ""
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          unset NODE_OPTIONS NODE_PATH
+          node --input-type=module <<'NODE'
+          import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises';
+          import {execFileSync} from 'node:child_process';
+          import {createHash} from 'node:crypto';
+          import {tmpdir} from 'node:os';
+          import {join} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));
+          let runLegacy=true,temporary;
+          try{
+          const kind=process.env.GITHUB_EVENT_NAME;
+          if(process.env.CI_CADENCE_MODE==='lean'&&['push','pull_request','schedule'].includes(kind)){
+          const revision=kind==='push'?event.before:kind==='schedule'?process.env.GITHUB_SHA:event.pull_request?.base?.sha;
+          if(!/^[a-f0-9]{40}$/.test(revision??'')||revision==='0'.repeat(40))throw Error('Native routing revision');
+          const env={PATH:'/usr/bin:/bin',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_GRAFT_FILE:'/dev/null',GIT_NO_REPLACE_OBJECTS:'1'};
+          const git=(...args)=>execFileSync('/usr/bin/git',['--no-replace-objects','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{env,timeout:5000,maxBuffer:2000000});
+          if(!['https://github.com/juan294/paisaxe.git','https://github.com/juan294/paisaxe'].includes(git('remote','get-url','origin').toString().trim()))throw Error('Routing origin');
+          if(kind==='push')git('update-ref','refs/ci-cadence/protected/'+revision,revision);
+          const entry=git('ls-tree',revision,'--','scripts/ci-cadence-native.mjs').toString();
+          const present=git('ls-tree','--name-only','-z',revision,'--','scripts/ci-cadence.mjs','.github/ci-cadence.json').toString().split('\0').filter(Boolean);
+          // Genuine first installation retains the original context graph, with no
+          // candidate import. Partial/unknown installation also retains full work.
+          if(present.length===2){
+          if(!/^100(?:644|755) blob [a-f0-9]{40}\t/.test(entry))throw Error('Routing module mode');
+          const bytes=git('show',revision+':scripts/ci-cadence-native.mjs');
+          if(createHash('sha256').update(bytes).digest('hex')!=='95d90114925026bc3f5ea7f978080376625241bfece4971de9b906e8bba528b1')throw Error('Routing reviewed bytes');
+          temporary=await mkdtemp(join(tmpdir(),'B-protected-route-'));
+          if(kind==='schedule'){
+          if(!/^100(?:644|755) blob [a-f0-9]{40}\t/.test(git('ls-tree',revision,'--','scripts/ci-cadence-launch.mjs').toString()))throw Error('Routing launcher mode');
+          const launch=git('show',revision+':scripts/ci-cadence-launch.mjs');
+          if(createHash('sha256').update(launch).digest('hex')!=='7af2cc34293872b4eb35f3b54649e85936a86ba5baa4fcc15b208858151e3216')throw Error('Routing launcher reviewed bytes');
+          await writeFile(join(temporary,'launch.mjs'),launch,{flag:'wx',mode:0o600});
+          const result=JSON.parse(execFileSync(process.execPath,[join(temporary,'launch.mjs')],{env:{...process.env,NODE_OPTIONS:'',NODE_PATH:''},timeout:65000,maxBuffer:2000000,stdio:['ignore','pipe','pipe']}).toString());
+          runLegacy=!(result.lane==='nightly'&&result.protectedImported===true&&result.allowDeploy===false);
+          }else{
+          await writeFile(join(temporary,'native.mjs'),bytes,{flag:'wx',mode:0o600});
+          const native=await import(pathToFileURL(join(temporary,'native.mjs')).href);
+          const integer=value=>/^[1-9][0-9]*$/.test(value??'')?Number(value):NaN;
+          const result=await native.classifyNativeEvent({root:process.cwd(),event,eventName:kind,actor:process.env.GITHUB_ACTOR,mode:process.env.CI_CADENCE_MODE,trustedRevision:revision,context:{repository:process.env.GITHUB_REPOSITORY,repositoryId:integer(process.env.GITHUB_REPOSITORY_ID),ownerId:integer(process.env.GITHUB_REPOSITORY_OWNER_ID),actorId:integer(process.env.GITHUB_ACTOR_ID),actorType:event.sender?.type,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF}});
+          runLegacy=result.lane!=='fast';
+          }}}
+          }catch{runLegacy=true;}finally{if(temporary)await rm(temporary,{recursive:true,force:true});}
+          await writeFile(process.env.GITHUB_OUTPUT,'run_legacy='+String(runLegacy)+'\n',{flag:'a'});
+          NODE
