@@ -64,11 +64,11 @@ When users talk to Paisaxe, it responds as:
 
 ## What Paisaxe Is NOT
 
-- **Not a booking engine** - no hotels, flights, or transactions
+- **Not a booking engine** - no hotels, flights, or package travel; the only bookings are local experiences a visitor chooses through conversation, with clear deposit and cancellation terms (see [ADR-0024](../decisions/0024-conversational-experience-booking.md))
 - **Not a comparison site** - no "top 10 hotels" lists
 - **Not cluttered** - no ads, no noise, no typical tourism board feel
 - **Not overwhelming** - not 500 things to do, just beautiful discovery
-- **Not a business** - no monetization, no commercial agenda
+- **Not an ad or listings business** - no paid placement, no sponsored rankings, no selling visitors' attention; when a booking happens, it is because it fits what the visitor asked for
 
 ## Design Principles
 
@@ -93,10 +93,10 @@ A year from now, if Paisaxe is working:
 
 ## Core Values
 
-1. **Discovery over commerce** - help people find beauty, not sell them things
+1. **Discovery before commerce** - help people find beauty first; a booking is the end of a conversation the visitor started, never a push
 2. **Simplicity over features** - resist the urge to add more
 3. **Respect over extraction** - honor the original content creators
-4. **Personal over corporate** - this is a labor of love, not a business
+4. **Personal over corporate** - a labor of love that can sustain itself honestly, without becoming a corporate tourism portal
 
 ## Tagline
 

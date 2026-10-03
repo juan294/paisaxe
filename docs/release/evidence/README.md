@@ -45,6 +45,20 @@ probes:
     deployment_commit: <40-hex>
     checked_at: "2026-07-28T19:59:00Z"
 
+# Optional. Only when the release plan requires a production acceptance step
+# (release-checklist.md section 5b). Kept apart from probes: the analyzer does not read it,
+# but a required acceptance step that failed or is missing blocks tagging.
+acceptance:
+  journey: voucher-booking-roundtrip   # the journey the release plan names
+  status: passed                       # passed | failed
+  authorized_in: "conversation of 2026-11-05"
+  ids:                                 # provider identifiers only; never tokens or credentials
+    order: <order id>
+    capture: <capture id>
+    refund: <refund id>
+    webhook_events: [<event id>]
+  checked_at: "2026-11-05T19:30:00Z"
+
 # Optional. An exception NEVER excuses a required probe, and an expired one blocks
 # outright — remove it rather than shipping with it.
 exceptions:

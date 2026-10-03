@@ -1,0 +1,73 @@
+{
+  "recordedAt": "2026-10-03T14:08:41.862Z",
+  "mode": "server-capture",
+  "apiBase": "https://api-m.sandbox.paypal.com",
+  "orderId": "5E496120FM196690K",
+  "createStatus": "PAYER_ACTION_REQUIRED",
+  "createDebugId": "f645657144099",
+  "returnedAtMs": 86947,
+  "approvalWebhookAtMs": 100129,
+  "getOrderBeforeCapture": "APPROVED",
+  "capture": {
+    "http": 201,
+    "orderStatus": "COMPLETED",
+    "captureId": "55C1718857335004P",
+    "captureStatus": "COMPLETED",
+    "amount": {
+      "currency_code": "EUR",
+      "value": "30.00"
+    }
+  },
+  "recaptureSameRequestId": {
+    "http": 201,
+    "captureId": "55C1718857335004P",
+    "sameCapture": true
+  },
+  "recaptureNewRequestId": {
+    "http": 201,
+    "issue": null
+  },
+  "refund": {
+    "http": 201,
+    "refundId": "9C560786T0139705C",
+    "status": "COMPLETED"
+  },
+  "refundLater": {
+    "status": "COMPLETED"
+  },
+  "webhooks": [
+    {
+      "receivedAtMs": 100129,
+      "eventId": "WH-1PV2024973077974R-7X8769942S685491N",
+      "eventType": "CHECKOUT.ORDER.APPROVED",
+      "resourceId": "5E496120FM196690K",
+      "verification": "SUCCESS"
+    },
+    {
+      "receivedAtMs": 123230,
+      "eventId": "WH-3UW196909C4294939-7P922996HL0013837",
+      "eventType": "PAYMENT.CAPTURE.REFUNDED",
+      "resourceId": "9C560786T0139705C",
+      "verification": "SUCCESS"
+    }
+  ],
+  "eventNamesObserved": [
+    "CHECKOUT.ORDER.APPROVED",
+    "PAYMENT.CAPTURE.REFUNDED"
+  ],
+  "log": [
+    "+0.0s listening on 8787; public base https://decade-canberra-see-designed.trycloudflare.com; mode server-capture; webhook verification on",
+    "+1.5s order 5E496120FM196690K status PAYER_ACTION_REQUIRED",
+    "+86.9s buyer returned with order 5E496120FM196690K",
+    "+100.1s webhook CHECKOUT.ORDER.APPROVED resource=5E496120FM196690K verification=SUCCESS",
+    "+101.0s getOrder before capture: APPROVED",
+    "+102.5s capture http 201 order COMPLETED capture 55C1718857335004P COMPLETED",
+    "+104.0s re-capture same request id: http 201 capture 55C1718857335004P",
+    "+104.9s re-capture new request id: http 201 ",
+    "+106.6s refund http 201 9C560786T0139705C COMPLETED",
+    "+106.9s getCapture after refund: REFUNDED",
+    "+107.7s getRefund: COMPLETED",
+    "+107.7s waiting 90 s for remaining webhooks",
+    "+123.2s webhook PAYMENT.CAPTURE.REFUNDED resource=9C560786T0139705C verification=SUCCESS"
+  ]
+}

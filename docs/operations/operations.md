@@ -204,7 +204,7 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Database activity safeguard |
 | `content-discovery` | Weekly Monday 3:00 AM UTC (`0 3 * * 1`) | Vercel Cron | Discovers new Asturias places via Google Places API |
 | `fail-stale-translations` | Every 15 minutes (`*/15 * * * *`) | Vercel Cron | Mark stories stuck in `translating` state as failed |
-| `fail-stale-bookings` | Every 5 minutes (`*/5 * * * *`) | Vercel Cron | Mark bookings stuck in a pending/in-progress state as failed |
+| `fail-stale-bookings` | Every 5 minutes (`*/5 * * * *`) | Vercel Cron | Mark bookings stuck in `initiating` for over 5 minutes as `orphaned` (needs attention), not failed: a late ElevenLabs webhook can still reconcile them |
 | `github-traffic-sync` | Every 6 hours (`0 */6 * * *`) | Vercel Cron | Sync GitHub traffic stats to admin dashboard |
 | `subscription-optimizer` | Weekly Monday 4:00 AM UTC (`0 4 * * 1`) | Vercel Cron | Analyze service costs and spending |
 | `retry-booking-sms` | Every 10 minutes (`*/10 * * * *`) | Vercel Cron | Retry failed booking SMS confirmations (up to 3 attempts per job) |

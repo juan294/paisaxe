@@ -1,0 +1,141 @@
+{
+  "recordedAt": "2026-10-03T13:48:01.720Z",
+  "model": "claude-sonnet-5",
+  "sdk": "@anthropic-ai/sdk",
+  "transport": "sdk (standalone tsx process, not the Next.js dev server)",
+  "iterations": [
+    {
+      "stopReason": "tool_use",
+      "blockTypes": [
+        "tool_use"
+      ],
+      "usage": {
+        "input_tokens": 660,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 104,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      }
+    },
+    {
+      "stopReason": "end_turn",
+      "blockTypes": [
+        "text"
+      ],
+      "usage": {
+        "input_tokens": 832,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 87,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      }
+    }
+  ],
+  "toolCalled": true,
+  "priceInFinalTextFromTool": true,
+  "finalText": "Para 4 personas el 24-10-2026, la Senda Costera sale así:\n\n- **Total:** 120 €\n- **Depósito (reserva):** 30 €\n- **Resto a pagar:** 90 €\n\n¿Confirmamos la reserva?",
+  "totalMs": 2921,
+  "events": [
+    {
+      "iteration": 1,
+      "msSinceStart": 1156,
+      "type": "message_start",
+      "count": 1
+    },
+    {
+      "iteration": 1,
+      "msSinceStart": 1156,
+      "type": "content_block_start",
+      "detail": "tool_use",
+      "count": 1
+    },
+    {
+      "iteration": 1,
+      "msSinceStart": 1156,
+      "type": "content_block_delta",
+      "detail": "input_json_delta",
+      "count": 7
+    },
+    {
+      "iteration": 1,
+      "msSinceStart": 1678,
+      "type": "content_block_stop",
+      "count": 1
+    },
+    {
+      "iteration": 1,
+      "msSinceStart": 1678,
+      "type": "message_delta",
+      "detail": "tool_use",
+      "count": 1
+    },
+    {
+      "iteration": 1,
+      "msSinceStart": 1678,
+      "type": "message_stop",
+      "count": 1
+    },
+    {
+      "iteration": 1,
+      "msSinceStart": 1679,
+      "type": "tool_executed",
+      "detail": "get_quote valid=true",
+      "count": 1
+    },
+    {
+      "iteration": 2,
+      "msSinceStart": 2300,
+      "type": "message_start",
+      "count": 1
+    },
+    {
+      "iteration": 2,
+      "msSinceStart": 2300,
+      "type": "content_block_start",
+      "detail": "text",
+      "count": 1
+    },
+    {
+      "iteration": 2,
+      "msSinceStart": 2300,
+      "type": "content_block_delta",
+      "detail": "text_delta",
+      "count": 14
+    },
+    {
+      "iteration": 2,
+      "msSinceStart": 2920,
+      "type": "content_block_stop",
+      "count": 1
+    },
+    {
+      "iteration": 2,
+      "msSinceStart": 2920,
+      "type": "message_delta",
+      "detail": "end_turn",
+      "count": 1
+    },
+    {
+      "iteration": 2,
+      "msSinceStart": 2920,
+      "type": "message_stop",
+      "count": 1
+    }
+  ]
+}

@@ -50,7 +50,7 @@ develop   # Active development (DEFAULT)
 1. **Push to `main`** — NEVER. Not even a typo fix.
 2. **Create a PR targeting `main`** — NEVER. Only when the user requests a release.
 3. **Merge a PR into `main`** — NEVER. The user merges production PRs themselves or gives explicit authorization.
-4. **Run `vercel` deploy commands** — NEVER for production. Preview deployments on `develop` are fine.
+4. **Run `vercel` deploy commands** — NEVER for production. Do not create Preview deployments either: the only permitted Preview is the release PR's (see Production Release).
 5. **Modify Supabase production data** — NEVER. Migrations must be reviewed.
 6. **Modify Vercel environment variables** — NEVER. The user does this.
 7. **Modify DNS, domain settings, or external service configs** — NEVER.
@@ -91,6 +91,13 @@ improvise a different sequence here or in any other file. Its ordering is:
 6. Analyze the evidence — `npm run analyze-release`
 7. Obtain authorization
 8. **Tag last** — no tag without a passing analyzer run for the shipped tree
+
+Two standing rulings live in the checklist: the release PR's Vercel Preview is the only permitted
+Preview (section 3), and a feature that needs a mutating production check uses the separate,
+owner-authorized acceptance step (section 5b), never the read-only probes. These are
+project-specific overrides of the installed rules: where `.rpi/rules/deployment-safety.md`,
+`AGENTS.md` or `.claude/rules/` say "Never create Vercel Previews", the release PR's Preview
+is the documented exception, and a release must not be stopped over it.
 
 The user requests a release; the agent never initiates one. **Never bypass branch protection.**
 If CI fails on the PR, fix on `develop` first, push, and let the PR update.

@@ -15,6 +15,7 @@ never sufficient, and authorization never carries over from a previous conversat
 3. Merge and deploy
 4. Verify the deployed identity
 5. Run the required probes
+   - 5b. Production acceptance step — only when the release plan requires one; separately owner-authorized
 6. Analyze the evidence
 7. Obtain authorization
 8. Tag — **last**
@@ -51,6 +52,7 @@ gh run list --branch develop --limit 3
 npm run test && npm run typecheck && npm run lint
 npm run check-migrations             # required probe: migration-posture
 npm run check-required-probes        # manifest and Playwright must agree
+npm run check-env                    # every process.env read is registered (otherwise CI-only)
 npm run prelaunch
 ```
 
@@ -67,7 +69,8 @@ It falls back explicitly to the `main`/`develop` merge-base — and says so — 
 resolves yet.
 
 Mutating verification runs against the local Docker stack, never a deployed environment —
-Preview shares the production Supabase project and holds live-mode Stripe keys.
+Preview shares the production Supabase project and holds live-mode Stripe keys. The only
+exception is the separately authorized production acceptance step in section 5b.
 
 ```bash
 npx supabase start                   # local Postgres on :54322
@@ -89,6 +92,14 @@ gh pr checks                          # all five required checks must pass
 
 Required contexts: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`,
 `Smoke test Vercel preview`.
+
+**Release PR Preview exception (owner decision, 2026-10-02; ADR-0024 decision 11).** The
+`Smoke test Vercel preview` check needs a Vercel Preview of the release pull request, and
+the project rule otherwise forbids creating Previews. The Preview built for the
+`develop` → `main` release pull request is the standing, documented exception. No other
+Preview is created for experimentation, feature work or debugging. Remember that this
+Preview runs against the production Supabase project and live Stripe keys: it is a
+read-only smoke target, never a place to exercise mutating flows.
 
 Report status and **stop**. Only after the user says "merge it":
 
@@ -143,6 +154,31 @@ manifest.
 
 No probe may be skipped. A probe whose prerequisites are missing fails — that is deliberate, and
 a skipped required probe blocks the release exactly like a failed one.
+
+## 5b. Production acceptance step (owner-authorized, only when a release requires it)
+
+Some features cannot be proven by read-only probes, for example the voucher-gated PayPal
+sandbox booking flow (ADR-0024 decision 12). For those, and only after the required probes
+in step 5 pass:
+
+1. Obtain explicit authorization for this step in the current conversation. Authorization
+   for the release does not include it.
+2. Run exactly the journey the release plan names against the deployed origin, using
+   **fixture data only** (the labelled demo merchant, a voucher, PayPal sandbox accounts).
+   Never touch real users' data and never use live payment credentials.
+3. Record the identifiers it produced (for the booking flow: order, capture, refund and
+   webhook event ids) in the evidence manifest under a separate `acceptance` key. Keep them
+   apart from the probe results: the analyzer's verdict covers the read-only probes, and
+   this step does not change that verdict.
+4. If the step fails, the feature stays disabled by its flag and the failure is fixed on
+   `develop` with a corrective release; if the site itself is affected, roll back first.
+   A failed or skipped acceptance step blocks tagging (step 8) for a release whose plan
+   requires it, even though the analyzer does not read the `acceptance` key.
+5. The fixture rows it writes stay in production, marked as fixtures (for the booking flow,
+   every row belongs to a merchant with `is_fixture = true`), so they can be told apart from
+   real data and excluded from reporting. Do not delete them by hand.
+
+The required probes themselves stay strictly read-only.
 
 ## 6. Analyze the evidence
 
