@@ -455,6 +455,26 @@ export const de: Translations = {
     footer_about: 'Über Paisaxe',
   },
 
+  booking: {
+    access: {
+      title: 'Zugang zu Buchungen',
+      intro: 'Gib den Code ein, den du erhalten hast, um ein Erlebnis zu buchen und mit Pelayo zu sprechen.',
+      codeLabel: 'Zugangscode',
+      codePlaceholder: 'Code hier einfügen',
+      submit: 'Weiter',
+      submitting: 'Wird geprüft…',
+      invalid: 'Dieser Code ist ungültig.',
+      expired: 'Dieser Code ist abgelaufen.',
+      exhausted: 'Dieser Code lässt keine weiteren Besucher zu.',
+      contactHint: 'Wenn du glaubst, dass das ein Fehler ist, bitte die Person, die ihn dir geschickt hat, um einen neuen Code.',
+      anonFailed: 'Die Gastsitzung konnte nicht gestartet werden. Bitte versuche es später erneut.',
+      limitReached: 'Du hast alles genutzt, was dieser Code enthält. Bitte um einen neuen, um fortzufahren.',
+      rateLimited: 'Zu viele Versuche. Warte eine Minute und versuche es erneut.',
+      failed: 'Der Code konnte nicht geprüft werden. Bitte versuche es erneut.',
+      welcome: 'Willkommen! Der Buchungsassistent wird geöffnet…',
+    },
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

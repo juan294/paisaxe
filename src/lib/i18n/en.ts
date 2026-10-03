@@ -455,6 +455,26 @@ export const en: Translations = {
     footer_about: 'About Paisaxe',
   },
 
+  booking: {
+    access: {
+      title: 'Booking access',
+      intro: 'Enter the code you received to book an experience and talk to Pelayo.',
+      codeLabel: 'Access code',
+      codePlaceholder: 'Paste your code here',
+      submit: 'Enter',
+      submitting: 'Checking…',
+      invalid: 'This code is not valid.',
+      expired: 'This code has expired.',
+      exhausted: 'This code cannot admit any more visitors.',
+      contactHint: 'If you think this is a mistake, ask whoever sent it to you for a new code.',
+      anonFailed: 'Could not start a guest session. Please try again later.',
+      limitReached: 'You have used everything this code includes. Ask for a new one to continue.',
+      rateLimited: 'Too many attempts. Wait a minute and try again.',
+      failed: 'Could not check the code. Please try again.',
+      welcome: 'Welcome! Opening the booking assistant…',
+    },
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

@@ -713,6 +713,34 @@ describe("Root path redirect", () => {
   });
 });
 
+describe("Booking surface gate (PayPal hackathon Phase 2)", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  // Without Supabase configuration the experience_booking flag reads as off,
+  // so the surface is closed.
+  it("answers /acceso with the closed rewrite (a real 404) and still sets the CSP", async () => {
+    const response = await proxy(new NextRequest("https://paisaxe.es/acceso"));
+
+    expect(response.headers.get("x-middleware-rewrite")).toBe("https://paisaxe.es/_booking-surface-closed");
+    expect(response.headers.get("Content-Security-Policy")).toContain("default-src");
+    expect(response.headers.get("X-Request-ID")).toBeTruthy();
+  });
+
+  it("does not touch other pages", async () => {
+    const response = await proxy(new NextRequest("https://paisaxe.es/immersive"));
+
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+});
+
 describe("Auth session refresh timeout", () => {
   // Real Supabase anon keys are JWTs starting with 'eyJ' (base64 JWT header)
   const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";

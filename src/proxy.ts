@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleCanonicalDomain } from "@/lib/proxy/canonical-domain";
 import { handleMaintenanceMode } from "@/lib/proxy/maintenance";
+import { handleBookingSurface } from "@/lib/proxy/booking-surface";
 import { handleRootRedirect } from "@/lib/proxy/root-redirect";
 import { handleCORS, addCORSHeaders } from "@/lib/proxy/cors";
 import { handleCsrfValidation, setCsrfCookie } from "@/lib/proxy/csrf-proxy";
@@ -44,6 +45,15 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (maintenanceResponse) {
     maintenanceResponse.headers.set("X-Request-ID", requestId);
     return maintenanceResponse;
+  }
+
+  // 2b. Voucher entry: real 404 while the booking surface is closed, and the
+  //     /access alias. Reads the flag for those two paths only.
+  const bookingSurfaceResponse = await handleBookingSurface(request);
+  if (bookingSurfaceResponse) {
+    bookingSurfaceResponse.headers.set("Content-Security-Policy", buildCspHeader());
+    bookingSurfaceResponse.headers.set("X-Request-ID", requestId);
+    return bookingSurfaceResponse;
   }
 
   // 3. Handle CORS preflight for API routes

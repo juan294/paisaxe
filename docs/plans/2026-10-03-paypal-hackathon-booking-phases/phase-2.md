@@ -126,3 +126,42 @@ owner defers it, record that production anonymous sign-in is still off and that 
 cannot proceed until it is on.
 
 Stop for acceptance.
+
+## Handoff (2026-10-03)
+
+**Status:** implemented, independently reviewed (no blocker or major findings; every
+finding dispositioned), simplified and verified locally. Merged into `develop` by owner
+instruction in the implementing conversation ("Commit, merge to develop and prune the
+tree"). Not pushed.
+
+- **Scope delivered:** migration 118; the voucher, metering, gate and surface modules; the
+  redeem and access routes; the `/acceso` page and form; the proxy gate for `/acceso` and
+  `/access`; `useBookingAccess`; the `experience_booking` flag key; `booking.access.*` in six
+  locales; `scripts/booking/create-voucher.ts`; local anonymous sign-ins in `config.toml`.
+- **Identity:** branch `feature/voucher-gate`
+  in `/Users/juan/code/paisaxe-hackathon-phase2`, based on `develop` `07066e55`.
+- **Deviations, findings, simplify:** notes file, "Phase 2" sections (deviations 1 to 12,
+  review findings 1 to 12, simplify pass).
+- **Evidence (local, on the final tree before commit):**
+  - **Static checks:** `check-migrations`, `typecheck`, `lint`, `check-env`, `check-required-probes`, `check-verification-coverage` and `knip` exit 0. `npm run build` exits 0 with no `[FEATURE_FLAG_FAILURE]` at build time.
+  - **Full suite:** `npx vitest run --maxWorkers=4` exits 0, with 439 files and 8,226 tests. The local stack was up, migrations 112 to 118 were freshly reset, and nothing was skipped.
+  - **Mutation check:** without `FOR UPDATE` in `redeem_voucher`, the forced cap race redeems twice and its test fails.
+  - **Local production build, real status codes:**
+    - flag off: `/acceso` 404 and `/access` 404;
+    - flag on: `/acceso` 200 and `/access` 307 to `/acceso`.
+  - **Manual flow over HTTP** (deviation 9): two anonymous guests and one password user redeemed a script-created code. Each got `voucher_pass` voice access and an active booking gate; a fourth identity at a cap of 3 got `exhausted` and a 404 gate. In Chrome, the guest-sign-in failure path showed its message and `[VOUCHER_ANON_SIGNIN_FAILED]`.
+- **Not done, needs the owner:** production anonymous sign-ins (deviation 10).
+- **Entry conditions carried forward:**
+  - **Phase 3:**
+    - The booking chat route uses `requireBookingAccess(request)`, which returns the redemption id and limits. It calls `consume(client, redemptionId, "chat_turns")` per turn and `"booking_attempts"` on accept. `{allowed:false}` maps to the typed `limit_reached` error and the `booking.access.limitReached` text.
+    - Show the booking entry from `useBookingAccess().active`.
+    - Run `get_quote` calls for one draft sequentially, or add a locked `create_quote` RPC (Phase 1 simplify).
+    - Under `next dev`, set the file limit (`ulimit -n 65536`) and `WATCHPACK_POLLING=true` (EMFILE otherwise).
+    - A local dev or production server must not use `.env.local` (it targets production): pass the local Supabase variables explicitly. The CSRF allowlist accepts only `http://localhost:3006` in development.
+  - **Phase 4:**
+    - The capability pages `/booking/<capability>` and `/operator/<capability>` cannot return a real 404 from the page under PPR (deviation 5). Decide whether the proxy answers them, generalizing `lib/proxy/booking-surface.ts` into a rule table (Preview → 404 for those prefixes; the headers `Referrer-Policy`, `Cache-Control`, `X-Robots-Tag`), and how an invalid capability gets a real 404 (needs a database check: a route handler or a proxy lookup). The Phase 6 probe `booking-gate-closed` depends on it.
+    - The local `booking-roundtrip` E2E needs Playwright `bypassCSP: true` on its local project (deviation 9).
+  - **Phase 7:**
+    - The owner authorizes enabling production anonymous sign-ins.
+    - Before that, sweep the routes that treat any signed-in user as an identity (`checkout/embedded` at least should require a non-anonymous user; `favorites`, `suggestions`) (review finding 8).
+- **Next action:** Phase 3 in `../paisaxe-hackathon-phase3` from the merged `develop`.

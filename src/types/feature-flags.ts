@@ -15,7 +15,8 @@ export type FeatureFlagKey =
   | "sms_booking_confirmation"
   | "maintenance_mode"
   | "user_story_suggestions"
-  | "fullscreen_button";
+  | "fullscreen_button"
+  | "experience_booking";
 
 export interface VisitorVoiceConfig {
   whitelisted_emails: string[];

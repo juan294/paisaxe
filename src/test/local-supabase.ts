@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Shared helpers for tests that exercise a REAL local Supabase Docker stack
@@ -90,4 +91,14 @@ export function warnLocalSupabaseUnreachable(testFile: string): void {
     `[${testFile}] Local Supabase stack not reachable at ${LOCAL_REST_URL} — ` +
       "skipping live verification. Run `supabase start` to enable it."
   );
+}
+
+/** A service-role client for the local stack (what createAdminClient() does in the app). */
+export function localServiceClient(): SupabaseClient {
+  return createClient(LOCAL_API_URL, LOCAL_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+}
+
+/** `'a', 'b'` for a SQL IN list of fixed test ids. */
+export function sqlList(ids: string[]): string {
+  return ids.map((id) => `'${id}'`).join(", ");
 }

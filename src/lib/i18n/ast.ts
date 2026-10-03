@@ -454,6 +454,26 @@ export const ast: Translations = {
     footer_about: 'Tocante a Paisaxe',
   },
 
+  booking: {
+    access: {
+      title: 'Accesu a les reserves',
+      intro: 'Escribi\'l códigu que recibisti pa reservar una esperiencia y falar con Pelayu.',
+      codeLabel: 'Códigu d\'accesu',
+      codePlaceholder: 'Pega equí el to códigu',
+      submit: 'Entrar',
+      submitting: 'Comprobando…',
+      invalid: 'Esti códigu nun ye válidu.',
+      expired: 'Esti códigu caducó.',
+      exhausted: 'Esti códigu yá nun almite más visitantes.',
+      contactHint: 'Si crees que ye un fallu, pidi un códigu nuevu a quien te lu unvió.',
+      anonFailed: 'Nun se pudo aniciar la sesión de convidáu. Volvi tentalo más sero.',
+      limitReached: 'Usasti tolo qu\'inclúi esti códigu. Pidi ún nuevu pa siguir.',
+      rateLimited: 'Demasiaos intentos. Espera un minutu y volvi probar.',
+      failed: 'Nun se pudo comprobar el códigu. Volvi tentalo.',
+      welcome: '¡Bienveníu! Abriendo l\'asistente de reserves…',
+    },
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

@@ -136,6 +136,86 @@ Four cleanup reviews (reuse, simplification, efficiency, altitude) after the app
   - **`updateDraft` update-first:** saves one round trip; marginal.
   - **Shared quote and booking field mapping:** optional.
 
+### Phase 2
+
+1. **Redemption is one atomic RPC (`redeem_voucher`, migration 118).**
+   - Plan said: in the route, look up the voucher, serve an existing redemption, else check `redemptions_count < max_redemptions`, insert, increment the count, then call `grant_voucher_voice_pass_idempotent`.
+   - Found: done as separate statements, two new guests can both pass the count check, and a failed grant after the insert leaves a redemption without a pass (the plan's own test wants "RPC failure → 500 and no counter change").
+   - Chose: one SECURITY DEFINER function that locks the voucher row, serves an existing redemption even at the cap, counts redemptions under the lock (no `redemptions_count` column), inserts, and grants the pass in the same transaction. A failed grant rolls the redemption back.
+   - Why: the cap and the rollback are guarantees only inside one transaction. Integration tests cover the race, the cap, the rollback and the returning user.
+2. **The voice pass and voucher expiry are judged on a clock the server passes in (`p_now`).**
+   - Plan said: date-advanced tests at 2026-12-01, 12-14 and 12-17.
+   - Found: the database clock cannot be moved, and `grant_voucher_voice_pass_idempotent` compared against `now()`.
+   - Chose: migration 118 adds `p_now` (default `now()`) to the grant function, and `redeem_voucher` takes `p_now` from the route (`new Date()`).
+   - Why: the date-advanced integration test exercises the production code path, not a mock.
+3. **`consume_voucher_counter` returns `{allowed, remaining}`.**
+   - Plan said: `consume(...) -> {allowed, remaining}`; migration 114 returned `consumed | limit_reached`.
+   - Chose: migration 118 redefines the function (Phase 1 was closed, so not an edit to 114, as phase-2.md asks).
+4. **Vouchers can be revoked (`vouchers.revoked_at`); a revoked code reports `invalid`.**
+   - Plan said: `--replace <label>` "deactivates a voucher".
+   - Why: a deactivation state is needed; reporting a revoked code as `invalid` reveals nothing about a leaked code.
+5. **`/acceso` is gated in `proxy.ts`, and the page is static.**
+   - Plan said: `/acceso` returns 404 when the flag is off or on a Preview (`requireBookingSurface`).
+   - Found: under PPR (`cacheComponents`) a `notFound()` in the page arrives after the shell has been sent with 200. Observed on a local production build: flag off → HTTP 200 with the not-found fallback streamed. A page-level `connection()` also triggered Next's blocking-route error in development.
+   - Chose: `src/lib/proxy/booking-surface.ts` rewrites `/acceso` and `/access` to an unmatched path while the surface is closed (a real 404 with the standard not-found page) and redirects `/access` to `/acceso` with 307. The flag and Preview rule moved to `src/lib/booking/surface.ts` so the proxy imports no auth or admin client. Verified on a local production build: flag off → 404 for both paths; flag on → 200 and 307.
+   - Why: the contract is a 404. Phase 4's capability pages face the same PPR limit (Phase 4 entry conditions in the Phase 2 handoff, `phase-2.md`).
+6. **`src/types/voice-access.ts` is unchanged.**
+   - Plan said: add `voucher_pass` to the purchase-type union there.
+   - Found: `VoiceAccessResponse.purchaseType` is already `string | null`; no union exists. Readers grant access on expiry alone, and `GET /api/voice-access` returned `voucher_pass` for an anonymous guest in the integration test.
+7. **`create-voucher.ts` has no `--voice-hours`, and targets local by default.**
+   - Plan said: `--voice-hours 24` (or `--no-voice`).
+   - Chose: the pass is fixed at 24 hours (`VOICE_PASS_HOURS`); `--no-voice` is supported. `--target production` requires `--yes-production` and reads `.env.local`.
+   - Why: a per-voucher duration would need a column for a value the plan fixes at 24 hours; the default target avoids an accidental production write.
+8. **Codes are 32 random bytes as 52 base32 characters (A to Z, 2 to 7).**
+   - Why: the plan asks for 32-byte random codes within the 8 to 64 character input limit; base32 survives the uppercase normalization.
+9. **The manual browser check could not complete the success path locally.**
+   - Plan said: a fresh browser redeems a voucher created by the script; a second browser and a Google user redeem too.
+   - Found: the CSP's `connect-src` allows only `https://*.supabase.co`, so a browser on localhost cannot reach the local stack at `http://127.0.0.1:54321` (verified: `securitypolicyviolation` on `connect-src`). Local Google OAuth is not configured.
+   - Chose: the success path was verified over HTTP against a local production build using the browser's exact calls: real anonymous sign-ins, the `__csrf` cookie and header, and the Bearer token. Two anonymous guests and one email/password (non-anonymous) user redeemed one script-created code. `/api/voice-access` reported `voucher_pass` for each, and a fourth identity at a cap of 3 got `exhausted`. In Chrome, the failure path was verified: the `anonFailed` message and `[VOUCHER_ANON_SIGNIN_FAILED]` in the console.
+   - Why: the CSP is intentional (plan P1: no CSP change). **Phase 4 entry condition:** the local `booking-roundtrip` E2E needs Playwright's test-only `bypassCSP` on its local project.
+10. **Production anonymous sign-in was not changed.** No owner authorization was given in the implementing conversation. Production anonymous sign-ins remain off (unchanged; not read). **Phase 7 cannot proceed until the owner authorizes enabling it.** Local `supabase/config.toml` has it on.
+11. **`next dev` rewrites `AGENTS.md`.** Next 16.3 appends a "nextjs-agent-rules" block to `AGENTS.md` whenever `next dev` runs. It was restored to HEAD and not committed; whether to keep that block is the owner's decision.
+12. **Smaller departures.**
+    - `booking.access.*` has more keys than the plan's list (`intro`, `codeLabel`, `submitting`, `contactHint`, `rateLimited`, `failed`).
+    - Refusals get one message per reason (invalid, expired, exhausted) plus a contact hint, instead of the stuck-state table's single "Este acceso no es válido o ha caducado".
+    - No retry on `23503`: the profile trigger is synchronous, and the anonymous-guest integration test passes without it.
+    - The planned `acceso/page.test.tsx` cases (`anonFailed`, `invalid`) live in `voucher-form.test.tsx`, because the page is now static.
+
+### Phase 2 review dispositions
+
+Independent review of 2026-10-03 (fresh context; it ran 593 related tests, with the voucher integration suite live). No blocker or major findings.
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| 1 | A submit before hydration could send the code as `GET /acceso?code=…` (history, logs, PostHog) | **Fixed:** `method="post"`, no `name` on the input; test |
+| 2 | Submitting while auth loads could replace a Google session with a guest one | **Fixed:** submit disabled while auth is loading; test |
+| 3 | `--replace` on a capped voucher locks out returning users; revoke then insert was not atomic | **Fixed:** the new code is inserted first, then the label's other active codes are revoked (never the new one). The script documents `--replace` for leaked codes only; a capped voucher gets a new label without `--replace`; test |
+| 4 | The closed `/acceso` 404 lacked the CSP header | **Fixed:** the proxy sets the CSP on that response; test |
+| 5 | The redeem race test did not force the interleaving | **Fixed:** the voucher row lock is held in a separate session until both callers queue. Mutation check: without `FOR UPDATE` in `redeem_voucher`, both redeem (`['ok','ok']`) and the test fails |
+| 6 | No test of the proxy wiring | **Fixed:** two cases in `src/proxy.test.ts` |
+| 7 | The CSP blocks every local browser flow | **Recorded:** deviation 9; Phase 4 entry condition (`bypassCSP` for the local Playwright project) |
+| 8 | No consumer sweep for anonymous users (`authenticated` role, nothing checks `is_anonymous`): `checkout/embedded` could sell a Stripe pass to a throwaway identity; `favorites`, `suggestions` | **Phase 7 entry condition:** before production anonymous sign-ins are enabled, sweep the routes that treat a user as an identity and decide per route (at least checkout should require a non-anonymous user) |
+| 9 | Some tests could not fail (`metering.test.ts` echo, hook 404, trivial page test) | **Fixed in part:** the hook 404 case now returns an `active:true` body that must be ignored. The metering unit test stays as a contract test; its behaviour is proven by the live concurrency test. The page test is trivial by design now that the gate is in the proxy |
+| 10 | The revoked filter was asserted on the fake only | **Fixed:** the live test asserts `findActiveRedemption` does not serve the revoked voucher |
+| 11 | `role="alert"` inside `aria-live`; a 401 maps to `failed`; the access 404 lacked `no-store` | **Fixed:** single live region; `no-store` on the 404 with a test. The 401 mapping is kept: the form always sends a fresh token, so a 401 there is an unexpected failure |
+| 12 | The script imports `src/test/local-supabase` for the local keys | **Kept:** those are the CLI's public demo keys, defined once; duplicating them in `scripts/` would let the two drift |
+
+### Phase 2 simplify pass
+
+Four cleanup reviews (reuse, simplification, efficiency, altitude) after the review fixes.
+
+- **Applied:**
+  - The live-test row-lock helpers (`lockRow`, `releaseRowLock`, `waitForBackendCount`) moved to `src/test/local-supabase-locks.ts`, shared by both booking integration suites. `localServiceClient` and `sqlList` moved to `src/test/local-supabase.ts`.
+  - The voucher form keeps one state value instead of three flags; the guest sign-in returns early when no client exists.
+  - `useBookingAccess` derives `active` from `limits` and re-checks only when the user id changes, not on every token refresh (the auth provider emits a new user object per auth event). Its unused `refresh` is removed.
+  - `vouchers.ts` has one `toLimits` mapping; `hashVoucherCode` hashes the canonical code as given.
+  - `create-voucher.ts` parses arguments with `node:util` `parseArgs`.
+- **Skipped:**
+  - **A general route-rule table in the proxy (altitude).** Phase 4 decides the shape when `/booking/*` and `/operator/*` arrive; see the entry condition in `phase-2.md`.
+  - **One shared SQL predicate for "active voucher" (altitude).** It is defined in `redeem_voucher` and in `findActiveRedemption`; `consume_voucher_counter` relies on callers passing the gate first. Low risk at this scale.
+  - **Dropping `redemptionId` from the redeem result (simplification).** The live tests read it.
+  - **Running the flag and `getUser` in parallel in the gate (efficiency).** It would spend an Auth call while the surface is closed.
+
 ## Owner decisions after Phase 0
 
 Recorded 2026-10-03, when the owner accepted Phase 0.

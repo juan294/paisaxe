@@ -12,21 +12,21 @@
  * Requires `supabase start` (local Docker) and self-skips when the stack is
  * not reachable, like the other *.postgrest-integration tests.
  */
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LOCAL_ANON_KEY,
-  LOCAL_API_URL,
   LOCAL_DB_CONTAINER,
   LOCAL_REST_URL,
-  LOCAL_SERVICE_ROLE_KEY,
   isLocalSupabaseReachable,
+  localServiceClient,
   psql,
+  sqlList,
   warnLocalSupabaseUnreachable,
 } from "@/test/local-supabase";
+import { lockRow, releaseRowLock, waitForBackendCount } from "@/test/local-supabase-locks";
 import { acceptQuote, createQuote } from "./quotes";
 import { searchExperiences } from "./availability";
 import { getOrCreateOpenDraft, updateDraft } from "./drafts";
@@ -49,7 +49,6 @@ const USER_A = "b0010000-0000-4000-8000-0000000000a1";
 const USER_B = "b0010000-0000-4000-8000-0000000000b1";
 const ALL_USERS = [USER_A, USER_B];
 
-const sqlList = (ids: string[]) => ids.map((id) => `'${id}'`).join(", ");
 const USERS_SQL = sqlList(ALL_USERS);
 const EXPS_SQL = sqlList([EXP_SMALL, EXP_BIG]);
 
@@ -74,16 +73,14 @@ const BOOKING_RPCS = [
   "reacquire_hold(uuid)",
   "consume_hold_and_confirm(uuid, text)",
   "expire_holds()",
-  "grant_voucher_voice_pass_idempotent(uuid, timestamptz)",
+  "grant_voucher_voice_pass_idempotent(uuid, timestamptz, timestamptz)",
+  "redeem_voucher(text, uuid, timestamptz, timestamptz)",
   "consume_voucher_counter(uuid, text)",
   "upsert_paypal_event(text, text, jsonb, text, text, text, text, text)",
   "mark_paypal_event_processed(text)",
   "mark_paypal_event_failed(text, text)",
 ];
 
-function serviceClient() {
-  return createClient(LOCAL_API_URL, LOCAL_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-}
 
 /** A future date (Madrid slots are always in the future 20+ days ahead). */
 function futureDate(daysAhead: number): string {
@@ -153,7 +150,7 @@ function insertQuote(args: {
 }
 
 async function available(experienceId: string, date: string, time = "10:00:00"): Promise<number> {
-  const { data, error } = await serviceClient().rpc("experience_availability", {
+  const { data, error } = await localServiceClient().rpc("experience_availability", {
     p_experience_id: experienceId,
     p_date: date,
   });
@@ -164,7 +161,7 @@ async function available(experienceId: string, date: string, time = "10:00:00"):
 }
 
 function accept(quoteId: string, userId: string) {
-  return serviceClient().rpc("accept_quote", { p_quote_id: quoteId, p_user_id: userId });
+  return localServiceClient().rpc("accept_quote", { p_quote_id: quoteId, p_user_id: userId });
 }
 
 async function acceptedBookingId(quoteId: string, userId: string): Promise<string> {
@@ -174,7 +171,7 @@ async function acceptedBookingId(quoteId: string, userId: string): Promise<strin
 }
 
 function confirm(bookingId: string, captureId: string | null) {
-  return serviceClient().rpc("consume_hold_and_confirm", { p_booking_id: bookingId, p_capture_id: captureId });
+  return localServiceClient().rpc("consume_hold_and_confirm", { p_booking_id: bookingId, p_capture_id: captureId });
 }
 
 function expireHoldFor(bookingId: string): void {
@@ -190,38 +187,7 @@ function insertPayment(bookingId: string, captureId: string): void {
   );
 }
 
-/**
- * Holds the experience row lock from a separate psql session (until
- * releaseLocker), so concurrent RPCs queue on it. Resolves once the lock is held.
- */
-async function startLocker(experienceId: string): Promise<ChildProcess> {
-  const locker = spawn("docker", [
-    "exec",
-    "-i",
-    LOCAL_DB_CONTAINER,
-    "psql",
-    "-U",
-    "postgres",
-    "-c",
-    `SET application_name = 'it_booking_locker'; BEGIN; SELECT 1 FROM public.experiences WHERE id = '${experienceId}' FOR UPDATE; SELECT pg_sleep(60); COMMIT;`,
-  ]);
-  await waitForCount(`application_name = 'it_booking_locker' AND wait_event = 'PgSleep'`, 1);
-  return locker;
-}
-
-/** Ends the lock-holding psql session, even when the test failed before releasing it. */
-function releaseLocker(locker: ChildProcess): void {
-  psql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'it_booking_locker';`);
-  locker.kill();
-}
-
-/** Waits until exactly `count` backends match the pg_stat_activity condition. */
-function waitForCount(condition: string, count: number): Promise<void> {
-  return vi.waitFor(
-    () => expect(psql(`SELECT count(*) FROM pg_stat_activity WHERE ${condition};`)).toBe(String(count)),
-    { timeout: 10_000, interval: 50 }
-  );
-}
+const EXPERIENCE_LOCKER = "it_booking_locker";
 
 describe.skipIf(!dbReachable)("booking domain against live local Supabase", () => {
   beforeAll(() => {
@@ -284,7 +250,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
         `UPDATE public.experiences SET slot_rule = '{"weekdays":[],"start_times":["10:00"]}' WHERE id = '${EXP_SMALL}';`
       );
       try {
-        const { data } = await serviceClient().rpc("experience_availability", {
+        const { data } = await localServiceClient().rpc("experience_availability", {
           p_experience_id: EXP_SMALL,
           p_date: date,
         });
@@ -326,12 +292,12 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
 
       // Hold the experience lock in a separate session so both RPCs pass the
       // fast path (no booking yet) and queue on the lock.
-      const locker = await startLocker(EXP_SMALL);
+      const locker = await lockRow("experiences", EXP_SMALL, EXPERIENCE_LOCKER);
       try {
         const both = Promise.all([accept(quoteId, USER_A), accept(quoteId, USER_A)]);
 
-        await waitForCount(`wait_event_type = 'Lock' AND query LIKE '%accept_quote%'`, 2);
-        releaseLocker(locker);
+        await waitForBackendCount(`wait_event_type = 'Lock' AND query LIKE '%accept_quote%'`, 2);
+        releaseRowLock(locker, EXPERIENCE_LOCKER);
 
         const [first, second] = await both;
         expect(first.error).toBeNull();
@@ -340,7 +306,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
         expect(psql(`SELECT count(*) FROM public.holds WHERE quote_id = '${quoteId}';`)).toBe("1");
         expect(psql(`SELECT count(*) FROM public.bookings WHERE quote_id = '${quoteId}';`)).toBe("1");
       } finally {
-        releaseLocker(locker);
+        releaseRowLock(locker, EXPERIENCE_LOCKER);
       }
     });
 
@@ -355,7 +321,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
     it("rejects a quote whose owner was deleted, even with a null user id (review finding 9)", async () => {
       const quoteId = insertQuote({ userId: USER_A, experienceId: EXP_BIG, date: futureDate(47), party: 1 });
       psql(`UPDATE public.quotes SET user_id = NULL WHERE id = '${quoteId}';`);
-      const result = await serviceClient().rpc("accept_quote", { p_quote_id: quoteId, p_user_id: null });
+      const result = await localServiceClient().rpc("accept_quote", { p_quote_id: quoteId, p_user_id: null });
       expect(result.error?.message).toBe("not_found");
     });
 
@@ -407,7 +373,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       expireHoldFor(bookingId);
       expect(await available(EXP_BIG, date)).toBe(12);
 
-      const reacquired = await serviceClient().rpc("reacquire_hold", { p_booking_id: bookingId });
+      const reacquired = await localServiceClient().rpc("reacquire_hold", { p_booking_id: bookingId });
       expect(reacquired.data).toBe(true);
       expect(await available(EXP_BIG, date)).toBe(8);
 
@@ -455,7 +421,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       );
       expireHoldFor(bookingId);
 
-      const reacquired = await serviceClient().rpc("reacquire_hold", { p_booking_id: bookingId });
+      const reacquired = await localServiceClient().rpc("reacquire_hold", { p_booking_id: bookingId });
       expect(reacquired.error?.message).toBe("invalid_state");
 
       const confirmed = await confirm(bookingId, "CAPTURE-IT-COMPENSATING");
@@ -480,23 +446,23 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       const bookingId = await acceptedBookingId(quoteId, USER_A);
       insertPayment(bookingId, "CAPTURE-IT-EXPIRY-RACE");
 
-      const locker = await startLocker(EXP_SMALL);
+      const locker = await lockRow("experiences", EXP_SMALL, EXPERIENCE_LOCKER);
       try {
         // Promise.resolve dispatches the (lazy) request now instead of at the await.
         const pending = Promise.resolve(confirm(bookingId, "CAPTURE-IT-EXPIRY-RACE"));
-        await waitForCount(`wait_event_type = 'Lock' AND query LIKE '%consume_hold_and_confirm%'`, 1);
+        await waitForBackendCount(`wait_event_type = 'Lock' AND query LIKE '%consume_hold_and_confirm%'`, 1);
         // The hold was live when the call started and expires while it waits for the lock.
         psql(
           `UPDATE public.holds SET expires_at = clock_timestamp() + interval '300 milliseconds' WHERE id = (SELECT hold_id FROM public.bookings WHERE id = '${bookingId}');`
         );
         await new Promise((resolve) => setTimeout(resolve, 800));
-        releaseLocker(locker);
+        releaseRowLock(locker, EXPERIENCE_LOCKER);
 
         const result = await pending;
         expect(result.error?.message).toBe("hold_not_live");
         expect(psql(`SELECT status FROM public.bookings WHERE id = '${bookingId}';`)).toBe("pending_payment");
       } finally {
-        releaseLocker(locker);
+        releaseRowLock(locker, EXPERIENCE_LOCKER);
       }
     });
 
@@ -509,7 +475,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       const second = insertQuote({ userId: USER_B, experienceId: EXP_SMALL, date, party: 4 });
       expect((await accept(second, USER_B)).error).toBeNull();
 
-      const result = await serviceClient().rpc("reacquire_hold", { p_booking_id: firstBooking });
+      const result = await localServiceClient().rpc("reacquire_hold", { p_booking_id: firstBooking });
       expect(result.data).toBe(false);
     });
 
@@ -521,7 +487,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       expireHoldFor(unpaid);
       expireHoldFor(withOrder);
 
-      const { data, error } = await serviceClient().rpc("expire_holds");
+      const { data, error } = await localServiceClient().rpc("expire_holds");
       expect(error).toBeNull();
       expect(data).toBeGreaterThanOrEqual(1);
       expect(psql(`SELECT status FROM public.bookings WHERE id = '${unpaid}';`)).toBe("expired");
@@ -531,7 +497,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
 
   describe("TypeScript service over the live database", () => {
     it("draft -> quote -> accept -> capability link round trip", async () => {
-      const client = serviceClient();
+      const client = localServiceClient();
       psql(`UPDATE public.booking_drafts SET status = 'abandoned' WHERE user_id = '${USER_B}' AND status = 'open';`);
       const draft = await getOrCreateOpenDraft(client, USER_B);
       expect((await getOrCreateOpenDraft(client, USER_B)).id).toBe(draft.id);
@@ -574,7 +540,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
     });
 
     it("createQuote refuses a draft owned by someone else", async () => {
-      const client = serviceClient();
+      const client = localServiceClient();
       const draft = await getOrCreateOpenDraft(client, USER_A);
       await expect(
         createQuote(client, USER_B, {
@@ -630,7 +596,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
     });
 
     it("searchExperiences rejects the stepped option and flags the unknown one for a step-free party of four within 120 EUR", async () => {
-      const results = await searchExperiences(serviceClient(), {
+      const results = await searchExperiences(localServiceClient(), {
         partySize: 4,
         date: futureDate(43),
         budgetCents: 12000,
@@ -666,7 +632,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       const redemptionId = seedRedemption();
       const until = new Date(Date.now() + 24 * 3_600_000).toISOString();
       const grant = () =>
-        serviceClient().rpc("grant_voucher_voice_pass_idempotent", { p_redemption_id: redemptionId, p_until: until });
+        localServiceClient().rpc("grant_voucher_voice_pass_idempotent", { p_redemption_id: redemptionId, p_until: until });
 
       expect((await grant()).data).toBe("granted");
       expect((await grant()).data).toBe("duplicate");
@@ -686,12 +652,12 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
     it("consume_voucher_counter stops at the voucher's limit", async () => {
       const redemptionId = seedRedemption(2);
       const consume = () =>
-        serviceClient().rpc("consume_voucher_counter", { p_redemption_id: redemptionId, p_counter: "chat_turns" });
-      expect((await consume()).data).toBe("consumed");
-      expect((await consume()).data).toBe("consumed");
-      expect((await consume()).data).toBe("limit_reached");
+        localServiceClient().rpc("consume_voucher_counter", { p_redemption_id: redemptionId, p_counter: "chat_turns" });
+      expect((await consume()).data).toEqual({ allowed: true, remaining: 1 });
+      expect((await consume()).data).toEqual({ allowed: true, remaining: 0 });
+      expect((await consume()).data).toEqual({ allowed: false, remaining: 0 });
       expect(
-        (await serviceClient().rpc("consume_voucher_counter", { p_redemption_id: redemptionId, p_counter: "nonsense" })).error?.message
+        (await localServiceClient().rpc("consume_voucher_counter", { p_redemption_id: redemptionId, p_counter: "nonsense" })).error?.message
       ).toBe("invalid_counter");
     });
   });
@@ -700,7 +666,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
     it("upsert returns new, then pending, then processed, and stores the replayable payload (R2-04)", async () => {
       const eventId = "WH-IT-BOOKING-1";
       const upsert = () =>
-        serviceClient().rpc("upsert_paypal_event", {
+        localServiceClient().rpc("upsert_paypal_event", {
           p_event_id: eventId,
           p_event_type: "CHECKOUT.ORDER.APPROVED",
           p_payload: { id: eventId, resource: { id: "ORDER-IT-1" } },
@@ -714,11 +680,11 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       expect((await upsert()).data).toBe("new");
       expect((await upsert()).data).toBe("pending");
       expect(
-        (await serviceClient().rpc("mark_paypal_event_failed", { p_event_id: eventId, p_error: "boom" })).error
+        (await localServiceClient().rpc("mark_paypal_event_failed", { p_event_id: eventId, p_error: "boom" })).error
       ).toBeNull();
       expect(psql(`SELECT last_error || ':' || (processed_at IS NULL) FROM public.paypal_webhook_events WHERE event_id = '${eventId}';`)).toBe("boom:true");
 
-      expect((await serviceClient().rpc("mark_paypal_event_processed", { p_event_id: eventId })).error).toBeNull();
+      expect((await localServiceClient().rpc("mark_paypal_event_processed", { p_event_id: eventId })).error).toBeNull();
       expect((await upsert()).data).toBe("processed");
 
       expect(

@@ -199,8 +199,9 @@ Stop for acceptance. Do not merge into `develop` until accepted; keep the worktr
 
 ## Handoff (2026-10-03)
 
-**Status:** implementation complete, reviewed and verified locally; **awaiting owner
-acceptance**. Not merged into `develop`, not pushed. The worktree stays until acceptance.
+**Status:** accepted by the owner on 2026-10-03 ("merge, prune tree and keep going");
+committed as `07066e55` (pre-commit hook: 428 files, 8,130 tests, knip clean), fast-forwarded
+into local `develop`, worktree and branch removed. Not pushed.
 
 - **Scope delivered:**
   - Units `[schema]` and `[service]`, done serially by one owner.

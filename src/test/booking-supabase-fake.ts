@@ -21,6 +21,7 @@ const BUILDER_METHODS = [
   "eq",
   "is",
   "lt",
+  "gt",
   "order",
   "limit",
   "maybeSingle",

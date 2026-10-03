@@ -455,6 +455,26 @@ export const fr: Translations = {
     footer_about: 'À propos de Paisaxe',
   },
 
+  booking: {
+    access: {
+      title: 'Accès aux réservations',
+      intro: 'Saisissez le code que vous avez reçu pour réserver une expérience et parler avec Pelayo.',
+      codeLabel: 'Code d\'accès',
+      codePlaceholder: 'Collez votre code ici',
+      submit: 'Entrer',
+      submitting: 'Vérification…',
+      invalid: 'Ce code n\'est pas valide.',
+      expired: 'Ce code a expiré.',
+      exhausted: 'Ce code n\'accepte plus de visiteurs.',
+      contactHint: 'Si vous pensez qu\'il s\'agit d\'une erreur, demandez un nouveau code à la personne qui vous l\'a envoyé.',
+      anonFailed: 'Impossible d\'ouvrir une session invité. Réessayez plus tard.',
+      limitReached: 'Vous avez utilisé tout ce que ce code inclut. Demandez-en un nouveau pour continuer.',
+      rateLimited: 'Trop de tentatives. Attendez une minute et réessayez.',
+      failed: 'Impossible de vérifier le code. Réessayez.',
+      welcome: 'Bienvenue ! Ouverture de l\'assistant de réservation…',
+    },
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
