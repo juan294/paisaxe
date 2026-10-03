@@ -196,3 +196,54 @@ Automated: `npm run check-migrations`, `npm run test -- --maxWorkers=4`,
 Manual: none.
 
 Stop for acceptance. Do not merge into `develop` until accepted; keep the worktree.
+
+## Handoff (2026-10-03)
+
+**Status:** implementation complete, reviewed and verified locally; **awaiting owner
+acceptance**. Not merged into `develop`, not pushed. The worktree stays until acceptance.
+
+- **Scope delivered:**
+  - Units `[schema]` and `[service]`, done serially by one owner.
+  - Migrations 112 to 117.
+  - `SENSITIVE_SERVICE_ROLE_TABLES` gains the 12 booking tables.
+  - `src/lib/booking/{types,fixtures,facts,links,drafts,availability,quotes,bookings}.ts`, each with a test.
+  - `booking.postgrest-integration.test.ts`.
+  - The unit-test fake `src/test/booking-supabase-fake.ts`.
+  - No HTTP routes, as planned.
+- **Identity:**
+  - Worktree `/Users/juan/code/paisaxe-hackathon-phase1`, branch `feature/booking-domain`.
+  - Base: `develop` at `de408294`.
+  - The candidate commit is recorded in the commit that follows this section.
+- **Checklist:**
+  - Every table, status contract, RPC contract, fixture value, service function and listed test is present.
+  - The independent reviewer listed them item by item; see the notes.
+  - The fixture seed check is a replay of 116 plus two consecutive resets (deviation 4).
+- **Deviations and findings:** in `2026-10-03-paypal-hackathon-booking-notes.md`, under:
+  - "Phase 1": deviations 1 to 9;
+  - "Phase 1 review dispositions": review findings 1 to 10 and re-review R1;
+  - "Phase 1 simplify pass".
+  - No finding is unresolved without a recorded disposition.
+- **Evidence (all local; the candidate before commit is the working tree after the simplify pass):**
+  - **Static checks:** `npm run check-migrations` (114 files), `typecheck`, `lint`, `check-env`, `check-required-probes`, `check-verification-coverage`, `npx knip` and `npm run build` all exit 0.
+  - **Full suite:** `npx vitest run --maxWorkers=4` exits 0, with 428 files and 8,130 tests.
+    - The local Docker stack was up and no suite skipped.
+    - Reset first, then re-check: the `booking.postgrest-integration` suite ran 48 tests against migrations 112 to 117 after `supabase db reset`.
+  - **Resets:** two consecutive `npx supabase db reset` runs succeed.
+  - **Mutation checks** (each test fails against the weakened SQL):
+    - Removing `accept_quote`'s recheck inside the lock fails the R2-03 test.
+    - Restoring the pre-review `consume_hold_and_confirm` (no experience lock, `now()`) fails the finding-2 test. Re-run after the test refactor.
+  - **Review:** independent review in a fresh context, then a re-review that ran 134/134 booking tests: **APPROVE**.
+- **Local environment note:** `npx supabase start` fails on this machine because the
+  `vector` container reports unhealthy. `npx supabase start -x vector,logflare` works.
+- **Entry conditions carried forward:**
+  - **Phase 2:** widen the `voice_purchases` purchase-type union in `src/types/voice-access.ts` with `voucher_pass` (CHECK widened here). Add `experience_booking` to `FeatureFlagKey` (the flag rows exist here). `grant_voucher_voice_pass_idempotent` returns `granted | duplicate | not_included`; `consume_voucher_counter` returns `consumed | limit_reached`.
+  - **Phase 3:**
+    - Run a turn's `get_quote` calls for one draft sequentially, or add a locked `create_quote` RPC (simplify pass).
+    - Measure the latency of `searchExperiences` without a date (7 RPCs per offerable experience).
+    - A price is per party (deviation 1).
+  - **Phase 4:**
+    - Reconciliation must mark abandoned `created` payments `expired` after `getOrder` (deviation 7).
+    - Fix and test re-review R1 (`reacquire_hold` counting its own just-lapsed hold).
+    - Persist the capture id before `consume_hold_and_confirm`. Its errors are `hold_not_live`, `capture_mismatch`, `invalid_state`, `invalid_input`, `payment_not_found` and `not_found`.
+- **Next action:** owner acceptance of Phase 1. Then merge `feature/booking-domain` into
+  `develop` locally, verify, push once, and start Phase 2 in its own conversation.

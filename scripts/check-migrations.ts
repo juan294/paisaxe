@@ -60,6 +60,21 @@ const SENSITIVE_SERVICE_ROLE_TABLES = [
   // Highest-PII table in the schema (customer names, phones, venue phones,
   // special requests) -- see migration 101 for the posture-parity migration.
   "pending_bookings",
+  // Experience booking domain (migrations 112-116): guest bookings, payments,
+  // voucher metering and the PayPal webhook inbox are reached only through
+  // createAdminClient(); identity is checked in server code, never by RLS.
+  "merchants",
+  "experiences",
+  "experience_facts",
+  "booking_drafts",
+  "quotes",
+  "holds",
+  "bookings",
+  "payments",
+  "vouchers",
+  "voucher_redemptions",
+  "paypal_webhook_events",
+  "operator_access",
 ];
 
 const COMPLETE_BOOKING_SMS_JOB_SIGNATURE_ERROR =
