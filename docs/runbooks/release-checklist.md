@@ -237,6 +237,17 @@ production Supabase data, Vercel env vars, DNS, or external service config.
 
 ## Cadence evidence at the release boundary
 
-A green `CI Fast` or unchanged nightly disposition does not satisfy this checklist. Require the original full release contexts and every applicable child, actual candidate build SHA/tree/BUILD_ID and immutable artifact manifest, the complete applicable authenticated/browser/visual/Lighthouse local qualification, and the existing Stripe, preview and post-deploy proof. Any required failure, cancellation or skipped leaf blocks release.
+A green `CI Fast` or unchanged nightly disposition does not satisfy this checklist. Require the original full release contexts and every applicable child, the existing Stripe proof and the post-deploy proof. Any required failure, cancellation or skipped leaf blocks release.
 
-`node scripts/ci-cadence-qualification-cli.mjs` runs against a real task-owned nonce profile and live private acquisition inspector. Preserve its original selection and cleanup journal; Linux image preparation, mocks, static profile receipts or provider-denial assertions alone are not runtime acceptance. Main-only coverage publication names the original measuring attempt and actual app completion, while develop nightly and calendar skips remain nonpublishing. Default-main schedule/workflow_run installation is a later authorized release operation; local develop adapter work does not activate it.
+`Release artifact smoke` (`.github/workflows/preview-smoke.yml`) runs on the release PR without secrets or a deployment: it builds the PR candidate, serves the production build on loopback against local Supabase and fails unless `/api/health` reports the candidate commit and tree, the datastore is healthy, the homepage hydrates and the `release-required-local` probes pass. It is local artifact evidence only; steps 4-5 (deployed identity and required probes) remain mandatory. Until main's branch protection is changed under separate authorization, `Smoke test Vercel preview` remains the registered required context. Reproduce locally:
+
+```bash
+npx supabase start
+export $(npx supabase status -o json | node scripts/ci-cadence-smoke-env.mjs | xargs)
+export VERCEL_GIT_COMMIT_SHA=$(git rev-parse HEAD) BUILD_TREE_HASH=$(git rev-parse 'HEAD^{tree}')
+export RELEASE_ARTIFACT_MANIFEST=$(mktemp -d)/manifest.json
+npm run build && node scripts/ci-cadence-artifact.mjs "$VERCEL_GIT_COMMIT_SHA" "$RELEASE_ARTIFACT_MANIFEST"
+CI=true npm run test:e2e:release-artifact
+```
+
+Main-only coverage publication names the original measuring attempt and actual app completion, while develop nightly and calendar skips remain nonpublishing. Default-main schedule/workflow_run installation is a later authorized release operation; local develop adapter work does not activate it.

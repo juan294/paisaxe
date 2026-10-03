@@ -33,7 +33,11 @@ const mobileChrome = {
 const releaseTargetUrl = process.env.RELEASE_TARGET_URL?.trim();
 const releaseBypassSecret =
   process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
-const releaseSpecs = ["**/release-required.spec.ts", "**/release-required-local.spec.ts"];
+const releaseSpecs = [
+  "**/release-required.spec.ts",
+  "**/release-required-local.spec.ts",
+  "**/release-artifact-smoke.spec.ts",
+];
 
 function getWebServerCommand() {
   if (isCI) return `npm run start -- --port ${e2ePort}`;
@@ -174,6 +178,16 @@ export default defineConfig({
       name: "release-required-local",
       use: desktopChrome,
       grep: /@local-docker/,
+      timeout: 60_000,
+      retries: 0,
+    },
+    {
+      // Release-PR candidate smoke: production build on loopback against the
+      // local Docker stack, bound to the build manifest. Driven by
+      // .github/workflows/preview-smoke.yml (`npm run test:e2e:release-artifact`).
+      name: "release-artifact-smoke",
+      use: desktopChrome,
+      testMatch: "release-artifact-smoke.spec.ts",
       timeout: 60_000,
       retries: 0,
     },

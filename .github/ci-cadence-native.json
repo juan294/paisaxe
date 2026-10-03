@@ -12,7 +12,7 @@
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "8c212008ca91d3ad14051d63a8d8a556a8bdb3c9"
+      "blobSha": "e82a2f0116704d235c1d2de1a212b73fbc7a2f6c"
     }
   },
   "callees": {
@@ -138,8 +138,8 @@
   },
   "workflowPins": {
     ".github/workflows/ci-nightly.yml": "feadcb1ae2b4e7b49fb8e297f1309b88a95df31f",
-    ".github/workflows/ci-cadence.yml": "8c212008ca91d3ad14051d63a8d8a556a8bdb3c9",
-    ".github/workflows/ci-fast.yml": "6b78591e1f3127ec4b967accc079c76bc3bfdae1",
+    ".github/workflows/ci-cadence.yml": "e82a2f0116704d235c1d2de1a212b73fbc7a2f6c",
+    ".github/workflows/ci-fast.yml": "855c216b3be126bf9bf8355427be8a384e37d017",
     ".github/workflows/ci.yml": "5de82ed57eeb7745c32da861f4fefa45b6482f5d",
     ".github/workflows/ci-cadence-e2e-full.yml": "e98412b62a66f4d2f1836153075b9f8725ace21c",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "db256a17ed4718c5911852bc4d98dbba7790cca1",

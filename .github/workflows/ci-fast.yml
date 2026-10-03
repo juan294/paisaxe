@@ -30,8 +30,9 @@ jobs:
       checkout_sha: ${{ steps.entry.outputs.checkout_sha }}
       definition_sha: ${{ steps.entry.outputs.definition_sha }}
       cadence_json: ${{ steps.entry.outputs.cadence_json }}
+    # Runs in legacy and lean mode alike: CI Fast is a real check before lean is
+    # activated. CI_CADENCE_MODE only decides who owns full-suite work.
     if: >-
-      vars.CI_CADENCE_MODE == 'lean' &&
       github.repository_id == '1141286326' && github.repository_owner_id == '3944118' &&
       github.actor_id == '3944118' && github.event.sender.type == 'User' &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
@@ -55,7 +56,12 @@ jobs:
         env:
           LAUNCHER_SHA256: 7af2cc34293872b4eb35f3b54649e85936a86ba5baa4fcc15b208858151e3216
           GITHUB_TOKEN: ${{ github.token }}
-          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
+          # The four Fast checks always execute, so the launcher always
+          # classifies under lean rules. ROUTING_MODE is the repository's real
+          # mode: under legacy the existing full workflows keep running and
+          # own any full-suite work, so the caller starts no recovery children.
+          CI_CADENCE_MODE: lean
+          ROUTING_MODE: ${{ vars.CI_CADENCE_MODE }}
         run: |
           set -euo pipefail
           unset NODE_OPTIONS NODE_PATH
@@ -83,6 +89,17 @@ jobs:
             fetch --no-tags --no-recurse-submodules --force https://github.com/juan294/paisaxe.git \
             "$definition:refs/ci-cadence/protected/$definition"
           test "$(git --no-replace-objects rev-parse "refs/ci-cadence/protected/$definition^{commit}")" = "$definition"
+          # First installation: the protected base predates the cadence helper,
+          # so nothing trusted exists to run. The existing full workflows detect
+          # the same absence and run their complete original graph.
+          installed="$(git --no-replace-objects ls-tree --name-only "$definition" -- scripts/ci-cadence-launch.mjs scripts/ci-cadence.mjs .github/ci-cadence.json)"
+          if [ -z "$installed" ]; then
+            reason='first installation: protected base has no cadence helper; the existing full workflows validate this event'
+            echo "::notice title=CI Fast::$reason"
+            echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+            echo 'decision=legacy' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git --no-replace-objects show "$definition:scripts/ci-cadence-launch.mjs" > "$private/launch.mjs"
           chmod 600 "$private/launch.mjs"
           printf '%s  %s\n' "$LAUNCHER_SHA256" "$private/launch.mjs" | sha256sum --check --status
@@ -94,7 +111,9 @@ jobs:
           if result.get('lane')=='fast' and result.get('success') is True and result.get('completed')==required:
               decision='skip'
           elif result.get('lane')=='full' and result.get('fullRequired') is True and result.get('success') is False:
-              decision='full'
+              # Lean: the caller runs every full recovery child. Legacy: the
+              # existing full workflows already validate this event.
+              decision='full' if os.environ.get('ROUTING_MODE')=='lean' else 'legacy'
           else:
               raise SystemExit('Protected Fast/full admission unavailable')
           values={'decision':decision,'source_sha':result.get('sourceSha'),'checkout_sha':result.get('testedCheckoutSha'),'definition_sha':result.get('definitionSha'),'cadence_json':json.dumps(result,separators=(',',':'))}
@@ -102,4 +121,6 @@ jobs:
               assert re.fullmatch('[a-f0-9]{40}',values[key] or '')
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
               for key,value in values.items(): f.write(key+'='+value+'\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('CI Fast decision: '+decision+' ('+str(result.get('reason') or 'four Fast checks passed')+')\n')
           PYTHON

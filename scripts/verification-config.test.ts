@@ -125,26 +125,69 @@ describe("verification coverage config", () => {
     expect(workflow).toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e");
   });
 
-  it("uses the body-parsing readiness monitor for Vercel health smoke checks, and does not run the dead develop-push smoke job (DO-H1)", () => {
+  it("gates release PRs on a secret-free local artifact smoke that fails without candidate identity, and does not run the dead develop-push smoke job (DO-H1)", () => {
     const ciWorkflow = readText(".github/workflows/ci.yml");
     const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
 
-    const parsed = parse(previewSmokeWorkflow) as { on: { pull_request: { branches: string[] } }; jobs: Record<string, { name: string; permissions: Record<string, string>; steps: { run?: string; env?: Record<string, string> }[] }> };
-    const job = parsed.jobs["preview-smoke"];
+    type Step = { name?: string; if?: string; uses?: string; run?: string; env?: Record<string, string>; with?: Record<string, unknown> };
+    const parsed = parse(previewSmokeWorkflow) as { on: Record<string, { branches: string[] }>; permissions: Record<string, string>; jobs: Record<string, { name: string; if?: string; "timeout-minutes": number; permissions: Record<string, string>; steps: Step[] }> };
+    // Release PRs only, one job, and its name is the required check context.
+    expect(Object.keys(parsed.on)).toEqual(["pull_request"]);
     expect(parsed.on.pull_request.branches).toEqual(["main"]);
+    expect(Object.keys(parsed.jobs)).toEqual(["preview-smoke"]);
+    const job = parsed.jobs["preview-smoke"];
     expect(job.name).toBe("Release artifact smoke");
-    expect(job.permissions).toEqual({ contents: "read", "pull-requests": "read" });
-    const acquisition = job.steps.find(step => step.run?.includes("ci-cadence-smoke-launch.mjs"));
-    expect(acquisition?.env?.candidate_sha).toBe("${{ github.sha }}");
-    expect(acquisition?.env?.base_sha).toBe("${{ github.event.pull_request.base.sha }}");
-    expect(acquisition?.run).toContain("$base_sha:scripts/ci-cadence-smoke-launch.mjs");
-    expect(acquisition?.run).toContain("sha256sum --check --status");
+    // Unconditional: a skipped required context would satisfy branch protection.
+    expect(job.if).toBeUndefined();
+    expect(job["timeout-minutes"]).toBeLessThanOrEqual(20);
+    // Read-only token and no secrets, so fork/Dependabot release PRs run the same job.
+    expect(parsed.permissions).toEqual({ contents: "read" });
+    expect(job.permissions).toEqual({ contents: "read" });
+    expect(previewSmokeWorkflow).not.toMatch(/secrets\.|github\.token|pull_request_target/);
     expect(previewSmokeWorkflow).not.toContain("VERCEL_AUTOMATION_BYPASS_SECRET");
-    const actualProbe = readText("tests/fixtures/ci-cadence-adapter/local-qa/artifact-smoke.spec.ts");
-    expect(actualProbe).toContain("const measured = await health.json()");
-    expect(actualProbe).toContain("expect(measured.status).toBe('healthy')");
-    expect(actualProbe).toContain("manifest.candidateSha");
-    expect(actualProbe).toContain("manifest.treeSha.slice(0, 12)");
+    // No deployment is created or awaited.
+    expect(previewSmokeWorkflow).not.toMatch(/deployments|vercel deploy|PREVIEW_URL/);
+
+    const steps = job.steps;
+    const index = (name: string) => {
+      const found = steps.findIndex(step => step.name === name);
+      expect(found, name).toBeGreaterThanOrEqual(0);
+      return found;
+    };
+    const checkout = steps[index("Checkout release candidate")];
+    expect(checkout.with).toEqual({ ref: "${{ github.sha }}", "persist-credentials": false });
+    // Identity comes from the physical checkout and must precede the build that embeds it.
+    const identity = steps[index("Bind candidate identity")];
+    expect(identity.run).toContain('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"');
+    expect(identity.run).toContain('echo "VERCEL_GIT_COMMIT_SHA=$GITHUB_SHA"');
+    expect(identity.run).toContain("BUILD_TREE_HASH=$(git rev-parse 'HEAD^{tree}')");
+    const order = ["Start local Supabase", "Provision synthetic smoke environment", "Bind candidate identity", "Build release candidate", "Record build manifest", "Smoke production server on loopback"].map(index);
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    expect(steps[index("Build release candidate")].run).toBe("npm run build");
+    expect(steps[index("Record build manifest")].run).toBe('node scripts/ci-cadence-artifact.mjs "$GITHUB_SHA" "$RELEASE_ARTIFACT_MANIFEST"');
+    expect(steps[index("Smoke production server on loopback")].run).toBe("npm run test:e2e:release-artifact");
+    // Every gating step is unconditional; only evidence upload uses always().
+    for (const step of steps) if (step.name !== "Upload smoke evidence") expect(step.if, step.name).toBeUndefined();
+
+    // The smoke runs the mutating local release probes plus the identity spec,
+    // against the production server Playwright boots under CI.
+    const scripts = JSON.parse(readText("package.json")).scripts as Record<string, string>;
+    expect(scripts["test:e2e:release-artifact"]).toBe("playwright test --project=release-required-local --project=release-artifact-smoke");
+    const playwrightConfig = readText("playwright.config.ts");
+    expect(playwrightConfig).toContain('name: "release-artifact-smoke"');
+    expect(playwrightConfig).toContain('testMatch: "release-artifact-smoke.spec.ts"');
+    expect(playwrightConfig).toContain('"**/release-artifact-smoke.spec.ts",');
+
+    // Identity, readiness and hydration are asserted, and absence throws rather than skips.
+    const probe = readText("e2e/release-artifact-smoke.spec.ts");
+    expect(probe).toContain("if (!manifestPath || !cronSecret) {\n    throw new Error(");
+    expect(probe).not.toMatch(/test\.skip|test\.fixme|\.skip\(/);
+    expect(probe).toContain("assertLocalDatastore(process.env.NEXT_PUBLIC_SUPABASE_URL)");
+    expect(probe).toContain('expect(body.status).toBe("healthy")');
+    expect(probe).toContain("commit: manifest.candidateSha");
+    expect(probe).toContain("tree: manifest.treeSha.slice(0, 12)");
+    expect(probe).toContain('await page.waitForURL("**/immersive")');
+    expect(probe).toContain("toBe(recorded?.sha256)");
     // DO-H4: --require-sentry deliberately stays off the required release gate.
     // sentry.status: "configured" is derived purely from NEXT_PUBLIC_SENTRY_DSN
     // being non-empty (src/app/api/health/route.ts checkSentry()) — it proves
@@ -268,29 +311,14 @@ describe("verification coverage config", () => {
   // ElevenLabs preflight needs HEALTH_PROBE_SECRET on the target, so running it
   // against a preview deployment made the required check unpassable. It is already a
   // required deployed-readonly probe (quality/required-probes.yaml) run post-deploy
-  // against production (release checklist step 5), so the preview smoke keeps only
-  // the health-readiness and homepage checks.
-  it("keeps the required preview smoke free of the secret-dependent ElevenLabs preflight", () => {
+  // against production (release checklist step 5). The release artifact smoke that
+  // replaced the preview smoke is secret-free and keeps the same boundary.
+  it("keeps the required release smoke free of the secret-dependent ElevenLabs preflight", () => {
     const previewSmoke = readText(".github/workflows/preview-smoke.yml");
     const probes = readText("quality/required-probes.yaml");
 
     expect(previewSmoke).not.toContain("check-elevenlabs-voice-preflight");
     expect(previewSmoke).not.toContain("HEALTH_PROBE_SECRET");
-    expect(previewSmoke).toContain("Release artifact smoke");
-    expect(previewSmoke).toContain("ci-cadence-smoke-launch.mjs");
-    const artifact = readText("tests/fixtures/ci-cadence-adapter/local-qa/artifact-smoke.spec.ts");
-    expect(artifact).toContain("await page.goto('/')");
-    expect(artifact).toContain("await page.waitForURL('**/immersive')");
-    expect(artifact).toContain("verifyServedArtifact(manifest");
-    expect(artifact).toContain("await verifyCandidateManifest(process.cwd(), manifest)");
-    const auth = readText("tests/fixtures/ci-cadence-adapter/local-qa/auth-proof.spec.ts");
-    expect(auth).toContain("CI_CADENCE_LOCAL_QA");
-    expect(readText("scripts/ci-cadence-local-qa.mjs")).toContain("REQUIRE_AUTH_JOURNEYS: 'true'");
-    expect(auth).toContain("QA_TEST_USER_EMAIL");
-    expect(auth).toContain("CI_CADENCE_QA_USER_ID");
-    const host = readText("scripts/ci-cadence-smoke-host.mjs");
-    expect(host).toContain("DENIAL_PROVED_BEFORE_CANDIDATE_SQL_AND_HOOKS");
-    expect(host).toContain("/trusted/scripts/ci-cadence-qualification-cli.mjs");
     // The preflight must stay a required production probe, not disappear.
     expect(probes).toContain("id: elevenlabs-voice-preflight");
     expect(probes).toContain("npm run check-elevenlabs-voice");

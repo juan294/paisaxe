@@ -1,59 +1,111 @@
 name: Release artifact smoke
 
-# Native definition/YAML review is the pre-import trust boundary. This local
-# production artifact gate makes no Vercel deployment/runtime assertion.
+# Runs only on release PRs (PRs targeting main).
+#
+# Builds the exact PR candidate, starts its production server on loopback
+# against a task-owned local Supabase stack with synthetic providers, and
+# asserts build identity, health readiness, homepage/hydration and the
+# mutating `release-required-local` probes. No deployment is created or
+# awaited, and the job uses no repository secrets, so it runs unchanged for
+# fork and Dependabot PRs.
+#
+# This is a local production-artifact gate. It makes no claim about the Vercel
+# runtime or live providers: the deployed identity check and required probes in
+# docs/runbooks/release-checklist.md (steps 4-5) remain mandatory after merge.
+#
+# The check context is the job name below: `Release artifact smoke`. It
+# replaces `Smoke test Vercel preview` in main's required checks only after it
+# has passed on an eligible release PR; changing branch protection is a
+# separately authorized step.
+
 on:
   pull_request:
     branches: [main]
+
 permissions:
   contents: read
-  pull-requests: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   preview-smoke:
     name: Release artifact smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     permissions:
       contents: read
-      pull-requests: read
+    env:
+      SUPABASE_CLI: supabase@2.119.0
+      PLAYWRIGHT_CHROME_CHANNEL: chrome
+      ANTHROPIC_API_KEY: dummy_key_for_release_smoke
+      VOYAGE_API_KEY: dummy_key_for_release_smoke
+
     steps:
-      - name: Preserve original physical PR merge
+      - name: Checkout release candidate
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 0
           persist-credentials: false
-      - name: Setup reviewed bootstrap Node
+
+      - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24.21.0'
-      - name: Acquire protected local artifact smoke before candidate code
-        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
-        env:
-          BASH_ENV: ''
-          ENV: ''
-          LD_PRELOAD: ''
-          LD_LIBRARY_PATH: ''
-          LD_AUDIT: ''
-          LD_ORIGIN_PATH: ''
-          NODE_OPTIONS: ''
-          NODE_PATH: ''
-          GITHUB_TOKEN: ${{ github.token }}
-          candidate_sha: ${{ github.sha }}
-          base_sha: ${{ github.event.pull_request.base.sha }}
-          head_sha: ${{ github.event.pull_request.head.sha }}
-          CI_CADENCE_SMOKE_EVIDENCE: ${{ runner.temp }}/B-release-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install canvas system dependencies
+        uses: ./.github/actions/install-canvas-deps
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright system dependencies
+        timeout-minutes: 10
+        run: npx playwright install-deps chromium
+
+      - name: Verify system Chrome
+        run: google-chrome --version
+
+      # A fresh runner has no database volume, so `start` applies every
+      # migration and supabase/seed.sql from scratch.
+      - name: Start local Supabase
+        run: npx --yes "$SUPABASE_CLI" start
+
+      - name: Provision synthetic smoke environment
+        run: npx --yes "$SUPABASE_CLI" status -o json | node scripts/ci-cadence-smoke-env.mjs
+
+      # The candidate identity is the physical checkout, never an input. A
+      # missing or mismatched identity fails the manifest step or the spec.
+      - name: Bind candidate identity
         run: |
           set -euo pipefail
-          while IFS= read -r name; do unset "$name"; done < <(compgen -v | /usr/bin/sed -n '/^GIT_/p')
-          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null
-          [[ "$base_sha" =~ ^[a-f0-9]{40}$ ]]
-          private="$(mktemp -d "$RUNNER_TEMP/B-smoke-launch.XXXXXXXX")"
-          chmod 700 "$private"
-          trap 'rm -rf "$private"' EXIT
-          /usr/bin/git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$base_sha:scripts/ci-cadence-smoke-launch.mjs" > "$private/ci-cadence-smoke-launch.mjs"
-          printf '%s  %s\n' '918e58b16abeae1d511c2d28b811c1599d86ef6d67fde6c81a9e9e54012f0f65' "$private/ci-cadence-smoke-launch.mjs" | /usr/bin/sha256sum --check --status
-          node "$private/ci-cadence-smoke-launch.mjs"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          {
+            echo "VERCEL_GIT_COMMIT_SHA=$GITHUB_SHA"
+            echo "BUILD_TREE_HASH=$(git rev-parse 'HEAD^{tree}')"
+            echo "RELEASE_ARTIFACT_MANIFEST=$RUNNER_TEMP/release-artifact-manifest.json"
+          } >> "$GITHUB_ENV"
+
+      - name: Build release candidate
+        run: npm run build
+
+      - name: Record build manifest
+        run: node scripts/ci-cadence-artifact.mjs "$GITHUB_SHA" "$RELEASE_ARTIFACT_MANIFEST"
+
+      - name: Smoke production server on loopback
+        run: npm run test:e2e:release-artifact
+        env:
+          CI: true
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-artifact-smoke
+          path: |
+            ${{ runner.temp }}/release-artifact-manifest.json
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 30

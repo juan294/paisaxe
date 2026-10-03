@@ -116,12 +116,14 @@ for(const eventName of ['pull_request','schedule','workflow_dispatch'])test('B-C
  for(const [key,value]of Object.entries(required.env))assert.equal(evaluate(value,context),context.secrets[key]);
 });
 
-test('B-COMP-3 actual release PR job is local immutable artifact smoke rather than Preview transport',()=>{
- const w=workflow('preview-smoke.yml');assert.deepEqual(w.on.pull_request.branches,['main']);
- const job=w.jobs['preview-smoke'];assert.equal(job.name,'Release artifact smoke');
- const source=JSON.stringify(job);assert.ok(!source.includes('VERCEL_AUTOMATION_BYPASS_SECRET'));assert.ok(!source.includes('api.github.com/repos/$REPO/deployments'));
- assert.match(source,/ci-cadence-smoke-launch\.mjs/);assert.match(source,/candidate_sha/);assert.match(source,/base_sha/);
- assert.deepEqual(job.permissions,{contents:'read','pull-requests':'read'});
+test('B-COMP-3 actual release PR job is a plain secret-free local artifact smoke rather than Preview transport',()=>{
+ const w=workflow('preview-smoke.yml');assert.deepEqual(Object.keys(w.on),['pull_request']);assert.deepEqual(w.on.pull_request.branches,['main']);
+ const job=w.jobs['preview-smoke'];assert.equal(job.name,'Release artifact smoke');assert.equal(job.if,undefined);
+ const source=JSON.stringify(w);for(const forbidden of ['secrets.','github.token','VERCEL_AUTOMATION_BYPASS_SECRET','deployments','git show','sha256sum'])assert.ok(!source.includes(forbidden),forbidden);
+ assert.deepEqual(job.permissions,{contents:'read'});
+ // The context the policy inventories is the one this job actually produces.
+ const policy=JSON.parse(readFileSync(join(root,'.github/ci-cadence.json'),'utf8')).workflows.find(entry=>entry.path==='.github/workflows/preview-smoke.yml');
+ assert.deepEqual(policy.contexts,{'Release artifact smoke':['preview-smoke-preview-smoke']});
 });
 test('B-COMP-3 actual manifest cannot qualify a real Git candidate without its physical production build',async t=>{
  const {directory,sha}=gitFixture(t);

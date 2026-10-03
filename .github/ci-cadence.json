@@ -214,7 +214,7 @@
     },
     {
       "path": ".github/workflows/e2e-stripe-integration.yml",
-      "definitionSha": "48cd7d1c92d3e0cb6ccca3d99b1bd1b4307cb1ee",
+      "definitionSha": "b54cb118569a670340cb855bc6c92632fc26f693",
       "jobs": [
         {
           "id": "e2e-stripe-integration-e2e-stripe",
@@ -229,7 +229,7 @@
     },
     {
       "path": ".github/workflows/preview-smoke.yml",
-      "definitionSha": "3bc1f261d61cf6dc4741074a20651f9519367321",
+      "definitionSha": "79b6fa65e81aaf5d1e262c16f8249150b574aa66",
       "jobs": [
         {
           "id": "preview-smoke-preview-smoke",
@@ -237,7 +237,7 @@
         }
       ],
       "contexts": {
-        "Smoke test Vercel preview": [
+        "Release artifact smoke": [
           "preview-smoke-preview-smoke"
         ]
       }

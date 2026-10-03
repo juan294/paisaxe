@@ -231,7 +231,7 @@ jobs:
       - license-check
       - security
       - measurement
-    if: ${{ always() && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)) }}
+    if: ${{ always() && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)) }}
     runs-on: ubuntu-latest
     permissions: *a1
     steps:
@@ -254,11 +254,11 @@ jobs:
           test "$ENTRY" = success
           case "$DECISION" in
           full) for result in "$CHILD_0" "$CHILD_1" "$CHILD_2" "$CHILD_3" "$CHILD_4" "$CHILD_5" "$CHILD_6"; do test "$result" = success; done; if test "$EVENT" = push; then test "$ADMISSION" = success; test "$MEASURED" = success; else test "$ADMISSION" = skipped; test "$MEASURED" = skipped; fi ;;
-          skip) test "$ADMISSION" = skipped; test "$MEASURED" = skipped; for result in "$CHILD_0" "$CHILD_1" "$CHILD_2" "$CHILD_3" "$CHILD_4" "$CHILD_5" "$CHILD_6"; do test "$result" = skipped; done ;;
+          skip|legacy) test "$ADMISSION" = skipped; test "$MEASURED" = skipped; for result in "$CHILD_0" "$CHILD_1" "$CHILD_2" "$CHILD_3" "$CHILD_4" "$CHILD_5" "$CHILD_6"; do test "$result" = skipped; done; if test "$DECISION" = legacy; then echo '::notice title=CI Fast::full-suite validation for this event is owned by the existing full workflows'; fi ;;
           *) exit 1 ;;
           esac
   entry:
-    if: vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))
+    if: github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))
     uses: ./.github/workflows/ci-fast.yml
     permissions:
       contents: read

@@ -116,7 +116,9 @@ PY
   const fastRoot=structuredClone(nightly);
   fastRoot.name='CI cadence';fastRoot.on={push:{branches:['develop']},pull_request:{branches:['develop']}};
   fastRoot.concurrency={group:'B-cadence-${{ github.ref }}','cancel-in-progress':true};
-  const rootGuard=enabled+" && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))";
+  // No mode term: CI Fast is produced under legacy too. Full recovery children
+  // still start only on a lean "full" decision; legacy keeps its original workflows.
+  const rootGuard="github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))";
   fastRoot.jobs.entry={if:rootGuard,uses:'./.github/workflows/ci-fast.yml',permissions:permission};
   fastRoot.jobs.admission.needs=['entry'];
   fastRoot.jobs.admission.if="needs.entry.outputs.decision == 'full' && github.event_name == 'push'";
@@ -131,7 +133,7 @@ PY
 test "$ENTRY" = success
 case "$DECISION" in
 full) for result in ${Object.keys(calls).map((_,i)=>'"$CHILD_'+i+'"').join(' ')}; do test "$result" = success; done; if test "$EVENT" = push; then test "$ADMISSION" = success; test "$MEASURED" = success; else test "$ADMISSION" = skipped; test "$MEASURED" = skipped; fi ;;
-skip) test "$ADMISSION" = skipped; test "$MEASURED" = skipped; for result in ${Object.keys(calls).map((_,i)=>'"$CHILD_'+i+'"').join(' ')}; do test "$result" = skipped; done ;;
+skip|legacy) test "$ADMISSION" = skipped; test "$MEASURED" = skipped; for result in ${Object.keys(calls).map((_,i)=>'"$CHILD_'+i+'"').join(' ')}; do test "$result" = skipped; done; if test "$DECISION" = legacy; then echo '::notice title=CI Fast::full-suite validation for this event is owned by the existing full workflows'; fi ;;
 *) exit 1 ;;
 esac
 `}];
@@ -170,7 +172,7 @@ export function generateNativeWorkflows(root=process.cwd()) {
   const coverageOnly={path:canonical+'coverage.yml',blobSha:blob(source(canonical+'coverage.yml')),steps:coverageDefinition.jobs.coverage.steps.map(step=>({name:step.name,conclusions:step.name==='Decide weekly native coverage eligibility'?['success']:step.name==='Report coverage to Portfolio'?['skipped']:['success','skipped'],post:Boolean(step.uses)}))};
   const callers=Object.fromEntries(['ci-nightly.yml','ci-cadence.yml'].map(path=>[canonical+path,{path:canonical+path,blobSha:pins[canonical+path]}]));
   files.push({path:'.github/ci-cadence-native.json',source:JSON.stringify({schemaVersion:1,repository:'juan294/paisaxe',caller:callers[canonical+'ci-nightly.yml'],callers,callees,coverageOnly,workflowPins:pins,stepInventory,auxiliaryJobs,censusByCaller:{[canonical+'ci-nightly.yml']:auxiliaryJobs,[canonical+'ci-cadence.yml']:pushAuxiliary}},null,2)+'\n'});
-  const updatedPolicy=structuredClone(policy);for(const w of updatedPolicy.workflows)if(byPath[w.path])w.definitionSha=blob(byPath[w.path]);
+  const updatedPolicy=structuredClone(policy);for(const w of updatedPolicy.workflows)w.definitionSha=blob(source(w.path));
   files.push({path:'.github/ci-cadence.json',source:JSON.stringify(updatedPolicy,null,2)+'\n'});
   return files;
 }
