@@ -1,3 +1,8 @@
+---
+name: deploy
+description: Prepare and carry out a Paisaxe production deployment when the user requests a release, following the project release checklist and explicit authorization gates.
+---
+
 # Deploy to Production
 
 **STOP. Production is live. This skill does not authorize itself.**
