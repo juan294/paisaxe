@@ -257,4 +257,6 @@ npm run build && node scripts/ci-cadence-artifact.mjs "$VERCEL_GIT_COMMIT_SHA" "
 CI=true npm run test:e2e:release-artifact
 ```
 
+When another local stack must stay untouched, run the smoke and the `*.postgrest-*` suites against a separate one: copy `supabase/` into a scratch directory, change only `project_id` and the published ports, pass that directory as `--workdir` to every Supabase CLI command, and export `SUPABASE_LOCAL_API_URL` and `SUPABASE_LOCAL_DB_CONTAINER` (`supabase_db_<project_id>`) so the suites do not default to `127.0.0.1:54321` and `supabase_db_paisaxe`. Set `PLAYWRIGHT_PORT` and `PLAYWRIGHT_REUSE_SERVER=false` if port 3100 may be in use.
+
 Main-only coverage publication names the original measuring attempt and actual app completion, while develop nightly and calendar skips remain nonpublishing. Default-main schedule/workflow_run installation is a later authorized release operation; local develop adapter work does not activate it.
