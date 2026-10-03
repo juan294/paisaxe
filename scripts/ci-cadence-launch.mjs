@@ -7,6 +7,8 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const ORIGIN = 'https://github.com/juan294/paisaxe.git';
 const API = 'https://api.github.com/repos/juan294/paisaxe';
+// Git over HTTPS takes the token exactly as actions/checkout sends it: basic x-access-token, never bearer.
+export const gitAuthorization = token => `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
 const canonicalOrigin = url => url === ORIGIN || url === 'https://github.com/juan294/paisaxe';
 const SHA = /^[a-f0-9]{40}$/;
 // Reviewed executable pins are selected only from the actual host runtime.
@@ -85,13 +87,18 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     } else throw Error('unsupported event');
     const metadata = await get(''); if (!repository(metadata)) throw Error('authenticated repository');
     const nativeRef = await get(`/git/ref/heads/${branch}`);
-    if (nativeRef.ref !== `refs/heads/${branch}` || nativeRef.object?.type !== 'commit' || nativeRef.object.sha !== (eventName === 'push' ? source : definition)) throw Error('authenticated native ref');
+    if (nativeRef.ref !== `refs/heads/${branch}` || nativeRef.object?.type !== 'commit' || !sha(nativeRef.object.sha)) throw Error('authenticated native ref');
+    if (eventName === 'pull_request') {
+      // base.sha legitimately lags when the base branch moves after the PR's last
+      // sync. It must still be the branch tip or one of its ancestors.
+      if (nativeRef.object.sha !== definition) { const compared = await get(`/compare/${definition}...${nativeRef.object.sha}`); if (compared.status !== 'ahead' || compared.merge_base_commit?.sha !== definition || compared.base_commit?.sha !== definition) throw Error('authenticated native ref'); }
+    } else if (nativeRef.object.sha !== (eventName === 'push' ? source : definition)) throw Error('authenticated native ref');
     const commit = await get(`/git/commits/${definition}`); if (commit.sha !== definition) throw Error('authenticated definition commit');
     temporary = await realpath(await mkdtemp(join(tmpdir(), 'paisaxe-launch-')));
     const work = join(temporary, 'checkout'); await mkdir(work, { mode: 0o700 }); run(['init', '--quiet', '--template=', work], temporary); run(['remote', 'add', 'origin', ORIGIN], work);
     const acquire = async (id, ref) => {
       if (!sha(id) || !/^refs\/(?:ci-cadence\/(?:protected|candidate)\/[a-f0-9]{40}|remotes\/origin\/(?:main|develop))$/.test(ref)) throw Error('acquisition ref');
-      const env = { ...environment(), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: `AUTHORIZATION: bearer ${input.token}`, GIT_ASKPASS: '/usr/bin/false', SSH_ASKPASS: '/usr/bin/false' };
+      const env = { ...environment(), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: gitAuthorization(input.token), GIT_ASKPASS: '/usr/bin/false', SSH_ASKPASS: '/usr/bin/false' };
       if (gitTransport) { let timer; try { await Promise.race([gitTransport({ root: work, url: ORIGIN, sha: id, ref, env, timeout: acquisitionRemaining(10000), run }), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Git transport deadline')), acquisitionRemaining(10000)); })]); } finally { clearTimeout(timer); } }
       else run(['-c', 'protocol.file.allow=never', '-c', 'protocol.ssh.allow=never', '-c', 'http.followRedirects=false', '-c', 'http.sslVerify=true', '-c', 'credential.helper=', '-c', 'core.askPass=/usr/bin/false', 'fetch', '--no-tags', '--no-recurse-submodules', '--force', ORIGIN, `${id}:${ref}`], work, { env, timeout: acquisitionRemaining(10000) });
       acquisitionRemaining(10000);

@@ -32,7 +32,7 @@ steps:
   - name: Acquire reviewed protected launcher
     id: entry
     env:
-      LAUNCHER_SHA256: a2304a07baf2950be19648c054b90dd550e07eda408b6b13fc3115561a0f233e
+      LAUNCHER_SHA256: c92bdd8351998a93a50f1792e2992f922f60a37efd6dafdb8a4bb969130d77aa
       GITHUB_TOKEN: ${{ github.token }}
       # The four Fast checks always execute, so the launcher always
       # classifies under lean rules. ROUTING_MODE is the repository's real
@@ -63,12 +63,15 @@ steps:
       private="$(mktemp -d "$RUNNER_TEMP/cadence-bootstrap.XXXXXXXX")"
       chmod 700 "$private"
       trap 'rm -rf "$private"' EXIT
-      timeout 30s git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false \
-        -c protocol.file.allow=never -c protocol.ssh.allow=never -c credential.helper= \
-        -c http.followRedirects=false -c http.sslVerify=true \
-        fetch --no-tags --no-recurse-submodules --force https://github.com/juan294/paisaxe.git \
-        "$definition:refs/ci-cadence/protected/$definition"
-      test "$(git --no-replace-objects rev-parse "refs/ci-cadence/protected/$definition^{commit}")" = "$definition"
+      # No network: the full-history checkout already holds the push `before`
+      # commit and the pull request base. Absence means a force-push or a
+      # shallow checkout, and nothing trusted can be read.
+      if ! git --no-replace-objects cat-file -e "$definition^{commit}" 2>/dev/null; then
+        reason="protected base $definition is not in this checkout (force-push or shallow history); CI Fast cannot read its trusted definition. Push a commit on top of the current develop."
+        echo "::error title=CI Fast::$reason"
+        echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+        exit 1
+      fi
       # First installation: the protected base predates the cadence helper,
       # so nothing trusted exists to run. Under legacy the original workflows
       # run their complete graph regardless. Under lean they are statically

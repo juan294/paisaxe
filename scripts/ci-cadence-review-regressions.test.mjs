@@ -92,7 +92,7 @@ function evaluate(expression,context){
 }
 function event(change={}){
  const github={repository:'juan294/paisaxe',repository_id:'1141286326',repository_owner_id:'3944118',actor_id:'3944118',event_name:'pull_request',ref:'refs/pull/7/merge',event:{sender:{id:3944118,type:'User'},pull_request:{user:{id:3944118,type:'User'},head:{repo:{id:1141286326,fork:false}},base:{ref:'main'}}},...change};
- return {github,secrets:Object.fromEntries(['STRIPE_TEST_SECRET_KEY','STRIPE_TEST_DAY_PASS_PRICE_ID','NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY','STRIPE_TEST_WEBHOOK_SECRET','NEXT_PUBLIC_SUPABASE_URL','NEXT_PUBLIC_SUPABASE_ANON_KEY','SUPABASE_SERVICE_KEY','QA_TEST_USER_EMAIL','QA_TEST_USER_PASSWORD'].map(key=>[key,'must-withhold-'+key]))};
+ return {github,vars:{CI_CADENCE_MODE:'legacy'},secrets:Object.fromEntries(['STRIPE_TEST_SECRET_KEY','STRIPE_TEST_DAY_PASS_PRICE_ID','NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY','STRIPE_TEST_WEBHOOK_SECRET','NEXT_PUBLIC_SUPABASE_URL','NEXT_PUBLIC_SUPABASE_ANON_KEY','SUPABASE_SERVICE_KEY','QA_TEST_USER_EMAIL','QA_TEST_USER_PASSWORD'].map(key=>[key,'must-withhold-'+key]))};
 }
 for(const fault of ['foreign-author','foreign-actor','fork','bot','wrong-owner','foreign-author-bot'])test('B-COMP-4 actual Stripe gate denies '+fault,()=>{
  const context=event();

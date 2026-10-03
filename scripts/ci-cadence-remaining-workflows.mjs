@@ -9,7 +9,7 @@ import { SOURCE_GUARD, SOURCE_SHELL, SOURCE_ENV } from './ci-cadence-source-guar
 const CATALOGUE = [
   { slug: 'e2e', sha256: '1f3cd010204ec27d8ac2d12f832dcd80613cbef0217a2b2ff7705993156e2218', jobs: ['e2e', 'visual-regression'] },
   { slug: 'lighthouse', sha256: '7da4649d9eab412e5f580ba19fa5d92238db2ae32d2b2e9aa1197a78000c408b', jobs: ['lighthouse'] },
-  { slug: 'security', sha256: 'c0df88dff2d618a7ab575281cbcc568f742c0d02cc7a867e7029477d1d403097', jobs: ['gitleaks', 'audit', 'vercel-env-safety'] },
+  { slug: 'security', sha256: '6059cf6f6d4ce610b63d5f96ce9c2125c3875dbc8c465cbaf34bcda0a9ea83a0', jobs: ['gitleaks', 'audit', 'vercel-env-safety'] },
 ];
 const BASELINE = 'tests/fixtures/ci-cadence-adapter/native/remaining-workflow-baselines.json';
 const SOURCE = `set -euo pipefail

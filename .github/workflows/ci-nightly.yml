@@ -62,7 +62,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-launch.mjs" > "$private/ci-cadence-launch.mjs"
           printf '%s  %s
-          ' 'a2304a07baf2950be19648c054b90dd550e07eda408b6b13fc3115561a0f233e' "$private/ci-cadence-launch.mjs" | sha256sum --check --status
+          ' 'c92bdd8351998a93a50f1792e2992f922f60a37efd6dafdb8a4bb969130d77aa' "$private/ci-cadence-launch.mjs" | sha256sum --check --status
           node "$private/ci-cadence-launch.mjs" > "$RUNNER_TEMP/B-native.json"
           python3 - <<'PY' >> "$GITHUB_ENV"
           import json,os,re
@@ -86,7 +86,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           printf '%s  %s
-          ' '91e46d0218a66c704acd09752b2fda303333ef0a2aa6fd1376b40c12e58adaf4' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          ' '8f0a013e2db6b22c56ee0db22fc725d092ee1ee784a903b37143f1bb7b6e8528' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
           node "$private/ci-cadence-control-launch.mjs" admit
       - name: Upload Cadence admission
         if: steps.admit.outputs.decision == 'full'
@@ -217,7 +217,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           printf '%s  %s
-          ' '91e46d0218a66c704acd09752b2fda303333ef0a2aa6fd1376b40c12e58adaf4' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          ' '8f0a013e2db6b22c56ee0db22fc725d092ee1ee784a903b37143f1bb7b6e8528' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
           node "$private/ci-cadence-control-launch.mjs" measure
       - name: Upload Cadence measurement
         uses: actions/upload-artifact@v7

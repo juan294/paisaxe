@@ -62,10 +62,21 @@ function run(name, context, outputs, prefix, started, sources) {
 /** Every job, across all installed workflows, that starts a runner for this event.
  * `sources` substitutes workflow text by file name (e.g. the pre-cadence originals). */
 export function startedJobs(context, outputs = {}, sources = {}) {
-  const started = [];
-  for (const name of readdirSync(directory).filter(file => /\.ya?ml$/.test(file)).sort()) {
+  const started = [], completed = [], files = readdirSync(directory).filter(file => /\.ya?ml$/.test(file)).sort();
+  for (const name of files) {
     const definition = workflow(name, sources);
-    if (triggered(definition, context)) run(name, { ...context, inputs: Object.fromEntries(Object.keys(definition.on.workflow_call?.inputs ?? {}).map(key => [key, ''])), github: { ...context.github, workflow: definition.name, workflow_ref: `juan294/paisaxe/.github/workflows/${name}@${context.github.ref}` } }, outputs, `${name}: `, started, sources);
+    if (!triggered(definition, context)) continue;
+    const before = started.length;
+    run(name, { ...context, inputs: Object.fromEntries(Object.keys(definition.on.workflow_call?.inputs ?? {}).map(key => [key, ''])), github: { ...context.github, workflow: definition.name, workflow_ref: `juan294/paisaxe/.github/workflows/${name}@${context.github.ref}` } }, outputs, `${name}: `, started, sources);
+    completed.push({ name: definition.name, path: `.github/workflows/${name}`, ran: started.length > before });
+  }
+  // Every triggered workflow completes as a run, even when all its jobs were
+  // skipped, and that completion triggers its `workflow_run` listeners.
+  for (const run of completed) for (const name of files) {
+    const listener = workflow(name, sources), filter = listener.on?.workflow_run;
+    if (!filter?.workflows?.includes(run.name)) continue;
+    const github = { ...context.github, event_name: 'workflow_run', ref: 'refs/heads/main', workflow: listener.name, event: { ...context.github.event, action: 'completed', workflow_run: { name: run.name, path: run.path, event: context.github.event_name, status: 'completed', conclusion: 'success', head_branch: context.github.event_name === 'pull_request' ? 'feature' : context.github.ref.replace(/^refs\/heads\//, ''), actor: { login: context.github.actor }, head_repository: { full_name: 'juan294/paisaxe' } } } };
+    for (const [id, job] of Object.entries(listener.jobs)) if (!job.needs && Boolean(evaluate(job.if, { ...context, github, needs: {} }))) started.push(`${name}: ${job.name ?? id} (after ${run.name})`);
   }
   return started.sort();
 }

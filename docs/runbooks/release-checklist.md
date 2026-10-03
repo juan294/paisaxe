@@ -244,6 +244,10 @@ Phase 4 required-context list (changing branch protection is separately authoriz
 
 `claude-review` stays ungated: automatic model review is outside the cadence change.
 
+Activation is legacy-first. Install the cadence files with `CI_CADENCE_MODE` unset or `legacy`, let `CI Fast` go green on develop, migrate the required contexts, and only then set `lean`. If `lean` is set while the protected base (the push `before` commit or the PR base) has no cadence helper, `CI Fast` fails with the repair instruction: set the mode back to `legacy`, land the helper on the base branch, then set `lean` again. Lean skips the full workflows, so nothing else would validate that event.
+
+What changes at installation, even in legacy mode: routed jobs declare job-level `contents: read` and check out with `fetch-depth: 0`; secrets reach only owner events and schedules; the coverage shard uses a hosted runner for non-owner events; the bundle comment is a separate owner-only job; `coverage.yml` pins its Node version and adds `source.attempt` to the coverage payload; and the Sutura repair monitor is off unless `CI_CADENCE_REPAIR_ENABLED` is `true`. Step bodies of the original checks are unchanged.
+
 A green `CI Fast` or unchanged nightly disposition does not satisfy this checklist. Require the original full release contexts and every applicable child, the existing Stripe proof and the post-deploy proof. Any required failure, cancellation or skipped leaf blocks release.
 
 `Release artifact smoke` (`.github/workflows/preview-smoke.yml`) runs on the release PR without secrets or a deployment: it builds the PR candidate, serves the production build on loopback against local Supabase and fails unless `/api/health` reports the candidate commit and tree, the datastore is healthy, the homepage hydrates and the `release-required-local` probes pass. It is local artifact evidence only; steps 4-5 (deployed identity and required probes) remain mandatory. Until main's branch protection is changed under separate authorization, `Smoke test Vercel preview` remains the registered required context. Reproduce locally:

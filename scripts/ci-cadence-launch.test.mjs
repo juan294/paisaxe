@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchNative, nativeScannerDigest } from './ci-cadence-launch.mjs';
@@ -14,6 +15,25 @@ each('schedule authentic develop ref resolves exactly once and pins its checkout
 each('both absent preserves legacy full without import', async f => { const x = await f.prepare('push', { definition: f.absent }); const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'full'); assert.equal(r.protectedImported, false); });
 each('sender-less schedule payload authenticates by repository identity and reaches the nightly decision', async f => { const x = await f.prepare('schedule'); x.input.event = { schedule: x.input.event.schedule }; x.input.actor = 'web-flow'; x.input.context.actorId = 19864447; x.input.context.actorType = undefined; const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'nightly'); assert.equal(r.sourceSha, x.source); assert.equal(r.protectedImported, true); assert.equal(f.requests.filter(r => r.url.endsWith('/git/ref/heads/develop')).length, 1); });
 each('sender-less push blocks: only schedule may omit sender', async f => { const x = await f.prepare('push'); delete x.input.event.sender; const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'blocked'); assert.equal(r.protectedImported, false); });
+// pull_request.base.sha lags legitimately when develop moves after the PR's last sync.
+for (const [label, compared, admitted] of [['an ancestor of the moved tip', base => ({ status: 'ahead', base_commit: { sha: base }, merge_base_commit: { sha: base } }), true], ['diverged from the tip', base => ({ status: 'diverged', base_commit: { sha: base }, merge_base_commit: { sha: 'c'.repeat(40) } }), false], ['ahead of the tip', base => ({ status: 'behind', base_commit: { sha: base }, merge_base_commit: { sha: 'c'.repeat(40) } }), false], ['compared against another base', () => ({ status: 'ahead', base_commit: { sha: 'c'.repeat(40) }, merge_base_commit: { sha: 'c'.repeat(40) } }), false]]) each(`pull request whose base is ${label} is ${admitted ? 'admitted' : 'blocked'}`, async f => {
+  const x = await f.prepare('pull_request'); x.input.mode = 'legacy'; const tip = 'd'.repeat(40); const compares = [];
+  const request = async (url, init) => {
+    if (url.endsWith('/git/ref/heads/develop')) return new Response(JSON.stringify({ ref: 'refs/heads/develop', object: { type: 'commit', sha: tip } }), { headers: { 'x-ratelimit-remaining': '950' } });
+    if (url.includes('/compare/')) { compares.push(url); return new Response(JSON.stringify(compared(x.base)), { headers: { 'x-ratelimit-remaining': '950' } }); }
+    return x.transports.request(url, init);
+  };
+  const r = await launchNative(x.input, { ...x.transports, request });
+  assert.deepEqual(compares.map(url => url.split('/compare/')[1]), [`${x.base}...${tip}`]);
+  assert.equal(r.lane, admitted ? 'full' : 'blocked'); if (admitted) assert.equal(r.definitionSha, x.base);
+});
+each('pull request whose base is the current tip needs no comparison', async f => { const x = await f.prepare('pull_request'); x.input.mode = 'legacy'; const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'full'); assert.equal(f.requests.filter(r => r.url.includes('/compare/')).length, 0); });
+test('git over HTTPS authenticates as actions/checkout does: basic x-access-token, never bearer', async () => {
+  const { gitAuthorization } = await import('./ci-cadence-launch.mjs'); const control = await import('./ci-cadence-control-launch.mjs');
+  const expected = 'AUTHORIZATION: basic ' + Buffer.from('x-access-token:fixture-token').toString('base64');
+  assert.equal(gitAuthorization('fixture-token'), expected); assert.equal(control.gitAuthorization('fixture-token'), expected);
+  for (const file of ['ci-cadence-launch.mjs', 'ci-cadence-control-launch.mjs']) { const source = await readFile(new URL(file, import.meta.url), 'utf8'); assert.doesNotMatch(source, /AUTHORIZATION: bearer/i); assert.match(source, /GIT_CONFIG_VALUE_0: ?gitAuthorization\(/); }
+});
 each('absent installation disables new nightly without integration resolution', async f => { const x = await f.prepare('schedule', { definition: f.absent }); const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'disabled'); assert.equal(f.requests.filter(r => r.url.endsWith('/git/ref/heads/develop')).length, 0); });
 each('partial installation blocks before code import', async f => { const x = await f.prepare('push', { definition: f.partial }); const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'blocked'); assert.equal(r.protectedImported, false); });
 for (const fault of ['repository', 'ref', 'quota', 'redirect', 'throw']) each(`external HTTP ${fault} fails closed and redacts token`, async f => { const x = await f.prepare(); const request = async (url, init) => { if (fault === 'throw') throw Error('fixture-token'); if (fault === 'redirect') return new Response('', { status: 302 }); if (fault === 'quota') return new Response('{}', { headers: { 'x-ratelimit-remaining': '0' } }); const response = await x.transports.request(url, init); const data = await response.json(); if (fault === 'repository' && !url.includes('/git/')) data.id = 333; if (fault === 'ref' && url.includes('/git/ref/')) data.object.sha = 'a'.repeat(40); return new Response(JSON.stringify(data), { headers: { 'x-ratelimit-remaining': '950' } }); }; const r = await launchNative(x.input, { ...x.transports, request }); assert.equal(r.lane, 'blocked'); assert.equal(r.protectedImported, false); assert.ok(!JSON.stringify(r).includes('fixture-token')); });

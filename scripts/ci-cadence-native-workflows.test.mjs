@@ -20,7 +20,7 @@ test('native catalogue contains exact seventeen leaves and all source guards wit
   assert.equal(Object.keys(value.stepInventory).length,17);
   for(const steps of Object.values(value.stepInventory))assert.ok(steps.includes('Verify callable source checkout'));
   const finalizer=parse(files.find(file=>file.path.endsWith('/ci-cadence-finalize.yml')).source);
-  assert.deepEqual(finalizer.on.workflow_run.workflows,['CI nightly','CI cadence','Coverage']);
+  assert.deepEqual(finalizer.on.workflow_run.workflows,['CI nightly','Coverage']);
   assert.match(JSON.stringify(finalizer),/workflow_run.path.*coverage\.yml/);assert.ok(!JSON.stringify(finalizer).includes('secrets:inherit'));
   assert.ok(!JSON.stringify(finalizer).includes('POST'));
 });

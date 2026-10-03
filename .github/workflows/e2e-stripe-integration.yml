@@ -23,7 +23,9 @@ concurrency:
 jobs:
   e2e-stripe:
     name: Real Stripe Checkout
-    if: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) }}
+    # Lean owner PRs into develop stand down like the other full suites; release
+    # PRs, the schedule, manual runs and legacy mode keep the real Stripe suite.
+    if: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && !(vars.CI_CADENCE_MODE == 'lean' && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop') }}
     permissions:
       contents: read
     runs-on: ubuntu-latest

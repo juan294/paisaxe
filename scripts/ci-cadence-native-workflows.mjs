@@ -143,14 +143,14 @@ for result in ${Object.keys(calls).map((_,i)=>'"$CHILD_'+i+'"').join(' ')}; do t
 if test "$EVENT" = push; then test "$ADMISSION" = success; test "$MEASURED" = success; else test "$ADMISSION" = skipped; test "$MEASURED" = skipped; fi
 `}];
   return [{path:canonical+'ci-nightly.yml',source:stringify(nightly,{lineWidth:0})}, {path:canonical+'ci-cadence.yml',source:stringify(fastRoot,{lineWidth:0})},
-    {path:canonical+'ci-cadence-finalize.yml',source:stringify({name:'CI cadence completed evidence',on:{workflow_run:{workflows:['CI nightly','CI cadence','Coverage'],types:['completed']}},permissions:permission,concurrency:{group:'B-finalize-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}','cancel-in-progress':false},jobs:{finalize:{if:enabled,'runs-on':'ubuntu-latest',permissions:permission,'timeout-minutes':6,steps:[...native,{name:'Authenticate original completed attempt',env:{...environment,COVERAGE_SECRET:"${{ github.event.workflow_run.path == '.github/workflows/coverage.yml' && secrets.COVERAGE_SECRET || '' }}"},run:acquired('ci-cadence-control-launch.mjs','finalize',root)}]}}},{lineWidth:0})}];
+    {path:canonical+'ci-cadence-finalize.yml',source:stringify({name:'CI cadence completed evidence',on:{workflow_run:{workflows:['CI nightly','Coverage'],types:['completed']}},permissions:permission,concurrency:{group:'B-finalize-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}','cancel-in-progress':false},jobs:{finalize:{if:enabled+" && github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.conclusion == 'success'",'runs-on':'ubuntu-latest',permissions:permission,'timeout-minutes':6,steps:[...native,{name:'Authenticate original completed attempt',env:{...environment,COVERAGE_SECRET:"${{ github.event.workflow_run.path == '.github/workflows/coverage.yml' && secrets.COVERAGE_SECRET || '' }}"},run:acquired('ci-cadence-control-launch.mjs','finalize',root)}]}}},{lineWidth:0})}];
 }
 export function generateNativeWorkflows(root=process.cwd()) {
   root=resolve(root);
   if(realpathSync(root)!==root)throw Error('Canonical native generator root required');
   const retainedPath='tests/fixtures/ci-cadence-adapter/native/routing-originals.json';
   const retained=readFileSync(resolve(root,retainedPath));
-  if(sha256(retained)!=='aa7076ca3ac3563de5447d5c3ed1b315b7dcba496e4f61d7ce6c48794ffdee90')throw Error('Retained routing source authority changed');
+  if(sha256(retained)!=='69c7139638b1a7f2c03eb43e693e6160136981c3de4fb3cf8144e6b8fa7d39f5')throw Error('Retained routing source authority changed');
   const originals=JSON.parse(retained).files;
   const routed=originals.map(file=>({path:file.path,source:routeOriginalWorkflow(file.source)}));
   const files=[...routed,...generateRemainingWorkflows(root),...generateExtraWorkflows(root),...nativeWorkflows(root),standaloneCoverage(root)];

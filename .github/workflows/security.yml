@@ -110,42 +110,7 @@ jobs:
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&limit=100")"
 
-          # A visible partial list cannot establish absence. Keep this parser
-          # inline: token-bearing validation must not import candidate helpers.
-          printf '%s' "$response" | node -e '
-            let input = "";
-            function fail() {
-              console.error("::error::Vercel env safety requires a complete, valid environment list.");
-              process.exit(1);
-            }
-            process.stdin.setEncoding("utf8");
-            process.stdin.on("data", chunk => {
-              input += chunk;
-              if (Buffer.byteLength(input) > 8 * 1024 * 1024) fail();
-            });
-            process.stdin.on("error", fail);
-            process.stdin.on("end", () => {
-              let body;
-              try { body = JSON.parse(input); } catch { fail(); }
-              const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
-              if (!object(body) || !Array.isArray(body.envs)) fail();
-              if (Object.hasOwn(body, "error") || Object.hasOwn(body, "errors")) fail();
-              const hasPagination = Object.hasOwn(body, "pagination");
-              const hasHiddenCount = Object.hasOwn(body, "hiddenProductionEnvCount");
-              if (!hasPagination && !hasHiddenCount) fail();
-              if (hasHiddenCount && body.hiddenProductionEnvCount !== 0) fail();
-              if (hasPagination) {
-                const page = body.pagination;
-                if (!object(page) || !Number.isSafeInteger(page.count) || page.count !== body.envs.length
-                  || page.next !== null || !(page.prev === null || Number.isSafeInteger(page.prev))) fail();
-              }
-              for (const variable of body.envs) {
-                if (!object(variable) || typeof variable.key !== "string" || variable.key.length === 0
-                  || variable.key.length > 1024 || /[\u0000-\u001f\u007f]/.test(variable.key)) fail();
-              }
-              for (const variable of body.envs) process.stdout.write(variable.key + "\n");
-            });
-          ' > env-keys.txt
+          echo "$response" | jq -r '.envs[]?.key' > env-keys.txt
 
           if grep -Fxq "$legacy_key" env-keys.txt; then
             echo "::error::Legacy agent runner override is still configured in Vercel. Remove it before deploy."

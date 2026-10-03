@@ -185,7 +185,7 @@
     },
     {
       "path": ".github/workflows/security.yml",
-      "definitionSha": "accf4e0c770b2e4e4cc061a37a9a6679239b47e5",
+      "definitionSha": "1c6993e4e968824716ff22e34eb1630aad83a651",
       "jobs": [
         {
           "id": "security-gitleaks",
@@ -214,7 +214,7 @@
     },
     {
       "path": ".github/workflows/e2e-stripe-integration.yml",
-      "definitionSha": "82554a22d396c8f19a9b0e9be2619ce9ee6dc6f8",
+      "definitionSha": "7a803bd2c0b4df6309c12bd1a0e8f611867ea112",
       "jobs": [
         {
           "id": "e2e-stripe-integration-e2e-stripe",

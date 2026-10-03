@@ -84,7 +84,7 @@ for (const [label, event] of [['production PR', pull('main')], ['production push
   // CI Fast is a required develop context, so it is decided for untrusted develop
   // events too (its entry step blocks them in lean, below). It never runs for main.
   const develop = event.ref === 'refs/heads/develop' || event.baseBranch === 'develop';
-  assert.deepEqual(jobs.filter(job => job.startsWith('ci-cadence')), develop ? [FAST] : []);
+  assert.deepEqual(jobs.filter(job => job.startsWith('ci-cadence.yml: ')), develop ? [FAST] : []);
   if (event.baseBranch === 'main') assert.ok(jobs.includes('preview-smoke.yml: Release artifact smoke'));
 });
 test('CI Fast holds no secrets and a read-only token, so deciding untrusted events is safe', () => {
@@ -150,6 +150,24 @@ for (const fixture of fixtures) test(`phase-1 "${fixture.name}": static job pred
   assert.equal(jobs.includes(FAST), ['push', 'pull_request'].includes(event.kind) && (event.ref === 'refs/heads/develop' || event.baseBranch === 'develop'));
 });
 
+test('the real Stripe suite stands down only for lean owner PRs into develop', () => {
+  const job = workflow('e2e-stripe-integration.yml').jobs['e2e-stripe'], selects = (event, mode) => Boolean(evaluate(job.if, { ...nativeContext(event, mode), needs: {} }));
+  for (const mode of ['lean', 'LEAN']) assert.equal(selects(pull(), mode), false, mode);
+  for (const [label, event, mode] of [['legacy develop PR', pull(), 'legacy'], ['unset-mode develop PR', pull(), undefined], ['lean release PR', pull('main'), 'lean'], ['lean schedule', { kind: 'schedule', ref: 'refs/heads/main', senderless: true }, 'lean'], ['legacy schedule', { kind: 'schedule', ref: 'refs/heads/main' }, 'legacy'], ['lean manual run', { kind: 'workflow_dispatch', ref: 'refs/heads/develop' }, 'lean']]) assert.equal(selects(event, mode), true, label);
+  for (const mode of ['lean', 'legacy']) for (const [label, event] of [['fork PR', pull('develop', { headRepository: 'outsider/paisaxe' })], ['Dependabot PR', pull('main', { actor: 'dependabot[bot]' })], ['outsider-authored PR', pull('develop', { author: 'outsider' })]]) assert.equal(selects(event, mode), false, `${mode} ${label}`);
+});
+test('completed-evidence finalizer never starts for CI cadence or pull-request runs, and only after a success', () => {
+  const definition = workflow('ci-cadence-finalize.yml'), job = definition.jobs.finalize;
+  assert.deepEqual(definition.on.workflow_run.workflows, ['CI nightly', 'Coverage']);
+  const selects = (run, mode = 'lean') => { const base = nativeContext({ kind: 'push', ref: 'refs/heads/main' }, mode); return Boolean(evaluate(job.if, { ...base, github: { ...base.github, event_name: 'workflow_run', event: { workflow_run: run } }, needs: {} })); };
+  assert.equal(selects({ event: 'schedule', conclusion: 'success' }), true);
+  assert.equal(selects({ event: 'push', conclusion: 'success' }), true);
+  for (const [label, run, mode] of [['pull-request run', { event: 'pull_request', conclusion: 'success' }, 'lean'], ['failed run', { event: 'schedule', conclusion: 'failure' }, 'lean'], ['cancelled run', { event: 'schedule', conclusion: 'cancelled' }, 'lean'], ['legacy mode', { event: 'schedule', conclusion: 'success' }, 'legacy']]) assert.equal(selects(run, mode), false, label);
+  // startedJobs() models workflow_run listeners, so every "exactly one job" oracle above includes them.
+  assert.ok(started({ kind: 'schedule', ref: 'refs/heads/main', senderless: true }, 'lean').includes('ci-cadence-finalize.yml: finalize (after CI nightly)'));
+  for (const event of [push(), pull()]) assert.ok(!started(event, 'lean').some(job => job.includes('(after ')));
+});
+
 /** Runs the real recovery aggregate for one set of needs results. */
 function recovery(needs, kind = 'push', mode = 'lean') {
   const job = cadenceJob('complete'), context = { ...nativeContext(kind === 'push' ? push() : pull(), mode), needs };
@@ -171,10 +189,11 @@ for (const kind of ['push', 'pull_request']) test(`recovery aggregate (${kind}) 
   for (const child of FULL_CHILDREN) assert.match(cadenceJob(child).if, /needs\.entry\.outputs\.decision == 'full'/);
 });
 
-/** Executes the real entry step. Only transport is replaced: `timeout … git fetch`
- * becomes a local pin, and the launcher is a fixture whose digest is supplied the
- * same way the workflow supplies the reviewed one. */
-function entryStep(t, { install = 'complete', launcher, routing, pin, event: kind = 'push' } = {}) {
+/** Executes the real entry step, unmodified, in a real local repository: the step
+ * performs no network operation. The launcher is a fixture whose digest is supplied
+ * the same way the workflow supplies the reviewed one; `sha256sum` is the only shim
+ * (GNU coreutils name, absent on macOS). */
+function entryStep(t, { install = 'complete', launcher, routing, pin, event: kind = 'push', definition: named } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'paisaxe-fast-entry-')); t.after(() => rmSync(directory, { recursive: true, force: true }));
   const repository = join(directory, 'repository'), bin = join(directory, 'bin'), temp = join(directory, 'temp');
   for (const path of [repository, bin, temp]) mkdirSync(path);
@@ -182,9 +201,8 @@ function entryStep(t, { install = 'complete', launcher, routing, pin, event: kin
   git('init', '--quiet', '--template='); writeFileSync(join(repository, 'README.md'), 'fixture\n');
   const bytes = launcher ?? '';
   if (install !== 'absent') { mkdirSync(join(repository, 'scripts')); mkdirSync(join(repository, '.github')); writeFileSync(join(repository, '.github/ci-cadence.json'), '{}\n'); writeFileSync(join(repository, 'scripts/ci-cadence.mjs'), '\n'); if (install === 'complete') writeFileSync(join(repository, 'scripts/ci-cadence-launch.mjs'), bytes); }
-  git('add', '.'); git('commit', '--quiet', '-m', 'protected base'); const definition = git('rev-parse', 'HEAD');
+  git('add', '.'); git('commit', '--quiet', '-m', 'protected base'); const definition = named ?? git('rev-parse', 'HEAD');
   writeFileSync(join(repository, 'candidate'), 'candidate\n'); git('add', '.'); git('commit', '--quiet', '-m', 'candidate');
-  writeFileSync(join(bin, 'timeout'), '#!/bin/bash\nfor last; do :; done\nexec git update-ref "${last#*:}" "${last%%:*}"\n'); chmodSync(join(bin, 'timeout'), 0o755);
   writeFileSync(join(bin, 'sha256sum'), '#!/bin/bash\nexec shasum -a 256 "$@"\n'); chmodSync(join(bin, 'sha256sum'), 0o755);
   const eventPath = join(directory, 'event.json'), output = join(directory, 'output'), summary = join(directory, 'summary'), marker = join(directory, 'launcher-ran');
   writeFileSync(eventPath, JSON.stringify(kind === 'push' ? { before: definition } : { pull_request: { base: { sha: definition } } })); writeFileSync(output, ''); writeFileSync(summary, '');
@@ -208,6 +226,17 @@ for (const kind of ['push', 'pull_request']) test(`first installation (${kind}) 
   const run = entryStep(t, { install: 'absent', routing: 'lean', event: kind });
   assert.notEqual(run.status, 0); assert.deepEqual(run.outputs, {}); assert.equal(run.ran, null);
   assert.match(run.stdout, /::error title=CI Fast::first installation.*Set CI_CADENCE_MODE to legacy/); assert.match(run.summary, /Set CI_CADENCE_MODE to legacy/);
+});
+test('entry step performs no network or credentialed git operation', () => {
+  const run = cadenceJob('entry').steps.find(entry => entry.name === 'Acquire reviewed protected launcher').run;
+  assert.doesNotMatch(run, /\bfetch\b|https?:\/\/|\bclone\b|ls-remote|extraheader/);
+  assert.match(run, /git --no-replace-objects cat-file -e "\$definition\^\{commit\}"/);
+  assert.equal(cadenceJob('entry').steps.find(entry => entry.uses?.startsWith('actions/checkout@')).with['fetch-depth'], 0);
+});
+for (const kind of ['push', 'pull_request']) for (const routing of ['lean', 'legacy']) test(`protected base missing from the checkout (${kind}, ${routing}) fails with a clear message and runs nothing`, t => {
+  const run = entryStep(t, { launcher: stub(passed), routing, event: kind, definition: 'e'.repeat(40) });
+  assert.notEqual(run.status, 0); assert.deepEqual(run.outputs, {}); assert.equal(run.ran, null);
+  assert.match(run.stdout, /::error title=CI Fast::protected base e{40} is not in this checkout/);
 });
 test('partial installation without the trusted launcher fails closed', t => {
   const run = entryStep(t, { install: 'partial', routing: 'lean' });

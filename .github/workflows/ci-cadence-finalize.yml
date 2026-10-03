@@ -3,7 +3,6 @@ on:
   workflow_run:
     workflows:
       - CI nightly
-      - CI cadence
       - Coverage
     types:
       - completed
@@ -17,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   finalize:
-    if: vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118'
+    if: vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions: *a1
     timeout-minutes: 6
@@ -52,5 +51,5 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           printf '%s  %s
-          ' '91e46d0218a66c704acd09752b2fda303333ef0a2aa6fd1376b40c12e58adaf4' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          ' '8f0a013e2db6b22c56ee0db22fc725d092ee1ee784a903b37143f1bb7b6e8528' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
           node "$private/ci-cadence-control-launch.mjs" finalize

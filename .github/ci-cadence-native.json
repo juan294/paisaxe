@@ -3,16 +3,16 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "18d2d9bcdf0f6f58387b7c33f5ba409956c1b8fb"
+    "blobSha": "469a6aaf0b272159d69ac559dedfeff44d7e73ac"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "18d2d9bcdf0f6f58387b7c33f5ba409956c1b8fb"
+      "blobSha": "469a6aaf0b272159d69ac559dedfeff44d7e73ac"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "a478dfa38a8085fb8ece99a2b349910c882d6e71"
+      "blobSha": "a776fa6091a2f34781fcf1adb3000d3366db9007"
     }
   },
   "callees": {
@@ -49,7 +49,7 @@
     ".github/workflows/security.yml": {
       "path": ".github/workflows/ci-cadence-security-full.yml",
       "prefix": "security",
-      "blobSha": "c4eff399a8124b7cf87af9d3f481d4caa623bf18"
+      "blobSha": "f177c2f2c21e76e11cf46187d37fb5f2b3e36f38"
     }
   },
   "coverageOnly": {
@@ -137,15 +137,15 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "18d2d9bcdf0f6f58387b7c33f5ba409956c1b8fb",
-    ".github/workflows/ci-cadence.yml": "a478dfa38a8085fb8ece99a2b349910c882d6e71",
+    ".github/workflows/ci-nightly.yml": "469a6aaf0b272159d69ac559dedfeff44d7e73ac",
+    ".github/workflows/ci-cadence.yml": "a776fa6091a2f34781fcf1adb3000d3366db9007",
     ".github/workflows/ci.yml": "05824a4836fe0f0d7773c5425904e72d581a4c36",
     ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "db256a17ed4718c5911852bc4d98dbba7790cca1",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",
     ".github/workflows/ci-cadence-knip-full.yml": "4453408d8ef1231818df8f32fdce1da95706650d",
     ".github/workflows/ci-cadence-license-check-full.yml": "75fd2a1b570303eb0f606cb0d6d9b10cf9933fbf",
-    ".github/workflows/ci-cadence-security-full.yml": "c4eff399a8124b7cf87af9d3f481d4caa623bf18"
+    ".github/workflows/ci-cadence-security-full.yml": "f177c2f2c21e76e11cf46187d37fb5f2b3e36f38"
   },
   "stepInventory": {
     "ci-lint-and-typecheck": [

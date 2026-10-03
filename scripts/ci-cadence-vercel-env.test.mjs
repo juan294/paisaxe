@@ -9,7 +9,6 @@ import { parse } from 'yaml';
 const workflow = parse(readFileSync(new URL('../.github/workflows/security.yml', import.meta.url), 'utf8'));
 const assertion = workflow.jobs['vercel-env-safety'].steps.find(step => step.name === 'Assert legacy agent override is absent from Vercel env');
 const legacyKey = ['ALLOW', 'AGENT', 'RUN'].join('_');
-const page = envs => ({ envs, pagination: { count: envs.length, next: null, prev: null } });
 
 function execute(t, body, curlExit = 0) {
   const directory = mkdtempSync(join(tmpdir(), 'paisaxe-vercel-env-contract-'));
@@ -30,52 +29,23 @@ function execute(t, body, curlExit = 0) {
   });
 }
 
-for (const [label, body] of [
-  ['complete empty page', page([])],
-  ['complete page with unrelated keys', page([{ key: 'SAFE_KEY', value: 'DO_NOT_PRINT_PRIVATE_VALUE' }])],
-  ['documented complete hidden-count variant', { envs: [], hiddenProductionEnvCount: 0 }],
-  ['same key in distinct environments', page([{ key: 'SAFE_KEY', target: ['production'] }, { key: 'SAFE_KEY', target: ['preview'] }])],
-]) {
-  test(`actual Vercel assertion accepts ${label}`, t => {
-    const result = execute(t, body);
-    assert.equal(result.status, 0, result.stderr);
-    assert.doesNotMatch(result.stdout + result.stderr, /DO_NOT_PRINT_PRIVATE_VALUE/);
-  });
-}
-
-for (const [label, body] of [
-  ['missing list', {}],
-  ['null list', { envs: null }],
-  ['object list', { envs: {} }],
-  ['primitive list item', page(['SAFE_KEY'])],
-  ['missing key', page([{}])],
-  ['numeric key', page([{ key: 5 }])],
-  ['empty key', page([{ key: '' }])],
-  ['control byte in key', page([{ key: 'SAFE\nKEY' }])],
-  ['legacy override', page([{ key: legacyKey }])],
-  ['incomplete next page', { envs: [], pagination: { count: 0, next: 1234, prev: null } }],
-  ['malformed pagination', { envs: [], pagination: {} }],
-  ['missing completeness metadata', { envs: [] }],
-  ['wrong page count', { envs: [], pagination: { count: 1, next: null, prev: null } }],
-  ['hidden production variables', { envs: [], hiddenProductionEnvCount: 1 }],
-  ['hidden variables alongside terminal page', { ...page([]), hiddenProductionEnvCount: 1 }],
-  ['invalid hidden count', { envs: [], hiddenProductionEnvCount: '0' }],
-  ['provider error object', { error: { code: 'forbidden', message: 'DO_NOT_PRINT_PRIVATE_VALUE' } }],
-  ['terminal page with provider error', { ...page([]), error: { code: 'forbidden', message: 'DO_NOT_PRINT_PRIVATE_VALUE' } }],
-  ['hidden-count list with provider error', { envs: [], hiddenProductionEnvCount: 0, error: { code: 'forbidden', message: 'DO_NOT_PRINT_PRIVATE_VALUE' } }],
-  ['terminal page with provider error array', { ...page([]), errors: [{ code: 'forbidden', message: 'DO_NOT_PRINT_PRIVATE_VALUE' }] }],
-  ['unsupported single-variable variant', { key: 'SAFE_KEY', value: 'DO_NOT_PRINT_PRIVATE_VALUE' }],
-  ['invalid JSON', '{'],
-]) {
-  test(`actual Vercel assertion rejects ${label}`, t => {
-    const result = execute(t, body);
-    assert.notEqual(result.status, 0, `absence cannot be established from ${label}`);
-    assert.doesNotMatch(result.stdout + result.stderr, /DO_NOT_PRINT_PRIVATE_VALUE/);
-  });
-}
+// The step body is the pre-cadence one, byte for byte: cadence routing changes
+// when the job runs, never what the release-path check does.
+test('Vercel env assertion body is exactly the retained original step', () => {
+  const retained = JSON.parse(readFileSync(new URL('../tests/fixtures/ci-cadence-adapter/native/routing-originals.json', import.meta.url), 'utf8')).files.find(file => file.path === '.github/workflows/security.yml');
+  const original = parse(retained.source).jobs['vercel-env-safety'].steps.find(step => step.name === assertion.name);
+  assert.equal(assertion.run, original.run);
+  assert.match(assertion.run, /jq -r '\.envs\[\]\?\.key' > env-keys\.txt/);
+  const callable = parse(readFileSync(new URL('../.github/workflows/ci-cadence-security-full.yml', import.meta.url), 'utf8')).jobs['vercel-env-safety'].steps.find(step => step.name === assertion.name);
+  assert.equal(callable.run, original.run);
+});
+test('actual Vercel assertion passes without the legacy key and fails when it is present', t => {
+  assert.equal(execute(t, { envs: [{ key: 'SAFE_KEY' }] }).status, 0);
+  assert.notEqual(execute(t, { envs: [{ key: 'SAFE_KEY' }, { key: legacyKey }] }).status, 0);
+});
 
 test('actual Vercel assertion preserves HTTP transport failure', t => {
-  const result = execute(t, page([]), 22);
+  const result = execute(t, { envs: [] }, 22);
   assert.notEqual(result.status, 0);
 });
 
