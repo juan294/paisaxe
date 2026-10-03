@@ -3,23 +3,23 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "feadcb1ae2b4e7b49fb8e297f1309b88a95df31f"
+    "blobSha": "1d6a0d5e931097659da85ec88de2adb18785bc46"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "feadcb1ae2b4e7b49fb8e297f1309b88a95df31f"
+      "blobSha": "1d6a0d5e931097659da85ec88de2adb18785bc46"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "e82a2f0116704d235c1d2de1a212b73fbc7a2f6c"
+      "blobSha": "9a5d4526f9e24bd3c4ab016267889dfc10d6e64c"
     }
   },
   "callees": {
     ".github/workflows/ci.yml": {
       "path": ".github/workflows/ci.yml",
       "prefix": "ci",
-      "blobSha": "5de82ed57eeb7745c32da861f4fefa45b6482f5d"
+      "blobSha": "e7fe09cbc42c366a2e089ae7b60ccd84c03a7876"
     },
     ".github/workflows/e2e.yml": {
       "path": ".github/workflows/ci-cadence-e2e-full.yml",
@@ -137,10 +137,9 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "feadcb1ae2b4e7b49fb8e297f1309b88a95df31f",
-    ".github/workflows/ci-cadence.yml": "e82a2f0116704d235c1d2de1a212b73fbc7a2f6c",
-    ".github/workflows/ci-fast.yml": "855c216b3be126bf9bf8355427be8a384e37d017",
-    ".github/workflows/ci.yml": "5de82ed57eeb7745c32da861f4fefa45b6482f5d",
+    ".github/workflows/ci-nightly.yml": "1d6a0d5e931097659da85ec88de2adb18785bc46",
+    ".github/workflows/ci-cadence.yml": "9a5d4526f9e24bd3c4ab016267889dfc10d6e64c",
+    ".github/workflows/ci.yml": "e7fe09cbc42c366a2e089ae7b60ccd84c03a7876",
     ".github/workflows/ci-cadence-e2e-full.yml": "e98412b62a66f4d2f1836153075b9f8725ace21c",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "db256a17ed4718c5911852bc4d98dbba7790cca1",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",
@@ -459,13 +458,6 @@
     },
     {
       "name": "ci / develop_push_source",
-      "conclusions": [
-        "skipped"
-      ],
-      "steps": []
-    },
-    {
-      "name": "ci / Protected cadence routing",
       "conclusions": [
         "skipped"
       ],
@@ -872,13 +864,6 @@
         "steps": []
       },
       {
-        "name": "ci / Protected cadence routing",
-        "conclusions": [
-          "skipped"
-        ],
-        "steps": []
-      },
-      {
         "name": "e2e / Callable source",
         "conclusions": [
           "success"
@@ -1278,13 +1263,6 @@
         "steps": []
       },
       {
-        "name": "ci / Protected cadence routing",
-        "conclusions": [
-          "skipped"
-        ],
-        "steps": []
-      },
-      {
         "name": "e2e / Callable source",
         "conclusions": [
           "success"
@@ -1597,7 +1575,7 @@
         ]
       },
       {
-        "name": "entry / Cadence entry",
+        "name": "CI Fast",
         "conclusions": [
           "success"
         ],
@@ -1635,13 +1613,13 @@
         ]
       },
       {
-        "name": "CI Fast",
+        "name": "CI Fast recovery",
         "conclusions": [
           "success"
         ],
         "steps": [
           {
-            "name": "Require real Fast checks or complete full recovery",
+            "name": "Require every full recovery child",
             "conclusions": [
               "success"
             ]

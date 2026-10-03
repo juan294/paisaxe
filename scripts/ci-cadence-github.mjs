@@ -417,7 +417,7 @@ export function createGitHubCadenceReader({ token, fetchImpl = fetch, limits = {
                     const admission=jobs.rows.find(j=>j.name==='Cadence admission'),measurement=jobs.rows.find(j=>j.name==='Cadence measurement');
                     const disposition=jobs.rows.find(j=>j.name===(workflow.includes('nightly')?'Nightly disposition':'CI Fast'));
                     if(!admission||!measurement||!disposition||disposition.conclusion!=='success'||measurement.conclusion!=='skipped'||admission.conclusion!==(workflow.includes('nightly')?'success':'skipped')||jobs.rows.filter(j=>![admission,measurement,disposition].includes(j)&&!j.name.startsWith('entry / ')).some(j=>j.conclusion!=='skipped')||artifacts.rows.some(a=>a.name==='ci-cadence-measurement'))fail('unexplained missing measuring admission');
-                    if(workflow.includes('ci-cadence')){const entry=jobs.rows.filter(j=>j.name==='entry / Cadence entry');if(entry.length!==1||entry[0].conclusion!=='success'||!entry[0].steps?.some(s=>s.name==='Acquire reviewed protected launcher'&&s.status==='completed'&&s.conclusion==='success'))fail('nonmeasuring Fast entry unavailable');}
+                    if(workflow.includes('ci-cadence')){const entry=jobs.rows.filter(j=>j.name==='CI Fast');if(entry.length!==1||entry[0].conclusion!=='success'||!entry[0].steps?.some(s=>s.name==='Acquire reviewed protected launcher'&&s.status==='completed'&&s.conclusion==='success'))fail('nonmeasuring Fast entry unavailable');}
                     nonmeasuring.push({runId:run.id,attempt,workflow});
                     continue; // authenticated original nonmeasuring disposition
                   }

@@ -83,9 +83,8 @@ test('actual provider scope and secret-withheld branches remain explicit', () =>
   assert.deepEqual(workflow.on.push.branches, ['develop', 'main']);
   assert.deepEqual(workflow.on.pull_request.branches, ['develop', 'main']);
   assert.deepEqual(workflow.on.schedule, [{ cron: '0 8 * * *' }]);
-  assert.deepEqual(Object.keys(workflow.jobs), ['develop_push_source', 'gitleaks', 'audit', 'vercel-env-safety', 'cadence-route']);
-  assert.match(workflow.jobs['cadence-route'].if, /CI_CADENCE_MODE/);
-  assert.match(workflow.jobs['cadence-route'].if, /3944118/);
+  assert.deepEqual(Object.keys(workflow.jobs), ['develop_push_source', 'gitleaks', 'audit', 'vercel-env-safety']);
+  for (const job of Object.values(workflow.jobs)) { assert.match(job.if, /CI_CADENCE_MODE == 'lean'/); assert.match(job.if, /3944118/); }
   assert.match(assertion.if, /env\.VERCEL_TOKEN != ''/);
   assert.match(assertion.run, /https:\/\/api\.vercel\.com\/v10\/projects\/\$VERCEL_PROJECT_ID\/env\?teamId=\$VERCEL_ORG_ID&limit=100/);
   assert.equal((assertion.run.match(/curl -fsS/g) ?? []).length, 1);

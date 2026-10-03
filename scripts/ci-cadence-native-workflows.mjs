@@ -7,6 +7,7 @@ import { generateRemainingWorkflows } from './ci-cadence-remaining-workflows.mjs
 import { generateExtraWorkflows } from './ci-cadence-extra-workflows.mjs';
 import { routeOriginalWorkflow } from './ci-cadence-route-originals.mjs';
 const canonical = '.github/workflows/';
+const fastJobPath = '.github/ci-cadence-fast-job.yml';
 const calls = { ci:'ci.yml', e2e:'ci-cadence-e2e-full.yml', lighthouse:'ci-cadence-lighthouse-full.yml', 'bundle-size':'ci-cadence-bundle-size-full.yml', knip:'ci-cadence-knip-full.yml', 'license-check':'ci-cadence-license-check-full.yml', security:'ci-cadence-security-full.yml' };
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const blob = bytes => createHash('sha1').update(`blob ${Buffer.byteLength(bytes)}\0`).update(bytes).digest('hex');
@@ -38,7 +39,7 @@ function standaloneCoverage(root) {
   job.steps[1].name='Setup reviewed Node runtime';job.steps[1].with['node-version']='24.21.0';
   job.steps[2].name='Install dependencies';
   const retained=JSON.parse(readFileSync(resolve(root,'tests/fixtures/ci-cadence-adapter/native/routing-originals.json')));
-  const ci=parse(routeOriginalWorkflow(retained.files.find(f=>f.path===canonical+'ci.yml').source,sha256(readFileSync(resolve(root,'scripts/ci-cadence-native.mjs')))));
+  const ci=parse(routeOriginalWorkflow(retained.files.find(f=>f.path===canonical+'ci.yml').source));
   const before=structuredClone(ci.jobs['coverage-merge'].steps.find(step=>step.name==='Verify callable source checkout'));
   const after=structuredClone(ci.jobs['coverage-merge'].steps.find(step=>step.name==='Verify completed callable source checkout'));
   for(const guard of [before,after]){guard.if='${{ '+lean+' }}';guard.env={...guard.env,SOURCE_SHA:'${{ github.sha }}'};}
@@ -116,10 +117,12 @@ PY
   const fastRoot=structuredClone(nightly);
   fastRoot.name='CI cadence';fastRoot.on={push:{branches:['develop']},pull_request:{branches:['develop']}};
   fastRoot.concurrency={group:'B-cadence-${{ github.ref }}','cancel-in-progress':true};
-  // No mode term: CI Fast is produced under legacy too. Full recovery children
-  // still start only on a lean "full" decision; legacy keeps its original workflows.
-  const rootGuard="github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))";
-  fastRoot.jobs.entry={if:rootGuard,uses:'./.github/workflows/ci-fast.yml',permissions:permission};
+  // The inlined job IS the `CI Fast` context and the only routine runner. It has
+  // no mode term, so it is produced under legacy too; recovery children start
+  // only on a lean "full" decision, and legacy keeps its original workflows.
+  const fastJob=parse(readFileSync(resolve(root,fastJobPath),'utf8'));
+  const rootGuard=fastJob.if.replace(/\s+/g,' ').trim();
+  fastRoot.jobs.entry={...fastJob,if:rootGuard,permissions:{contents:'read'}};
   fastRoot.jobs.admission.needs=['entry'];
   fastRoot.jobs.admission.if="needs.entry.outputs.decision == 'full' && github.event_name == 'push'";
   fastRoot.jobs.admission.steps=fastRoot.jobs.admission.steps.filter(s=>s.name!=='Resolve once and authenticate native source');
@@ -128,14 +131,12 @@ PY
   fastRoot.jobs.measurement.needs=['entry','admission',...Object.keys(calls)];
   fastRoot.jobs.measurement.if="always() && github.event_name == 'push' && needs.entry.outputs.decision == 'full' && needs.admission.result == 'success' && "+Object.keys(calls).map(id=>`needs.${id}.result == 'success'`).join(' && ');
   for(const step of fastRoot.jobs.measurement.steps)if(step.env)step.env={...step.env,CI_CADENCE_DEFINITION_SHA:'${{ needs.entry.outputs.definition_sha }}',CI_CADENCE_SOURCE_SHA:'${{ needs.entry.outputs.source_sha }}'};
-  fastRoot.jobs.complete.name='CI Fast';fastRoot.jobs.complete.needs=['entry','admission',...Object.keys(calls),'measurement'];fastRoot.jobs.complete.if='${{ always() && '+rootGuard+' }}';
-  fastRoot.jobs.complete.steps=[{name:'Require real Fast checks or complete full recovery',env:{ENTRY:'${{ needs.entry.result }}',DECISION:'${{ needs.entry.outputs.decision }}',ADMISSION:'${{ needs.admission.result }}',EVENT:'${{ github.event_name }}',MEASURED:'${{ needs.measurement.result }}',...Object.fromEntries(Object.keys(calls).map((id,i)=>['CHILD_'+i,'${{ needs.'+id+'.result }}']))},run:`set -euo pipefail
+  // Starts a runner only when recovery children ran; otherwise skipped at no cost.
+  fastRoot.jobs.complete.name='CI Fast recovery';fastRoot.jobs.complete.needs=['entry','admission',...Object.keys(calls),'measurement'];fastRoot.jobs.complete.if="${{ always() && "+rootGuard+" && needs.entry.outputs.decision == 'full' }}";
+  fastRoot.jobs.complete.steps=[{name:'Require every full recovery child',env:{ENTRY:'${{ needs.entry.result }}',ADMISSION:'${{ needs.admission.result }}',EVENT:'${{ github.event_name }}',MEASURED:'${{ needs.measurement.result }}',...Object.fromEntries(Object.keys(calls).map((id,i)=>['CHILD_'+i,'${{ needs.'+id+'.result }}']))},run:`set -euo pipefail
 test "$ENTRY" = success
-case "$DECISION" in
-full) for result in ${Object.keys(calls).map((_,i)=>'"$CHILD_'+i+'"').join(' ')}; do test "$result" = success; done; if test "$EVENT" = push; then test "$ADMISSION" = success; test "$MEASURED" = success; else test "$ADMISSION" = skipped; test "$MEASURED" = skipped; fi ;;
-skip|legacy) test "$ADMISSION" = skipped; test "$MEASURED" = skipped; for result in ${Object.keys(calls).map((_,i)=>'"$CHILD_'+i+'"').join(' ')}; do test "$result" = skipped; done; if test "$DECISION" = legacy; then echo '::notice title=CI Fast::full-suite validation for this event is owned by the existing full workflows'; fi ;;
-*) exit 1 ;;
-esac
+for result in ${Object.keys(calls).map((_,i)=>'"$CHILD_'+i+'"').join(' ')}; do test "$result" = success; done
+if test "$EVENT" = push; then test "$ADMISSION" = success; test "$MEASURED" = success; else test "$ADMISSION" = skipped; test "$MEASURED" = skipped; fi
 `}];
   return [{path:canonical+'ci-nightly.yml',source:stringify(nightly,{lineWidth:0})}, {path:canonical+'ci-cadence.yml',source:stringify(fastRoot,{lineWidth:0})},
     {path:canonical+'ci-cadence-finalize.yml',source:stringify({name:'CI cadence completed evidence',on:{workflow_run:{workflows:['CI nightly','CI cadence','Coverage'],types:['completed']}},permissions:permission,concurrency:{group:'B-finalize-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}','cancel-in-progress':false},jobs:{finalize:{if:enabled,'runs-on':'ubuntu-latest',permissions:permission,'timeout-minutes':6,steps:[...native,{name:'Authenticate original completed attempt',env:{...environment,COVERAGE_SECRET:"${{ github.event.workflow_run.path == '.github/workflows/coverage.yml' && secrets.COVERAGE_SECRET || '' }}"},run:acquired('ci-cadence-control-launch.mjs','finalize',root)}]}}},{lineWidth:0})}];
@@ -147,8 +148,7 @@ export function generateNativeWorkflows(root=process.cwd()) {
   const retained=readFileSync(resolve(root,retainedPath));
   if(sha256(retained)!=='aa7076ca3ac3563de5447d5c3ed1b315b7dcba496e4f61d7ce6c48794ffdee90')throw Error('Retained routing source authority changed');
   const originals=JSON.parse(retained).files;
-  const nativePin=sha256(readFileSync(resolve(root,'scripts/ci-cadence-native.mjs')));
-  const routed=originals.map(file=>({path:file.path,source:routeOriginalWorkflow(file.source,nativePin)}));
+  const routed=originals.map(file=>({path:file.path,source:routeOriginalWorkflow(file.source)}));
   const files=[...routed,...generateRemainingWorkflows(root),...generateExtraWorkflows(root),...nativeWorkflows(root),standaloneCoverage(root)];
   const byPath=Object.fromEntries(files.map(file=>[file.path,file.source]));
   const source=path=>byPath[path]??readFileSync(resolve(root,path),'utf8');
@@ -160,14 +160,14 @@ export function generateNativeWorkflows(root=process.cwd()) {
     const original=policy.workflows.find(w=>w.path===canonical+slug+'.yml');if(!original)throw Error('Canonical app catalogue changed');
     for(const app of original.jobs){const id=app.id.startsWith('ci-coverage-shard-')?'coverage-shard':app.id.slice(slug.length+1);const job=definition.jobs[id];if(!job)throw Error('Callable app disappeared');const steps=job.steps.map(step=>step.name);if(steps.some(name=>typeof name!=='string'||!name)||new Set(steps).size!==steps.length)throw Error('Explicit step census required');stepInventory[app.id]=[...steps,'Set up job','Complete job',...job.steps.filter(step=>step.uses).map(step=>'Post '+step.name)];}
     for(const id of ['callable-source','callable-full']){const job=definition.jobs[id];if(!job)throw Error('Callable auxiliary disappeared');auxiliaryJobs.push({name:slug+' / '+job.name,conclusions:['success'],steps:[...job.steps.map(step=>({name:step.name,conclusions:['success']})),{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}]});}
-    if(slug==='ci')for(const name of ['develop_push_source','Protected cadence routing'])auxiliaryJobs.push({name:'ci / '+name,conclusions:['skipped'],steps:[]});
+    if(slug==='ci')auxiliaryJobs.push({name:'ci / develop_push_source',conclusions:['skipped'],steps:[]});
   }
   auxiliaryJobs.push({name:'Nightly disposition',conclusions:['success'],steps:[{name:'Require real full proof or unchanged skip',conclusions:['success']},{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}]});
-  const pins=Object.fromEntries([canonical+'ci-nightly.yml',canonical+'ci-cadence.yml',canonical+'ci-fast.yml',...Object.values(callees).map(c=>c.path)].map(path=>[path,blob(source(path))]));
+  const pins=Object.fromEntries([canonical+'ci-nightly.yml',canonical+'ci-cadence.yml',...Object.values(callees).map(c=>c.path)].map(path=>[path,blob(source(path))]));
   const pushAuxiliary=auxiliaryJobs.filter(j=>j.name!=='Nightly disposition');
-  const fast=parse(source(canonical+'ci-fast.yml')).jobs.fast;
-  pushAuxiliary.push({name:'entry / '+fast.name,conclusions:['success'],steps:fast.steps.map(s=>({name:s.name,conclusions:['success']})).concat([{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}])});
-  pushAuxiliary.push({name:'CI Fast',conclusions:['success'],steps:[{name:'Require real Fast checks or complete full recovery',conclusions:['success']},{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}]});
+  const fast=parse(readFileSync(resolve(root,fastJobPath),'utf8'));
+  pushAuxiliary.push({name:fast.name,conclusions:['success'],steps:fast.steps.map(s=>({name:s.name,conclusions:['success']})).concat([{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}])});
+  pushAuxiliary.push({name:'CI Fast recovery',conclusions:['success'],steps:[{name:'Require every full recovery child',conclusions:['success']},{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}]});
   const coverageDefinition=parse(source(canonical+'coverage.yml'));
   const coverageOnly={path:canonical+'coverage.yml',blobSha:blob(source(canonical+'coverage.yml')),steps:coverageDefinition.jobs.coverage.steps.map(step=>({name:step.name,conclusions:step.name==='Decide weekly native coverage eligibility'?['success']:step.name==='Report coverage to Portfolio'?['skipped']:['success','skipped'],post:Boolean(step.uses)}))};
   const callers=Object.fromEntries(['ci-nightly.yml','ci-cadence.yml'].map(path=>[canonical+path,{path:canonical+path,blobSha:pins[canonical+path]}]));

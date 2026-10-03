@@ -32,7 +32,6 @@ export function buildFullState({ root, definitionSha, authoritySha = definitionS
   const projected = projectFullGraph({ protectedPolicy:policy, profile, definitionSha, sourceSha, caller,
     callees:Object.fromEntries(Object.entries(catalogue.callees).map(([path,callee])=>[path,{...callee,definitionSha}])),
     auxiliaryJobs:catalogue.censusByCaller?.[callerPath]??catalogue.auxiliaryJobs, stepInventory:catalogue.stepInventory,
-    auxiliaryWorkflows:profile==='develop_push'?[{path:'.github/workflows/ci-fast.yml',blobSha:catalogue.workflowPins['.github/workflows/ci-fast.yml']}]:[],
     admissionJob:'Cadence admission', admissionStep:'Upload Cadence admission', measurementJob:'Cadence measurement', measurementStep:'Upload Cadence measurement' });
   need(projected.available);
   const expected = { repository:'juan294/paisaxe', sourceSha, targetBranch:'develop', definitionSha,

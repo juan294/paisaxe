@@ -30,9 +30,9 @@ test('native generator --check compares complete generated source rather than sy
 
 test('routine root performs full recovery only after protected Fast and never treats a missing child as proof',()=>{
  const files=generateNativeWorkflows(),root=parse(files.find(f=>f.path.endsWith('/ci-cadence.yml')).source);
- assert.equal(root.jobs.complete.name,'CI Fast');
- assert.equal(root.jobs.entry.uses,'./.github/workflows/ci-fast.yml');
- assert.equal(Object.values(root.jobs).filter(j=>j.uses&&j!==root.jobs.entry).length,7);
+ assert.equal(root.jobs.entry.name,'CI Fast');assert.equal(root.jobs.entry.uses,undefined);assert.equal(root.jobs.complete.name,'CI Fast recovery');
+ assert.deepEqual(parse(readFileSync('.github/ci-cadence-fast-job.yml','utf8')).steps,root.jobs.entry.steps);
+ assert.equal(Object.values(root.jobs).filter(j=>j.uses).length,7);
  assert.match(root.jobs.complete.steps[0].run,/test "\$ENTRY" = success/);
  assert.match(root.jobs.complete.steps[0].run,/test "\$result" = success/);
  assert.match(root.jobs.measurement.if,/github.event_name == 'push'/);
