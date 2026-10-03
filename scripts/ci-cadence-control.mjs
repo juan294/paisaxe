@@ -74,10 +74,11 @@ export async function controlMain(purpose, { definitionSha, sourceSha, root = pr
   const runId = Number(process.env.GITHUB_RUN_ID), attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
   const token = process.env.GITHUB_TOKEN;
   if(purpose === 'admit') {
-    need(['push','schedule'].includes(process.env.GITHUB_EVENT_NAME) && process.env.GITHUB_REPOSITORY === 'juan294/paisaxe' && process.env.GITHUB_REPOSITORY_ID === '1141286326' && process.env.GITHUB_ACTOR_ID === '3944118');
+    need(['push','schedule'].includes(process.env.GITHUB_EVENT_NAME) && process.env.GITHUB_REPOSITORY === 'juan294/paisaxe' && process.env.GITHUB_REPOSITORY_ID === '1141286326' && process.env.GITHUB_REPOSITORY_OWNER_ID === '3944118');
     const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));
     const push=process.env.GITHUB_EVENT_NAME==='push';
-    need(event.sender?.id===3944118&&event.sender.type==='User'&&(push?event.before===definitionSha&&event.after===sourceSha&&event.ref==='refs/heads/develop'&&process.env.GITHUB_SHA===sourceSha:process.env.GITHUB_SHA===definitionSha));
+    // Schedule payloads need not carry sender: schedule trust is repository/owner identity and the default ref.
+    need(push?process.env.GITHUB_ACTOR_ID==='3944118'&&event.sender?.id===3944118&&event.sender.type==='User'&&event.before===definitionSha&&event.after===sourceSha&&event.ref==='refs/heads/develop'&&process.env.GITHUB_SHA===sourceSha:process.env.GITHUB_REF==='refs/heads/main'&&process.env.GITHUB_SHA===definitionSha);
     const state = buildFullState({root,definitionSha,sourceSha,runId,attempt,callerPath:push?'.github/workflows/ci-cadence.yml':workflow});
     const result = push?{decision:{action:'full'},admission:{schemaVersion:1,kind:'ci-cadence-admission',...state.expected,runId,attempt,workflow:state.workflow,lane:'full',testedCheckoutSha:sourceSha,workflowDefinitionSha:state.policy.workflows[0].definitionSha,workflowPins:state.projection.workflowPins,jobs:state.policy.workflows[0].jobs,contexts:state.policy.workflows[0].contexts}}:await admitNightly(state,{token,resolveState:values=>buildFullState({root,authoritySha:definitionSha,...values})});
     if(result.admission){need(process.env.CI_CADENCE_EVIDENCE_DIR?.startsWith('/'));await mkdir(process.env.CI_CADENCE_EVIDENCE_DIR,{mode:0o700});await writeFile(resolve(process.env.CI_CADENCE_EVIDENCE_DIR,'admission.json'),JSON.stringify(result.admission),{flag:'wx',mode:0o600});}

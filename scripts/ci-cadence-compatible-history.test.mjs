@@ -50,7 +50,7 @@ async function fixture(kinds){
    routes[`/actions/runs/${id}/attempts/1/jobs?per_page=100&page=1`]={total_count:jobs.length,jobs};routes[`/actions/runs/${id}/artifacts?per_page=100&page=1`]={total_count:artifacts.length,artifacts};
   }
   for(const [workflow,list]of Object.entries(runs))routes[`/actions/workflows/${workflow.split('/').at(-1)}/runs?per_page=100&page=1`]={total_count:list.length,workflow_runs:list};
-  const requests=[],fetchImpl=async(url,options)=>{requests.push({url,options});const key=url.slice(repository.length);return new Response(Buffer.isBuffer(routes[key])?routes[key]:JSON.stringify(routes[key]),{status:key in routes?200:404,headers:{'x-ratelimit-remaining':'5000'}});};
+  const requests=[],fetchImpl=async(url,options)=>{requests.push({url,options});const key=url.slice(repository.length);return new Response(Buffer.isBuffer(routes[key])?routes[key]:JSON.stringify(routes[key]),{status:key in routes?200:404,headers:{'x-ratelimit-remaining':'950'}});};
   return{root,authoritySha,sourceSha,headState,resolveState,fetchImpl,requests,close:()=>rm(root,{recursive:true,force:true})};
  }catch(error){await rm(root,{recursive:true,force:true});throw error;}
 }

@@ -13,7 +13,7 @@ const STATUS = /\b(?:always|failure|cancelled|success)\(\)/;
 export function evaluate(expression, context) {
   if (expression === undefined || expression === null) return true;
   const body = String(expression).replace(/^\$\{\{\s*|\s*\}\}$/g, '');
-  const source = body.split(/('(?:[^']|'')*')/).map((part, index) => index % 2 ? part : part.replace(/needs\.([A-Za-z_][A-Za-z0-9_-]*)/g, (_, id) => `needs[${JSON.stringify(id)}]`).replace(/\.(?=[A-Za-z_])/g, '?.')).join('');
+  const source = body.split(/('(?:[^']|'')*')/).map((part, index) => index % 2 ? part : part.replace(/\b(needs|steps)\.([A-Za-z_][A-Za-z0-9_-]*)/g, (_, scope, id) => `${scope}?.[${JSON.stringify(id)}]`).replace(/\.(?=[A-Za-z_])/g, '?.')).join('');
   const failed = Object.values(context.needs ?? {}).some(need => ['failure', 'cancelled'].includes(need.result));
   return vm.runInNewContext(source, { ...context, always: () => true, success: () => !failed, failure: () => failed, cancelled: () => false, format: (pattern, ...args) => pattern.replace(/\{(\d+)\}/g, (_, n) => args[Number(n)]), contains: (value, item) => String(value ?? '').includes(item), startsWith: (value, prefix) => String(value ?? '').startsWith(prefix), fromJSON: JSON.parse }, { timeout: 100 });
 }
@@ -66,9 +66,9 @@ export function startedJobs(context, outputs = {}, sources = {}) {
 const OWNER = { id: 3944118, type: 'User', login: 'juan294' };
 export const account = login => login === 'juan294' ? OWNER : { id: 49699333, type: login.endsWith('[bot]') ? 'Bot' : 'User', login };
 /** Native contexts for a frozen phase-1 style event (kind/actor/author/ref/baseBranch/headRepository). */
-export function nativeContext({ kind, actor = 'juan294', author = actor, ref, baseBranch, headRepository = 'juan294/paisaxe' }, mode) {
+export function nativeContext({ kind, actor = 'juan294', author = actor, ref, baseBranch, headRepository = 'juan294/paisaxe', senderless = false }, mode) {
   const sender = account(actor), same = headRepository === 'juan294/paisaxe';
   return { vars: mode === undefined || mode === null ? {} : { CI_CADENCE_MODE: mode }, inputs: {}, secrets: {}, matrix: {}, env: {},
     github: { repository: 'juan294/paisaxe', repository_id: '1141286326', repository_owner_id: '3944118', actor: sender.login, actor_id: String(sender.id), event_name: kind, ref, sha: 'a'.repeat(40), run_id: '42', run_attempt: '1',
-      event: { sender, ...(kind === 'pull_request' ? { action: 'synchronize', pull_request: { user: account(author), base: { ref: baseBranch }, head: { repo: { id: same ? 1141286326 : 999, full_name: headRepository, fork: !same } } } } : {}) } } };
+      event: { ...(senderless ? {} : { sender }), ...(kind === 'schedule' ? { schedule: '0 3 * * *' } : {}), ...(kind === 'pull_request' ? { action: 'synchronize', pull_request: { user: account(author), base: { ref: baseBranch }, head: { repo: { id: same ? 1141286326 : 999, full_name: headRepository, fork: !same } } } } : {}) } } };
 }

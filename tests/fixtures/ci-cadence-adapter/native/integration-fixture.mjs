@@ -52,7 +52,7 @@ function fixture({ run = nativeRun(), jobs = [nativeJob(1, 'Lint'), nativeJob(2,
     if (!(key in routes)) return new Response('not found', { status: 404 });
     const row = routes[key];
     if (row instanceof Response) return row;
-    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { headers: { 'x-ratelimit-remaining': '4000' } });
+    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { headers: { 'x-ratelimit-remaining': '950' } });
   };
   return { fetchImpl: mock, reader: createGitHubCadenceReader({ token: 'fixture-secret-token', fetchImpl: mock, limits, now }), requests, routes, artifacts, bodies };
 }

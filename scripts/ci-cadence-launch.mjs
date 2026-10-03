@@ -26,7 +26,7 @@ const PINS = {
   "tests/fixtures/ci-cadence/jobs.json": "08af6060b239cac912889fffc6a5337795593e83381ed1f47e6d902bc0b9cd59",
   "tests/fixtures/ci-cadence/policy.json": "7f290ed3791c910948e489e297e4df1bf87b57ac8e4dc4e071b0fe44f9661e76",
   "tests/fixtures/ci-cadence/contract.json": "dc4d409ef86f17cd212e9d9b9de554dd324bafffebe4762af09929b3832feb16",
-  "scripts/ci-cadence-native.mjs": "95d90114925026bc3f5ea7f978080376625241bfece4971de9b906e8bba528b1",
+  "scripts/ci-cadence-native.mjs": "3d570d2624d653496c38c0430ea3d6b20bb8507e383f1cad9233def089ce44a5",
   "scripts/ci-fast.mjs": "0dba2914770c4d676a5ac98abe730f59ef4a5869396f1acfbd30514d9e8b4190",
   "scripts/ci-cadence-scanner.mjs": "6cf7da7f0c59020aaeed179131051fff931e2ff4ce1f8264a990a15916719e6b"
 };
@@ -52,7 +52,7 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     try {
       const response = await Promise.race([request(url, { method: 'GET', redirect: 'error', signal: controller.signal, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${input.token}`, 'X-GitHub-Api-Version': '2022-11-28' } }), aborted]);
       const quota = response.headers.get('x-ratelimit-remaining');
-      if (response.status !== 200 || (response.url && response.url !== url) || !/^[0-9]+$/.test(quota ?? '') || !Number.isSafeInteger(Number(quota)) || Number(quota) < 1000) throw Error('HTTP identity or quota');
+      if (response.status !== 200 || (response.url && response.url !== url) || !/^[0-9]+$/.test(quota ?? '') || !Number.isSafeInteger(Number(quota)) || Number(quota) < 100) throw Error('HTTP identity or quota');
       const length = response.headers.get('content-length'); if (length && (!/^[0-9]+$/.test(length) || Number(length) > 2000000)) throw Error('HTTP body bound');
       const reader = response.body?.getReader(); if (!reader) throw Error('HTTP body missing'); let size = 0; const parts = [];
       try { for (;;) { const chunk = await Promise.race([reader.read(), aborted]); if (chunk.done) break; size += chunk.value.length; if (size > 2000000) throw Error('HTTP body bound'); parts.push(Buffer.from(chunk.value)); } } finally { void reader.cancel().catch(() => {}); }
@@ -63,7 +63,11 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     remaining(10000);
     const { root, event, context, eventName, actor, mode } = input;
     if (process.env.NODE_OPTIONS?.trim() || process.execArgv.some(a => /^--(?:require|import|loader|experimental-loader)(?:=|$)/.test(a) || a === '-r')) throw Error('Node startup hooks');
-    if (typeof input.token !== 'string' || !input.token.trim() || /[\r\n]/.test(input.token) || !record(event) || !repository(event.repository) || !account(event.sender) || actor !== event.sender.login || !record(context) || context.repository !== 'juan294/paisaxe' || context.repositoryId !== 1141286326 || context.ownerId !== 3944118 || context.actorId !== event.sender.id || context.actorType !== event.sender.type || !sha(context.sha)) throw Error('native context');
+    // A schedule payload is not guaranteed to carry sender or repository. Its trust
+    // is the native repository/owner identity and default ref, authenticated below.
+    const scheduled = eventName === 'schedule';
+    if (typeof input.token !== 'string' || !input.token.trim() || /[\r\n]/.test(input.token) || !record(event) || !record(context) || context.repository !== 'juan294/paisaxe' || context.repositoryId !== 1141286326 || context.ownerId !== 3944118 || !sha(context.sha)) throw Error('native context');
+    if (!scheduled && (!repository(event.repository) || !account(event.sender) || actor !== event.sender.login || context.actorId !== event.sender.id || context.actorType !== event.sender.type)) throw Error('native context');
     if (!canonicalOrigin(run(['remote', 'get-url', 'origin'], root).trim()) || run(['rev-parse', '--verify', 'HEAD'], root).trim() !== context.sha || run(['rev-parse', '--is-shallow-repository'], root).trim() !== 'false') throw Error('physical original checkout');
     let definition; let branch; let source; let checkout = context.sha; let author = event.sender;
     if (eventName === 'push') {
@@ -99,7 +103,7 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     };
     revalidateIdentity();
     const present = run(['ls-tree', '--name-only', '-z', definition, '--', '.github/ci-cadence.json', 'scripts/ci-cadence.mjs'], work).split('\0').filter(Boolean);
-    const owner = actor === 'juan294' && event.sender.id === 3944118 && event.sender.type === 'User' && author.login === 'juan294' && author.id === 3944118 && author.type === 'User' && (eventName !== 'pull_request' || event.pull_request.head.repo.full_name === 'juan294/paisaxe');
+    const owner = scheduled || actor === 'juan294' && event.sender.id === 3944118 && event.sender.type === 'User' && author.login === 'juan294' && author.id === 3944118 && author.type === 'User' && (eventName !== 'pull_request' || event.pull_request.head.repo.full_name === 'juan294/paisaxe');
     if (present.length === 0) {
       if (eventName === 'schedule') return { ...blocked(), lane: 'disabled', reason: 'new nightly disabled until protected installation' };
       return { ...blocked(), lane: !owner ? 'untrusted' : branch === 'main' ? 'release' : 'full', reason: 'first installation preserves legacy full', sourceSha: source, testedCheckoutSha: checkout, definitionSha: definition, releaseRequired: branch === 'main', acceptanceBlocked: !owner, ...(!owner ? { runner: 'standard-hosted', token: 'read-only' } : branch === 'main' ? { allowDeploy: eventName === 'push', allowPrivileged: true } : {}) };

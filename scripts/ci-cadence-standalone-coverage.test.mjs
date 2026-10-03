@@ -31,7 +31,7 @@ function fixture(fault){
  '/actions/artifacts/10':artifact,'/actions/artifacts/10/zip':bytes,
  };
  const requests=[];
- const fetchImpl=async(url,options)=>{requests.push({url,options});const key=url.slice('https://api.github.com/repos/juan294/paisaxe'.length);return new Response(Buffer.isBuffer(routes[key])?routes[key]:JSON.stringify(routes[key]),{status:key in routes?200:404,headers:{'x-ratelimit-remaining':'5000'}});};
+ const fetchImpl=async(url,options)=>{requests.push({url,options});const key=url.slice('https://api.github.com/repos/juan294/paisaxe'.length);return new Response(Buffer.isBuffer(routes[key])?routes[key]:JSON.stringify(routes[key]),{status:key in routes?200:404,headers:{'x-ratelimit-remaining':'950'}});};
  return{reader:createGitHubCadenceReader({token:'external-fixture-only',fetchImpl,now:()=>new Date('2026-10-03T00:00:00Z')}),requests};
 }
 for(const fault of ['none','failed-parent','nonowner','failed-suite','missing-final','wrong-attempt','bad-metrics','early-upload','digest','duplicate-job','duplicate-artifact','changed-root'])test('actual standalone original HTTP/ZIP completion '+fault,async()=>{

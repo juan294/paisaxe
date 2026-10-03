@@ -3,28 +3,28 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "1d6a0d5e931097659da85ec88de2adb18785bc46"
+    "blobSha": "c9d428ebac7fed3ecf7e338b1a8edd560db6eeff"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "1d6a0d5e931097659da85ec88de2adb18785bc46"
+      "blobSha": "c9d428ebac7fed3ecf7e338b1a8edd560db6eeff"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "9a5d4526f9e24bd3c4ab016267889dfc10d6e64c"
+      "blobSha": "03f3135adf1c4e08ca787a55c14110dba719c12a"
     }
   },
   "callees": {
     ".github/workflows/ci.yml": {
       "path": ".github/workflows/ci.yml",
       "prefix": "ci",
-      "blobSha": "e7fe09cbc42c366a2e089ae7b60ccd84c03a7876"
+      "blobSha": "05824a4836fe0f0d7773c5425904e72d581a4c36"
     },
     ".github/workflows/e2e.yml": {
       "path": ".github/workflows/ci-cadence-e2e-full.yml",
       "prefix": "e2e",
-      "blobSha": "e98412b62a66f4d2f1836153075b9f8725ace21c"
+      "blobSha": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9"
     },
     ".github/workflows/lighthouse.yml": {
       "path": ".github/workflows/ci-cadence-lighthouse-full.yml",
@@ -49,12 +49,12 @@
     ".github/workflows/security.yml": {
       "path": ".github/workflows/ci-cadence-security-full.yml",
       "prefix": "security",
-      "blobSha": "601ca33c2c39801e3cebe6485e35fe2dbd559175"
+      "blobSha": "c4eff399a8124b7cf87af9d3f481d4caa623bf18"
     }
   },
   "coverageOnly": {
     "path": ".github/workflows/coverage.yml",
-    "blobSha": "010641213896270e79ef2c951b6d3284710fcfab",
+    "blobSha": "10b6988c262be664ccc64b23742530a04e084286",
     "steps": [
       {
         "name": "Decide weekly native coverage eligibility",
@@ -137,15 +137,15 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "1d6a0d5e931097659da85ec88de2adb18785bc46",
-    ".github/workflows/ci-cadence.yml": "9a5d4526f9e24bd3c4ab016267889dfc10d6e64c",
-    ".github/workflows/ci.yml": "e7fe09cbc42c366a2e089ae7b60ccd84c03a7876",
-    ".github/workflows/ci-cadence-e2e-full.yml": "e98412b62a66f4d2f1836153075b9f8725ace21c",
+    ".github/workflows/ci-nightly.yml": "c9d428ebac7fed3ecf7e338b1a8edd560db6eeff",
+    ".github/workflows/ci-cadence.yml": "03f3135adf1c4e08ca787a55c14110dba719c12a",
+    ".github/workflows/ci.yml": "05824a4836fe0f0d7773c5425904e72d581a4c36",
+    ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "db256a17ed4718c5911852bc4d98dbba7790cca1",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",
     ".github/workflows/ci-cadence-knip-full.yml": "4453408d8ef1231818df8f32fdce1da95706650d",
     ".github/workflows/ci-cadence-license-check-full.yml": "75fd2a1b570303eb0f606cb0d6d9b10cf9933fbf",
-    ".github/workflows/ci-cadence-security-full.yml": "601ca33c2c39801e3cebe6485e35fe2dbd559175"
+    ".github/workflows/ci-cadence-security-full.yml": "c4eff399a8124b7cf87af9d3f481d4caa623bf18"
   },
   "stepInventory": {
     "ci-lint-and-typecheck": [

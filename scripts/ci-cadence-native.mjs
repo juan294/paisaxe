@@ -32,7 +32,11 @@ export async function classifyNativeEvent({ root, event, eventName, actor, mode,
   const deadline = inheritedDeadline === undefined ? performance.now() + 60000 : Math.min(performance.now() + 60000, inheritedDeadline);
   const remaining = () => { const milliseconds = Math.min(5000, Math.floor(deadline - performance.now())); if (!Number.isFinite(milliseconds) || milliseconds < 1) throw Error('native deadline'); return milliseconds; };
   if (!Number.isFinite(deadline) || deadline <= performance.now()) return blocked('native deadline expired');
-  if (!record(event) || !repository(event.repository) || !account(event.sender) || actor !== event.sender.login || !record(context) || context.repository !== REPOSITORY || context.repositoryId !== REPOSITORY_ID || context.ownerId !== OWNER_ID || context.actorId !== event.sender.id || context.actorType !== event.sender.type || !sha(context.sha) || !sha(trustedRevision)) return blocked('native repository/account/context identity mismatch');
+  // A schedule payload is not guaranteed to carry sender or repository: its trust
+  // is the native repository/owner identity and the default-branch definition.
+  const scheduled = eventName === 'schedule';
+  if (!record(event) || !record(context) || context.repository !== REPOSITORY || context.repositoryId !== REPOSITORY_ID || context.ownerId !== OWNER_ID || !sha(context.sha) || !sha(trustedRevision)) return blocked('native repository/account/context identity mismatch');
+  if (!scheduled && (!repository(event.repository) || !account(event.sender) || actor !== event.sender.login || context.actorId !== event.sender.id || context.actorType !== event.sender.type)) return blocked('native repository/account/context identity mismatch');
   const git = (...args) => execFileSync('git', ['--no-replace-objects', '-c', 'core.useReplaceRefs=false', ...args], { cwd: root, env: protectedGitEnvironment(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: remaining(), maxBuffer: 2_000_000 });
   const oid = (...args) => git(...args).trim();
   let normalized, branch, author, sourceSha, testedCheckoutSha;
@@ -54,10 +58,10 @@ export async function classifyNativeEvent({ root, event, eventName, actor, mode,
       normalized = { kind: eventName, repository: REPOSITORY, actor, author: author.login, sourceSha, ref: event.ref };
     } else if (eventName === 'schedule') {
       if (context.ref !== 'refs/heads/main' || context.sha !== trustedRevision || defaultSha !== trustedRevision || typeof event.schedule !== 'string' || event.schedule.length === 0 || oid('rev-parse', '--verify', 'refs/remotes/origin/main') !== trustedRevision) return blocked('scheduled native default definition identity mismatch');
-      branch = 'main'; author = event.sender;
+      branch = 'main';
     } else return blocked('unsupported native event; callee identities cannot manufacture admission');
 
-    const owner = actor === OWNER && event.sender.id === OWNER_ID && event.sender.type === 'User' && author.login === OWNER && author.id === OWNER_ID && author.type === 'User' && (eventName !== 'pull_request' || normalized.headRepository === REPOSITORY);
+    const owner = scheduled || actor === OWNER && event.sender.id === OWNER_ID && event.sender.type === 'User' && author.login === OWNER && author.id === OWNER_ID && author.type === 'User' && (eventName !== 'pull_request' || normalized.headRepository === REPOSITORY);
     const identity = () => ({ sourceSha, testedCheckoutSha, targetBranch: eventName === 'schedule' ? 'develop' : branch, ...(eventName === 'pull_request' ? { baseSha: trustedRevision } : {}), definitionSha: trustedRevision, nativeHeadSha: context.sha, allowDeploy: false, allowPrivileged: false, reusable: testedCheckoutSha === sourceSha && owner });
     const mandatory = classification => {
       remaining();
@@ -95,7 +99,7 @@ export async function classifyNativeEvent({ root, event, eventName, actor, mode,
         if (!record(resolved) || !repository(resolved.repository) || resolved.ref !== 'refs/heads/develop' || !sha(resolved.sha)) return blocked('scheduled integration resolution identity mismatch');
         sourceSha = resolved.sha; testedCheckoutSha = sourceSha;
         if (oid('rev-parse', '--verify', 'HEAD') !== sourceSha || oid('rev-parse', '--verify', 'refs/remotes/origin/develop') !== sourceSha) return blocked('scheduled resolved integration checkout/origin mismatch');
-        normalized = { kind: eventName, repository: REPOSITORY, actor, author: author.login, resolvedBranch: 'develop', resolvedHeadSha: sourceSha };
+        normalized = { kind: eventName, repository: REPOSITORY, actor: OWNER, author: OWNER, resolvedBranch: 'develop', resolvedHeadSha: sourceSha };
       }
       return { ...mandatory(classifyEvent(normalized, policy, mode, { repository: REPOSITORY, branch, sha: trustedRevision, helperInstalled: true })), policyBlobSha: oid('rev-parse', `${trustedRevision}:.github/ci-cadence.json`), helperBlobSha: oid('rev-parse', `${trustedRevision}:scripts/ci-cadence.mjs`) };
     } finally { await rm(directory, { recursive: true, force: true }); }

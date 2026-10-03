@@ -4,13 +4,14 @@ import { parse, stringify } from 'yaml';
 import { resolve } from 'node:path';
 const strip = value => typeof value==='string'?value.replace(/^\$\{\{\s*|\s*\}\}$/g,''):value;
 const callable = "(inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != ''";
-const reduced = "vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326) || (github.event_name == 'schedule' && github.ref == 'refs/heads/main'))";
+// Schedule payloads need not carry sender: the schedule clause rests on repository/owner identity and ref only.
+const reduced = "vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))";
 /** Routing is static: a skipped job starts no runner. Originals run unless the
  * event is a lean owner integration event; `!reduced` therefore keeps every
  * legacy, production and untrusted event on the complete original graph. */
 export function routeOriginalWorkflow(source) {
   const value=parse(source),ci=value.name==='CI';
-  const trusted="github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))";
+  const trusted="github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))";
   // Secret authority is independent of cadence routing and contributor policy.
   const protect=value=>{
     if(Array.isArray(value))return value.map(protect);

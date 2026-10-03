@@ -22,7 +22,8 @@ test "$DEFAULT_BRANCH" = main
 [[ "$INVOCATION_ID" =~ ^[A-Za-z_][A-Za-z0-9_-]{0,63}$ ]]
 `;
 const CHECKOUT = SOURCE_GUARD;
-const trusted = "github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))";
+// Schedule payloads need not carry sender; schedules run only from this repository's default branch.
+const trusted = "github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))";
 const digest = source => createHash('sha256').update(source).digest('hex');
 function source(root, path) {
   const file = join(root, path), metadata = lstatSync(file);

@@ -98,7 +98,7 @@ export function createGitHubCadenceReader({ token, fetchImpl = fetch, limits = {
       try { response = await fetchImpl(`${ORIGIN}${path}`, { method: 'GET', redirect: 'manual', signal: controller.signal, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2026-03-10' } }); }
       catch { fail('native transport unavailable'); }
       const initialRate = response?.headers?.get('x-ratelimit-remaining');
-      if (initialRate === null || initialRate === undefined || !/^\d+$/.test(initialRate) || !Number.isSafeInteger(Number(initialRate)) || Number(initialRate) < 1000) { state.stopError = 'native rate limit unavailable'; fail(state.stopError); }
+      if (initialRate === null || initialRate === undefined || !/^\d+$/.test(initialRate) || !Number.isSafeInteger(Number(initialRate)) || Number(initialRate) < 100) { state.stopError = 'native rate limit unavailable'; fail(state.stopError); }
       if (binary && response instanceof Response && response.status === 302) {
         let target; try { target = new URL(response.headers.get('location')); } catch { fail('artifact redirect forbidden'); }
         if (target.protocol !== 'https:' || target.username || target.password || target.port || target.hash || !/^productionresultssa[0-9]+\.blob\.core\.windows\.net$/.test(target.hostname)) fail('artifact redirect forbidden');

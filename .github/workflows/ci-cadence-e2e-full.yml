@@ -57,7 +57,7 @@ jobs:
     name: Playwright E2E
     needs:
       - callable-source
-    if: ${{ always() && needs.callable-source.result == 'success' && (github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))) }}
+    if: ${{ always() && needs.callable-source.result == 'success' && (github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:

@@ -21,7 +21,7 @@ jobs:
         id: cadence-calendar
         env:
           CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
-          NATIVE_OWNER: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' }}
+          NATIVE_OWNER: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
         run: |
           set -euo pipefail
           if test "$CI_CADENCE_MODE" = lean && test "$NATIVE_OWNER" = true && test "$GITHUB_EVENT_NAME" = schedule && test "$(date -u +%u)" != 1; then
@@ -36,7 +36,7 @@ jobs:
           persist-credentials: false
         if: ${{ steps.cadence-calendar.outputs.eligible == 'true' }}
       - name: Verify callable source checkout
-        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' }}
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
         shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
         env:
           BASH_ENV: ""
@@ -146,9 +146,9 @@ jobs:
         if: ${{ steps.cadence-calendar.outputs.eligible == 'true' }}
         env:
           CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
-          NATIVE_OWNER: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' }}
+          NATIVE_OWNER: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
       - name: Verify completed callable source checkout
-        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' }}
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
         shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
         env:
           BASH_ENV: ""
@@ -215,7 +215,7 @@ jobs:
           assert git('rev-parse','--verify','HEAD').strip().decode()==expected
           PY
       - name: Produce measured standalone coverage
-        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' }}
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
         env:
           SOURCE_SHA: ${{ github.sha }}
           NODE_OPTIONS: ""
@@ -233,7 +233,7 @@ jobs:
           const git=(...args)=>execFileSync('/usr/bin/git',['--no-replace-objects','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{env,timeout:10000,maxBuffer:2000000});
           const temporary=await mkdtemp(join(tmpdir(),'protected-B-producer-'));
           try{
-          for(const[path,pin]of Object.entries({"scripts/ci-cadence-producer.mjs":"7b21806e84b690deb6ca889d79f60c0fefae1f1ca53a8b6073022970932a0f3e","scripts/ci-cadence-coverage.mjs":"f5a6fa57a388781c7d3714021f2196b83f1b54e59b611327956aa17e1b02bddf","scripts/ci-cadence-native.mjs":"95d90114925026bc3f5ea7f978080376625241bfece4971de9b906e8bba528b1"})){
+          for(const[path,pin]of Object.entries({"scripts/ci-cadence-producer.mjs":"7b21806e84b690deb6ca889d79f60c0fefae1f1ca53a8b6073022970932a0f3e","scripts/ci-cadence-coverage.mjs":"f5a6fa57a388781c7d3714021f2196b83f1b54e59b611327956aa17e1b02bddf","scripts/ci-cadence-native.mjs":"3d570d2624d653496c38c0430ea3d6b20bb8507e383f1cad9233def089ce44a5"})){
           if(!/^100(?:644|755) blob [a-f0-9]{40}\t/.test(git('ls-tree',process.env.GITHUB_SHA,'--',path).toString()))throw Error('Producer mode');
           const bytes=git('show',process.env.GITHUB_SHA+':'+path);if(createHash('sha256').update(bytes).digest('hex')!==pin)throw Error('Protected producer pin');
           await writeFile(join(temporary,path.split('/').at(-1)),bytes,{flag:'wx',mode:0o600});}
@@ -243,7 +243,7 @@ jobs:
           }finally{await rm(temporary,{recursive:true,force:true});}
           NODE
       - name: Upload measured standalone coverage
-        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' }}
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
         uses: actions/upload-artifact@v7
         with:
           name: ci-cadence-coverage
@@ -264,6 +264,6 @@ jobs:
           COVERAGE_WORKFLOW_REF: ${{ github.workflow_ref }}
           SOURCE_TARGET_BRANCH: main
         run: bash scripts/report-coverage.sh
-        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User') && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' }}
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User'))) && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
     permissions:
       contents: read

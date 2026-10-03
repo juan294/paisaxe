@@ -32,7 +32,8 @@ function standaloneCoverage(root) {
   const bytes=readFileSync(resolve(root,retainedPath));
   if(sha256(bytes)!=='37edfd50e06893729b41042dfe295ec46761d0937f062df645bee7ed5bd179c5')throw Error('Original standalone coverage source changed');
   const original=JSON.parse(bytes).source,value=parse(original),job=value.jobs.coverage;
-  const owner="github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User'";
+  // Coverage runs on main push, schedule and dispatch; a schedule payload need not carry sender.
+  const owner="github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User'))";
   const lean="vars.CI_CADENCE_MODE == 'lean' && "+owner;
   job.permissions={contents:'read'};
   job.steps[0].name='Checkout measured main source';job.steps[0].with={'fetch-depth':0,'persist-credentials':false};
@@ -106,7 +107,7 @@ assert re.fullmatch('[a-f0-9]{40}',source)
 print('CI_CADENCE_SOURCE_SHA='+source)
 PY
 `);
-  const jobs = { admission: {name:'Cadence admission',if:enabled+" && github.actor_id == '3944118' && github.event.sender.type == 'User'",'runs-on':'ubuntu-latest','timeout-minutes':6,permissions:permission,
+  const jobs = { admission: {name:'Cadence admission',if:enabled,'runs-on':'ubuntu-latest','timeout-minutes':6,permissions:permission,
     outputs:Object.fromEntries(['decision','source_sha','definition_sha','original_run_id','original_attempt','original_run_url','original_completed_at','original_admission_completed_at','original_evidence_kind','original_source_sha','original_target_branch','original_workflow'].map(key=>[key,'${{ steps.admit.outputs.'+key+' }}'])),
     steps:[...native,{name:'Resolve once and authenticate native source',env:environment,run:launch},{name:'Admit actual complete nightly graph',id:'admit',env:environment,run:acquired('ci-cadence-control-launch.mjs','admit',root)},{name:'Upload Cadence admission',if:"steps.admit.outputs.decision == 'full'",uses:'actions/upload-artifact@v7',with:{name:'ci-cadence-admission',path:evidence+'/admission.json','if-no-files-found':'error','retention-days':90}}] } };
   for(const [slug,path]of Object.entries(calls)) jobs[slug]={needs:['admission'],if:"needs.admission.outputs.decision == 'full'",uses:'./'+canonical+path,permissions:permission,with:{source_sha:'${{ needs.admission.outputs.source_sha }}',profile:'nightly',invocation_id:slug},...(slug==='e2e'?{secrets:Object.fromEntries(['NEXT_PUBLIC_SUPABASE_URL','NEXT_PUBLIC_SUPABASE_ANON_KEY','SUPABASE_SERVICE_KEY','QA_TEST_USER_EMAIL','QA_TEST_USER_PASSWORD'].map(k=>[k,'${{ secrets.'+k+' }}']))}:slug==='security'?{secrets:{VERCEL_TOKEN:'${{ secrets.VERCEL_TOKEN }}'}}:{})};

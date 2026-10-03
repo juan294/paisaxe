@@ -61,13 +61,13 @@ function fixture({ run = nativeRun(), jobs = [nativeJob(1, 'Lint'), nativeJob(2,
     if (!(key in routes)) return new Response('not found', { status: 404 });
     const row = routes[key];
     if (row instanceof Response) return row;
-    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { headers: { 'x-ratelimit-remaining': '4000' } });
+    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { headers: { 'x-ratelimit-remaining': '950' } });
   };
   return { reader: createGitHubCadenceReader({ token: 'fixture-secret-token', fetchImpl: mock, limits, now }), requests, routes, artifacts, bodies };
 }
 const read = (f, extra = {}) => f.reader.readRun({ runId: 123, attempt: 1, expected, policy, projection, ...extra });
 
-for (const [label, remaining] of [['unsafe integer', '9007199254740992'], ['infinite conversion', '9'.repeat(400)], ['decimal', '1000.0'], ['exponent', '1e4'], ['negative', '-1000'], ['unparseable', 'unknown'], ['below floor', '999']]) test(`BAPI-QUOTA: ${label} stops at the first GET without a receipt`, async () => {
+for (const [label, remaining] of [['unsafe integer', '9007199254740992'], ['infinite conversion', '9'.repeat(400)], ['decimal', '950.0'], ['exponent', '1e4'], ['negative', '-950'], ['unparseable', 'unknown'], ['empty', ''], ['below floor', '99'], ['well below floor', '50']]) test(`BAPI-QUOTA: ${label} stops at the first GET without a receipt`, async () => {
   const make = () => fixture({ fetchImpl: async (url, options, row) => new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { status: row === undefined ? 404 : 200, headers: { 'x-ratelimit-remaining': remaining } }) });
   const direct = make(); const result = await read(direct);
   assert.equal(result.available, false); assert.equal(result.receipt, undefined); assert.equal(result.knownFailed, undefined);
@@ -78,7 +78,9 @@ for (const [label, remaining] of [['unsafe integer', '9007199254740992'], ['infi
   assert.equal(collected.requests.length, 1);
   assert.equal(JSON.stringify([result, evidence, decision]).includes('fixture-secret-token'), false);
 });
-for (const remaining of ['1000', '9007199254740991']) test(`BAPI-QUOTA: exact safe quota ${remaining} permits authenticated success`, async () => {
+// GITHUB_TOKEN allows 1,000 requests/hour per repository, so a healthy native
+// session reports at most 999 remaining: the floor must sit well below that.
+for (const remaining of ['100', '950', '999', '9007199254740991']) test(`BAPI-QUOTA: exact safe quota ${remaining} permits authenticated success`, async () => {
   const f = fixture({ fetchImpl: async (url, options, row) => new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { status: row === undefined ? 404 : 200, headers: { 'x-ratelimit-remaining': remaining } }) });
   const evidence = await history(f); const decision = nightly(evidence);
   assert.equal(evidence.complete, true); assert.equal(evidence.receipts.length, 1);
@@ -142,20 +144,20 @@ for (const [label, page] of [['missing', { total_count: 1 }], ['duplicate', { to
 test('jobs pagination requires next pages and stable counts', async () => {
   const jobs = [nativeJob(1, 'Lint'), nativeJob(2, 'Test'), nativeJob(3, 'Cadence admission')];
   const f = fixture({ override: {
-    '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: jobs.slice(0, 1) }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '4000' } }),
+    '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: jobs.slice(0, 1) }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '950' } }),
     '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2': { total_count: 3, jobs: jobs.slice(1) },
   } });
   assert.equal((await read(f)).available, true);
 });
 for (const total of [4, 2]) test(`changing page total ${total} rejected`, async () => {
   const f = fixture({ override: {
-    '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: [nativeJob(1, 'Lint')] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '4000' } }),
+    '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: [nativeJob(1, 'Lint')] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '950' } }),
     '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2': { total_count: total, jobs: [nativeJob(2, 'Test'), nativeJob(3, 'Cadence admission')] },
   } }); assert.equal((await read(f)).available, false);
 });
 test('page limit and cross-origin/repeated next links never followed', async () => {
   for (const url of ['https://evil.test/private', 'https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1']) {
-    const f = fixture({ override: { '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: [nativeJob(1, 'Lint')] }), { headers: { link: `<${url}>; rel="next"`, 'x-ratelimit-remaining': '4000' } }) } });
+    const f = fixture({ override: { '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: [nativeJob(1, 'Lint')] }), { headers: { link: `<${url}>; rel="next"`, 'x-ratelimit-remaining': '950' } }) } });
     assert.equal((await read(f)).available, false); assert.equal(f.requests.some(r => r.url === 'https://evil.test/private'), false);
   }
 });
@@ -195,7 +197,7 @@ test('missing pagination next link never hides remaining rows', async () => {
 });
 test('known failure survives later partial history and cannot be retried automatically', async () => {
   const run = { ...nativeRun(), conclusion: 'failure' }; const f = fixture({ run, jobs: [nativeJob(1, 'Lint', 'failure'), nativeJob(3, 'Cadence admission')], override: {
-    '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 2, workflow_runs: [run] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '4000' } }),
+    '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 2, workflow_runs: [run] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '950' } }),
     '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2': new Response('unavailable', { status: 503 }),
   } });
   const history = await f.reader.collectHistory({ workflow, expected, policy, projection });
@@ -203,7 +205,7 @@ test('known failure survives later partial history and cannot be retried automat
   assert.equal(chooseNightly(expected, history, '2026-10-03T01:00:00Z', policy).action, 'blocked');
 });
 test('HTTP and body deadlines bound unresolved third-party promises', async () => {
-  for (const fetchImpl of [async () => new Promise(() => {}), async () => new Response(new ReadableStream({ start() {} }), { headers: { 'x-ratelimit-remaining': '4000' } })]) {
+  for (const fetchImpl of [async () => new Promise(() => {}), async () => new Response(new ReadableStream({ start() {} }), { headers: { 'x-ratelimit-remaining': '950' } })]) {
     const f = fixture({ fetchImpl, limits: { timeoutMs: 10 } }); const result = await read(f); assert.equal(result.available, false); assert.match(result.error, /deadline/);
   }
 });
@@ -230,9 +232,9 @@ test('failed admission upload step cannot authenticate source claim despite succ
 });
 test('authenticated API ZIP redirect is bounded and storage GET never receives token', async () => {
   const f = fixture({ fetchImpl: async (url, options, row) => {
-    if (url.endsWith('/artifacts/10/zip')) return new Response(null, { status: 302, headers: { location: 'https://productionresultssa1.blob.core.windows.net/fixture/archive.zip', 'x-ratelimit-remaining': '4000' } });
+    if (url.endsWith('/artifacts/10/zip')) return new Response(null, { status: 302, headers: { location: 'https://productionresultssa1.blob.core.windows.net/fixture/archive.zip', 'x-ratelimit-remaining': '950' } });
     if (url.startsWith('https://productionresultssa1.blob.core.windows.net/')) { assert.equal(options.headers.Authorization, undefined); return new Response(f.bodies[10]); }
-    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { headers: { 'x-ratelimit-remaining': '4000' } });
+    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { headers: { 'x-ratelimit-remaining': '950' } });
   } });
   assert.equal((await read(f)).available, true);
 });
@@ -258,7 +260,7 @@ test('cancelled after authenticated pre-suite admission but before app work rema
 test('bounded history page cap preserves known failure and marks incompleteness', async () => {
   const run = { ...nativeRun(), conclusion: 'failure' };
   const f = fixture({ run, jobs: [nativeJob(1, 'Lint', 'failure'), nativeJob(3, 'Cadence admission')], limits: { maxPages: 1 }, override: {
-    '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 2, workflow_runs: [run] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '4000' } }),
+    '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 2, workflow_runs: [run] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '950' } }),
   } });
   const history = await f.reader.collectHistory({ workflow, expected, policy, projection });
   assert.equal(history.complete, false); assert.equal(f.requests.some(r => r.url.endsWith('runs?per_page=100&page=2')), false);
@@ -310,13 +312,13 @@ test('admission must complete before application work rather than authenticate s
 test('partial child pagination still preserves authenticated known failure before history fallback', async () => {
   const run = { ...nativeRun(), conclusion: 'failure' };
   const f = fixture({ run, override: {
-    '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: [nativeJob(3, 'Cadence admission'), nativeJob(1, 'Lint', 'failure')] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '4000' } }),
+    '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: [nativeJob(3, 'Cadence admission'), nativeJob(1, 'Lint', 'failure')] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '950' } }),
     '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2': new Response('unavailable', { status: 503 }),
   } });
   const result = await read(f); assert.equal(result.knownFailed?.sourceSha, expected.sourceSha); assert.equal(result.available, false);
   // Responses are single-use, so use a fresh fixture for complete collector evaluation.
   const f2 = fixture({ run, override: {
-    '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: [nativeJob(3, 'Cadence admission'), nativeJob(1, 'Lint', 'failure')] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '4000' } }),
+    '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 3, jobs: [nativeJob(3, 'Cadence admission'), nativeJob(1, 'Lint', 'failure')] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '950' } }),
     '/repos/juan294/paisaxe/actions/runs/123/attempts/1/jobs?per_page=100&page=2': new Response('unavailable', { status: 503 }),
   } });
   const history = await f2.reader.collectHistory({ workflow, expected, policy, projection }); assert.equal(history.complete, false);
@@ -381,18 +383,18 @@ for (const change of ['missing', 'failed', 'early', 'late', 'wrong-native-attemp
   if (change === 'late') f.artifacts[1].created_at = '2026-10-02T01:01:00Z';
   const evidence = await history(f); assert.equal(evidence.complete, false); assert.equal(evidence.receipts.length, 0); assert.equal(nightly(evidence).action, 'full');
 });
-for (const remaining of ['999', 'unknown', null, '9007199254740992', '9'.repeat(400)]) test(`BAPI-RATE-FLOOR: ${remaining} stops all subsequent session reads`, async () => {
+for (const remaining of ['99', '50', 'unknown', null, '9007199254740992', '9'.repeat(400)]) test(`BAPI-RATE-FLOOR: ${remaining} stops all subsequent session reads`, async () => {
   const f = fixture({ override: { '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': { total_count: 1, workflow_runs: [{ ...nativeRun(), run_attempt: 3 }] } }, fetchImpl: async (url, options, row) => {
     if (url.endsWith('/attempts/1')) return new Response(JSON.stringify(nativeRun()), { headers: remaining === null ? {} : { 'x-ratelimit-remaining': remaining } });
-    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { status: row === undefined ? 404 : 200, headers: { 'x-ratelimit-remaining': '4000' } });
+    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { status: row === undefined ? 404 : 200, headers: { 'x-ratelimit-remaining': '950' } });
   } });
   const evidence = await history(f); assert.equal(evidence.complete, false); assert.equal(nightly(evidence).action, 'full');
   assert.equal(f.requests.filter(row => /\/attempts\/[23]$/.test(row.url)).length, 0);
 });
-for (const remaining of ['999', '9007199254740992', '9'.repeat(400)]) test(`BAPI-RATE-FLOOR: sticky ${remaining} stop preserves previously authenticated failed attempt`, async () => {
+for (const remaining of ['99', '50', '9007199254740992', '9'.repeat(400)]) test(`BAPI-RATE-FLOOR: sticky ${remaining} stop preserves previously authenticated failed attempt`, async () => {
   const f = failedFixture({ override: { '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': { total_count: 1, workflow_runs: [{ ...nativeRun(), conclusion: 'failure', run_attempt: 3 }] } }, fetchImpl: async (url, options, row) => {
     if (url.endsWith('/attempts/2')) return new Response('{}', { headers: { 'x-ratelimit-remaining': remaining } });
-    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { status: row === undefined ? 404 : 200, headers: { 'x-ratelimit-remaining': '4000' } });
+    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { status: row === undefined ? 404 : 200, headers: { 'x-ratelimit-remaining': '950' } });
   } });
   const evidence = await history(f); assertBlockedFailure(evidence, 'rate stop must retain first attempt failure');
   assert.equal(f.requests.some(row => row.url.endsWith('/attempts/3')), false);
@@ -401,8 +403,8 @@ for (const remaining of ['999', '9007199254740992', '9'.repeat(400)]) test(`BAPI
 test('BAPI-RATE-FLOOR: authenticates page-one failure before later history rate stop', async () => {
   const run = { ...nativeRun(), conclusion: 'failure' };
   const f = failedFixture({ override: {
-    '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 2, workflow_runs: [run] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '4000' } }),
-    '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2': new Response('{}', { headers: { 'x-ratelimit-remaining': '999' } }),
+    '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': new Response(JSON.stringify({ total_count: 2, workflow_runs: [run] }), { headers: { link: '<https://api.github.com/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2>; rel="next"', 'x-ratelimit-remaining': '950' } }),
+    '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=2': new Response('{}', { headers: { 'x-ratelimit-remaining': '50' } }),
   } });
   const evidence = await history(f); assertBlockedFailure(evidence, 'later floor cannot erase authenticated failure');
   assert.ok(f.requests.findIndex(row => row.url.endsWith('/artifacts/10/zip')) < f.requests.findIndex(row => row.url.endsWith('runs?per_page=100&page=2')));
@@ -471,14 +473,14 @@ async function executedRootFixture(t, variant = 'app-only', event = 'push', conc
     const prefix = `/repos/${repository}/contents/`;
     if (parsed.pathname.startsWith(prefix)) {
       const path = parsed.pathname.slice(prefix.length); const commitSha = parsed.searchParams.get('ref');
-      if (commitSha === after && path === workflow && variant === 'unavailable') return new Response('unavailable', { status: 503, headers: { 'x-ratelimit-remaining': '4000' } });
+      if (commitSha === after && path === workflow && variant === 'unavailable') return new Response('unavailable', { status: 503, headers: { 'x-ratelimit-remaining': '950' } });
       const result = { type: 'file', path, sha: blobAt(commitSha, path) };
       if (commitSha === after && path === workflow && variant === 'wrong-blob') result.sha = callee;
       if (commitSha === after && path === workflow && variant === 'wrong-path') result.path = calleePath;
       if (commitSha === after && path === workflow && variant === 'wrong-type') result.type = 'dir';
-      return new Response(JSON.stringify(result), { headers: { 'x-ratelimit-remaining': '4000' } });
+      return new Response(JSON.stringify(result), { headers: { 'x-ratelimit-remaining': '950' } });
     }
-    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { status: row === undefined ? 404 : 200, headers: { 'x-ratelimit-remaining': '4000' } });
+    return new Response(Buffer.isBuffer(row) ? row : JSON.stringify(row), { status: row === undefined ? 404 : 200, headers: { 'x-ratelimit-remaining': '950' } });
   } });
   return { ...f, before, after, reviewedBlob, executedBlob: blobAt(after, workflow), actualExpected, actualPolicy, actualProjection };
 }

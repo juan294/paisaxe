@@ -30,7 +30,7 @@ export async function launchFixture() {
         let data = repository;
         if (url.includes('/git/ref/heads/')) { const branch = url.split('/').at(-1); data = { ref: `refs/heads/${branch}`, object: { type: 'commit', sha: branch === 'main' ? base : kind === 'schedule' || kind === 'push' ? source : base } }; }
         else if (url.includes('/git/commits/')) data = { sha: url.split('/').at(-1) };
-        return new Response(JSON.stringify(data), { status: 200, headers: { 'x-ratelimit-remaining': '5000' } });
+        return new Response(JSON.stringify(data), { status: 200, headers: { 'x-ratelimit-remaining': '950' } });
       };
       const gitTransport = ({ url, sha, ref, root, run }) => { fetches.push({ url, sha, ref }); if (url !== 'https://github.com/juan294/paisaxe.git') throw Error('wrong authenticated origin'); run(['fetch', '--no-tags', '--no-recurse-submodules', '--force', f.root, `${sha}:${ref}`], root); };
       return { input: { ...input, token: 'fixture-token', scanner: { executable: '/opt/homebrew/bin/gitleaks', sha256: 'f414bc2fb952be6c9072b75cb411e3368614ef4b16d48dbd9ad238034afd2302' } }, transports: { request, gitTransport }, source, checkout, base };

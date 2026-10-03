@@ -1,0 +1,13 @@
+# Shellcheck style/info notes on original step bodies that the cadence adapter
+# must keep byte-identical to the pre-cadence workflows (and their generated
+# full callables). Workflow-syntax diagnostics are never ignored here.
+paths:
+  .github/workflows/bundle-size.yml:
+    ignore:
+      - 'SC2129'
+  .github/workflows/ci-cadence-bundle-size-full.yml:
+    ignore:
+      - 'SC2129'
+  .github/workflows/coverage.yml:
+    ignore:
+      - 'SC2016'

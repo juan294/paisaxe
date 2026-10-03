@@ -9,15 +9,14 @@ outputs:
   checkout_sha: ${{ steps.entry.outputs.checkout_sha }}
   definition_sha: ${{ steps.entry.outputs.definition_sha }}
   cadence_json: ${{ steps.entry.outputs.cadence_json }}
-# Runs in legacy and lean mode alike: CI Fast is a real check before lean is
-# activated. CI_CADENCE_MODE only decides who owns full-suite work.
+# Runs in legacy and lean mode alike, and for untrusted contributors too: CI Fast
+# is a required context, so it must be decided for every integration event. It
+# holds a read-only token and no secrets, and executes only base-branch code.
+# CI_CADENCE_MODE only decides who owns full-suite work.
 if: >-
   github.repository_id == '1141286326' && github.repository_owner_id == '3944118' &&
-  github.actor_id == '3944118' && github.event.sender.type == 'User' &&
   ((github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
-   (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' &&
-    github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' &&
-    github.event.pull_request.head.repo.id == 1141286326))
+   (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop'))
 runs-on: ubuntu-latest
 timeout-minutes: 6
 steps:
@@ -33,7 +32,7 @@ steps:
   - name: Acquire reviewed protected launcher
     id: entry
     env:
-      LAUNCHER_SHA256: 7af2cc34293872b4eb35f3b54649e85936a86ba5baa4fcc15b208858151e3216
+      LAUNCHER_SHA256: 2add6aee55aeccb476b5ffec96742e426d951ba23a416f11141a91cc8ab3f5ce
       GITHUB_TOKEN: ${{ github.token }}
       # The four Fast checks always execute, so the launcher always
       # classifies under lean rules. ROUTING_MODE is the repository's real
@@ -94,19 +93,31 @@ steps:
       import json,os,re,sys
       with open(sys.argv[1]) as f: result=json.load(f)
       required=['commit-secret-scan','policy-validation','lockfile-validation','cadence-contracts']
+      lean=os.environ.get('ROUTING_MODE')=='lean'
+      disclosure=None
       if result.get('lane')=='fast' and result.get('success') is True and result.get('completed')==required:
           decision='skip'
       elif result.get('lane')=='full' and result.get('fullRequired') is True and result.get('success') is False:
           # Lean: the caller runs every full recovery child. Legacy: the
           # existing full workflows already validate this event.
-          decision='full' if os.environ.get('ROUTING_MODE')=='lean' else 'legacy'
+          decision='full' if lean else 'legacy'
+          if not lean: disclosure='full validation is required ('+str(result.get('reason'))+'); the original full workflows validate this event under legacy mode'
+      elif result.get('lane')=='untrusted' and result.get('acceptanceBlocked') is True and result.get('protectedImported') is True:
+          # The original workflows always run their full secret-free graph for
+          # untrusted events. Lean never accepts that as integration proof.
+          if lean:
+              print('::error title=CI Fast::untrusted contribution: acceptance is blocked until a vetted owner integration obtains authenticated proof; the full hosted suite runs without secrets')
+              raise SystemExit(1)
+          decision='legacy'
+          disclosure='untrusted contribution: the original full workflows validate this event without secrets under legacy mode; CI Fast adds no acceptance'
       else:
           raise SystemExit('Protected Fast/full admission unavailable')
+      if disclosure: print('::notice title=CI Fast::'+disclosure)
       values={'decision':decision,'source_sha':result.get('sourceSha'),'checkout_sha':result.get('testedCheckoutSha'),'definition_sha':result.get('definitionSha'),'cadence_json':json.dumps(result,separators=(',',':'))}
       for key in ['source_sha','checkout_sha','definition_sha']:
           assert re.fullmatch('[a-f0-9]{40}',values[key] or '')
       with open(os.environ['GITHUB_OUTPUT'],'a') as f:
           for key,value in values.items(): f.write(key+'='+value+'\n')
       with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
-          f.write('CI Fast decision: '+decision+' ('+str(result.get('reason') or 'four Fast checks passed')+')\n')
+          f.write('CI Fast decision: '+decision+' ('+str(disclosure or result.get('reason') or 'four Fast checks passed')+')\n')
       PYTHON

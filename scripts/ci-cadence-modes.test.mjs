@@ -77,8 +77,47 @@ for (const [label, event] of [['production PR', pull('main')], ['production push
   const jobs = started(event, mode), before = original(event, mode);
   assert.ok(before.length >= 5, String(before.length));
   assert.deepEqual(routedOriginals(jobs), before);
-  assert.deepEqual(jobs.filter(job => job.startsWith('ci-cadence')), []);
+  // CI Fast is a required develop context, so it is decided for untrusted develop
+  // events too (its entry step blocks them in lean, below). It never runs for main.
+  const develop = event.ref === 'refs/heads/develop' || event.baseBranch === 'develop';
+  assert.deepEqual(jobs.filter(job => job.startsWith('ci-cadence')), develop ? [FAST] : []);
   if (event.baseBranch === 'main') assert.ok(jobs.includes('preview-smoke.yml: Release artifact smoke'));
+});
+test('CI Fast holds no secrets and a read-only token, so deciding untrusted events is safe', () => {
+  const definition = workflow('ci-cadence.yml'), job = cadenceJob('entry');
+  assert.deepEqual(job.permissions, { contents: 'read' });
+  assert.ok(!JSON.stringify(job).includes('secrets.'));
+  assert.equal(definition.on.pull_request_target, undefined);
+  // Only base-branch bytes are executed: the launcher is read from the protected definition and digest-checked.
+  const run = job.steps.find(step => step.name === 'Acquire reviewed protected launcher').run;
+  assert.match(run, /git --no-replace-objects show "\$definition:scripts\/ci-cadence-launch\.mjs" > "\$private\/launch\.mjs"/);
+});
+
+// A schedule payload is not guaranteed to carry sender, and its actor is whoever
+// last touched the default branch.
+for (const [label, event] of [['sender-less', { kind: 'schedule', ref: 'refs/heads/main', senderless: true }], ['foreign-actor', { kind: 'schedule', ref: 'refs/heads/main', actor: 'web-flow' }], ['sender-less foreign-actor', { kind: 'schedule', ref: 'refs/heads/main', actor: 'web-flow', senderless: true }]]) test(`${label} schedule: lean reaches the nightly decision once and originals stand down; legacy keeps the original schedules`, () => {
+  const lean = started(event, 'lean');
+  assert.ok(lean.includes('ci-nightly.yml: Cadence admission'));
+  // No routed original starts on a lean schedule: that would double the nightly cost.
+  assert.deepEqual(routedOriginals(lean).filter(job => !job.startsWith('coverage.yml') && !job.startsWith('e2e-stripe-integration.yml')), []);
+  const legacy = started(event, 'legacy');
+  assert.deepEqual(routedOriginals(legacy), original(event, 'legacy'));
+  assert.ok(legacy.includes('security.yml: Gitleaks secret scan'));
+  assert.ok(!legacy.some(job => job.startsWith('ci-nightly')));
+  // Scheduled secret-backed work keeps its secrets without a sender.
+  for (const mode of ['lean', 'legacy']) {
+    const context = { ...nativeContext(event, mode), secrets: { STRIPE_TEST_SECRET_KEY: 'fixture', COVERAGE_SECRET: 'fixture' }, needs: {} };
+    const stripe = workflow('e2e-stripe-integration.yml').jobs['e2e-stripe'];
+    assert.equal(Boolean(evaluate(stripe.if, context)), true, mode);
+    assert.equal(evaluate(stripe.steps.find(step => step.name === 'Check required secrets').env.STRIPE_TEST_SECRET_KEY, context), 'fixture', mode);
+  }
+});
+test('sender-less schedule cannot make scheduled coverage daily or unpublished', () => {
+  const steps = workflow('coverage.yml').jobs.coverage.steps, event = { kind: 'schedule', ref: 'refs/heads/main', actor: 'web-flow', senderless: true };
+  const eligibility = steps.find(step => step.name === 'Decide weekly native coverage eligibility'), report = steps.find(step => step.name === 'Report coverage to Portfolio');
+  for (const mode of ['lean', 'legacy']) assert.equal(String(evaluate(eligibility.env.NATIVE_OWNER, { ...nativeContext(event, mode), needs: {} })), 'true', mode);
+  // Legacy keeps publishing from the scheduled main run exactly as before cadence.
+  assert.equal(Boolean(evaluate(report.if, { ...nativeContext(event, 'legacy'), steps: { 'cadence-calendar': { outputs: { eligible: 'true' } } }, needs: {} })), true);
 });
 
 // Frozen phase-1 events, renamed onto this repository's native identities.
@@ -100,7 +139,7 @@ for (const fixture of fixtures) test(`phase-1 "${fixture.name}": static job pred
   // full, release, untrusted, blocked: the complete original graph for that event.
   assert.deepEqual(routedOriginals(jobs), before);
   if (['push', 'pull_request'].includes(event.kind)) assert.ok(before.length >= 5, String(before.length));
-  assert.equal(jobs.includes(FAST), lane === 'full' && ['push', 'pull_request'].includes(event.kind));
+  assert.equal(jobs.includes(FAST), ['push', 'pull_request'].includes(event.kind) && (event.ref === 'refs/heads/develop' || event.baseBranch === 'develop'));
 });
 
 /** Runs the real recovery aggregate for one set of needs results. */
@@ -179,8 +218,21 @@ for (const routing of ['lean', 'legacy', undefined, 'LEAN']) test(`four passed F
 for (const [routing, decision] of [['lean', 'full'], ['legacy', 'legacy'], [undefined, 'legacy'], ['LEAN', 'legacy']]) test(`full-required result under routing ${routing} yields ${decision}`, t => {
   const run = entryStep(t, { launcher: stub(fullRequired), routing });
   assert.equal(run.status, 0); assert.equal(run.outputs.decision, decision); assert.match(run.summary, /install\/runtime\/workspace drift/);
+  // Legacy passes with a disclosure because the original workflows validate the event.
+  assert.equal(/::notice title=CI Fast::full validation is required .*original full workflows/.test(run.stdout), decision === 'legacy');
 });
-for (const [label, result, exit] of [['failed Fast check', { ...passed, success: false, completed: ['commit-secret-scan'] }, 1], ['blocked admission', { lane: 'blocked', reason: 'native identity' }, 1], ['incomplete Fast work', { ...passed, completed: passed.completed.slice(0, 3) }, 0], ['legacy-full classification without Fast work', { ...identity, lane: 'full', reason: 'legacy full' }, 0], ['untrusted lane', { ...identity, lane: 'untrusted' }, 0], ['malformed identity', { ...passed, sourceSha: 'short' }, 0]]) for (const routing of ['lean', 'legacy']) test(`${label} under ${routing} fails CI Fast instead of deferring`, t => {
+const untrusted = { ...identity, lane: 'untrusted', acceptanceBlocked: true, protectedImported: true, runner: 'standard-hosted', token: 'read-only' };
+for (const routing of ['legacy', undefined, 'LEAN']) test(`untrusted event under routing ${routing} passes CI Fast with a disclosure and no recovery`, t => {
+  const run = entryStep(t, { launcher: stub(untrusted), routing, event: 'pull_request' });
+  assert.equal(run.status, 0); assert.equal(run.outputs.decision, 'legacy');
+  assert.match(run.stdout, /::notice title=CI Fast::untrusted contribution: the original full workflows validate this event without secrets/); assert.match(run.summary, /untrusted contribution/);
+});
+test('untrusted event under lean blocks CI Fast', t => {
+  const run = entryStep(t, { launcher: stub(untrusted), routing: 'lean', event: 'pull_request' });
+  assert.notEqual(run.status, 0); assert.equal(run.outputs.decision, undefined);
+  assert.match(run.stdout, /::error title=CI Fast::untrusted contribution: acceptance is blocked/);
+});
+for (const [label, result, exit] of [['failed Fast check', { ...passed, success: false, completed: ['commit-secret-scan'] }, 1], ['blocked admission', { lane: 'blocked', reason: 'native identity' }, 1], ['incomplete Fast work', { ...passed, completed: passed.completed.slice(0, 3) }, 0], ['legacy-full classification without Fast work', { ...identity, lane: 'full', reason: 'legacy full' }, 0], ['untrusted lane without protected classification', { ...identity, lane: 'untrusted', acceptanceBlocked: true }, 0], ['untrusted lane without blocked acceptance', { ...identity, lane: 'untrusted', protectedImported: true }, 0], ['malformed identity', { ...passed, sourceSha: 'short' }, 0]]) for (const routing of ['lean', 'legacy']) test(`${label} under ${routing} fails CI Fast instead of deferring`, t => {
   const run = entryStep(t, { launcher: stub(result, exit), routing });
   assert.notEqual(run.status, 0); assert.equal(run.outputs.decision, undefined);
 });

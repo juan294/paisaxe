@@ -6,13 +6,13 @@ import { join, dirname, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 const PINS = {
   "scripts/ci-cadence-publish.mjs": "aa7bc0ddec18d73bc732f2cd30fe32d0b73d1c4ddee2d050f70ee30b99711f25",
-  "scripts/ci-cadence-control.mjs": "4e0f899d14fb002d5021ff88d716c419504ebe5119baeedd6fc3eb2a70bd3ac1",
+  "scripts/ci-cadence-control.mjs": "b0dfdd16f6035e69a7797daad99d74dbc3ee6ed07bbd26796f5ad86ac41a128f",
   "scripts/ci-cadence-projection.mjs": "aaeea5200fe40d88942796a8187a12b1a0a8dde6b3a5491bbc2e27c87e545b31",
   "scripts/ci-cadence-run.mjs": "ef1b11904bba6fb5cd210a1ec060ac5314fe262f644535deb63a88860f847b84",
-  "scripts/ci-cadence-github.mjs": "c9e507cd12f3a0060cec42cc6c5ae17020bf096bb2d4787331bb20e692d58d1a",
+  "scripts/ci-cadence-github.mjs": "b58ff93639ffeaa15b7e63b9fb71069b1600731a588b5e37632361576d4730f4",
   "scripts/ci-cadence-producer.mjs": "7b21806e84b690deb6ca889d79f60c0fefae1f1ca53a8b6073022970932a0f3e",
   "scripts/ci-cadence-coverage.mjs": "f5a6fa57a388781c7d3714021f2196b83f1b54e59b611327956aa17e1b02bddf",
-  "scripts/ci-cadence-native.mjs": "95d90114925026bc3f5ea7f978080376625241bfece4971de9b906e8bba528b1",
+  "scripts/ci-cadence-native.mjs": "3d570d2624d653496c38c0430ea3d6b20bb8507e383f1cad9233def089ce44a5",
   "scripts/ci-cadence.mjs": "9f2da9ab55525a3ca4acc311feaf5426fc86d83258c5dda7754dc05405c9a7ab"
 };
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value) && value !== '0'.repeat(40);

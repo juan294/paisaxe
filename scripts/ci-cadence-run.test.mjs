@@ -18,7 +18,7 @@ test('known actual failure remains blocked even when subsequent history is unava
   assert.equal(result.action, 'blocked'); assert.equal(result.publishCoverage, false);
 });
 test('incomplete unknown history falls back full with no publication', async () => {
-  const f = fixture({ override: { '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': new Response('{}', { status: 503, headers: { 'x-ratelimit-remaining': '4000' } }) } });
+  const f = fixture({ override: { '/repos/juan294/paisaxe/actions/workflows/ci-nightly.yml/runs?per_page=100&page=1': new Response('{}', { status: 503, headers: { 'x-ratelimit-remaining': '950' } }) } });
   const { decideNightlyRun } = await module(); const result = await decideNightlyRun(input(), options(f));
   assert.equal(result.action, 'full'); assert.equal(result.publishCoverage, false); assert.equal(result.history.complete, false);
 });
