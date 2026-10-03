@@ -1,5 +1,6 @@
 "use client";
 
+import { redactCapabilityPath, redactCapabilityPathsDeep } from "@/lib/redact-capability-path";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense, createContext, useContext } from "react";
 import type { PostHog } from "posthog-js";
@@ -34,7 +35,8 @@ function PostHogPageViewTracker() {
         url = url + "?" + searchParams.toString();
       }
       posthog.capture("$pageview", {
-        $current_url: url,
+        // F05: capability links never reach analytics.
+        $current_url: redactCapabilityPath(url),
       });
     }
   }, [pathname, searchParams, posthog]);
@@ -86,6 +88,9 @@ export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps
             capture_pageview: false, // We handle this manually for Next.js routing
             capture_pageleave: false,
             autocapture: false,
+            // F05: PostHog attaches URLs to every event ($current_url,
+            // $referrer, …); scrub capability links from all of them.
+            before_send: (event) => (event ? redactCapabilityPathsDeep(event) : event),
           });
         }
 

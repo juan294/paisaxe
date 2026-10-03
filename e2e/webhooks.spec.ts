@@ -42,6 +42,19 @@ test.describe("Webhook signature rejection", () => {
     });
   });
 
+  test("paypal webhook rejects a request with no paypal-transmission headers", async ({
+    request,
+  }) => {
+    await expectRejected(request, "/api/webhooks/paypal", {
+      data: JSON.stringify({
+        id: "WH-E2E-UNSIGNED",
+        event_type: "CHECKOUT.ORDER.APPROVED",
+        resource: { id: "ORDER-E2E" },
+      }),
+      headers: { "content-type": "application/json" },
+    });
+  });
+
   test("supabase webhook rejects a request with no x-webhook-secret header", async ({
     request,
   }) => {

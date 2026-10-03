@@ -284,3 +284,56 @@ build can still change. Output: the draft file kept outside the repository, and 
 short list of problems in the phase evidence, each assigned to Phase 5, 5b or 6.
 
 Stop for acceptance.
+
+## Handoff (2026-10-03)
+
+**Status:** implemented, independently reviewed (CHANGES REQUESTED with two money-safety
+majors; fixed test-first; re-review APPROVE), simplified (two telemetry defects found and
+fixed) and verified by the full local gate. Committed on the feature branch; **not merged into
+`develop`, not pushed** (awaiting the owner's acceptance). Manual sandbox acceptance and 4b are
+open (owner credentials, tunnel and buyer approval).
+
+- **Scope delivered:**
+  - Adapter `src/lib/paypal/` over the pinned plugin SDK (contract sheet
+    `pay-pal-server-sdk-plan.md`), sandbox-only origin guard, shared token cache, webhook
+    signature verification, local mock server `src/test/paypal-mock-server.ts`; Phase 0 spikes
+    deleted.
+  - Flow: `src/lib/booking/capture.ts` (the single capture path), `payment-state.ts` (shared
+    guarded transitions and status sets), `webhook-events.ts`, `reconcile.ts`, `view.ts`.
+  - Tool `create_payment_order` (card-only approval link), the post-accept instruction, the
+    payment card with the hold's expiry.
+  - Routes: `GET /api/booking/bookings/<capability>`, `POST …/payment`,
+    `POST /api/booking/payments/capture`, `POST /api/webhooks/paypal`,
+    `GET|POST /api/cron/reconcile-bookings` (every 5 minutes in `vercel.json`).
+  - Pages: `/booking/<capability>` (pay, confirming with 5 s then 30 s polling, receipt,
+    expired, attention, refunding, refunded, cancelled) and `/booking/<capability>/return`.
+  - Telemetry redaction (F05) in PostHog, Sentry (events and transactions) and Vercel
+    Analytics / Speed Insights.
+  - Migrations 119 (`payments.approve_url`), 120 (R1 `reacquire_hold`), 121 (one open payment
+    per booking), 122 (bookings status index). `booking.page.*` and `booking.cards.payBefore` in
+    six locales.
+- **Identity:** branch `feature/paypal-deposit` in `/Users/juan/code/paisaxe-hackathon-phase4`,
+  based on `develop` `05d00641`; the commit carrying this handoff is the candidate.
+- **Gate evidence (local, this candidate's inputs):** `supabase db reset --local` applied 112 to
+  122 through the runner (`schema_migrations` max 122; both new indexes present; R1 body in
+  `reacquire_hold`); `typecheck` 0, `lint` 0, `knip` 0, `check-env` 0,
+  `check-verification-coverage` 0, `check-migrations` 0 (119 files); full suite
+  `vitest run --maxWorkers=4`: 467 files, 8,613 tests passed, live-DB tests running against the
+  reset stack; `next build` 0 after deviation 19 (the booking page tests re-run: 36 passed;
+  typecheck, lint and knip re-run clean). Playwright was not run (the unsigned-webhook 401 case
+  was added to `e2e/webhooks.spec.ts`).
+- **Deviations, review, simplify:** notes file, "Phase 4" (deviations 1 to 19), "Phase 4 review
+  dispositions" (findings 1 to 6, R1, R2), "Phase 4 simplify pass".
+- **Open for this phase's acceptance (owner):**
+  - Manual acceptance 1 to 4 on local Docker with real sandbox credentials and a tunnel for
+    the webhook; record the order, capture and event ids here.
+  - 4b rehearsal and rough cut (Oct 27 to 28).
+- **Entry conditions for Phase 5:**
+  - Cancellation reuses `payment-state.ts` (`guardedUpdate`, `flagNeedsAttention`,
+    `markBookingRefunded`) and reconciliation step 7, which already refunds `cancel_pending`
+    bookings with `cancellation_confirmed_at` and `refund_cents` using the payment's key.
+  - The booking page's cancelled state exists; Phase 5 adds the cancel action and the
+    `preview_cancellation` tool.
+  - The local `booking-roundtrip` E2E still needs Playwright `bypassCSP` (Phase 2 deviation 9).
+  - Production stays untouched: anonymous sign-in, `PAYPAL_*` and `BOOKING_LINK_SECRET` in
+    Vercel, the PayPal webhook subscription and the cron need owner authorization at release.

@@ -1,4 +1,5 @@
-import type { ErrorEvent, RequestEventData } from "@sentry/core";
+import type { ErrorEvent, RequestEventData, TransactionEvent } from "@sentry/core";
+import { redactCapabilityPath, redactCapabilityPathsDeep } from "./redact-capability-path";
 import { getRequestId } from "./request-context";
 
 const REDACTED = "[REDACTED]";
@@ -52,7 +53,8 @@ export async function sanitizeSentryEvent(event: ErrorEvent): Promise<ErrorEvent
     delete event.request.query_string;
 
     if (event.request.url) {
-      event.request.url = normalizeUrlToPath(event.request.url);
+      const path = normalizeUrlToPath(event.request.url);
+      event.request.url = path === undefined ? path : redactCapabilityPath(path);
     }
 
     if (event.request.headers) {
@@ -70,6 +72,10 @@ export async function sanitizeSentryEvent(event: ErrorEvent): Promise<ErrorEvent
     }
   }
 
+  // F05: capability links (booking and operator pages) never reach Sentry.
+  if (event.transaction) event.transaction = redactCapabilityPath(event.transaction);
+  if (event.breadcrumbs) event.breadcrumbs = redactCapabilityPathsDeep(event.breadcrumbs);
+
   const requestId = getRequestId() ?? extractRequestId(event.request?.headers);
   if (requestId) {
     event.tags = {
@@ -79,4 +85,16 @@ export async function sanitizeSentryEvent(event: ErrorEvent): Promise<ErrorEvent
   }
 
   return event;
+}
+
+/**
+ * beforeSendTransaction: performance events carry the page URL, the
+ * transaction name, span descriptions and breadcrumbs; scrub capability links
+ * from all of them (F05).
+ */
+export function sanitizeSentryTransaction(event: TransactionEvent): TransactionEvent {
+  // The SDK's own bookkeeping (scopes, the client) is passed through by reference.
+  const { sdkProcessingMetadata, ...rest } = event;
+  const redacted = redactCapabilityPathsDeep(rest);
+  return sdkProcessingMetadata === undefined ? redacted : { ...redacted, sdkProcessingMetadata };
 }

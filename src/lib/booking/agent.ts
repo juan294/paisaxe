@@ -98,9 +98,8 @@ function stateBlock(input: BookingTurnInput, now: Date): string {
     lines.push(
       `El visitante acaba de pulsar el botón y ha aceptado la oferta: reserva ${input.acceptedBooking.reference} ` +
         `(bookingId ${input.acceptedBooking.id}), plaza retenida 15 minutos. ` +
-        "Confírmaselo en una frase y dile que el enlace de su reserva está en la tarjeta de la reserva. " +
-        // Phase 4 replaces this sentence when create_payment_order exists.
-        "El pago de la señal todavía no está disponible en esta conversación: no menciones ningún enlace de pago."
+        "Confírmaselo en una frase, prepara el pago de la señal con create_payment_order y dile que pague con el botón " +
+        "de la tarjeta de pago antes de que caduque la retención. La reserva no está pagada hasta que get_booking_status diga confirmed."
     );
   }
   if (input.contextText) {

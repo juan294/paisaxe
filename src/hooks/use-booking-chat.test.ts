@@ -32,6 +32,14 @@ const quoteCard = {
   accepted: false,
 };
 const bookingCard = { kind: "booking", bookingId: BOOKING_ID, reference: "RS-ABC123", status: "pending_payment", link: "/booking/x.y" };
+const paymentCard = {
+  kind: "payment",
+  bookingId: BOOKING_ID,
+  approvalUrl: "https://www.sandbox.paypal.com/checkoutnow?token=5O190127TN364715T",
+  amountCents: 3000,
+  currency: "EUR",
+  expiresAt: "2026-11-20T09:20:00.000Z",
+};
 
 function sse(events: unknown[]) {
   const body = new TextEncoder().encode(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(""));
@@ -144,11 +152,19 @@ describe("useBookingChat", () => {
     expect(result.current.error).toBe(message);
   });
 
-  it("accepting a quote swaps its card for the booking card, then sends the quote_accepted turn with no typed text", async () => {
+  it("accepting a quote swaps its card for the booking card, then sends the quote_accepted turn, whose answer carries the payment card", async () => {
     mockFetch
       .mockResolvedValueOnce(sse([{ type: "card", card: quoteCard }, { type: "done", images: [], sources: [] }]))
       .mockResolvedValueOnce(json(200, { card: bookingCard }))
-      .mockResolvedValueOnce(sse([{ type: "text", content: "Reserva retenida." }, { type: "done", images: [], sources: [] }]));
+      .mockResolvedValueOnce(
+        sse([
+          { type: "text", content: "Reserva retenida." },
+          { type: "tool", name: "create_payment_order", status: "start" },
+          { type: "tool", name: "create_payment_order", status: "done" },
+          { type: "card", card: paymentCard },
+          { type: "done", images: [], sources: [] },
+        ])
+      );
     const { result } = renderHook(() => useBookingChat());
 
     await act(() => result.current.sendMessage("Quiero el paseo"));
@@ -164,6 +180,7 @@ describe("useBookingChat", () => {
     // No visible user bubble for the event turn; the assistant answers.
     expect(result.current.messages.map((m) => m.role)).toEqual(["user", "assistant", "assistant"]);
     expect(result.current.messages[2].content).toBe("Reserva retenida.");
+    expect(result.current.messages[2].cards).toEqual([paymentCard]);
   });
 
   it.each([

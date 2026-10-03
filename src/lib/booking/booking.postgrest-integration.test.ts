@@ -479,6 +479,20 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       expect(result.data).toBe(false);
     });
 
+    it("reacquire_hold does not count the booking's own hold when it lapses while the call waits (R1)", async () => {
+      const date = futureDate(70);
+      const bookingId = await acceptedBookingId(insertQuote({ userId: USER_A, experienceId: EXP_SMALL, date, party: 4 }), USER_A);
+
+      // One transaction: the hold is live at transaction start (now()) and
+      // lapsed by the time reacquire_hold reads clock_timestamp().
+      const result = psql(
+        `BEGIN; UPDATE public.holds SET expires_at = now() + interval '50 milliseconds' WHERE id = (SELECT hold_id FROM public.bookings WHERE id = '${bookingId}');` +
+          `SELECT pg_sleep(0.1); SELECT public.reacquire_hold('${bookingId}'); COMMIT;`
+      );
+
+      expect(result.split("\n").filter((line) => line === "t" || line === "f")).toEqual(["t"]);
+    });
+
     it("expire_holds expires unpaid bookings whose hold lapsed, and leaves bookings with a payment for reconciliation", async () => {
       const date = futureDate(39);
       const unpaid = await acceptedBookingId(insertQuote({ userId: USER_A, experienceId: EXP_BIG, date, party: 1 }), USER_A);

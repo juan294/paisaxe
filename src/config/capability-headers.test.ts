@@ -22,7 +22,11 @@ async function lastHeader(path: string, key: string): Promise<string | undefined
 }
 
 describe("Referrer-Policy and X-Robots-Tag on capability routes", () => {
-  it.each(["/booking/11111111-2222-4333-8444-555555555555.token", "/operator/a7e5c0de-0000-4000-8000-000000000001.token"])(
+  it.each([
+    "/booking/11111111-2222-4333-8444-555555555555.token",
+    "/booking/11111111-2222-4333-8444-555555555555.token/return",
+    "/operator/a7e5c0de-0000-4000-8000-000000000001.token",
+  ])(
     "is no-referrer for %s",
     async (path) => {
       expect(await lastHeader(path, "referrer-policy")).toBe("no-referrer");

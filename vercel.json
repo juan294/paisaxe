@@ -28,6 +28,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/reconcile-bookings",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/retry-booking-sms",
       "schedule": "*/10 * * * *"
     }

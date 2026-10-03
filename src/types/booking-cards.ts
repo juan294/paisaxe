@@ -64,6 +64,8 @@ export interface PaymentCard {
   approvalUrl: string;
   amountCents: number;
   currency: string;
+  /** The hold's expiry: the buyer must approve before it. */
+  expiresAt: string;
 }
 
 /** Phase 5: the read-only cancellation preview. */

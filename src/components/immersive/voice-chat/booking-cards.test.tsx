@@ -102,10 +102,20 @@ describe("BookingCards", () => {
     expect(screen.getByText(/booking.cards.verdict.unknown/)).toBeInTheDocument();
   });
 
-  it("labels a payment card as PayPal sandbox", () => {
-    renderCards([{ kind: "payment", bookingId: "b1", approvalUrl: "https://www.sandbox.paypal.com/checkoutnow?token=x", amountCents: 3000, currency: "EUR" }]);
+  it("labels a payment card as PayPal sandbox, with the hold's expiry", () => {
+    renderCards([
+      {
+        kind: "payment",
+        bookingId: "b1",
+        approvalUrl: "https://www.sandbox.paypal.com/checkoutnow?token=x",
+        amountCents: 3000,
+        currency: "EUR",
+        expiresAt: "2026-11-20T09:20:00.000Z",
+      },
+    ]);
 
     expect(screen.getByText("booking.cards.sandbox")).toBeInTheDocument();
+    expect(screen.getByText("booking.cards.payBefore")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "booking.cards.pay" })).toHaveAttribute(
       "href",
       "https://www.sandbox.paypal.com/checkoutnow?token=x"

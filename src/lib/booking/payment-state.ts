@@ -1,0 +1,51 @@
+/**
+ * The payment and booking transitions shared by the capture path, the
+ * webhook and reconciliation (PayPal hackathon plan, Phase 4). Every write is
+ * a guarded UPDATE that applies only from the listed statuses, so a lost race
+ * is a no-op the caller can see, and states only move forward.
+ */
+import "server-only";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export type Row = Record<string, unknown>;
+
+/** Payment statuses from which a capture may still be attempted (no capture is known yet). */
+export const CAPTURABLE = ["created", "approved", "capture_pending"];
+/** Payment statuses in which the refund is the outcome (never re-confirm). */
+export const COMPENSATING = ["refund_pending", "refunded", "refund_failed"];
+/** Every status but the refund ones: a capture that happened is recorded over them, because money moved (R2-01). */
+export const RECORDABLE = [...CAPTURABLE, "captured", "expired", "capture_failed"];
+/** Booking statuses a refunded payment turns into refunded. */
+export const BOOKING_REFUNDED_FROM = ["pending_payment", "confirmed", "needs_attention", "expired", "cancel_pending", "refund_pending"];
+
+/**
+ * One guarded UPDATE: applies `fields` only while the row is in one of
+ * `fromStatuses`. Returns whether a row changed, so a lost race is visible.
+ */
+export async function guardedUpdate(
+  client: SupabaseClient,
+  table: "payments" | "bookings",
+  id: unknown,
+  fields: Row,
+  fromStatuses: string[]
+): Promise<boolean> {
+  const { data, error } = await client.from(table).update(fields).eq("id", id).in("status", fromStatuses).select("id");
+  if (error) throw new Error(`Failed to update ${table}: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
+/** A booking whose payment needs a human (declined, mismatched, refund failed) unless it moved on. */
+export function flagNeedsAttention(client: SupabaseClient, bookingId: unknown, from = ["pending_payment", "expired"]): Promise<boolean> {
+  return guardedUpdate(client, "bookings", bookingId, { status: "needs_attention" }, from);
+}
+
+/** After a payment is refunded: the booking is refunded, except for a duplicate capture, whose booking stays confirmed by its other payment. */
+export async function markBookingRefunded(client: SupabaseClient, payment: Row, bookingId: unknown): Promise<void> {
+  if (payment.compensation_reason === "duplicate_capture") return;
+  await guardedUpdate(client, "bookings", bookingId, { status: "refunded" }, BOOKING_REFUNDED_FROM);
+}
+
+export function holdIsLive(hold: Row): boolean {
+  return !hold.consumed_at && !hold.released_at && new Date(hold.expires_at as string) > new Date();
+}

@@ -311,6 +311,92 @@ Independent review of 2026-10-03 (fresh context; it ran 35 files and 748 tests, 
   - **Unifying the two booking-mode predicates in `VoiceChat`:** the plan defines the booking hook by voucher access and voice suppression by the `?booking=1` entry; kept as specified.
   - **The search tool's availability RPC count:** `[BOOKING_TOOL_TIMING]` now records it. Decide on a range RPC in Phase 6 from the timing logs of the evaluation re-run.
 
+### Phase 4
+
+1. **The adapter wraps the pinned PayPal plugin SDK (owner decision, 2026-10-03).**
+   - Plan said: decide between `@paypal/paypal-server-sdk` and plain `fetch`.
+   - Chose: `pay-pal-server-sdk` 2.29 from `github:context-plugins/paypal-typescript-sdk`, pinned to commit `c27911067cf7e19e88eaca5bcd114dc182572656` (MIT; runtime dependency `zod` only). It covers orders, captures and refunds with `payPalRequestId`; webhook signature verification stays plain `fetch` (the SDK has no notifications surface) and shares the adapter's token cache.
+   - The APIMatic skill requires a contract sheet before adapter code: `pay-pal-server-sdk-plan.md` at the repository root (hosts, client, operations, error arms, assumptions).
+2. **The adapter's host guard compares the full origin and allows loopback outside production.**
+   - Plan said: exact hostname `api-m.sandbox.paypal.com`.
+   - Chose: https on exactly that host with the default port; `http://127.0.0.1` or `http://localhost` only when `NODE_ENV !== "production"`, for the mock server (`src/test/paypal-mock-server.ts`). Paths, credentials and other ports are rejected.
+3. **Migration 119 adds `payments.approve_url`.** The plan reuses "the stored approve_url" on a second `create_payment_order`, but migration 115 had no column for it.
+4. **`BookingErrorCode` gains `hold_expired`, `invalid_state` and `payment_unavailable`** (the plan's HoldExpired / NotConfigured branches). A PayPal error message is logged, never returned to the model.
+5. **The booking page is a static shell that loads through the capability API.**
+   - Plan said: a server component that verifies the capability and calls `notFound()` for an invalid one.
+   - Found: under PPR a page-level `notFound()` arrives after the shell's 200 (Phase 2 finding).
+   - Chose: `page.tsx` renders `BookingStatus`, which fetches `GET /api/booking/bookings/<capability>`. The route answers a real 404 for an unknown capability or on a Preview, and the page shows the not-found state. Polling uses the same route. The return page is a static shell too. Neither HTML response contains booking data, so the per-route Cache-Control the plan asked for lives on the API routes (`private, no-store`); `Referrer-Policy` and `X-Robots-Tag` come from the Phase 3 `next.config` entries, which already cover `/return` (tested).
+6. **Capability headers come from `next.config.ts`, not `proxy.ts`** (Phase 3 deviation 10), so the plan's proxy step was not needed.
+7. **The capability routes share one per-IP limit** (30 a minute, `booking-capability:<ip>`), checked before any database read. Polling every 5 s uses 12.
+8. **The capture route requires the order id to be the booking's latest payment's** and answers 409 `mismatch` otherwise, without capturing and without flagging the booking (a stale or foreign return URL is not evidence about this payment).
+9. **The payment card carries `expiresAt`** (the hold's expiry), shown as "Paga antes de las HH:MM" (new key `booking.cards.payBefore`); the quote's "Oferta válida hasta" key stays for quotes. The money and clock formatters moved to `src/lib/booking-format.ts` for the cards and the page.
+10. **The Phase 3 tripwire is replaced by the Phase 4 contract.** The post-accept state now directs the model to `create_payment_order` and the pay button; the test asserts the tool is registered, the state names it and the old sentence is gone. `buildBookingInstructions()` gains one rule for the tool.
+11. **Telemetry redaction (F05) matches the capability shape, not the route prefix.**
+    - Plan said: map `/booking/<anything>` to `/booking/[redacted]`.
+    - Found: a prefix match also mangled `/api/booking/chat/stream`.
+    - Chose: `redactCapabilityPath` replaces `<uuid>.<token of 20+ base64url chars>` wherever it appears, drops its query (PayPal's `token` and `PayerID`), keeps any suffix such as `/return`, and is applied to the PostHog page view and `before_send`, the Sentry event and transaction paths and breadcrumbs (`beforeSendTransaction` added to the server, edge and client configs), and the Vercel Analytics and Speed Insights `beforeSend`.
+12. **Phase 1 entry condition R1 is closed by migration 120.** `reacquire_hold`'s lapsed branch gives the booking's own places back when its hold was still live at transaction start (availability reads `now()`). The test reproduces the race deterministically in one transaction (hold expires 50 ms after `now()`, `pg_sleep(0.1)`): it returned `f` before the migration and `t` after.
+
+13. **Webhook event names are the plan's.** Phase 0 confirmed `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED` and `PAYMENT.CAPTURE.REFUNDED`; `PAYMENT.CAPTURE.PENDING` and `PAYMENT.CAPTURE.DENIED` are handled as documented but were not observed in the sandbox.
+14. **Webhook route details beyond the plan.** A request missing any `paypal-transmission-*` header gets 401 without calling PayPal (the e2e server has no PayPal credentials, so verification would otherwise answer 500). A verified event with no id or type gets 400. Events are also matched by `payments.capture_id` before falling back to `getCapture`.
+15. **Forward-only rules, made explicit.** A `PAYMENT.CAPTURE.COMPLETED` event is accepted on an `expired` payment (money moved, R2-01). `PAYMENT.CAPTURE.REFUNDED` is accepted from any status but `refunded`; the booking becomes `refunded` unless the reason is `duplicate_capture` (that booking stays confirmed by its other payment). `CHECKOUT.ORDER.APPROVED` on an expired or failed payment is out of order and never captures.
+16. **Reconciliation step 7 is implemented now,** because migration 112 already has `cancel_pending`, `cancellation_confirmed_at` and `refund_cents`; it refunds `refund_cents` with the payment's key. Step 6 refunds the full amount for compensations and `refund_cents` otherwise. No migration was needed for `reconcile_passes`.
+17. **"PayPal unreachable" in the cron** means not configured, or a `PaypalError` with no HTTP status or a 5xx: the run stops, states stay, the route answers 500 with `[CRON_FAILURE]`, and it does not count as an inconclusive capture pass. Other per-item errors are counted and also give 500. `reconcileBookings` takes an optional `bookingIds` scope used only by the live tests.
+18. **Three capture-path defects found while integrating the webhook unit, fixed test-first** (each test failed before the fix; mutations M5 and M6 restored them):
+    - A late buyer approval of an `expired` payment re-acquired the free slot and captured while every payment write was a no-op; confirmation then raised `payment_not_found`, leaving money taken on an expired booking. Only `created`, `approved` and `capture_pending` payments are captured now; a late approval answers `slot_gone` (nothing charged).
+    - The COMPLETED-order branch confirmed regardless of the capture's own status. All capture results go through one `settleCapture`: COMPLETED is recorded over any non-refund status (an `expired` or `capture_failed` payment included, R2-01) and finalized; DECLINED or FAILED is `capture_failed`; anything else (PENDING) stays `capture_pending` for reconciliation.
+    - A mismatched COMPLETED order was written `captured` and then `refund_pending`; a crash between the two would have let reconciliation confirm it. `compensateCapturedPayment` now writes the capture id, `refund_pending` and the reason in one UPDATE (test asserts no `captured` write ever happens on that path). **Correction (review finding 3):** this first fix covered `capture.ts` only; the webhook's `PAYMENT.CAPTURE.COMPLETED` mismatch path kept the two writes until the review dispositions below.
+19. **The booking pages render per request (`export const instant = false`).**
+    - Found at the gate: `next build` failed prerendering `/booking/[capability]` because the root `Providers` (`src/app/providers.tsx`) reads `usePathname()` outside a Suspense boundary, which a dynamic segment with unknown params cannot prerender (`blocking-prerender-client-hook`).
+    - Chose: the build's own "block" option on the two booking pages, leaving the shared `Providers` untouched. A capability page has nothing to cache; the shell carries no booking data either way. Tested (`page.test.tsx`), and the build lists both pages.
+
+### Phase 4 review dispositions
+
+Independent reviewer (fresh context): CHANGES REQUESTED, with two majors reproduced against the live stack. Each fix below has a regression test that failed first and a mutation that the test catches (M7 to M10).
+
+| # | Severity | Finding | Disposition |
+|---|----------|---------|-------------|
+| 1 | major | `capture_pending` payment, order still `APPROVED`, hold lapsed, slot taken: the payment write was a no-op but the booking was expired (`slot_gone`), so it never counted as inconclusive, and a later run could capture and confirm an "expired" booking | **Fixed.** A capture may be in flight, so APPROVED is not proof it did not happen: that case returns `pending` (inconclusive, counted, flagged at three passes) and changes nothing. For `created`/`approved`, the booking is expired only if the payment's guarded update actually changed a row (`updatePayment` now returns that). Test M7 |
+| 2 | major | A second order hides a completed capture: `ensurePaymentOrder` created a new payment and order while the latest was `capture_pending`/`captured`, and concurrent tool + button calls could create two | **Fixed.** `payment_in_progress` refuses a new order while a payment is `capture_pending` or `captured` (409 on the button route; the tool tells the model not to ask for payment again). Migration 121: a partial unique index allows one payment per booking in `created`/`approved`/`capture_pending`; the losing concurrent insert continues the winner's row, and its operation key makes PayPal return the same order. Tests M8, M10 |
+| 3 | minor | The webhook mismatch path still wrote `captured` before compensating | **Fixed.** The mismatch goes straight to the single-write `compensateCapturedPayment`; test records every payments UPDATE and asserts none sets `captured` |
+| 4 | minor | Unmatched inbox events (for example, another environment's events on a shared sandbox app) fill the drain's batch of 50 for ever | **Fixed.** The drain skips rows whose `last_error` starts with `[PAYPAL_WEBHOOK_UNMATCHED]` (shared `UNMATCHED_TAG`); they stay in the inbox for audit. Payments exist before their orders, so an unmatched event cannot become matchable. Test with 60 unmatched rows plus one replayable event, M9 |
+| 5 | nit | `returnFailed` promised a retry that does not exist (a declined capture flags the booking) | **Fixed** in all six locales: "PayPal ha rechazado el pago y no se ha cobrado nada. Lo estamos revisando." |
+| 6a | nit | Migration 120 was applied with psql, not recorded by the migration runner | **Resolved at the gate:** `supabase db reset` applies 112 to 121 through the runner (see the gate evidence) |
+| 6b | nit (INFERRED risk) | The SDK is a git dependency (`prepare: tshy`); an install from a clean clone in CI or Vercel is unproven | **Verified:** `npm ci` from the candidate `package.json` and lockfile, with an empty cache and `GIT_SSH_COMMAND=false`, exits 0 and builds the SDK's `dist` (npm falls back to https for the `git+ssh` lockfile URL) |
+
+Re-review (same reviewer, after the fixes): **APPROVE**. It re-ran its scratch repros of findings 1 and 2 (now `pending` then flagged at three passes, never expired; one order, reconciliation confirms on the first run), confirmed that no path moves a closed payment back to an open status (so the unique index blocks nothing legitimate), and checked the drain filter keeps rows with a NULL `last_error`. Two nits:
+
+| # | Severity | Finding | Disposition |
+|---|----------|---------|-------------|
+| R1 | nit | A stale booking page that gets 409 `payment_in_progress` showed "No se pudo abrir el pago" instead of switching to "Confirmando el pago…" | **Fixed:** the page re-fetches the booking on `payment_in_progress` (and `invalid_state`) and shows its real state with no error; test |
+| R2 | nit | An unmatched event is now replayed only by PayPal's redelivery, not by the drain | **Accepted:** reconciliation steps 3 to 5 query every open payment through `getOrder`, so no payment depends on an unmatched event; only a refund we did not initiate could rely on redelivery alone |
+
+### Phase 4 simplify pass
+
+Four read-only reviewers (reuse, simplification, efficiency, altitude). Two efficiency findings were defects, fixed test-first:
+
+- **Sentry transactions were dropped.** `sanitizeSentryTransaction` deep-walked the whole event, including `sdkProcessingMetadata`, whose scopes reach the client's cyclic timer list: `RangeError: Maximum call stack size exceeded` (reproduced; the test failed the same way). Now `sdkProcessingMetadata` passes through by reference.
+- **PostHog timestamps became `{}`.** The deep walk rebuilt the event's `timestamp` Date as a plain object. `redactCapabilityPathsDeep` now walks only plain objects and arrays, returns any other object (Date, SDK instances) unchanged, has a cycle guard, and skips strings without a dot.
+
+Applied (semantics unchanged unless stated):
+
+- `src/lib/booking/payment-state.ts` is the one home for `guardedUpdate`, the status sets (`CAPTURABLE`, `COMPENSATING`, `RECORDABLE`, `BOOKING_REFUNDED_FROM`), `flagNeedsAttention`, `markBookingRefunded` and `holdIsLive`; `capture.ts`, `webhook-events.ts` and `reconcile.ts` import them instead of three private copies.
+- **One intended semantic alignment:** the webhook's capture-evidence list lacked `capture_failed`, so a `PAYMENT.CAPTURE.COMPLETED` after a decline was "out of order" on the webhook but recorded by the capture path. Both now use `RECORDABLE` (deviation 18's documented rule); test (failed under the old list).
+- `loadState` reads the booking with its hold and experience title in one query, in parallel with the payment. `ensurePaymentOrder` takes no title (the tool and the pay route no longer look it up), and `captureApprovedOrder` takes the return page's expected order id and answers `mismatch` itself, so the capture route no longer loads the booking view (3 queries) first; test.
+- The webhook route and verifier share `TRANSMISSION_HEADERS` (now in `src/lib/paypal/types.ts`); verification uses the adapter's timeout; `getCapture` reuses `normalizeCapture`; `isUuid` replaces a local regex.
+- Migration 122: a partial index on `bookings(status, updated_at)` for the statuses the cron filters every 5 minutes.
+- Dead `expired` entry in the booking page's message map, an orphaned doc comment and the mock server's stale "used by E2E" header removed.
+
+Skipped:
+
+- **Shared live-test fixtures for the capture and reconcile integration tests** (about 70 similar lines): the two files use separate id prefixes and seed differently; worth doing if a third live booking test appears.
+- **Capability headers on API routes from `next.config`:** whether Next keeps a config Cache-Control on route handlers is untested; the per-route constant is small.
+- **An `unmatched_at` column instead of the `last_error` prefix:** `UNMATCHED_TAG` is the only writer of that prefix, so a migration buys little now.
+- **Folding the test-only timeout into the PayPal config and dropping the `bookingIds` scope:** both serve tests on a shared database; leaving them.
+- **Deep redaction of Sentry error events:** they keep the explicit field list (request URL, transaction, breadcrumbs).
+- **Fewer queries per status poll and per reconcile item:** 4 and about 4 queries; revisit with timing data.
+- **A shared error-message helper and JSON-parse helper:** no existing helper to reuse; the ternary is a codebase-wide idiom.
+
 ## Owner decisions after Phase 0
 
 Recorded 2026-10-03, when the owner accepted Phase 0.

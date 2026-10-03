@@ -9,7 +9,13 @@ import { join } from "node:path";
 describe("vercel.json", () => {
   const vercelConfig = JSON.parse(
     readFileSync(join(process.cwd(), "vercel.json"), "utf-8"),
-  ) as { ignoreCommand?: unknown; regions?: unknown };
+  ) as { ignoreCommand?: unknown; regions?: unknown; crons?: Array<{ path: string; schedule: string }> };
+
+  // PayPal hackathon plan, Phase 4: reconciliation is what resolves every
+  // uncertain payment with nobody present, so it must stay scheduled.
+  it("runs booking reconciliation every 5 minutes", () => {
+    expect(vercelConfig.crons).toContainEqual({ path: "/api/cron/reconcile-bookings", schedule: "*/5 * * * *" });
+  });
 
   it("builds production and pull-request deployments while ignoring ordinary previews", () => {
     expect(vercelConfig.ignoreCommand).toBe(

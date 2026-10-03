@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger";
 import type { BookingCard, BookingSummaryCard } from "@/types/booking-cards";
 import { searchExperiences } from "./availability";
 import { getBookingForUser, listBookingsForUser } from "./bookings";
+import { ensurePaymentOrder } from "./capture";
 import { draftPatchSchema, getOrCreateOpenDraft, updateDraft, type BookingDraft } from "./drafts";
 import { visitorConstraintsSchema } from "./facts";
 import { bookingLink } from "./links";
@@ -239,7 +240,41 @@ const getBookingStatusTool: BookingTool<{ bookingId?: string }> = {
   },
 };
 
-const BOOKING_TOOLS = [searchExperiencesTool, updateDraftTool, getQuoteTool, getBookingStatusTool] as const;
+const createPaymentOrderTool: BookingTool<{ bookingId: string }> = {
+  name: "create_payment_order",
+  description:
+    "Prepara el pago de la señal en PayPal para una reserva aceptada del visitante (estado pending_payment). Devuelve la " +
+    "tarjeta de pago con el botón de PayPal; el visitante paga allí antes de que caduque la plaza retenida. " +
+    "Crear el pedido no es un pago: la reserva solo está confirmada cuando get_booking_status dice confirmed. " +
+    "payment_in_progress significa que el visitante ya aprobó el pago y se está confirmando: no le pidas pagar otra vez.",
+  inputSchema: z.object({ bookingId: z.guid() }).strict(),
+  async execute(ctx, input) {
+    const booking = await getBookingForUser(ctx.client, ctx.userId, input.bookingId);
+    if (!booking) throw new BookingError("not_found");
+    const order = await ensurePaymentOrder(ctx.client, booking.id);
+
+    return {
+      // The approval URL carries PayPal's order token: card only (F05).
+      result: { payment: "order_created", reference: booking.reference },
+      card: {
+        kind: "payment",
+        bookingId: booking.id,
+        approvalUrl: order.approveUrl,
+        amountCents: order.amountCents,
+        currency: order.currency,
+        expiresAt: order.expiresAt,
+      },
+    };
+  },
+};
+
+const BOOKING_TOOLS = [
+  searchExperiencesTool,
+  updateDraftTool,
+  getQuoteTool,
+  getBookingStatusTool,
+  createPaymentOrderTool,
+] as const;
 
 /** Tool definitions for messages.stream, with JSON schemas derived from the zod schemas. */
 export function bookingToolDefinitions(): Anthropic.Tool[] {

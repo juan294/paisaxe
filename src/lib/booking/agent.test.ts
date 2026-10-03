@@ -217,9 +217,8 @@ describe("streamBookingTurn", () => {
     expect(systemB[1].text).toContain("RS-ABC123");
     expect(systemB[1].text).toContain("El Sella nace en los Picos de Europa.");
     expect(systemA[1].text).not.toContain("RS-ABC123");
-    // Until the payment tool exists (Phase 4) the post-accept line must not
-    // send the visitor looking for a payment link (found in the dev-server run).
-    expect(systemB[1].text).toMatch(/no menciones ningún enlace de pago/i);
+    // The post-accept line sends the model to the payment tool, never to a link in text.
+    expect(systemB[1].text).toContain("create_payment_order");
     expect(countCacheBreakpoints({ system: systemB })).toBeLessThanOrEqual(MAX_CACHE_BREAKPOINTS);
   });
 
@@ -277,14 +276,15 @@ describe("streamBookingTurn", () => {
     expect((fake.calls[0].params.system as { text: string }[])[1].text).toContain("Idioma de la interfaz del visitante: en");
   });
 
-  it("tripwire: the 'payment not available' sentence must go when create_payment_order is registered (Phase 4)", async () => {
+  it("the post-accept state names create_payment_order, a registered tool, and never claims payment availability is missing", async () => {
     const { bookingToolDefinitions } = await vi.importActual<typeof import("./tools")>("./tools");
     const fake = fakeAnthropic([{ content: [], stopReason: "end_turn" }]);
     await collect(streamBookingTurn(input(fake.client, { acceptedBooking: { id: "b1", reference: "RS-ABC123" } })));
     const stateText = (fake.calls[0].params.system as { text: string }[])[1].text;
-    const paymentToolRegistered = bookingToolDefinitions().some((tool) => tool.name === "create_payment_order");
 
-    expect(paymentToolRegistered && /todavía no está disponible/.test(stateText)).toBe(false);
+    expect(bookingToolDefinitions().map((tool) => tool.name)).toContain("create_payment_order");
+    expect(stateText).toContain("create_payment_order");
+    expect(stateText).not.toMatch(/todavía no está disponible/);
   });
 });
 

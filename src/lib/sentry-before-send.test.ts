@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
-import { sanitizeSentryEvent } from "./sentry-before-send";
+import { sanitizeSentryEvent, sanitizeSentryTransaction } from "./sentry-before-send";
 import { runWithRequestContext } from "./request-context";
 import type { ErrorEvent } from "@sentry/core";
 
@@ -163,3 +163,58 @@ describe("sanitizeSentryEvent", () => {
     expect(packageJson.dependencies?.["@sentry/core"]).toBeTruthy();
   });
 });
+
+describe("capability redaction (F05)", () => {
+  const capability = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+
+  it("redacts capabilities from the request URL, transaction and breadcrumbs of an error", async () => {
+    const event = await sanitizeSentryEvent({
+      request: { url: `https://paisaxe.es/booking/${capability}/return?token=X` },
+      transaction: `/booking/${capability}`,
+      breadcrumbs: [
+        { category: "navigation", data: { from: "/immersive", to: `/booking/${capability}` } },
+        { category: "fetch", data: { url: `/api/booking/bookings/${capability}/payment` }, message: `POST /booking/${capability}` },
+      ],
+    } as unknown as ErrorEvent);
+
+    expect(JSON.stringify(event)).not.toContain(capability);
+    expect(event.request?.url).toBe("/booking/[redacted]/return");
+    expect(event.breadcrumbs?.[0].data?.from).toBe("/immersive");
+  });
+
+  it("redacts capabilities from transaction events", () => {
+    const transaction = sanitizeSentryTransaction({
+      type: "transaction",
+      transaction: `/booking/${capability}`,
+      request: { url: `https://paisaxe.es/booking/${capability}` },
+      spans: [{ description: `GET /api/booking/bookings/${capability}`, span_id: "s", trace_id: "t", start_timestamp: 0 }],
+    } as never);
+
+    expect(JSON.stringify(transaction)).not.toContain(capability);
+  });
+
+  it("never walks sdkProcessingMetadata (scopes reach the client and its timers, which are cyclic)", () => {
+    const capability = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+    const timers: Record<string, unknown> = {};
+    timers.next = timers;
+    const sdkProcessingMetadata = { capturedSpanScope: { client: { timers } } };
+
+    const transaction = sanitizeSentryTransaction({
+      type: "transaction",
+      transaction: `/booking/${capability}`,
+      spans: [{ description: `GET /booking/${capability}`, span_id: "s", trace_id: "t", start_timestamp: 0 }],
+      sdkProcessingMetadata,
+    } as never);
+
+    expect(transaction.sdkProcessingMetadata).toBe(sdkProcessingMetadata);
+    expect(transaction.transaction).toBe("/booking/[redacted]");
+    expect(transaction.spans?.[0].description).toBe("GET /booking/[redacted]");
+  });
+
+  it("is wired as beforeSendTransaction in every Sentry init", () => {
+    for (const file of ["sentry.server.config.ts", "sentry.edge.config.ts", "src/lib/sentry-client-init.ts"]) {
+      expect(readFileSync(file, "utf8")).toContain("beforeSendTransaction: sanitizeSentryTransaction");
+    }
+  });
+});
+

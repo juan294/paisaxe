@@ -11,11 +11,13 @@ vi.mock("./drafts", async (importOriginal) => ({
 }));
 vi.mock("./quotes", () => ({ createQuote: vi.fn() }));
 vi.mock("./bookings", () => ({ getBookingForUser: vi.fn(), listBookingsForUser: vi.fn() }));
+vi.mock("./capture", () => ({ ensurePaymentOrder: vi.fn() }));
 
 const { searchExperiences } = await import("./availability");
 const { getOrCreateOpenDraft, updateDraft } = await import("./drafts");
 const { createQuote } = await import("./quotes");
 const { getBookingForUser, listBookingsForUser } = await import("./bookings");
+const { ensurePaymentOrder } = await import("./capture");
 const { executeBookingTool, bookingToolDefinitions } = await import("./tools");
 const { buildBookingInstructions } = await import("@/lib/chat-config");
 
@@ -77,12 +79,13 @@ function expectNoLinks(result: unknown) {
 }
 
 describe("tool definitions", () => {
-  it("registers the Phase 3 tools with JSON schemas derived from their zod schemas", () => {
+  it("registers the Phase 3 and 4 tools with JSON schemas derived from their zod schemas", () => {
     expect(bookingToolDefinitions().map((tool) => tool.name)).toEqual([
       "search_experiences",
       "update_booking_draft",
       "get_quote",
       "get_booking_status",
+      "create_payment_order",
     ]);
     for (const definition of bookingToolDefinitions()) {
       expect(definition.input_schema.type).toBe("object");
@@ -303,5 +306,55 @@ describe("get_booking_status", () => {
     expect(listBookingsForUser).toHaveBeenCalledWith(client, USER);
     expect((outcome.result as { bookings: unknown[] }).bookings).toHaveLength(1);
     expectNoLinks(outcome.result);
+  });
+});
+
+describe("create_payment_order", () => {
+  const APPROVE_URL = "https://www.sandbox.paypal.com/checkoutnow?token=5O190127TN364715T";
+
+  it("returns only the reference to the model; the approval link goes in the payment card", async () => {
+    vi.mocked(getBookingForUser).mockResolvedValue(booking);
+    vi.mocked(ensurePaymentOrder).mockResolvedValue({
+      approveUrl: APPROVE_URL,
+      amountCents: 3000,
+      currency: "EUR",
+      expiresAt: "2026-11-20T09:20:00.000Z",
+    });
+
+    const outcome = await executeBookingTool(ctx, "create_payment_order", { bookingId: BOOKING_ID });
+
+    expect(outcome.isError).toBe(false);
+    expect(outcome.result).toEqual({ payment: "order_created", reference: "RS-ABC123" });
+    expectNoLinks(outcome.result);
+    expect(JSON.stringify(outcome.result)).not.toContain("5O190127TN364715T");
+    expect(getBookingForUser).toHaveBeenCalledWith(client, USER, BOOKING_ID);
+    expect(ensurePaymentOrder).toHaveBeenCalledWith(client, BOOKING_ID);
+    expect(outcome.card).toEqual({
+      kind: "payment",
+      bookingId: BOOKING_ID,
+      approvalUrl: APPROVE_URL,
+      amountCents: 3000,
+      currency: "EUR",
+      expiresAt: "2026-11-20T09:20:00.000Z",
+    });
+  });
+
+  it("refuses a booking of another user without creating an order", async () => {
+    vi.mocked(getBookingForUser).mockResolvedValue(null);
+
+    const outcome = await executeBookingTool(ctx, "create_payment_order", { bookingId: BOOKING_ID });
+
+    expect(outcome).toMatchObject({ isError: true, result: { error: "not_found" } });
+    expect(ensurePaymentOrder).not.toHaveBeenCalled();
+  });
+
+  it.each(["hold_expired", "invalid_state", "payment_unavailable", "payment_in_progress"] as const)("reports %s as an error result", async (code) => {
+    vi.mocked(getBookingForUser).mockResolvedValue(booking);
+    vi.mocked(ensurePaymentOrder).mockRejectedValue(new BookingError(code));
+
+    const outcome = await executeBookingTool(ctx, "create_payment_order", { bookingId: BOOKING_ID });
+
+    expect(outcome).toMatchObject({ isError: true, result: { error: code } });
+    expect(outcome.card).toBeUndefined();
   });
 });

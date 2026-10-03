@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { sanitizeSentryEvent } from "@/lib/sentry-before-send";
+import { sanitizeSentryEvent, sanitizeSentryTransaction } from "@/lib/sentry-before-send";
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
 
@@ -9,5 +9,6 @@ if (dsn) {
     // Capture 10% of transactions for performance monitoring
     tracesSampleRate: 0.1,
     beforeSend: sanitizeSentryEvent,
+    beforeSendTransaction: sanitizeSentryTransaction,
   });
 }

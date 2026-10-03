@@ -2,9 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import type { QuoteState } from "@/hooks/use-booking-chat";
+import { clockTime, money } from "@/lib/booking-format";
 import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n/types";
-import { toIntlLocale } from "@/lib/utils";
 import type {
   BookingCard,
   BookingSummaryCard,
@@ -24,10 +24,6 @@ interface BookingCardsProps {
 }
 
 type T = (key: string) => string;
-
-function money(cents: number, currency: string, locale: Locale): string {
-  return new Intl.NumberFormat(toIntlLocale(locale), { style: "currency", currency }).format(cents / 100);
-}
 
 function CardShell({ title, children, t }: { title: string; children: React.ReactNode; t: T }) {
   return (
@@ -91,11 +87,7 @@ function QuoteCardView({
   t: T;
   locale: Locale;
 }) {
-  const expiresAt = new Date(card.expiresAt).toLocaleTimeString(toIntlLocale(locale), {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Madrid",
-  });
+  const expiresAt = clockTime(card.expiresAt, locale);
   const lapsed = state === "expired" || state === "noCapacity";
 
   return (
@@ -160,6 +152,7 @@ function PaymentCardView({ card, t, locale }: { card: PaymentCard; t: T; locale:
   return (
     <CardShell title={t("booking.cards.paymentTitle")} t={t}>
       <p className="font-semibold">{money(card.amountCents, card.currency, locale)}</p>
+      <p className="text-white/60">{t("booking.cards.payBefore").replace("{time}", clockTime(card.expiresAt, locale))}</p>
       <p className="text-white/60">{t("booking.cards.sandbox")}</p>
       <a href={card.approvalUrl} className="mt-2 inline-block underline">
         {t("booking.cards.pay")}

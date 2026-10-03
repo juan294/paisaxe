@@ -75,7 +75,15 @@ export type BookingErrorCode =
   | "not_owned"
   | "quote_expired"
   | "no_capacity"
-  | "invalid_input";
+  | "invalid_input"
+  /** The hold lapsed before payment: re-quote (Phase 4). */
+  | "hold_expired"
+  /** The booking is not waiting for payment any more (Phase 4). */
+  | "invalid_state"
+  /** PayPal is not configured or did not answer (Phase 4). */
+  | "payment_unavailable"
+  /** The buyer already approved and the capture is being finished: no new order (Phase 4). */
+  | "payment_in_progress";
 
 export class BookingError extends Error {
   readonly code: BookingErrorCode;
