@@ -33,7 +33,7 @@ export interface BookingDraft {
   constraints: VisitorConstraints;
 }
 
-const draftPatchSchema = z
+export const draftPatchSchema = z
   .object({
     partySize: partySizeSchema,
     date: isoDateSchema.nullable(),

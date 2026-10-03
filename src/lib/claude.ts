@@ -575,7 +575,7 @@ function buildChatSystem(messageIndex: number, asturianEnabled: boolean): System
 /**
  * Build the context text from chunks with length limiting.
  */
-function buildContextText(context: Chunk[]): string {
+export function buildContextText(context: Chunk[]): string {
   let contextText = "";
   for (let i = 0; i < context.length && contextText.length < MAX_CONTEXT_LENGTH; i++) {
     const chunk = context[i];

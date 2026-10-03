@@ -176,3 +176,25 @@ Pass: 6 of 6 correct outcome classes, no price outside tool results, at most two
 clarification turns in scenario 1. Record the run in the phase evidence.
 
 Stop for acceptance.
+
+## Handoff (2026-10-03)
+
+**Status:** implemented, independently reviewed (no blockers; one major observability
+finding fixed), simplified and verified locally. Merged into `develop` by owner instruction in
+the implementing conversation ("merge, prune tree and keep going with phase 4"). Not pushed.
+
+- **Scope delivered:** SSE `tool` and `card` events; booking card and wire-contract types; the
+  four tools; the SDK tool loop; the booking rules; the booking chat, quote accept and
+  placeholder `/booking/<capability>` routes; `useBookingChat`; the booking cards; `VoiceChat`
+  booking mode and the `?booking=1` entry; `booking.chat.*` and `booking.cards.*` in six
+  locales; capability headers in `next.config.ts`; `npm run eval:booking`.
+- **Identity:** branch `feature/booking-chat` in `/Users/juan/code/paisaxe-hackathon-phase3`,
+  based on `develop` `477ff636`.
+- **Deviations, review, simplify, manual evidence:** notes file, "Phase 3" sections
+  (deviations 1 to 16, review findings 1 to 12, simplify, manual evidence).
+- **Entry conditions for Phase 4:**
+  - Replace `src/app/booking/[capability]/route.ts` with the page; a route and a page cannot share the segment. `Referrer-Policy` and `X-Robots-Tag` already come from `next.config.ts` for every `/booking/` and `/operator/` response, so do not add them in `proxy.ts` (phase-4.md's proxy bullet is superseded). Set Cache-Control per route handler.
+  - Register `create_payment_order` in `src/lib/booking/tools.ts`. Replace the post-accept sentence in `agent.ts` `stateBlock` (the tripwire test fails until then). Assert the payment card in `use-booking-chat.test.ts` (deviation 16).
+  - The capability pages cannot return a real 404 from the page under PPR (Phase 2 deviation 5). Decide the proxy rule (see the Phase 2 handoff).
+  - The local `booking-roundtrip` E2E needs Playwright `bypassCSP` (Phase 2 deviation 9).
+  - Running `next dev` locally: see the Phase 2 handoff (no `.env.local`, explicit local variables, `ulimit -n 65536`, `WATCHPACK_POLLING=true`, port 3006 for the CSRF allowlist). Restore `AGENTS.md` afterwards.

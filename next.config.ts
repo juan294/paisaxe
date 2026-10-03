@@ -72,6 +72,25 @@ const nextConfig: NextConfig = {
         // for the `unsafe-inline` rationale (PPR compatibility).
       ],
     },
+    // Capability URLs (/booking/<id>.<token>, /operator/<id>.<token>) must
+    // never leak through a Referer header nor be indexed (PayPal hackathon
+    // plan, F05). The single place for these headers, pages and route handlers
+    // alike; for one path the last matching entry wins, so these follow the
+    // site-wide one. Cache-Control is set per route (Next overrides it for pages).
+    {
+      source: "/booking/:path*",
+      headers: [
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Robots-Tag", value: "noindex" },
+      ],
+    },
+    {
+      source: "/operator/:path*",
+      headers: [
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Robots-Tag", value: "noindex" },
+      ],
+    },
   ],
   images: {
     // Prefer modern formats for better compression

@@ -26,6 +26,7 @@
     "check-verification-coverage": "tsx scripts/check-verification-coverage.ts",
     "check-env": "tsx scripts/check-env.ts",
     "check-migrations": "tsx scripts/check-migrations.ts",
+    "eval:booking": "tsx --conditions=react-server scripts/eval/booking-eval.ts",
     "check-licenses": "tsx scripts/check-production-licenses.ts",
     "check-secret-inventory": "tsx scripts/check-secret-inventory.ts",
     "check-required-probes": "tsx scripts/release/required-probes.ts",

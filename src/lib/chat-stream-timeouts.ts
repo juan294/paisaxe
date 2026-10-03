@@ -22,6 +22,12 @@ export const CHAT_STREAM_STAGE_TIMEOUTS_MS = {
 export const CHAT_STREAM_RESPONSE_TOTAL_CAP_MS =
   CHAT_STREAM_STAGE_TIMEOUTS_MS.response * 3;
 
+// Booking chat (PayPal hackathon plan, Phase 3): the non-resetting ceiling on
+// the whole tool loop (model iterations plus tool calls). Sized so the stages
+// before it (rate limit 3 s, gate and metering, embedding 12 s, search 5 s)
+// still finish inside the route's maxDuration of 120 s.
+export const BOOKING_CHAT_TOTAL_CAP_MS = 85_000;
+
 export type ChatStreamStage = keyof typeof CHAT_STREAM_STAGE_TIMEOUTS_MS;
 
 export class ChatStreamStageTimeoutError extends Error {

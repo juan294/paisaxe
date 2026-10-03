@@ -47,4 +47,51 @@ describe("types/sse", () => {
     expect(parseSseEvent("data: {invalid json}")).toBeNull();
     expect(parseSseEvent(`data: ${JSON.stringify({ type: "unknown" })}`)).toBeNull();
   });
+
+  it("encodes and parses tool status events (booking chat)", () => {
+    for (const status of ["start", "done", "error"] as const) {
+      const event = { type: "tool" as const, name: "search_experiences", status };
+      expect(parseSseEvent(encodeSseEvent(event).trim())).toEqual(event);
+    }
+  });
+
+  it("rejects tool events with an unknown status or no name", () => {
+    expect(parseSseEvent(`data: ${JSON.stringify({ type: "tool", name: "x", status: "later" })}`)).toBeNull();
+    expect(parseSseEvent(`data: ${JSON.stringify({ type: "tool", status: "start" })}`)).toBeNull();
+  });
+
+  it("encodes and parses card events for each card kind", () => {
+    const quote = {
+      kind: "quote" as const,
+      quoteId: "q1",
+      version: 2,
+      experienceTitle: "Paseo por la senda costera",
+      slotDate: "2026-11-21",
+      slotTime: "10:00",
+      partySize: 4,
+      totalCents: 12000,
+      depositCents: 3000,
+      balanceCents: 9000,
+      currency: "EUR",
+      cancellationWindowHours: 24,
+      expiresAt: "2026-11-20T09:20:00.000Z",
+      accepted: false,
+    };
+    const event = { type: "card" as const, card: quote };
+    expect(parseSseEvent(encodeSseEvent(event).trim())).toEqual(event);
+
+    for (const card of [
+      { kind: "offer", options: [] },
+      { kind: "booking", bookingId: "b1", reference: "RS-ABC123", status: "pending_payment", link: "/booking/x.y" },
+      { kind: "payment", bookingId: "b1", approvalUrl: "https://www.sandbox.paypal.com/x", amountCents: 3000, currency: "EUR" },
+      { kind: "cancellation", bookingId: "b1", refundCents: 3000, currency: "EUR", policy: "full" },
+    ]) {
+      expect(parseSseEvent(`data: ${JSON.stringify({ type: "card", card })}`)?.type).toBe("card");
+    }
+  });
+
+  it("rejects card events without a known kind", () => {
+    expect(parseSseEvent(`data: ${JSON.stringify({ type: "card", card: { kind: "receipt" } })}`)).toBeNull();
+    expect(parseSseEvent(`data: ${JSON.stringify({ type: "card" })}`)).toBeNull();
+  });
 });

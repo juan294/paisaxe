@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ImageResult } from "@/types";
+import type { BookingCard } from "@/types/booking-cards";
 import { useTranslation } from "@/lib/i18n";
 import {
   detectUpsellMarker,
@@ -33,6 +34,8 @@ export interface StreamChatMessage {
   images?: ImageResult[];
   upsellReason?: UpsellReason;
   upsellDismissed?: boolean;
+  /** Booking chat only: structured cards shown under the bubble. */
+  cards?: BookingCard[];
 }
 
 interface SendMessageOptions {
@@ -271,9 +274,9 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
               };
               return updated;
             });
-          } else {
-            // event.type === "error" — the only remaining member of the
-            // ChatStreamEvent union once "text" and "done" are ruled out.
+          } else if (event.type === "error") {
+            // Booking-chat events ("tool", "card") parse too since Phase 3 of the
+            // PayPal hackathon plan; the discovery chat ignores them.
             // PE-M4: content below is replaced wholesale, so any buffered
             // text is discarded rather than flushed — flushing first would
             // just have it immediately overwritten anyway, but leaving a

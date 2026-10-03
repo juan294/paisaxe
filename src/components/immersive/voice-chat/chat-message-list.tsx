@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, memo } from "react";
+import { useRef, useEffect, memo, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { ChatMessageSkeleton } from "@/components/immersive/skeleton-chat-message";
@@ -14,12 +14,15 @@ interface ChatMessageListProps {
   messages: StreamChatMessage[];
   isLoading: boolean;
   onUpsellDismiss: (index: number) => void;
+  /** Booking chat: renders a message's cards under its bubble. */
+  renderCards?: (msg: StreamChatMessage) => ReactNode;
 }
 
 interface MessageRowProps {
   msg: StreamChatMessage;
   idx: number;
   onUpsellDismiss: (index: number) => void;
+  renderCards?: (msg: StreamChatMessage) => ReactNode;
 }
 
 // FE-M3: memoize individual rows so only the actively-streaming row re-renders
@@ -28,11 +31,13 @@ const MessageRow = memo(function MessageRow({
   msg,
   idx,
   onUpsellDismiss,
+  renderCards,
 }: MessageRowProps) {
   const { t } = useTranslation();
+  const cardsOnly = msg.role === "assistant" && !msg.content && !!msg.cards?.length;
   return (
     <div key={msg.id}>
-      <div
+      {!cardsOnly && <div
         className={cn(
           "max-w-[85%] p-3 rounded-2xl",
           msg.role === "user"
@@ -69,7 +74,8 @@ const MessageRow = memo(function MessageRow({
             ))}
           </div>
         )}
-      </div>
+      </div>}
+      {msg.cards && msg.cards.length > 0 && renderCards?.(msg)}
       {msg.upsellReason && !msg.upsellDismissed && (
         <ChatUpsellCTA
           reason={msg.upsellReason}
@@ -92,6 +98,7 @@ export function ChatMessageList({
   messages,
   isLoading,
   onUpsellDismiss,
+  renderCards,
 }: ChatMessageListProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -134,9 +141,10 @@ export function ChatMessageList({
           msg={msg}
           idx={idx}
           onUpsellDismiss={onUpsellDismiss}
+          renderCards={renderCards}
         />
       ))}
-      {isLoading && messages[messages.length - 1]?.content === "" && (
+      {isLoading && messages[messages.length - 1]?.content === "" && !messages[messages.length - 1]?.cards?.length && (
         <ChatMessageSkeleton />
       )}
       <div ref={messagesEndRef} />

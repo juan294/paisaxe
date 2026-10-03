@@ -9,7 +9,9 @@ import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
-import { useStreamChat } from "@/hooks/use-stream-chat";
+import { useStreamChat, type StreamChatMessage } from "@/hooks/use-stream-chat";
+import { useBookingAccess } from "@/hooks/use-booking-access";
+import { useBookingChat } from "@/hooks/use-booking-chat";
 import { useChatMode } from "@/hooks/use-chat-mode";
 import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
@@ -20,6 +22,7 @@ import { ChatHeader } from "./voice-chat/chat-header";
 import { ChatMessageList } from "./voice-chat/chat-message-list";
 import { ChatComposer } from "./voice-chat/chat-composer";
 import { ChatErrorBanner } from "./voice-chat/chat-error-banner";
+import { BookingCards } from "./voice-chat/booking-cards";
 
 // FE-M1: the streaming hot path pushes a `messages` state update on every SSE
 // token, re-rendering VoiceChat every token. ChatComposer and ChatActions
@@ -73,9 +76,11 @@ interface VoiceChatProps {
   onClose: () => void;
   initialMessage?: string;
   triggerRef?: React.RefObject<HTMLButtonElement | null>;
+  /** Opened from the voucher entry (?booking=1): stay in the text booking chat (F06). */
+  bookingMode?: boolean;
 }
 
-export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: VoiceChatProps) {
+export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bookingMode = false }: VoiceChatProps) {
   const [inputValue, setInputValue] = useState("");
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>("");
@@ -115,20 +120,32 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     isLoading: isVoiceAccessLoading
   } = useVoiceAccess();
 
-  // Stream chat hook for SSE message handling
+  // Stream chat hooks for SSE message handling. A visitor with an active
+  // voucher redemption gets the booking chat (tools, cards); everyone else the
+  // discovery chat. Both hooks always run (rules of hooks); one is used.
+  const discoveryChat = useStreamChat({ canUseVoice });
+  const bookingChat = useBookingChat();
+  const { active: bookingActive } = useBookingAccess();
+  const chat = bookingActive ? bookingChat : discoveryChat;
   const {
     messages,
     isStreaming: isLoading,
     error: chatError,
-    sendMessage,
     resetMessages,
     dismissUpsell: handleUpsellDismiss,
-    // FE-M1: kept in sync by useStreamChat itself (synchronously, inside the
+    // FE-M1: kept in sync by the chat hook itself (synchronously, inside the
     // same setState updater as every message mutation) — read this instead
     // of `messages` in submitMessage/handleRetry below so those callbacks'
     // identity doesn't change on every streamed token.
     messagesRef,
-  } = useStreamChat({ canUseVoice });
+  } = chat;
+  const discoverySend = discoveryChat.sendMessage;
+  const bookingSend = bookingChat.sendMessage;
+  const sendMessage = useCallback(
+    (message: string, options: { context: string; locale: string; messageIndex: number }) =>
+      bookingActive ? bookingSend(message, { locale: options.locale }) : discoverySend(message, options),
+    [bookingActive, bookingSend, discoverySend]
+  );
 
   // Voice/text mode state — extracted to useChatMode hook
   const { useElevenLabs, setUseElevenLabs, toggle: handleToggleMode } = useChatMode(false);
@@ -136,7 +153,9 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
   // Whether voice mode is/will be the active mode once access resolves — a
   // single source shared by the mode-sync effect and the initial-message
   // effect below so the two can't independently drift out of sync.
-  const willUseVoiceMode = canUseVoice && !!agentId;
+  // Booking mode keeps the text chat even when the voucher's voice pass makes
+  // voice available (F06); voice stays one toggle away.
+  const willUseVoiceMode = canUseVoice && !!agentId && !bookingMode;
 
   // Sync voice mode whenever access status resolves or changes (e.g., mid-session purchase)
   useEffect(() => {
@@ -248,6 +267,24 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     });
   }, [lastMessage, isLoading, sendMessage, buildStoryContext, locale, messagesRef]);
 
+  const { acceptQuote, quoteStates } = bookingChat;
+  const handleRequote = useCallback(() => {
+    void submitMessage(t("booking.chat.requoteMessage"));
+  }, [submitMessage, t]);
+  const renderCards = useCallback(
+    (msg: StreamChatMessage) =>
+      msg.cards ? (
+        <BookingCards
+          cards={msg.cards}
+          quoteStates={quoteStates}
+          onAccept={(quoteId) => void acceptQuote(quoteId, locale)}
+          onRequote={handleRequote}
+          busy={isLoading}
+        />
+      ) : null,
+    [acceptQuote, quoteStates, locale, handleRequote, isLoading]
+  );
+
   if (!open) return null;
 
   return (
@@ -276,6 +313,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
           storySlug={story.slug}
           onToggleMode={handleToggleMode}
           onClose={handleClose}
+          tryVoiceLabel={bookingActive ? t("booking.chat.voiceDiscovery") : undefined}
         />
 
         {/* Privacy Notice */}
@@ -319,7 +357,15 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
               messages={messages}
               isLoading={isLoading}
               onUpsellDismiss={handleUpsellDismiss}
+              renderCards={bookingActive ? renderCards : undefined}
             />
+
+            {/* Kept mounted so screen readers announce the line when it appears. */}
+            {bookingActive && (
+              <p role="status" className={bookingChat.statusLine ? "px-4 pb-2 text-xs text-white/70" : "sr-only"}>
+                {bookingChat.statusLine ?? ""}
+              </p>
+            )}
 
             {/* Error banner for chat API failures */}
             {chatError && (

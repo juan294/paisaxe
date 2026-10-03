@@ -72,7 +72,7 @@ vi.mock("@/components/ui/component-error-boundary", () => ({
 // the underlying module is mocked before it is ever resolved.
 vi.mock("@/components/immersive/voice-chat", () => ({
   VoiceChat: (props: Record<string, unknown>) => (
-    <div data-testid="voice-chat" data-open={String(props.open)}>
+    <div data-testid="voice-chat" data-open={String(props.open)} data-booking-mode={String(props.bookingMode ?? false)}>
       <button data-testid="voice-chat-close" onClick={() => (props.onClose as () => void)()} />
     </div>
   ),
@@ -80,7 +80,7 @@ vi.mock("@/components/immersive/voice-chat", () => ({
 // Mock dynamic import for VoiceChat — renders a div so we can detect it
 vi.mock("next/dynamic", () => ({
   default: () => (props: Record<string, unknown>) => (
-    <div data-testid="voice-chat" data-open={String(props.open)}>
+    <div data-testid="voice-chat" data-open={String(props.open)} data-booking-mode={String(props.bookingMode ?? false)}>
       <button data-testid="voice-chat-close" onClick={() => (props.onClose as () => void)()} />
     </div>
   ),
@@ -385,6 +385,29 @@ describe("ImmersivePageContent", () => {
     const viewer = screen.getByTestId("story-viewer");
     expect(viewer).toHaveAttribute("data-index", "1");
     expect(viewer).toHaveAttribute("data-chat-open", "true");
+  });
+
+  it("?booking=1 opens the chat in booking mode, even without a story parameter (F06)", () => {
+    setupDefaults();
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams("booking=1") as unknown as ReturnType<typeof useSearchParams>
+    );
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    expect(screen.getByTestId("story-viewer")).toHaveAttribute("data-chat-open", "true");
+    expect(screen.getByTestId("voice-chat")).toHaveAttribute("data-booking-mode", "true");
+  });
+
+  it("without ?booking=1 the chat opens in discovery mode", () => {
+    setupDefaults();
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams("story=oviedo-cathedral&voice=ready") as unknown as ReturnType<typeof useSearchParams>
+    );
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    expect(screen.getByTestId("voice-chat")).toHaveAttribute("data-booking-mode", "false");
   });
 
   // -----------------------------------------------------------------------

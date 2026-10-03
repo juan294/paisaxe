@@ -63,6 +63,9 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
   const { stories: allStories, isLoading } = useStories();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
+  // Opened from the voucher entry (/acceso redirects to ?booking=1): the chat
+  // stays in the text booking mode instead of switching to voice (F06).
+  const [bookingMode, setBookingMode] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | undefined>();
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [moodDismissed, setMoodDismissed] = useState(false);
@@ -153,17 +156,28 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
   useEffect(() => {
     const storySlug = searchParams.get("story");
     const voiceState = searchParams.get("voice");
-    const deepLinkKey = `${storySlug ?? ""}:${voiceState ?? ""}`;
+    const booking = searchParams.get("booking") === "1";
+    const deepLinkKey = `${storySlug ?? ""}:${voiceState ?? ""}:${booking ? "booking" : ""}`;
 
-    if (!storySlug || filteredStories.length === 0 || lastHandledDeepLink.current === deepLinkKey) {
+    if (filteredStories.length === 0 || lastHandledDeepLink.current === deepLinkKey) {
       return;
     }
+
+    // ?booking=1 needs no story: the chat opens on the current one.
+    if (booking && !storySlug) {
+      lastHandledDeepLink.current = deepLinkKey;
+      setBookingMode(true);
+      setChatOpen(true);
+      return;
+    }
+    if (!storySlug) return;
 
     const index = filteredStories.findIndex((s) => s.slug === storySlug || s.id === storySlug);
     if (index >= 0) {
       lastHandledDeepLink.current = deepLinkKey;
       setCurrentIndex(index);
-      if (voiceState === "ready") {
+      if (booking) setBookingMode(true);
+      if (voiceState === "ready" || booking) {
         setChatOpen(true);
       }
     }
@@ -272,6 +286,7 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
               onClose={handleCloseChat}
               initialMessage={initialMessage}
               triggerRef={chatTriggerRef}
+              bookingMode={bookingMode}
             />
           </ComponentErrorBoundary>
         </Suspense>

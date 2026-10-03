@@ -5,6 +5,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  buildBookingInstructions,
   buildSystemPrompt,
   buildConversationFlow,
   GENERIC_REDIRECT_RESPONSE,
@@ -348,3 +349,31 @@ describe("CHAT_CONFIG", () => {
     });
   });
 });
+
+describe("buildBookingInstructions (PayPal hackathon booking chat)", () => {
+  const text = buildBookingInstructions();
+
+  it("is stable across calls (it sits in the cached system block)", () => {
+    expect(buildBookingInstructions()).toBe(text);
+  });
+
+  it.each([
+    ["never states a price that did not come from a tool", /precio[^.]*herramienta/i],
+    ["asks only for missing fields", /solo lo que falte/i],
+    ["requires the accept button, never acceptance by text", /botón/i],
+    ["never claims confirmation without get_booking_status", /get_booking_status/],
+    ["says unsupported plainly and offers an alternative", /unsupported/],
+    ["never presents unknown as suitable", /unknown/],
+    ["offers the nearest slots when one is gone", /horarios más cercanos/i],
+    ["replies in the visitor's language, Spanish by default", /idioma del visitante/i],
+    ["overrides the discovery persona's voice upsell markers", /VOICE_UPSELL/],
+  ])("%s", (_label, pattern) => {
+    expect(text).toMatch(pattern);
+  });
+
+  it("never mentions links or URLs, which only cards carry", () => {
+    expect(text).toMatch(/enlace/i);
+    expect(text).toMatch(/tarjeta/i);
+  });
+});
+

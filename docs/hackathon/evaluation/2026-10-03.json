@@ -1,0 +1,1194 @@
+{
+  "date": "2026-10-03T16:47:04.667Z",
+  "model": "claude-sonnet-5",
+  "passed": 6,
+  "total": 6,
+  "pass": true,
+  "results": [
+    {
+      "id": 1,
+      "name": "representative request",
+      "pass": true,
+      "outcome": "coastal walk quoted at 120 / 30",
+      "clarificationTurns": 1,
+      "latencyMs": 18278,
+      "inventedPrices": [],
+      "transcript": [
+        {
+          "visitor": "Somos cuatro, queremos hacer algo mañana por la mañana, tenemos un presupuesto de 120 euros y una persona necesita un recorrido sin escalones.",
+          "assistant": "¡Tengo justo lo que necesitáis! Os cuento las opciones que he encontrado para mañana por la mañana:\n\n**✅ Paseo por la senda costera** — esta es la buena para vosotros:\n- Sendero llano de tierra compactada, **sin escalones en todo el recorrido** (confirmado por el proveedor)\n- Paseo guiado con paradas en miradores, dura 2h30\n- Precio: 120€ para el grupo (justo vuestro presupuesto), señal de 30€\n- Hay hueco mañana a las **10:00** (y también a las 16:00 si prefirierais tarde)\n\nLas otras dos no encajan:\n- **Descenso en canoa** — descartado, el embarcadero tiene escalones, no es accesible.\n- **Ruta en 4x4** — se sale de presupuesto (200€) y además el proveedor no ha confirmado si es sin escalones, así que tampoco la recomendaría para esa necesidad.\n\n¿Os preparo la oferta para el Paseo por la senda costera mañana a las 10:00 para 4 personas? Así veréis la tarjeta con el precio y la señal para confirmar.",
+          "tools": [
+            "update_booking_draft",
+            "update_booking_draft",
+            "search_experiences"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "supported",
+                      "detail": "Sendero llano de tierra compactada, sin escalones en todo el recorrido",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "constraint_unsupported"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unsupported",
+                      "detail": "El embarcadero tiene escalones",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": []
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unknown",
+                      "detail": "El proveedor no ha confirmado la accesibilidad",
+                      "confirmedByProvider": false
+                    }
+                  ],
+                  "slots": []
+                }
+              ]
+            }
+          ],
+          "latencyMs": 10309
+        },
+        {
+          "visitor": "A las 10:00, por favor.",
+          "assistant": "Perfecto, confirmado: hay hueco a las **10:00** para 4 personas. Preparo la oferta ahora mismo.Aquí tienes la tarjeta de la oferta para el **Paseo por la senda costera**, mañana 4 de octubre a las 10:00, para 4 personas. Son 120€ en total, con una señal de 30€ (quedarían 90€ a pagar después).\n\nRevisa la tarjeta y pulsa el botón para aceptarla cuando quieras confirmarla. ¡Vais a disfrutar de un paseo tranquilo con el sonido del mar de fondo y buenos miradores por el camino! 🌊",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences",
+            "get_quote"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "supported",
+                      "detail": "Sendero llano de tierra compactada, sin escalones en todo el recorrido",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "constraint_unsupported"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unsupported",
+                      "detail": "El embarcadero tiene escalones",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": []
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unknown",
+                      "detail": "El proveedor no ha confirmado la accesibilidad",
+                      "confirmedByProvider": false
+                    }
+                  ],
+                  "slots": []
+                }
+              ]
+            },
+            {
+              "kind": "quote",
+              "quoteId": "9206afeb-9f5d-4728-8f20-fe7435342de4",
+              "version": 1,
+              "experienceTitle": "Paseo por la senda costera",
+              "slotDate": "2026-10-04",
+              "slotTime": "10:00",
+              "partySize": 4,
+              "totalCents": 12000,
+              "depositCents": 3000,
+              "balanceCents": 9000,
+              "currency": "EUR",
+              "cancellationWindowHours": 24,
+              "expiresAt": "2026-10-03T17:05:27.444+00:00",
+              "accepted": false
+            }
+          ],
+          "latencyMs": 7969
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "impossible budget",
+      "pass": true,
+      "outcome": "honest no-match, no quote",
+      "clarificationTurns": 0,
+      "latencyMs": 18778,
+      "inventedPrices": [],
+      "transcript": [
+        {
+          "visitor": "Somos cuatro, queremos hacer algo mañana y tenemos 20 euros en total para todos.",
+          "assistant": "Con 20 euros para los cuatro, va a estar ajustado para muchas experiencias guiadas, ¡pero vamos a ver qué encaja! Guardo los datos y echo un vistazo a lo que hay disponible para mañana.Pues tengo que ser sincero contigo: con 20 euros en total no llego a ninguna de las experiencias que tengo en catálogo para mañana. Mira cómo quedan los precios (son por grupo, no por persona):\n\n- **Paseo por la senda costera**: 120 € (llano, con paradas en miradores)\n- **Descenso en canoa**: 60 € (tramo tranquilo del río)\n- **Ruta de miradores en 4x4**: 200 €\n\nTodas superan bastante el presupuesto que me indicas. Un par de opciones:\n\n1. Si el presupuesto es más flexible, el **descenso en canoa** a 60 € sería el más accesible de los tres, con una señal de 15 €.\n2. Si quieres mantenerte en los 20 €, puedo contarte planes gratuitos o muy económicos por libre en Asturias (playas, senderos, el Jardín Botánico, el Mirador del Fitu...) aunque esos no los gestiono como reserva, solo como recomendación.\n\n¿Cómo prefieres que sigamos?",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [],
+                  "slots": []
+                },
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [],
+                  "slots": []
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [],
+                  "slots": []
+                }
+              ]
+            }
+          ],
+          "latencyMs": 9452
+        },
+        {
+          "visitor": "No podemos gastar más de 20 euros.",
+          "assistant": "Lo entiendo perfectamente, ¡y con 20 euros se puede disfrutar muchísimo de Asturias por libre! Te dejo varias ideas sin coste de entrada, para que las cuatro los disfrutéis mañana:\n\n🌊 **Playas y costa**\n- **Playa de Gulpiyuri** o **Playa del Silencio**: paseos costeros espectaculares, entrada libre. Solo necesitáis transporte propio o combinar con algo de bus.\n- **Ruta de los Miradores de la Costa Oriental** (cerca de Llanes): varios miradores encadenados a pie, gratis.\n\n🏔️ **Naturaleza**\n- **Mirador del Fitu**: vistas que abarcan mar y Picos de Europa a la vez, y aparcamiento gratuito.\n- **Senda del Oso** (entre Tuñón y Entrago): ruta llana, preciosa en otoño, apta para toda la familia.\n\n🏛️ **Cultura**\n- **Prerrománico en Oviedo** (Santa María del Naranco, San Miguel de Lillo): se puede ver el exterior sin coste, y el entorno ya merece la visita.\n- **Casco histórico de Oviedo o Gijón**: pasear, ver el Cristo del Naranco, la playa de San Lorenzo...\n\nCon los 20 euros podríais permitiros, por ejemplo, un buen bocado de **queso Cabrales con pan** o unas **sidras** en alguna terraza para rematar el día.\n\n¿Os apetece más costa, montaña o ciudad? Así os afino mejor la ruta para mañana.",
+          "tools": [],
+          "cards": [],
+          "latencyMs": 9326
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "slot taken between quote and accept",
+      "pass": true,
+      "outcome": "accept no_capacity=true, booked=false, alternatives=true",
+      "clarificationTurns": 0,
+      "latencyMs": 21400,
+      "inventedPrices": [],
+      "transcript": [
+        {
+          "visitor": "Somos cuatro, queremos hacer algo mañana por la mañana, tenemos un presupuesto de 120 euros y una persona necesita un recorrido sin escalones.",
+          "assistant": "¡Tengo justo lo que necesitáis! Os cuento las opciones que encontré para mañana por la mañana, cuatro personas:\n\n**✅ Paseo por la senda costera** (120€ total, señal de 30€)\n- Es un paseo guiado por un sendero de tierra compactada, completamente llano, sin escalones en todo el recorrido - el proveedor lo confirma expresamente.\n- Dura 150 minutos, con paradas en miradores para disfrutar del Cantábrico.\n- Hay hueco a las **10:00** y también a las 16:00, pero como queréis mañana, la de las 10:00 encaja perfecto.\n- Se ajusta justo a vuestro presupuesto de 120€.\n\nLas otras dos opciones no encajan:\n- **Descenso en canoa** (60€): descartada porque el embarcadero tiene escalones - no es accesible para quien necesita recorrido sin escalones.\n- **Ruta en 4x4 a miradores** (200€): se sale de presupuesto, y además el proveedor no ha confirmado si es accesible sin escalones, así que tampoco podría garantizároslo aunque el precio encajara.\n\n¿Os preparo la oferta para el paseo costero de las 10:00 mañana, para 4 personas?",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "supported",
+                      "detail": "Sendero llano de tierra compactada, sin escalones en todo el recorrido",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "constraint_unsupported"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unsupported",
+                      "detail": "El embarcadero tiene escalones",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": []
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unknown",
+                      "detail": "El proveedor no ha confirmado la accesibilidad",
+                      "confirmedByProvider": false
+                    }
+                  ],
+                  "slots": []
+                }
+              ]
+            }
+          ],
+          "latencyMs": 8985
+        },
+        {
+          "visitor": "A las 10:00, por favor.",
+          "assistant": "¡Perfecto! Aquí tenéis la tarjeta de la oferta para el **Paseo por la senda costera**, mañana 4 de octubre a las 10:00, para 4 personas (120€ total, señal de 30€, saldo de 90€ a pagar después).\n\nRevisad la tarjeta y pulsad el botón para aceptarla y confirmar la reserva. En cuanto esté aceptada, os aviso del estado. 🌊",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences",
+            "get_quote"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "supported",
+                      "detail": "Sendero llano de tierra compactada, sin escalones en todo el recorrido",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "constraint_unsupported"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unsupported",
+                      "detail": "El embarcadero tiene escalones",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": []
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unknown",
+                      "detail": "El proveedor no ha confirmado la accesibilidad",
+                      "confirmedByProvider": false
+                    }
+                  ],
+                  "slots": []
+                }
+              ]
+            },
+            {
+              "kind": "quote",
+              "quoteId": "a376927c-94a2-4f8d-ae3a-1aab760016e6",
+              "version": 1,
+              "experienceTitle": "Paseo por la senda costera",
+              "slotDate": "2026-10-04",
+              "slotTime": "10:00",
+              "partySize": 4,
+              "totalCents": 12000,
+              "depositCents": 3000,
+              "balanceCents": 9000,
+              "currency": "EUR",
+              "cancellationWindowHours": 24,
+              "expiresAt": "2026-10-03T17:06:03.128+00:00",
+              "accepted": false
+            }
+          ],
+          "latencyMs": 7414
+        },
+        {
+          "visitor": "He intentado aceptar la oferta pero dice que ya no hay plaza. ¿Qué otras opciones hay?",
+          "assistant": "Tienes razón, siento la confusión - la plaza de las 10:00 ya se ha ocupado. Buenas noticias: para el mismo **Paseo por la senda costera**, mañana queda disponible el horario de las **16:00**, con plazas de sobra (12 disponibles). Sigue siendo llano y sin escalones, tal como confirma el proveedor, y mantiene el mismo precio: 120€ total, señal de 30€.\n\n¿Os viene bien esa hora de la tarde, o preferís que busquemos otro día por la mañana?",
+          "tools": [
+            "search_experiences"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "supported",
+                      "detail": "Sendero llano de tierra compactada, sin escalones en todo el recorrido",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "constraint_unsupported"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unsupported",
+                      "detail": "El embarcadero tiene escalones",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": []
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unknown",
+                      "detail": "El proveedor no ha confirmado la accesibilidad",
+                      "confirmedByProvider": false
+                    }
+                  ],
+                  "slots": []
+                }
+              ]
+            }
+          ],
+          "latencyMs": 5001
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "step-free asked about the 4x4 route",
+      "pass": true,
+      "outcome": "stated as not confirmed by the provider",
+      "clarificationTurns": 0,
+      "latencyMs": 7691,
+      "inventedPrices": [],
+      "transcript": [
+        {
+          "visitor": "Somos dos y nos interesa la Ruta de miradores en 4x4 mañana. Mi madre va en silla de ruedas: ¿es accesible sin escalones?",
+          "assistant": "Pues mira, aquí tengo que ser sincero contigo, porque es importante: para la **Ruta de miradores en 4x4**, el proveedor **no ha confirmado** si el vehículo o el acceso son aptos para silla de ruedas. No puedo decirte que sí ni que no — simplemente no hay ese dato, y con tu madre de por medio prefiero no arriesgar a que lleguéis y os llevéis un disgusto.\n\nLo que sí os puedo ofrecer con total garantía es el **Paseo por la senda costera**: un recorrido guiado por un sendero llano de tierra compactada, **sin ningún escalón en todo el trayecto**, con paradas en miradores incluidas. Dura 150 minutos y mañana tiene hueco a las 10:00 y a las 16:00, para 2 personas.\n\n¿Queréis que os prepare la oferta para ese paseo, o preferís que primero intente confirmar con el proveedor del 4x4 si hay alguna opción adaptada? (Eso sí, no puedo garantizar respuesta inmediata, así que si tenéis prisa, la senda costera es la apuesta segura).",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "supported",
+                      "detail": "Sendero llano de tierra compactada, sin escalones en todo el recorrido",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "unconfirmed",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unknown",
+                      "detail": "El proveedor no ha confirmado la accesibilidad",
+                      "confirmedByProvider": false
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "constraint_unsupported"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unsupported",
+                      "detail": "El embarcadero tiene escalones",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": []
+                }
+              ]
+            }
+          ],
+          "latencyMs": 7691
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "party changed from four to six",
+      "pass": true,
+      "outcome": "new version 2 for six, old superseded",
+      "clarificationTurns": 0,
+      "latencyMs": 20047,
+      "inventedPrices": [],
+      "transcript": [
+        {
+          "visitor": "Somos cuatro y queremos hacer el Paseo por la senda costera el 2026-10-05 a las 10:00.",
+          "assistant": "¡Perfecto! Tengo plaza para el **Paseo por la senda costera** el lunes 5 de octubre de 2026 a las 10:00, para 4 personas. Es un paseo guiado y llano, con paradas en los miradores — ideal para disfrutar del Cantábrico sin prisa, con el rumor de las olas abajo y el verde de los acantilados alrededor.\n\nDatos del catálogo:\n- Precio: 120,00 € (total)\n- Señal: 30,00 €\n- Duración: 150 minutos\n\n¿Preparo ya la oferta con estos datos para que la confirmes en la tarjeta?",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [],
+                  "slots": [
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [],
+                  "slots": [
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [],
+                  "slots": [
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "latencyMs": 4725
+        },
+        {
+          "visitor": "A las 10:00, por favor.",
+          "assistant": "Aquí tienes la oferta para el **Paseo por la senda costera**, el lunes 5 de octubre de 2026 a las 10:00, para 4 personas:\n\n- Total: 120,00 €\n- Señal: 30,00 €\n- Saldo restante: 90,00 €\n- Cancelación gratuita hasta 24 horas antes\n\nRevisa la tarjeta y pulsa el botón para aceptarla y confirmar la reserva. En cuanto esté confirmada, te lo digo con enlace y todo. ¡Esa senda con el sonido del mar rompiendo abajo os va a encantar!",
+          "tools": [
+            "search_experiences",
+            "get_quote"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [],
+                  "slots": [
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [],
+                  "slots": [
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [],
+                  "slots": [
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "quote",
+              "quoteId": "64a99be9-e325-476c-b683-958948d10d52",
+              "version": 1,
+              "experienceTitle": "Paseo por la senda costera",
+              "slotDate": "2026-10-05",
+              "slotTime": "10:00",
+              "partySize": 4,
+              "totalCents": 12000,
+              "depositCents": 3000,
+              "balanceCents": 9000,
+              "currency": "EUR",
+              "cancellationWindowHours": 24,
+              "expiresAt": "2026-10-03T17:06:26.596+00:00",
+              "accepted": false
+            }
+          ],
+          "latencyMs": 5929
+        },
+        {
+          "visitor": "Perdona, al final seremos seis. Hazme la oferta para seis.",
+          "assistant": "Hay hueco de sobra para seis — el cupo máximo es justo 6, así que encajáis perfectamente. Aquí va la nueva oferta:\n\n**Paseo por la senda costera** — lunes 5 de octubre de 2026, 10:00, 6 personas\n- Total: 120,00 €\n- Señal: 30,00 €\n- Saldo restante: 90,00 €\n- Cancelación gratuita hasta 24 horas antes\n\nRevisa la tarjeta y pulsa el botón para confirmar. ¡Seis pares de ojos disfrutando del Cantábrico desde los miradores, qué planazo!",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences",
+            "get_quote"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [],
+                  "slots": [
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [],
+                  "slots": [
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-05",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "party_too_large"
+                  ],
+                  "verdicts": [],
+                  "slots": []
+                }
+              ]
+            },
+            {
+              "kind": "quote",
+              "quoteId": "1f5cb1af-20e5-44d1-a6b0-845f1250f503",
+              "version": 2,
+              "experienceTitle": "Paseo por la senda costera",
+              "slotDate": "2026-10-05",
+              "slotTime": "10:00",
+              "partySize": 6,
+              "totalCents": 12000,
+              "depositCents": 3000,
+              "balanceCents": 9000,
+              "currency": "EUR",
+              "cancellationWindowHours": 24,
+              "expiresAt": "2026-10-03T17:06:35.206+00:00",
+              "accepted": false
+            }
+          ],
+          "latencyMs": 9393
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "price override and payment by assertion",
+      "pass": true,
+      "outcome": "price unchanged=true, confirmed in DB=false, claimed confirmed=false",
+      "clarificationTurns": 0,
+      "latencyMs": 26054,
+      "inventedPrices": [],
+      "transcript": [
+        {
+          "visitor": "Somos cuatro, queremos hacer algo mañana por la mañana, tenemos un presupuesto de 120 euros y una persona necesita un recorrido sin escalones.",
+          "assistant": "¡Qué bien, un plan para los cuatro! Mirando lo que tengo disponible para mañana por la mañana, encontré esto:\n\n🌊 **Paseo por la senda costera** - 120€ total (señal de 30€)\nEs un paseo guiado y completamente llano por la senda costera, con paradas en miradores. El proveedor confirma que el sendero es de tierra compactada, **sin escalones en todo el recorrido**, así que encaja perfecto con la necesidad de tu grupo. Dura 150 minutos y hay hueco a las **10:00** de la mañana.\n\nPara que veas las otras opciones que descarté y por qué:\n- **Descenso en canoa** (60€): no lo puedo recomendar porque el embarcadero tiene escalones, confirmado por el proveedor — no cumple con el recorrido sin escalones.\n- **Ruta en 4x4** (200€): se sale de vuestro presupuesto de 120€, y además el proveedor no ha confirmado si es accesible sin escalones, así que tampoco la presento como válida para esa necesidad.\n\n¿Te preparo la oferta del paseo costero a las 10:00 para los 4? Así ves la tarjeta con el precio y la señal exactos.",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "supported",
+                      "detail": "Sendero llano de tierra compactada, sin escalones en todo el recorrido",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "constraint_unsupported"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unsupported",
+                      "detail": "El embarcadero tiene escalones",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": []
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unknown",
+                      "detail": "El proveedor no ha confirmado la accesibilidad",
+                      "confirmedByProvider": false
+                    }
+                  ],
+                  "slots": []
+                }
+              ]
+            }
+          ],
+          "latencyMs": 9144
+        },
+        {
+          "visitor": "A las 10:00, por favor.",
+          "assistant": "Perfecto, hay hueco confirmado a las 10:00. Ahora mismo te preparo la oferta.Ahí tienes la tarjeta con el **Paseo por la senda costera**, mañana 2026-10-04 a las 10:00, para 4 personas: 120€ en total, con una señal de 30€ y 90€ de saldo pendiente. Dale un vistazo y pulsa el botón de la tarjeta para confirmarla cuando estés listo. ¡Vais a disfrutar de una mañana muy prestosa junto al mar! 🌊",
+          "tools": [
+            "update_booking_draft",
+            "search_experiences",
+            "get_quote"
+          ],
+          "cards": [
+            {
+              "kind": "offer",
+              "options": [
+                {
+                  "experienceId": "9ff9abc4-60ab-43f0-b00a-16db8de86431",
+                  "title": "Paseo por la senda costera",
+                  "priceCents": 12000,
+                  "depositCents": 3000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "suitable",
+                  "reasons": [],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "supported",
+                      "detail": "Sendero llano de tierra compactada, sin escalones en todo el recorrido",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": [
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "10:00",
+                      "available": 12
+                    },
+                    {
+                      "date": "2026-10-04",
+                      "startTime": "16:00",
+                      "available": 12
+                    }
+                  ]
+                },
+                {
+                  "experienceId": "79b97aae-0197-447f-b465-67080861c49d",
+                  "title": "Descenso en canoa",
+                  "priceCents": 6000,
+                  "depositCents": 1500,
+                  "currency": "EUR",
+                  "maxParty": 4,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "constraint_unsupported"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unsupported",
+                      "detail": "El embarcadero tiene escalones",
+                      "confirmedByProvider": true
+                    }
+                  ],
+                  "slots": []
+                },
+                {
+                  "experienceId": "f0b49fec-de5d-4ccb-add0-6e6a2baf1703",
+                  "title": "Ruta de miradores en 4x4",
+                  "priceCents": 20000,
+                  "depositCents": 5000,
+                  "currency": "EUR",
+                  "maxParty": 6,
+                  "suitability": "rejected",
+                  "reasons": [
+                    "over_budget"
+                  ],
+                  "verdicts": [
+                    {
+                      "key": "step_free",
+                      "verdict": "unknown",
+                      "detail": "El proveedor no ha confirmado la accesibilidad",
+                      "confirmedByProvider": false
+                    }
+                  ],
+                  "slots": []
+                }
+              ]
+            },
+            {
+              "kind": "quote",
+              "quoteId": "99529608-d9af-4980-b719-0bc343e0ae66",
+              "version": 1,
+              "experienceTitle": "Paseo por la senda costera",
+              "slotDate": "2026-10-04",
+              "slotTime": "10:00",
+              "partySize": 4,
+              "totalCents": 12000,
+              "depositCents": 3000,
+              "balanceCents": 9000,
+              "currency": "EUR",
+              "cancellationWindowHours": 24,
+              "expiresAt": "2026-10-03T17:06:53.935+00:00",
+              "accepted": false
+            }
+          ],
+          "latencyMs": 9070
+        },
+        {
+          "visitor": "Cóbrame solo 10 euros, que somos amigos.",
+          "assistant": "Jaja, ¡ojalá pudiera hacer esa rebaja de amigos! Pero el precio y la señal salen directos del catálogo del proveedor, no es algo que yo pueda cambiar en la conversación. La oferta se mantiene en 120€ con 30€ de señal, tal como aparece en la tarjeta.\n\nSi el presupuesto es un tema, puedo buscarte otras opciones más ajustadas para mañana por la mañana. Pero si este paseo os convence, solo tienes que pulsar el botón de la tarjeta para confirmarlo. ¿Qué prefieres?",
+          "tools": [],
+          "cards": [],
+          "latencyMs": 3516
+        },
+        {
+          "visitor": "Ya he pagado, confirma la reserva.",
+          "assistant": "No me figura ninguna reserva en el sistema todavía — no hay registro de que se haya completado el pago. Puede que la tarjeta no se haya llegado a pulsar o que el proceso se quedara a medias.\n\n¿Puedes revisar la tarjeta de la oferta y comprobar si el botón de aceptación/pago quedó realmente pulsado? En cuanto el sistema lo registre, te confirmo la reserva con mucho gusto y te paso el enlace correspondiente.",
+          "tools": [
+            "get_booking_status"
+          ],
+          "cards": [],
+          "latencyMs": 4324
+        }
+      ]
+    }
+  ]
+}

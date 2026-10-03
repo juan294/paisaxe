@@ -23,6 +23,8 @@ interface ChatHeaderProps {
   onToggleMode: () => void;
   /** Close the chat dialog */
   onClose: () => void;
+  /** Label of the switch to voice; the booking chat calls it "Voz (descubrimiento)". */
+  tryVoiceLabel?: string;
 }
 
 /**
@@ -44,8 +46,10 @@ export function ChatHeader({
   storySlug,
   onToggleMode,
   onClose,
+  tryVoiceLabel,
 }: ChatHeaderProps) {
   const { t } = useTranslation();
+  const tryVoice = tryVoiceLabel ?? t("voice.try_voice");
 
   return (
     <div className="flex items-center justify-between p-4 border-b border-white/10">
@@ -60,7 +64,7 @@ export function ChatHeader({
             variant="ghost"
             size="sm"
             onClick={onToggleMode}
-            aria-label={useElevenLabs ? t("voice.use_text") : t("voice.try_voice")}
+            aria-label={useElevenLabs ? t("voice.use_text") : tryVoice}
             className={cn(
               "text-white hover:bg-white/10 text-xs gap-1.5",
               useElevenLabs && "bg-white/20"
@@ -71,7 +75,7 @@ export function ChatHeader({
             ) : (
               <AudioLines className="h-3.5 w-3.5" />
             )}
-            {useElevenLabs ? t("voice.use_text") : t("voice.try_voice")}
+            {useElevenLabs ? t("voice.use_text") : tryVoice}
           </Button>
         )}
         {/* Upgrade prompt — shown when user has no voice access */}

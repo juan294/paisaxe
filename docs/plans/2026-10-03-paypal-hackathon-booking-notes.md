@@ -216,6 +216,101 @@ Four cleanup reviews (reuse, simplification, efficiency, altitude) after the rev
   - **Dropping `redemptionId` from the redeem result (simplification).** The live tests read it.
   - **Running the flag and `getUser` in parallel in the gate (efficiency).** It would spend an Auth call while the surface is closed.
 
+### Phase 3
+
+1. **The tool loop's total cap is 85 s, not 110 s.**
+   - Plan said: idle 30 s, total cap 110 s, route `maxDuration` 120 s.
+   - Found: rate limit (3 s), embedding (12 s) and search (5 s) run before the loop, so 110 s would overrun the 120 s function limit.
+   - Chose: `BOOKING_CHAT_TOTAL_CAP_MS = 85_000`; idle 30 s, reset on every event, tool events included. The client abort stays at 120 s.
+2. **The agent instantiates the Anthropic SDK itself; tool JSON schemas are derived with `z.toJSONSchema`.**
+   - Plan said: forced SDK transport; hand-written JSON schemas matching the zod ones.
+   - Found: `src/lib/claude.ts` messages are `{role, content: string}` and both transports yield text only, so they cannot carry `tool_use` or `tool_result`.
+   - Chose: `src/lib/booking/agent.ts` calls `messages.stream` with tools (injected client for tests). zod 4's `toJSONSchema` produces the schemas, so they cannot drift from the validation.
+3. **The booking rules sit in the cached system block.**
+   - Plan said: cached persona block plus an unmarked block holding the booking instructions, the draft, the bookings and the retrieved context.
+   - Chose: persona and `buildBookingInstructions()` (both stable) form the cached block. Today's date, draft, bookings, the accept event and guide context form the unmarked block (`.claude/rules/prompt-caching.md`: stable content cached, volatile content after it). The cache rule's builder table gains the `booking_chat` row.
+4. **Retrieval is optional and non-fatal.** Guide context goes in the unmarked system block. A retrieval failure only drops it (`[BOOKING_CHAT_RETRIEVAL_SKIPPED]`), and the event turn does no retrieval. `buildContextText` is exported from `src/lib/claude.ts` for reuse.
+5. **History validation.**
+   - Plan said: "sanitized like `agentChatRequestSchema`".
+   - Found: that schema does not sanitize.
+   - Chose: at most 10 items of at most 2,000 characters, each passed through `chat-safety` `sanitizeInput`. The injection check covers the message and every user item in the history. The client truncates items to 2,000 characters.
+6. **The post-accept turn has an empty message.** The schema allows an empty message only with an `event`; the model receives "He aceptado la oferta." as the visitor's words, and the verified event line goes in the state block.
+7. **The discovery hook needed a fix.**
+   - Plan said: existing consumers ignore the new SSE events (`use-stream-chat.ts:236-239`).
+   - Found: once `parseSseEvent` accepts `tool` and `card`, the hook's final unconditional `else` would have turned them into an error message.
+   - Chose: `else if (event.type === "error")`, with a regression test. The discovery route and its 42 tests are untouched.
+8. **`VoiceChat` runs both chat hooks and uses one** (rules of hooks), with the booking hook whenever `useBookingAccess().active`. `?booking=1` opens the chat in booking mode even without a `story` parameter (the deep-link effect returned early without one). `ChatHeader` gains `tryVoiceLabel` for "Voz (descubrimiento)".
+9. **One response's tool calls run sequentially.** This closes the Phase 1 simplify entry condition: two `get_quote` calls on one draft never race, so no `create_quote` RPC is needed.
+10. **The booking link has a placeholder, and capability Referrer-Policy moved forward from Phase 4.**
+    - `GET /booking/<capability>` returns the booking JSON (404 for an invalid capability or on a Preview), as phase-3.md allows.
+    - Found on the dev server: `next.config.ts`'s site-wide `Referrer-Policy` overrides a route's header. Added `/booking/:path*` and `/operator/:path*` entries with `no-referrer` after the site-wide one, tested through `nextConfig.headers()`. Verified on `next dev`: `no-referrer`, `private, no-store`, `noindex`.
+    - **Phase 4:** replace the placeholder route with the page (a `route.ts` and a `page.tsx` cannot share the segment).
+11. **`BOOKING_LINK_SECRET` is registered in `.env.example` now** (planned for Phase 6), because the evaluation script sets it and `check-env` scans scripts.
+12. **The post-accept instruction says payment is not yet available.**
+    - Found on the dev server: the model told the visitor the payment link was in the card, but no payment link exists before Phase 4.
+    - Chose: the state line says the payment is not available yet and forbids mentioning a payment link (with a test). **Phase 4 replaces that sentence when `create_payment_order` exists.**
+13. **`scripts/tsconfig.json` includes `src/instrumentation.ts`,** which declares the console global that `src/lib/logger.ts` reads; the evaluation script pulls the logger into the scripts typecheck.
+14. **The accept route spends a booking attempt before `accept_quote`,** so an idempotent retry of the same accept also spends one (limit 10). Accepted.
+15. **The model evaluation runs the agent loop in-process,** not through the HTTP route: the route is covered by the dev-server run below, and in-process runs give exact tool and database outcomes. It reads only `ANTHROPIC_API_KEY` from the main checkout's `.env.local`; every database call goes to local Docker.
+
+16. **Payment card after accept is deferred to Phase 4.**
+    - Plan said: `use-booking-chat.test.ts`: "accepting a quote triggers the event turn and yields a payment card".
+    - Chose: the event turn is tested (no typed text, `quote_accepted` sent, assistant answers). The payment card needs Phase 4's `create_payment_order` and is asserted there.
+
+### Phase 3 review dispositions
+
+Independent review of 2026-10-03 (fresh context; it ran 35 files and 748 tests, with the live suites up). No blocker findings.
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| 1 | (major, observability) A client disconnect was logged as `[BOOKING_CHAT_FAILED]`: the SDK's abort error is not named `AbortError`, and `send` or `close` could throw on a cancelled stream | **Fixed:** the stream ends exactly once through `send`/`end` guards. The client-abort branch tests `turnAbort.signal.aborted`. A timeout reports and closes immediately instead of waiting for the model stream to notice the abort. New route tests cover the client abort, the idle limit and the total cap; the client-abort test was red before the fix |
+| 2 | An ignored event with an empty message still spent a turn and called the model with no user message | **Fixed:** the event is verified before metering; an ignored event with no text returns `done` without spending a turn; test |
+| 3 | Text of consecutive iterations ran together | **Fixed:** a later iteration's first text delta starts with a paragraph break; test |
+| 4 | The injection check skipped assistant history items | **Fixed:** every history item is checked; test |
+| 5 | Concurrent turns: a second turn, an accept or a re-quote could start mid-stream | **Fixed:** the hook runs one turn at a time (a second turn or accept mid-stream is ignored; test), and the cards disable accept and re-quote while a turn streams; test |
+| 6 | The persona's `[[VOICE_UPSELL…]]` rule was inherited and the markers would not be stripped | **Fixed:** the booking rules override it explicitly; test. None appeared in the six evaluated runs |
+| 7 | The manual dev-server evidence was not recorded | **Fixed:** see "Phase 3 manual evidence" below |
+| 8 | a11y: status line mounted only with text; focus lost after accept; lapsed message not announced | **Fixed in part:** the status region stays mounted, and the lapsed message is in a polite live region. Focus after the accept card swap is left to Phase 5's UI pass |
+| 9 | The booking link left the chat | **Fixed:** opens in a new tab with `noopener noreferrer`; test |
+| 10 | Unused fields (`QuoteCard.accepted`, `ToolContext.redemptionId`, `locale`), Spanish-only cap message | **Fixed in part:** `locale` now reaches the state block ("Idioma de la interfaz del visitante"; test). `accepted` and `redemptionId` are kept because phase-3.md specifies them (the card field and the tool context). The cap message stays Spanish (the plan's text; the model answers in the visitor's language otherwise) |
+| 11 | No cache breakpoint on messages | **Deferred:** an optional cost improvement; revisit if usage shows long multi-iteration turns |
+| 12 | `booking-eval.ts` hard-codes `~/code/paisaxe/.env.local` | **Kept:** a local owner tool; the path is the main checkout's documented location |
+
+### Phase 3 manual evidence (2026-10-03)
+
+- **Model evaluation:** `npm run eval:booking` on local Docker, before the post-accept and review fixes: **6/6 passed**, recorded in `docs/hackathon/evaluation/2026-10-03.json`.
+  - Scenario 1 needed one clarification and no invented prices. Latencies: 7.7 to 26 s per scenario.
+  - The transcripts of scenarios 2, 4 and 6 were read to confirm the outcome classes (honest no-match; "no ha confirmado" for the 4x4 route; price kept and `get_booking_status` checked before refusing to confirm).
+  - Later changes (paragraph break, override line, locale line, post-accept line) do not change the evaluated outcome classes. A re-run on the Phase 6 candidate is already planned.
+- **Dev-server transport check (plan, Phase 0 deviation 3).**
+  - Setup: `next dev` (Turbopack) on port 3006, run from the worktree, which has no `.env.local`. Only the local Supabase variables, a local link secret and `ANTHROPIC_API_KEY` were passed.
+  - Over HTTP: an anonymous guest, voucher redemption (200), the representative request, then "A las 10:00", then the quote accepted through the route, then the `quote_accepted` turn.
+  - All turns streamed tool calls through the SDK (`update_booking_draft`, `search_experiences`, `get_quote`, `get_booking_status`). **ECONNRESET: 0**, and no curl fallback.
+  - Booking `RS-78EC78`, `pending_payment`, deposit 30 / balance 90. The `/booking/<capability>` link returned 200 with the booking JSON; a tampered token returned 404. Headers on the real response: `Referrer-Policy: no-referrer`, `Cache-Control: private, no-store`, `X-Robots-Tag: noindex`.
+  - Usage rows: 41 `booking_chat` rows in local Docker's `anthropic_usage` from the evaluation and dev runs (local query); nothing pointed at the production database.
+  - Retrieval was skipped (no Voyage key passed), as designed.
+
+### Phase 3 simplify pass
+
+- **Applied:**
+  - Capability headers have one home: `next.config.ts` entries for `/booking/:path*` and `/operator/:path*` set `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex` for pages and handlers alike (tested through `nextConfig.headers()`). Cache-Control stays per route.
+  - A tripwire test fails if `create_payment_order` is registered while the post-accept line still says payment is unavailable. Another checks that every tool the booking rules name is registered.
+  - The route has one `stop(code)` and no separate timeout flag. The agent's yield-tracking callback is replaced by a wrapper.
+  - The accept route reuses the tools' `bookingCard`. The tool registry is private.
+  - The booking hook batches text tokens per animation frame, like `useStreamChat` (PE-M4); test.
+  - Each tool logs `[BOOKING_TOOL_TIMING]`.
+  - The evaluation script uses `madridDate` and no duplicate cleanup.
+- **Skipped:**
+  - **Shared SSE response helpers:** the discovery route stays untouched by design.
+  - **Holding quote state on the card instead of a `quoteStates` map:** medium churn for no behaviour change.
+  - **One `sendMessage` signature across both hooks:** a small wrapper in `VoiceChat` is clearer.
+  - **Removing the payment and cancellation card types:** Phases 4 and 5 need them; they are types and small views.
+  - **Merging the two `next.config` entries into one pattern:** the explicit pair reads better.
+  - **A cache breakpoint on messages:** deferred (review 11).
+  - **Skipping retrieval for booking-only messages:** the plan keeps optional retrieval. Revisit with the timing logs.
+  - **Unifying the two booking-mode predicates in `VoiceChat`:** the plan defines the booking hook by voucher access and voice suppression by the `?booking=1` entry; kept as specified.
+  - **The search tool's availability RPC count:** `[BOOKING_TOOL_TIMING]` now records it. Decide on a range RPC in Phase 6 from the timing logs of the evaluation re-run.
+
 ## Owner decisions after Phase 0
 
 Recorded 2026-10-03, when the owner accepted Phase 0.

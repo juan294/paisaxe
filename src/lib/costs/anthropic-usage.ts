@@ -29,6 +29,7 @@ export type UsageSource =
   | "chat_stream"
   | "translate"
   | "content_discovery"
+  | "booking_chat"
   | `marketing_${string}`;
 
 export interface RecordUsageOptions {

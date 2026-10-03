@@ -10,6 +10,6 @@ import type { Locale } from "@/lib/i18n";
 export const LOCALE_COVERAGE: Partial<Record<Locale, number>> = {
   "fr": 99,
   "de": 99,
-  "pt": 89,
+  "pt": 88,
   "ast": 81
 };
