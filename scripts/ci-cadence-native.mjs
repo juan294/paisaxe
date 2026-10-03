@@ -48,7 +48,12 @@ export async function classifyNativeEvent({ root, event, eventName, actor, mode,
       if (!record(pr) || !positive(event.number) || pr.number !== event.number || !repository(pr.base?.repo) || !['develop', 'main'].includes(pr.base?.ref) || pr.base.sha !== trustedRevision || !sha(pr.head?.sha) || !account(pr.user) || !record(pr.head.repo) || !positive(pr.head.repo.id) || typeof pr.head.repo.full_name !== 'string' || (pr.head.repo.full_name === REPOSITORY && !repository(pr.head.repo)) || context.ref !== `refs/pull/${event.number}/merge`) return blocked('native PR candidate/base identity mismatch');
       branch = pr.base.ref; sourceSha = pr.head.sha; author = pr.user;
       testedCheckoutSha = context.sha;
-      if (oid('rev-parse', '--verify', 'HEAD') !== testedCheckoutSha || oid('rev-parse', '--verify', `refs/remotes/origin/${branch}`) !== trustedRevision || oid('rev-list', '--parents', '-n', '1', testedCheckoutSha) !== `${testedCheckoutSha} ${trustedRevision} ${sourceSha}`) return blocked('native PR physical merge/base/checkout mismatch');
+      if (oid('rev-parse', '--verify', 'HEAD') !== testedCheckoutSha || oid('rev-parse', '--verify', `refs/remotes/origin/${branch}`) !== trustedRevision) return blocked('native PR physical merge/base/checkout mismatch');
+      // The merge ref is built on the current base tip; the event's base.sha may lag
+      // it. The first parent must be base.sha or descend from it.
+      const parents = oid('rev-list', '--parents', '-n', '1', testedCheckoutSha).split(' ');
+      if (parents.length !== 3 || parents[0] !== testedCheckoutSha || parents[2] !== sourceSha || !sha(parents[1])) return blocked('native PR physical merge/base/checkout mismatch');
+      if (parents[1] !== trustedRevision) git('merge-base', '--is-ancestor', trustedRevision, parents[1]);
       normalized = { kind: eventName, repository: REPOSITORY, actor, author: author.login, headRepository: pr.head.repo.full_name, headSha: sourceSha, baseSha: trustedRevision, baseBranch: branch };
     } else if (eventName === 'push') {
       if (!['refs/heads/develop', 'refs/heads/main'].includes(event.ref) || event.before !== trustedRevision || !sha(event.after) || event.deleted !== false || context.ref !== event.ref || context.sha !== event.after) return blocked('native push ref/before/after context mismatch');

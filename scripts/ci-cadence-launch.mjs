@@ -28,7 +28,7 @@ const PINS = {
   "tests/fixtures/ci-cadence/jobs.json": "08af6060b239cac912889fffc6a5337795593e83381ed1f47e6d902bc0b9cd59",
   "tests/fixtures/ci-cadence/policy.json": "7f290ed3791c910948e489e297e4df1bf87b57ac8e4dc4e071b0fe44f9661e76",
   "tests/fixtures/ci-cadence/contract.json": "dc4d409ef86f17cd212e9d9b9de554dd324bafffebe4762af09929b3832feb16",
-  "scripts/ci-cadence-native.mjs": "3d570d2624d653496c38c0430ea3d6b20bb8507e383f1cad9233def089ce44a5",
+  "scripts/ci-cadence-native.mjs": "a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d",
   "scripts/ci-fast.mjs": "310c126bc7feca8b4a138c730056b0cdef9c98420892aac850361a4c7eedf853",
   "scripts/ci-cadence-scanner.mjs": "6cf7da7f0c59020aaeed179131051fff931e2ff4ce1f8264a990a15916719e6b"
 };
@@ -71,7 +71,7 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     if (typeof input.token !== 'string' || !input.token.trim() || /[\r\n]/.test(input.token) || !record(event) || !record(context) || context.repository !== 'juan294/paisaxe' || context.repositoryId !== 1141286326 || context.ownerId !== 3944118 || !sha(context.sha)) throw Error('native context');
     if (!scheduled && (!repository(event.repository) || !account(event.sender) || actor !== event.sender.login || context.actorId !== event.sender.id || context.actorType !== event.sender.type)) throw Error('native context');
     if (!canonicalOrigin(run(['remote', 'get-url', 'origin'], root).trim()) || run(['rev-parse', '--verify', 'HEAD'], root).trim() !== context.sha || run(['rev-parse', '--is-shallow-repository'], root).trim() !== 'false') throw Error('physical original checkout');
-    let definition; let branch; let source; let checkout = context.sha; let author = event.sender;
+    let definition; let branch; let source; let checkout = context.sha; let author = event.sender; let mergeBase;
     if (eventName === 'push') {
       if (!['refs/heads/develop', 'refs/heads/main'].includes(event.ref) || context.ref !== event.ref || event.deleted !== false || event.after !== context.sha || !sha(event.before)) throw Error('push binding');
       definition = event.before; branch = event.ref.slice(11); source = event.after;
@@ -80,7 +80,14 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
       const p = event.pull_request;
       if (!record(p) || !Number.isSafeInteger(event.number) || event.number < 1 || p.number !== event.number || context.ref !== `refs/pull/${event.number}/merge` || !repository(p.base?.repo) || !['develop', 'main'].includes(p.base?.ref) || !sha(p.base.sha) || !sha(p.head?.sha) || !account(p.user) || !record(p.head.repo) || !Number.isSafeInteger(p.head.repo.id) || p.head.repo.id < 1 || typeof p.head.repo.full_name !== 'string' || (p.head.repo.full_name === 'juan294/paisaxe' && !repository(p.head.repo))) throw Error('PR binding');
       definition = p.base.sha; source = p.head.sha; branch = p.base.ref; author = p.user;
-      if (run(['rev-list', '--parents', '-n', '1', checkout], root).trim() !== `${checkout} ${definition} ${source}`) throw Error('physical PR parents');
+      // GitHub builds refs/pull/N/merge on the CURRENT base tip, while the payload's
+      // base.sha can be older. The merge's first parent must be base.sha or descend
+      // from it; that it lies on the base branch is authenticated below. base.sha
+      // stays the protected definition: the conservative, event-named commit.
+      const parents = run(['rev-list', '--parents', '-n', '1', checkout], root).trim().split(' ');
+      if (parents.length !== 3 || parents[0] !== checkout || parents[2] !== source || !sha(parents[1])) throw Error('physical PR parents');
+      mergeBase = parents[1];
+      if (mergeBase !== definition) run(['merge-base', '--is-ancestor', definition, mergeBase], root);
     } else if (eventName === 'schedule') {
       if (context.ref !== 'refs/heads/main' || typeof event.schedule !== 'string' || !event.schedule) throw Error('schedule binding');
       definition = context.sha; branch = 'main';
@@ -89,9 +96,9 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     const nativeRef = await get(`/git/ref/heads/${branch}`);
     if (nativeRef.ref !== `refs/heads/${branch}` || nativeRef.object?.type !== 'commit' || !sha(nativeRef.object.sha)) throw Error('authenticated native ref');
     if (eventName === 'pull_request') {
-      // base.sha legitimately lags when the base branch moves after the PR's last
-      // sync. It must still be the branch tip or one of its ancestors.
-      if (nativeRef.object.sha !== definition) { const compared = await get(`/compare/${definition}...${nativeRef.object.sha}`); if (compared.status !== 'ahead' || compared.merge_base_commit?.sha !== definition || compared.base_commit?.sha !== definition) throw Error('authenticated native ref'); }
+      // The merge's first parent (base.sha or its descendant) must be the branch
+      // tip or one of its ancestors, so base.sha is on the branch as well.
+      if (nativeRef.object.sha !== mergeBase) { const compared = await get(`/compare/${mergeBase}...${nativeRef.object.sha}`); if (compared.status !== 'ahead' || compared.merge_base_commit?.sha !== mergeBase || compared.base_commit?.sha !== mergeBase) throw Error('authenticated native ref'); }
     } else if (nativeRef.object.sha !== (eventName === 'push' ? source : definition)) throw Error('authenticated native ref');
     const commit = await get(`/git/commits/${definition}`); if (commit.sha !== definition) throw Error('authenticated definition commit');
     temporary = await realpath(await mkdtemp(join(tmpdir(), 'paisaxe-launch-')));
@@ -99,7 +106,17 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     const acquire = async (id, ref) => {
       if (!sha(id) || !/^refs\/(?:ci-cadence\/(?:protected|candidate)\/[a-f0-9]{40}|remotes\/origin\/(?:main|develop))$/.test(ref)) throw Error('acquisition ref');
       const env = { ...environment(), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: gitAuthorization(input.token), GIT_ASKPASS: '/usr/bin/false', SSH_ASKPASS: '/usr/bin/false' };
-      if (gitTransport) { let timer; try { await Promise.race([gitTransport({ root: work, url: ORIGIN, sha: id, ref, env, timeout: acquisitionRemaining(10000), run }), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Git transport deadline')), acquisitionRemaining(10000)); })]); } finally { clearTimeout(timer); } }
+      // Push and pull request: the fetch-depth 0 checkout already holds both the
+      // protected base and the candidate, so they are shared through alternates
+      // with no network. Only the nightly's develop head can be absent from its
+      // main checkout; that one fetch stays, authenticated.
+      let local = false; try { run(['cat-file', '-e', `${id}^{commit}`], root); local = true; } catch { if (eventName !== 'schedule') throw Error('object absent from full-history checkout'); }
+      if (local && !gitTransport) {
+        const objects = run(['rev-parse', '--path-format=absolute', '--git-path', 'objects'], root).trim(); if (!objects.startsWith('/') || /[\r\n]/.test(objects)) throw Error('checkout object path');
+        await mkdir(join(work, '.git/objects/info'), { recursive: true }); await writeFile(join(work, '.git/objects/info/alternates'), objects + '\n', { mode: 0o600 });
+        run(['update-ref', ref, id], work);
+      }
+      else if (gitTransport) { let timer; try { await Promise.race([gitTransport({ root: work, url: ORIGIN, sha: id, ref, env, timeout: acquisitionRemaining(10000), run }), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Git transport deadline')), acquisitionRemaining(10000)); })]); } finally { clearTimeout(timer); } }
       else run(['-c', 'protocol.file.allow=never', '-c', 'protocol.ssh.allow=never', '-c', 'http.followRedirects=false', '-c', 'http.sslVerify=true', '-c', 'credential.helper=', '-c', 'core.askPass=/usr/bin/false', 'fetch', '--no-tags', '--no-recurse-submodules', '--force', ORIGIN, `${id}:${ref}`], work, { env, timeout: acquisitionRemaining(10000) });
       acquisitionRemaining(10000);
       if (run(['rev-parse', '--verify', `${ref}^{commit}`], work).trim() !== id || run(['cat-file', '-t', id], work).trim() !== 'commit' || run(['remote', 'get-url', 'origin'], work).trim() !== ORIGIN) throw Error('fetched immutable ref');

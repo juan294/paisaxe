@@ -12,7 +12,7 @@ const PINS = {
   "scripts/ci-cadence-github.mjs": "b58ff93639ffeaa15b7e63b9fb71069b1600731a588b5e37632361576d4730f4",
   "scripts/ci-cadence-producer.mjs": "7b21806e84b690deb6ca889d79f60c0fefae1f1ca53a8b6073022970932a0f3e",
   "scripts/ci-cadence-coverage.mjs": "f5a6fa57a388781c7d3714021f2196b83f1b54e59b611327956aa17e1b02bddf",
-  "scripts/ci-cadence-native.mjs": "3d570d2624d653496c38c0430ea3d6b20bb8507e383f1cad9233def089ce44a5",
+  "scripts/ci-cadence-native.mjs": "a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d",
   "scripts/ci-cadence.mjs": "9f2da9ab55525a3ca4acc311feaf5426fc86d83258c5dda7754dc05405c9a7ab"
 };
 // Git over HTTPS takes the token exactly as actions/checkout sends it: basic x-access-token, never bearer.

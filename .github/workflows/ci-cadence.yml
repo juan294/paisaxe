@@ -68,7 +68,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           printf '%s  %s
-          ' '8f0a013e2db6b22c56ee0db22fc725d092ee1ee784a903b37143f1bb7b6e8528' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          ' 'fbeabccdfc0660178ca763c0169d97bf748895839003d39203ad4bad3248ee5c' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
           node "$private/ci-cadence-control-launch.mjs" admit
       - name: Upload Cadence admission
         if: steps.admit.outputs.decision == 'full'
@@ -209,7 +209,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           printf '%s  %s
-          ' '8f0a013e2db6b22c56ee0db22fc725d092ee1ee784a903b37143f1bb7b6e8528' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          ' 'fbeabccdfc0660178ca763c0169d97bf748895839003d39203ad4bad3248ee5c' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
           node "$private/ci-cadence-control-launch.mjs" measure
       - name: Upload Cadence measurement
         uses: actions/upload-artifact@v7
@@ -277,7 +277,7 @@ jobs:
       - name: Acquire reviewed protected launcher
         id: entry
         env:
-          LAUNCHER_SHA256: c92bdd8351998a93a50f1792e2992f922f60a37efd6dafdb8a4bb969130d77aa
+          LAUNCHER_SHA256: 09dc2177167db556792c854b8164f1a7a59b8e4ca228de0d436a571c217b09ce
           GITHUB_TOKEN: ${{ github.token }}
           CI_CADENCE_MODE: lean
           ROUTING_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}

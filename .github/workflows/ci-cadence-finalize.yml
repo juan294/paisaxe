@@ -51,5 +51,5 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           printf '%s  %s
-          ' '8f0a013e2db6b22c56ee0db22fc725d092ee1ee784a903b37143f1bb7b6e8528' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          ' 'fbeabccdfc0660178ca763c0169d97bf748895839003d39203ad4bad3248ee5c' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
           node "$private/ci-cadence-control-launch.mjs" finalize

@@ -27,6 +27,55 @@ for (const [label, compared, admitted] of [['an ancestor of the moved tip', base
   assert.deepEqual(compares.map(url => url.split('/compare/')[1]), [`${x.base}...${tip}`]);
   assert.equal(r.lane, admitted ? 'full' : 'blocked'); if (admitted) assert.equal(r.definitionSha, x.base);
 });
+// GitHub builds refs/pull/N/merge on the current develop tip, while the payload's
+// base.sha can be older: the merge's first parent then descends from base.sha.
+const rebuilt = (f, x, first) => { const merge = f.git('commit-tree', f.git('rev-parse', `${x.checkout}^{tree}`), '-p', first, '-p', x.source, '-m', 'native PR merge on moved base'); f.git('checkout', '--quiet', '--force', '--detach', merge); x.input.context.sha = merge; return merge; };
+const tipAt = (x, tip, compared) => async (url, init) => {
+  if (url.endsWith('/git/ref/heads/develop')) return new Response(JSON.stringify({ ref: 'refs/heads/develop', object: { type: 'commit', sha: tip } }), { headers: { 'x-ratelimit-remaining': '950' } });
+  if (url.includes('/compare/')) return new Response(JSON.stringify(compared), { headers: { 'x-ratelimit-remaining': '950' } });
+  return x.transports.request(url, init);
+};
+each('lagging base.sha: merge built on a newer develop commit is admitted with base.sha as the protected definition', async f => {
+  const x = await f.prepare('pull_request'); x.input.mode = 'legacy';
+  const moved = f.git('commit-tree', f.git('rev-parse', `${x.base}^{tree}`), '-p', x.base, '-m', 'develop moved after the PR synced');
+  const merge = rebuilt(f, x, moved);
+  const r = await launchNative(x.input, { ...x.transports, request: tipAt(x, moved) });
+  assert.equal(r.lane, 'full'); assert.equal(r.definitionSha, x.base); assert.equal(r.testedCheckoutSha, merge); assert.equal(r.sourceSha, x.source); assert.equal(r.protectedImported, true);
+  // The moved commit may itself be behind the tip, as long as it is on develop.
+  const y = await launchNative(x.input, { ...x.transports, request: tipAt(x, 'd'.repeat(40), { status: 'ahead', base_commit: { sha: moved }, merge_base_commit: { sha: moved } }) });
+  assert.equal(y.lane, 'full');
+});
+each('merge whose first parent does not descend from base.sha is blocked', async f => {
+  const x = await f.prepare('pull_request'); x.input.mode = 'legacy';
+  const unrelated = f.git('commit-tree', f.git('rev-parse', `${x.base}^{tree}`), '-p', f.absent, '-m', 'not a descendant of base.sha');
+  rebuilt(f, x, unrelated);
+  const r = await launchNative(x.input, { ...x.transports, request: tipAt(x, unrelated) });
+  assert.equal(r.lane, 'blocked'); assert.equal(r.protectedImported, false);
+});
+each('merge whose first parent descends from base.sha but is not on develop is blocked', async f => {
+  const x = await f.prepare('pull_request'); x.input.mode = 'legacy';
+  const moved = f.git('commit-tree', f.git('rev-parse', `${x.base}^{tree}`), '-p', x.base, '-m', 'descendant that never reached develop');
+  rebuilt(f, x, moved);
+  const r = await launchNative(x.input, { ...x.transports, request: tipAt(x, 'd'.repeat(40), { status: 'diverged', base_commit: { sha: moved }, merge_base_commit: { sha: x.base } }) });
+  assert.equal(r.lane, 'blocked');
+});
+each('merge with a third parent or a foreign second parent is blocked', async f => {
+  const x = await f.prepare('pull_request'); x.input.mode = 'legacy';
+  const tree = f.git('rev-parse', `${x.checkout}^{tree}`);
+  for (const parents of [[x.base, x.source, f.absent], [x.base, f.absent]]) { const merge = f.git('commit-tree', tree, ...parents.flatMap(parent => ['-p', parent]), '-m', 'forged merge'); f.git('checkout', '--quiet', '--force', '--detach', merge); x.input.context.sha = merge; assert.equal((await launchNative(x.input, x.transports)).lane, 'blocked'); }
+});
+// No injected git transport: the real launcher shares objects from the
+// full-history checkout. A network fetch would fail here (private origin, fixture token).
+for (const kind of ['push', 'pull_request']) each(`${kind} is classified from the local checkout with no git network operation`, async f => {
+  const x = await f.prepare(kind); x.input.mode = 'legacy';
+  const r = await launchNative(x.input, { request: x.transports.request });
+  assert.equal(r.lane, 'full'); assert.equal(r.protectedImported, true); assert.equal(r.definitionSha, x.base); assert.equal(f.fetches.length, 0);
+});
+each('push whose protected base is missing from the checkout blocks instead of fetching', async f => {
+  const x = await f.prepare('push'); x.input.event.before = 'e'.repeat(40);
+  const r = await launchNative(x.input, { request: x.transports.request });
+  assert.equal(r.lane, 'blocked'); assert.equal(r.protectedImported, false);
+});
 each('pull request whose base is the current tip needs no comparison', async f => { const x = await f.prepare('pull_request'); x.input.mode = 'legacy'; const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'full'); assert.equal(f.requests.filter(r => r.url.includes('/compare/')).length, 0); });
 test('git over HTTPS authenticates as actions/checkout does: basic x-access-token, never bearer', async () => {
   const { gitAuthorization } = await import('./ci-cadence-launch.mjs'); const control = await import('./ci-cadence-control-launch.mjs');
