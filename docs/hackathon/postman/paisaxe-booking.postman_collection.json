@@ -1,0 +1,1138 @@
+{
+  "info": {
+    "name": "Paisaxe booking API (PayPal hackathon)",
+    "description": "The booking journey over HTTP: anonymous session, voucher, quote acceptance, booking status by capability, PayPal deposit (approval + capture), cancellation preview and confirmation, and the PayPal webhook.\n\nRead docs/hackathon/postman/README.md first. Fill an environment from paisaxe-booking.postman_environment.template.json.\n\n- Requests marked \"Local only\" need the local runner (scripts/booking/postman-local.ts) and are skipped when localControlUrl is empty.\n- The PayPal approval is interactive against the real sandbox: open approveUrl as the sandbox buyer, then run \"Capture after approval\".\n- Never point this at production without the owner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Double-submit CSRF value for this run: any random value works, as long as",
+          "// the __csrf cookie and the x-csrf-token header carry the same one.",
+          "if (!pm.environment.get(\"csrfToken\")) {",
+          "  const a = pm.variables.replaceIn(\"{{$guid}}\");",
+          "  const b = pm.variables.replaceIn(\"{{$guid}}\");",
+          "  pm.environment.set(\"csrfToken\", (a + b).replace(/-/g, \"\"));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Session",
+      "item": [
+        {
+          "name": "Anonymous session (Supabase Auth)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with an anonymous session\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.access_token, \"access_token\").to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(body.user && body.user.is_anonymous, \"user.is_anonymous\").to.equal(true);",
+                  "  pm.environment.set(\"accessToken\", body.access_token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{supabaseAnonKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{supabaseUrl}}/auth/v1/signup",
+            "description": "Supabase Auth anonymous sign-up with the public anon key. Returns the session's access token, sent afterwards as a Bearer token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Local only: seed quotes for this session",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"localControlUrl\")) {",
+                  "  console.log(\"Skipped: local runner only (localControlUrl is empty).\");",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with a fresh and a stale quote\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.quoteId).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(body.staleQuoteId).to.be.a(\"string\").and.not.empty;",
+                  "  pm.environment.set(\"quoteId\", body.quoteId);",
+                  "  pm.environment.set(\"staleQuoteId\", body.staleQuoteId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{localControlUrl}}/quotes",
+            "description": "Local runner only: inserts a fresh and an expired quote for this anonymous user. Judges take quoteId from the chat's quote card instead.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accessToken\": \"{{accessToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Without a voucher (404)",
+      "item": [
+        {
+          "name": "Booking access without a voucher -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404: the booking surface is invisible without a voucher\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/access"
+          }
+        },
+        {
+          "name": "Quote acceptance without a voucher -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404: no booking without access\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/quotes/{{quoteId}}/accept"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Voucher",
+      "item": [
+        {
+          "name": "Redeem voucher",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 ok\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.ok).to.equal(true);",
+                  "  pm.expect(body.limits, \"limits\").to.be.an(\"object\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/voucher/redeem",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{voucherCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Booking access",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 active, never cached\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().active).to.equal(true);",
+                  "  pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/access"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Quote acceptance",
+      "item": [
+        {
+          "name": "Accept a stale quote -> 409",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"staleQuoteId\")) {",
+                  "  console.log(\"Skipped: staleQuoteId is empty.\");",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 quote_expired\", () => {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().error).to.equal(\"quote_expired\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/quotes/{{staleQuoteId}}/accept",
+            "description": "staleQuoteId: an expired or superseded quote of this session (the local runner seeds one; in the chat, an earlier version of a quote that was later revised, or any quote after its expiresAt)."
+          }
+        },
+        {
+          "name": "Accept the quote",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with the booking card\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const card = pm.response.json().card;",
+                  "  pm.expect(card.kind).to.equal(\"booking\");",
+                  "  pm.expect(card.status).to.equal(\"pending_payment\");",
+                  "  pm.expect(card.link, \"capability link\").to.match(/^\\/booking\\/[^/]+\\.[^/]+$/);",
+                  "  // The capability authorizes the booking: kept in the environment, never logged.",
+                  "  pm.environment.set(\"capability\", card.link.replace(/^\\/booking\\//, \"\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/quotes/{{quoteId}}/accept",
+            "description": "quoteId comes from the chat's quote card (the local runner seeds it). Holds the places for 15 minutes and returns the booking card with the capability link."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Booking status",
+      "item": [
+        {
+          "name": "Booking status by capability",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 pending_payment with a live hold, never cached or indexed\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const view = pm.response.json();",
+                  "  pm.expect(view.status).to.equal(\"pending_payment\");",
+                  "  pm.expect(view.holdExpiresAt, \"holdExpiresAt\").to.be.a(\"string\");",
+                  "  pm.expect(view.depositCents).to.be.above(0);",
+                  "  pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\");",
+                  "  pm.expect(pm.response.headers.get(\"X-Robots-Tag\")).to.equal(\"noindex\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}"
+          }
+        },
+        {
+          "name": "Unknown capability -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 for a capability that opens nothing\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/00000000-0000-4000-8000-000000000000.not-a-valid-token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 PayPal deposit",
+      "item": [
+        {
+          "name": "Start payment (approval URL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with the approval URL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.approveUrl).to.be.a(\"string\");",
+                  "  pm.expect(body.amountCents).to.be.above(0);",
+                  "  pm.expect(body.currency).to.equal(\"EUR\");",
+                  "  const token = (body.approveUrl.match(/[?&]token=([^&]+)/) || [])[1];",
+                  "  pm.expect(token, \"token in approveUrl\").to.be.a(\"string\");",
+                  "  pm.environment.set(\"approveUrl\", body.approveUrl);",
+                  "  pm.environment.set(\"paypalOrderId\", decodeURIComponent(token));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}/payment",
+            "description": "Creates (or reuses) the booking's PayPal order. Open approveUrl in a browser as the sandbox buyer and approve; PayPal then returns with ?token=<order id>."
+          }
+        },
+        {
+          "name": "Local only: buyer approves at the PayPal mock",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"localControlUrl\")) {",
+                  "  console.log(\"Skipped: local runner only (localControlUrl is empty).\");",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 approved\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().status).to.equal(\"APPROVED\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{localControlUrl}}/paypal/orders/{{paypalOrderId}}/approve",
+            "description": "Local runner only: stands in for the buyer approving at PayPal. Against the sandbox, open approveUrl and approve instead."
+          }
+        },
+        {
+          "name": "Capture after approval",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 confirmed (approve at PayPal first)\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().outcome).to.equal(\"confirmed\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/payments/capture",
+            "description": "orderId is PayPal's token from the return URL (the same as the token in approveUrl). 202 awaiting_approval means the buyer has not approved yet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"capability\": \"{{capability}}\",\n  \"orderId\": \"{{paypalOrderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Booking status after capture",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 confirmed with a captured payment\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const view = pm.response.json();",
+                  "  pm.expect(view.status).to.equal(\"confirmed\");",
+                  "  pm.expect(view.holdExpiresAt).to.equal(null);",
+                  "  pm.expect(view.payment.status).to.equal(\"captured\");",
+                  "  pm.expect(view.payment.orderId).to.equal(pm.environment.get(\"paypalOrderId\"));",
+                  "  pm.expect(view.payment.captureId, \"captureId\").to.be.a(\"string\");",
+                  "  pm.environment.set(\"captureId\", view.payment.captureId);",
+                  "  pm.environment.set(\"depositCents\", String(view.depositCents));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Cancellation",
+      "item": [
+        {
+          "name": "Cancellation preview (read-only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with the refund the policy gives now\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const terms = pm.response.json();",
+                  "  pm.expect(terms.refundCents).to.be.a(\"number\").and.at.least(0);",
+                  "  pm.expect(terms.refundCents).to.be.at.most(Number(pm.environment.get(\"depositCents\")));",
+                  "  pm.expect(terms.currency).to.equal(\"EUR\");",
+                  "  if (terms.refundCents > 0) pm.expect(terms.termsValidUntil, \"termsValidUntil\").to.be.a(\"string\");",
+                  "  pm.environment.set(\"expectedRefundCents\", String(terms.refundCents));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}/cancellation-preview"
+          }
+        },
+        {
+          "name": "Booking status after preview (nothing changed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 still confirmed: the preview writes nothing\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const view = pm.response.json();",
+                  "  pm.expect(view.status).to.equal(\"confirmed\");",
+                  "  pm.expect(view.payment.status).to.equal(\"captured\");",
+                  "  pm.expect(view.payment.refundId).to.equal(null);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}"
+          }
+        },
+        {
+          "name": "Confirm with a higher expectation -> 409 terms_changed",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"higherRefundCents\", String(Number(pm.environment.get(\"expectedRefundCents\")) + 100));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 terms_changed with the server's terms\", () => {",
+                  "  pm.response.to.have.status(409);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.error).to.equal(\"terms_changed\");",
+                  "  pm.expect(body.terms.refundCents).to.equal(Number(pm.environment.get(\"expectedRefundCents\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}/cancel",
+            "description": "The expectation is checked, never trusted: a refund the policy does not give is refused with the fresh terms and nothing is written.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expectedRefundCents\": {{higherRefundCents}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Booking status after the refused confirm (nothing changed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 still confirmed, no refund\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const view = pm.response.json();",
+                  "  pm.expect(view.status).to.equal(\"confirmed\");",
+                  "  pm.expect(view.payment.refundId).to.equal(null);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}"
+          }
+        },
+        {
+          "name": "Confirm cancellation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 cancelled with the previewed refund\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  const expected = Number(pm.environment.get(\"expectedRefundCents\"));",
+                  "  pm.expect(body.refundCents).to.equal(expected);",
+                  "  pm.expect(body.status).to.be.oneOf(expected > 0 ? [\"refund_pending\", \"refunded\"] : [\"cancelled\"]);",
+                  "  pm.environment.set(\"cancelStatus\", body.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}/cancel",
+            "description": "expectedRefundCents is the refund the preview showed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expectedRefundCents\": {{expectedRefundCents}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Confirm cancellation again (idempotent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with the same cancellation, no second refund\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.refundCents).to.equal(Number(pm.environment.get(\"expectedRefundCents\")));",
+                  "  // A refund may complete between the two calls; it never starts again.",
+                  "  const first = pm.environment.get(\"cancelStatus\");",
+                  "  pm.expect(body.status).to.be.oneOf(first === \"refund_pending\" ? [\"refund_pending\", \"refunded\"] : [first]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}",
+                "description": "Must be an allowed origin (http://localhost:3006 under next dev)."
+              },
+              {
+                "key": "Cookie",
+                "value": "__csrf={{csrfToken}}",
+                "description": "Double-submit CSRF: the cookie and the header carry the same value."
+              },
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expectedRefundCents\": {{expectedRefundCents}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Booking status after cancellation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with one refund recorded\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const view = pm.response.json();",
+                  "  const expected = Number(pm.environment.get(\"expectedRefundCents\"));",
+                  "  pm.expect(view.status).to.be.oneOf(expected > 0 ? [\"refund_pending\", \"refunded\"] : [\"cancelled\"]);",
+                  "  if (expected > 0) {",
+                  "    pm.expect(view.payment.refundId, \"refundId\").to.be.a(\"string\");",
+                  "    pm.environment.set(\"refundId\", view.payment.refundId);",
+                  "    pm.environment.set(\"refundValue\", (expected / 100).toFixed(2));",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 PayPal webhook",
+      "item": [
+        {
+          "name": "Unsigned webhook -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401: no PayPal transmission headers, refused before anything is recorded\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/webhooks/paypal",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"WH-UNSIGNED-POSTMAN\",\n  \"event_type\": \"PAYMENT.CAPTURE.COMPLETED\",\n  \"resource\": {\n    \"id\": \"CAPTURE-UNSIGNED\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Local only: refund webhook, first delivery",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"localControlUrl\") || !pm.environment.get(\"refundId\")) {",
+                  "  console.log(\"Skipped: local runner only, after a refund.\");",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  pm.environment.set(\"webhookEventId\", \"WH-POSTMAN-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "  pm.environment.set(\"webhookTransmissionId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "  pm.environment.set(\"webhookTransmissionTime\", new Date().toISOString());",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 processed\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().status).to.equal(\"processed\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "paypal-auth-algo",
+                "value": "SHA256withRSA"
+              },
+              {
+                "key": "paypal-cert-url",
+                "value": "https://api-m.sandbox.paypal.com/v1/notifications/certs/CERT-local-mock"
+              },
+              {
+                "key": "paypal-transmission-id",
+                "value": "{{webhookTransmissionId}}"
+              },
+              {
+                "key": "paypal-transmission-sig",
+                "value": "local-mock-signature"
+              },
+              {
+                "key": "paypal-transmission-time",
+                "value": "{{webhookTransmissionTime}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/webhooks/paypal",
+            "description": "Local runner only: the PayPal mock answers the signature check with SUCCESS. Against the sandbox, PayPal sends this event itself; use its dashboard's resend to redeliver it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{webhookEventId}}\",\n  \"event_type\": \"PAYMENT.CAPTURE.REFUNDED\",\n  \"resource_type\": \"refund\",\n  \"resource\": {\n    \"id\": \"{{refundId}}\",\n    \"status\": \"COMPLETED\",\n    \"amount\": { \"currency_code\": \"EUR\", \"value\": \"{{refundValue}}\" },\n    \"links\": [\n      { \"href\": \"https://api-m.sandbox.paypal.com/v2/payments/captures/{{captureId}}\", \"rel\": \"up\", \"method\": \"GET\" }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Booking status before redelivery",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"localControlUrl\") || !pm.environment.get(\"refundId\")) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 refunded; snapshot taken\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const view = pm.response.json();",
+                  "  pm.expect(view.status).to.equal(\"refunded\");",
+                  "  pm.expect(view.payment.status).to.equal(\"refunded\");",
+                  "  pm.environment.set(\"statusSnapshot\", JSON.stringify({ status: view.status, payment: view.payment }));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}"
+          }
+        },
+        {
+          "name": "Redeliver the processed webhook -> 200, no change",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"webhookEventId\")) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 duplicate\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().status).to.equal(\"duplicate\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "paypal-auth-algo",
+                "value": "SHA256withRSA"
+              },
+              {
+                "key": "paypal-cert-url",
+                "value": "https://api-m.sandbox.paypal.com/v1/notifications/certs/CERT-local-mock"
+              },
+              {
+                "key": "paypal-transmission-id",
+                "value": "{{webhookTransmissionId}}"
+              },
+              {
+                "key": "paypal-transmission-sig",
+                "value": "local-mock-signature"
+              },
+              {
+                "key": "paypal-transmission-time",
+                "value": "{{webhookTransmissionTime}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/webhooks/paypal",
+            "description": "The same event id again: PayPal redelivers until it gets a 2xx. Already processed -> 200 duplicate, nothing reprocessed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{webhookEventId}}\",\n  \"event_type\": \"PAYMENT.CAPTURE.REFUNDED\",\n  \"resource_type\": \"refund\",\n  \"resource\": {\n    \"id\": \"{{refundId}}\",\n    \"status\": \"COMPLETED\",\n    \"amount\": { \"currency_code\": \"EUR\", \"value\": \"{{refundValue}}\" },\n    \"links\": [\n      { \"href\": \"https://api-m.sandbox.paypal.com/v2/payments/captures/{{captureId}}\", \"rel\": \"up\", \"method\": \"GET\" }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Booking status after redelivery (unchanged)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"statusSnapshot\")) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 and identical to the snapshot\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const view = pm.response.json();",
+                  "  pm.expect(JSON.stringify({ status: view.status, payment: view.payment })).to.equal(pm.environment.get(\"statusSnapshot\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/booking/bookings/{{capability}}"
+          }
+        }
+      ]
+    }
+  ]
+}

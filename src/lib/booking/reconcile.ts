@@ -27,8 +27,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { PaypalError, PaypalNotConfigured, getRefund, refundCapture } from "@/lib/paypal";
 import { captureApprovedOrder, finalizeCaptured, type CaptureOutcome } from "./capture";
+import { requestCancellationRefund } from "./cancel";
 import { abandonStaleDrafts } from "./drafts";
-import { flagNeedsAttention, guardedUpdate, holdIsLive, markBookingRefunded, type Row } from "./payment-state";
+import { applyRefundStatus, flagNeedsAttention, guardedUpdate, holdIsLive, type Row } from "./payment-state";
 import { PaypalWebhookUnmatched, UNMATCHED_TAG, processAndRecordPaypalEvent, type PaypalInboxEvent } from "./webhook-events";
 
 
@@ -69,8 +70,6 @@ const INBOX_GRACE_MS = 2 * 60_000;
 const STALE_ATTENTION_MS = 15 * 60_000;
 /** Booking statuses a captured payment can still be confirmed or compensated from. */
 const UNFINALIZED = ["pending_payment", "needs_attention", "expired"];
-/** Booking statuses a failed refund flags (never a booking confirmed by another payment). */
-const REFUND_FAILED_FLAGS = ["pending_payment", "needs_attention", "expired", "cancel_pending", "refund_pending"];
 
 /** No answer from PayPal at all: the run stops instead of waiting on every item. */
 function paypalUnreachable(error: unknown): boolean {
@@ -220,24 +219,20 @@ async function followPendingCaptures(run: Run): Promise<void> {
 
 // Step 5
 async function finalizeCapturedPayments(run: Run): Promise<void> {
-  const rows = await payments(run, ["captured"], (query) => query.not("capture_id", "is", null).in("bookings.status", UNFINALIZED));
+  // A confirmed cancellation is never finalized: compensation would refund the full capture.
+  const rows = await payments(run, ["captured"], (query) =>
+    query.not("capture_id", "is", null).in("bookings.status", UNFINALIZED).is("bookings.cancellation_confirmed_at", null)
+  );
   await eachItem(run, "captured", rows, async (row) => {
     count(run, await finalizeCaptured(run.client, row.bookings as Row, paymentOf(row)));
   });
 }
 
-/** Moves a refund_pending payment, and its booking, to PayPal's final refund status. */
-async function applyRefundStatus(run: Run, payment: Row, booking: Row, status: string): Promise<void> {
-  if (status === "COMPLETED") {
-    if (!(await guardedUpdate(run.client, "payments", payment.id, { status: "refunded", refunded_at: new Date().toISOString() }, ["refund_pending"]))) return;
-    run.summary.refunded++;
-    await markBookingRefunded(run.client, payment, booking.id);
-  } else if (status === "FAILED" || status === "CANCELLED") {
-    if (!(await guardedUpdate(run.client, "payments", payment.id, { status: "refund_failed" }, ["refund_pending"]))) return;
-    run.summary.refundFailed++;
-    await flagNeedsAttention(run.client, booking.id, REFUND_FAILED_FLAGS);
-    logger.error("[PAYPAL_REFUND_FAILED]", { bookingId: booking.id, paymentId: payment.id, refundStatus: status });
-  }
+/** Applies PayPal's refund status and counts what changed. */
+async function countRefundStatus(run: Run, payment: Row, booking: Row, status: string): Promise<void> {
+  const changed = await applyRefundStatus(run.client, payment, booking.id, status);
+  if (changed === "refunded") run.summary.refunded++;
+  if (changed === "refund_failed") run.summary.refundFailed++;
 }
 
 /** Requests the refund with "refund:" + the payment's operation key: a retry never refunds twice. */
@@ -258,13 +253,13 @@ async function followRefunds(run: Run): Promise<void> {
     const booking = row.bookings as Row;
     if (payment.refund_id) {
       const refund = await getRefund(payment.refund_id as string);
-      return applyRefundStatus(run, payment, booking, refund.status);
+      return countRefundStatus(run, payment, booking, refund.status);
     }
     // A compensation refunds the whole capture; a cancellation refunds what Phase 5 computed.
     const amount = payment.compensation_reason ? payment.amount_cents : booking.refund_cents;
     const refund = await requestRefund(run, payment, amount);
     await guardedUpdate(run.client, "payments", payment.id, { refund_id: refund.id }, ["refund_pending"]);
-    await applyRefundStatus(run, payment, booking, refund.status);
+    await countRefundStatus(run, payment, booking, refund.status);
   });
 }
 
@@ -278,12 +273,8 @@ async function retryConfirmedCancellations(run: Run): Promise<void> {
       .gt("bookings.refund_cents", 0)
   );
   await eachItem(run, "cancel_pending", rows, async (row) => {
-    const payment = paymentOf(row);
-    const booking = row.bookings as Row;
-    const refund = await requestRefund(run, payment, booking.refund_cents);
-    if (!(await guardedUpdate(run.client, "payments", payment.id, { status: "refund_pending", refund_id: refund.id }, ["captured"]))) return;
-    await guardedUpdate(run.client, "bookings", booking.id, { status: "refund_pending" }, ["cancel_pending"]);
-    await applyRefundStatus(run, payment, booking, refund.status);
+    // Null: refused for good (now refund_failed) or another caller got there first.
+    if (await requestCancellationRefund(run.client, row.bookings as Row, paymentOf(row))) run.summary.refundsRequested++;
   });
 }
 

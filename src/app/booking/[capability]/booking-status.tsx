@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { CancellationConfirm } from "@/components/booking/cancellation-confirm";
 import { Button } from "@/components/ui/button";
 import { clockTime, money } from "@/lib/booking-format";
 import { csrfHeaders } from "@/lib/csrf-client";
 import { useTranslation } from "@/lib/i18n";
-import type { BookingView, PaymentStartResponse } from "@/types/booking-page";
+import type { BookingView, CancellationTerms, PaymentStartResponse } from "@/types/booking-page";
 
 const FAST_POLL_MS = 5_000;
 const FAST_WINDOW_MS = 2 * 60_000;
@@ -20,12 +21,14 @@ export function nextPollDelay(elapsedMs: number): number | null {
   return null;
 }
 
-type Phase = "pay" | "confirming" | "confirmed" | "expired" | "attention" | "refunding" | "refunded" | "cancelled";
+type Phase = "pay" | "confirming" | "confirmed" | "expired" | "attention" | "refundFailed" | "refunding" | "refunded" | "cancelled";
 
 /** Payment statuses in which the buyer has approved and the server is finishing the capture. */
 const CONFIRMING_PAYMENTS = new Set(["approved", "capture_pending", "captured"]);
 
 function phaseOf(view: BookingView): Phase {
+  // A refused refund is the truth whatever the booking row still says.
+  if (view.payment?.status === "refund_failed") return "refundFailed";
   switch (view.status) {
     case "confirmed":
       return "confirmed";
@@ -33,11 +36,11 @@ function phaseOf(view: BookingView): Phase {
       return "expired";
     case "needs_attention":
       return "attention";
+    case "cancel_pending":
     case "refund_pending":
       return "refunding";
     case "refunded":
       return "refunded";
-    case "cancel_pending":
     case "cancelled":
       return "cancelled";
     default:
@@ -47,6 +50,7 @@ function phaseOf(view: BookingView): Phase {
 
 const PHASE_MESSAGE: Partial<Record<Phase, string>> = {
   attention: "booking.page.attentionBody",
+  refundFailed: "booking.cancel.refundFailed",
   refunding: "booking.page.refundingBody",
   refunded: "booking.page.refundedBody",
   cancelled: "booking.page.cancelledBody",
@@ -61,8 +65,9 @@ const BACK_TO_CHAT = "/immersive?booking=1";
  * The booking behind a capability link (PayPal hackathon plan, Phase 4). The
  * page is a static shell; everything here loads through the capability API,
  * so an unknown link gets that route's real 404. While the server finishes a
- * capture the status is polled; the webhook and reconciliation complete it
- * whether or not this page stays open.
+ * capture or a refund the status is polled; the webhook and reconciliation
+ * complete it whether or not this page stays open. Phase 5 adds the
+ * cancellation section of a confirmed booking.
  */
 export function BookingStatus() {
   const { t, locale } = useTranslation();
@@ -90,7 +95,8 @@ export function BookingStatus() {
   const phase = load.kind === "ready" ? phaseOf(load.view) : null;
 
   useEffect(() => {
-    if (phase !== "confirming") return;
+    // The server is finishing something the visitor started: a capture, or a refund.
+    if (phase !== "confirming" && phase !== "refunding") return;
     const startedAt = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const schedule = () => {
@@ -212,10 +218,60 @@ export function BookingStatus() {
           </>
         )}
 
+        {phase === "confirmed" && <CancelSection capability={capability} onCancelled={() => void refresh()} />}
+
+        {phase === "refunding" && (
+          <>
+            <p className="font-semibold">{t("booking.cancel.refundPending")}</p>
+            <Button type="button" variant="secondary" onClick={() => void refresh()}>
+              {t("booking.page.refresh")}
+            </Button>
+          </>
+        )}
+
+        {(phase === "refunding" || phase === "refunded") && view.payment?.refundId && (
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <dt className="text-white/70">{t("booking.cancel.refundId")}</dt>
+            <dd className="font-mono">{view.payment.refundId}</dd>
+          </dl>
+        )}
+
         {phase === "expired" && <BackToChat message={t("booking.page.expiredBody")} label={t("booking.page.backToChat")} />}
         {phase && PHASE_MESSAGE[phase] && <p>{t(PHASE_MESSAGE[phase])}</p>}
       </div>
     </Shell>
+  );
+}
+
+type Preview = { kind: "closed" } | { kind: "loading" } | { kind: "unavailable" } | { kind: "ready"; terms: CancellationTerms };
+
+/** The read-only preview, loaded on demand, then the one confirm button (F01, R2-05). */
+function CancelSection({ capability, onCancelled }: { capability: string; onCancelled: () => void }) {
+  const { t } = useTranslation();
+  const [preview, setPreview] = useState<Preview>({ kind: "closed" });
+
+  const open = async () => {
+    setPreview({ kind: "loading" });
+    try {
+      const response = await fetch(`/api/booking/bookings/${capability}/cancellation-preview`, { cache: "no-store" });
+      setPreview(response.ok ? { kind: "ready", terms: (await response.json()) as CancellationTerms } : { kind: "unavailable" });
+    } catch {
+      setPreview({ kind: "unavailable" });
+    }
+  };
+
+  return (
+    <section className="space-y-2 border-t border-white/10 pt-4">
+      <h2 className="font-semibold">{t("booking.cancel.title")}</h2>
+      {preview.kind === "closed" && (
+        <Button type="button" variant="secondary" onClick={() => void open()}>
+          {t("booking.cancel.open")}
+        </Button>
+      )}
+      {preview.kind === "loading" && <p className="text-white/70">{t("booking.cancel.loading")}</p>}
+      {preview.kind === "unavailable" && <p className="text-amber-200">{t("booking.cancel.unavailable")}</p>}
+      {preview.kind === "ready" && <CancellationConfirm capability={capability} terms={preview.terms} onCancelled={onCancelled} />}
+    </section>
   );
 }
 

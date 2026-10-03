@@ -18,7 +18,8 @@ export const metadata: Metadata = {
  * A static shell: the booking loads in the browser through
  * /api/booking/bookings/<capability>, which verifies the capability and
  * answers a real 404 for an unknown one (a notFound() here would arrive after
- * PPR's 200 shell). No-referrer, noindex and no-store come from next.config.
+ * PPR's 200 shell). No-referrer and noindex come from next.config; no-store
+ * from the API route.
  */
 export default function BookingPage() {
   return (

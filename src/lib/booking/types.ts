@@ -83,7 +83,9 @@ export type BookingErrorCode =
   /** PayPal is not configured or did not answer (Phase 4). */
   | "payment_unavailable"
   /** The buyer already approved and the capture is being finished: no new order (Phase 4). */
-  | "payment_in_progress";
+  | "payment_in_progress"
+  /** The cancellation is confirmed but PayPal could not take the refund now; reconciliation retries (Phase 5). */
+  | "refund_unavailable";
 
 export class BookingError extends Error {
   readonly code: BookingErrorCode;

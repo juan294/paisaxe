@@ -322,6 +322,12 @@ open (owner credentials, tunnel and buyer approval).
   reset stack; `next build` 0 after deviation 19 (the booking page tests re-run: 36 passed;
   typecheck, lint and knip re-run clean). Playwright was not run (the unsigned-webhook 401 case
   was added to `e2e/webhooks.spec.ts`).
+- **Correction (2026-10-03, found in Phase 5):** the gate above did not run the coverage
+  thresholds, and CI does not run the live-DB tests. Measured with them skipped, as in CI,
+  coverage was 94.89 / 91.86 / 95.28 / 95.89 % (statements / branches / functions / lines)
+  against 97 / 95 / 97 / 97: `capture.ts`, `reconcile.ts`, `webhook-events.ts` and the PayPal
+  webhook route had live tests only. Nothing had been pushed. Phase 5 adds unit tests for them
+  and runs the coverage gate under CI conditions (Phase 5 handoff).
 - **Deviations, review, simplify:** notes file, "Phase 4" (deviations 1 to 19), "Phase 4 review
   dispositions" (findings 1 to 6, R1, R2), "Phase 4 simplify pass".
 - **Open for this phase's acceptance (owner):**

@@ -7,6 +7,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger";
 
 export type Row = Record<string, unknown>;
 
@@ -44,6 +45,34 @@ export function flagNeedsAttention(client: SupabaseClient, bookingId: unknown, f
 export async function markBookingRefunded(client: SupabaseClient, payment: Row, bookingId: unknown): Promise<void> {
   if (payment.compensation_reason === "duplicate_capture") return;
   await guardedUpdate(client, "bookings", bookingId, { status: "refunded" }, BOOKING_REFUNDED_FROM);
+}
+
+/** Booking statuses a failed refund flags for attention. */
+const REFUND_FAILED_FLAGS = ["pending_payment", "needs_attention", "expired", "cancel_pending", "refund_pending"];
+
+/**
+ * Moves a refund_pending payment, and its booking, to PayPal's final refund
+ * status. Returns the payment's new status, or null when nothing changed
+ * (PayPal still pending, or another caller got there first).
+ */
+export async function applyRefundStatus(
+  client: SupabaseClient,
+  payment: Row,
+  bookingId: unknown,
+  refundStatus: string
+): Promise<"refunded" | "refund_failed" | null> {
+  if (refundStatus === "COMPLETED") {
+    if (!(await guardedUpdate(client, "payments", payment.id, { status: "refunded", refunded_at: new Date().toISOString() }, ["refund_pending"]))) return null;
+    await markBookingRefunded(client, payment, bookingId);
+    return "refunded";
+  }
+  if (refundStatus === "FAILED" || refundStatus === "CANCELLED") {
+    if (!(await guardedUpdate(client, "payments", payment.id, { status: "refund_failed" }, ["refund_pending"]))) return null;
+    await flagNeedsAttention(client, bookingId, REFUND_FAILED_FLAGS);
+    logger.error("[PAYPAL_REFUND_FAILED]", { bookingId, paymentId: payment.id, refundStatus });
+    return "refund_failed";
+  }
+  return null;
 }
 
 export function holdIsLive(hold: Row): boolean {

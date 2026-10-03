@@ -15,6 +15,13 @@
  *   409 {outcome: "slot_gone" | "mismatch" | "compensating" | "failed"}
  *       (mismatch also when orderId is not the booking's latest payment's)
  *   404 unknown capability
+ * GET  /api/booking/bookings/<capability>/cancellation-preview    (read-only, F01)
+ *   200 CancellationTerms | 409 {error: "invalid_state"} (not confirmed)
+ * POST /api/booking/bookings/<capability>/cancel {expectedRefundCents}  (CSRF)
+ *   200 CancelResponse (also for a booking already cancelled: idempotent)
+ *   409 {error: "terms_changed", terms: CancellationTerms}  (R2-05: nothing written)
+ *   409 {error: "invalid_state"} (unpaid, expired or flagged: nothing to cancel)
+ *   502 {error: "refund_unavailable"} (cancellation recorded; refund retried automatically)
  */
 
 /** The payment as the page needs it; ids appear on the confirmed receipt. */
@@ -22,6 +29,7 @@ export interface BookingPaymentView {
   status: string;
   orderId: string | null;
   captureId: string | null;
+  refundId: string | null;
 }
 
 export interface BookingView {
@@ -73,4 +81,26 @@ export interface CaptureRequest {
 
 export interface CaptureResponse {
   outcome: CaptureOutcome;
+}
+
+/** What a cancellation would refund now (Phase 5); the confirm request sends refundCents back. */
+export interface CancellationTerms {
+  refundCents: number;
+  depositCents: number;
+  currency: string;
+  cancellationWindowHours: number;
+  /** When the activity starts. */
+  slotStart: string;
+  /** The last instant a full refund applies, or null when none is due. */
+  termsValidUntil: string | null;
+}
+
+export interface CancelRequest {
+  /** The refund the visitor was shown: an expectation the server checks, never authority. */
+  expectedRefundCents: number;
+}
+
+export interface CancelResponse {
+  status: string;
+  refundCents: number | null;
 }

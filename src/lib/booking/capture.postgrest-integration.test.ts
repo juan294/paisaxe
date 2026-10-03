@@ -448,7 +448,7 @@ describe.skipIf(!dbReachable)("deposit flow against live local Supabase", () => 
       const view = await viewOf(id);
       expect(view.status).toBe("confirmed");
       expect(view.holdExpiresAt).toBeNull();
-      expect(view.payment).toEqual({ status: "captured", orderId: `ORDER-${id.slice(0, 8)}`, captureId: `CAP-${id.slice(0, 8)}` });
+      expect(view.payment).toEqual({ status: "captured", orderId: `ORDER-${id.slice(0, 8)}`, captureId: `CAP-${id.slice(0, 8)}`, refundId: null });
     });
   });
 });

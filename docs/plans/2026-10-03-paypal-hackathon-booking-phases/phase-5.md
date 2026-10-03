@@ -176,3 +176,31 @@ a second confirm does nothing. Record ids. Unit 5b accepted separately when its
 results file is in.
 
 Stop for acceptance.
+
+## Handoff (2026-10-03)
+
+**Status:** units [cancel], [operator] and [postman] implemented; unit 5b materials prepared.
+Independently reviewed (CHANGES REQUESTED, all minor, plus one money defect found while fixing;
+second pass CHANGES REQUESTED, minor; final pass **APPROVE**), simplified, and verified by the full
+local gate including CI-conditions coverage and a Postman run on the final tree. Committed on the
+feature branch; **not merged into `develop`, not pushed**. The manual acceptance and the 5b
+sessions are the owner's.
+
+- **Scope delivered:**
+  - Cancellation: migration 123 (`cancellation_terms`, `confirm_cancellation`), `src/lib/booking/cancel.ts`, the read-only `preview_cancellation` tool, `GET …/cancellation-preview` and `POST …/cancel` (R2-05 `terms_changed`, idempotent replies, 409 `invalid_state` outside the flow, 502 `refund_unavailable`), one confirm component for the chat card and the booking page, refund states on the page, `booking.cancel.*` in six locales.
+  - Money safety beyond the plan: migration 124 (a confirmed cancellation is never re-confirmed by any capture path), reconciliation step 5 never finalizes it, definitive PayPal refusals end `refund_failed` + `needs_attention` (a `PREVIOUS_REQUEST_IN_PROGRESS` 422 stays retryable).
+  - Operator: `/operator/<capability>` (static shell + `GET /api/operator/<capability>`), hold release and link re-issue, 14-day capacity, `scripts/booking/create-operator-link.ts`.
+  - Postman: collection, empty environment template, README, loopback-only runner `scripts/booking/postman-local.ts`, run summary.
+  - 5b: `docs/hackathon/validation/script.md` and `observation-sheet.md` (the desk survey and the provider message existed already).
+  - CI coverage restored for the Phase 4 and 5 booking modules (unit tests over the Supabase fake); capability API paths get `no-referrer` from `next.config.ts`.
+- **Identity:** branch `feature/booking-after-payment` in `/Users/juan/code/paisaxe-hackathon-phase5`, based on `develop` `7e43a9e8`; the commit carrying this handoff is the candidate.
+- **Gate evidence (local, this candidate's inputs):** `supabase db reset --local` 0 (`schema_migrations` max 124); `typecheck` 0, `lint` 0, `knip` 0, `check-env` 0, `check-verification-coverage` 0, `check-migrations` 0 (121 files), `lint:deps` 0; full suite with the live stack: 485 files, 9,021 tests passed; CI conditions (`SUPABASE_LOCAL_API_URL=http://127.0.0.1:1`): 8,845 passed, 176 skipped, coverage 98.20 / 95.81 / 97.97 / 98.85 % against 97 / 95 / 97 / 97 (branches has 0.81 points of headroom); `next build` 0; Newman on the final tree: 26 requests, 26 assertions, 0 failures; live headers checked with curl. Playwright not run.
+- **Deviations, reviews, simplify:** notes file, "Phase 5" (1 to 14), "Phase 5 review dispositions" (R0, 1 to 8; second pass R2-1 to R2-4; final APPROVE), "Phase 5 simplify pass". The Phase 4 handoff carries a correction about its coverage gate.
+- **Known limitations:** Phase 4 compensation refunds (reconciliation step 6) still retry a definitive PayPal refusal; the operator view makes 14 availability calls per active experience.
+- **Open for this phase's acceptance (owner):**
+  - Manual, on local Docker with the real sandbox: preview a cancellation and leave it; twenty minutes later nothing has changed; confirm it inside the window; the sandbox shows the refund; the booking page shows `refund_pending` then `refunded`; the operator link shows the same; a second confirm does nothing. Record the ids here.
+  - 5b: five tester sessions (`script.md`), the provider tier reached, `results.md`; send the Tier B message (`provider-message.md`) if not yet sent (planned by Oct 9).
+- **Entry conditions for Phase 6:**
+  - Production still untouched: anonymous sign-in, `PAYPAL_*` and `BOOKING_LINK_SECRET` in Vercel, the PayPal webhook subscription, the reconcile cron and any production operator link need owner authorization at release.
+  - Run the CI-conditions coverage command before any push (memory and Phase 4 correction); keep branch headroom in mind when adding untested branches.
+  - The local `booking-roundtrip` E2E still needs Playwright `bypassCSP` (Phase 2 deviation 9).

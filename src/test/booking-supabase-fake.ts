@@ -18,10 +18,17 @@ const BUILDER_METHODS = [
   "select",
   "insert",
   "update",
+  "delete",
   "eq",
+  "neq",
+  "in",
   "is",
+  "not",
+  "or",
   "lt",
+  "lte",
   "gt",
+  "gte",
   "order",
   "limit",
   "maybeSingle",
@@ -47,14 +54,14 @@ export interface BookingSupabaseFake {
   client: SupabaseClient;
   /** Queue the result of the next `from(table)` query. Returns the query for assertions. */
   onTable(table: string, result: FakeResult): FakeQuery;
-  /** Queue the result of the next `rpc(fn)` call. */
-  onRpc(fn: string, result: FakeResult): void;
+  /** Queue the result of the next `rpc(fn)` call (chainable like a query, e.g. `.single()`). Returns it for assertions. */
+  onRpc(fn: string, result: FakeResult): FakeQuery;
   rpc: ReturnType<typeof vi.fn>;
 }
 
 export function createBookingSupabaseFake(): BookingSupabaseFake {
   const tables = new Map<string, FakeQuery[]>();
-  const rpcs = new Map<string, FakeResult[]>();
+  const rpcs = new Map<string, FakeQuery[]>();
 
   const from = vi.fn((table: string) => {
     const next = tables.get(table)?.shift();
@@ -65,7 +72,7 @@ export function createBookingSupabaseFake(): BookingSupabaseFake {
   const rpc = vi.fn((fn: string) => {
     const next = rpcs.get(fn)?.shift();
     if (!next) throw new Error(`unexpected rpc ${fn}`);
-    return Promise.resolve({ data: next.data ?? null, error: next.error ?? null });
+    return next;
   });
 
   return {
@@ -77,7 +84,9 @@ export function createBookingSupabaseFake(): BookingSupabaseFake {
       return query;
     },
     onRpc(fn, result) {
-      rpcs.set(fn, [...(rpcs.get(fn) ?? []), result]);
+      const query = fakeQuery(result);
+      rpcs.set(fn, [...(rpcs.get(fn) ?? []), query]);
+      return query;
     },
   };
 }

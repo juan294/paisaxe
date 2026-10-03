@@ -26,6 +26,11 @@ describe("Referrer-Policy and X-Robots-Tag on capability routes", () => {
     "/booking/11111111-2222-4333-8444-555555555555.token",
     "/booking/11111111-2222-4333-8444-555555555555.token/return",
     "/operator/a7e5c0de-0000-4000-8000-000000000001.token",
+    // The capability API routes carry it in their path too (Postman run finding, Phase 5).
+    "/api/booking/bookings/11111111-2222-4333-8444-555555555555.token",
+    "/api/booking/bookings/11111111-2222-4333-8444-555555555555.token/cancel",
+    "/api/operator/a7e5c0de-0000-4000-8000-000000000001.token",
+    "/api/operator/a7e5c0de-0000-4000-8000-000000000001.token/holds/h1/release",
   ])(
     "is no-referrer for %s",
     async (path) => {
@@ -37,6 +42,7 @@ describe("Referrer-Policy and X-Robots-Tag on capability routes", () => {
   it("stays strict-origin-when-cross-origin everywhere else", async () => {
     expect(await lastHeader("/immersive", "referrer-policy")).toBe("strict-origin-when-cross-origin");
     expect(await lastHeader("/acceso", "referrer-policy")).toBe("strict-origin-when-cross-origin");
+    expect(await lastHeader("/api/booking/chat/stream", "referrer-policy")).toBe("strict-origin-when-cross-origin");
     expect(await lastHeader("/immersive", "x-robots-tag")).toBeUndefined();
   });
 });

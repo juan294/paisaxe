@@ -7,7 +7,8 @@
  * tool_result content; cards go only to the browser. A capability link or URL
  * never appears in a result (F05).
  *
- * Phase 4 adds create_payment_order; Phase 5 adds preview_cancellation.
+ * Phase 4 adds create_payment_order; Phase 5 adds preview_cancellation, which
+ * is read-only: no tool can confirm a cancellation (F01).
  */
 import "server-only";
 
@@ -18,10 +19,11 @@ import { logger } from "@/lib/logger";
 import type { BookingCard, BookingSummaryCard } from "@/types/booking-cards";
 import { searchExperiences } from "./availability";
 import { getBookingForUser, listBookingsForUser } from "./bookings";
+import { cancellationPreview } from "./cancel";
 import { ensurePaymentOrder } from "./capture";
 import { draftPatchSchema, getOrCreateOpenDraft, updateDraft, type BookingDraft } from "./drafts";
 import { visitorConstraintsSchema } from "./facts";
-import { bookingLink } from "./links";
+import { bookingCapability, bookingLink } from "./links";
 import { createQuote } from "./quotes";
 import { BookingError, hhmmSchema, isoDateSchema, partySizeSchema, type Booking } from "./types";
 
@@ -268,12 +270,41 @@ const createPaymentOrderTool: BookingTool<{ bookingId: string }> = {
   },
 };
 
+const previewCancellationTool: BookingTool<{ bookingId: string }> = {
+  name: "preview_cancellation",
+  description:
+    "Calcula, sin cambiar nada, cuánto se devolvería si el visitante cancelara ahora una reserva confirmada: la señal " +
+    "completa hasta cancellationWindowHours antes del inicio, nada después. Devuelve la tarjeta de cancelación; el visitante " +
+    "confirma con su botón. Tú no puedes cancelar: no digas que una reserva está cancelada hasta que get_booking_status lo diga.",
+  inputSchema: z.object({ bookingId: z.guid() }).strict(),
+  async execute(ctx, input) {
+    const booking = await getBookingForUser(ctx.client, ctx.userId, input.bookingId);
+    if (!booking) throw new BookingError("not_found");
+    const terms = await cancellationPreview(ctx.client, booking);
+
+    return {
+      result: {
+        reference: booking.reference,
+        refundEuros: euros(terms.refundCents),
+        depositEuros: euros(terms.depositCents),
+        cancellationWindowHours: terms.cancellationWindowHours,
+        slotStart: terms.slotStart,
+        refundUntil: terms.termsValidUntil,
+        next: "El visitante confirma la cancelación con el botón de la tarjeta.",
+      },
+      // The capability goes to the card's button only, never to the model (F05).
+      card: { kind: "cancellation", bookingId: booking.id, capability: bookingCapability(booking), ...terms },
+    };
+  },
+};
+
 const BOOKING_TOOLS = [
   searchExperiencesTool,
   updateDraftTool,
   getQuoteTool,
   getBookingStatusTool,
   createPaymentOrderTool,
+  previewCancellationTool,
 ] as const;
 
 /** Tool definitions for messages.stream, with JSON schemas derived from the zod schemas. */

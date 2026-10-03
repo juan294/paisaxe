@@ -7,6 +7,7 @@
  * never appear in model-visible text or tool results (plan F05). Amounts are
  * integer cents.
  */
+import type { CancellationTerms } from "./booking-page";
 
 export interface OfferCardOption {
   experienceId: string;
@@ -68,13 +69,15 @@ export interface PaymentCard {
   expiresAt: string;
 }
 
-/** Phase 5: the read-only cancellation preview. */
-export interface CancellationCard {
+/**
+ * Phase 5: the read-only cancellation preview (F01). Its button confirms
+ * through the capability route with the refund shown here (R2-05).
+ */
+export interface CancellationCard extends CancellationTerms {
   kind: "cancellation";
   bookingId: string;
-  refundCents: number;
-  currency: string;
-  policy: string;
+  /** `<id>.<token>` for POST /api/booking/bookings/<capability>/cancel. */
+  capability: string;
 }
 
 export type BookingCard = OfferCard | QuoteCard | BookingSummaryCard | PaymentCard | CancellationCard;

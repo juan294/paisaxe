@@ -397,6 +397,78 @@ Skipped:
 - **Fewer queries per status poll and per reconcile item:** 4 and about 4 queries; revisit with timing data.
 - **A shared error-message helper and JSON-parse helper:** no existing helper to reuse; the ternary is a codebase-wide idiom.
 
+### Phase 5
+
+1. **The confirmation is one SQL function (migration 123).**
+   - Plan said: the confirm endpoint recomputes, compares, then does one UPDATE.
+   - Chose: `confirm_cancellation` does all three under the booking's row lock, so two concurrent clicks cannot both pass the comparison. `cancellation_terms` is the read-only computation both the preview and the confirm use, in the merchant's time zone like `experience_availability`. Both take an optional `p_now` used only by the cutoff tests (the `redeem_voucher` pattern); the application never passes it.
+2. **A cancellation with no refund goes straight to `cancelled`,** never `cancel_pending`: reconciliation step 7 retries only bookings with a refund due, so a zero-refund `cancel_pending` would never settle. The payment stays `captured` (plan step 6).
+3. **One refund path for the endpoint and the cron.** `requestCancellationRefund` (`src/lib/booking/cancel.ts`) requests the refund with the payment's key and moves payment and booking to `refund_pending`; reconciliation step 7 now calls it instead of its own copy. `applyRefundStatus` moved from `reconcile.ts` into `payment-state.ts` (it returns what changed, so the cron keeps its counters) and also settles a refund PayPal completes at once.
+4. **The cancellation card carries the booking's capability** for its confirm button (cards only; the tool result has no link, tested). `CancellationCard` was redefined from the Phase 3 placeholder (`policy` text replaced by the terms, which the UI words from `booking.cancel.*`); the unused `booking.cards.refund` key was removed from the six locales.
+5. **One confirm component for both surfaces.** `src/components/booking/cancellation-confirm.tsx` sends the refund it shows, replaces the terms on `terms_changed` and needs a second click (R2-05), and reports a 502 as "recorded, refund retried automatically". The chat card and the booking page both render it.
+6. **The booking page loads the preview on demand** ("Quiero cancelar"), so viewing a booking never computes terms the visitor did not ask for. A `cancel_pending` or `refund_pending` booking shows "Reembolso en curso" (with the PayPal refund id once known) and polls with the payment cadence until it settles; `needs_attention` with a `refund_failed` payment shows "No se pudo completar el reembolso; lo estamos revisando".
+7. **Analytics exclusion: no helper counts `voice_purchases` rows.** The readers are `voice-session` and `voice-access` (the visitor's own active pass, which a voucher pass is meant to grant) and the health probe (reachability only); `stripe-analytics/route.ts` has no Supabase reference. Nothing to exclude, so no test was added (grep evidence in the gate notes).
+8. **Operator view: static shell plus a capability API, as the booking page.**
+   - Plan said: server component with `notFound()` on a bad or expired capability.
+   - Chose: `src/app/operator/[capability]/page.tsx` (`instant = false`, Suspense) renders a client dashboard that loads `GET /api/operator/<capability>`; that route answers a real 404 for a bad, unknown or expired link (Phase 4 deviations 5 and 19). Operator routes are also hidden on a Preview, like the visitor's.
+9. **Operator details.** The exception flag also covers a payment in `refund_failed`. The "demo" label shows when `merchants.is_fixture` is true. Tiles: upcoming = confirmed bookings from today; deposits collected = bookings whose latest payment is `captured`; balance due = balances of upcoming confirmed bookings. Re-issue is a compare-and-set on `link_version` (no migration); the API returns the new path and the page shows the full link once, after a confirmation. Logs carry hold or booking ids only (tested).
+10. **`create-operator-link.ts` reads `.env.local` only for `--target production`** (it holds production credentials and the production link secret); a local run takes `BOOKING_LINK_SECRET` from its own environment, as `create-voucher.ts` does. The first version loaded `.env.local` for both targets; caught when integrating the unit and fixed before any production use. It runs with `npx tsx --conditions=react-server` because `links.ts` is server-only.
+11. **Postman: Newman instead of the Postman CLI, run locally against a PayPal stand-in.**
+    - The Postman CLI is not installed; `npx --yes newman@6` (Postman's open-source runner, Apache-2.0) runs the same collection with no global install.
+    - `scripts/booking/postman-local.ts` is a loopback-only runner: it starts the PayPal mock (with control routes to seed the run's quotes and approve an order, standing in for the sandbox buyer), enables the flag and issues a voucher on local Docker, and writes the filled environment outside the repository. `next dev` runs with local variables only (the README lists them; the service key variable is `SUPABASE_SERVICE_KEY`, as `src/lib/env.ts` reads). The mock gained additive `port` and `idSalt` options (a restarted mock had reissued an order id already in `payments`).
+    - Run of 2026-10-03: 26 requests, 26 assertions, 0 failures (`docs/hackathon/postman/run-2026-10-03-local.md`). Judges use the same collection with the real sandbox approval step (README).
+12. **Two defects found by the Postman run, fixed test-first:**
+    - `POST …/cancel` on a booking outside the cancellation flow (unpaid, expired, flagged) answered 200 "unchanged", which the confirm component shows as "Reserva cancelada". Now only `cancel_pending`, `refund_pending`, `refunded` and `cancelled` are idempotent replies; anything else is 409 `invalid_state` (unit, live and route tests).
+    - The capability API routes (`/api/booking/bookings/…`, `/api/operator/…`) answered the site-wide `Referrer-Policy: strict-origin-when-cross-origin`: the route's own `no-referrer` loses to `next.config.ts`, the Phase 3 finding for pages. Both prefixes now have `next.config` entries (tested); other API routes keep the site-wide policy.
+13. **CI coverage restored for Phases 4 and 5** (see the Phase 4 handoff correction). Unit tests over `src/test/booking-supabase-fake.ts` (extended additively: more builder methods, chainable `rpc`) now cover `capture.ts`, `cancel.ts`, `payment-state.ts`, `reconcile.ts`, `webhook-events.ts`, the PayPal webhook route, `operator.ts` and `view.ts` at 100% statements and branches each, mirroring the live tests' oracles; mutations in each file were caught. The live tests remain the proof of the database behaviour. Measured under CI conditions (`SUPABASE_LOCAL_API_URL=http://127.0.0.1:1`, so the live tests skip): before 94.89 / 91.86 / 95.28 / 95.89 %, after 98.20 / 95.81 / 97.97 / 98.85 % (statements / branches / functions / lines; thresholds 97 / 95 / 97 / 97); 8,829 tests passed, 171 skipped.
+14. **5b materials** (`docs/hackathon/validation/script.md`, `observation-sheet.md`): the task, the observer's words, the stop rules and the three questions as the plan gives them. The scoring answers come from the fixture migration (coastal walk 120 € with a 30 € deposit, canoe 15 €, 4x4 50 €, 24 h window). The sandbox buyer's password stays in 1Password.
+
+### Phase 5 review dispositions
+
+Independent reviewer (fresh context): CHANGES REQUESTED, no blocker or major. While fixing finding 1, a test exposed a money defect beyond the review; it is listed first.
+
+| # | Severity | Finding | Disposition |
+|---|----------|---------|-------------|
+| R0 | major (found while fixing 1) | Reconciliation step 5 finalized any `captured` payment of an unfinalized booking. For a booking with a confirmed cancellation that later became `needs_attention` (a refused refund, or the reviewer's finding 8), `finalizeCaptured` found the hold consumed and compensated: a full refund, even for a zero-refund cancellation | **Fixed.** Step 5 selects only bookings with no `cancellation_confirmed_at`; a refused cancellation refund moves the payment to `refund_failed`, so it is not `captured` either. Live test reproduced the refund (failed before the fix); mutation of the filter is caught by the unit and live tests |
+| 1 | minor | A definitive PayPal refusal (4xx) of a cancellation refund was reported "retried automatically" and retried every 5 minutes for ever | **Fixed.** 400, 403, 404 and 422 are final: the payment becomes `refund_failed`, the booking `needs_attention` ("No se pudo completar el reembolso; lo estamos revisando" on the page and in the chat card), `[PAYPAL_REFUND_REFUSED]` logged, nothing retries. Timeouts, 401, 408, 409, 429 and 5xx stay retryable. **Known limitation:** Phase 4's compensation refunds (step 6) still retry a definitive refusal; the booking is already `needs_attention` and visible to the operator |
+| 2 | minor | The F01 oracle lacked the "wait beyond ten minutes (clock advanced)" step | **Fixed:** live test previews, advances the clock 11 minutes (`vi.setSystemTime`), runs reconciliation, and asserts the booking and payment rows are byte-identical, availability unchanged and no refund |
+| 3 | minor | The Postman evidence predates the final tree | **Re-run on the final tree at the gate** (see the gate evidence); the run summary is updated |
+| 4 | minor | After the cancellation was recorded, a later database error answered 500 "No se pudo cancelar" | **Fixed:** everything after `confirm_cancellation` records the cancellation answers `refund_unavailable` (502, "registrada… lo reintentaremos") or the real status; tests for the payment load, a database error, a non-Error rejection and the reload |
+| 5 | minor | `create-operator-link.ts` claimed a new row revokes the old link | **Fixed** (docstring): rows are independent; a leaked link is revoked by expiring its row |
+| 6 | nit | Orphaned doc comment in `reconcile.ts` | **Fixed** |
+| 7 | nit | Gaps in the Phase 5 deviation numbering | **Fixed:** renumbered 1 to 14 |
+| 8 | nit (INFERRED) | A cancellation plus a duplicate-capture compensation whose refund fails would stop the cancellation's retries | **Covered by R0** (the compensation can no longer refund the cancelled payment); the cancellation refund itself is then left to the operator, who sees the `needs_attention` booking. Accepted |
+
+Second pass (same reviewer):
+
+| # | Severity | Finding | Disposition |
+|---|----------|---------|-------------|
+| R2-1 | minor | The R0 filter protected reconciliation step 5 only; the return page, both capture webhooks and the other steps reach `finalizeCaptured` too | **Fixed at the database (migration 124):** `consume_hold_and_confirm` and `reacquire_hold` raise `invalid_state` for a booking with `cancellation_confirmed_at`, which the capture code treats as "compensating" with no refund call. A live test through `captureApprovedOrder` (return page) reproduced the full compensation refund of a zero-refund cancellation before the migration (VERIFIED) and passes after; removing the guards is caught. Step 5's filter stays as a cheaper first line |
+| R2-2 | minor | Every 422 counted as a definitive refusal, but PayPal documents `PREVIOUS_REQUEST_IN_PROGRESS` (422) as "wait and retry" (developer.paypal.com/api/rest/responses, checked 2026-10-03) | **Fixed:** that issue stays retryable (unit test); other 400/403/404/422 are final |
+| R2-3 | nit | A repeated click on a stale chat card after a refused refund said "Esta reserva ya no se puede cancelar" | **Fixed:** `confirm_cancellation`'s "unchanged" reply says whether a cancellation was confirmed; such a booking reports its status (`needs_attention`, shown as the refused refund) instead of `invalid_state` (live test) |
+| R2-4 | nit (INFERRED) | A crash between the payment's `refund_failed` and the booking flag leaves `cancel_pending`, shown as "Reembolso en curso" | **Fixed:** the booking page shows the refused refund whenever the payment is `refund_failed`, whatever the booking row says (test) |
+
+Final pass: **APPROVE.** The reviewer diffed migration 124's bodies against 113, 120 and 123 (identical but for the guards), checked the grants, found no legitimate caller of the two RPCs for a cancelled booking, and ran the live suites (124 tests) and the unit suites (922). One accepted nit: `finalizeCaptured` still compensates on a `reacquire_hold` `invalid_state`, reachable only if a cancellation were confirmed between two RPCs of one capture, which needs the booking confirmed and cancelled in that window.
+
+### Phase 5 simplify pass
+
+Two read-only reviewers (reuse and simplification; efficiency and altitude). Applied, semantics unchanged unless stated:
+
+- **One capability guard.** `guardCapability(request, bucket, verify)` in `view.ts` holds the per-IP limit before any read, the Preview rule and the 404; `guardCapabilityRoute` and `guardOperatorRoute` are thin wrappers (they had been line-for-line copies). `bookingForCapability` became redundant and was removed.
+- **One production gate for the seed scripts.** `scripts/booking/target.ts` (`parseTarget`, `endOfMadridDay`, `serviceClientFor`) is used by `create-voucher.ts` and `create-operator-link.ts`; the `--yes-production` check and the production-only `.env.local` read live in one place.
+- **`confirm_cancellation` defined once:** the `cancellation_confirmed` field moved into migration 123 (never applied outside local Docker) and migration 124 now only changes the two capture RPCs.
+- **Reconciliation step 7 counts a refund only when one was requested** (a refusal or a lost race returns null); test. `reconcile.ts`'s local wrapper is `countRefundStatus`, no longer an alias of `applyRefundStatus`.
+- `CancellationCard` extends `CancellationTerms`; the operator view reuses `BookingPaymentView` and `toPaymentView`; the unused `CancellationTerms` re-export is gone; the Postman runner's slot dates use `addDays(madridDate())` (Madrid calendar, test updated); `next.config.ts` builds the four capability entries from `CAPABILITY_PATH_PREFIXES`, and its comment and the booking page's no longer claim things the code does not do.
+
+Skipped:
+
+- **A range availability RPC for the operator view** (14 calls per active experience, run in parallel): fine at demo scale; revisit with Phase 6 timing, together with Phase 3's search-tool note.
+- **Fewer round trips in the cancel path and the operator view's two waves:** one or two queries each; not worth the complexity now.
+- **One helper for the three `refundCapture` call sites:** their amount sources and error handling differ (compensation, follow-up, cancellation); the shared part is two lines.
+- **Shared test mocks** (operator route tests, the guarded-write result constants in five unit-test files): test-only duplication; worth doing if more route tests appear.
+- **The operator dashboard's own status labels:** merchant-facing wording, deliberately different from the visitor's for `needs_attention` and `expired`.
+- **Test-only exports and a shared cancellation-message helper:** low value.
+
 ## Owner decisions after Phase 0
 
 Recorded 2026-10-03, when the owner accepted Phase 0.

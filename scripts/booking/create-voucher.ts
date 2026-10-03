@@ -23,10 +23,9 @@
  */
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { config } from "dotenv";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateVoucherCode, hashVoucherCode } from "../../src/lib/booking/vouchers";
-import { localServiceClient } from "../../src/test/local-supabase";
+import { endOfMadridDay, parseTarget, serviceClientFor, type ScriptTarget } from "./target";
 
 interface VoucherOptions {
   label: string;
@@ -37,7 +36,7 @@ interface VoucherOptions {
   turns: number;
   attempts: number;
   replace: string | null;
-  target: "local" | "production";
+  target: ScriptTarget;
   confirmProduction: boolean;
 }
 
@@ -65,10 +64,7 @@ export function parseVoucherArgs(argv: string[]): VoucherOptions {
   });
 
   if (!values.label) throw new Error("--label is required");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(values.expires)) throw new Error("--expires needs YYYY-MM-DD");
-  if (values.target !== "local" && values.target !== "production") {
-    throw new Error("--target is local or production");
-  }
+  endOfMadridDay(values.expires);
 
   return {
     label: values.label,
@@ -78,7 +74,7 @@ export function parseVoucherArgs(argv: string[]): VoucherOptions {
     turns: positiveInt("turns", values.turns),
     attempts: positiveInt("attempts", values.attempts),
     replace: values.replace ?? null,
-    target: values.target,
+    target: parseTarget(values.target),
     confirmProduction: values["yes-production"],
   };
 }
@@ -89,7 +85,7 @@ export async function createVoucher(client: SupabaseClient, options: VoucherOpti
   const inserted = await client.from("vouchers").insert({
     code_hash: codeHash,
     label: options.label,
-    expires_at: `${options.expires}T23:59:59+01:00`,
+    expires_at: endOfMadridDay(options.expires),
     max_redemptions: options.max,
     chat_turns_limit: options.turns,
     booking_attempts_limit: options.attempts,
@@ -110,23 +106,9 @@ export async function createVoucher(client: SupabaseClient, options: VoucherOpti
   return { code };
 }
 
-function clientFor(options: VoucherOptions): SupabaseClient {
-  if (options.target === "local") {
-    return localServiceClient();
-  }
-  if (!options.confirmProduction) {
-    throw new Error("--target production also needs --yes-production (owner-authorized action)");
-  }
-  config({ path: ".env.local" });
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_KEY?.trim();
-  if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in .env.local");
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
 async function main(): Promise<void> {
   const options = parseVoucherArgs(process.argv.slice(2));
-  const { code } = await createVoucher(clientFor(options), options);
+  const { code } = await createVoucher(serviceClientFor(options.target, options.confirmProduction), options);
   console.log(`Voucher "${options.label}" (${options.target}) created. Code, shown once:\n\n  ${code}\n`);
 }
 

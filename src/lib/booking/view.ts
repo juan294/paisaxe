@@ -10,7 +10,7 @@ import { buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/request-utils";
 import { createAdminClient } from "@/lib/supabase-admin";
-import type { BookingView } from "@/types/booking-page";
+import type { BookingPaymentView, BookingView } from "@/types/booking-page";
 import { verifyBookingCapability } from "./links";
 import { isPreviewDeployment } from "./surface";
 import type { Booking } from "./types";
@@ -22,27 +22,21 @@ export const CAPABILITY_HEADERS = {
   "X-Robots-Tag": "noindex",
 };
 
-/**
- * The booking a capability opens, or null. Needs no voucher and keeps working
- * after the flag is turned off; only a Preview deployment hides it.
- */
-export async function bookingForCapability(client: SupabaseClient, capability: string): Promise<Booking | null> {
-  if (isPreviewDeployment()) return null;
-  return verifyBookingCapability(client, capability);
-}
-
-// Polling every 5 s is 12 a minute; the pay and return calls fit beside it.
+// Polling every 5 s is 12 a minute; the page's actions fit beside it.
 const CAPABILITY_ROUTE_RATE_LIMIT = { windowMs: 60_000, maxRequests: 30, maxEntries: 10_000 };
 
 /**
- * Shared front of the booking-page routes: a per-IP limit (before any
- * database read), then the capability. Returns the booking or the response.
+ * Shared front of every capability route (booking and operator): a per-IP
+ * limit before any database read, then `verify`. An unknown, bad or expired
+ * capability, and every capability on a Preview (whose data is
+ * production's), is a 404 with no data.
  */
-export async function guardCapabilityRoute(
+export async function guardCapability<T>(
   request: NextRequest,
-  capability: string
-): Promise<{ admin: SupabaseClient; booking: Booking } | NextResponse> {
-  const rateLimit = await checkRateLimit(`booking-capability:${getClientIp(request)}`, CAPABILITY_ROUTE_RATE_LIMIT);
+  bucket: string,
+  verify: (admin: SupabaseClient) => Promise<T | null>
+): Promise<{ admin: SupabaseClient; found: T } | NextResponse> {
+  const rateLimit = await checkRateLimit(`${bucket}:${getClientIp(request)}`, CAPABILITY_ROUTE_RATE_LIMIT);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -50,9 +44,28 @@ export async function guardCapabilityRoute(
     );
   }
   const admin = createAdminClient();
-  const booking = await bookingForCapability(admin, capability);
-  if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404, headers: CAPABILITY_HEADERS });
-  return { admin, booking };
+  const found = isPreviewDeployment() ? null : await verify(admin);
+  if (!found) return NextResponse.json({ error: "Not found" }, { status: 404, headers: CAPABILITY_HEADERS });
+  return { admin, found };
+}
+
+/** The booking-page routes' front: guardCapability with the booking capability. */
+export async function guardCapabilityRoute(
+  request: NextRequest,
+  capability: string
+): Promise<{ admin: SupabaseClient; booking: Booking } | NextResponse> {
+  const guard = await guardCapability(request, "booking-capability", (admin) => verifyBookingCapability(admin, capability));
+  return guard instanceof NextResponse ? guard : { admin: guard.admin, booking: guard.found };
+}
+
+/** A payments row as the booking page and the operator view show it. */
+export function toPaymentView(row: Record<string, unknown>): BookingPaymentView {
+  return {
+    status: row.status as string,
+    orderId: (row.order_id as string | null) ?? null,
+    captureId: (row.capture_id as string | null) ?? null,
+    refundId: (row.refund_id as string | null) ?? null,
+  };
 }
 
 export async function loadBookingView(client: SupabaseClient, booking: Booking): Promise<BookingView> {
@@ -60,7 +73,7 @@ export async function loadBookingView(client: SupabaseClient, booking: Booking):
     client.from("experiences").select("title").eq("id", booking.experienceId).maybeSingle(),
     client
       .from("payments")
-      .select("status, order_id, capture_id")
+      .select("status, order_id, capture_id, refund_id")
       .eq("booking_id", booking.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -85,12 +98,6 @@ export async function loadBookingView(client: SupabaseClient, booking: Booking):
     currency: booking.currency,
     cancellationWindowHours: booking.cancellationWindowHours,
     holdExpiresAt: booking.status === "pending_payment" ? (holdRow?.expires_at ?? null) : null,
-    payment: payment.data
-      ? {
-          status: payment.data.status as string,
-          orderId: (payment.data.order_id as string | null) ?? null,
-          captureId: (payment.data.capture_id as string | null) ?? null,
-        }
-      : null,
+    payment: payment.data ? toPaymentView(payment.data) : null,
   };
 }

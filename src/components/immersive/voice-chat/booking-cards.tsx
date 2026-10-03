@@ -1,5 +1,6 @@
 "use client";
 
+import { CancellationConfirm } from "@/components/booking/cancellation-confirm";
 import { Button } from "@/components/ui/button";
 import type { QuoteState } from "@/hooks/use-booking-chat";
 import { clockTime, money } from "@/lib/booking-format";
@@ -161,11 +162,10 @@ function PaymentCardView({ card, t, locale }: { card: PaymentCard; t: T; locale:
   );
 }
 
-function CancellationCardView({ card, t, locale }: { card: CancellationCard; t: T; locale: Locale }) {
+function CancellationCardView({ card, t }: { card: CancellationCard; t: T }) {
   return (
     <CardShell title={t("booking.cards.cancellationTitle")} t={t}>
-      <p>{t("booking.cards.refund").replace("{amount}", money(card.refundCents, card.currency, locale))}</p>
-      <p className="text-white/60">{card.policy}</p>
+      <CancellationConfirm capability={card.capability} terms={card} />
     </CardShell>
   );
 }
@@ -202,7 +202,7 @@ export function BookingCards({ cards, quoteStates, onAccept, onRequote, busy = f
           case "payment":
             return <PaymentCardView key={`pay-${card.bookingId}`} card={card} t={t} locale={locale} />;
           case "cancellation":
-            return <CancellationCardView key={`cancel-${card.bookingId}`} card={card} t={t} locale={locale} />;
+            return <CancellationCardView key={`cancel-${card.bookingId}`} card={card} t={t} />;
         }
       })}
     </>

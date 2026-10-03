@@ -50,8 +50,13 @@ function parseCapability(capability: string): { id: string; token: string } | nu
   return { id, token };
 }
 
+/** The `<id>.<token>` capability alone, for a card whose button calls a capability route. */
+export function bookingCapability(booking: { id: string; linkVersion: number }): string {
+  return `${booking.id}.${capabilityToken("booking", booking.id, booking.linkVersion)}`;
+}
+
 export function bookingLink(booking: { id: string; linkVersion: number }): string {
-  return `/booking/${booking.id}.${capabilityToken("booking", booking.id, booking.linkVersion)}`;
+  return `/booking/${bookingCapability(booking)}`;
 }
 
 export function operatorLink(access: { id: string; linkVersion: number }): string {

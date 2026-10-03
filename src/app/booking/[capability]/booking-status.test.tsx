@@ -13,6 +13,13 @@ vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({ t: (key: string) => key, locale: "es" }),
 }));
 vi.mock("@/lib/csrf-client", () => ({ csrfHeaders: () => ({ "x-csrf-token": "csrf-1" }) }));
+vi.mock("@/components/booking/cancellation-confirm", () => ({
+  CancellationConfirm: ({ terms, onCancelled }: { terms: { refundCents: number }; onCancelled: (r: unknown) => void }) => (
+    <button type="button" onClick={() => onCancelled({ status: "refund_pending", refundCents: terms.refundCents })}>
+      confirm {terms.refundCents}
+    </button>
+  ),
+}));
 
 const { BookingStatus, nextPollDelay } = await import("./booking-status");
 
@@ -42,7 +49,7 @@ function view(overrides: Partial<BookingView> = {}): BookingView {
   };
 }
 
-const confirming = () => view({ payment: { status: "capture_pending", orderId: "ORDER-1", captureId: null } });
+const confirming = () => view({ payment: { status: "capture_pending", orderId: "ORDER-1", captureId: null, refundId: null } });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -145,7 +152,7 @@ describe("BookingStatus", () => {
   });
 
   it("shows the receipt with the order and capture ids once confirmed", async () => {
-    mockFetch.mockResolvedValueOnce(json(200, view({ status: "confirmed", holdExpiresAt: null, payment: { status: "captured", orderId: "ORDER-1", captureId: "CAP-1" } })));
+    mockFetch.mockResolvedValueOnce(json(200, view({ status: "confirmed", holdExpiresAt: null, payment: { status: "captured", orderId: "ORDER-1", captureId: "CAP-1", refundId: null } })));
     render(<BookingStatus />);
 
     expect(await screen.findByText("booking.page.confirmedTitle")).toBeInTheDocument();
@@ -184,7 +191,7 @@ describe("BookingStatus", () => {
     await act(() => vi.advanceTimersByTimeAsync(1_000));
     expect(mockFetch).toHaveBeenCalledTimes(atTwoMinutes + 1);
 
-    mockFetch.mockResolvedValue(json(200, view({ status: "confirmed", holdExpiresAt: null, payment: { status: "captured", orderId: "ORDER-1", captureId: "CAP-1" } })));
+    mockFetch.mockResolvedValue(json(200, view({ status: "confirmed", holdExpiresAt: null, payment: { status: "captured", orderId: "ORDER-1", captureId: "CAP-1", refundId: null } })));
     await act(() => vi.advanceTimersByTimeAsync(30_000));
     expect(screen.getByText("booking.page.confirmedTitle")).toBeInTheDocument();
     const settled = mockFetch.mock.calls.length;
@@ -199,5 +206,67 @@ describe("BookingStatus", () => {
     fireEvent.click(await screen.findByRole("button", { name: "booking.page.refresh" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+  });
+
+  describe("cancellation (Phase 5)", () => {
+    const confirmedView = () =>
+      view({ status: "confirmed", holdExpiresAt: null, payment: { status: "captured", orderId: "ORDER-1", captureId: "CAP-1", refundId: null } });
+    const terms = {
+      refundCents: 3000,
+      depositCents: 3000,
+      currency: "EUR",
+      cancellationWindowHours: 24,
+      slotStart: "2026-11-21T09:00:00.000Z",
+      termsValidUntil: "2026-11-20T09:00:00.000Z",
+    };
+
+    it("loads the read-only preview on demand, confirms through it and reloads the booking", async () => {
+      mockFetch
+        .mockResolvedValueOnce(json(200, confirmedView()))
+        .mockResolvedValueOnce(json(200, terms))
+        .mockResolvedValue(json(200, view({ status: "refund_pending", holdExpiresAt: null, payment: { status: "refund_pending", orderId: "ORDER-1", captureId: "CAP-1", refundId: "RF-1" } })));
+      render(<BookingStatus />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "booking.cancel.open" }));
+      fireEvent.click(await screen.findByRole("button", { name: "confirm 3000" }));
+
+      expect(await screen.findByText("booking.cancel.refundPending")).toBeInTheDocument();
+      expect(mockFetch.mock.calls[1][0]).toBe(`/api/booking/bookings/${CAPABILITY}/cancellation-preview`);
+      expect(mockFetch.mock.calls[1][1]).toMatchObject({ cache: "no-store" });
+      expect(screen.getByText("RF-1")).toBeInTheDocument();
+    });
+
+    it("a booking that can no longer be cancelled says so", async () => {
+      mockFetch.mockResolvedValueOnce(json(200, confirmedView())).mockResolvedValueOnce(json(409, { error: "invalid_state" }));
+      render(<BookingStatus />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "booking.cancel.open" }));
+
+      expect(await screen.findByText("booking.cancel.unavailable")).toBeInTheDocument();
+    });
+
+    it.each(["cancel_pending", "refund_pending"])("%s shows the refund in progress", async (status) => {
+      mockFetch.mockResolvedValueOnce(json(200, view({ status, holdExpiresAt: null, payment: { status: "captured", orderId: "O", captureId: "C", refundId: null } })));
+      render(<BookingStatus />);
+      expect(await screen.findByText("booking.cancel.refundPending")).toBeInTheDocument();
+    });
+
+    it("a failed refund shows as such even while the booking still says cancel_pending", async () => {
+      mockFetch.mockResolvedValueOnce(
+        json(200, view({ status: "cancel_pending", holdExpiresAt: null, payment: { status: "refund_failed", orderId: "O", captureId: "C", refundId: null } }))
+      );
+      render(<BookingStatus />);
+      expect(await screen.findByText("booking.cancel.refundFailed")).toBeInTheDocument();
+      expect(screen.queryByText("booking.cancel.refundPending")).toBeNull();
+    });
+
+    it("a failed refund says it is being reviewed", async () => {
+      mockFetch.mockResolvedValueOnce(
+        json(200, view({ status: "needs_attention", holdExpiresAt: null, payment: { status: "refund_failed", orderId: "O", captureId: "C", refundId: "RF-9" } }))
+      );
+      render(<BookingStatus />);
+      expect(await screen.findByText("booking.cancel.refundFailed")).toBeInTheDocument();
+      expect(screen.queryByText("booking.page.attentionBody")).toBeNull();
+    });
   });
 });

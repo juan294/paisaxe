@@ -102,6 +102,25 @@ describe("BookingCards", () => {
     expect(screen.getByText(/booking.cards.verdict.unknown/)).toBeInTheDocument();
   });
 
+  it("a cancellation card offers the confirm button with the refund it shows", () => {
+    renderCards([
+      {
+        kind: "cancellation",
+        bookingId: "b1",
+        capability: "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde",
+        refundCents: 3000,
+        depositCents: 3000,
+        currency: "EUR",
+        cancellationWindowHours: 24,
+        slotStart: "2026-11-21T09:00:00.000Z",
+        termsValidUntil: "2026-11-20T09:00:00.000Z",
+      },
+    ]);
+
+    expect(screen.getByText("booking.cards.cancellationTitle")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "booking.cancel.confirmRefund" })).toBeEnabled();
+  });
+
   it("labels a payment card as PayPal sandbox, with the hold's expiry", () => {
     renderCards([
       {

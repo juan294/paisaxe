@@ -10,3 +10,14 @@ export function money(cents: number, currency: string, locale: Locale): string {
 export function clockTime(iso: string, locale: Locale): string {
   return new Date(iso).toLocaleTimeString(toIntlLocale(locale), { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 }
+
+/** Day, month and HH:MM in Asturias time, for deadlines such as the refund cutoff. */
+export function dateTime(iso: string, locale: Locale): string {
+  return new Date(iso).toLocaleString(toIntlLocale(locale), {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Madrid",
+  });
+}

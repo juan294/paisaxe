@@ -96,6 +96,13 @@ export interface PaypalMockOptions {
   /** When set, the token endpoint answers 401 invalid_client for other credentials. */
   clientId?: string;
   clientSecret?: string;
+  /** Fixed port on 127.0.0.1, for a server started before the mock (scripts/booking/postman-local.ts). Default: any free port. */
+  port?: number;
+  /**
+   * Inserted into every order, capture and refund id (letters and digits). A mock that is
+   * restarted against a database that keeps its rows needs one, or its ids repeat. Default: none.
+   */
+  idSalt?: string;
 }
 
 export interface PaypalMock {
@@ -166,7 +173,9 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
   let tokenExpiresIn = 32_400;
   let baseUrl = "";
 
-  const nextId = (prefix: string) => `${prefix}${String(++sequence).padStart(13, "0")}`;
+  const idSalt = options.idSalt ?? "";
+  if (!/^[A-Za-z0-9]*$/.test(idSalt)) throw new Error("paypal mock: idSalt must be letters and digits");
+  const nextId = (prefix: string) => `${prefix}${idSalt}${String(++sequence).padStart(13, "0")}`;
   const debugId = () => `mockdebug${++sequence}`;
 
   function send(response: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
@@ -449,7 +458,13 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
       if (!response.headersSent) response.writeHead(500).end();
     });
   });
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  await new Promise<void>((done, fail) => {
+    server.once("error", fail);
+    server.listen(options.port ?? 0, "127.0.0.1", () => {
+      server.off("error", fail);
+      done();
+    });
+  });
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
   function requireOrder(orderId: string): MockOrder {

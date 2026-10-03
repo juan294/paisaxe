@@ -7,6 +7,9 @@ const withBundleAnalyzer = bundleAnalyzer({
   openAnalyzer: false, // Don't auto-open browser
 });
 
+/** Path prefixes whose URLs carry a booking or operator capability. */
+const CAPABILITY_PATH_PREFIXES = ["/booking", "/operator", "/api/booking/bookings", "/api/operator"];
+
 const nextConfig: NextConfig = {
   transpilePackages: ["@supabase/ssr"],
   serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
@@ -72,25 +75,19 @@ const nextConfig: NextConfig = {
         // for the `unsafe-inline` rationale (PPR compatibility).
       ],
     },
-    // Capability URLs (/booking/<id>.<token>, /operator/<id>.<token>) must
-    // never leak through a Referer header nor be indexed (PayPal hackathon
-    // plan, F05). The single place for these headers, pages and route handlers
-    // alike; for one path the last matching entry wins, so these follow the
-    // site-wide one. Cache-Control is set per route (Next overrides it for pages).
-    {
-      source: "/booking/:path*",
+    // Capability URLs (/booking/<id>.<token>, /operator/<id>.<token>, and the
+    // API routes that carry one in their path) must never leak through a
+    // Referer header nor be indexed (PayPal hackathon plan, F05). For one path
+    // the last matching entry wins, so these follow the site-wide one; a route
+    // handler's own Referrer-Policy would lose to it. Cache-Control is set by
+    // the API routes (private, no-store); the page shells hold no booking data.
+    ...CAPABILITY_PATH_PREFIXES.map((prefix) => ({
+      source: `${prefix}/:path*`,
       headers: [
         { key: "Referrer-Policy", value: "no-referrer" },
         { key: "X-Robots-Tag", value: "noindex" },
       ],
-    },
-    {
-      source: "/operator/:path*",
-      headers: [
-        { key: "Referrer-Policy", value: "no-referrer" },
-        { key: "X-Robots-Tag", value: "noindex" },
-      ],
-    },
+    })),
   ],
   images: {
     // Prefer modern formats for better compression
