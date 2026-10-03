@@ -276,6 +276,14 @@ for (const [label, result, exit] of [['failed Fast check', { ...passed, success:
 
 // In a called workflow `github.workflow` is the CALLER's name, so a callee group
 // built from it would collide with its caller or a sibling and cancel or queue it.
+test('CI Fast cancels a superseded pull-request run but never a push run, and pushes never share a group', () => {
+  const concurrency = workflow('ci-cadence.yml').concurrency;
+  const resolve = (event, sha) => { const base = nativeContext(event, 'lean'), context = { ...base, github: { ...base.github, sha } }; return { group: interpolate(concurrency.group, context), cancel: String(interpolate(concurrency['cancel-in-progress'], context)) }; };
+  const first = resolve(push(), 'a'.repeat(40)), second = resolve(push(), 'b'.repeat(40));
+  assert.equal(first.cancel, 'false'); assert.equal(second.cancel, 'false'); assert.notEqual(first.group, second.group);
+  const pr = resolve(pull(), 'a'.repeat(40)), resync = resolve(pull(), 'b'.repeat(40));
+  assert.equal(pr.cancel, 'true'); assert.equal(pr.group, resync.group); assert.notEqual(pr.group, first.group);
+});
 test('concurrency groups: no callee shares a group with its caller or a sibling, and develop / nightly / release are disjoint', () => {
   const definition = name => workflow(name);
   const group = (name, context) => interpolate(definition(name).concurrency.group, context);

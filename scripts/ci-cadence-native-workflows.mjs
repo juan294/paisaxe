@@ -120,7 +120,10 @@ PY
   const nightly={name:'CI nightly',on:{schedule:[{cron:'0 3 * * *'}]},permissions:permission,concurrency:{group:'B-nightly-${{ github.run_id }}-${{ github.run_attempt }}','cancel-in-progress':false},jobs};
   const fastRoot=structuredClone(nightly);
   fastRoot.name='CI cadence';fastRoot.on={push:{branches:['develop']},pull_request:{branches:['develop']}};
-  fastRoot.concurrency={group:'B-cadence-${{ github.ref }}','cancel-in-progress':true};
+  // A superseded PR run may be cancelled: the newer run rescans the whole PR.
+  // A push run scans only its own before..after, so it is never cancelled, and
+  // its group is per commit so a later push cannot evict it while it is pending.
+  fastRoot.concurrency={group:"B-cadence-${{ github.event_name == 'pull_request' && github.ref || github.sha }}",'cancel-in-progress':"${{ github.event_name == 'pull_request' }}"};
   // The inlined job IS the `CI Fast` context and the only routine runner. It has
   // no mode term, so it is produced under legacy too; recovery children start
   // only on a lean "full" decision, and legacy keeps its original workflows.

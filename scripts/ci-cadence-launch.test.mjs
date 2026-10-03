@@ -64,6 +64,25 @@ each('merge with a third parent or a foreign second parent is blocked', async f 
   const tree = f.git('rev-parse', `${x.checkout}^{tree}`);
   for (const parents of [[x.base, x.source, f.absent], [x.base, f.absent]]) { const merge = f.git('commit-tree', tree, ...parents.flatMap(parent => ['-p', parent]), '-m', 'forged merge'); f.git('checkout', '--quiet', '--force', '--detach', merge); x.input.context.sha = merge; assert.equal((await launchNative(x.input, x.transports)).lane, 'blocked'); }
 });
+// A newer push does not cancel an older push's run; the older run must still scan
+// its own before..after once develop has moved past it.
+each('superseded push whose head is an ancestor of the develop tip completes all four Fast works on its own range', async f => {
+  const x = await f.prepare('push'); const compares = [];
+  const request = async (url, init) => { if (url.includes('/compare/')) compares.push(url.split('/compare/')[1]); return tipAt(x, 'd'.repeat(40), { status: 'ahead', base_commit: { sha: x.source }, merge_base_commit: { sha: x.source } })(url, init); };
+  const r = await launchNative(x.input, { ...x.transports, request });
+  assert.equal(r.lane, 'fast'); assert.equal(r.success, true); assert.deepEqual(r.completed, ['commit-secret-scan', 'policy-validation', 'lockfile-validation', 'cadence-contracts']);
+  assert.equal(r.sourceSha, x.source); assert.equal(r.definitionSha, x.base); assert.deepEqual(compares, [`${x.source}...${'d'.repeat(40)}`]);
+});
+each('superseded push still fails on a secret introduced in its own range', async f => {
+  const x = await f.prepare('push', { mutate: async ({ put }) => put('leak.ts', 'const token = "ghp_0123456789abcdef0123456789abcdef012345";\n') });
+  const r = await launchNative(x.input, { ...x.transports, request: tipAt(x, 'd'.repeat(40), { status: 'ahead', base_commit: { sha: x.source }, merge_base_commit: { sha: x.source } }) });
+  assert.equal(r.lane, 'fast'); assert.equal(r.success, false); assert.match(r.reason, /secret/);
+});
+for (const [label, compared] of [['diverged from develop', x => ({ status: 'diverged', base_commit: { sha: x.source }, merge_base_commit: { sha: x.base } })], ['ahead of develop', x => ({ status: 'behind', base_commit: { sha: x.source }, merge_base_commit: { sha: 'd'.repeat(40) } })], ['compared against another commit', x => ({ status: 'ahead', base_commit: { sha: x.base }, merge_base_commit: { sha: x.base } })]]) each(`pushed SHA ${label} blocks`, async f => {
+  const x = await f.prepare('push');
+  const r = await launchNative(x.input, { ...x.transports, request: tipAt(x, 'd'.repeat(40), compared(x)) });
+  assert.equal(r.lane, 'blocked'); assert.equal(r.protectedImported, false);
+});
 // No injected git transport: the real launcher shares objects from the
 // full-history checkout. A network fetch would fail here (private origin, fixture token).
 for (const kind of ['push', 'pull_request']) each(`${kind} is classified from the local checkout with no git network operation`, async f => {

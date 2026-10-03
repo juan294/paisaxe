@@ -99,7 +99,11 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
       // The merge's first parent (base.sha or its descendant) must be the branch
       // tip or one of its ancestors, so base.sha is on the branch as well.
       if (nativeRef.object.sha !== mergeBase) { const compared = await get(`/compare/${mergeBase}...${nativeRef.object.sha}`); if (compared.status !== 'ahead' || compared.merge_base_commit?.sha !== mergeBase || compared.base_commit?.sha !== mergeBase) throw Error('authenticated native ref'); }
-    } else if (nativeRef.object.sha !== (eventName === 'push' ? source : definition)) throw Error('authenticated native ref');
+    } else if (eventName === 'push') {
+      // A superseded push still scans its own before..after: its head must be the
+      // branch tip or one of its ancestors, not necessarily the tip.
+      if (nativeRef.object.sha !== source) { const compared = await get(`/compare/${source}...${nativeRef.object.sha}`); if (compared.status !== 'ahead' || compared.merge_base_commit?.sha !== source || compared.base_commit?.sha !== source) throw Error('authenticated native ref'); }
+    } else if (nativeRef.object.sha !== definition) throw Error('authenticated native ref');
     const commit = await get(`/git/commits/${definition}`); if (commit.sha !== definition) throw Error('authenticated definition commit');
     temporary = await realpath(await mkdtemp(join(tmpdir(), 'paisaxe-launch-')));
     const work = join(temporary, 'checkout'); await mkdir(work, { mode: 0o700 }); run(['init', '--quiet', '--template=', work], temporary); run(['remote', 'add', 'origin', ORIGIN], work);

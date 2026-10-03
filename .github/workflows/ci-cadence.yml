@@ -12,8 +12,8 @@ permissions: &a1
   checks: read
   pull-requests: read
 concurrency:
-  group: B-cadence-${{ github.ref }}
-  cancel-in-progress: true
+  group: B-cadence-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   admission:
     name: Cadence admission
@@ -277,7 +277,7 @@ jobs:
       - name: Acquire reviewed protected launcher
         id: entry
         env:
-          LAUNCHER_SHA256: 09dc2177167db556792c854b8164f1a7a59b8e4ca228de0d436a571c217b09ce
+          LAUNCHER_SHA256: 61171cc1cd4a5f6049e04085040936d7205b78a690d8cd0bc78ac3c878389bf5
           GITHUB_TOKEN: ${{ github.token }}
           CI_CADENCE_MODE: lean
           ROUTING_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
