@@ -3,6 +3,9 @@ import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { TRANSMISSION_HEADERS, verifyWebhookSignature } from "@/lib/paypal";
 import { normalizePaypalEvent, processAndRecordPaypalEvent } from "@/lib/booking/webhook-events";
+import { buildRateLimitHeaders } from "@/lib/chat-route-utils";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/request-utils";
 
 /**
  * POST /api/webhooks/paypal (PayPal hackathon plan, Phase 4, F03)
@@ -21,6 +24,8 @@ import { normalizePaypalEvent, processAndRecordPaypalEvent } from "@/lib/booking
 
 /** A request missing any PayPal transmission header cannot be a PayPal delivery: refused before asking PayPal. */
 const REQUIRED_HEADERS = Object.values(TRANSMISSION_HEADERS);
+
+const WEBHOOK_RATE_LIMIT = { windowMs: 60_000, maxRequests: 120, maxEntries: 10_000 };
 
 function invalid(reason: string, transmissionId: string | null): NextResponse {
   logger.warn("[PAYPAL_WEBHOOK_INVALID]", { reason, transmissionId });
@@ -41,6 +46,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (REQUIRED_HEADERS.some((header) => !request.headers.get(header)?.trim())) {
     return invalid("missing_transmission_headers", transmissionId);
+  }
+
+  // Each request with headers costs a PayPal verification call; PayPal redelivers after a 429.
+  const rateLimit = await checkRateLimit(`paypal-webhook:${getClientIp(request)}`, WEBHOOK_RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: buildRateLimitHeaders(rateLimit, true) });
   }
 
   let verification: "SUCCESS" | "FAILURE";

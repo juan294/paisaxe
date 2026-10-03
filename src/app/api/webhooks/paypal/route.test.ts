@@ -13,6 +13,16 @@ import { resetPaypalClientForTests } from "@/lib/paypal/client";
 
 const logger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
 vi.mock("@/lib/logger", () => ({ logger }));
+const limiter = vi.hoisted(() => ({ allowed: true }));
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn(async () => ({
+    allowed: limiter.allowed,
+    limit: 120,
+    remaining: limiter.allowed ? 119 : 0,
+    resetAt: Date.now() + 60_000,
+    retryAfter: 60,
+  })),
+}));
 
 const admin = vi.hoisted(() => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/supabase-admin", () => admin);
@@ -57,6 +67,7 @@ let mock: PaypalMock;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  limiter.allowed = true;
   mock = await startPaypalMock();
   vi.stubEnv("PAYPAL_CLIENT_ID", "client-id");
   vi.stubEnv("PAYPAL_CLIENT_SECRET", "client-secret");
@@ -72,6 +83,19 @@ afterEach(async () => {
   vi.unstubAllEnvs();
   resetPaypalClientForTests();
   await mock.close();
+});
+
+describe("rate limit", () => {
+  it("429s over the per-IP limit before asking PayPal to verify anything", async () => {
+    limiter.allowed = false;
+    const { checkRateLimit } = await import("@/lib/rate-limit");
+
+    const response = await POST(request({ ...SIGNED_HEADERS, "x-forwarded-for": "203.0.113.9" }));
+
+    expect(response.status).toBe(429);
+    expect(checkRateLimit).toHaveBeenCalledWith("paypal-webhook:203.0.113.9", expect.objectContaining({ maxRequests: 120 }));
+    expect(mock.requestsTo("POST", VERIFY_PATH)).toHaveLength(0);
+  });
 });
 
 describe("POST /api/webhooks/paypal before the inbox", () => {

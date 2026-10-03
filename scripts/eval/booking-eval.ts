@@ -12,8 +12,9 @@
  * euro amount in assistant text that did not come from a tool, and at most
  * two clarification turns in scenario 1.
  *
- * Only ANTHROPIC_API_KEY is read from the main checkout's .env.local; every
- * database call goes to the local stack. Never point this at production.
+ * Only ANTHROPIC_API_KEY is read: from the environment if set, else from the
+ * main checkout's .env.local. Every database call goes to the local stack.
+ * Never point this at production.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -23,6 +24,8 @@ import { LOCAL_API_URL, LOCAL_SERVICE_ROLE_KEY, localServiceClient, psql } from 
 const ENV_LOCAL = join(process.env.HOME ?? "", "code/paisaxe/.env.local");
 
 function loadAnthropicKey(): string {
+  const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
   const line = readFileSync(ENV_LOCAL, "utf8")
     .split("\n")
     .find((l) => l.startsWith("ANTHROPIC_API_KEY="));
@@ -46,6 +49,10 @@ type BookingCard = import("../../src/types/booking-cards").BookingCard;
 type QuoteCard = Extract<BookingCard, { kind: "quote" }>;
 
 const admin = localServiceClient();
+// This evaluates the REAL model: never the E2E replay.
+if (process.env.BOOKING_AGENT_REPLAY?.trim()) {
+  throw new Error("Unset BOOKING_AGENT_REPLAY: the evaluation must run the real model, not the E2E replay");
+}
 const anthropic = await createBookingModelClient();
 
 interface Turn {

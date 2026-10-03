@@ -14,14 +14,16 @@ permissions:
 
 jobs:
   claude-review:
-    # Run on PR events (skip bot authors) or when @claude is mentioned in a PR comment.
+    # Run on PR events (skip bot authors) or when @claude is mentioned in a PR comment
+    # by the owner, a member or a collaborator; outside commenters cannot start it.
     if: |
       (github.event_name == 'pull_request' &&
        github.event.pull_request.user.login != 'dependabot[bot]' &&
        github.event.pull_request.user.login != 'renovate[bot]') ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
-       contains(github.event.comment.body, '@claude'))
+       contains(github.event.comment.body, '@claude') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

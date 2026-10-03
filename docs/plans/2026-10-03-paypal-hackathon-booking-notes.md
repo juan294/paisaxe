@@ -469,6 +469,57 @@ Skipped:
 - **The operator dashboard's own status labels:** merchant-facing wording, deliberately different from the visitor's for `needs_attention` and `expired`.
 - **Test-only exports and a shared cancellation-message helper:** low value.
 
+### Phase 6
+
+1. **The research document was already committed** (Phase 0, `985f570d`); cleanup item 6 needed nothing.
+2. **`docs/agents/` untracked as the plan says, with two choices the plan did not anticipate.**
+   - The folder also held reference documents, not only agent reports: `elevenlabs-modernization-handoff.md` (which `CLAUDE.md` tells agents to read), `elevenlabs-parameter-tuning-guide.md`, `paisaxe-voice-agent-test-plan.md`, `shared-context.md`, `google-ai-pro-analysis.md` and two JSON test registries. Chose the plan's default (untrack the whole folder), so new reports stay local. **Correction (Phase 6 review finding 2):** untracking does not unpublish: all 23 files remain in git history (413 commits touch the path), including the security, pre-launch and cost reports. A pattern scan found no secrets (only ElevenLabs test ids), but making the repository public exposes that history unless it is purged; that is an owner decision before `gh repo edit --visibility public`. They stay as local copies, so the `CLAUDE.md` reference still works in the owner's checkout; a public clone does not have them. Moving any of them to a tracked folder is an owner decision at publication.
+   - `scripts/agents/cc-rpi-update.sh` stays tracked although `scripts/agents/` is now ignored: `scripts/tests/cc-rpi-update-fallback.test.sh` copies it from the repository.
+   - Merging this phase into a checkout where those files are tracked deletes them from its working tree; the merge step backs them up and restores them as ignored local copies.
+3. **Writers to the newly ignored paths** (checked): the agent scripts create their folders (`mkdir -p`); `scripts/create-paisaxe-tests.py` did not, and now does. Two follow-ups outside this phase's files: the triage skill's private-repository step runs `git add … docs/agents/ logs/ scripts/agents/`, which git refuses for ignored paths (already true for `logs/` before this phase), and `scripts/commit-reports.sh` becomes a no-op; both belong to the owner's publication decision.
+4. **`npm run eval:booking` takes `ANTHROPIC_API_KEY` from the environment first**, then the owner's `.env.local`, so a fresh clone can run it (README updated).
+5. **Evaluation re-run on the candidate (F07): 6 of 6** with the real model (`docs/hackathon/evaluation/2026-10-03-phase6.json`; the Phase 3 file is unchanged). Scenario 1 needed one clarification.
+6. **Alerting runbook:** a "PayPal Booking Deposits" section documents the four markers the plan names and the other money-relevant markers from Phases 4 and 5 (`[PAYPAL_CAPTURE_DENIED]`, `[PAYPAL_COMPENSATING]`, `[PAYPAL_REFUND_FAILED]`, `[PAYPAL_REFUND_REFUSED]`, `[BOOKING_CANCEL_REFUND_FAILED]`, the webhook markers), with fields checked against the code, and read-only diagnosis queries.
+7. **The scripted booking model is `BOOKING_AGENT_REPLAY`, not `ANTHROPIC_TRANSPORT=mock`.**
+   - Plan said: an `ANTHROPIC_TRANSPORT=mock` fixture replaying a recorded tool sequence.
+   - Found: that variable only switches the discovery chat between SDK and curl; the booking agent instantiates its own SDK client.
+   - Chose: `src/lib/booking/replay-model.ts` replays `e2e/fixtures/booking-agent-replay/<name>.json` (scenarios matched on the visitor's words; tool calls run through the real tool executor, so rows, cards and capability links are real). It throws when `NODE_ENV=production` or `VERCEL`/`VERCEL_ENV` is set, so the chat fails closed with `ai_unavailable` (unit-tested; also seen on a local Preview build). `.env.example` documents it as E2E-only.
+8. **Probe details.** Selectors carry `@release-required @local-docker <id>` (the manifest validator requires the first tag). `booking-access-boundary` has its own spec file. "Another user's booking id is 404 in the chat tool route" is asserted as the tool's `not_found` result inside the 200 SSE stream: no HTTP route takes a raw booking id. The Preview assertions use a second local server (a production build with `VERCEL_ENV=preview`). `release-required-local` now runs `next dev`, because the mock's loopback base and the replay are refused in production; `bypassCSP` is scoped to that project. The mock completes refunds at once, so the round trip ends `refunded` without a webhook step. Each boundary gate was proven by mutation, run by the unit's implementer against local Docker with every file restored from a backup afterwards: removing the token check in `links.ts` let a wrong token through (200, not 404); requiring a session in `view.ts` made the cookie-less capability 404; removing `.eq("user_id")` in `getBookingForUser` let the chat tool return the other user's booking; removing the redemption check in `gate.ts` turned the 404 into a 500; removing the Preview rule in `surface.ts` (Preview rebuilt) opened access, chat and `/acceso` (200); removing it in the capability guard opened the capability on Preview (200). The independent reviewer found the assertions not vacuous by reading (soft expectations still fail the test, a liveness check precedes the Preview assertions, cleanup asserts zero rows) but did not re-run the mutations.
+9. **Rate limits added where the audit found none** (hardening checklist): quote accept, 20 a minute per user, before the attempt allowance; PayPal webhook, 120 a minute per IP, before the verification call PayPal is asked to make (header-less requests are still refused first). Tested.
+10. **`release-checklist.md` section 2** now gives the full local-probe command (anon and service keys, a local QA user) and the warning not to run another dev server or build in the same checkout during the run.
+11. **A circular import caught by the gate's `lint:deps`:** `replay-model.ts` imported the `BookingModelClient` type from `agent.ts`, which loads the replay. The type (with its stream shape) moved to `src/lib/booking/model-client.ts`, imported by both; types only, so behaviour is unchanged (agent, replay and route tests re-run; the final gate re-runs the suite and the build).
+12. **Two Phase 1 live tests were timing-dependent once later phases added live test files running in parallel**, and the pre-commit hook's full runs hit both: `expire_holds`'s returned count can be 0 when reconciliation in another file expires the same lapsed hold first (the test now asserts the rows, the real oracle); and the migration-116 idempotence snapshot counted every merchant and experience in the database, which other files create and delete (it is now scoped to the fixture merchant).
+
+### Phase 6 review dispositions
+
+Independent reviewer (fresh context): CHANGES REQUESTED, two majors (one an owner decision); the code itself sound. Checks the reviewer ran: `check-required-probes`, the release-script and new route tests, the three typechecks, eslint, knip, `check-env`, `check-verification-coverage`, and the `release-required` project selection (only the read-only spec; no `@local-docker` probe selectable).
+
+| # | Severity | Finding | Disposition |
+|---|----------|---------|-------------|
+| 1 | major | `booking-gate-closed` required `/acceso` to render, but Phase 7 runs the read-only probes before it turns the flag on, so the analyzer would block the release | **Fixed:** the probe reads the deployed `experience_booking` flag from the public `/api/feature-flags` endpoint and asserts the gate accordingly (on: the code form; off: a real 404); the unknown-capability 404 holds in both states. Manifest title and notes updated; `check-required-probes` passes. Run locally in both flag states at the gate |
+| 2 | major (owner) | Untracking `docs/agents/` does not remove it from history | **Owner decision before publication** (purge or accept); deviation 2 corrected |
+| 3 | minor | No recorded evidence of the boundary mutations | **Recorded** in deviation 8 (from the implementer's run) |
+| 4 | minor | A failed second or third user creation leaked the earlier local auth users | **Fixed:** each user is recorded for cleanup as soon as it exists |
+| 5 | minor | A public clone lacks `docs/agents/`, which `CLAUDE.md:223`, `docs/operations/operations.md` and two ElevenLabs test scripts reference | **Owner decision at publication** (deviation 2): move the reference documents to a tracked folder or accept the broken references; nothing in CI or the tests depends on them |
+| 6 | minor | The webhook limit fails closed in production when Upstash is unreachable | **Accepted and documented** in the runbook: PayPal redelivers and reconciliation queries PayPal, so nothing is lost |
+| 7 | nit | `npm run eval:booking` would silently use the replay if `BOOKING_AGENT_REPLAY` were set | **Fixed:** the evaluation refuses to start with it set |
+| 8 | nit | The README said the browser flow cannot run locally at all | **Fixed:** it now names the `booking-roundtrip` probe |
+
+Re-review: **APPROVE.** The reviewer confirmed `/api/feature-flags` and the proxy read the same rows with the same environment, so a disagreement fails the probe in either direction. Caveats for Phase 7: for up to about three minutes after the flag flips (the endpoint's CDN cache and the server-side flag cache), the two can disagree and the probe fails loudly; re-run it before investigating. Never point the probe at a Preview, where the flags can read "on" while the Preview rule closes the surface.
+
+### Phase 6 simplify pass
+
+Two read-only reviewers. Applied (behaviour unchanged): the two booking specs share `NOTHING_LEFT` and `randomSlotDate()` (Madrid calendar, through the runner's `slotDateAfter`) from `e2e/fixtures/booking-local.ts`, and the cleanup oracle's eight counts run in parallel; the round trip no longer looks the guest up twice; the replay model compiles each scenario's pattern once at parse time, hoists the whole-placeholder regex, resolves a missing value in one place and inlines its usage object; the analyzer test derives its evidence from the one filtered manifest.
+
+Skipped:
+
+- **The second (production) build on every `release-required-local` run** for the Preview-isolation assertions: a second `next dev` with `VERCEL_ENV=preview` and its own `distDir` would be cheaper but is unproven on Next 16 with two dev servers; correctness of the release gate first. Revisit if the run time hurts.
+- **Selecting the servers from `--project` in argv** rather than an explicit variable: misuse fails loudly, and the checklist command is exact.
+- **One helper for the feature-flag upsert** (psql in the runner, supabase-js in the specs): different contexts.
+- **The typed SSE parser** (`parseSseEvent`): it drops malformed cards silently, which would weaken the "no booking card" assertion; the permissive parser stays.
+- **The `[n]` array-index branch of the replay placeholders**: documented in the header; kept.
+- **A shared 429 helper for the two new rate limits**: they follow the inline pattern of about ten routes; a cross-route cleanup, not this phase.
+
 ## Owner decisions after Phase 0
 
 Recorded 2026-10-03, when the owner accepted Phase 0.

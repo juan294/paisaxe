@@ -1,14 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireBookingAccess } from "@/lib/booking/gate";
+import { buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import { consume } from "@/lib/booking/metering";
 import { acceptQuote } from "@/lib/booking/quotes";
 import { bookingCard } from "@/lib/booking/tools";
 import { BookingError } from "@/lib/booking/types";
 import { logger } from "@/lib/logger";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase-admin";
 import type { QuoteAcceptResponse } from "@/types/booking-chat";
 
 const NO_STORE = { "Cache-Control": "private, no-store" };
+// A click per accept; the per-redemption booking_attempts allowance is the real budget.
+const ACCEPT_RATE_LIMIT = { windowMs: 60_000, maxRequests: 20, maxEntries: 10_000 };
 
 /**
  * POST /api/booking/quotes/[id]/accept
@@ -25,6 +29,14 @@ export async function POST(
   const access = await requireBookingAccess(request);
   if (access instanceof NextResponse) return access;
   const { id: quoteId } = await params;
+
+  const rateLimit = await checkRateLimit(`booking-accept:${access.userId}`, ACCEPT_RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { ...NO_STORE, ...buildRateLimitHeaders(rateLimit, true) } }
+    );
+  }
 
   const admin = createAdminClient();
   const allowance = await consume(admin, access.redemption.id, "booking_attempts");

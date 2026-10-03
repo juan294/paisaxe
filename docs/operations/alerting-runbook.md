@@ -300,6 +300,62 @@ msg:[STRIPE_UNRECOVERABLE] OR msg:[STRIPE_RPC_TIMEOUT] OR msg:[STRIPE_RPC_FAILUR
 
 ---
 
+## PayPal Booking Deposits (experience booking, sandbox)
+
+**Trigger:** any `error`-level marker below from the booking deposit flow
+(`src/lib/booking/{capture,cancel,reconcile,webhook-events}.ts`,
+`src/app/api/webhooks/paypal/route.ts`, `src/app/api/booking/voucher/redeem/route.ts`).
+PayPal runs in **sandbox** only (`src/lib/paypal/env.ts` refuses any other host), so no real
+money moves; the markers still mean a visitor's booking or deposit needs attention.
+
+Design facts that shape the response: every capture goes through one path and only captures
+buyer-approved orders; money that moved is confirmed or refunded, never shown unpaid (R2-01);
+an uncertain capture stays `capture_pending` until PayPal says otherwise (R2-02); webhooks go
+through the `paypal_webhook_events` inbox and are replayed by the `reconcile-bookings` cron
+(every 5 minutes); every refund uses `refund:<payments.operation_key>` as its PayPal-Request-Id,
+so a retry never refunds twice.
+
+### Structured Telemetry Log Events
+
+| Event | Level | Fields | Meaning | First response |
+|-------|-------|--------|---------|----------------|
+| `[PAYPAL_WEBHOOK_INVALID]` | `warn` (401), `error` (400) | `reason`, `transmissionId` | A request without PayPal's transmission headers or failing verification (401), or a verified event with no id or type (400) | Occasional 401s are scanners; a burst after a deploy means `PAYPAL_WEBHOOK_ID` no longer matches the listener: check it against the PayPal app's webhook |
+| (HTTP 429, no marker) | — | — | The webhook route's per-IP limit (120 a minute) answered 429; in production it also fails closed when the rate-limit backend (Upstash) is unreachable, see "Rate Limit Backend Degraded" | Nothing is lost: PayPal redelivers, and the reconcile cron queries PayPal for every open payment. Fix the backend if `[RATE_LIMIT_DEGRADED]` accompanies it |
+| `[PAYPAL_WEBHOOK_VERIFY_FAILED]` | `error` | `transmissionId`, `error` | PayPal's verification API could not answer; the route answers 500 so PayPal redelivers | Transient unless repeated; check PayPal status and the `PAYPAL_*` variables |
+| `[PAYPAL_WEBHOOK_PROCESSING_FAILED]` | `error` | `eventId`, `eventType`, `error` | The event is stored but processing failed; 500, PayPal redelivers and the cron replays it from the inbox | Look for a following success for the same `eventId`; if none after 15 minutes, read its `last_error` in `paypal_webhook_events` |
+| `[PAYPAL_WEBHOOK_UNMATCHED]` | `error` | `eventId`, `eventType`, `orderId`, `captureId` | The event matches no payment (for example another environment's event on a shared sandbox app); it stays in the inbox and the drain skips it | Expected for foreign events; investigate only if the order or custom id is one of ours |
+| `[PAYPAL_CAPTURE_MISMATCH]` | `error` | `bookingId`, `orderId`/`eventId`, `source`, `captured` | An order or capture whose amount, currency or custom id is not the booking's. Uncaptured: never captured, booking `needs_attention`. Captured: refunded in one write (`order_mismatch`) | Treat as a possible tampering or integration bug: compare the order in the PayPal sandbox dashboard with the booking |
+| `[PAYPAL_CAPTURE_DENIED]` | `error` | `bookingId`, `paymentId`, `eventId` | PayPal declined the capture; payment `capture_failed`, booking `needs_attention` | Nothing was charged; the visitor can be offered a new quote |
+| `[PAYPAL_COMPENSATING]` | `error` | `bookingId`, `paymentId`, `reason` | Money moved but the booking cannot be fulfilled (`slot_gone`, `order_mismatch`, `duplicate_capture`); a refund was requested | Follow it with the `refund_id` until `refunded` (the cron does) |
+| `[PAYPAL_REFUND_FAILED]` | `error` | `bookingId`, `paymentId`, `error` or `refundStatus` | A refund request failed (retried with the same key) or PayPal reported it `FAILED`/`CANCELLED` (payment `refund_failed`, booking `needs_attention`) | For a final failure, refund by hand in the PayPal dashboard; the `PAYMENT.CAPTURE.REFUNDED` webhook then records it |
+| `[PAYPAL_REFUND_REFUSED]` | `error` | `bookingId`, `paymentId`, `status`, `issue` | A cancellation refund PayPal refuses for good (400/403/404/422 except `PREVIOUS_REQUEST_IN_PROGRESS`); not retried; payment `refund_failed`, booking `needs_attention` | Read `issue`, fix the cause (for example the sandbox merchant balance) and refund by hand. Known limitation: a refused compensation refund is still retried every run |
+| `[BOOKING_CANCEL_REFUND_FAILED]` | `error` | `bookingId`, `error` | The cancellation is recorded but the refund request failed; the visitor saw "lo reintentaremos" and the cron retries with the same key | Check the next cron runs; escalate if it repeats |
+| `[CRON_RECONCILE_ATTENTION]` | `error` | `bookingId`, `paymentId`, `passes`, `reason` — or `staleCount`, `bookingIds` | Three inconclusive capture passes (the payment stays `capture_pending` and keeps being reconciled), or bookings in `needs_attention` for more than 15 minutes | Open the operator view (`/operator/<capability>`): exceptions are highlighted; compare each with the PayPal sandbox order |
+| `[VOUCHER_GRANT_FAILED]` | `error` | `userId`, `error` | Voucher redemption failed in the database (500); the visitor can retry | Check Supabase health and the `redeem_voucher` RPC |
+| `[PAYPAL_CREATE_ORDER_FAILED]` | `error` | `bookingId`, `error` | The order could not be created (PayPal error or not configured); the tool and the pay button answer `payment_unavailable` | Check the `PAYPAL_*` variables and PayPal status |
+
+**Example log drain query:**
+```
+msg:[PAYPAL_* OR msg:[CRON_RECONCILE_ATTENTION] OR msg:[BOOKING_CANCEL_REFUND_FAILED] OR msg:[VOUCHER_GRANT_FAILED]
+```
+
+**Read-only diagnosis (service role, local or with the owner's authorization for production):**
+
+```sql
+SELECT b.reference, b.status, b.cancellation_confirmed_at, p.status AS payment, p.order_id, p.capture_id,
+       p.refund_id, p.compensation_reason, p.reconcile_passes
+FROM public.bookings b LEFT JOIN public.payments p ON p.booking_id = b.id
+WHERE b.id = '<bookingId>' ORDER BY p.created_at;
+
+SELECT event_id, event_type, received_at, processed_at, attempts, last_error
+FROM public.paypal_webhook_events WHERE processed_at IS NULL ORDER BY received_at;
+```
+
+Never change payment or booking rows by hand to "fix" a state: refund through PayPal and let
+the webhook or the cron record it. Production writes need the owner's authorization.
+
+---
+
 ## Stripe Webhook Failure
 
 **Trigger:** Stripe dashboard shows failed webhook deliveries.

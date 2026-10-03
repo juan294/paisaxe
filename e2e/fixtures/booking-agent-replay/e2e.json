@@ -1,0 +1,49 @@
+{
+  "scenarios": [
+    {
+      "name": "quote",
+      "when": "^Somos (\\d+) personas el (\\d{4}-\\d{2}-\\d{2}) a las (\\d{2}:\\d{2})$",
+      "steps": [
+        { "tools": [{ "name": "search_experiences", "input": { "partySize": "{{match.1:number}}", "date": "{{match.2}}" } }] },
+        {
+          "tools": [
+            {
+              "name": "get_quote",
+              "input": {
+                "experienceId": "{{result.options[title=Paseo por la senda costera].experienceId}}",
+                "date": "{{match.2}}",
+                "time": "{{match.3}}",
+                "partySize": "{{match.1:number}}"
+              }
+            }
+          ]
+        },
+        { "text": "Te he preparado la oferta del paseo por la senda costera. Revisa la tarjeta y pulsa «Aceptar oferta»." }
+      ]
+    },
+    {
+      "name": "accepted",
+      "when": "^He aceptado la oferta\\.$",
+      "steps": [
+        { "tools": [{ "name": "create_payment_order", "input": { "bookingId": "{{state.acceptedBookingId}}" } }] },
+        { "text": "Plaza retenida. Paga la señal con el botón de la tarjeta de pago antes de que caduque la retención." }
+      ]
+    },
+    {
+      "name": "cancel",
+      "when": "^Quiero cancelar mi reserva$",
+      "steps": [
+        { "tools": [{ "name": "preview_cancellation", "input": { "bookingId": "{{state.bookings[status=confirmed].bookingId}}" } }] },
+        { "text": "Estas son las condiciones de cancelación. Confirma con el botón de la tarjeta si quieres cancelar." }
+      ]
+    },
+    {
+      "name": "status",
+      "when": "^Estado de la reserva ([0-9a-f-]{36})$",
+      "steps": [
+        { "tools": [{ "name": "get_booking_status", "input": { "bookingId": "{{match.1}}" } }] },
+        { "text": "Resultado: {{result.error}}" }
+      ]
+    }
+  ]
+}
