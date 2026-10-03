@@ -8,6 +8,9 @@ import { generateExtraWorkflows } from './ci-cadence-extra-workflows.mjs';
 import { routeOriginalWorkflow } from './ci-cadence-route-originals.mjs';
 const canonical = '.github/workflows/';
 const fastJobPath = '.github/ci-cadence-fast-job.yml';
+// GitHub's `==` ignores case, so a variable set to `LEAN` satisfies every YAML
+// predicate. Shell and JS compare exactly: they only ever receive this value.
+const MODE = "${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}";
 const calls = { ci:'ci.yml', e2e:'ci-cadence-e2e-full.yml', lighthouse:'ci-cadence-lighthouse-full.yml', 'bundle-size':'ci-cadence-bundle-size-full.yml', knip:'ci-cadence-knip-full.yml', 'license-check':'ci-cadence-license-check-full.yml', security:'ci-cadence-security-full.yml' };
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const blob = bytes => createHash('sha1').update(`blob ${Buffer.byteLength(bytes)}\0`).update(bytes).digest('hex');
@@ -47,7 +50,7 @@ function standaloneCoverage(root) {
   job.steps.splice(1,0,before);
   const suite=job.steps.find(step=>step.name==='Run authoritative coverage suite');
   const previous=suite.run;
-  const eligibility={name:'Decide weekly native coverage eligibility',id:'cadence-calendar',env:{CI_CADENCE_MODE:'${{ vars.CI_CADENCE_MODE }}',NATIVE_OWNER:'${{ '+owner+' }}'},run:`set -euo pipefail
+  const eligibility={name:'Decide weekly native coverage eligibility',id:'cadence-calendar',env:{CI_CADENCE_MODE:MODE,NATIVE_OWNER:'${{ '+owner+' }}'},run:`set -euo pipefail
 if test "$CI_CADENCE_MODE" = lean && test "$NATIVE_OWNER" = true && test "$GITHUB_EVENT_NAME" = schedule && test "$(date -u +%u)" != 1; then
   echo 'eligible=false' >> "$GITHUB_OUTPUT"
 else
@@ -58,7 +61,7 @@ fi
   for(const step of job.steps)if(step!==eligibility)step.if='${{ steps.cadence-calendar.outputs.eligible == \'true\' }}';
   before.if='${{ steps.cadence-calendar.outputs.eligible == \'true\' && '+lean+' }}';
   after.if=before.if;
-  suite.env={CI_CADENCE_MODE:'${{ vars.CI_CADENCE_MODE }}',NATIVE_OWNER:'${{ '+owner+' }}'};
+  suite.env={CI_CADENCE_MODE:MODE,NATIVE_OWNER:'${{ '+owner+' }}'};
   suite.run=`set -euo pipefail
 if test "$CI_CADENCE_MODE" = lean && test "$NATIVE_OWNER" = true; then
 node --input-type=module <<'NODE'
@@ -96,7 +99,7 @@ function nativeWorkflows(root) {
   const enabled = "vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118'";
   const native = [ {name:'Checkout native definition',uses:'actions/checkout@v7',with:{ref:'${{ github.sha }}','fetch-depth':0,'persist-credentials':false}}, {name:'Setup reviewed Node runtime',uses:'actions/setup-node@v7',with:{'node-version':'24.21.0'}} ];
   const evidence = '${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}';
-  const environment = { GITHUB_TOKEN:'${{ github.token }}', CI_CADENCE_MODE:'${{ vars.CI_CADENCE_MODE }}', CI_CADENCE_DEFINITION_SHA:'${{ github.sha }}', CI_CADENCE_EVIDENCE_DIR:evidence, NODE_OPTIONS:'',NODE_PATH:'' };
+  const environment = { GITHUB_TOKEN:'${{ github.token }}', CI_CADENCE_MODE:MODE, CI_CADENCE_DEFINITION_SHA:'${{ github.sha }}', CI_CADENCE_EVIDENCE_DIR:evidence, NODE_OPTIONS:'',NODE_PATH:'' };
   const launch = acquired('ci-cadence-launch.mjs','',root).replace(/node "\$private\/ci-cadence-launch.mjs" \n$/,`node "$private/ci-cadence-launch.mjs" > "$RUNNER_TEMP/B-native.json"
 python3 - <<'PY' >> "$GITHUB_ENV"
 import json,os,re

@@ -3,16 +3,16 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "9587c9d4e458c7ba31a2246a085e0870c9046dcc"
+    "blobSha": "18d2d9bcdf0f6f58387b7c33f5ba409956c1b8fb"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "9587c9d4e458c7ba31a2246a085e0870c9046dcc"
+      "blobSha": "18d2d9bcdf0f6f58387b7c33f5ba409956c1b8fb"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "90a0367c04b36a290bde417c1017d479d1c0b3f7"
+      "blobSha": "a478dfa38a8085fb8ece99a2b349910c882d6e71"
     }
   },
   "callees": {
@@ -54,7 +54,7 @@
   },
   "coverageOnly": {
     "path": ".github/workflows/coverage.yml",
-    "blobSha": "10b6988c262be664ccc64b23742530a04e084286",
+    "blobSha": "dfa994ae4ff4f8e9b1372aa3c4c98548ab4c7429",
     "steps": [
       {
         "name": "Decide weekly native coverage eligibility",
@@ -137,8 +137,8 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "9587c9d4e458c7ba31a2246a085e0870c9046dcc",
-    ".github/workflows/ci-cadence.yml": "90a0367c04b36a290bde417c1017d479d1c0b3f7",
+    ".github/workflows/ci-nightly.yml": "18d2d9bcdf0f6f58387b7c33f5ba409956c1b8fb",
+    ".github/workflows/ci-cadence.yml": "a478dfa38a8085fb8ece99a2b349910c882d6e71",
     ".github/workflows/ci.yml": "05824a4836fe0f0d7773c5425904e72d581a4c36",
     ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "db256a17ed4718c5911852bc4d98dbba7790cca1",

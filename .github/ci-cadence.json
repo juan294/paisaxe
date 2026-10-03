@@ -110,7 +110,7 @@
     },
     {
       "path": ".github/workflows/coverage.yml",
-      "definitionSha": "10b6988c262be664ccc64b23742530a04e084286",
+      "definitionSha": "dfa994ae4ff4f8e9b1372aa3c4c98548ab4c7429",
       "jobs": [
         {
           "id": "coverage-coverage",

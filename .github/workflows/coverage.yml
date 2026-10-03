@@ -20,7 +20,7 @@ jobs:
       - name: Decide weekly native coverage eligibility
         id: cadence-calendar
         env:
-          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
           NATIVE_OWNER: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
         run: |
           set -euo pipefail
@@ -145,7 +145,7 @@ jobs:
           fi
         if: ${{ steps.cadence-calendar.outputs.eligible == 'true' }}
         env:
-          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
           NATIVE_OWNER: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
       - name: Verify completed callable source checkout
         if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}

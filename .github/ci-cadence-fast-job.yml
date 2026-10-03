@@ -39,7 +39,9 @@ steps:
       # mode: under legacy the existing full workflows keep running and
       # own any full-suite work, so the caller starts no recovery children.
       CI_CADENCE_MODE: lean
-      ROUTING_MODE: ${{ vars.CI_CADENCE_MODE }}
+      # Normalised with GitHub's case-insensitive `==`, exactly as the job
+      # predicates of the routed workflows read the variable.
+      ROUTING_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
     run: |
       set -euo pipefail
       unset NODE_OPTIONS NODE_PATH

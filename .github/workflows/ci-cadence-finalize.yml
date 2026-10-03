@@ -35,7 +35,7 @@ jobs:
       - name: Authenticate original completed attempt
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
           CI_CADENCE_DEFINITION_SHA: ${{ github.sha }}
           CI_CADENCE_EVIDENCE_DIR: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           NODE_OPTIONS: ""

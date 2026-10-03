@@ -9,14 +9,20 @@ import { parse } from 'yaml';
 const directory = new URL('../../../../.github/workflows/', import.meta.url);
 const STATUS = /\b(?:always|failure|cancelled|success)\(\)/;
 
-/** GitHub expression semantics needed here: missing properties are null, not errors. */
+const lower = value => typeof value === 'string' ? value.toLowerCase() : Array.isArray(value) ? value.map(lower) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, lower(entry)])) : value;
+/** GitHub expression semantics needed here: missing properties are null, not
+ * errors, and string comparison ignores case (both sides are lower-cased, so a
+ * string result comes back lower-cased too). */
 export function evaluate(expression, context) {
   if (expression === undefined || expression === null) return true;
   const body = String(expression).replace(/^\$\{\{\s*|\s*\}\}$/g, '');
-  const source = body.split(/('(?:[^']|'')*')/).map((part, index) => index % 2 ? part : part.replace(/\b(needs|steps)\.([A-Za-z_][A-Za-z0-9_-]*)/g, (_, scope, id) => `${scope}?.[${JSON.stringify(id)}]`).replace(/\.(?=[A-Za-z_])/g, '?.')).join('');
+  context = lower(context);
+  const source = body.split(/('(?:[^']|'')*')/).map((part, index) => index % 2 ? part.toLowerCase() : part.replace(/\b(needs|steps)\.([A-Za-z_][A-Za-z0-9_-]*)/g, (_, scope, id) => `${scope}?.[${JSON.stringify(id)}]`).replace(/\.(?=[A-Za-z_])/g, '?.')).join('');
   const failed = Object.values(context.needs ?? {}).some(need => ['failure', 'cancelled'].includes(need.result));
   return vm.runInNewContext(source, { ...context, always: () => true, success: () => !failed, failure: () => failed, cancelled: () => false, format: (pattern, ...args) => pattern.replace(/\{(\d+)\}/g, (_, n) => args[Number(n)]), contains: (value, item) => String(value ?? '').includes(item), startsWith: (value, prefix) => String(value ?? '').startsWith(prefix), fromJSON: JSON.parse }, { timeout: 100 });
 }
+/** Resolves a string that embeds `${{ }}` expressions, e.g. a concurrency group. */
+export const interpolate = (text, context) => String(text).replace(/\$\{\{([\s\S]*?)\}\}/g, (_, body) => String(evaluate(body, context) ?? ''));
 export const workflow = (name, sources = {}) => parse(sources[name] ?? readFileSync(new URL(name, directory), 'utf8'));
 const branchOf = context => context.github.event_name === 'pull_request' ? context.github.event.pull_request.base.ref : context.github.ref.replace(/^refs\/heads\//, '');
 function triggered(definition, context) {

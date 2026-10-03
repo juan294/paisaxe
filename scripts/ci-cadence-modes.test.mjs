@@ -6,7 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { classifyEvent } from './ci-cadence.mjs';
-import { evaluate, workflow, startedJobs, nativeContext } from '../tests/fixtures/ci-cadence-adapter/native/workflow-graph.mjs';
+import { evaluate, interpolate, workflow, startedJobs, nativeContext } from '../tests/fixtures/ci-cadence-adapter/native/workflow-graph.mjs';
 
 // Activation order (plan "Activation"): install under legacy, establish a real
 // CI Fast, migrate required checks, then set lean. GitHub bills every started
@@ -43,7 +43,11 @@ test('CI Fast is hosted, read-only, six-minute bounded and free of app install/b
 test('bootstrap pins the exact protected launcher and always runs the four checks', () => {
   const step = cadenceJob('entry').steps.find(entry => entry.name === 'Acquire reviewed protected launcher');
   assert.equal(step.env.LAUNCHER_SHA256, createHash('sha256').update(readFileSync(new URL('scripts/ci-cadence-launch.mjs', root))).digest('hex'));
-  assert.equal(step.env.CI_CADENCE_MODE, 'lean'); assert.equal(step.env.ROUTING_MODE, '${{ vars.CI_CADENCE_MODE }}');
+  assert.equal(step.env.CI_CADENCE_MODE, 'lean');
+  // GitHub's `==` ignores case, so LEAN skips the routed workflows. The shell and
+  // launcher compare exactly, so they receive the value normalised by that same `==`.
+  for (const [mode, expected] of [['lean', 'lean'], ['LEAN', 'lean'], ['Lean', 'lean'], ['legacy', 'legacy'], ['', 'legacy'], [undefined, 'legacy'], ['leaner', 'legacy'], ['lean ', 'legacy']]) assert.equal(evaluate(step.env.ROUTING_MODE, nativeContext(push(), mode)), expected, String(mode));
+  for (const name of ['ci-cadence.yml', 'ci-nightly.yml', 'ci-cadence-finalize.yml', 'coverage.yml']) assert.ok(!readFileSync(new URL('.github/workflows/' + name, root), 'utf8').includes('${{ vars.CI_CADENCE_MODE }}'), name);
   assert.match(step.run, /event\['before'\] if kind == 'push' else event\['pull_request'\]\['base'\]\['sha'\]/);
   assert.match(step.run, /required=\['commit-secret-scan','policy-validation','lockfile-validation','cadence-contracts'\]/);
   assert.ok(!step.run.includes('node scripts/'));
@@ -53,11 +57,11 @@ test('no routed workflow keeps a per-workflow classifier job or a dynamic routin
 });
 
 for (const [label, event] of [['push', push()], ['PR', pull()]]) test(`lean owner ${label}: exactly one job starts a runner, and it is CI Fast`, () => {
-  assert.deepEqual(started(event, 'lean'), [FAST]);
+  for (const mode of ['lean', 'LEAN', 'Lean']) assert.deepEqual(started(event, mode), [FAST], mode);
   // Unfiltered: the only other runner is the separately accounted model review on PRs.
   assert.deepEqual(startedJobs(nativeContext(event, 'lean'), { 'ci-cadence.yml:entry': { decision: 'skip' } }).filter(outside), label === 'PR' ? ['claude-review.yml: claude-review'] : []);
 });
-for (const [label, event] of [['push', push()], ['PR', pull()]]) for (const mode of ['legacy', undefined, null, 'LEAN', 'LEAn', '']) test(`legacy (${JSON.stringify(mode)}) owner ${label}: every original job still starts, plus CI Fast`, () => {
+for (const [label, event] of [['push', push()], ['PR', pull()]]) for (const mode of ['legacy', undefined, null, 'leaner', 'lean ', '']) test(`legacy (${JSON.stringify(mode)}) owner ${label}: every original job still starts, plus CI Fast`, () => {
   const before = original(event, mode), jobs = started(event, mode);
   assert.ok(before.length >= 13, String(before.length));
   for (const required of ['ci.yml: Lint & Typecheck', 'ci.yml: Test', 'ci.yml: Build', 'e2e.yml: Playwright E2E']) assert.ok(before.includes(required), required);
@@ -123,8 +127,12 @@ test('sender-less schedule cannot make scheduled coverage daily or unpublished',
 // Frozen phase-1 events, renamed onto this repository's native identities.
 const fixtures = JSON.parse(readFileSync(new URL('tests/fixtures/ci-cadence/events.json', root), 'utf8').replaceAll('example/fleet-A', 'juan294/paisaxe').replaceAll('example-owner', 'juan294')).cases;
 for (const fixture of fixtures) test(`phase-1 "${fixture.name}": static job predicates agree with the classifier lane ${fixture.expectedLane}`, () => {
-  const lane = classifyEvent(fixture.event, policy, fixture.mode, fixture.trustedDefinition).lane;
-  assert.equal(lane, fixture.expectedLane);
+  // The frozen helper compares the mode exactly; the workflows hand it the value
+  // normalised by GitHub's case-insensitive `==`, so "LEAn" reaches it as lean.
+  assert.equal(classifyEvent(fixture.event, policy, fixture.mode, fixture.trustedDefinition).lane, fixture.expectedLane);
+  const normalised = evaluate("vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy'", nativeContext(push(), fixture.mode));
+  const lane = classifyEvent(fixture.event, policy, normalised, fixture.trustedDefinition).lane;
+  if (typeof fixture.mode !== 'string' || fixture.mode.toLowerCase() !== 'lean' || fixture.mode === 'lean') assert.equal(lane, fixture.expectedLane);
   const event = { kind: fixture.event.kind, actor: fixture.event.actor, author: fixture.event.author, ref: fixture.event.ref, baseBranch: fixture.event.baseBranch, headRepository: fixture.event.headRepository ?? 'juan294/paisaxe' };
   const jobs = started(event, fixture.mode), before = original(event, fixture.mode);
   if (lane === 'fast') return assert.deepEqual(jobs, [FAST]);
@@ -135,7 +143,7 @@ for (const fixture of fixtures) test(`phase-1 "${fixture.name}": static job pred
   }
   // The one lane static predicates cannot see is a lean base without the helper:
   // only CI Fast starts, and its entry step fails with the repair instruction (below).
-  if (fixture.trustedDefinition.helperInstalled === false && fixture.mode === 'lean') return assert.deepEqual(jobs, [FAST]);
+  if (fixture.trustedDefinition.helperInstalled === false && normalised === 'lean') return assert.deepEqual(jobs, [FAST]);
   // full, release, untrusted, blocked: the complete original graph for that event.
   assert.deepEqual(routedOriginals(jobs), before);
   if (['push', 'pull_request'].includes(event.kind)) assert.ok(before.length >= 5, String(before.length));
@@ -191,7 +199,7 @@ const identity = { sourceSha: 'a'.repeat(40), testedCheckoutSha: 'b'.repeat(40),
 const passed = { ...identity, lane: 'fast', success: true, completed: ['commit-secret-scan', 'policy-validation', 'lockfile-validation', 'cadence-contracts'] };
 const fullRequired = { ...identity, lane: 'full', success: false, fullRequired: true, completed: passed.completed, reason: 'committed install/runtime/workspace drift requires full dependency validation' };
 
-for (const kind of ['push', 'pull_request']) for (const routing of ['legacy', undefined, 'LEAN']) test(`first installation (${kind}, routing ${routing}) defers to the still-running original workflows with a visible reason`, t => {
+for (const kind of ['push', 'pull_request']) for (const routing of ['legacy', undefined]) test(`first installation (${kind}, routing ${routing}) defers to the still-running original workflows with a visible reason`, t => {
   const run = entryStep(t, { install: 'absent', routing, event: kind });
   assert.equal(run.status, 0); assert.deepEqual(run.outputs, { decision: 'legacy' }); assert.equal(run.ran, null);
   assert.match(run.stdout, /::notice title=CI Fast::first installation/); assert.match(run.summary, /first installation/);
@@ -210,19 +218,19 @@ test('launcher bytes differing from the reviewed digest are never executed', t =
   const run = entryStep(t, { launcher: stub(passed), routing: 'lean', pin: reviewed });
   assert.notEqual(run.status, 0); assert.equal(run.ran, null); assert.equal(run.outputs.decision, undefined);
 });
-for (const routing of ['lean', 'legacy', undefined, 'LEAN']) test(`four passed Fast checks yield skip under routing ${routing}, having run in lean classification`, t => {
+for (const routing of ['lean', 'legacy', undefined]) test(`four passed Fast checks yield skip under routing ${routing}, having run in lean classification`, t => {
   const run = entryStep(t, { launcher: stub(passed), routing });
   assert.equal(run.status, 0); assert.equal(run.ran, 'lean');
   assert.deepEqual(run.outputs.decision, 'skip'); assert.equal(run.outputs.source_sha, identity.sourceSha); assert.equal(run.outputs.checkout_sha, identity.testedCheckoutSha); assert.equal(run.outputs.definition_sha, identity.definitionSha);
 });
-for (const [routing, decision] of [['lean', 'full'], ['legacy', 'legacy'], [undefined, 'legacy'], ['LEAN', 'legacy']]) test(`full-required result under routing ${routing} yields ${decision}`, t => {
+for (const [routing, decision] of [['lean', 'full'], ['legacy', 'legacy'], [undefined, 'legacy']]) test(`full-required result under routing ${routing} yields ${decision}`, t => {
   const run = entryStep(t, { launcher: stub(fullRequired), routing });
   assert.equal(run.status, 0); assert.equal(run.outputs.decision, decision); assert.match(run.summary, /install\/runtime\/workspace drift/);
   // Legacy passes with a disclosure because the original workflows validate the event.
   assert.equal(/::notice title=CI Fast::full validation is required .*original full workflows/.test(run.stdout), decision === 'legacy');
 });
 const untrusted = { ...identity, lane: 'untrusted', acceptanceBlocked: true, protectedImported: true, runner: 'standard-hosted', token: 'read-only' };
-for (const routing of ['legacy', undefined, 'LEAN']) test(`untrusted event under routing ${routing} passes CI Fast with a disclosure and no recovery`, t => {
+for (const routing of ['legacy', undefined]) test(`untrusted event under routing ${routing} passes CI Fast with a disclosure and no recovery`, t => {
   const run = entryStep(t, { launcher: stub(untrusted), routing, event: 'pull_request' });
   assert.equal(run.status, 0); assert.equal(run.outputs.decision, 'legacy');
   assert.match(run.stdout, /::notice title=CI Fast::untrusted contribution: the original full workflows validate this event without secrets/); assert.match(run.summary, /untrusted contribution/);
@@ -235,4 +243,33 @@ test('untrusted event under lean blocks CI Fast', t => {
 for (const [label, result, exit] of [['failed Fast check', { ...passed, success: false, completed: ['commit-secret-scan'] }, 1], ['blocked admission', { lane: 'blocked', reason: 'native identity' }, 1], ['incomplete Fast work', { ...passed, completed: passed.completed.slice(0, 3) }, 0], ['legacy-full classification without Fast work', { ...identity, lane: 'full', reason: 'legacy full' }, 0], ['untrusted lane without protected classification', { ...identity, lane: 'untrusted', acceptanceBlocked: true }, 0], ['untrusted lane without blocked acceptance', { ...identity, lane: 'untrusted', protectedImported: true }, 0], ['malformed identity', { ...passed, sourceSha: 'short' }, 0]]) for (const routing of ['lean', 'legacy']) test(`${label} under ${routing} fails CI Fast instead of deferring`, t => {
   const run = entryStep(t, { launcher: stub(result, exit), routing });
   assert.notEqual(run.status, 0); assert.equal(run.outputs.decision, undefined);
+});
+
+// In a called workflow `github.workflow` is the CALLER's name, so a callee group
+// built from it would collide with its caller or a sibling and cancel or queue it.
+test('concurrency groups: no callee shares a group with its caller or a sibling, and develop / nightly / release are disjoint', () => {
+  const definition = name => workflow(name);
+  const group = (name, context) => interpolate(definition(name).concurrency.group, context);
+  const callees = caller => Object.entries(definition(caller).jobs).filter(([, job]) => job.uses).map(([id, job]) => ({ id, name: job.uses.split('/').at(-1), inputs: job.with }));
+  const lane = (caller, event, runId) => {
+    const base = nativeContext(event, 'lean'), github = { ...base.github, run_id: runId, workflow: definition(caller).name, workflow_ref: `juan294/paisaxe/.github/workflows/${caller}@${event.ref}` };
+    const groups = { [caller]: group(caller, { ...base, github, inputs: {} }) };
+    for (const callee of callees(caller)) {
+      assert.ok(!JSON.stringify(definition(callee.name).concurrency).includes('github.workflow') || callee.name === 'ci.yml', callee.name);
+      groups[`${caller} > ${callee.id}`] = group(callee.name, { ...base, github, inputs: { profile: callee.inputs.profile, source_sha: 'b'.repeat(40), invocation_id: callee.inputs.invocation_id } });
+    }
+    return groups;
+  };
+  const nightly = lane('ci-nightly.yml', { kind: 'schedule', ref: 'refs/heads/main' }, '41');
+  const develop = lane('ci-cadence.yml', push(), '42');
+  assert.equal(Object.keys(nightly).length, 8); assert.equal(Object.keys(develop).length, 8);
+  for (const [label, groups] of [['nightly', nightly], ['develop', develop]]) { const values = Object.values(groups); assert.equal(new Set(values).size, values.length, label + ' ' + JSON.stringify(groups)); for (const value of values) assert.ok(value && !value.includes('undefined') && !value.includes('null'), value); }
+  // Original (direct) workflows: develop push under legacy and release events on main.
+  const direct = (event, runId) => Object.fromEntries(policy.workflows.map(entry => entry.path.split('/').at(-1)).filter(name => definition(name).on[event.kind]).map(name => { const base = nativeContext(event, 'legacy'); return [name, group(name, { ...base, inputs: Object.fromEntries(Object.keys(definition(name).on.workflow_call?.inputs ?? {}).map(key => [key, ''])), github: { ...base.github, run_id: runId, workflow: definition(name).name, workflow_ref: `juan294/paisaxe/.github/workflows/${name}@${event.ref}` } })]; }));
+  const lanes = { nightly: Object.values(nightly), develop: [...Object.values(develop), ...Object.values(direct(push(), '43'))], release: [...Object.values(direct(push('refs/heads/main'), '44')), ...Object.values(direct(pull('main'), '45'))] };
+  for (const [left, right] of [['nightly', 'develop'], ['nightly', 'release'], ['develop', 'release']]) assert.deepEqual(lanes[left].filter(value => lanes[right].includes(value)), [], `${left} vs ${right}`);
+  // Two nightly runs never share a group, and neither caller cancels evidence in progress on the nightly path.
+  assert.deepEqual(Object.values(lane('ci-nightly.yml', { kind: 'schedule', ref: 'refs/heads/main' }, '46')).filter(value => Object.values(nightly).includes(value)), []);
+  assert.equal(definition('ci-nightly.yml').concurrency['cancel-in-progress'], false);
+  for (const callee of callees('ci-nightly.yml')) assert.equal(String(interpolate(definition(callee.name).concurrency['cancel-in-progress'], { ...nativeContext({ kind: 'schedule', ref: 'refs/heads/main' }, 'lean'), inputs: { profile: 'nightly', source_sha: 'b'.repeat(40), invocation_id: callee.inputs.invocation_id } })), 'false', callee.name);
 });

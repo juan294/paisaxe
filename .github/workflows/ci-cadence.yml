@@ -51,7 +51,7 @@ jobs:
         id: admit
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
           CI_CADENCE_DEFINITION_SHA: ${{ needs.entry.outputs.definition_sha }}
           CI_CADENCE_EVIDENCE_DIR: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           NODE_OPTIONS: ""
@@ -192,7 +192,7 @@ jobs:
       - name: Produce authenticated native measurement
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE }}
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
           CI_CADENCE_DEFINITION_SHA: ${{ needs.entry.outputs.definition_sha }}
           CI_CADENCE_EVIDENCE_DIR: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           NODE_OPTIONS: ""
@@ -280,7 +280,7 @@ jobs:
           LAUNCHER_SHA256: a2304a07baf2950be19648c054b90dd550e07eda408b6b13fc3115561a0f233e
           GITHUB_TOKEN: ${{ github.token }}
           CI_CADENCE_MODE: lean
-          ROUTING_MODE: ${{ vars.CI_CADENCE_MODE }}
+          ROUTING_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
         run: |
           set -euo pipefail
           unset NODE_OPTIONS NODE_PATH
