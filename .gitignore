@@ -49,6 +49,9 @@ content/processed/
 # PDF extracted images (local processing only, uses Supabase Storage in prod)
 content/images/
 
+# Source tourism guides: publisher's property, not redistributed (see README > Content Sources)
+content/pdfs/
+
 # Testing
 coverage/
 coverage-*/
