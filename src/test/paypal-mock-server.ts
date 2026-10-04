@@ -22,6 +22,22 @@
  *   GET  /v2/payments/refunds/:id
  *   POST /v1/notifications/verify-webhook-signature
  *
+ * Authorize / capture / void (Phase 8b, decision R7), for orders created with intent AUTHORIZE:
+ *   POST /v2/checkout/orders/:id/authorize       APPROVED -> COMPLETED with one authorization (CREATED);
+ *                                                already authorized -> 422 ORDER_ALREADY_AUTHORIZED;
+ *                                                not approved -> 422 ORDER_NOT_APPROVED. A capture of an
+ *                                                AUTHORIZE order -> 422 ACTION_DOES_NOT_MATCH_INTENT
+ *   GET  /v2/payments/authorizations/:id
+ *   POST /v2/payments/authorizations/:id/capture  CREATED -> CAPTURED with one capture (also listed on the
+ *                                                order); CAPTURED -> 422 AUTHORIZATION_ALREADY_CAPTURED;
+ *                                                VOIDED -> 422 AUTHORIZATION_VOIDED; EXPIRED -> 422
+ *                                                AUTHORIZATION_EXPIRED. Honours setCaptureFailure
+ *   POST /v2/payments/authorizations/:id/void     CREATED -> VOIDED (200 with the authorization);
+ *                                                VOIDED -> 422 PREVIOUSLY_VOIDED; CAPTURED -> 422
+ *                                                PREVIOUSLY_CAPTURED; EXPIRED -> 422 AUTHORIZATION_EXPIRED
+ * The 422 issue names for authorizations follow PayPal's Payments v2 documentation as
+ * understood when this was written; Phase 0 did not observe them in the sandbox.
+ *
  * POSTs carrying a PayPal-Request-Id are idempotent per endpoint: a repeat replays the
  * first response exactly, as PayPal does. API calls need a Bearer token this mock issued.
  * Errors carry name, message, debug_id and details[].issue, plus a paypal-debug-id header.
@@ -29,7 +45,8 @@
  * Knobs: approve(orderId), complete(orderId) (a capture that happened but whose response
  * was lost), setCaptureFailure("timeout" | "declined" | "none"), setRecaptureMode,
  * setRefundStatus, setVerification, setTokenExpiresIn and injectNext (a one-shot canned
- * response for the next matching request).
+ * response for the next matching request), plus setAuthorizationStatus (for example EXPIRED)
+ * and completeAuthorization (an authorization capture whose response was lost).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -57,6 +74,18 @@ export interface MockOrder {
   customId: string | null;
   description: string | null;
   experienceContext: Record<string, unknown> | null;
+  captureId: string | null;
+  /** Set once an AUTHORIZE order is authorized. */
+  authorizationId?: string | null;
+}
+
+export interface MockAuthorization {
+  id: string;
+  orderId: string;
+  status: string;
+  amount: WireMoney | null;
+  customId: string | null;
+  expirationTime: string;
   captureId: string | null;
 }
 
@@ -111,6 +140,7 @@ export interface PaypalMock {
   orders: Map<string, MockOrder>;
   captures: Map<string, MockCapture>;
   refunds: Map<string, MockRefund>;
+  authorizations: Map<string, MockAuthorization>;
   /** Recorded requests matching a method and a path (exact string or pattern). */
   requestsTo(method: string, path: string | RegExp): RecordedRequest[];
   /** The buyer approved the order at PayPal. */
@@ -127,6 +157,10 @@ export interface PaypalMock {
   /** expires_in of tokens issued from now on. Default 32400. */
   setTokenExpiresIn(seconds: number): void;
   injectNext(response: InjectedResponse): void;
+  /** Sets an authorization's status, for example EXPIRED or VOIDED. */
+  setAuthorizationStatus(authorizationId: string, status: string): void;
+  /** PayPal captured the authorization but the response never reached us. Returns the capture. */
+  completeAuthorization(authorizationId: string): MockCapture;
   close(): Promise<void>;
 }
 
@@ -160,6 +194,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
   const orders = new Map<string, MockOrder>();
   const captures = new Map<string, MockCapture>();
   const refunds = new Map<string, MockRefund>();
+  const authorizations = new Map<string, MockAuthorization>();
   const tokens = new Set<string>();
   const replays = new Map<string, { status: number; body: unknown }>();
   const injected: InjectedResponse[] = [];
@@ -203,8 +238,24 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     };
   }
 
+  function authorizationWire(authorization: MockAuthorization): Record<string, unknown> {
+    return {
+      id: authorization.id,
+      status: authorization.status,
+      ...(authorization.amount ? { amount: authorization.amount } : {}),
+      ...(authorization.customId ? { custom_id: authorization.customId } : {}),
+      expiration_time: authorization.expirationTime,
+      supplementary_data: { related_ids: { order_id: authorization.orderId } },
+    };
+  }
+
   function orderWire(order: MockOrder): Record<string, unknown> {
     const capture = order.captureId ? captures.get(order.captureId) : undefined;
+    const authorization = order.authorizationId ? authorizations.get(order.authorizationId) : undefined;
+    const payments: Record<string, unknown> = {
+      ...(authorization ? { authorizations: [authorizationWire(authorization)] } : {}),
+      ...(capture ? { captures: [captureWire(capture)] } : {}),
+    };
     const approvalRel = order.experienceContext ? "payer-action" : "approve";
     const links: Array<Record<string, string>> = [
       { href: `${baseUrl}/v2/checkout/orders/${order.id}`, rel: "self", method: "GET" },
@@ -222,7 +273,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
           ...(order.amount ? { amount: order.amount } : {}),
           ...(order.customId ? { custom_id: order.customId } : {}),
           ...(order.description ? { description: order.description } : {}),
-          ...(capture ? { payments: { captures: [captureWire(capture)] } } : {}),
+          ...(Object.keys(payments).length > 0 ? { payments } : {}),
         },
       ],
       links,
@@ -329,6 +380,10 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     }
     const { replayed, key } = replay(`capture ${orderId}`, request, response);
     if (replayed) return;
+    if (order.intent === "AUTHORIZE") {
+      sendError(response, 422, "UNPROCESSABLE_ENTITY", "ACTION_DOES_NOT_MATCH_INTENT");
+      return;
+    }
     if (order.status === "COMPLETED") {
       if (recaptureMode === "201") {
         const wire = orderWire(order);
@@ -404,6 +459,114 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     send(response, 200, { id: refund.id, status: refund.status, ...(refund.amount ? { amount: refund.amount } : {}) });
   }
 
+  function handleAuthorize(orderId: string, request: IncomingMessage, response: ServerResponse): void {
+    const order = orders.get(orderId);
+    if (!order) {
+      sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+      return;
+    }
+    const { replayed, key } = replay(`authorize ${orderId}`, request, response);
+    if (replayed) return;
+    if (order.intent !== "AUTHORIZE") {
+      sendError(response, 422, "UNPROCESSABLE_ENTITY", "ACTION_DOES_NOT_MATCH_INTENT");
+      return;
+    }
+    if (order.authorizationId) {
+      sendError(response, 422, "UNPROCESSABLE_ENTITY", "ORDER_ALREADY_AUTHORIZED");
+      return;
+    }
+    if (order.status !== "APPROVED") {
+      sendError(response, 422, "UNPROCESSABLE_ENTITY", "ORDER_NOT_APPROVED");
+      return;
+    }
+    const authorization: MockAuthorization = {
+      id: nextId("AUTH"),
+      orderId: order.id,
+      status: "CREATED",
+      amount: order.amount,
+      customId: order.customId,
+      expirationTime: new Date(Date.now() + 29 * 24 * 3_600_000).toISOString(),
+      captureId: null,
+    };
+    authorizations.set(authorization.id, authorization);
+    order.authorizationId = authorization.id;
+    order.status = "COMPLETED";
+    const wire = orderWire(order);
+    remember(key, 201, wire);
+    send(response, 201, wire);
+  }
+
+  function captureAuthorizationNow(authorization: MockAuthorization, status: string): MockCapture {
+    const capture: MockCapture = {
+      id: nextId("CAP"),
+      orderId: authorization.orderId,
+      status,
+      amount: authorization.amount,
+      customId: authorization.customId,
+    };
+    captures.set(capture.id, capture);
+    authorization.status = "CAPTURED";
+    authorization.captureId = capture.id;
+    const order = orders.get(authorization.orderId);
+    if (order) order.captureId = capture.id;
+    return capture;
+  }
+
+  const AUTHORIZATION_CAPTURE_REFUSALS: Record<string, string> = {
+    CAPTURED: "AUTHORIZATION_ALREADY_CAPTURED",
+    VOIDED: "AUTHORIZATION_VOIDED",
+    EXPIRED: "AUTHORIZATION_EXPIRED",
+  };
+
+  function handleCaptureAuthorization(authorizationId: string, request: IncomingMessage, response: ServerResponse): void {
+    const authorization = authorizations.get(authorizationId);
+    if (!authorization) {
+      sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+      return;
+    }
+    const { replayed, key } = replay(`capture-authorization ${authorizationId}`, request, response);
+    if (replayed) return;
+    const refusal = AUTHORIZATION_CAPTURE_REFUSALS[authorization.status];
+    if (refusal) {
+      sendError(response, 422, "UNPROCESSABLE_ENTITY", refusal);
+      return;
+    }
+    if (captureFailure === "timeout") {
+      hanging.add(response);
+      response.on("close", () => hanging.delete(response));
+      return;
+    }
+    const capture = captureAuthorizationNow(authorization, captureFailure === "declined" ? "DECLINED" : "COMPLETED");
+    const wire = { ...captureWire(capture), supplementary_data: { related_ids: { order_id: capture.orderId, authorization_id: authorizationId } } };
+    remember(key, 201, wire);
+    send(response, 201, wire);
+  }
+
+  const VOID_REFUSALS: Record<string, string> = {
+    VOIDED: "PREVIOUSLY_VOIDED",
+    CAPTURED: "PREVIOUSLY_CAPTURED",
+    EXPIRED: "AUTHORIZATION_EXPIRED",
+  };
+
+  function handleVoid(authorizationId: string, request: IncomingMessage, response: ServerResponse): void {
+    const authorization = authorizations.get(authorizationId);
+    if (!authorization) {
+      sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+      return;
+    }
+    const { replayed, key } = replay(`void ${authorizationId}`, request, response);
+    if (replayed) return;
+    const refusal = VOID_REFUSALS[authorization.status];
+    if (refusal) {
+      sendError(response, 422, "UNPROCESSABLE_ENTITY", refusal);
+      return;
+    }
+    authorization.status = "VOIDED";
+    const wire = authorizationWire(authorization);
+    remember(key, 200, wire);
+    send(response, 200, wire);
+  }
+
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const rawBody = await readBody(request);
     const method = request.method ?? "GET";
@@ -437,6 +600,20 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     }
     if (method === "POST" && (match = path.match(/^\/v2\/checkout\/orders\/([^/]+)\/capture$/))) {
       return handleCapture(match[1], request, response);
+    }
+    if (method === "POST" && (match = path.match(/^\/v2\/checkout\/orders\/([^/]+)\/authorize$/))) {
+      return handleAuthorize(match[1], request, response);
+    }
+    if (method === "GET" && (match = path.match(/^\/v2\/payments\/authorizations\/([^/]+)$/))) {
+      const authorization = authorizations.get(match[1]);
+      if (!authorization) return sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+      return send(response, 200, authorizationWire(authorization));
+    }
+    if (method === "POST" && (match = path.match(/^\/v2\/payments\/authorizations\/([^/]+)\/capture$/))) {
+      return handleCaptureAuthorization(match[1], request, response);
+    }
+    if (method === "POST" && (match = path.match(/^\/v2\/payments\/authorizations\/([^/]+)\/void$/))) {
+      return handleVoid(match[1], request, response);
     }
     if (method === "GET" && (match = path.match(/^\/v2\/payments\/captures\/([^/]+)$/))) {
       return handleGetCapture(match[1], response);
@@ -479,6 +656,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     orders,
     captures,
     refunds,
+    authorizations,
     requestsTo: (method, path) => requests.filter((entry) => entry.method === method && matches(path, entry.path)),
     approve(orderId) {
       const order = requireOrder(orderId);
@@ -514,6 +692,18 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     },
     injectNext: (response) => {
       injected.push(response);
+    },
+    setAuthorizationStatus(authorizationId, status) {
+      const authorization = authorizations.get(authorizationId);
+      if (!authorization) throw new Error(`paypal mock: no authorization ${authorizationId}`);
+      authorization.status = status;
+    },
+    completeAuthorization(authorizationId) {
+      const authorization = authorizations.get(authorizationId);
+      if (!authorization || authorization.status !== "CREATED") {
+        throw new Error(`paypal mock: cannot capture authorization ${authorizationId}`);
+      }
+      return captureAuthorizationNow(authorization, "COMPLETED");
     },
     close: () =>
       new Promise<void>((done) => {

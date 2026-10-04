@@ -11,6 +11,7 @@
 import "server-only";
 
 import {
+  type AuthorizationWithAdditionalData,
   CheckoutPaymentIntent,
   PayPalExperienceUserAction,
   PayPalWalletContextShippingPreference,
@@ -20,7 +21,13 @@ import {
 } from "pay-pal-server-sdk";
 import { callPaypal } from "./client";
 import { centsToValue, valueToCents } from "./money";
-import { PaypalError, type CreateOrderInput, type PaypalCapture, type PaypalOrder } from "./types";
+import {
+  PaypalError,
+  type CreateOrderInput,
+  type PaypalAuthorization,
+  type PaypalCapture,
+  type PaypalOrder,
+} from "./types";
 
 const PREFER_REPRESENTATION = "return=representation";
 const APPROVAL_RELS = new Set(["payer-action", "approve"]);
@@ -43,12 +50,35 @@ export function normalizeCapture(capture: OrdersCapture, orderId: string | null,
   };
 }
 
-function normalizeOrder(order: Order, status: number | null): PaypalOrder {
+type AuthorizationLike = Pick<AuthorizationWithAdditionalData, "id" | "status" | "amount" | "customId" | "expirationTime">;
+
+/** Phase 8b: an authorization as the adapter's callers see it. */
+export function normalizeAuthorization(
+  authorization: AuthorizationLike,
+  orderId: string | null,
+  status: number | null
+): PaypalAuthorization {
+  if (!authorization.id || !authorization.status) {
+    throw new PaypalError("PayPal returned an authorization without id or status", { status });
+  }
+  return {
+    id: authorization.id,
+    status: authorization.status,
+    amountCents: authorization.amount ? valueToCents(authorization.amount.value) : null,
+    currency: authorization.amount?.currencyCode ?? null,
+    customId: authorization.customId ?? null,
+    orderId,
+    expiresAt: authorization.expirationTime ?? null,
+  };
+}
+
+export function normalizeOrder(order: Order, status: number | null): PaypalOrder {
   if (!order.id || !order.status) {
     throw new PaypalError("PayPal returned an order without id or status", { status });
   }
   const unit = order.purchaseUnits?.[0];
   const capture = unit?.payments?.captures?.[0];
+  const authorization = unit?.payments?.authorizations?.[0];
   return {
     id: order.id,
     status: order.status,
@@ -57,10 +87,14 @@ function normalizeOrder(order: Order, status: number | null): PaypalOrder {
     customId: unit?.customId ?? null,
     capture: capture ? normalizeCapture(capture, order.id, status) : null,
     approveUrl: approvalLink(order.links),
+    ...(authorization ? { authorization: normalizeAuthorization(authorization, order.id, status) } : {}),
   };
 }
 
-/** Creates the CAPTURE order for a booking deposit. Returns the order id and the buyer's approval URL. */
+/**
+ * Creates the order for a booking deposit: intent CAPTURE, or AUTHORIZE for a
+ * phone-confirmed merchant (Phase 8b). Returns the order id and the buyer's approval URL.
+ */
 export async function createOrder(input: CreateOrderInput): Promise<{ orderId: string; approveUrl: string }> {
   const value = centsToValue(input.amountCents);
   const { value: order, status } = await callPaypal("createOrder", (client) =>
@@ -68,7 +102,7 @@ export async function createOrder(input: CreateOrderInput): Promise<{ orderId: s
       payPalRequestId: input.operationKey,
       prefer: PREFER_REPRESENTATION,
       body: {
-        intent: CheckoutPaymentIntent.Capture,
+        intent: input.intent === "AUTHORIZE" ? CheckoutPaymentIntent.Authorize : CheckoutPaymentIntent.Capture,
         purchaseUnits: [
           {
             amount: { currencyCode: input.currency, value },
