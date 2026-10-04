@@ -40,6 +40,7 @@ import {
   type Row,
 } from "./payment-state";
 import { BookingError, UNIQUE_VIOLATION } from "./types";
+import { notifyBookingSync } from "./zapier";
 
 export type CaptureSource = "return" | "webhook" | "reconcile";
 
@@ -269,7 +270,11 @@ export async function finalizeCaptured(client: SupabaseClient, booking: Row, pay
     if (!reacquired) return compensateCapturedPayment(client, booking, payment, "slot_gone");
     result = await confirm();
   }
-  if (!result.error) return "confirmed";
+  if (!result.error) {
+    // Only this call's own 'confirmed' is the transition; 'already_confirmed' is a repeat (Phase 8c).
+    if (result.data === "confirmed") notifyBookingSync(client, booking.id as string, "booking.confirmed");
+    return "confirmed";
+  }
 
   switch (result.error.message) {
     case "invalid_state":

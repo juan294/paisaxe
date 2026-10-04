@@ -31,6 +31,7 @@ const BUILDER_METHODS = [
   "gte",
   "order",
   "limit",
+  "abortSignal",
   "maybeSingle",
   "single",
 ] as const;
