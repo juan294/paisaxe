@@ -25,6 +25,17 @@ export type PaypalCaptureStatus =
   | "FAILED"
   | (string & {});
 
+/** Authorization statuses (Phase 8b); open as above. */
+export type PaypalAuthorizationStatus =
+  | "CREATED"
+  | "CAPTURED"
+  | "DENIED"
+  | "PARTIALLY_CAPTURED"
+  | "VOIDED"
+  | "PENDING"
+  | "EXPIRED"
+  | (string & {});
+
 /** Refund statuses; open as above. */
 export type PaypalRefundStatus = "CANCELLED" | "FAILED" | "PENDING" | "COMPLETED" | (string & {});
 
@@ -36,6 +47,19 @@ export interface PaypalCapture {
   customId: string | null;
   /** The order this capture belongs to (supplementary_data.related_ids.order_id). */
   orderId: string | null;
+}
+
+/** An authorization of an AUTHORIZE order (Phase 8b, decision R7). */
+export interface PaypalAuthorization {
+  id: string;
+  status: PaypalAuthorizationStatus;
+  amountCents: number | null;
+  currency: string | null;
+  customId: string | null;
+  /** The order it belongs to (supplementary_data.related_ids.order_id), when PayPal says. */
+  orderId: string | null;
+  /** expiration_time: 29 days after authorization (Phase 0 evidence). */
+  expiresAt: string | null;
 }
 
 export interface PaypalOrder {
@@ -56,6 +80,8 @@ export interface PaypalOrder {
    * Omitted when PayPal sent none.
    */
   payerEmail?: string;
+  /** purchase_units[0].payments.authorizations[0] of an AUTHORIZE order (Phase 8b); absent otherwise. */
+  authorization?: PaypalAuthorization;
 }
 
 /** Invoice statuses PayPal documents (Invoicing v2); open, so other strings can appear. */
@@ -130,6 +156,8 @@ export interface CreateOrderInput {
   cancelUrl: string;
   /** payments.operation_key: becomes PayPal-Request-Id, so retries are idempotent. */
   operationKey: string;
+  /** Default CAPTURE. AUTHORIZE for a phone-confirmed merchant (Phase 8b): authorized on approval, captured after the call. */
+  intent?: "CAPTURE" | "AUTHORIZE";
 }
 
 /** PayPal credentials or base URL missing or not allowed (sandbox-only host guard). */

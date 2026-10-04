@@ -24,8 +24,11 @@ export function nextPollDelay(elapsedMs: number): number | null {
 
 type Phase = "pay" | "confirming" | "confirmed" | "expired" | "attention" | "refundFailed" | "refunding" | "refunded" | "cancelled";
 
-/** Payment statuses in which the buyer has approved and the server is finishing the capture. */
-const CONFIRMING_PAYMENTS = new Set(["approved", "capture_pending", "captured"]);
+/**
+ * Payment statuses in which the buyer has approved and the server is finishing the capture,
+ * or (Phase 8b) holds the authorized deposit while the merchant confirms by phone.
+ */
+const CONFIRMING_PAYMENTS = new Set(["approved", "capture_pending", "captured", "authorized", "void_pending"]);
 
 function phaseOf(view: BookingView): Phase {
   // A refused refund is the truth whatever the booking row still says.

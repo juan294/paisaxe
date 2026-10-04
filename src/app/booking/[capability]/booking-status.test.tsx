@@ -134,6 +134,16 @@ describe("BookingStatus", () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it.each(["authorized", "void_pending"])(
+    "a phone-confirmed deposit that is %s shows confirming, never the pay button (Phase 8b)",
+    async (status) => {
+      mockFetch.mockResolvedValueOnce(json(200, view({ payment: { status, orderId: "ORDER-1", captureId: null, refundId: null } })));
+      render(<BookingStatus />);
+      expect(await screen.findByText("booking.page.confirming")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "booking.cards.pay" })).not.toBeInTheDocument();
+    }
+  );
+
   it("a lapsed hold replaces the pay button with the way back to the assistant", async () => {
     mockFetch.mockResolvedValueOnce(json(200, view({ holdExpiresAt: new Date(Date.now() - 1_000).toISOString() })));
     render(<BookingStatus />);

@@ -21,6 +21,9 @@ vi.mock("./drafts", () => drafts);
 
 const invoice = vi.hoisted(() => ({ closeInvoiceAfterCancellation: vi.fn() }));
 vi.mock("./invoice", () => invoice);
+// Phase 8b's step is unit-tested in phone-confirmation.test.ts; here only its wiring.
+const phone = vi.hoisted(() => ({ reconcilePhoneAuthorizations: vi.fn() }));
+vi.mock("./phone-confirmation", () => phone);
 
 const inbox = vi.hoisted(() => ({ processAndRecordPaypalEvent: vi.fn() }));
 vi.mock("./webhook-events", async (importOriginal) => ({ ...(await importOriginal<typeof import("./webhook-events")>()), ...inbox }));
@@ -189,6 +192,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"], now: NOW });
   fake = createBookingSupabaseFake();
+  phone.reconcilePhoneAuthorizations.mockResolvedValue({ confirmed: 0, voided: 0 });
 });
 
 afterEach(() => {
@@ -830,5 +834,43 @@ describe("step 9: balance invoices of cancelled bookings (Phase 8a)", () => {
 
     script({ invoices: { error: { message: "denied" } } });
     await expect(reconcileBookings(fake.client)).rejects.toThrow("Failed to load cancelled bookings with an invoice: denied");
+  });
+});
+
+describe("step 4b: phone-confirmation authorizations (Phase 8b)", () => {
+  it("runs after the capture_pending step and before the captured step, scoped like the others", async () => {
+    script();
+    await reconcileBookings(fake.client, { bookingIds: [B1] });
+    const order = phone.reconcilePhoneAuthorizations.mock.invocationCallOrder[0];
+    const fromCalls = vi.mocked(fake.client.from).mock.invocationCallOrder;
+    // from() calls: inbox, open, pending, captured, refunds, cancels, stale
+    expect(order).toBeGreaterThan(fromCalls[2]);
+    expect(order).toBeLessThan(fromCalls[3]);
+    expect(phone.reconcilePhoneAuthorizations).toHaveBeenCalledWith(fake.client, [B1], expect.any(Function));
+  });
+
+  it("counts captured authorizations as confirmed and voided ones as expired", async () => {
+    script();
+    phone.reconcilePhoneAuthorizations.mockResolvedValue({ confirmed: 2, voided: 1 });
+    await expect(reconcileBookings(fake.client)).resolves.toEqual({ ...ZERO, confirmed: 2, expired: 1 });
+    expect(phone.reconcilePhoneAuthorizations).toHaveBeenCalledWith(fake.client, null, expect.any(Function));
+  });
+
+  it("counts and logs an item error, and aborts the run when PayPal is unreachable", async () => {
+    script();
+    phone.reconcilePhoneAuthorizations.mockImplementation(async (_client, _scope, onError: (error: unknown, row: Row) => void) => {
+      onError(new Error("boom"), { id: "pay-x", booking_id: B2 });
+      return { confirmed: 0, voided: 0 };
+    });
+    await expect(reconcileBookings(fake.client)).resolves.toEqual({ ...ZERO, errors: 1 });
+    expect(logger.error).toHaveBeenCalledWith("[CRON_RECONCILE_ITEM_FAILED]", { step: "phone_authorization", bookingId: B2, paymentId: "pay-x", error: "boom" });
+
+    fake = createBookingSupabaseFake();
+    script();
+    phone.reconcilePhoneAuthorizations.mockImplementation(async (_client, _scope, onError: (error: unknown, row: Row) => void) => {
+      onError(new PaypalNotConfigured(), { id: "pay-x", booking_id: B2 });
+      return { confirmed: 0, voided: 0 };
+    });
+    await expect(reconcileBookings(fake.client)).rejects.toBeInstanceOf(PaypalNotConfigured);
   });
 });

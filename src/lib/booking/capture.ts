@@ -12,6 +12,10 @@
  * Whether money has moved decides the branch (R2-01): an order that is
  * COMPLETED is never expired, it is confirmed or refunded. An unknown capture
  * outcome stays capture_pending until PayPal says otherwise (R2-02).
+ *
+ * Phase 8b: for a merchant in confirmation_mode 'phone' the order is created
+ * with intent AUTHORIZE, and captureApprovedOrder hands an approval to
+ * phone-confirmation.ts, which authorizes and never reaches captureOrder.
  */
 import "server-only";
 
@@ -30,6 +34,8 @@ import {
 } from "@/lib/paypal";
 import type { CaptureOutcome, PaymentStartResponse } from "@/types/booking-page";
 import { bookingLink } from "./links";
+import { settleApprovedPhoneOrder } from "./phone-confirmation";
+import { isPhoneMerchant, phoneConfirmationReadiness } from "./phone-config";
 import {
   CAPTURABLE,
   COMPENSATING,
@@ -51,10 +57,17 @@ interface FlowState {
   hold: Row;
 }
 
-/** The booking (with its hold and experience title) and its latest payment, in one round trip. */
-async function loadState(client: SupabaseClient, bookingId: string): Promise<FlowState & { experienceTitle: string }> {
+/** Payment statuses in which the buyer already approved: a second order would hide this one. */
+const IN_PROGRESS = ["capture_pending", "captured", "authorized", "void_pending"];
+
+/** The booking (with its hold, experience title and merchant's confirmation mode) and its latest payment, in one round trip. */
+async function loadState(client: SupabaseClient, bookingId: string): Promise<FlowState & { experienceTitle: string; phone: boolean }> {
   const [booking, payment] = await Promise.all([
-    client.from("bookings").select("*, hold:holds(*), experience:experiences(title)").eq("id", bookingId).maybeSingle(),
+    client
+      .from("bookings")
+      .select("*, hold:holds(*), experience:experiences(title, merchant:merchants(confirmation_mode))")
+      .eq("id", bookingId)
+      .maybeSingle(),
     client.from("payments").select("*").eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (booking.error) throw new Error(`Failed to load booking: ${booking.error.message}`);
@@ -62,7 +75,7 @@ async function loadState(client: SupabaseClient, bookingId: string): Promise<Flo
   if (payment.error) throw new Error(`Failed to load payment: ${payment.error.message}`);
 
   const { hold, experience, ...row } = booking.data as Row & { hold: Row; experience: { title: string } | null };
-  return { booking: row, payment: payment.data, hold, experienceTitle: experience?.title ?? "" };
+  return { booking: row, payment: payment.data, hold, experienceTitle: experience?.title ?? "", phone: isPhoneMerchant(experience) };
 }
 
 /** One open payment per booking (migration 121): a concurrent insert loses and continues the winner's row. */
@@ -92,9 +105,17 @@ function matchesBooking(order: PaypalOrder, booking: Row): boolean {
  * since a booking exists only after accept_quote).
  */
 export async function ensurePaymentOrder(client: SupabaseClient, bookingId: string): Promise<PaymentStartResponse> {
-  const { booking, payment, hold, experienceTitle } = await loadState(client, bookingId);
+  const { booking, payment, hold, experienceTitle, phone } = await loadState(client, bookingId);
   if (booking.status !== "pending_payment") throw new BookingError("invalid_state");
   if (!holdIsLive(hold)) throw new BookingError("hold_expired");
+  if (phone) {
+    // Never take an authorization for a confirmation call that cannot be made (Phase 8b).
+    const readiness = await phoneConfirmationReadiness();
+    if (!readiness.ready) {
+      logger.warn("[PHONE_CONFIRMATION_NOT_CONFIGURED]", { bookingId, reason: readiness.reason });
+      throw new BookingError("payment_unavailable");
+    }
+  }
 
   // expiresAt is the hold's expiry: the buyer must approve before it.
   const result = (approveUrl: string): PaymentStartResponse => ({
@@ -105,7 +126,7 @@ export async function ensurePaymentOrder(client: SupabaseClient, bookingId: stri
   });
 
   // The buyer already approved: a second order would hide this one from reconciliation.
-  if (payment && ["capture_pending", "captured"].includes(payment.status as string)) {
+  if (payment && IN_PROGRESS.includes(payment.status as string)) {
     throw new BookingError("payment_in_progress");
   }
   if (payment?.order_id && payment.approve_url && ["created", "approved"].includes(payment.status as string)) {
@@ -127,6 +148,7 @@ export async function ensurePaymentOrder(client: SupabaseClient, bookingId: stri
       returnUrl: `${link}/return`,
       cancelUrl: `${link}?cancelled=1`,
       operationKey: row.operation_key as string,
+      ...(phone ? { intent: "AUTHORIZE" as const } : {}),
     });
     const stored = await client.from("payments").update({ order_id: order.orderId, approve_url: order.approveUrl }).eq("id", row.id);
     if (stored.error) throw new Error(`Failed to store the order: ${stored.error.message}`);
@@ -187,6 +209,8 @@ export async function captureApprovedOrder(
   if (payment.status === "captured" && payment.capture_id) {
     return finalizeCaptured(client, booking, payment);
   }
+  // Phone-confirmed merchant: authorize, never capture here (Phase 8b).
+  if (state.phone) return settleApprovedPhoneOrder(client, { booking, payment, hold }, source);
 
   const order = await getOrder(payment.order_id as string);
 

@@ -11,6 +11,10 @@
  *      authoritative answer ends the state. Every inconclusive pass is counted;
  *      from the third the booking needs attention, and the payment stays
  *      capture_pending and keeps being reconciled every run (R2-02)
+ *   4b. authorized|void_pending payments of phone-confirmed merchants (Phase 8b)
+ *      -> settled from the recorded call outcome: confirmed captures, any other
+ *      final outcome voids, no outcome after the 3-day honor period voids, a
+ *      call never placed is placed (phone-confirmation.ts)
  *   5. captured payments whose booking is not confirmed -> finalizeCaptured
  *   6. refund_pending payments -> request the refund with the payment's fixed
  *      key if it has no refund id yet, else follow it to refunded or refund_failed
@@ -34,6 +38,7 @@ import { requestCancellationRefund } from "./cancel";
 import { abandonStaleDrafts } from "./drafts";
 import { closeInvoiceAfterCancellation } from "./invoice";
 import { applyRefundStatus, flagNeedsAttention, guardedUpdate, holdIsLive, type Row } from "./payment-state";
+import { reconcilePhoneAuthorizations } from "./phone-confirmation";
 import { PaypalWebhookUnmatched, UNMATCHED_TAG, processAndRecordPaypalEvent, type PaypalInboxEvent } from "./webhook-events";
 
 
@@ -222,6 +227,17 @@ async function followPendingCaptures(run: Run): Promise<void> {
   });
 }
 
+// Step 4b (Phase 8b): a captured authorization counts as confirmed, a voided one as expired.
+async function settlePhoneAuthorizations(run: Run): Promise<void> {
+  const settled = await reconcilePhoneAuthorizations(run.client, run.scope, (error, row) => {
+    if (paypalUnreachable(error)) throw error;
+    run.summary.errors++;
+    logger.error("[CRON_RECONCILE_ITEM_FAILED]", { step: "phone_authorization", bookingId: row.booking_id, paymentId: row.id, error: message(error) });
+  });
+  run.summary.confirmed += settled.confirmed;
+  run.summary.expired += settled.voided;
+}
+
 // Step 5
 async function finalizeCapturedPayments(run: Run): Promise<void> {
   // A confirmed cancellation is never finalized: compensation would refund the full capture.
@@ -348,6 +364,7 @@ export async function reconcileBookings(client: SupabaseClient, options: Reconci
   await drainInbox(run);
   await captureOpenOrders(run);
   await followPendingCaptures(run);
+  await settlePhoneAuthorizations(run);
   await finalizeCapturedPayments(run);
   await followRefunds(run);
   await retryConfirmedCancellations(run);

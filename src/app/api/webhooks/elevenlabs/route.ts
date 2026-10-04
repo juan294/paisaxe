@@ -12,6 +12,8 @@ import {
   type TranscriptEntry,
 } from "@/lib/services/elevenlabs-webhook-service";
 import { getUnknownFields } from "@/lib/webhook-schema-utils";
+import { settlePhoneConfirmationCall } from "@/lib/booking/phone-confirmation";
+import { isPhoneConfirmationCall } from "@/lib/booking/phone-config";
 
 /**
  * POST /api/webhooks/elevenlabs
@@ -27,6 +29,12 @@ import { getUnknownFields } from "@/lib/webhook-schema-utils";
  * selection live in `src/lib/services/elevenlabs-webhook-service.ts` (#625).
  * This handler keeps the request orchestration: verify → look up booking →
  * run the idempotent RPC → claim/send the SMS job.
+ *
+ * Phase 8b (PayPal hackathon plan): a call placed by the phone-confirmation
+ * flow (idempotency key "phone-confirmation:<payment id>") then settles its
+ * PayPal authorization from the outcome the RPC just recorded. Any other call
+ * never reaches that step, and its failure never changes this response:
+ * reconciliation settles from the recorded outcome every 5 minutes.
  */
 
 const SMS_JOB_LEASE_SECONDS = 15 * 60;
@@ -363,6 +371,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
         { status: 200 }
       );
+    }
+
+    // Phase 8b: settle the PayPal authorization of a phone-confirmation call
+    // from the outcome recorded above (also on a redelivery, idempotent by state).
+    if (isPhoneConfirmationCall(booking)) {
+      try {
+        await settlePhoneConfirmationCall(supabase, booking.id);
+      } catch (settleError) {
+        logger.error("[PHONE_CONFIRMATION_SETTLE_FAILED]", {
+          callId: booking.id,
+          error: settleError instanceof Error ? settleError.message : String(settleError),
+        });
+      }
     }
 
     // Send SMS if feature is enabled
