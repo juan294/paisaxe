@@ -49,6 +49,7 @@ function normalizeOrder(order: Order, status: number | null): PaypalOrder {
   }
   const unit = order.purchaseUnits?.[0];
   const capture = unit?.payments?.captures?.[0];
+  const payerEmail = order.payer?.emailAddress || order.paymentSource?.paypal?.emailAddress;
   return {
     id: order.id,
     status: order.status,
@@ -57,6 +58,7 @@ function normalizeOrder(order: Order, status: number | null): PaypalOrder {
     customId: unit?.customId ?? null,
     capture: capture ? normalizeCapture(capture, order.id, status) : null,
     approveUrl: approvalLink(order.links),
+    ...(payerEmail ? { payerEmail } : {}),
   };
 }
 

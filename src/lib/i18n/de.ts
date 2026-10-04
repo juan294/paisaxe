@@ -531,6 +531,19 @@ export const de: Translations = {
       refundFailed: 'Die Erstattung konnte nicht abgeschlossen werden; wir prüfen das.',
       unavailable: 'Diese Buchung kann nicht mehr storniert werden.',
     },
+    invoice: {
+      title: 'Restbetrag der Buchung',
+      dueOn: 'Fällig am {date}',
+      pay: 'Restbetrag mit PayPal bezahlen',
+      status: {
+        draft: 'PayPal-Rechnung wird erstellt',
+        sent: 'Rechnung an die E-Mail-Adresse deines PayPal-Kontos gesendet',
+        payment_pending: 'PayPal hat die Zahlung erhalten, aber noch nicht bestätigt',
+        partially_paid: 'Teilzahlung erhalten: Es ist noch ein Restbetrag offen',
+        paid: 'Restbetrag bezahlt',
+        cancelled: 'Rechnung storniert: Sie kann nicht mehr bezahlt werden',
+      },
+    },
     cards: {
       demo: 'Demo',
       offerTitle: 'Verfügbare Optionen',

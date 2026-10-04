@@ -41,6 +41,7 @@ function summary(overrides: Partial<ReconcileSummary> = {}): ReconcileSummary {
     refunded: 0,
     refundFailed: 0,
     staleAttention: 0,
+    invoicesCancelled: 0,
     errors: 0,
     ...overrides,
   };

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { BalanceInvoiceStatusView } from "@/components/booking/balance-invoice";
 import { CancellationConfirm } from "@/components/booking/cancellation-confirm";
 import { Button } from "@/components/ui/button";
 import { clockTime, money } from "@/lib/booking-format";
@@ -67,7 +68,9 @@ const BACK_TO_CHAT = "/immersive?booking=1";
  * so an unknown link gets that route's real 404. While the server finishes a
  * capture or a refund the status is polled; the webhook and reconciliation
  * complete it whether or not this page stays open. Phase 5 adds the
- * cancellation section of a confirmed booking.
+ * cancellation section of a confirmed booking; Phase 8a the balance invoice,
+ * shown whenever one exists (money may have moved even if the booking did not
+ * stay confirmed).
  */
 export function BookingStatus() {
   const { t, locale } = useTranslation();
@@ -239,6 +242,14 @@ export function BookingStatus() {
         {phase === "expired" && <BackToChat message={t("booking.page.expiredBody")} label={t("booking.page.backToChat")} />}
         {phase && PHASE_MESSAGE[phase] && <p>{t(PHASE_MESSAGE[phase])}</p>}
       </div>
+
+      {view.invoice && (
+        <section className="space-y-1 border-t border-white/10 pt-4 text-sm" aria-live="polite">
+          <h2 className="text-base font-semibold">{t("booking.invoice.title")}</h2>
+          <p className="text-white/60">{t("booking.invoice.dueOn").replace("{date}", view.slotDate)}</p>
+          <BalanceInvoiceStatusView status={view.invoice.status} url={view.invoice.url} />
+        </section>
+      )}
     </Shell>
   );
 }

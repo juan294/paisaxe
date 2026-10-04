@@ -14,7 +14,12 @@
  * Event names are the ones confirmed in the Phase 0 sandbox runs
  * (CHECKOUT.ORDER.APPROVED, PAYMENT.CAPTURE.COMPLETED, PAYMENT.CAPTURE.REFUNDED)
  * plus PayPal's documented PAYMENT.CAPTURE.PENDING and PAYMENT.CAPTURE.DENIED,
- * which the sandbox runs did not produce.
+ * which the sandbox runs did not produce, and (Phase 8a) PayPal's documented
+ * INVOICING.INVOICE.PAID, which concerns a booking's balance invoice, not a
+ * payment row. It also fires for partial and pending payments, so it only
+ * triggers a read of the invoice (settleBalanceInvoice). INVOICING.INVOICE.CANCELLED
+ * ("A merchant or customer cancels an invoice.") only marks an open invoice
+ * cancelled.
  */
 import "server-only";
 
@@ -22,6 +27,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { getCapture, valueToCents } from "@/lib/paypal";
 import { captureApprovedOrder, compensateCapturedPayment, finalizeCaptured, type CaptureOutcome } from "./capture";
+import { markInvoiceCancelled, settleBalanceInvoice } from "./invoice";
 import {
   CAPTURABLE,
   RECORDABLE,
@@ -43,7 +49,8 @@ export interface PaypalInboxEvent {
   custom_id: string | null;
 }
 
-export type EventOutcome = CaptureOutcome | "recorded" | "out_of_order" | "ignored";
+/** "unsettled": an invoice event whose invoice is not (yet) paid in full and settled; nothing to retry. */
+export type EventOutcome = CaptureOutcome | "recorded" | "out_of_order" | "ignored" | "unsettled";
 
 /** Prefix of an unmatched event's last_error; the reconciliation drain skips those rows. */
 export const UNMATCHED_TAG = "[PAYPAL_WEBHOOK_UNMATCHED]";
@@ -61,6 +68,8 @@ const CAPTURE_COMPLETED = "PAYMENT.CAPTURE.COMPLETED";
 const CAPTURE_PENDING = "PAYMENT.CAPTURE.PENDING";
 const CAPTURE_DENIED = "PAYMENT.CAPTURE.DENIED";
 const CAPTURE_REFUNDED = "PAYMENT.CAPTURE.REFUNDED";
+const INVOICE_PAID = "INVOICING.INVOICE.PAID";
+const INVOICE_CANCELLED = "INVOICING.INVOICE.CANCELLED";
 
 /** An approval can still lead to a capture (or confirms one already made). */
 const APPROVAL_FROM = [...CAPTURABLE, "captured"];
@@ -238,11 +247,34 @@ async function onCaptureRefunded(client: SupabaseClient, event: PaypalInboxEvent
 }
 
 /**
+ * A balance invoice event. The invoice id is read from the stored payload
+ * (resource.invoice.id, or resource.id when the resource is the invoice), so
+ * a replay needs only the inbox row. Throws PaypalWebhookUnmatched when no
+ * booking has the invoice.
+ */
+async function onInvoiceEvent(client: SupabaseClient, event: PaypalInboxEvent): Promise<EventOutcome> {
+  const resource = asRow(event.payload.resource) ?? {};
+  const invoiceId = text(asRow(resource.invoice)?.id) ?? text(resource.id);
+  const cancelled = event.event_type === INVOICE_CANCELLED;
+  let status: string | null = null;
+  if (invoiceId) status = cancelled ? await markInvoiceCancelled(client, invoiceId) : await settleBalanceInvoice(client, invoiceId);
+  if (!status) {
+    logger.error("[PAYPAL_WEBHOOK_UNMATCHED]", { eventId: event.event_id, eventType: event.event_type, invoiceId });
+    throw new PaypalWebhookUnmatched(event.event_id);
+  }
+  if (!cancelled) return status === "paid" ? "recorded" : "unsettled";
+  if (status === "cancelled") return "recorded";
+  logger.warn("[PAYPAL_WEBHOOK_OUT_OF_ORDER]", { eventId: event.event_id, eventType: event.event_type, invoiceId, invoiceStatus: status });
+  return "out_of_order";
+}
+
+/**
  * Applies one inbox row. Reads only the row and PayPal (R2-04), so the cron
  * drain can replay it long after the request that stored it has ended.
  * Throws when the row matches no payment; it then stays unprocessed.
  */
 export async function processPaypalEvent(client: SupabaseClient, event: PaypalInboxEvent): Promise<EventOutcome> {
+  if (event.event_type === INVOICE_PAID || event.event_type === INVOICE_CANCELLED) return onInvoiceEvent(client, event);
   const handlers: Record<string, typeof onCaptureCompleted> = {
     [ORDER_APPROVED]: onOrderApproved,
     [CAPTURE_COMPLETED]: onCaptureCompleted,

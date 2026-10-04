@@ -530,6 +530,19 @@ export const ast: Translations = {
       refundFailed: 'Nun se pudo completar el reembolsu; tamos revisándolu.',
       unavailable: 'Esta reserva yá nun se pue encaboxar.',
     },
+    invoice: {
+      title: 'Restu de la reserva',
+      dueOn: 'Vence el {date}',
+      pay: 'Pagar el restu con PayPal',
+      status: {
+        draft: 'Preparando la factura de PayPal',
+        sent: 'Factura unviada al corréu de la to cuenta PayPal',
+        payment_pending: 'PayPal recibió\'l pagu, pero entá nun lu confirmó',
+        partially_paid: 'Pagu parcial recibíu: entá queda restu por pagar',
+        paid: 'Restu pagáu',
+        cancelled: 'Factura anulada: yá nun se pue pagar',
+      },
+    },
     cards: {
       demo: 'Demo',
       offerTitle: 'Opciones disponibles',

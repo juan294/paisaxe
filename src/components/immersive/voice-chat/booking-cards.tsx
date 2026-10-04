@@ -1,5 +1,6 @@
 "use client";
 
+import { BalanceInvoiceStatusView } from "@/components/booking/balance-invoice";
 import { CancellationConfirm } from "@/components/booking/cancellation-confirm";
 import { Button } from "@/components/ui/button";
 import type { QuoteState } from "@/hooks/use-booking-chat";
@@ -10,6 +11,7 @@ import type {
   BookingCard,
   BookingSummaryCard,
   CancellationCard,
+  InvoiceCard,
   OfferCard,
   PaymentCard,
   QuoteCard,
@@ -170,6 +172,17 @@ function CancellationCardView({ card, t }: { card: CancellationCard; t: T }) {
   );
 }
 
+function InvoiceCardView({ card, t, locale }: { card: InvoiceCard; t: T; locale: Locale }) {
+  return (
+    <CardShell title={`${t("booking.invoice.title")} ${card.reference}`} t={t}>
+      <p className="font-semibold">{money(card.amountCents, card.currency, locale)}</p>
+      <p className="text-white/60">{t("booking.invoice.dueOn").replace("{date}", card.dueDate)}</p>
+      <BalanceInvoiceStatusView status={card.status} url={card.invoiceUrl} />
+      <p className="text-white/60">{t("booking.cards.sandbox")}</p>
+    </CardShell>
+  );
+}
+
 /**
  * Booking chat cards under an assistant bubble (PayPal hackathon plan, Phase
  * 3). The quote card's button is the only way to accept an offer; capability
@@ -203,6 +216,8 @@ export function BookingCards({ cards, quoteStates, onAccept, onRequote, busy = f
             return <PaymentCardView key={`pay-${card.bookingId}`} card={card} t={t} locale={locale} />;
           case "cancellation":
             return <CancellationCardView key={`cancel-${card.bookingId}`} card={card} t={t} />;
+          case "invoice":
+            return <InvoiceCardView key={`invoice-${card.bookingId}`} card={card} t={t} locale={locale} />;
         }
       })}
     </>

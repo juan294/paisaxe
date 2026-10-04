@@ -16,6 +16,9 @@
  *      key if it has no refund id yet, else follow it to refunded or refund_failed
  *   7. confirmed cancellations (Phase 5) whose refund was never created -> request it
  *   8. needs_attention bookings older than 15 minutes -> [CRON_RECONCILE_ATTENTION]
+ *   9. confirmed cancellations with a balance invoice (Phase 8a): cancel an
+ *      invoice still open at PayPal; flag a booking whose balance was already
+ *      paid needs_attention once its cancellation is complete (never refunded)
  *
  * Only the shared capture path captures, and only buyer-approved orders.
  * PayPal unreachable aborts the run and leaves every state as it was (the route
@@ -29,6 +32,7 @@ import { PaypalError, PaypalNotConfigured, getRefund, refundCapture } from "@/li
 import { captureApprovedOrder, finalizeCaptured, type CaptureOutcome } from "./capture";
 import { requestCancellationRefund } from "./cancel";
 import { abandonStaleDrafts } from "./drafts";
+import { closeInvoiceAfterCancellation } from "./invoice";
 import { applyRefundStatus, flagNeedsAttention, guardedUpdate, holdIsLive, type Row } from "./payment-state";
 import { PaypalWebhookUnmatched, UNMATCHED_TAG, processAndRecordPaypalEvent, type PaypalInboxEvent } from "./webhook-events";
 
@@ -54,6 +58,7 @@ export interface ReconcileSummary {
   refunded: number;
   refundFailed: number;
   staleAttention: number;
+  invoicesCancelled: number;
   errors: number;
 }
 
@@ -297,6 +302,26 @@ async function reportStaleAttention(run: Run): Promise<void> {
   }
 }
 
+// Step 9
+async function closeCancelledBookingInvoices(run: Run): Promise<void> {
+  let query = run.client
+    .from("bookings")
+    .select("id")
+    .not("cancellation_confirmed_at", "is", null)
+    .or("invoice_status.in.(draft,sent,payment_pending),and(invoice_status.in.(paid,partially_paid),status.in.(cancelled,refunded))")
+    .order("updated_at", { ascending: true })
+    .limit(BATCH);
+  if (run.scope) query = query.in("id", run.scope);
+  const { data, error } = await query;
+  if (error) throw new Error(`Failed to load cancelled bookings with an invoice: ${error.message}`);
+  const rows = (data ?? []).map((row) => ({ booking_id: row.id }));
+  await eachItem(run, "invoices", rows, async (row) => {
+    const outcome = await closeInvoiceAfterCancellation(run.client, row.booking_id as string);
+    if (outcome === "cancelled") run.summary.invoicesCancelled++;
+    if (outcome === "flagged") run.summary.flaggedForAttention++;
+  });
+}
+
 export async function reconcileBookings(client: SupabaseClient, options: ReconcileOptions = {}): Promise<ReconcileSummary> {
   const run: Run = {
     client,
@@ -314,6 +339,7 @@ export async function reconcileBookings(client: SupabaseClient, options: Reconci
       refunded: 0,
       refundFailed: 0,
       staleAttention: 0,
+      invoicesCancelled: 0,
       errors: 0,
     },
   };
@@ -326,5 +352,6 @@ export async function reconcileBookings(client: SupabaseClient, options: Reconci
   await followRefunds(run);
   await retryConfirmedCancellations(run);
   await reportStaleAttention(run);
+  await closeCancelledBookingInvoices(run);
   return run.summary;
 }

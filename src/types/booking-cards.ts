@@ -7,7 +7,7 @@
  * never appear in model-visible text or tool results (plan F05). Amounts are
  * integer cents.
  */
-import type { CancellationTerms } from "./booking-page";
+import type { BalanceInvoiceStatus, CancellationTerms } from "./booking-page";
 
 export interface OfferCardOption {
   experienceId: string;
@@ -80,9 +80,24 @@ export interface CancellationCard extends CancellationTerms {
   capability: string;
 }
 
-export type BookingCard = OfferCard | QuoteCard | BookingSummaryCard | PaymentCard | CancellationCard;
+/** Phase 8a: the PayPal invoice for the balance of a confirmed booking. */
+export interface InvoiceCard {
+  kind: "invoice";
+  bookingId: string;
+  reference: string;
+  /** The balance invoiced: total - deposit. */
+  amountCents: number;
+  currency: string;
+  /** "YYYY-MM-DD": the slot date. */
+  dueDate: string;
+  status: BalanceInvoiceStatus;
+  /** The payer's PayPal link (card only, F05); null while a draft. */
+  invoiceUrl: string | null;
+}
 
-const CARD_KINDS = new Set<BookingCard["kind"]>(["offer", "quote", "booking", "payment", "cancellation"]);
+export type BookingCard = OfferCard | QuoteCard | BookingSummaryCard | PaymentCard | CancellationCard | InvoiceCard;
+
+const CARD_KINDS = new Set<BookingCard["kind"]>(["offer", "quote", "booking", "payment", "cancellation", "invoice"]);
 
 /** Shallow check that a parsed value carries a known card kind. */
 export function isBookingCard(value: unknown): value is BookingCard {

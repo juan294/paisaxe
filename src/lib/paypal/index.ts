@@ -3,6 +3,7 @@
  * from here only; pay-pal-server-sdk types stay inside src/lib/paypal.
  */
 export { valueToCents } from "./money";
+export { cancelInvoice, createInvoice, getInvoice, sendInvoice } from "./invoices";
 export { captureOrder, createOrder, getOrder } from "./orders";
 export { getCapture, getRefund, refundCapture } from "./payments";
 export { verifyWebhookSignature } from "./webhooks";

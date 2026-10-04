@@ -21,12 +21,22 @@
  *   POST /v2/payments/captures/:id/refund
  *   GET  /v2/payments/refunds/:id
  *   POST /v1/notifications/verify-webhook-signature
+ *   POST /v2/invoicing/invoices                  DRAFT invoice (Phase 8a); the full invoice with
+ *                                                Prefer: return=representation, else a self link
+ *   POST /v2/invoicing/invoices/:id/send         DRAFT -> SENT, 200 with the payer-view link;
+ *                                                not DRAFT -> 422 INVALID_INVOICE_STATUS (assumed name)
+ *   POST /v2/invoicing/invoices/:id/cancel       SENT | UNPAID | PAYMENT_PENDING -> CANCELLED, 204 with no
+ *                                                body; any other status -> 422 (issue name assumed)
+ *   GET  /v2/invoicing/invoices/:id              amount, due_amount, payments.paid_amount and
+ *                                                detail.metadata.recipient_view_url once sent
  *
  * POSTs carrying a PayPal-Request-Id are idempotent per endpoint: a repeat replays the
  * first response exactly, as PayPal does. API calls need a Bearer token this mock issued.
  * Errors carry name, message, debug_id and details[].issue, plus a paypal-debug-id header.
  *
- * Knobs: approve(orderId), complete(orderId) (a capture that happened but whose response
+ * Knobs: approve(orderId, payerEmail?) (an approved or completed order carries payer.email_address),
+ * payInvoice(invoiceId, {amountCents, pending}) (the buyer pays an invoice in full, in part, or
+ * with a payment PayPal has not settled), complete(orderId) (a capture that happened but whose response
  * was lost), setCaptureFailure("timeout" | "declined" | "none"), setRecaptureMode,
  * setRefundStatus, setVerification, setTokenExpiresIn and injectNext (a one-shot canned
  * response for the next matching request).
@@ -58,6 +68,23 @@ export interface MockOrder {
   description: string | null;
   experienceContext: Record<string, unknown> | null;
   captureId: string | null;
+  /** Set when the buyer approves (payer.email_address on the wire). */
+  payerEmail: string | null;
+}
+
+export interface MockInvoice {
+  id: string;
+  status: string;
+  currency: string;
+  /** The invoice total in cents (sum of the items). */
+  amountCents: number;
+  /** Paid and settled, in cents. */
+  paidCents: number;
+  recipientEmail: string;
+  dueDate: string | null;
+  reference: string | null;
+  /** The request body as received. */
+  body: Record<string, unknown>;
 }
 
 export interface MockCapture {
@@ -111,10 +138,17 @@ export interface PaypalMock {
   orders: Map<string, MockOrder>;
   captures: Map<string, MockCapture>;
   refunds: Map<string, MockRefund>;
+  invoices: Map<string, MockInvoice>;
   /** Recorded requests matching a method and a path (exact string or pattern). */
   requestsTo(method: string, path: string | RegExp): RecordedRequest[];
-  /** The buyer approved the order at PayPal. */
-  approve(orderId: string): void;
+  /** The buyer approved the order at PayPal, as `payerEmail` (default DEFAULT_PAYER_EMAIL). */
+  approve(orderId: string, payerEmail?: string): void;
+  /**
+   * The recipient pays a sent invoice: `amountCents` (default: everything due). A settled
+   * full payment makes it PAID with nothing due; a smaller one PARTIALLY_PAID; a `pending`
+   * payment (not settled by PayPal yet) PAYMENT_PENDING with the amount still due.
+   */
+  payInvoice(invoiceId: string, payment?: { amountCents?: number; pending?: boolean }): MockInvoice;
   /** PayPal captured the order but the capture response never reached us. Returns the capture. */
   complete(orderId: string): MockCapture;
   setCaptureFailure(kind: CaptureFailure): void;
@@ -131,6 +165,20 @@ export interface PaypalMock {
 }
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
+
+/** The sandbox buyer's email when a test does not choose one. */
+export const DEFAULT_PAYER_EMAIL = "sb-buyer@personal.example.com";
+
+/** Cents as PayPal's value string ("90.00"). */
+function centsValue(cents: number): string {
+  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
+}
+
+/** PayPal's value string as cents, or null when unreadable. */
+function valueCents(value: unknown): number | null {
+  const match = typeof value === "string" ? /^(\d+)(?:\.(\d{1,2}))?$/.exec(value) : null;
+  return match ? Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0")) : null;
+}
 
 function matches(pattern: string | RegExp, path: string): boolean {
   return typeof pattern === "string" ? pattern === path : pattern.test(path);
@@ -160,6 +208,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
   const orders = new Map<string, MockOrder>();
   const captures = new Map<string, MockCapture>();
   const refunds = new Map<string, MockRefund>();
+  const invoices = new Map<string, MockInvoice>();
   const tokens = new Set<string>();
   const replays = new Map<string, { status: number; body: unknown }>();
   const injected: InjectedResponse[] = [];
@@ -225,7 +274,40 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
           ...(capture ? { payments: { captures: [captureWire(capture)] } } : {}),
         },
       ],
+      ...(order.payerEmail ? { payer: { email_address: order.payerEmail, payer_id: "MOCKPAYER01" } } : {}),
       links,
+    };
+  }
+
+  function invoiceWire(invoice: MockInvoice): Record<string, unknown> {
+    const money = (cents: number) => ({ currency_code: invoice.currency, value: centsValue(cents) });
+    const sent = invoice.status !== "DRAFT";
+    const detail = asRecord(invoice.body.detail);
+    return {
+      ...invoice.body,
+      id: invoice.id,
+      status: invoice.status,
+      detail: {
+        ...detail,
+        invoice_number: invoice.id.slice(-6),
+        metadata: {
+          create_time: "2026-10-04T10:00:00Z",
+          invoicer_view_url: `https://www.sandbox.paypal.com/invoice/details/${invoice.id}`,
+          ...(sent ? { recipient_view_url: `https://www.sandbox.paypal.com/invoice/p/#${invoice.id}` } : {}),
+        },
+      },
+      amount: money(invoice.amountCents),
+      // A pending payment is not settled: it counts neither as paid nor against what is due.
+      due_amount: money(invoice.amountCents - invoice.paidCents),
+      ...(invoice.paidCents > 0
+        ? {
+            payments: {
+              paid_amount: money(invoice.paidCents),
+              transactions: [{ payment_id: `PAY-${invoice.id}`, method: "PAYPAL", amount: money(invoice.paidCents) }],
+            },
+          }
+        : {}),
+      links: [{ href: `${baseUrl}/v2/invoicing/invoices/${invoice.id}`, rel: "self", method: "GET" }],
     };
   }
 
@@ -314,6 +396,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
       description: typeof unit.description === "string" ? unit.description : null,
       experienceContext: hasPaypalSource ? experienceContext : null,
       captureId: null,
+      payerEmail: null,
     };
     orders.set(order.id, order);
     const wire = orderWire(order);
@@ -404,6 +487,75 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     send(response, 200, { id: refund.id, status: refund.status, ...(refund.amount ? { amount: refund.amount } : {}) });
   }
 
+  function handleCreateInvoice(request: IncomingMessage, body: unknown, response: ServerResponse): void {
+    const { replayed, key } = replay("create-invoice", request, response);
+    if (replayed) return;
+    const input = asRecord(body);
+    const detail = asRecord(input.detail);
+    const recipient = asRecord(asRecord(Array.isArray(input.primary_recipients) ? input.primary_recipients[0] : undefined).billing_info);
+    const items = Array.isArray(input.items) ? input.items.map(asRecord) : [];
+    const amounts = items.map((item) => (valueCents(asRecord(item.unit_amount).value) ?? Number.NaN) * Number(item.quantity));
+    if (
+      typeof detail.currency_code !== "string" ||
+      typeof recipient.email_address !== "string" ||
+      items.length === 0 ||
+      amounts.some((amount) => !Number.isInteger(amount) || amount <= 0)
+    ) {
+      sendError(response, 400, "INVALID_REQUEST", "MISSING_REQUIRED_PARAMETER");
+      return;
+    }
+    const invoice: MockInvoice = {
+      id: nextId("INV2-"),
+      status: "DRAFT",
+      currency: detail.currency_code,
+      amountCents: amounts.reduce((sum, amount) => sum + amount, 0),
+      paidCents: 0,
+      recipientEmail: recipient.email_address,
+      dueDate: typeof asRecord(detail.payment_term).due_date === "string" ? (asRecord(detail.payment_term).due_date as string) : null,
+      reference: typeof detail.reference === "string" ? detail.reference : null,
+      body: input,
+    };
+    invoices.set(invoice.id, invoice);
+    const representation = String(request.headers.prefer ?? "").includes("return=representation");
+    const wire = representation
+      ? invoiceWire(invoice)
+      : { rel: "self", href: `${baseUrl}/v2/invoicing/invoices/${invoice.id}`, method: "GET" };
+    remember(key, 201, wire);
+    send(response, 201, wire);
+  }
+
+  function handleSendInvoice(invoiceId: string, request: IncomingMessage, response: ServerResponse): void {
+    const invoice = invoices.get(invoiceId);
+    if (!invoice) {
+      sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+      return;
+    }
+    const { replayed, key } = replay(`send-invoice ${invoiceId}`, request, response);
+    if (replayed) return;
+    if (invoice.status !== "DRAFT") {
+      sendError(response, 422, "UNPROCESSABLE_ENTITY", "INVALID_INVOICE_STATUS");
+      return;
+    }
+    invoice.status = "SENT";
+    const wire = { href: `https://www.sandbox.paypal.com/invoice/p/#${invoice.id}`, rel: "payer-view", method: "GET" };
+    remember(key, 200, wire);
+    send(response, 200, wire);
+  }
+
+  function handleCancelInvoice(invoiceId: string, response: ServerResponse): void {
+    const invoice = invoices.get(invoiceId);
+    if (!invoice) {
+      sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+      return;
+    }
+    if (!["SENT", "UNPAID", "PAYMENT_PENDING"].includes(invoice.status)) {
+      sendError(response, 422, "UNPROCESSABLE_ENTITY", "INVALID_INVOICE_STATUS");
+      return;
+    }
+    invoice.status = "CANCELLED";
+    response.writeHead(204, { "paypal-debug-id": debugId() }).end();
+  }
+
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const rawBody = await readBody(request);
     const method = request.method ?? "GET";
@@ -450,6 +602,18 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     if (method === "POST" && path === "/v1/notifications/verify-webhook-signature") {
       return send(response, 200, { verification_status: verification });
     }
+    if (method === "POST" && path === "/v2/invoicing/invoices") return handleCreateInvoice(request, body, response);
+    if (method === "POST" && (match = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)\/send$/))) {
+      return handleSendInvoice(match[1], request, response);
+    }
+    if (method === "POST" && (match = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)\/cancel$/))) {
+      return handleCancelInvoice(decodeURIComponent(match[1]), response);
+    }
+    if (method === "GET" && (match = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)$/))) {
+      const invoice = invoices.get(match[1]);
+      if (!invoice) return sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+      return send(response, 200, invoiceWire(invoice));
+    }
     sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
   }
 
@@ -479,13 +643,31 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     orders,
     captures,
     refunds,
+    invoices,
     requestsTo: (method, path) => requests.filter((entry) => entry.method === method && matches(path, entry.path)),
-    approve(orderId) {
+    approve(orderId, payerEmail = DEFAULT_PAYER_EMAIL) {
       const order = requireOrder(orderId);
       if (order.status !== "CREATED" && order.status !== "PAYER_ACTION_REQUIRED") {
         throw new Error(`paypal mock: cannot approve order ${orderId} in status ${order.status}`);
       }
       order.status = "APPROVED";
+      order.payerEmail = payerEmail;
+    },
+    payInvoice(invoiceId, payment = {}) {
+      const invoice = invoices.get(invoiceId);
+      if (!invoice) throw new Error(`paypal mock: no invoice ${invoiceId}`);
+      if (invoice.status === "DRAFT" || invoice.status === "PAID") {
+        throw new Error(`paypal mock: cannot pay invoice ${invoiceId} in status ${invoice.status}`);
+      }
+      const due = invoice.amountCents - invoice.paidCents;
+      const amount = payment.amountCents ?? due;
+      if (payment.pending) {
+        invoice.status = "PAYMENT_PENDING";
+      } else {
+        invoice.paidCents += amount;
+        invoice.status = amount >= due ? "PAID" : "PARTIALLY_PAID";
+      }
+      return invoice;
     },
     complete(orderId) {
       const order = requireOrder(orderId);

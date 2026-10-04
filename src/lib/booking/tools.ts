@@ -8,7 +8,8 @@
  * never appears in a result (F05).
  *
  * Phase 4 adds create_payment_order; Phase 5 adds preview_cancellation, which
- * is read-only: no tool can confirm a cancellation (F01).
+ * is read-only: no tool can confirm a cancellation (F01). Phase 8a adds
+ * send_balance_invoice.
  */
 import "server-only";
 
@@ -23,6 +24,7 @@ import { cancellationPreview } from "./cancel";
 import { ensurePaymentOrder } from "./capture";
 import { draftPatchSchema, getOrCreateOpenDraft, updateDraft, type BookingDraft } from "./drafts";
 import { visitorConstraintsSchema } from "./facts";
+import { sendBalanceInvoice } from "./invoice";
 import { bookingCapability, bookingLink } from "./links";
 import { createQuote } from "./quotes";
 import { BookingError, hhmmSchema, isoDateSchema, partySizeSchema, type Booking } from "./types";
@@ -298,6 +300,43 @@ const previewCancellationTool: BookingTool<{ bookingId: string }> = {
   },
 };
 
+const sendBalanceInvoiceTool: BookingTool<{ bookingId: string }> = {
+  name: "send_balance_invoice",
+  description:
+    "Envía por PayPal la factura del resto (total menos la señal) de una reserva confirmada del visitante, con vencimiento " +
+    "el día de la actividad, al correo de la cuenta PayPal con la que pagó la señal. Si la reserva ya tiene factura no crea " +
+    "otra: devuelve su estado (sent, payment_pending, partially_paid, paid o cancelled). La tarjeta lleva el enlace de pago. El resto " +
+    "solo está pagado cuando el estado es paid.",
+  inputSchema: z.object({ bookingId: z.guid() }).strict(),
+  async execute(ctx, input) {
+    const booking = await getBookingForUser(ctx.client, ctx.userId, input.bookingId);
+    if (!booking) throw new BookingError("not_found");
+    const invoice = await sendBalanceInvoice(ctx.client, booking);
+
+    return {
+      // The invoice link and the payer's email stay out of the model's view (F05).
+      result: {
+        invoice: invoice.status,
+        alreadySent: !invoice.created,
+        reference: booking.reference,
+        balanceEuros: euros(booking.balanceCents),
+        dueDate: booking.slotDate,
+        next: "La factura llega al correo de la cuenta PayPal con la que se pagó la señal; también puede pagarla con el botón de la tarjeta.",
+      },
+      card: {
+        kind: "invoice",
+        bookingId: booking.id,
+        reference: booking.reference,
+        amountCents: booking.balanceCents,
+        currency: booking.currency,
+        dueDate: booking.slotDate,
+        status: invoice.status,
+        invoiceUrl: invoice.url,
+      },
+    };
+  },
+};
+
 const BOOKING_TOOLS = [
   searchExperiencesTool,
   updateDraftTool,
@@ -305,6 +344,7 @@ const BOOKING_TOOLS = [
   getBookingStatusTool,
   createPaymentOrderTool,
   previewCancellationTool,
+  sendBalanceInvoiceTool,
 ] as const;
 
 /** Tool definitions for messages.stream, with JSON schemas derived from the zod schemas. */

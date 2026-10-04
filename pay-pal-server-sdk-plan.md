@@ -70,5 +70,13 @@ Rules:
 - A re-capture with a new request id can return 201 with the existing capture
   (Phase 0 finding 6): parsed normally, never treated as a second capture.
 - Webhook verification is outside the SDK (no notifications surface).
+- Invoicing v2 (Phase 8a: create, send, get and cancel invoice) is outside the SDK
+  too (the pinned commit has no invoicing resource): plain `fetch` in
+  `src/lib/paypal/invoices.ts` through `createPaypalFetch` and `getAccessToken`,
+  like `webhooks.ts`. PayPal-Request-Id `invoice:` / `invoice-send:` + the
+  booking id is sent on create and send as best effort: the published spec does
+  not list that header for them (or for cancel). Cancel is
+  `POST /v2/invoicing/invoices/{id}/cancel` with a `notification` body, 204. `getOrder` now also normalizes `payer.email_address` (else
+  `payment_source.paypal.email_address`) as `payerEmail`, the invoice recipient.
 - Blocker for production: the sandbox-only host guard stays until a reviewed
   production decision.

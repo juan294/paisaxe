@@ -9,6 +9,9 @@
  *   recomputes it at that instant and refuses with the fresh terms if it
  *   differs (R2-05). Otherwise the refund is requested with the payment's
  *   operation key, so a retry here or in reconciliation refunds once.
+ *   Phase 8a: once the cancellation is recorded, the booking's balance invoice
+ *   is closed (closeInvoiceAfterCancellationSafely, which never throws, so a
+ *   PayPal problem can neither block nor fail the cancellation).
  */
 import "server-only";
 
@@ -16,6 +19,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { PaypalError, refundCapture, type PaypalRefund } from "@/lib/paypal";
 import type { CancellationTerms } from "@/types/booking-page";
+import { closeInvoiceAfterCancellationSafely } from "./invoice";
 import { applyRefundStatus, flagNeedsAttention, guardedUpdate, type Row } from "./payment-state";
 import { BookingError, type Booking } from "./types";
 
@@ -123,6 +127,7 @@ export async function confirmCancellation(
     throw new BookingError("invalid_state");
   }
   if (result.outcome !== "cancelled" || result.status !== "cancel_pending") {
+    if (result.outcome === "cancelled") await closeInvoiceAfterCancellationSafely(client, booking.id);
     return { outcome: result.outcome as "cancelled" | "unchanged", status: result.status, refundCents: result.refund_cents };
   }
 
@@ -150,5 +155,8 @@ export async function confirmCancellation(
       error: refundError instanceof Error ? refundError.message : String(refundError),
     });
     throw new BookingError("refund_unavailable");
+  } finally {
+    // Recorded either way: the invoice is closed now, or by reconciliation.
+    await closeInvoiceAfterCancellationSafely(client, booking.id);
   }
 }

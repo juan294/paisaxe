@@ -10,7 +10,7 @@ import { buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/request-utils";
 import { createAdminClient } from "@/lib/supabase-admin";
-import type { BookingPaymentView, BookingView } from "@/types/booking-page";
+import type { BalanceInvoiceStatus, BookingPaymentView, BookingView } from "@/types/booking-page";
 import { verifyBookingCapability } from "./links";
 import { isPreviewDeployment } from "./surface";
 import type { Booking } from "./types";
@@ -78,12 +78,17 @@ export async function loadBookingView(client: SupabaseClient, booking: Booking):
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    client.from("bookings").select("hold:holds(expires_at)").eq("id", booking.id).single(),
+    client.from("bookings").select("invoice_status, invoice_url, hold:holds(expires_at)").eq("id", booking.id).single(),
   ]);
   for (const result of [experience, payment, hold]) {
     if (result.error) throw new Error(`Failed to load booking view: ${result.error.message}`);
   }
-  const holdRow = (hold.data as { hold: { expires_at: string } | null } | null)?.hold;
+  const row = hold.data as {
+    hold: { expires_at: string } | null;
+    invoice_status?: BalanceInvoiceStatus | null;
+    invoice_url?: string | null;
+  } | null;
+  const holdRow = row?.hold;
 
   return {
     reference: booking.reference,
@@ -99,5 +104,6 @@ export async function loadBookingView(client: SupabaseClient, booking: Booking):
     cancellationWindowHours: booking.cancellationWindowHours,
     holdExpiresAt: booking.status === "pending_payment" ? (holdRow?.expires_at ?? null) : null,
     payment: payment.data ? toPaymentView(payment.data) : null,
+    invoice: row?.invoice_status ? { status: row.invoice_status, url: row.invoice_url ?? null } : null,
   };
 }

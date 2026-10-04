@@ -63,7 +63,26 @@ describe("loadBookingView", () => {
     fake.onTable("experiences", { data: { title: "Paseo" } });
     fake.onTable("payments", { data: null });
     fake.onTable("bookings", { data: null });
-    expect(await loadBookingView(fake.client, booking())).toMatchObject({ payment: null, holdExpiresAt: null });
+    expect(await loadBookingView(fake.client, booking())).toMatchObject({ payment: null, holdExpiresAt: null, invoice: null });
+  });
+
+  it("shows the balance invoice's status and payer link once one exists (Phase 8a), and none before", async () => {
+    const fake = createBookingSupabaseFake();
+    fake.onTable("experiences", { data: { title: "Paseo" } });
+    fake.onTable("payments", { data: null });
+    const row = fake.onTable("bookings", {
+      data: { hold: null, invoice_status: "partially_paid", invoice_url: "https://www.sandbox.paypal.com/invoice/p/#INV2-1" },
+    });
+
+    const view = await loadBookingView(fake.client, booking("confirmed"));
+
+    expect(row.select).toHaveBeenCalledWith("invoice_status, invoice_url, hold:holds(expires_at)");
+    expect(view.invoice).toEqual({ status: "partially_paid", url: "https://www.sandbox.paypal.com/invoice/p/#INV2-1" });
+
+    fake.onTable("experiences", { data: { title: "Paseo" } });
+    fake.onTable("payments", { data: null });
+    fake.onTable("bookings", { data: { hold: null, invoice_status: null, invoice_url: null } });
+    expect((await loadBookingView(fake.client, booking("confirmed"))).invoice).toBeNull();
   });
 
   it("throws when any read fails", async () => {
