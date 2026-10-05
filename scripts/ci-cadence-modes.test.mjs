@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, chmodSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -247,6 +247,52 @@ test('launcher bytes differing from the reviewed digest are never executed', t =
   const run = entryStep(t, { launcher: stub(passed), routing: 'lean', pin: reviewed });
   assert.notEqual(run.status, 0); assert.equal(run.ran, null); assert.equal(run.outputs.decision, undefined);
 });
+// A candidate that changes the launcher carries a pin the protected base cannot
+// match until the change lands. Legacy defers to the original workflows, which
+// still run; lean fails with the repair, since nothing else would validate it.
+for (const kind of ['push', 'pull_request']) for (const routing of ['legacy', undefined]) test(`launcher change (${kind}, routing ${routing}) defers to the still-running original workflows with a visible notice`, t => {
+  const run = entryStep(t, { launcher: stub(passed), routing, event: kind, pin: '0'.repeat(64) });
+  assert.equal(run.status, 0); assert.deepEqual(run.outputs, { decision: 'legacy' }); assert.equal(run.ran, null);
+  assert.match(run.stdout, /::notice title=CI Fast::launcher change: the protected base launcher differs from the reviewed pin/); assert.match(run.summary, /launcher change/);
+});
+for (const kind of ['push', 'pull_request']) test(`launcher change (${kind}) under lean fails CI Fast with the repair instruction and runs nothing`, t => {
+  const run = entryStep(t, { launcher: stub(passed), routing: 'lean', event: kind, pin: '0'.repeat(64) });
+  assert.notEqual(run.status, 0); assert.deepEqual(run.outputs, {}); assert.equal(run.ran, null);
+  assert.match(run.stdout, /::error title=CI Fast::launcher change: .*Set CI_CADENCE_MODE to legacy, land the launcher change on the base branch, then set lean again/); assert.match(run.summary, /Set CI_CADENCE_MODE to legacy/);
+});
+for (const routing of ['lean', 'legacy']) test(`matching launcher digest under routing ${routing} runs the launcher with no launcher-change disclosure`, t => {
+  const run = entryStep(t, { launcher: stub(passed), routing });
+  assert.equal(run.status, 0); assert.equal(run.ran, 'lean'); assert.equal(run.outputs.decision, 'skip');
+  assert.doesNotMatch(run.stdout + run.summary, /launcher change/);
+});
+/** Executes the real lean push admission/measurement step against a protected
+ * base whose control loader bytes are supplied; only `sha256sum` is shimmed. */
+function controlStep(t, job, bytes) {
+  // Real path: the loader runs its CLI only when argv[1] equals its own resolved URL.
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'paisaxe-control-step-'))); t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const repository = join(directory, 'repository'), bin = join(directory, 'bin'), temp = join(directory, 'temp'), summary = join(directory, 'summary');
+  for (const path of [repository, join(repository, 'scripts'), bin, temp]) mkdirSync(path);
+  const git = (...args) => execFileSync('git', ['-c', 'core.fsmonitor=false', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: repository, encoding: 'utf8', timeout: 5000 }).trim();
+  git('init', '--quiet', '--template='); writeFileSync(join(repository, 'scripts/ci-cadence-control-launch.mjs'), bytes); git('add', '.'); git('commit', '--quiet', '-m', 'protected base');
+  writeFileSync(join(bin, 'sha256sum'), '#!/bin/bash\nexec shasum -a 256 "$@"\n'); chmodSync(join(bin, 'sha256sum'), 0o755); writeFileSync(summary, '');
+  const step = cadenceJob(job).steps.find(entry => /ci-cadence-control-launch\.mjs/.test(entry.run ?? ''));
+  const result = spawnSync('/bin/bash', ['-e', '-o', 'pipefail', '-c', step.run], { cwd: repository, encoding: 'utf8', timeout: 20000, env: { PATH: `${bin}:${process.env.PATH}`, HOME: directory, RUNNER_TEMP: temp, GITHUB_STEP_SUMMARY: summary, CI_CADENCE_DEFINITION_SHA: git('rev-parse', 'HEAD'), CI_CADENCE_MODE: 'lean' } });
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr, summary: readFileSync(summary, 'utf8') };
+}
+// Admission and measurement run only for a lean push, so a control loader change
+// on the protected base always fails there, with the same repair instruction.
+for (const job of ['admission', 'measurement']) {
+  test(`${job}: control loader change fails with the repair instruction and runs nothing`, t => {
+    const run = controlStep(t, job, 'throw Error("changed control loader executed");\n');
+    assert.notEqual(run.status, 0); assert.doesNotMatch(run.stderr, /changed control loader executed/);
+    assert.match(run.stdout, /::error title=CI cadence::control loader change: .*Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again/); assert.match(run.summary, /Set CI_CADENCE_MODE to legacy/);
+  });
+  test(`${job}: matching control loader digest executes the reviewed loader`, t => {
+    const run = controlStep(t, job, readFileSync(new URL('scripts/ci-cadence-control-launch.mjs', root)));
+    // The reviewed loader ran and stopped on its own identity check (no token here).
+    assert.notEqual(run.status, 0); assert.match(run.stderr, /Protected control acquisition failed \(Control identity\)/); assert.doesNotMatch(run.stdout, /control loader change/);
+  });
+}
 for (const routing of ['lean', 'legacy', undefined]) test(`four passed Fast checks yield skip under routing ${routing}, having run in lean classification`, t => {
   const run = entryStep(t, { launcher: stub(passed), routing });
   assert.equal(run.status, 0); assert.equal(run.ran, 'lean');

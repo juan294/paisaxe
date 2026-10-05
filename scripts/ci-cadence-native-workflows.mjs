@@ -17,6 +17,9 @@ const blob = bytes => createHash('sha1').update(`blob ${Buffer.byteLength(bytes)
 const permission = {contents:'read',actions:'read',checks:'read','pull-requests':'read'};
 const acquired = (file,purpose,root) => {
   const pin = sha256(readFileSync(resolve(root,'scripts/'+file)));
+  // Admission and measurement read the loader from the push `before`, so a loader
+  // change cannot match until it lands; they run only under lean, hence the repair.
+  const label = file === 'ci-cadence-control-launch.mjs' ? 'control loader' : 'launcher';
   return `set -euo pipefail
 unset NODE_OPTIONS NODE_PATH
 while IFS= read -r name; do unset "$name"; done < <(compgen -v | sed -n '/^GIT_/p')
@@ -26,7 +29,12 @@ private="$(mktemp -d "$RUNNER_TEMP/B-control.XXXXXXXX")"
 chmod 700 "$private"
 trap 'rm -rf "$private"' EXIT
 git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/${file}" > "$private/${file}"
-printf '%s  %s\n' '${pin}' "$private/${file}" | sha256sum --check --status
+if ! printf '%s  %s\n' '${pin}' "$private/${file}" | sha256sum --check --status; then
+  reason='${label} change: the protected base ${label} differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the ${label} change on the base branch, then set lean again.'
+  echo "::error title=CI cadence::$reason"
+  echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+  exit 1
+fi
 node "$private/${file}" ${purpose}
 `;
 };

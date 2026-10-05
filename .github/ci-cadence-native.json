@@ -3,16 +3,16 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "80c496be64528ba9ef9b25eb6bf9f727c3ee8480"
+    "blobSha": "354f9306ebbb521ee267ec38cdbe5222e4f55614"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "80c496be64528ba9ef9b25eb6bf9f727c3ee8480"
+      "blobSha": "354f9306ebbb521ee267ec38cdbe5222e4f55614"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "9187f41225f984b4bf443445f0a613b63ca80223"
+      "blobSha": "478c1cebf11a000487a730ce5216e4569cd02495"
     }
   },
   "callees": {
@@ -137,8 +137,8 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "80c496be64528ba9ef9b25eb6bf9f727c3ee8480",
-    ".github/workflows/ci-cadence.yml": "9187f41225f984b4bf443445f0a613b63ca80223",
+    ".github/workflows/ci-nightly.yml": "354f9306ebbb521ee267ec38cdbe5222e4f55614",
+    ".github/workflows/ci-cadence.yml": "478c1cebf11a000487a730ce5216e4569cd02495",
     ".github/workflows/ci.yml": "fa583062712c4c2bff78ebfc7c07a825909f240e",
     ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "db256a17ed4718c5911852bc4d98dbba7790cca1",

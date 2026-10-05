@@ -246,6 +246,8 @@ Phase 4 required-context list (changing branch protection is separately authoriz
 
 Activation is legacy-first. Install the cadence files with `CI_CADENCE_MODE` unset or `legacy`, let `CI Fast` go green on develop, migrate the required contexts, and only then set `lean`. If `lean` is set while the protected base (the push `before` commit or the PR base) has no cadence helper, `CI Fast` fails with the repair instruction: set the mode back to `legacy`, land the helper on the base branch, then set `lean` again. Lean skips the full workflows, so nothing else would validate that event.
 
+Land launcher/control-launch changes while `CI_CADENCE_MODE` is `legacy`. Until such a change is on the protected base, the candidate's reviewed pin cannot match the base's bytes: under legacy `CI Fast` defers to the original workflows with a notice; under lean `CI Fast`, admission and measurement fail with the same repair instruction.
+
 What changes at installation, even in legacy mode: routed jobs declare job-level `contents: read` and check out with `fetch-depth: 0`; secrets reach only owner events and schedules; the coverage shard uses a hosted runner for non-owner events; the bundle comment is a separate owner-only job; `coverage.yml` pins its Node version and adds `source.attempt` to the coverage payload; and the Sutura repair monitor is off unless `CI_CADENCE_REPAIR_ENABLED` is `true`. Step bodies of the original checks are unchanged.
 
 A green `CI Fast` or unchanged nightly disposition does not satisfy this checklist. Require the original full release contexts and every applicable child, the existing Stripe proof and the post-deploy proof. Any required failure, cancellation or skipped leaf blocks release.

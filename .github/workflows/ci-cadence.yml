@@ -67,8 +67,13 @@ jobs:
           chmod 700 "$private"
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
-          printf '%s  %s
-          ' 'fb12b64481f7424afee42f5f65e46717745183d7fbbf644729eae177050f2c7d' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          if ! printf '%s  %s
+          ' 'fb12b64481f7424afee42f5f65e46717745183d7fbbf644729eae177050f2c7d' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+            reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again.'
+            echo "::error title=CI cadence::$reason"
+            echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
           node "$private/ci-cadence-control-launch.mjs" admit
       - name: Upload Cadence admission
         if: steps.admit.outputs.decision == 'full'
@@ -208,8 +213,13 @@ jobs:
           chmod 700 "$private"
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
-          printf '%s  %s
-          ' 'fb12b64481f7424afee42f5f65e46717745183d7fbbf644729eae177050f2c7d' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status
+          if ! printf '%s  %s
+          ' 'fb12b64481f7424afee42f5f65e46717745183d7fbbf644729eae177050f2c7d' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+            reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again.'
+            echo "::error title=CI cadence::$reason"
+            echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
           node "$private/ci-cadence-control-launch.mjs" measure
       - name: Upload Cadence measurement
         uses: actions/upload-artifact@v7
@@ -331,7 +341,23 @@ jobs:
           fi
           git --no-replace-objects show "$definition:scripts/ci-cadence-launch.mjs" > "$private/launch.mjs"
           chmod 600 "$private/launch.mjs"
-          printf '%s  %s\n' "$LAUNCHER_SHA256" "$private/launch.mjs" | sha256sum --check --status
+          # Launcher change: the candidate carries the pin of its own launcher, which
+          # the protected base cannot match until the change lands. Nothing trusted
+          # can run. Under legacy the original workflows validate this event; under
+          # lean they are skipped, so fail with the same repair as first installation.
+          if ! printf '%s  %s\n' "$LAUNCHER_SHA256" "$private/launch.mjs" | sha256sum --check --status; then
+            if [ "${ROUTING_MODE:-}" = lean ]; then
+              reason='launcher change: the protected base launcher differs from the reviewed pin in this candidate, and lean mode skips the full workflows. Set CI_CADENCE_MODE to legacy, land the launcher change on the base branch, then set lean again.'
+              echo "::error title=CI Fast::$reason"
+              echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            reason='launcher change: the protected base launcher differs from the reviewed pin in this candidate; the existing full workflows validate this event under legacy mode'
+            echo "::notice title=CI Fast::$reason"
+            echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+            echo 'decision=legacy' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           node "$private/launch.mjs" > "$private/result.json"
           python3 - "$private/result.json" <<'PYTHON'
           import json,os,re,sys
