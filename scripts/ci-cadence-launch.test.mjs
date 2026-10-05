@@ -215,6 +215,18 @@ each('wrong physical PR parent order blocks before HTTP or protected import', as
 each('missing mode cannot activate Fast or execute cheap works', async f => { const x = await f.prepare(); delete x.input.mode; const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'full'); assert.equal(r.completed, undefined); });
 each('supplied resolver cannot replace the single authenticated scheduled snapshot', async f => { const x = await f.prepare('schedule'); x.input.resolveIntegrationHead = () => { throw Error('caller resolver used'); }; const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'nightly'); assert.equal(r.sourceSha, x.source); assert.equal(f.requests.filter(r => r.url.endsWith('/git/ref/heads/develop')).length, 1); });
 each('streamed body timeout bounds reads as well as initial response', async f => { const x = await f.prepare(); const request = async () => new Response(new ReadableStream({ start() {}, cancel() { return new Promise(() => {}); } }), { headers: { 'x-ratelimit-remaining': '950' } }); const started = performance.now(); const r = await launchNative(x.input, { ...x.transports, request }); assert.equal(r.lane, 'blocked'); assert.equal(r.protectedImported, false); assert.ok(performance.now() - started < 6500); });
+// The store's protected pin is re-read before import: moving it after the
+// first check (here, while the nightly resolves develop) blocks before any import.
+each('protected pin moved in the store before import blocks the identity revalidation', async f => {
+  const x = await f.prepare('schedule'); const before = new Set((await readdir(tmpdir())).filter(name => name.startsWith('paisaxe-launch-'))); let moved = false;
+  const original = x.transports.request;
+  x.transports.request = async (url, init) => {
+    if (url.endsWith('/git/ref/heads/develop')) { const [store] = (await readdir(tmpdir())).filter(name => name.startsWith('paisaxe-launch-') && !before.has(name)); execFileSync('git', ['update-ref', `refs/ci-cadence/protected/${x.base}`, x.source], { cwd: join(tmpdir(), store, 'checkout') }); moved = true; }
+    return original(url, init);
+  };
+  const r = await launchNative(x.input, x.transports);
+  assert.equal(moved, true); assert.equal(r.lane, 'blocked'); assert.equal(r.reason, 'original checkout or protected pin moved'); assert.equal(r.protectedImported, false);
+});
 each('owned private store is removed after a blocked acquisition and the checkout is untouched', async f => { const x = await f.prepare('schedule'); x.transports.request = developAt(x, 'e'.repeat(40)); const before = new Set((await readdir(tmpdir())).filter(name => name.startsWith('paisaxe-launch-'))); const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'blocked'); assert.deepEqual((await readdir(tmpdir())).filter(name => name.startsWith('paisaxe-launch-') && !before.has(name)), []); assert.equal(f.git('rev-parse', 'HEAD'), x.base); });
 
 each('first-install bot retains explicit hosted read-only untrusted outputs', async f => { const x = await f.prepare('push', { definition: f.absent, sender: user('dependabot[bot]') }); const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'untrusted'); assert.equal(r.runner, 'standard-hosted'); assert.equal(r.token, 'read-only'); assert.equal(r.acceptanceBlocked, true); assert.equal(r.allowPrivileged, false); });
