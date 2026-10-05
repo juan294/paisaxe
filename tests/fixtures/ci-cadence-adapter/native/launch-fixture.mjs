@@ -11,7 +11,7 @@ export async function launchFixture() {
     for (const path of [...manifest.files, 'tests/fixtures/ci-cadence/contract.json', 'scripts/ci-cadence-native.mjs', 'scripts/ci-fast.mjs', 'scripts/ci-cadence-scanner.mjs', 'package.json', 'package-lock.json', '.nvmrc', '.github/gitleaks-ci-fast.toml']) await put(path, await readFile(new URL(path, project)));
     f.git('add', '.'); const definition = f.git('commit-tree', f.git('write-tree'), '-p', f.installed, '-m', 'reviewed protected modules');
     f.git('remote', 'add', 'origin', 'https://github.com/juan294/paisaxe.git');
-    const requests = []; const fetches = [];
+    const requests = [];
     const prepare = async (kind = 'push', options = {}) => {
       const base = options.definition ?? definition; const sender = options.sender ?? user();
       const input = f.prepare(kind, 'develop', base, sender, options.fork ?? false);
@@ -32,9 +32,9 @@ export async function launchFixture() {
         else if (url.includes('/git/commits/')) data = { sha: url.split('/').at(-1) };
         return new Response(JSON.stringify(data), { status: 200, headers: { 'x-ratelimit-remaining': '950' } });
       };
-      const gitTransport = ({ url, sha, ref, root, run }) => { fetches.push({ url, sha, ref }); if (url !== 'https://github.com/juan294/paisaxe.git') throw Error('wrong authenticated origin'); run(['fetch', '--no-tags', '--no-recurse-submodules', '--force', f.root, `${sha}:${ref}`], root); };
-      return { input: { ...input, token: 'fixture-token', scanner: { executable: '/opt/homebrew/bin/gitleaks', sha256: 'f414bc2fb952be6c9072b75cb411e3368614ef4b16d48dbd9ad238034afd2302' } }, transports: { request, gitTransport }, source, checkout, base };
+      // Git objects are never transported: the launcher reads this checkout.
+      return { input: { ...input, token: 'fixture-token', scanner: { executable: '/opt/homebrew/bin/gitleaks', sha256: 'f414bc2fb952be6c9072b75cb411e3368614ef4b16d48dbd9ad238034afd2302' } }, transports: { request }, source, checkout, base };
     };
-    return { ...f, put, definition, requests, fetches, prepare };
+    return { ...f, put, definition, requests, prepare };
   } catch (error) { await f.close(); throw error; }
 }

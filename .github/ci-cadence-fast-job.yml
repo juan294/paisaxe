@@ -32,7 +32,7 @@ steps:
   - name: Acquire reviewed protected launcher
     id: entry
     env:
-      LAUNCHER_SHA256: 61171cc1cd4a5f6049e04085040936d7205b78a690d8cd0bc78ac3c878389bf5
+      LAUNCHER_SHA256: 1ed0a7e1979647dac9f1e676bdcf3a80761b25bdf749f821f2308ef630ce72e0
       GITHUB_TOKEN: ${{ github.token }}
       # The four Fast checks always execute, so the launcher always
       # classifies under lean rules. ROUTING_MODE is the repository's real

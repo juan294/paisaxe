@@ -15,15 +15,18 @@ const PINS = {
   "scripts/ci-cadence-native.mjs": "a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d",
   "scripts/ci-cadence.mjs": "9f2da9ab55525a3ca4acc311feaf5426fc86d83258c5dda7754dc05405c9a7ab"
 };
-// Git over HTTPS takes the token exactly as actions/checkout sends it: basic x-access-token, never bearer.
-export const gitAuthorization = token => `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
+// A failure is reported only from this fixed vocabulary, never a git or module
+// message that could carry stderr, paths or tokens.
+export const CONTROL_REASONS = Object.freeze(['Control acquisition deadline','Native control physical identity','Control identity','Control immutable object','Control object absent from checkout','Control object acquisition failed','Completed native identity','Control source identity','Control module mode','Control reviewed closure mismatch']);
+export const controlFailure = error => error instanceof Error && CONTROL_REASONS.includes(error.message) ? error.message : 'unclassified';
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value) && value !== '0'.repeat(40);
 const origin = 'https://github.com/juan294/paisaxe.git';
-const env = () => ({PATH:'/usr/bin:/bin',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_NO_REPLACE_OBJECTS:'1',GIT_GRAFT_FILE:'/dev/null',GIT_TERMINAL_PROMPT:'0',GIT_CONFIG_COUNT:'1',GIT_CONFIG_KEY_0:'http.https://github.com/.extraheader',GIT_CONFIG_VALUE_0:gitAuthorization(process.env.GITHUB_TOKEN)});
+const env = () => ({PATH:'/usr/bin:/bin',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_NO_REPLACE_OBJECTS:'1',GIT_GRAFT_FILE:'/dev/null',GIT_TERMINAL_PROMPT:'0'});
 
 /** Trusted workflow acquires these builtins-only bytes before executing them.
- * This loader cannot authenticate a contributor-controlled copy of itself. */
-export async function launchControl({purpose,root,definitionSha,sourceSha,originalSha}, {gitTransport} = {}) {
+ * This loader cannot authenticate a contributor-controlled copy of itself.
+ * Every object comes from the job's own fetch-depth 0 checkout: nothing is fetched. */
+export async function launchControl({purpose,root,definitionSha,sourceSha,originalSha}) {
   let directory;
   const deadline = performance.now()+60000;
   const git=(...args)=>{const timeout=Math.min(10000,Math.floor(deadline-performance.now()));if(timeout<1)throw Error('Control acquisition deadline');return execFileSync('git',['--no-replace-objects','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.useReplaceRefs=false',...args],{cwd:root,env:env(),timeout,maxBuffer:2_000_000,stdio:['ignore','pipe','pipe']});};
@@ -31,13 +34,13 @@ export async function launchControl({purpose,root,definitionSha,sourceSha,origin
   try{
     if(typeof process.env.GITHUB_TOKEN!=='string'||!process.env.GITHUB_TOKEN||/[\r\n]/.test(process.env.GITHUB_TOKEN)||process.env.NODE_OPTIONS?.trim()||process.execArgv.some(arg=>/^--(?:require|import|loader|experimental-loader)(?:=|$)/.test(arg)||arg==='-r')||!['admit','measure','finalize'].includes(purpose)||!sha(definitionSha))throw Error('Control identity');
     check();
-    const acquire=async id=>{if(!sha(id))throw Error('Control immutable object');const ref=`refs/ci-cadence/control/${id}`;if(gitTransport){let timer;try{await Promise.race([gitTransport({root,url:origin,sha:id,ref}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Control transport deadline')),Math.min(10000,deadline-performance.now()));})]);}finally{clearTimeout(timer);}}else git('-c','protocol.file.allow=never','-c','protocol.ssh.allow=never','-c','credential.helper=','-c','http.followRedirects=false','fetch','--no-tags','--no-recurse-submodules','--force',origin,`${id}:${ref}`);if(git('rev-parse',`${ref}^{commit}`).toString().trim()!==id)throw Error('Control object acquisition failed');};
-    await acquire(definitionSha);
+    const acquire=id=>{if(!sha(id))throw Error('Control immutable object');let type;try{type=git('cat-file','-t',id).toString().trim();}catch{throw Error('Control object absent from checkout');}if(type!=='commit')throw Error('Control object absent from checkout');const ref=`refs/ci-cadence/control/${id}`;git('update-ref',ref,id);if(git('rev-parse',`${ref}^{commit}`).toString().trim()!==id)throw Error('Control object acquisition failed');};
+    acquire(definitionSha);
     if(purpose==='finalize'){
       const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));
       if(process.env.GITHUB_EVENT_NAME!=='workflow_run'||event.action!=='completed'||event.repository?.id!==1141286326||event.repository.owner?.id!==3944118||!(['push','schedule'].includes(event.workflow_run?.event)||(event.workflow_run?.path==='.github/workflows/coverage.yml'&&event.workflow_run?.event==='workflow_dispatch'))||!['.github/workflows/ci-cadence.yml','.github/workflows/ci-nightly.yml','.github/workflows/coverage.yml'].includes(event.workflow_run?.path)||!sha(event.workflow_run.head_sha))throw Error('Completed native identity');
-      await acquire(event.workflow_run.head_sha);
-    }else{if(!sha(sourceSha))throw Error('Control source identity');await acquire(sourceSha);}
+      acquire(event.workflow_run.head_sha);
+    }else{if(!sha(sourceSha))throw Error('Control source identity');acquire(sourceSha);}
     directory=await mkdtemp(join(tmpdir(),'paisaxe-protected-control-'));
     for(const[path,pin]of Object.entries(PINS)){
       if(!/^100(?:644|755) blob [a-f0-9]{40}\t/.test(git('ls-tree',definitionSha,'--',path).toString()))throw Error('Control module mode');
@@ -51,5 +54,5 @@ export async function launchControl({purpose,root,definitionSha,sourceSha,origin
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   try{const result=await launchControl({purpose:process.argv[2],root:process.cwd(),definitionSha:process.env.CI_CADENCE_DEFINITION_SHA,sourceSha:process.env.CI_CADENCE_SOURCE_SHA,originalSha:process.env.GITHUB_SHA});console.log(JSON.stringify(result));if(result.action==='blocked')process.exitCode=1;}
-  catch{console.error('Protected control acquisition failed; no retry or publication');process.exitCode=1;}
+  catch(error){console.error(`Protected control acquisition failed (${controlFailure(error)}); no retry or publication`);process.exitCode=1;}
 }

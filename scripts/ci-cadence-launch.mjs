@@ -7,8 +7,6 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const ORIGIN = 'https://github.com/juan294/paisaxe.git';
 const API = 'https://api.github.com/repos/juan294/paisaxe';
-// Git over HTTPS takes the token exactly as actions/checkout sends it: basic x-access-token, never bearer.
-export const gitAuthorization = token => `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
 const canonicalOrigin = url => url === ORIGIN || url === 'https://github.com/juan294/paisaxe';
 const SHA = /^[a-f0-9]{40}$/;
 // Reviewed executable pins are selected only from the actual host runtime.
@@ -37,12 +35,25 @@ const repository = x => record(x) && x.full_name === 'juan294/paisaxe' && x.id =
 const sha = x => typeof x === 'string' && SHA.test(x);
 const account = x => record(x) && /^[A-Za-z0-9][A-Za-z0-9-]*(?:\[bot\])?$/.test(x.login ?? '') && Number.isSafeInteger(x.id) && x.id > 0 && ['User', 'Bot'].includes(x.type) && (x.type === 'Bot') === x.login.endsWith('[bot]') && (x.login === 'juan294') === (x.id === 3944118);
 const blocked = () => ({ lane: 'blocked', reason: 'protected launcher acquisition or native identity unavailable', protectedImported: false, allowDeploy: false, allowPrivileged: false, reusable: false });
+// A blocked result names the failed check only from this fixed vocabulary, never
+// a git, HTTP or imported-module message that could carry stderr, paths or tokens.
+export const LAUNCHER_REASONS = Object.freeze(['acquisition deadline', 'HTTP request quota', 'HTTP deadline', 'HTTP identity or quota', 'HTTP body bound', 'HTTP body missing', 'Node startup hooks', 'native context', 'physical original checkout', 'push binding', 'push ancestry', 'PR binding', 'physical PR parents', 'PR base ancestry', 'schedule binding', 'unsupported event', 'authenticated repository', 'authenticated native ref', 'authenticated definition commit', 'checkout object path', 'acquisition ref', 'object absent from full-history checkout', 'acquired immutable ref', 'original checkout or protected pin moved', 'partial installation', 'schedule owner', 'authenticated integration ref', 'protected module mode', 'reviewed protected module digest', 'event bound']);
+const launcherReason = error => error instanceof Error && LAUNCHER_REASONS.includes(error.message) ? error.message : 'unclassified';
 const environment = () => ({ ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') && !k.startsWith('NODE_'))), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_NO_REPLACE_OBJECTS: '1', GIT_GRAFT_FILE: '/dev/null', GIT_TERMINAL_PROMPT: '0' });
+
+/** The private store reads the job's own fetch-depth 0 checkout through git
+ * alternates: no git network operation, no copy, and no fallback. The objects
+ * directory is resolved by git itself, so a linked worktree yields the common one. */
+export async function shareCheckoutObjects(root, store, run) {
+  const objects = run(['rev-parse', '--path-format=absolute', '--git-path', 'objects'], root).trim(); if (!objects.startsWith('/') || /[\r\n]/.test(objects)) throw Error('checkout object path');
+  const resolved = await realpath(objects); if (!(await stat(resolved)).isDirectory()) throw Error('checkout object path');
+  await mkdir(join(store, '.git/objects/info'), { recursive: true }); await writeFile(join(store, '.git/objects/info/alternates'), resolved + '\n', { mode: 0o600, flag: 'wx' });
+}
 
 /** This bootstrap MUST be obtained by a trusted native caller BEFORE execution.
  * It cannot authenticate a contributor-controlled copy of itself or its YAML.
- * Only external HTTP/Git transport may be injected; inspections/imports are real. */
-export async function launchNative(input, { request = fetch, gitTransport, scannerFetch } = {}) {
+ * Only external HTTP may be injected; inspections, git objects and imports are real. */
+export async function launchNative(input, { request = fetch, scannerFetch } = {}) {
   let temporary; let imported = false; let requests = 0; const deadline = input?.deadline === undefined ? performance.now() + 300000 : Math.min(performance.now() + 300000, input.deadline); const acquisitionDeadline = Math.min(deadline, performance.now() + 60000);
   const remaining = maximum => { const n = Math.min(maximum, Math.floor(deadline - performance.now())); if (!Number.isFinite(n) || n < 1) throw Error('acquisition deadline'); return n; };
   const acquisitionRemaining = maximum => { const n = Math.min(remaining(maximum), Math.floor(acquisitionDeadline - performance.now())); if (!Number.isFinite(n) || n < 1) throw Error('acquisition deadline'); return n; };
@@ -75,7 +86,7 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     if (eventName === 'push') {
       if (!['refs/heads/develop', 'refs/heads/main'].includes(event.ref) || context.ref !== event.ref || event.deleted !== false || event.after !== context.sha || !sha(event.before)) throw Error('push binding');
       definition = event.before; branch = event.ref.slice(11); source = event.after;
-      run(['merge-base', '--is-ancestor', definition, source], root);
+      try { run(['merge-base', '--is-ancestor', definition, source], root); } catch { throw Error('push ancestry'); }
     } else if (eventName === 'pull_request') {
       const p = event.pull_request;
       if (!record(p) || !Number.isSafeInteger(event.number) || event.number < 1 || p.number !== event.number || context.ref !== `refs/pull/${event.number}/merge` || !repository(p.base?.repo) || !['develop', 'main'].includes(p.base?.ref) || !sha(p.base.sha) || !sha(p.head?.sha) || !account(p.user) || !record(p.head.repo) || !Number.isSafeInteger(p.head.repo.id) || p.head.repo.id < 1 || typeof p.head.repo.full_name !== 'string' || (p.head.repo.full_name === 'juan294/paisaxe' && !repository(p.head.repo))) throw Error('PR binding');
@@ -87,7 +98,7 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
       const parents = run(['rev-list', '--parents', '-n', '1', checkout], root).trim().split(' ');
       if (parents.length !== 3 || parents[0] !== checkout || parents[2] !== source || !sha(parents[1])) throw Error('physical PR parents');
       mergeBase = parents[1];
-      if (mergeBase !== definition) run(['merge-base', '--is-ancestor', definition, mergeBase], root);
+      if (mergeBase !== definition) try { run(['merge-base', '--is-ancestor', definition, mergeBase], root); } catch { throw Error('PR base ancestry'); }
     } else if (eventName === 'schedule') {
       if (context.ref !== 'refs/heads/main' || typeof event.schedule !== 'string' || !event.schedule) throw Error('schedule binding');
       definition = context.sha; branch = 'main';
@@ -107,25 +118,18 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     const commit = await get(`/git/commits/${definition}`); if (commit.sha !== definition) throw Error('authenticated definition commit');
     temporary = await realpath(await mkdtemp(join(tmpdir(), 'paisaxe-launch-')));
     const work = join(temporary, 'checkout'); await mkdir(work, { mode: 0o700 }); run(['init', '--quiet', '--template=', work], temporary); run(['remote', 'add', 'origin', ORIGIN], work);
-    const acquire = async (id, ref) => {
+    // Push, pull request and nightly all check out with fetch-depth 0, which holds
+    // every branch: the protected base, the candidate and the develop head. An
+    // object absent from that checkout blocks; nothing is fetched.
+    await shareCheckoutObjects(root, work, run);
+    const acquire = (id, ref) => {
       if (!sha(id) || !/^refs\/(?:ci-cadence\/(?:protected|candidate)\/[a-f0-9]{40}|remotes\/origin\/(?:main|develop))$/.test(ref)) throw Error('acquisition ref');
-      const env = { ...environment(), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: gitAuthorization(input.token), GIT_ASKPASS: '/usr/bin/false', SSH_ASKPASS: '/usr/bin/false' };
-      // Push and pull request: the fetch-depth 0 checkout already holds both the
-      // protected base and the candidate, so they are shared through alternates
-      // with no network. Only the nightly's develop head can be absent from its
-      // main checkout; that one fetch stays, authenticated.
-      let local = false; try { run(['cat-file', '-e', `${id}^{commit}`], root); local = true; } catch { if (eventName !== 'schedule') throw Error('object absent from full-history checkout'); }
-      if (local && !gitTransport) {
-        const objects = run(['rev-parse', '--path-format=absolute', '--git-path', 'objects'], root).trim(); if (!objects.startsWith('/') || /[\r\n]/.test(objects)) throw Error('checkout object path');
-        await mkdir(join(work, '.git/objects/info'), { recursive: true }); await writeFile(join(work, '.git/objects/info/alternates'), objects + '\n', { mode: 0o600 });
-        run(['update-ref', ref, id], work);
-      }
-      else if (gitTransport) { let timer; try { await Promise.race([gitTransport({ root: work, url: ORIGIN, sha: id, ref, env, timeout: acquisitionRemaining(10000), run }), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Git transport deadline')), acquisitionRemaining(10000)); })]); } finally { clearTimeout(timer); } }
-      else run(['-c', 'protocol.file.allow=never', '-c', 'protocol.ssh.allow=never', '-c', 'http.followRedirects=false', '-c', 'http.sslVerify=true', '-c', 'credential.helper=', '-c', 'core.askPass=/usr/bin/false', 'fetch', '--no-tags', '--no-recurse-submodules', '--force', ORIGIN, `${id}:${ref}`], work, { env, timeout: acquisitionRemaining(10000) });
-      acquisitionRemaining(10000);
-      if (run(['rev-parse', '--verify', `${ref}^{commit}`], work).trim() !== id || run(['cat-file', '-t', id], work).trim() !== 'commit' || run(['remote', 'get-url', 'origin'], work).trim() !== ORIGIN) throw Error('fetched immutable ref');
+      let type; try { type = run(['cat-file', '-t', id], work).trim(); } catch { throw Error('object absent from full-history checkout'); }
+      if (type !== 'commit') throw Error('object absent from full-history checkout');
+      run(['update-ref', ref, id], work); acquisitionRemaining(10000);
+      if (run(['rev-parse', '--verify', `${ref}^{commit}`], work).trim() !== id || run(['cat-file', '-t', id], work).trim() !== 'commit' || run(['remote', 'get-url', 'origin'], work).trim() !== ORIGIN) throw Error('acquired immutable ref');
     };
-    const pin = `refs/ci-cadence/protected/${definition}`; await acquire(definition, pin);
+    const pin = `refs/ci-cadence/protected/${definition}`; acquire(definition, pin);
     const revalidateIdentity = () => {
       if (run(['rev-parse', pin], work).trim() !== definition || run(['rev-parse', 'HEAD'], root).trim() !== context.sha || !canonicalOrigin(run(['remote', 'get-url', 'origin'], root).trim())) throw Error('original checkout or protected pin moved');
     };
@@ -142,7 +146,7 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
       if (!owner) throw Error('schedule owner');
       const integration = await get('/git/ref/heads/develop'); if (integration.ref !== 'refs/heads/develop' || integration.object?.type !== 'commit' || !sha(integration.object.sha)) throw Error('authenticated integration ref'); source = checkout = integration.object.sha;
     }
-    await acquire(checkout, `refs/ci-cadence/candidate/${checkout}`);
+    acquire(checkout, `refs/ci-cadence/candidate/${checkout}`);
     run(['update-ref', `refs/remotes/origin/${branch}`, eventName === 'push' ? source : definition], work);
     if (eventName === 'schedule') run(['update-ref', 'refs/remotes/origin/develop', source], work);
     run(['checkout', '--no-recurse-submodules', '--quiet', '--force', '--detach', checkout], work);
@@ -171,7 +175,7 @@ export async function launchNative(input, { request = fetch, gitTransport, scann
     }
     revalidateIdentity();
     return { ...result, protectedImported: true, acquisitionRequests: requests, nativeCallerInstallationVerified: false };
-  } catch { return { ...blocked(), protectedImported: imported }; }
+  } catch (error) { return { ...blocked(), reason: launcherReason(error), protectedImported: imported }; }
   finally { if (temporary) await rm(temporary, { recursive: true, force: true }); }
 }
 
@@ -181,5 +185,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8')); const integer = x => typeof x === 'string' && /^[1-9][0-9]*$/.test(x) ? Number(x) : NaN;
     const result = await launchNative({ root: process.cwd(), event, eventName: process.env.GITHUB_EVENT_NAME, actor: process.env.GITHUB_ACTOR, mode: process.env.CI_CADENCE_MODE, token: process.env.GITHUB_TOKEN, scanner: { executable: process.env.CI_CADENCE_SCANNER_PATH, sha256: nativeScannerDigest() }, context: { repository: process.env.GITHUB_REPOSITORY, repositoryId: integer(process.env.GITHUB_REPOSITORY_ID), ownerId: integer(process.env.GITHUB_REPOSITORY_OWNER_ID), actorId: integer(process.env.GITHUB_ACTOR_ID), actorType: event.sender?.type, sha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF } });
     console.log(JSON.stringify(result)); if (result.lane === 'blocked' || (result.lane === 'fast' && !result.success)) process.exitCode = 1;
+    if (result.lane === 'blocked') console.error(`protected launcher blocked: ${result.reason}`);
   } catch { console.error('protected launcher event acquisition failed'); process.exitCode = 1; }
 }
