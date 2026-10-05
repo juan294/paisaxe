@@ -546,6 +546,26 @@ Skipped:
     - **Unverified:** the webhook `resource` shape of both events (the event-names page has no payload sample); the code reads `resource.invoice.id`, else `resource.id`. **Not documented:** `PayPal-Request-Id` on create, send and cancel (the spec lists it only for conditional rules), so it is sent on create and send as best effort, not relied on: the guarantee is `bookings.invoice_id` set once plus re-reading the invoice. Residual: if a create answer is lost and PayPal ignores the header, an unsent orphan draft can remain (never visible to the payer).
 12. **Not done here:** subscribing the production webhook to `INVOICING.INVOICE.PAID` and `INVOICING.INVOICE.CANCELLED` (PayPal dashboard, owner); the manual sandbox run the acceptance gate requires.
 
+### Phase 8b
+
+1. **Phone confirmation reuses the voice-booking services, not the make-booking HTTP route.** `src/app/api/mcp/make-booking/` is Pelayo's tool (MCP secret, Idempotency-Key, per-customer limit) and is unchanged (0 diff lines, regression tests). The flow calls the same services with the same gates: the `booking_system` flag, the daily cap (`claimDailyBookingCallSlot`), a `claimPendingBooking` claim keyed `phone-confirmation:<paymentId>`, then `initiateCall`, and only ever to `PHONE_CONFIRMATION_TEST_NUMBER` (registered in `.env.example`; unset, the phone experience is not offered, no order is created and no call is placed).
+2. **"No bookable capacity" is enforced by the flow, not the row.** The fixture experience (`demo-confirmacion-telefonica`, migration 126) has `capacity_per_slot` 6 because the schema requires a positive value and `accept_quote` checks capacity; it is only offered with the test number set.
+3. **Outcomes:** `confirmed` re-takes the slot, captures the authorization and confirms; `denied`, `no_answer`, `failed` and `orphaned` (the last two beyond the plan's list) void it, expire the booking and release the hold. A database trigger (`payments_require_recorded_confirmation`) refuses `authorized → capture_pending` unless the linked call is `confirmed` with its ElevenLabs event recorded. Reconciliation step 4b settles missed outcomes, places a call that was never placed, voids authorizations after the 3-day honor period, and marks ones already expired at PayPal.
+4. **Finalization calls `consume_hold_and_confirm` directly** (`phone-confirmation.ts` cannot import `capture.ts`, which imports it); on failure the payment stays `captured` and reconciliation's finalize step completes it. The PayPal 422 issue names for authorizations are from the documentation as understood, not observed; every 422 is resolved by reading the authorization or the order.
+5. **No new UI text:** while authorized the booking page shows "confirming"; a void shows the existing slot-gone outcome.
+
+### Phase 8c
+
+1. **Hooks at the transitions:** `booking.confirmed` where `consume_hold_and_confirm` returns `'confirmed'` (only the call that made the change; a repeat returns `'already_confirmed'`), and `booking.refunded` where the guarded update to `refunded` changed a row. Every capture and refund path reaches one of them.
+2. **Payload:** `id` (the booking reference), `event`, `slotDate`, `slotTime`, `partySize`, `totalCents`, `depositCents`, `balanceCents`, `currency`, `experienceTitle`. No booking id, user, email, capability or PayPal ids. No refund amount (it comes from different places for cancellations, compensations and outside refunds). Both events share `id`, which suits a webhook trigger; a polling Zap that deduplicates on `id` would drop the second.
+3. **Delivery:** fire-and-forget through `after()` (as `src/lib/costs/anthropic-usage.ts`), one 5-second deadline for the booking read and the POST, redirects refused, https only (http for loopback outside production); failures log `[ZAPIER_SYNC_FAILED]` with a reason and never change state or throw; an unset URL is skipped with a debug line.
+
+### Phase 8 integration
+
+1. **Three worktrees, one integrator.** 8a, 8b and 8c were built in parallel in separate worktrees on one shared local database (each applying its own migration with psql), then merged in an integration branch: 8a cleanly; 8b with conflicts in the PayPal adapter types and orders, the mock server, the reconcile tests and the contract sheet, all resolved by keeping both sides (invoicing and authorizations are independent additions); 8c cleanly. The branch commits of 8a and 8b skipped the pre-commit hook (8b alone fails the migration-sequence check without 8a's 125); the integration commit runs the full gate and the hook.
+2. **The phone path notifies Zapier too:** 8b's direct `consume_hold_and_confirm` call now calls `notifyBookingSync` when the RPC returns `'confirmed'`, like `capture.ts` (tests for confirmed and already-confirmed).
+3. **Disk space:** the machine's data volume filled up (1.1 GB free) during the integration; a dependency install was left corrupted and was redone with `npm ci` after the three extension worktrees (committed) were removed. The owner should free space before the release.
+
 ## Owner decisions after Phase 0
 
 Recorded 2026-10-03, when the owner accepted Phase 0.

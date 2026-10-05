@@ -48,6 +48,8 @@ vi.mock("@/lib/feature-flags-server", () => flags);
 
 const logger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
 vi.mock("@/lib/logger", () => ({ logger }));
+const zapier = vi.hoisted(() => ({ notifyBookingSync: vi.fn() }));
+vi.mock("./zapier", () => zapier);
 
 const { PaypalError } = await import("@/lib/paypal/types");
 const {
@@ -421,6 +423,22 @@ describe("settlePhonePayment: no capture without a recorded confirmation", () =>
     expect(fake.rpc).toHaveBeenCalledWith("consume_hold_and_confirm", { p_booking_id: ID, p_capture_id: CAPTURE_ID });
     expect(rpcs()).toEqual(["reacquire_hold", "consume_hold_and_confirm"]);
     expect(logger.info).toHaveBeenCalledWith("[PHONE_CONFIRMATION_CAPTURED]", expect.objectContaining({ bookingId: ID }));
+    // Phase 8c: the transition notifies Zapier once, like the capture path.
+    expect(zapier.notifyBookingSync).toHaveBeenCalledTimes(1);
+    expect(zapier.notifyBookingSync).toHaveBeenCalledWith(fake.client, ID, "booking.confirmed");
+  });
+
+  it("a booking that was already confirmed does not notify again", async () => {
+    outcome("confirmed");
+    fake.onRpc("reacquire_hold", { data: true });
+    write("payments");
+    paypal.captureAuthorization.mockResolvedValue(capture());
+    write("payments");
+    fake.onRpc("consume_hold_and_confirm", { data: "already_confirmed" });
+
+    await settlePhonePayment(fake.client, booking(), authorizedPayment());
+
+    expect(zapier.notifyBookingSync).not.toHaveBeenCalled();
   });
 
   it.each(["initiating", "pending"])("a call still %s captures nothing and voids nothing", async (status) => {

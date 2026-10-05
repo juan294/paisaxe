@@ -66,6 +66,7 @@ import { initiateCall } from "@/lib/services/elevenlabs-call-service";
 import type { CaptureOutcome } from "@/types/booking-page";
 import { COMPENSATING, flagNeedsAttention, guardedUpdate, holdIsLive, type Row } from "./payment-state";
 import { PHONE_CONFIRMATION_KEY_PREFIX, phoneConfirmationReadiness } from "./phone-config";
+import { notifyBookingSync } from "./zapier";
 
 /** Capture is guaranteed only within 3 days of the authorization (Phase 0 evidence). */
 const HONOR_PERIOD_MS = 3 * 86_400_000;
@@ -308,11 +309,13 @@ async function settleAuthorizationCapture(client: SupabaseClient, booking: Row, 
   if (capture.status === "COMPLETED") {
     // Persisted before anything else: money moved (R2-01).
     await guardedUpdate(client, "payments", payment.id, { status: "captured", capture_id: capture.id, captured_at: nowIso() }, ["capture_pending"]);
-    const { error } = await client.rpc("consume_hold_and_confirm", { p_booking_id: booking.id, p_capture_id: capture.id });
+    const { data, error } = await client.rpc("consume_hold_and_confirm", { p_booking_id: booking.id, p_capture_id: capture.id });
     if (error) {
       logger.warn("[PHONE_CONFIRMATION_FINALIZE_DEFERRED]", { bookingId: booking.id, paymentId: payment.id, error: error.message });
       return "captured";
     }
+    // Only the call that made the transition notifies (Phase 8c), as in capture.ts.
+    if (data === "confirmed") notifyBookingSync(client, booking.id as string, "booking.confirmed");
     logger.info("[PHONE_CONFIRMATION_CAPTURED]", { bookingId: booking.id, paymentId: payment.id, captureId: capture.id });
     return "confirmed";
   }
