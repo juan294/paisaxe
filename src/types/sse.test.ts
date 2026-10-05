@@ -85,6 +85,7 @@ describe("types/sse", () => {
       { kind: "booking", bookingId: "b1", reference: "RS-ABC123", status: "pending_payment", link: "/booking/x.y" },
       { kind: "payment", bookingId: "b1", approvalUrl: "https://www.sandbox.paypal.com/x", amountCents: 3000, currency: "EUR" },
       { kind: "cancellation", bookingId: "b1", refundCents: 3000, currency: "EUR", policy: "full" },
+      { kind: "invoice", bookingId: "b1", reference: "RS-ABC123", amountCents: 9000, currency: "EUR", dueDate: "2026-11-21", status: "sent", invoiceUrl: "https://www.sandbox.paypal.com/invoice/p/#INV2-1" },
     ]) {
       expect(parseSseEvent(`data: ${JSON.stringify({ type: "card", card })}`)?.type).toBe("card");
     }

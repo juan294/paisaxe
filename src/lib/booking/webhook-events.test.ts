@@ -16,6 +16,9 @@ const capture = vi.hoisted(() => ({
 }));
 vi.mock("./capture", () => capture);
 
+const invoice = vi.hoisted(() => ({ settleBalanceInvoice: vi.fn(), markInvoiceCancelled: vi.fn() }));
+vi.mock("./invoice", () => invoice);
+
 const paypal = vi.hoisted(() => ({ getCapture: vi.fn() }));
 vi.mock("@/lib/paypal", async () => {
   const money = await vi.importActual<typeof import("@/lib/paypal/money")>("@/lib/paypal/money");
@@ -500,6 +503,85 @@ describe("PAYMENT.CAPTURE.REFUNDED", () => {
 
     await expect(processPaypalEvent(fake.client, refundEvent())).resolves.toBe("out_of_order");
     expect(tablesQueried()).toEqual(["payments", "bookings", "payments"]);
+  });
+});
+
+describe("INVOICING.INVOICE.PAID (Phase 8a)", () => {
+  const INVOICE_ID = "INV2-AAAA-BBBB-CCCC-DDDD";
+  const invoicePaid = (resource: Row) => inboxEvent("INVOICING.INVOICE.PAID", { order_id: null, custom_id: null }, resource);
+
+  it("settles the balance from PayPal's invoice, never from the event (it also fires for partial and pending payments)", async () => {
+    invoice.settleBalanceInvoice.mockResolvedValueOnce("paid");
+
+    await expect(processPaypalEvent(fake.client, invoicePaid({ invoice: { id: INVOICE_ID, status: "PAID" } }))).resolves.toBe("recorded");
+    expect(invoice.settleBalanceInvoice).toHaveBeenCalledWith(fake.client, INVOICE_ID);
+    expect(fake.client.from).not.toHaveBeenCalled();
+  });
+
+  it.each(["payment_pending", "partially_paid", "sent"])("reports a %s invoice as unsettled", async (status) => {
+    invoice.settleBalanceInvoice.mockResolvedValueOnce(status);
+    await expect(processPaypalEvent(fake.client, invoicePaid({ invoice: { id: INVOICE_ID } }))).resolves.toBe("unsettled");
+  });
+
+  it("reads the invoice id from a resource that is the invoice itself", async () => {
+    invoice.settleBalanceInvoice.mockResolvedValueOnce("paid");
+    await processPaypalEvent(fake.client, invoicePaid({ id: INVOICE_ID, status: "PAID" }));
+    expect(invoice.settleBalanceInvoice).toHaveBeenCalledWith(fake.client, INVOICE_ID);
+  });
+
+  it("is unmatched (tagged for the drain filter) when no booking has the invoice", async () => {
+    invoice.settleBalanceInvoice.mockResolvedValueOnce(null);
+
+    const error = await processPaypalEvent(fake.client, invoicePaid({ invoice: { id: INVOICE_ID } })).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(PaypalWebhookUnmatched);
+    expect((error as Error).message.startsWith(UNMATCHED_TAG)).toBe(true);
+    expect(logger.error).toHaveBeenCalledWith("[PAYPAL_WEBHOOK_UNMATCHED]", {
+      eventId: "WH-10",
+      eventType: "INVOICING.INVOICE.PAID",
+      invoiceId: INVOICE_ID,
+    });
+  });
+
+  it("is unmatched without reading anything when the event names no invoice", async () => {
+    await expect(processPaypalEvent(fake.client, invoicePaid({ invoice: "nope" }))).rejects.toBeInstanceOf(PaypalWebhookUnmatched);
+    const noResource = { ...invoicePaid({}), payload: { id: "WH-10", event_type: "INVOICING.INVOICE.PAID" } };
+    await expect(processPaypalEvent(fake.client, noResource)).rejects.toBeInstanceOf(PaypalWebhookUnmatched);
+    expect(invoice.settleBalanceInvoice).not.toHaveBeenCalled();
+  });
+});
+
+describe("INVOICING.INVOICE.CANCELLED (Phase 8a)", () => {
+  const INVOICE_ID = "INV2-AAAA-BBBB-CCCC-DDDD";
+  const invoiceCancelled = (resource: Row) => inboxEvent("INVOICING.INVOICE.CANCELLED", { order_id: null, custom_id: null }, resource);
+
+  it("records the invoice cancelled, idempotently, with nothing else read or written", async () => {
+    invoice.markInvoiceCancelled.mockResolvedValue("cancelled");
+
+    await expect(processPaypalEvent(fake.client, invoiceCancelled({ invoice: { id: INVOICE_ID } }))).resolves.toBe("recorded");
+    await expect(processPaypalEvent(fake.client, invoiceCancelled({ id: INVOICE_ID }))).resolves.toBe("recorded");
+    expect(invoice.markInvoiceCancelled).toHaveBeenCalledWith(fake.client, INVOICE_ID);
+    expect(invoice.settleBalanceInvoice).not.toHaveBeenCalled();
+    expect(fake.client.from).not.toHaveBeenCalled();
+  });
+
+  it("is out of order for an invoice whose balance was paid (a cancel never undoes a payment)", async () => {
+    invoice.markInvoiceCancelled.mockResolvedValueOnce("paid");
+
+    await expect(processPaypalEvent(fake.client, invoiceCancelled({ invoice: { id: INVOICE_ID } }))).resolves.toBe("out_of_order");
+    expect(logger.warn).toHaveBeenCalledWith("[PAYPAL_WEBHOOK_OUT_OF_ORDER]", {
+      eventId: "WH-10",
+      eventType: "INVOICING.INVOICE.CANCELLED",
+      invoiceId: INVOICE_ID,
+      invoiceStatus: "paid",
+    });
+  });
+
+  it("is unmatched when no booking has the invoice, or the event names none", async () => {
+    invoice.markInvoiceCancelled.mockResolvedValueOnce(null);
+    await expect(processPaypalEvent(fake.client, invoiceCancelled({ invoice: { id: INVOICE_ID } }))).rejects.toBeInstanceOf(PaypalWebhookUnmatched);
+    await expect(processPaypalEvent(fake.client, invoiceCancelled({}))).rejects.toBeInstanceOf(PaypalWebhookUnmatched);
+    expect(invoice.markInvoiceCancelled).toHaveBeenCalledTimes(1);
   });
 });
 

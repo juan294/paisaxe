@@ -367,6 +367,7 @@ describe("buildBookingInstructions (PayPal hackathon booking chat)", () => {
     ["offers the nearest slots when one is gone", /horarios más cercanos/i],
     ["replies in the visitor's language, Spanish by default", /idioma del visitante/i],
     ["overrides the discovery persona's voice upsell markers", /VOICE_UPSELL/],
+    ["invoices the balance of a confirmed booking only through send_balance_invoice, paid only when it says paid", /send_balance_invoice[^\n]*confirmada[^\n]*paid/],
   ])("%s", (_label, pattern) => {
     expect(text).toMatch(pattern);
   });

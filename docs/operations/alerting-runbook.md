@@ -323,7 +323,7 @@ so a retry never refunds twice.
 | (HTTP 429, no marker) | — | — | The webhook route's per-IP limit (120 a minute) answered 429; in production it also fails closed when the rate-limit backend (Upstash) is unreachable, see "Rate Limit Backend Degraded" | Nothing is lost: PayPal redelivers, and the reconcile cron queries PayPal for every open payment. Fix the backend if `[RATE_LIMIT_DEGRADED]` accompanies it |
 | `[PAYPAL_WEBHOOK_VERIFY_FAILED]` | `error` | `transmissionId`, `error` | PayPal's verification API could not answer; the route answers 500 so PayPal redelivers | Transient unless repeated; check PayPal status and the `PAYPAL_*` variables |
 | `[PAYPAL_WEBHOOK_PROCESSING_FAILED]` | `error` | `eventId`, `eventType`, `error` | The event is stored but processing failed; 500, PayPal redelivers and the cron replays it from the inbox | Look for a following success for the same `eventId`; if none after 15 minutes, read its `last_error` in `paypal_webhook_events` |
-| `[PAYPAL_WEBHOOK_UNMATCHED]` | `error` | `eventId`, `eventType`, `orderId`, `captureId` | The event matches no payment (for example another environment's event on a shared sandbox app); it stays in the inbox and the drain skips it | Expected for foreign events; investigate only if the order or custom id is one of ours |
+| `[PAYPAL_WEBHOOK_UNMATCHED]` | `error` | `eventId`, `eventType`, `orderId`, `captureId` (invoice events: `eventId`, `eventType`, `invoiceId`) | The event matches no payment (for example another environment's event on a shared sandbox app); it stays in the inbox and the drain skips it | Expected for foreign events; investigate only if the order or custom id is one of ours |
 | `[PAYPAL_CAPTURE_MISMATCH]` | `error` | `bookingId`, `orderId`/`eventId`, `source`, `captured` | An order or capture whose amount, currency or custom id is not the booking's. Uncaptured: never captured, booking `needs_attention`. Captured: refunded in one write (`order_mismatch`) | Treat as a possible tampering or integration bug: compare the order in the PayPal sandbox dashboard with the booking |
 | `[PAYPAL_CAPTURE_DENIED]` | `error` | `bookingId`, `paymentId`, `eventId` | PayPal declined the capture; payment `capture_failed`, booking `needs_attention` | Nothing was charged; the visitor can be offered a new quote |
 | `[PAYPAL_COMPENSATING]` | `error` | `bookingId`, `paymentId`, `reason` | Money moved but the booking cannot be fulfilled (`slot_gone`, `order_mismatch`, `duplicate_capture`); a refund was requested | Follow it with the `refund_id` until `refunded` (the cron does) |
@@ -333,17 +333,28 @@ so a retry never refunds twice.
 | `[CRON_RECONCILE_ATTENTION]` | `error` | `bookingId`, `paymentId`, `passes`, `reason` — or `staleCount`, `bookingIds` | Three inconclusive capture passes (the payment stays `capture_pending` and keeps being reconciled), or bookings in `needs_attention` for more than 15 minutes | Open the operator view (`/operator/<capability>`): exceptions are highlighted; compare each with the PayPal sandbox order |
 | `[VOUCHER_GRANT_FAILED]` | `error` | `userId`, `error` | Voucher redemption failed in the database (500); the visitor can retry | Check Supabase health and the `redeem_voucher` RPC |
 | `[PAYPAL_CREATE_ORDER_FAILED]` | `error` | `bookingId`, `error` | The order could not be created (PayPal error or not configured); the tool and the pay button answer `payment_unavailable` | Check the `PAYPAL_*` variables and PayPal status |
+| `[PAYPAL_INVOICE_FAILED]` | `error` | `bookingId`, `error` | `send_balance_invoice` could not create or send the balance invoice (PayPal error or not configured); the tool answers `payment_unavailable`. A created draft stays `draft` and the next call sends it | Check the `PAYPAL_*` variables and PayPal status; the visitor can ask again |
+| `[PAYPAL_INVOICE_NO_PAYER]` | `error` | `bookingId`, `orderId` | The captured order has no payer email at PayPal, so the balance cannot be invoiced (`invalid_state`) | Look up the order in the sandbox dashboard; collect the balance another way |
+| `[PAYPAL_INVOICE_DUPLICATE]` | `error` | `bookingId`, `kept`, `orphan` | Two concurrent calls created two invoices; `kept` is the booking's, `orphan` is an unsent draft | Delete the `orphan` draft in the PayPal dashboard; nothing was sent to the payer |
+| `[PAYPAL_INVOICE_REFRESH_FAILED]` | `warn` | `bookingId`, `invoiceId`, `error` | A repeated `send_balance_invoice` could not re-read the invoice; the stored status was answered | Transient unless repeated |
+| `[PAYPAL_INVOICE_PAID]` | `info` | `bookingId`, `invoiceId` | PayPal reported the invoice `PAID` with nothing due and the whole balance paid; `balance_paid_at` set | None |
+| `[PAYPAL_INVOICE_UNSETTLED]` | `warn` | `bookingId`, `invoiceId`, `invoiceStatus`, `dueAmountCents` | An invoice-paid event (or re-read) for a partial (`PARTIALLY_PAID`) or pending (`PAYMENT_PENDING`) payment; the balance is not marked paid | None while pending; a partial payment should not happen (partial payments are disabled on the invoice): check the invoice |
+| `[PAYPAL_INVOICE_MISMATCH]` | `error` | `bookingId`, `invoiceId`, `balanceCents`, `amountCents`, `paidAmountCents`, `dueAmountCents`, `currency` | PayPal says `PAID` but the amounts or currency are not the booking's balance; nothing is written | Compare the invoice in the sandbox dashboard with the booking; treat as an integration bug |
+| `[PAYPAL_INVOICE_PAID_INACTIVE]` | `warn` | `bookingId`, `invoiceId`, `status` | The balance was paid on a booking that is no longer confirmed (money moved, so it is recorded) | Followed by `[BOOKING_BALANCE_PAID_ON_CANCEL]` once a cancellation completes |
+| `[PAYPAL_INVOICE_CANCELLED]` | `info` | `bookingId`, `invoiceId` | The visitor cancelled the booking and its unpaid balance invoice was cancelled at PayPal | None |
+| `[PAYPAL_INVOICE_CANCEL_FAILED]` | `error` | `bookingId`, `error` | The visitor's cancellation is recorded, but the balance invoice could not be cancelled now; it stays payable until the cron (step 9) cancels it | Check the next cron runs (`[CRON_RECONCILE_ITEM_FAILED]` with `step: "invoices"`); if it repeats, cancel the invoice by hand in the PayPal dashboard |
+| `[BOOKING_BALANCE_PAID_ON_CANCEL]` | `error` | `bookingId`, `invoiceId`, `invoiceStatus` | A cancelled booking's balance had already been paid (or partly paid); the deposit was refunded per policy, the balance was **not** (known limitation); the booking is `needs_attention` | Decide with the visitor and refund the balance by hand in the PayPal dashboard (invoice refund) |
 
 **Example log drain query:**
 ```
-msg:[PAYPAL_* OR msg:[CRON_RECONCILE_ATTENTION] OR msg:[BOOKING_CANCEL_REFUND_FAILED] OR msg:[VOUCHER_GRANT_FAILED]
+msg:[PAYPAL_* OR msg:[CRON_RECONCILE_ATTENTION] OR msg:[BOOKING_CANCEL_REFUND_FAILED] OR msg:[BOOKING_BALANCE_PAID_ON_CANCEL] OR msg:[VOUCHER_GRANT_FAILED]
 ```
 
 **Read-only diagnosis (service role, local or with the owner's authorization for production):**
 
 ```sql
-SELECT b.reference, b.status, b.cancellation_confirmed_at, p.status AS payment, p.order_id, p.capture_id,
-       p.refund_id, p.compensation_reason, p.reconcile_passes
+SELECT b.reference, b.status, b.cancellation_confirmed_at, b.invoice_id, b.invoice_status, b.balance_paid_at,
+       p.status AS payment, p.order_id, p.capture_id, p.refund_id, p.compensation_reason, p.reconcile_passes
 FROM public.bookings b LEFT JOIN public.payments p ON p.booking_id = b.id
 WHERE b.id = '<bookingId>' ORDER BY p.created_at;
 

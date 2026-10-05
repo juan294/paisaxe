@@ -39,6 +39,10 @@ exist in the SDK; `payPalRequestId` is the only idempotency.
 | `payments.getCapturedPayment` | `{ captureId }` | `captureId` | none | 401, 403, 404, 500 (empty decoder), 4xx/5xx |
 | `payments.refundCapturedPayment` | `Payments.RefundCapturedPaymentRequest` | `captureId`, `payPalRequestId: "refund:" + key`, `prefer: "return=representation"`, `body.amount` | `prefer` is `return=minimal` | 400, 401, 403, 404, 409, 422, 500 (empty decoder), 4xx/5xx |
 | `payments.getRefund` | `{ refundId }` | `refundId` | none | as getCapturedPayment |
+| `orders.authorizeOrder` (Phase 8b) | `Orders.AuthorizeOrderRequest` | `id`, `payPalRequestId: "authorize:" + key`, `prefer: "return=representation"`, `body: {}`; the order was created with `intent: AUTHORIZE` | `prefer` is `return=minimal` | 400, 401, 403, 404, 422 (`ORDER_ALREADY_AUTHORIZED` -> read the order, `ORDER_NOT_APPROVED`), 500, 4xx/5xx |
+| `payments.captureAuthorizedPayment` (Phase 8b) | `Payments.CaptureAuthorizedPaymentRequest` | `authorizationId`, `payPalRequestId: "capture-authorization:" + key`, `prefer: "return=representation"`, `body: {amount, finalCapture: true}` | `prefer` is `return=minimal` | 400, 401, 403, 404, 409, 422 (`AUTHORIZATION_ALREADY_CAPTURED`, `AUTHORIZATION_VOIDED`, `AUTHORIZATION_EXPIRED`), 500 (empty decoder), 4xx/5xx |
+| `payments.voidPayment` (Phase 8b) | `Payments.VoidPaymentRequest` | `authorizationId`, `payPalRequestId: "void:" + key`, `prefer: "return=representation"` (a 200 body, not 204) | `prefer` is `return=minimal` | 401, 403, 404, 409, 422 (`PREVIOUSLY_VOIDED` -> read the authorization; `PREVIOUSLY_CAPTURED`, `AUTHORIZATION_EXPIRED` thrown), 500 (empty decoder), 4xx/5xx |
+| `payments.getAuthorizedPayment` (Phase 8b) | `{ authorizationId }` | `authorizationId` | none | 401, 403, 404, 500 (empty decoder), 4xx/5xx |
 
 Rules:
 - Awaiting an operation resolves to the model on 2xx and rejects with the
@@ -70,5 +74,19 @@ Rules:
 - A re-capture with a new request id can return 201 with the existing capture
   (Phase 0 finding 6): parsed normally, never treated as a second capture.
 - Webhook verification is outside the SDK (no notifications surface).
+- Invoicing v2 (Phase 8a: create, send, get and cancel invoice) is outside the SDK
+  too (the pinned commit has no invoicing resource): plain `fetch` in
+  `src/lib/paypal/invoices.ts` through `createPaypalFetch` and `getAccessToken`,
+  like `webhooks.ts`. PayPal-Request-Id `invoice:` / `invoice-send:` + the
+  booking id is sent on create and send as best effort: the published spec does
+  not list that header for them (or for cancel). Cancel is
+  `POST /v2/invoicing/invoices/{id}/cancel` with a `notification` body, 204. `getOrder` now also normalizes `payer.email_address` (else
+  `payment_source.paypal.email_address`) as `payerEmail`, the invoice recipient.
+- Phase 8b: the 422 issue names for authorizations (`ORDER_ALREADY_AUTHORIZED`,
+  `AUTHORIZATION_ALREADY_CAPTURED`, `AUTHORIZATION_VOIDED`, `AUTHORIZATION_EXPIRED`,
+  `PREVIOUSLY_VOIDED`, `PREVIOUSLY_CAPTURED`) are from PayPal's documentation as understood,
+  not observed in the sandbox; the booking code resolves every 422 by reading the
+  authorization (`getAuthorizedPayment`) or the order, never by the issue name alone,
+  except the idempotent re-authorize and re-void shortcuts.
 - Blocker for production: the sandbox-only host guard stays until a reviewed
   production decision.

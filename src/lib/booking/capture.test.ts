@@ -122,7 +122,7 @@ describe("loadState (through captureApprovedOrder)", () => {
 
     await captureApprovedOrder(fake.client, ID, "return");
 
-    expect(bookings.select).toHaveBeenCalledWith("*, hold:holds(*), experience:experiences(title)");
+    expect(bookings.select).toHaveBeenCalledWith("*, hold:holds(*), experience:experiences(title, merchant:merchants(confirmation_mode))");
     expect(bookings.eq).toHaveBeenCalledWith("id", ID);
     expect(payments.eq).toHaveBeenCalledWith("booking_id", ID);
     expect(payments.order).toHaveBeenCalledWith("created_at", { ascending: false });

@@ -25,6 +25,17 @@ export type PaypalCaptureStatus =
   | "FAILED"
   | (string & {});
 
+/** Authorization statuses (Phase 8b); open as above. */
+export type PaypalAuthorizationStatus =
+  | "CREATED"
+  | "CAPTURED"
+  | "DENIED"
+  | "PARTIALLY_CAPTURED"
+  | "VOIDED"
+  | "PENDING"
+  | "EXPIRED"
+  | (string & {});
+
 /** Refund statuses; open as above. */
 export type PaypalRefundStatus = "CANCELLED" | "FAILED" | "PENDING" | "COMPLETED" | (string & {});
 
@@ -36,6 +47,19 @@ export interface PaypalCapture {
   customId: string | null;
   /** The order this capture belongs to (supplementary_data.related_ids.order_id). */
   orderId: string | null;
+}
+
+/** An authorization of an AUTHORIZE order (Phase 8b, decision R7). */
+export interface PaypalAuthorization {
+  id: string;
+  status: PaypalAuthorizationStatus;
+  amountCents: number | null;
+  currency: string | null;
+  customId: string | null;
+  /** The order it belongs to (supplementary_data.related_ids.order_id), when PayPal says. */
+  orderId: string | null;
+  /** expiration_time: 29 days after authorization (Phase 0 evidence). */
+  expiresAt: string | null;
 }
 
 export interface PaypalOrder {
@@ -50,6 +74,63 @@ export interface PaypalOrder {
   capture: PaypalCapture | null;
   /** links[rel = payer-action | approve] while the buyer has not approved */
   approveUrl: string | null;
+  /**
+   * payer.email_address (else payment_source.paypal.email_address), present
+   * once the buyer has approved: the balance invoice's recipient (Phase 8a).
+   * Omitted when PayPal sent none.
+   */
+  payerEmail?: string;
+  /** purchase_units[0].payments.authorizations[0] of an AUTHORIZE order (Phase 8b); absent otherwise. */
+  authorization?: PaypalAuthorization;
+}
+
+/** Invoice statuses PayPal documents (Invoicing v2); open, so other strings can appear. */
+export type PaypalInvoiceStatus =
+  | "DRAFT"
+  | "SENT"
+  | "SCHEDULED"
+  | "UNPAID"
+  | "PAYMENT_PENDING"
+  | "PARTIALLY_PAID"
+  | "PAID"
+  | "MARKED_AS_PAID"
+  | "CANCELLED"
+  | "REFUNDED"
+  | "PARTIALLY_REFUNDED"
+  | "MARKED_AS_REFUNDED"
+  | (string & {});
+
+export interface PaypalInvoice {
+  id: string;
+  status: PaypalInvoiceStatus;
+  /** amount: the invoice total. */
+  amountCents: number | null;
+  currency: string | null;
+  /** due_amount: what is still outstanding (null when PayPal sent none). */
+  dueAmountCents: number | null;
+  /** payments.paid_amount: what PayPal has recorded as paid (null before any payment). */
+  paidAmountCents: number | null;
+  /** detail.reference: our booking reference. */
+  reference: string | null;
+  /** detail.metadata.recipient_view_url: the payer's link, once the invoice is sent. */
+  recipientViewUrl: string | null;
+}
+
+export interface CreateInvoiceInput {
+  /**
+   * Fixed per booking (the booking id): PayPal-Request-Id "invoice:" + key on
+   * create and "invoice-send:" + key on send, so a retry returns the same invoice.
+   */
+  idempotencyKey: string;
+  /** Booking reference, shown on the invoice (detail.reference). */
+  reference: string;
+  recipientEmail: string;
+  amountCents: number;
+  currency: "EUR";
+  /** "YYYY-MM-DD": the slot date. */
+  dueDate: string;
+  /** The single line item's name. */
+  itemName: string;
 }
 
 export interface PaypalRefund {
@@ -75,6 +156,8 @@ export interface CreateOrderInput {
   cancelUrl: string;
   /** payments.operation_key: becomes PayPal-Request-Id, so retries are idempotent. */
   operationKey: string;
+  /** Default CAPTURE. AUTHORIZE for a phone-confirmed merchant (Phase 8b): authorized on approval, captured after the call. */
+  intent?: "CAPTURE" | "AUTHORIZE";
 }
 
 /** PayPal credentials or base URL missing or not allowed (sandbox-only host guard). */

@@ -8,6 +8,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
+import { notifyBookingSync } from "./zapier";
 
 export type Row = Record<string, unknown>;
 
@@ -44,7 +45,10 @@ export function flagNeedsAttention(client: SupabaseClient, bookingId: unknown, f
 /** After a payment is refunded: the booking is refunded, except for a duplicate capture, whose booking stays confirmed by its other payment. */
 export async function markBookingRefunded(client: SupabaseClient, payment: Row, bookingId: unknown): Promise<void> {
   if (payment.compensation_reason === "duplicate_capture") return;
-  await guardedUpdate(client, "bookings", bookingId, { status: "refunded" }, BOOKING_REFUNDED_FROM);
+  // BOOKING_REFUNDED_FROM excludes refunded: only the write that changed the row notifies (Phase 8c).
+  if (await guardedUpdate(client, "bookings", bookingId, { status: "refunded" }, BOOKING_REFUNDED_FROM)) {
+    notifyBookingSync(client, bookingId as string, "booking.refunded");
+  }
 }
 
 /** Booking statuses a failed refund flags for attention. */

@@ -48,6 +48,17 @@ export interface BookingView {
   holdExpiresAt: string | null;
   /** The latest payment attempt, or null before the first one. */
   payment: BookingPaymentView | null;
+  /** The balance invoice (Phase 8a), or null before one is sent. */
+  invoice: BookingInvoiceView | null;
+}
+
+/** Our reading of the PayPal balance invoice (bookings.invoice_status, migration 125). */
+export type BalanceInvoiceStatus = "draft" | "sent" | "payment_pending" | "partially_paid" | "paid" | "cancelled";
+
+export interface BookingInvoiceView {
+  status: BalanceInvoiceStatus;
+  /** The payer's PayPal link once sent; null while a draft. */
+  url: string | null;
 }
 
 export interface PaymentStartResponse {

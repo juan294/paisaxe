@@ -14,6 +14,9 @@ vi.mock("@/lib/paypal", async () => {
 });
 const logger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
 vi.mock("@/lib/logger", () => ({ logger }));
+// Phase 8a: the balance invoice step (tested in invoice.test.ts); only its never-throwing wrapper may be used here.
+const invoice = vi.hoisted(() => ({ closeInvoiceAfterCancellationSafely: vi.fn(async () => "none") }));
+vi.mock("./invoice", () => invoice);
 
 const { PaypalError, PaypalNotConfigured } = await import("@/lib/paypal/types");
 const { cancellationPreview, confirmCancellation, requestCancellationRefund } = await import("./cancel");
@@ -236,6 +239,49 @@ describe("confirmCancellation", () => {
     paypal.refundCapture.mockResolvedValue({ id: "RF-1", status: "PENDING" });
 
     await expect(confirmCancellation(fake.client, confirmed(), 3000)).rejects.toMatchObject({ code: "refund_unavailable" });
+  });
+});
+
+describe("confirmCancellation: the balance invoice (Phase 8a)", () => {
+  const confirmReply = (data: Record<string, unknown>) => fake.onRpc("confirm_cancellation", { data });
+
+  it("closes the invoice after a cancellation with nothing to refund, and an invoice failure changes nothing", async () => {
+    confirmReply({ outcome: "cancelled", status: "cancelled", refund_cents: 0 });
+    invoice.closeInvoiceAfterCancellationSafely.mockResolvedValueOnce("failed");
+
+    expect(await confirmCancellation(fake.client, confirmed(), 0)).toEqual({ outcome: "cancelled", status: "cancelled", refundCents: 0 });
+    expect(invoice.closeInvoiceAfterCancellationSafely).toHaveBeenCalledWith(fake.client, ID);
+  });
+
+  it("closes the invoice after the deposit refund was requested", async () => {
+    confirmReply({ outcome: "cancelled", status: "cancel_pending", refund_cents: 3000 });
+    fake.onTable("payments", { data: PAYMENT });
+    fake.onTable("payments", CHANGED);
+    fake.onTable("bookings", CHANGED);
+    fake.onTable("bookings", { data: { status: "refund_pending" } });
+    paypal.refundCapture.mockResolvedValue({ id: "RF-1", status: "PENDING" });
+
+    expect(await confirmCancellation(fake.client, confirmed(), 3000)).toMatchObject({ status: "refund_pending" });
+    expect(invoice.closeInvoiceAfterCancellationSafely).toHaveBeenCalledTimes(1);
+    expect(invoice.closeInvoiceAfterCancellationSafely.mock.invocationCallOrder[0]).toBeGreaterThan(paypal.refundCapture.mock.invocationCallOrder[0]);
+  });
+
+  it("still closes the invoice when the deposit refund must be retried (the cancellation is recorded)", async () => {
+    confirmReply({ outcome: "cancelled", status: "cancel_pending", refund_cents: 3000 });
+    fake.onTable("payments", { data: PAYMENT });
+    paypal.refundCapture.mockRejectedValue(new PaypalError("down", { status: 503 }));
+
+    await expect(confirmCancellation(fake.client, confirmed(), 3000)).rejects.toMatchObject({ code: "refund_unavailable" });
+    expect(invoice.closeInvoiceAfterCancellationSafely).toHaveBeenCalledWith(fake.client, ID);
+  });
+
+  it.each([
+    ["changed terms", { outcome: "terms_changed", status: "confirmed", refund_cents: 0, slot_start: SLOT_START, refund_until: REFUND_UNTIL }],
+    ["a repeated confirm", { outcome: "unchanged", status: "refund_pending", refund_cents: 3000 }],
+  ])("leaves the invoice alone on %s (nothing new was recorded)", async (_case, reply) => {
+    confirmReply(reply);
+    await confirmCancellation(fake.client, confirmed(), 3000);
+    expect(invoice.closeInvoiceAfterCancellationSafely).not.toHaveBeenCalled();
   });
 });
 

@@ -531,6 +531,19 @@ export const fr: Translations = {
       refundFailed: 'Le remboursement n\'a pas pu aboutir ; nous vérifions la situation.',
       unavailable: 'Cette réservation ne peut plus être annulée.',
     },
+    invoice: {
+      title: 'Solde de la réservation',
+      dueOn: 'À régler le {date}',
+      pay: 'Payer le solde avec PayPal',
+      status: {
+        draft: 'Préparation de la facture PayPal',
+        sent: 'Facture envoyée à l\'adresse e-mail de votre compte PayPal',
+        payment_pending: 'PayPal a reçu le paiement mais ne l\'a pas encore confirmé',
+        partially_paid: 'Paiement partiel reçu : il reste un solde à payer',
+        paid: 'Solde payé',
+        cancelled: 'Facture annulée : elle ne peut plus être payée',
+      },
+    },
     cards: {
       demo: 'Démo',
       offerTitle: 'Options disponibles',

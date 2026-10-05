@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { startPaypalMock, type PaypalMock } from "@/test/paypal-mock-server";
+import { DEFAULT_PAYER_EMAIL, startPaypalMock, type PaypalMock } from "@/test/paypal-mock-server";
 import { resetPaypalClientForTests } from "./client";
 import { captureOrder, createOrder, getOrder } from "./orders";
 import { PaypalError, type CreateOrderInput } from "./types";
@@ -168,7 +168,7 @@ describe("getOrder", () => {
     });
   });
 
-  it("normalizes a completed order with its capture", async () => {
+  it("normalizes a completed order with its capture and the payer's email", async () => {
     const orderId = await approvedOrder();
     const capture = mock.complete(orderId);
 
@@ -180,7 +180,32 @@ describe("getOrder", () => {
       customId: BOOKING_ID,
       capture: { id: capture.id, status: "COMPLETED", amountCents: 3000, currency: "EUR", customId: BOOKING_ID, orderId },
       approveUrl: null,
+      payerEmail: DEFAULT_PAYER_EMAIL,
     });
+  });
+
+  it("reads the payer's email from the approval (Phase 8a invoice recipient)", async () => {
+    const { orderId } = await createOrder(input);
+    mock.approve(orderId, "visitor@example.com");
+
+    expect((await getOrder(orderId)).payerEmail).toBe("visitor@example.com");
+  });
+
+  it("falls back to payment_source.paypal.email_address when the order has no payer", async () => {
+    mock.injectNext({
+      method: "GET",
+      path: "/v2/checkout/orders/ORDER-A",
+      status: 200,
+      body: { id: "ORDER-A", status: "COMPLETED", payment_source: { paypal: { email_address: "wallet@example.com" } } },
+    });
+
+    expect((await getOrder("ORDER-A")).payerEmail).toBe("wallet@example.com");
+  });
+
+  it("omits payerEmail when PayPal sent none", async () => {
+    mock.injectNext({ method: "GET", path: "/v2/checkout/orders/ORDER-A", status: 200, body: { id: "ORDER-A", status: "APPROVED", payer: {} } });
+
+    expect(await getOrder("ORDER-A")).not.toHaveProperty("payerEmail");
   });
 
   it("fails on an unknown order with PayPal's 404", async () => {

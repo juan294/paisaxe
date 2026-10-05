@@ -531,6 +531,19 @@ export const en: Translations = {
       refundFailed: 'The refund could not be completed; we are reviewing it.',
       unavailable: 'This booking can no longer be cancelled.',
     },
+    invoice: {
+      title: 'Remaining balance',
+      dueOn: 'Due on {date}',
+      pay: 'Pay the balance with PayPal',
+      status: {
+        draft: 'Preparing the PayPal invoice',
+        sent: 'Invoice sent to your PayPal account email',
+        payment_pending: 'PayPal has received the payment but has not confirmed it yet',
+        partially_paid: 'Partial payment received: some balance is still due',
+        paid: 'Balance paid',
+        cancelled: 'Invoice cancelled: it can no longer be paid',
+      },
+    },
     cards: {
       demo: 'Demo',
       offerTitle: 'Available options',
