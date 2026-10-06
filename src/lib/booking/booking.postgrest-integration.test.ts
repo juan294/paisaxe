@@ -16,6 +16,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+// Live local Supabase: a loaded host can push a test past the 5 s default (#997).
+vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 });
 import {
   LOCAL_ANON_KEY,
   LOCAL_DB_CONTAINER,

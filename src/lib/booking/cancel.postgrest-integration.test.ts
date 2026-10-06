@@ -6,6 +6,8 @@
  * PayPal is a scripted stand-in. Requires `supabase start`; self-skips otherwise.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+// Live local Supabase: a loaded host can push a test past the 5 s default (#997).
+vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 });
 import {
   isLocalSupabaseReachable,
   localServiceClient,

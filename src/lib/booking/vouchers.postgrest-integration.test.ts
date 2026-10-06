@@ -13,6 +13,8 @@
 import { NextRequest } from "next/server";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+// Live local Supabase: a loaded host can push a test past the 5 s default (#997).
+vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 });
 import {
   LOCAL_ANON_KEY,
   LOCAL_API_URL,
