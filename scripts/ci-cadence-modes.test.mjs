@@ -193,7 +193,7 @@ for (const kind of ['push', 'pull_request']) test(`recovery aggregate (${kind}) 
  * performs no network operation. The launcher is a fixture whose digest is supplied
  * the same way the workflow supplies the reviewed one; `sha256sum` is the only shim
  * (GNU coreutils name, absent on macOS). */
-function entryStep(t, { install = 'complete', launcher, routing, pin, event: kind = 'push', definition: named, workflows, pins, change = {} } = {}) {
+function entryStep(t, { install = 'complete', launcher, routing, pin, event: kind = 'push', definition: named, workflows, pins, change = {}, moved, merge = true } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'paisaxe-fast-entry-')); t.after(() => rmSync(directory, { recursive: true, force: true }));
   const repository = join(directory, 'repository'), bin = join(directory, 'bin'), temp = join(directory, 'temp');
   for (const path of [repository, bin, temp]) mkdirSync(path);
@@ -202,7 +202,11 @@ function entryStep(t, { install = 'complete', launcher, routing, pin, event: kin
   const bytes = launcher ?? '';
   if (install !== 'absent') { mkdirSync(join(repository, 'scripts')); mkdirSync(join(repository, '.github')); writeFileSync(join(repository, '.github/ci-cadence.json'), workflows ? JSON.stringify({ workflows: Object.keys(workflows).map(path => ({ path })) }) : '{}\n'); if (pins) writeFileSync(join(repository, '.github/ci-cadence-native.json'), JSON.stringify({ workflowPins: Object.fromEntries(Object.keys(pins).map(path => [path, 'f'.repeat(40)])) })); for (const [path, text] of Object.entries({ ...workflows, ...pins })) { mkdirSync(join(repository, path, '..'), { recursive: true }); writeFileSync(join(repository, path), text); } writeFileSync(join(repository, 'scripts/ci-cadence.mjs'), '\n'); if (install === 'complete') writeFileSync(join(repository, 'scripts/ci-cadence-launch.mjs'), bytes); }
   git('add', '.'); git('commit', '--quiet', '-m', 'protected base'); const definition = named ?? git('rev-parse', 'HEAD');
-  writeFileSync(join(repository, 'candidate'), 'candidate\n'); for (const [path, text] of Object.entries(change)) { if (text === null) rmSync(join(repository, path)); else { mkdirSync(join(repository, path, '..'), { recursive: true }); writeFileSync(join(repository, path), text); } } git('add', '--all', '.'); git('commit', '--quiet', '-m', 'candidate');
+  const apply = (files, message) => { for (const [path, text] of Object.entries(files)) { if (text === null) rmSync(join(repository, path)); else { mkdirSync(join(repository, path, '..'), { recursive: true }); writeFileSync(join(repository, path), text); } } git('add', '--all', '.'); git('commit', '--quiet', '--allow-empty', '-m', message); };
+  // A pull request is checked out as GitHub builds refs/pull/N/merge: the PR head
+  // merged onto the current base tip, which `moved` advances past base.sha.
+  const base = git('rev-parse', 'HEAD'); git('checkout', '--quiet', '-b', 'fixture-head'); apply({ candidate: 'candidate\n', ...change }, 'candidate');
+  if (kind === 'pull_request' && merge) { git('checkout', '--quiet', '--detach', base); if (moved) apply(moved, 'develop moved after base.sha'); git('merge', '--quiet', '--no-ff', '-m', 'native PR merge', 'fixture-head'); }
   writeFileSync(join(bin, 'sha256sum'), '#!/bin/bash\nexec shasum -a 256 "$@"\n'); chmodSync(join(bin, 'sha256sum'), 0o755);
   const eventPath = join(directory, 'event.json'), output = join(directory, 'output'), summary = join(directory, 'summary'), marker = join(directory, 'launcher-ran');
   writeFileSync(eventPath, JSON.stringify(kind === 'push' ? { before: definition } : { pull_request: { base: { sha: definition } } })); writeFileSync(output, ''); writeFileSync(summary, '');
@@ -307,6 +311,25 @@ for (const kind of ['push', 'pull_request']) for (const [label, change] of workf
 for (const routing of ['legacy', undefined]) for (const [label, change] of workflowChanges) test(`routing ${routing} with ${label} is unaffected by the workflow-change guard`, t => {
   const run = entryStep(t, { launcher: stub(passed), routing, workflows: listed, pins: pinned, change });
   assert.equal(run.status, 0); assert.equal(run.ran, 'lean'); assert.equal(run.outputs.decision, 'skip'); assert.doesNotMatch(run.stdout + run.summary, /workflow change/);
+});
+// refs/pull/N/merge sits on the current develop tip while base.sha lags: a listed
+// workflow edited on develop after base.sha is not the pull request's change.
+test('lean pull request merged onto a base that moved a listed workflow, touching only other files, passes the guard', t => {
+  const run = entryStep(t, { launcher: stub(passed), routing: 'lean', event: 'pull_request', workflows: listed, pins: pinned, moved: { '.github/workflows/ci.yml': 'name: CI edited on develop\n', '.github/workflows/ci-cadence.yml': 'name: CI cadence edited on develop\n' }, change: { 'src.txt': 'pull request change\n' } });
+  assert.equal(run.status, 0); assert.equal(run.ran, 'lean'); assert.equal(run.outputs.decision, 'skip'); assert.doesNotMatch(run.stdout + run.summary, /workflow change/);
+});
+test('lean pull request editing a listed workflow on top of a moved base names only its own change', t => {
+  const run = entryStep(t, { launcher: stub(passed), routing: 'lean', event: 'pull_request', workflows: listed, pins: pinned, moved: { '.github/workflows/ci-cadence.yml': 'name: CI cadence edited on develop\n' }, change: { '.github/workflows/ci.yml': 'name: CI edited by the PR\n' } });
+  assert.notEqual(run.status, 0); assert.deepEqual(run.outputs, {}); assert.equal(run.ran, null);
+  assert.match(run.stdout, /::error title=CI Fast::workflow change: \.github\/workflows\/ci\.yml differs/); assert.doesNotMatch(run.stdout, /ci-cadence\.yml differs|ci-cadence\.yml ci/);
+});
+test('lean pull request whose candidate is not a two-parent merge fails closed before the launcher', t => {
+  const run = entryStep(t, { launcher: stub(passed), routing: 'lean', event: 'pull_request', workflows: listed, pins: pinned, merge: false, change: { 'src.txt': 'pull request change\n' } });
+  assert.notEqual(run.status, 0); assert.deepEqual(run.outputs, {}); assert.equal(run.ran, null);
+});
+test('legacy pull request whose candidate is not a merge is unaffected by the guard', t => {
+  const run = entryStep(t, { launcher: stub(passed), routing: 'legacy', event: 'pull_request', workflows: listed, pins: pinned, merge: false });
+  assert.equal(run.status, 0); assert.equal(run.outputs.decision, 'skip');
 });
 for (const [label, change] of [['no change to a listed workflow', {}], ['an edit to an unlisted workflow', { '.github/workflows/other.yml': 'name: other\n' }]]) test(`lean with ${label} passes the workflow-change guard unchanged`, t => {
   const run = entryStep(t, { launcher: stub(passed), routing: 'lean', workflows: listed, pins: pinned, change });

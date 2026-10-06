@@ -363,7 +363,12 @@ jobs:
           # definitions, so an edited workflow listed by the protected base (policy
           # workflows or native pins) would first execute on the release PR. Under
           # legacy the originals run it, so nothing changes. Only base-listed paths
-          # are compared, from the local checkout; a missing path is a change.
+          # are compared, from the local checkout; a missing path is a change. A pull
+          # request is refs/pull/N/merge on the CURRENT base tip while base.sha can
+          # lag, so its baseline is the merge's first parent: exactly what the PR
+          # introduces (the launcher authenticates that parent against the branch).
+          # This catches honest mistakes, not adversaries: review before merge is the
+          # control for a PR that edits its own workflow.
           if [ "${ROUTING_MODE:-}" = lean ]; then
             changed="$(python3 - "$definition" <<'PY'
           import json, os, re, subprocess, sys
@@ -372,6 +377,13 @@ jobs:
               raise SystemExit('invalid candidate identity')
           def git(*args):
               return subprocess.run(['git', '--no-replace-objects', *args], capture_output=True, text=True)
+          baseline = definition
+          if os.environ['GITHUB_EVENT_NAME'] == 'pull_request':
+              parents = git('rev-list', '--parents', '-n', '1', candidate)
+              commits = parents.stdout.split()
+              if parents.returncode != 0 or len(commits) != 3 or commits[0] != candidate or not all(re.fullmatch('[a-f0-9]{40}', c) for c in commits):
+                  raise SystemExit('pull request candidate is not a two-parent merge')
+              baseline = commits[1]
           def listed(path, key):
               shown = git('show', f'{definition}:{path}')
               if shown.returncode != 0:
@@ -382,7 +394,7 @@ jobs:
           for path in paths:
               if not isinstance(path, str) or not re.fullmatch(r'\.github/workflows/[A-Za-z0-9._-]+\.ya?ml', path):
                   raise SystemExit('invalid listed workflow path')
-              before, after = (git('rev-parse', '--verify', '--quiet', f'{revision}:{path}') for revision in (definition, candidate))
+              before, after = (git('rev-parse', '--verify', '--quiet', f'{revision}:{path}') for revision in (baseline, candidate))
               if before.returncode != 0 or after.returncode != 0 or before.stdout != after.stdout:
                   print(path)
           PY
