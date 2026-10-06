@@ -158,5 +158,50 @@ describe("BookingCards", () => {
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
+  describe("invoice card (Phase 8a)", () => {
+    const INVOICE_URL = "https://www.sandbox.paypal.com/invoice/p/#INV2-1";
+    const invoiceCard = (status: "draft" | "sent" | "payment_pending" | "partially_paid" | "paid" | "cancelled", invoiceUrl: string | null = INVOICE_URL): BookingCard => ({
+      kind: "invoice",
+      bookingId: "b1",
+      reference: "RS-ABC123",
+      amountCents: 9000,
+      currency: "EUR",
+      dueDate: "2026-11-21",
+      status,
+      invoiceUrl,
+    });
+
+    it("shows the balance, its due date and status, and the PayPal link in a new tab without a referrer", () => {
+      renderCards([invoiceCard("sent")]);
+
+      expect(screen.getByText("booking.invoice.title RS-ABC123")).toBeInTheDocument();
+      expect(screen.getByText(/90,00/)).toBeInTheDocument();
+      expect(screen.getByText("booking.invoice.dueOn")).toBeInTheDocument();
+      expect(screen.getByText("booking.invoice.status.sent")).toBeInTheDocument();
+      expect(screen.getByText("booking.cards.sandbox")).toBeInTheDocument();
+      const link = screen.getByRole("link", { name: "booking.invoice.pay" });
+      expect(link).toHaveAttribute("href", INVOICE_URL);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+
+    it("keeps the link for a partially paid invoice (there is still a balance due)", () => {
+      renderCards([invoiceCard("partially_paid")]);
+      expect(screen.getByText("booking.invoice.status.partially_paid")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "booking.invoice.pay" })).toBeInTheDocument();
+    });
+
+    it.each(["paid", "payment_pending", "cancelled"] as const)("offers no payment link for a %s invoice", (status) => {
+      renderCards([invoiceCard(status)]);
+      expect(screen.getByText(`booking.invoice.status.${status}`)).toBeInTheDocument();
+      expect(screen.queryByRole("link")).toBeNull();
+    });
+
+    it("offers no link while the invoice is a draft without one", () => {
+      renderCards([invoiceCard("draft", null)]);
+      expect(screen.getByText("booking.invoice.status.draft")).toBeInTheDocument();
+      expect(screen.queryByRole("link")).toBeNull();
+    });
+  });
 });
 

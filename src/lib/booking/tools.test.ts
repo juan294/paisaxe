@@ -13,6 +13,7 @@ vi.mock("./quotes", () => ({ createQuote: vi.fn() }));
 vi.mock("./bookings", () => ({ getBookingForUser: vi.fn(), listBookingsForUser: vi.fn() }));
 vi.mock("./capture", () => ({ ensurePaymentOrder: vi.fn() }));
 vi.mock("./cancel", () => ({ cancellationPreview: vi.fn() }));
+vi.mock("./invoice", () => ({ sendBalanceInvoice: vi.fn() }));
 
 const { searchExperiences } = await import("./availability");
 const { getOrCreateOpenDraft, updateDraft } = await import("./drafts");
@@ -20,6 +21,7 @@ const { createQuote } = await import("./quotes");
 const { getBookingForUser, listBookingsForUser } = await import("./bookings");
 const { ensurePaymentOrder } = await import("./capture");
 const { cancellationPreview } = await import("./cancel");
+const { sendBalanceInvoice } = await import("./invoice");
 const { executeBookingTool, bookingToolDefinitions } = await import("./tools");
 const { buildBookingInstructions } = await import("@/lib/chat-config");
 
@@ -81,7 +83,7 @@ function expectNoLinks(result: unknown) {
 }
 
 describe("tool definitions", () => {
-  it("registers the Phase 3 to 5 tools with JSON schemas derived from their zod schemas", () => {
+  it("registers the Phase 3 to 5 and 8a tools with JSON schemas derived from their zod schemas", () => {
     expect(bookingToolDefinitions().map((tool) => tool.name)).toEqual([
       "search_experiences",
       "update_booking_draft",
@@ -89,6 +91,7 @@ describe("tool definitions", () => {
       "get_booking_status",
       "create_payment_order",
       "preview_cancellation",
+      "send_balance_invoice",
     ]);
     for (const definition of bookingToolDefinitions()) {
       expect(definition.input_schema.type).toBe("object");
@@ -401,5 +404,71 @@ describe("preview_cancellation (read-only, F01)", () => {
   it("no tool can confirm a cancellation: only the card's button reaches the confirm endpoint", () => {
     const names = bookingToolDefinitions().map((tool) => tool.name);
     expect(names.filter((name) => /cancel/.test(name))).toEqual(["preview_cancellation"]);
+  });
+});
+
+describe("send_balance_invoice (Phase 8a)", () => {
+  const confirmed = { ...booking, status: "confirmed" as const };
+  const INVOICE_URL = "https://www.sandbox.paypal.com/invoice/p/#INV2-AAAA-BBBB-CCCC-DDDD";
+
+  it("invoices the balance of the visitor's own booking: the model gets no link and no email, the card gets the link", async () => {
+    vi.mocked(getBookingForUser).mockResolvedValue(confirmed);
+    vi.mocked(sendBalanceInvoice).mockResolvedValue({ invoiceId: "INV2-AAAA-BBBB-CCCC-DDDD", status: "sent", url: INVOICE_URL, created: true });
+
+    const outcome = await executeBookingTool(ctx, "send_balance_invoice", { bookingId: BOOKING_ID });
+
+    expect(outcome.isError).toBe(false);
+    expect(getBookingForUser).toHaveBeenCalledWith(client, USER, BOOKING_ID);
+    expect(sendBalanceInvoice).toHaveBeenCalledWith(client, confirmed);
+    expect(outcome.result).toEqual({
+      invoice: "sent",
+      alreadySent: false,
+      reference: "RS-ABC123",
+      balanceEuros: "90.00",
+      dueDate: "2026-11-21",
+      next: "La factura llega al correo de la cuenta PayPal con la que se pagó la señal; también puede pagarla con el botón de la tarjeta.",
+    });
+    expectNoLinks(outcome.result);
+    expect(JSON.stringify(outcome.result)).not.toMatch(/INV2-|@/);
+    expect(outcome.card).toEqual({
+      kind: "invoice",
+      bookingId: BOOKING_ID,
+      reference: "RS-ABC123",
+      amountCents: 9000,
+      currency: "EUR",
+      dueDate: "2026-11-21",
+      status: "sent",
+      invoiceUrl: INVOICE_URL,
+    });
+  });
+
+  it("a repeat reports the existing invoice as already sent", async () => {
+    vi.mocked(getBookingForUser).mockResolvedValue(confirmed);
+    vi.mocked(sendBalanceInvoice).mockResolvedValue({ invoiceId: "INV2-A", status: "paid", url: INVOICE_URL, created: false });
+
+    const outcome = await executeBookingTool(ctx, "send_balance_invoice", { bookingId: BOOKING_ID });
+
+    expect(outcome.result).toMatchObject({ invoice: "paid", alreadySent: true });
+    expect(outcome.card).toMatchObject({ status: "paid" });
+  });
+
+  it("refuses a booking of another user without invoicing anything", async () => {
+    vi.mocked(getBookingForUser).mockResolvedValue(null);
+
+    expect(await executeBookingTool(ctx, "send_balance_invoice", { bookingId: BOOKING_ID })).toMatchObject({
+      isError: true,
+      result: { error: "not_found" },
+    });
+    expect(sendBalanceInvoice).not.toHaveBeenCalled();
+  });
+
+  it.each(["invalid_state", "payment_unavailable"] as const)("reports %s as an error result without a card", async (code) => {
+    vi.mocked(getBookingForUser).mockResolvedValue(booking);
+    vi.mocked(sendBalanceInvoice).mockRejectedValue(new BookingError(code));
+
+    const outcome = await executeBookingTool(ctx, "send_balance_invoice", { bookingId: BOOKING_ID });
+
+    expect(outcome).toMatchObject({ isError: true, result: { error: code } });
+    expect(outcome.card).toBeUndefined();
   });
 });

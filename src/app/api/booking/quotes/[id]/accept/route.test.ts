@@ -6,6 +6,7 @@ import { BookingError } from "@/lib/booking/types";
 const deps = vi.hoisted(() => ({
   access: null as unknown,
   meter: { allowed: true, remaining: 9 },
+  rateAllowed: true,
 }));
 const logger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() }));
 
@@ -14,10 +15,20 @@ vi.mock("@/lib/booking/gate", () => ({ requireBookingAccess: vi.fn(async () => d
 vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({ admin: true })) }));
 vi.mock("@/lib/booking/metering", () => ({ consume: vi.fn(async () => deps.meter) }));
 vi.mock("@/lib/booking/quotes", () => ({ acceptQuote: vi.fn() }));
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn(async () => ({
+    allowed: deps.rateAllowed,
+    limit: 20,
+    remaining: deps.rateAllowed ? 19 : 0,
+    resetAt: Date.now() + 60_000,
+    retryAfter: 60,
+  })),
+}));
 
 const { POST } = await import("./route");
 const { acceptQuote } = await import("@/lib/booking/quotes");
 const { consume } = await import("@/lib/booking/metering");
+const { checkRateLimit } = await import("@/lib/rate-limit");
 
 const QUOTE_ID = "99999999-2222-4333-8444-555555555555";
 const accept = () =>
@@ -30,9 +41,21 @@ beforeEach(() => {
   vi.stubEnv("BOOKING_LINK_SECRET", "unit-test-secret-that-is-at-least-32-bytes-long");
   deps.access = { userId: "user-1", redemption: { id: "r1" } };
   deps.meter = { allowed: true, remaining: 9 };
+  deps.rateAllowed = true;
 });
 
 describe("POST /api/booking/quotes/[id]/accept", () => {
+  it("429s over the per-user rate limit before spending a booking attempt", async () => {
+    deps.rateAllowed = false;
+
+    const response = await accept();
+
+    expect(response.status).toBe(429);
+    expect(checkRateLimit).toHaveBeenCalledWith("booking-accept:user-1", expect.objectContaining({ maxRequests: 20 }));
+    expect(consume).not.toHaveBeenCalled();
+    expect(acceptQuote).not.toHaveBeenCalled();
+  });
+
   it("is the gate's 404 without booking access", async () => {
     deps.access = NextResponse.json({ error: "Not found" }, { status: 404 });
     expect((await accept()).status).toBe(404);

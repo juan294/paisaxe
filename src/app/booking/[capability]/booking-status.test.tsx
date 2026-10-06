@@ -45,6 +45,7 @@ function view(overrides: Partial<BookingView> = {}): BookingView {
     cancellationWindowHours: 24,
     holdExpiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
     payment: null,
+    invoice: null,
     ...overrides,
   };
 }
@@ -133,6 +134,16 @@ describe("BookingStatus", () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it.each(["authorized", "void_pending"])(
+    "a phone-confirmed deposit that is %s shows confirming, never the pay button (Phase 8b)",
+    async (status) => {
+      mockFetch.mockResolvedValueOnce(json(200, view({ payment: { status, orderId: "ORDER-1", captureId: null, refundId: null } })));
+      render(<BookingStatus />);
+      expect(await screen.findByText("booking.page.confirming")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "booking.cards.pay" })).not.toBeInTheDocument();
+    }
+  );
+
   it("a lapsed hold replaces the pay button with the way back to the assistant", async () => {
     mockFetch.mockResolvedValueOnce(json(200, view({ holdExpiresAt: new Date(Date.now() - 1_000).toISOString() })));
     render(<BookingStatus />);
@@ -159,6 +170,43 @@ describe("BookingStatus", () => {
     expect(screen.getByText("ORDER-1")).toBeInTheDocument();
     expect(screen.getByText("CAP-1")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "booking.cards.pay" })).toBeNull();
+  });
+
+  describe("the balance invoice (Phase 8a)", () => {
+    const INVOICE_URL = "https://www.sandbox.paypal.com/invoice/p/#INV2-1";
+    const paid = { status: "captured", orderId: "ORDER-1", captureId: "CAP-1", refundId: null };
+
+    it("shows a sent invoice's status and its PayPal link", async () => {
+      mockFetch.mockResolvedValueOnce(json(200, view({ status: "confirmed", holdExpiresAt: null, payment: paid, invoice: { status: "sent", url: INVOICE_URL } })));
+      render(<BookingStatus />);
+
+      expect(await screen.findByText("booking.invoice.title")).toBeInTheDocument();
+      expect(screen.getByText("booking.invoice.status.sent")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "booking.invoice.pay" })).toHaveAttribute("href", INVOICE_URL);
+    });
+
+    it("shows a paid balance without a payment link", async () => {
+      mockFetch.mockResolvedValueOnce(json(200, view({ status: "confirmed", holdExpiresAt: null, payment: paid, invoice: { status: "paid", url: INVOICE_URL } })));
+      render(<BookingStatus />);
+
+      expect(await screen.findByText("booking.invoice.status.paid")).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "booking.invoice.pay" })).toBeNull();
+    });
+
+    it("has no invoice section before an invoice exists", async () => {
+      mockFetch.mockResolvedValueOnce(json(200, view({ status: "confirmed", holdExpiresAt: null, payment: paid })));
+      render(<BookingStatus />);
+
+      expect(await screen.findByText("booking.page.confirmedTitle")).toBeInTheDocument();
+      expect(screen.queryByText("booking.invoice.title")).toBeNull();
+    });
+
+    it("keeps showing the invoice of a booking cancelled after it was sent", async () => {
+      mockFetch.mockResolvedValueOnce(json(200, view({ status: "cancelled", holdExpiresAt: null, payment: paid, invoice: { status: "payment_pending", url: INVOICE_URL } })));
+      render(<BookingStatus />);
+
+      expect(await screen.findByText("booking.invoice.status.payment_pending")).toBeInTheDocument();
+    });
   });
 
   it.each([

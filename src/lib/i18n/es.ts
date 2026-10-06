@@ -531,6 +531,19 @@ export const es: Translations = {
       refundFailed: 'No se pudo completar el reembolso; lo estamos revisando.',
       unavailable: 'Esta reserva ya no se puede cancelar.',
     },
+    invoice: {
+      title: 'Resto de la reserva',
+      dueOn: 'Vence el {date}',
+      pay: 'Pagar el resto con PayPal',
+      status: {
+        draft: 'Preparando la factura de PayPal',
+        sent: 'Factura enviada al correo de tu cuenta PayPal',
+        payment_pending: 'PayPal ha recibido el pago, pero aún no lo ha confirmado',
+        partially_paid: 'Pago parcial recibido: aún queda resto por pagar',
+        paid: 'Resto pagado',
+        cancelled: 'Factura anulada: ya no se puede pagar',
+      },
+    },
     cards: {
       demo: 'Demo',
       offerTitle: 'Opciones disponibles',

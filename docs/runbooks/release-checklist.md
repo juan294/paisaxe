@@ -73,10 +73,23 @@ Preview shares the production Supabase project and holds live-mode Stripe keys. 
 exception is the separately authorized production acceptance step in section 5b.
 
 ```bash
-npx supabase start                   # local Postgres on :54322
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
+npx supabase start -x vector,logflare   # local Postgres on :54322 (the vector container is unhealthy locally)
+eval "$(npx supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+NEXT_PUBLIC_SUPABASE_URL="$API_URL" \
+NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" \
+SUPABASE_SERVICE_KEY="$SERVICE_ROLE_KEY" \
+QA_TEST_USER_EMAIL=<qa-test-<name>@paisaxe.dev, existing in the local stack> \
+QA_TEST_USER_PASSWORD=<its password> \
   npx playwright test --project=release-required-local
 ```
+
+The project runs three probes: `favorite-roundtrip` (signs in as the QA user),
+`booking-access-boundary` and `booking-roundtrip` (PayPal booking). The config starts a PayPal
+mock, `next dev` (the mock's loopback base and the scripted booking model,
+`BOOKING_AGENT_REPLAY`, are refused in production) and a second, production build with
+`VERCEL_ENV=preview` for the Preview-isolation checks, so the first run includes a build. Do not
+run another `next dev` or `next build` in the same checkout meanwhile: the build type-checks
+`.next/dev/types`, which a concurrent dev server rewrites.
 
 Present the summary to the user: commits since the last release, CI status, known risks, and a
 recommendation. **Stop here.**

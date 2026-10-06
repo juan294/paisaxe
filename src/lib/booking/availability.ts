@@ -6,9 +6,14 @@
  * live holds" (F04). searchExperiences returns every active experience with
  * its constraint verdicts, so an unsuitable option is reported as rejected
  * with a reason rather than silently dropped (F07).
+ *
+ * A phone-confirmed merchant's experience (Phase 8b, migration 126) is offered
+ * only while the phone confirmation is configured: without the owner's test
+ * number nothing can confirm it, so it has no bookable capacity.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { evaluateConstraints, type ConstraintVerdict, type VisitorConstraints } from "./facts";
+import { isPhoneMerchant, phoneConfirmationConfigured } from "./phone-config";
 import { addDays, madridDate, mapExperience, toHhMm, type Experience } from "./types";
 
 const MAX_WINDOW_DAYS = 31;
@@ -86,7 +91,7 @@ export async function searchExperiences(
 ): Promise<SearchResult[]> {
   const { data, error } = await client
     .from("experiences")
-    .select("*, experience_facts(*)")
+    .select("*, experience_facts(*), merchant:merchants(confirmation_mode)")
     .eq("active", true)
     .order("price_cents");
   if (error) throw new Error(`Failed to load experiences: ${error.message}`);
@@ -94,8 +99,11 @@ export async function searchExperiences(
   const party = input.partySize ?? 1;
   const hasRoom = (slot: SlotAvailability) => slot.available >= party;
 
+  const phoneOffered = phoneConfirmationConfigured();
+  const offerable = (data ?? []).filter((row) => phoneOffered || !isPhoneMerchant(row));
+
   const results = await Promise.all(
-    (data ?? []).map(async (row): Promise<SearchResult> => {
+    offerable.map(async (row): Promise<SearchResult> => {
       const experience = mapExperience(row);
       const verdicts = evaluateConstraints(experience, input.constraints ?? {});
       const reasons = staticReasons(experience, input, verdicts);

@@ -21,12 +21,14 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { buildSystemBlocks } from "@/lib/cached-system";
 import { buildBookingInstructions, buildSystemPrompt } from "@/lib/chat-config";
 import { recordAnthropicUsageInBackground } from "@/lib/costs/anthropic-usage";
+import { getEnv } from "@/lib/env";
 import { CHAT_MODEL } from "@/lib/models";
 import type { BookingChatHistoryItem } from "@/types/booking-chat";
 import type { ChatStreamEvent } from "@/types/sse";
 import type { BookingDraft } from "./drafts";
 import { bookingToolDefinitions, executeBookingTool, type ToolContext } from "./tools";
 import { madridDate, type Booking } from "./types";
+import type { BookingModelClient } from "./model-client";
 
 export const MAX_TOOL_ITERATIONS = 6;
 export const ITERATION_CAP_MESSAGE =
@@ -35,18 +37,11 @@ const MAX_TOKENS = 1024;
 /** Stands in for the visitor's words on the turn sent right after the accept button. */
 const ACCEPTED_TURN_TEXT = "He aceptado la oferta.";
 
-interface ModelStream extends AsyncIterable<Anthropic.MessageStreamEvent> {
-  finalMessage(): Promise<Anthropic.Message>;
-}
-
-/** The slice of the Anthropic SDK this loop uses (injected for tests). */
-export interface BookingModelClient {
-  messages: {
-    stream(params: Anthropic.MessageStreamParams, options?: { signal?: AbortSignal }): ModelStream;
-  };
-}
-
 export async function createBookingModelClient(): Promise<BookingModelClient> {
+  // Local release probes only: a scripted model replaying a recorded tool
+  // sequence (replay-model.ts refuses production and Vercel processes).
+  const replay = getEnv("BOOKING_AGENT_REPLAY");
+  if (replay) return (await import("./replay-model")).createReplayModelClient(replay);
   const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
   return new AnthropicSDK({ maxRetries: 1 });
 }

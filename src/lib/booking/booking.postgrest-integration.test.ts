@@ -16,6 +16,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+// Live local Supabase: a loaded host can push a test past the 5 s default (#997).
+vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 });
 import {
   LOCAL_ANON_KEY,
   LOCAL_DB_CONTAINER,
@@ -503,7 +505,9 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
 
       const { data, error } = await localServiceClient().rpc("expire_holds");
       expect(error).toBeNull();
-      expect(data).toBeGreaterThanOrEqual(1);
+      // The count is not asserted: live test files run in parallel, and reconciliation
+      // in another file runs expire_holds over the whole database too. The rows are the oracle.
+      expect(typeof data).toBe("number");
       expect(psql(`SELECT status FROM public.bookings WHERE id = '${unpaid}';`)).toBe("expired");
       expect(psql(`SELECT status FROM public.bookings WHERE id = '${withOrder}';`)).toBe("pending_payment");
     });
@@ -591,11 +595,17 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
     });
 
     it("re-running migration 116 changes nothing (idempotent seed)", () => {
+      // Scoped to the fixture merchant: other live test files create and delete
+      // their own merchants and experiences in parallel.
+      const fixture = `(SELECT id FROM public.merchants WHERE slug = '${FIXTURE_MERCHANT_SLUG}')`;
+      const experiences = `(SELECT id FROM public.experiences WHERE merchant_id = ${fixture})`;
       const snapshot = () =>
         psql(
-          `SELECT (SELECT count(*) FROM public.merchants) || '/' || (SELECT count(*) FROM public.experiences) || '/' || ` +
-            `(SELECT count(*) FROM public.experience_facts) || '/' || (SELECT count(*) FROM public.operator_access) || '/' || ` +
-            `(SELECT string_agg(id::text, ',' ORDER BY slug) FROM public.experiences);`
+          `SELECT (SELECT count(*) FROM public.merchants WHERE slug = '${FIXTURE_MERCHANT_SLUG}') || '/' || ` +
+            `(SELECT count(*) FROM public.experiences WHERE merchant_id = ${fixture}) || '/' || ` +
+            `(SELECT count(*) FROM public.experience_facts WHERE experience_id IN ${experiences}) || '/' || ` +
+            `(SELECT count(*) FROM public.operator_access WHERE merchant_id = ${fixture}) || '/' || ` +
+            `(SELECT string_agg(id::text, ',' ORDER BY slug) FROM public.experiences WHERE merchant_id = ${fixture});`
         );
       const before = snapshot();
       const sql = readFileSync(

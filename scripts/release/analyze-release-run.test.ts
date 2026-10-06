@@ -6,7 +6,7 @@ import {
   type EvidenceManifest,
   type ProbeEvidence,
 } from "./analyze-release-run";
-import type { RequiredProbeManifest } from "./required-probes";
+import { loadManifest, type RequiredProbeManifest } from "./required-probes";
 
 const TREE = "95a62c4be18d9b222187b88a450ba02bcc664365";
 const OTHER_TREE = "0123456789abcdef0123456789abcdef01234567";
@@ -205,6 +205,67 @@ describe("analyzeRelease — blocking cases", () => {
     });
 
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("booking probes in the committed manifest (PayPal hackathon Phase 6)", () => {
+  const committed = loadManifest();
+  const BOOKING_IDS = ["booking-gate-closed", "booking-access-boundary", "booking-roundtrip"];
+
+  const withoutVoice: RequiredProbeManifest = {
+    ...committed,
+    probes: committed.probes.filter((probe) => probe.id !== "elevenlabs-voice-preflight"),
+  };
+  /** Passing evidence for every probe of that manifest, each with exactly its declared oracles. */
+  function fullEvidence(): ProbeEvidence[] {
+    return withoutVoice.probes.map((probe) => ({
+      id: probe.id,
+      status: "passed",
+      oracles: [...probe.oracles],
+      ...(probe.oracles.includes("cleanup") ? { cleanup: "removed" } : {}),
+    }));
+  }
+
+  it("passes a run with complete evidence for all three booking probes", () => {
+    const result = analyzeRelease(evidence({ probes: fullEvidence() }), withoutVoice, NOW);
+
+    expect(result.blockers).toEqual([]);
+    expect(BOOKING_IDS.every((id) => withoutVoice.probes.some((probe) => probe.id === id))).toBe(true);
+  });
+
+  it.each(BOOKING_IDS)("blocks the release when %s has no evidence", (id) => {
+    const result = analyzeRelease(
+      evidence({ probes: fullEvidence().filter((probe) => probe.id !== id) }),
+      withoutVoice,
+      NOW
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.blockers).toContainEqual(expect.stringContaining(`"${id}" has no evidence`));
+  });
+
+  it("blocks when booking-roundtrip left its rows behind", () => {
+    const probes = fullEvidence().map((probe) =>
+      probe.id === "booking-roundtrip" ? { ...probe, cleanup: "left-behind" } : probe
+    );
+    const result = analyzeRelease(evidence({ probes }), withoutVoice, NOW);
+
+    expect(result.ok).toBe(false);
+    expect(result.blockers).toContainEqual(
+      expect.stringMatching(/"booking-roundtrip" does not evidence cleanup/)
+    );
+  });
+
+  it("blocks when booking-roundtrip reports no datastore evidence", () => {
+    const probes = fullEvidence().map((probe) =>
+      probe.id === "booking-roundtrip" ? { ...probe, oracles: ["ui", "cleanup"] } : probe
+    );
+    const result = analyzeRelease(evidence({ probes }), withoutVoice, NOW);
+
+    expect(result.ok).toBe(false);
+    expect(result.blockers).toContainEqual(
+      expect.stringMatching(/"booking-roundtrip" declares the datastore oracle/)
+    );
   });
 });
 

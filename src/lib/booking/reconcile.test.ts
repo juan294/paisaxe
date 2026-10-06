@@ -19,6 +19,12 @@ vi.mock("./cancel", () => cancel);
 const drafts = vi.hoisted(() => ({ abandonStaleDrafts: vi.fn() }));
 vi.mock("./drafts", () => drafts);
 
+const invoice = vi.hoisted(() => ({ closeInvoiceAfterCancellation: vi.fn() }));
+vi.mock("./invoice", () => invoice);
+// Phase 8b's step is unit-tested in phone-confirmation.test.ts; here only its wiring.
+const phone = vi.hoisted(() => ({ reconcilePhoneAuthorizations: vi.fn() }));
+vi.mock("./phone-confirmation", () => phone);
+
 const inbox = vi.hoisted(() => ({ processAndRecordPaypalEvent: vi.fn() }));
 vi.mock("./webhook-events", async (importOriginal) => ({ ...(await importOriginal<typeof import("./webhook-events")>()), ...inbox }));
 
@@ -53,6 +59,7 @@ const ZERO: ReconcileSummary = {
   refunded: 0,
   refundFailed: 0,
   staleAttention: 0,
+  invoicesCancelled: 0,
   errors: 0,
 };
 
@@ -114,9 +121,10 @@ interface Script {
   refunds?: Step;
   cancels?: Step;
   stale?: { ids?: string[] | null; count?: number | null; error?: { message: string } };
+  invoices?: Step;
 }
 
-type StepName = "inbox" | "open" | "pending" | "captured" | "refunds" | "cancels" | "stale";
+type StepName = "inbox" | "open" | "pending" | "captured" | "refunds" | "cancels" | "stale" | "invoices";
 
 /**
  * Local helper: the shared fake resolves only { data, error }, but step 8 reads
@@ -160,7 +168,8 @@ function script(s: Script = {}): Record<StepName, FakeQuery> & { writes: FakeQue
     count: stale.count === undefined ? ids?.length ?? 0 : stale.count,
     error: stale.error ?? null,
   });
-  return { ...queries, stale: staleQuery, writes };
+  const invoices = stage("bookings", s.invoices);
+  return { ...queries, stale: staleQuery, invoices, writes };
 }
 
 /** A guarded write's result: whether a row matched the guard. */
@@ -183,6 +192,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"], now: NOW });
   fake = createBookingSupabaseFake();
+  phone.reconcilePhoneAuthorizations.mockResolvedValue({ confirmed: 0, voided: 0 });
 });
 
 afterEach(() => {
@@ -190,7 +200,7 @@ afterEach(() => {
 });
 
 describe("reconcileBookings: the run", () => {
-  it("runs the eight steps in order and reports nothing when nothing is due", async () => {
+  it("runs the nine steps in order and reports nothing when nothing is due", async () => {
     script();
 
     await expect(reconcileBookings(fake.client)).resolves.toEqual(ZERO);
@@ -199,7 +209,7 @@ describe("reconcileBookings: the run", () => {
     expect(fake.rpc.mock.invocationCallOrder[0]).toBeLessThan(drafts.abandonStaleDrafts.mock.invocationCallOrder[0]);
     expect(drafts.abandonStaleDrafts.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(fake.client.from).mock.invocationCallOrder[0]);
     expect(drafts.abandonStaleDrafts).toHaveBeenCalledWith(fake.client);
-    expect(tablesQueried()).toEqual(["paypal_webhook_events", "payments", "payments", "payments", "payments", "payments", "bookings"]);
+    expect(tablesQueried()).toEqual(["paypal_webhook_events", "payments", "payments", "payments", "payments", "payments", "bookings", "bookings"]);
     expect(logger.error).not.toHaveBeenCalled();
   });
 
@@ -234,7 +244,7 @@ describe("reconcileBookings: the run", () => {
     expect(q.cancels.not).toHaveBeenCalledWith("bookings.cancellation_confirmed_at", "is", null);
     expect(q.cancels.gt).toHaveBeenCalledWith("bookings.refund_cents", 0);
     // Unscoped: no booking filter anywhere.
-    for (const step of ["inbox", "open", "pending", "captured", "refunds", "cancels", "stale"] as const) {
+    for (const step of ["inbox", "open", "pending", "captured", "refunds", "cancels", "stale", "invoices"] as const) {
       expect(q[step].in).not.toHaveBeenCalledWith(expect.stringMatching(/^(booking_id|custom_id|id)$/), expect.anything());
     }
   });
@@ -262,6 +272,7 @@ describe("reconcileBookings: the run", () => {
       expect(q[step].in).toHaveBeenCalledWith("booking_id", [B1, B2]);
     }
     expect(q.stale.in).toHaveBeenCalledWith("id", [B1, B2]);
+    expect(q.invoices.in).toHaveBeenCalledWith("id", [B1, B2]);
     // Step 1 is global.
     expect(fake.rpc).toHaveBeenCalledWith("expire_holds");
     expect(drafts.abandonStaleDrafts).toHaveBeenCalledWith(fake.client);
@@ -773,5 +784,93 @@ describe("step 8: stale needs_attention report", () => {
     script({ stale: { error: { message: "denied" } } });
 
     await expect(reconcileBookings(fake.client)).rejects.toThrow("Failed to load needs_attention bookings: denied");
+  });
+});
+
+describe("step 9: balance invoices of cancelled bookings (Phase 8a)", () => {
+  it("selects confirmed cancellations whose invoice is still open, or whose paid balance awaits the operator", async () => {
+    const q = script();
+
+    await reconcileBookings(fake.client);
+
+    expect(q.invoices.select).toHaveBeenCalledWith("id");
+    expect(q.invoices.not).toHaveBeenCalledWith("cancellation_confirmed_at", "is", null);
+    expect(q.invoices.or).toHaveBeenCalledWith(
+      "invoice_status.in.(draft,sent,payment_pending),and(invoice_status.in.(paid,partially_paid),status.in.(cancelled,refunded))"
+    );
+    expect(q.invoices.order).toHaveBeenCalledWith("updated_at", { ascending: true });
+    expect(q.invoices.limit).toHaveBeenCalledWith(50);
+  });
+
+  it("closes each one and counts cancelled invoices and bookings flagged for a paid balance", async () => {
+    script({ invoices: { rows: [{ id: B1 }, { id: B2 }, { id: "b3" }] } });
+    invoice.closeInvoiceAfterCancellation.mockResolvedValueOnce("cancelled").mockResolvedValueOnce("flagged").mockResolvedValueOnce("awaiting_completion");
+
+    const summary = await reconcileBookings(fake.client);
+
+    expect(invoice.closeInvoiceAfterCancellation.mock.calls).toEqual([
+      [fake.client, B1],
+      [fake.client, B2],
+      [fake.client, "b3"],
+    ]);
+    expect(summary).toEqual({ ...ZERO, invoicesCancelled: 1, flaggedForAttention: 1 });
+  });
+
+  it("counts a failure and retries next run; PayPal unreachable stops the run", async () => {
+    script({ invoices: { rows: [{ id: B1 }] } });
+    invoice.closeInvoiceAfterCancellation.mockRejectedValueOnce(new PaypalError("refused", { status: 422 }));
+
+    await expect(reconcileBookings(fake.client)).resolves.toEqual({ ...ZERO, errors: 1 });
+    expect(logger.error).toHaveBeenCalledWith("[CRON_RECONCILE_ITEM_FAILED]", expect.objectContaining({ step: "invoices", bookingId: B1 }));
+
+    script({ invoices: { rows: [{ id: B1 }] } });
+    invoice.closeInvoiceAfterCancellation.mockRejectedValueOnce(new PaypalError("down", { status: 503 }));
+    await expect(reconcileBookings(fake.client)).rejects.toThrow("down");
+  });
+
+  it("treats no data as no rows, and fails the run when the rows cannot be read", async () => {
+    script({ invoices: { rows: null } });
+    await expect(reconcileBookings(fake.client)).resolves.toEqual(ZERO);
+
+    script({ invoices: { error: { message: "denied" } } });
+    await expect(reconcileBookings(fake.client)).rejects.toThrow("Failed to load cancelled bookings with an invoice: denied");
+  });
+});
+
+describe("step 4b: phone-confirmation authorizations (Phase 8b)", () => {
+  it("runs after the capture_pending step and before the captured step, scoped like the others", async () => {
+    script();
+    await reconcileBookings(fake.client, { bookingIds: [B1] });
+    const order = phone.reconcilePhoneAuthorizations.mock.invocationCallOrder[0];
+    const fromCalls = vi.mocked(fake.client.from).mock.invocationCallOrder;
+    // from() calls: inbox, open, pending, captured, refunds, cancels, stale
+    expect(order).toBeGreaterThan(fromCalls[2]);
+    expect(order).toBeLessThan(fromCalls[3]);
+    expect(phone.reconcilePhoneAuthorizations).toHaveBeenCalledWith(fake.client, [B1], expect.any(Function));
+  });
+
+  it("counts captured authorizations as confirmed and voided ones as expired", async () => {
+    script();
+    phone.reconcilePhoneAuthorizations.mockResolvedValue({ confirmed: 2, voided: 1 });
+    await expect(reconcileBookings(fake.client)).resolves.toEqual({ ...ZERO, confirmed: 2, expired: 1 });
+    expect(phone.reconcilePhoneAuthorizations).toHaveBeenCalledWith(fake.client, null, expect.any(Function));
+  });
+
+  it("counts and logs an item error, and aborts the run when PayPal is unreachable", async () => {
+    script();
+    phone.reconcilePhoneAuthorizations.mockImplementation(async (_client, _scope, onError: (error: unknown, row: Row) => void) => {
+      onError(new Error("boom"), { id: "pay-x", booking_id: B2 });
+      return { confirmed: 0, voided: 0 };
+    });
+    await expect(reconcileBookings(fake.client)).resolves.toEqual({ ...ZERO, errors: 1 });
+    expect(logger.error).toHaveBeenCalledWith("[CRON_RECONCILE_ITEM_FAILED]", { step: "phone_authorization", bookingId: B2, paymentId: "pay-x", error: "boom" });
+
+    fake = createBookingSupabaseFake();
+    script();
+    phone.reconcilePhoneAuthorizations.mockImplementation(async (_client, _scope, onError: (error: unknown, row: Row) => void) => {
+      onError(new PaypalNotConfigured(), { id: "pay-x", booking_id: B2 });
+      return { confirmed: 0, voided: 0 };
+    });
+    await expect(reconcileBookings(fake.client)).rejects.toBeInstanceOf(PaypalNotConfigured);
   });
 });

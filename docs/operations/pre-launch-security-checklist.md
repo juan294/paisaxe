@@ -62,25 +62,29 @@ rejects non-admin users from admin endpoints — not just the mock.
 **Requires:** QA test user credentials (`QA_TEST_USER_EMAIL` / `QA_TEST_USER_PASSWORD`).
 
 ```bash
-# Step 1: Get an access token for the QA user (non-admin role)
-# Log in via the app and capture the Supabase session token from browser DevTools
-# (Network tab → /auth/v1/token → access_token in response body)
-QA_TOKEN="<paste-token-here>"
+# Step 1: Sign in as the QA user (non-admin role) and build the Supabase SSR
+# session cookie. validateAdminAuth() reads the session from cookies; an
+# Authorization: Bearer header is ignored and yields 401, which is NOT a pass.
+SESSION=$(curl -s -X POST "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" -H "Content-Type: application/json" \
+  -d "{\"email\":\"$QA_TEST_USER_EMAIL\",\"password\":\"$QA_TEST_USER_PASSWORD\"}")
+REF=$(echo "$NEXT_PUBLIC_SUPABASE_URL" | sed -E 's#https://([^.]+)\..*#\1#')
+COOKIE="sb-$REF-auth-token=base64-$(printf '%s' "$SESSION" | jq -c . | base64 | tr '+/' '-_' | tr -d '=\n')"
 BASE_URL="https://paisaxe.es"
 
 # Step 2: Probe admin endpoints — all must return 403 (not 200)
 curl -s -o /dev/null -w "%{http_code}" \
-  -H "Authorization: Bearer $QA_TOKEN" \
+  -H "Cookie: $COOKIE" \
   "$BASE_URL/api/admin/analytics"
 # Expected: 403
 
 curl -s -o /dev/null -w "%{http_code}" \
-  -H "Authorization: Bearer $QA_TOKEN" \
+  -H "Cookie: $COOKIE" \
   "$BASE_URL/api/admin/stories"
 # Expected: 403
 
 curl -s -o /dev/null -w "%{http_code}" \
-  -H "Authorization: Bearer $QA_TOKEN" \
+  -H "Cookie: $COOKIE" \
   "$BASE_URL/api/admin/agent-reports"
 # Expected: 403
 ```

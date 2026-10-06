@@ -64,8 +64,10 @@ blob-report/
 playwright/.cache/
 e2e/storage-state.json
 
-# Coverage agent logs
+# Agent logs, reports and scripts: local only, never published (Rule #70, public repository)
 logs/
+docs/agents/
+scripts/agents/
 
 # Supabase local
 supabase/.temp/

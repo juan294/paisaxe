@@ -257,6 +257,10 @@ test.describe("Real Stripe checkout", () => {
           "input[name='postal_code']",
         ],
         "28001",
+        // Stripe asks for a postal code only for some billing countries (US, GB,
+        // CA...); a checkout that resolves to Spain shows none, so absence is fine.
+        // Every other field and the payment itself stay required.
+        { required: false, timeout: 5_000 },
       );
 
       const payButton = checkoutFrame.getByRole("button", {

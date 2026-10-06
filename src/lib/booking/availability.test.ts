@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBookingSupabaseFake, experienceRow, type BookingSupabaseFake } from "@/test/booking-supabase-fake";
 import { listAvailability, searchExperiences } from "./availability";
 
@@ -157,7 +157,42 @@ describe("searchExperiences", () => {
     const query = fake.onTable("experiences", { data: [] });
 
     expect(await searchExperiences(fake.client, {}, NOW)).toEqual([]);
-    expect(query.select).toHaveBeenCalledWith("*, experience_facts(*)");
+    expect(query.select).toHaveBeenCalledWith("*, experience_facts(*), merchant:merchants(confirmation_mode)");
     expect(query.eq).toHaveBeenCalledWith("active", true);
+  });
+});
+
+describe("searchExperiences: phone-confirmed merchants (Phase 8b)", () => {
+  const phone = () => experience("queseria", { merchant: { confirmation_mode: "phone" } });
+  const instant = () => experience("walk", { merchant: { confirmation_mode: "instant" } });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("never offers a phone-confirmed experience while the phone confirmation is not configured", async () => {
+    vi.stubEnv("PHONE_CONFIRMATION_TEST_NUMBER", "");
+    const fake = createBookingSupabaseFake();
+    fake.onTable("experiences", { data: [instant(), phone()] });
+    queueDays(fake, 1);
+
+    const results = await searchExperiences(fake.client, { date: "2026-11-21" }, NOW);
+
+    expect(results.map((r) => r.experience.slug)).toEqual(["walk"]);
+    expect(fake.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers it like any other once the test number and the ElevenLabs settings are set", async () => {
+    vi.stubEnv("PHONE_CONFIRMATION_TEST_NUMBER", "612345678");
+    vi.stubEnv("ELEVENLABS_API_KEY", "sk-test");
+    vi.stubEnv("ELEVENLABS_PHONE_NUMBER_ID", "phnum-test");
+    vi.stubEnv("ELEVENLABS_BOOKING_AGENT_ID", "agent-test");
+    const fake = createBookingSupabaseFake();
+    fake.onTable("experiences", { data: [instant(), phone()] });
+    queueDays(fake, 2);
+
+    const results = await searchExperiences(fake.client, { date: "2026-11-21" }, NOW);
+
+    expect(results.map((r) => r.experience.slug).sort()).toEqual(["queseria", "walk"]);
   });
 });
