@@ -1,0 +1,1643 @@
+{
+  "schemaVersion": 1,
+  "repository": "juan294/paisaxe",
+  "caller": {
+    "path": ".github/workflows/ci-nightly.yml",
+    "blobSha": "354f9306ebbb521ee267ec38cdbe5222e4f55614"
+  },
+  "callers": {
+    ".github/workflows/ci-nightly.yml": {
+      "path": ".github/workflows/ci-nightly.yml",
+      "blobSha": "354f9306ebbb521ee267ec38cdbe5222e4f55614"
+    },
+    ".github/workflows/ci-cadence.yml": {
+      "path": ".github/workflows/ci-cadence.yml",
+      "blobSha": "e9cd3078f3caee4a99a0e011fdfd1cf21fbe294f"
+    }
+  },
+  "callees": {
+    ".github/workflows/ci.yml": {
+      "path": ".github/workflows/ci.yml",
+      "prefix": "ci",
+      "blobSha": "fa583062712c4c2bff78ebfc7c07a825909f240e"
+    },
+    ".github/workflows/e2e.yml": {
+      "path": ".github/workflows/ci-cadence-e2e-full.yml",
+      "prefix": "e2e",
+      "blobSha": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9"
+    },
+    ".github/workflows/lighthouse.yml": {
+      "path": ".github/workflows/ci-cadence-lighthouse-full.yml",
+      "prefix": "lighthouse",
+      "blobSha": "db256a17ed4718c5911852bc4d98dbba7790cca1"
+    },
+    ".github/workflows/bundle-size.yml": {
+      "path": ".github/workflows/ci-cadence-bundle-size-full.yml",
+      "prefix": "bundle-size",
+      "blobSha": "bb198d8094581a0fe5d728b61bddb40128766aaf"
+    },
+    ".github/workflows/knip.yml": {
+      "path": ".github/workflows/ci-cadence-knip-full.yml",
+      "prefix": "knip",
+      "blobSha": "4453408d8ef1231818df8f32fdce1da95706650d"
+    },
+    ".github/workflows/license-check.yml": {
+      "path": ".github/workflows/ci-cadence-license-check-full.yml",
+      "prefix": "license-check",
+      "blobSha": "75fd2a1b570303eb0f606cb0d6d9b10cf9933fbf"
+    },
+    ".github/workflows/security.yml": {
+      "path": ".github/workflows/ci-cadence-security-full.yml",
+      "prefix": "security",
+      "blobSha": "f177c2f2c21e76e11cf46187d37fb5f2b3e36f38"
+    }
+  },
+  "coverageOnly": {
+    "path": ".github/workflows/coverage.yml",
+    "blobSha": "662f3870251115a92b8d49a484127d4bad474be0",
+    "steps": [
+      {
+        "name": "Decide weekly native coverage eligibility",
+        "conclusions": [
+          "success"
+        ],
+        "post": false
+      },
+      {
+        "name": "Checkout measured main source",
+        "conclusions": [
+          "success",
+          "skipped"
+        ],
+        "post": true
+      },
+      {
+        "name": "Verify callable source checkout",
+        "conclusions": [
+          "success",
+          "skipped"
+        ],
+        "post": false
+      },
+      {
+        "name": "Setup reviewed Node runtime",
+        "conclusions": [
+          "success",
+          "skipped"
+        ],
+        "post": true
+      },
+      {
+        "name": "Install dependencies",
+        "conclusions": [
+          "success",
+          "skipped"
+        ],
+        "post": false
+      },
+      {
+        "name": "Run authoritative coverage suite",
+        "conclusions": [
+          "success",
+          "skipped"
+        ],
+        "post": false
+      },
+      {
+        "name": "Verify completed callable source checkout",
+        "conclusions": [
+          "success",
+          "skipped"
+        ],
+        "post": false
+      },
+      {
+        "name": "Produce measured standalone coverage",
+        "conclusions": [
+          "success",
+          "skipped"
+        ],
+        "post": false
+      },
+      {
+        "name": "Upload measured standalone coverage",
+        "conclusions": [
+          "success",
+          "skipped"
+        ],
+        "post": true
+      },
+      {
+        "name": "Report coverage to Portfolio",
+        "conclusions": [
+          "skipped"
+        ],
+        "post": false
+      }
+    ]
+  },
+  "workflowPins": {
+    ".github/workflows/ci-nightly.yml": "354f9306ebbb521ee267ec38cdbe5222e4f55614",
+    ".github/workflows/ci-cadence.yml": "e9cd3078f3caee4a99a0e011fdfd1cf21fbe294f",
+    ".github/workflows/ci.yml": "fa583062712c4c2bff78ebfc7c07a825909f240e",
+    ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
+    ".github/workflows/ci-cadence-lighthouse-full.yml": "db256a17ed4718c5911852bc4d98dbba7790cca1",
+    ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",
+    ".github/workflows/ci-cadence-knip-full.yml": "4453408d8ef1231818df8f32fdce1da95706650d",
+    ".github/workflows/ci-cadence-license-check-full.yml": "75fd2a1b570303eb0f606cb0d6d9b10cf9933fbf",
+    ".github/workflows/ci-cadence-security-full.yml": "f177c2f2c21e76e11cf46187d37fb5f2b3e36f38"
+  },
+  "stepInventory": {
+    "ci-lint-and-typecheck": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Run typecheck",
+      "Check verification coverage wiring",
+      "Run lint",
+      "Check env vars documented",
+      "Validate migrations",
+      "Check circular dependencies",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies"
+    ],
+    "ci-coverage-shard-1": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Run tests with coverage (sharded)",
+      "Upload coverage blob",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies",
+      "Post Upload coverage blob"
+    ],
+    "ci-coverage-shard-2": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Run tests with coverage (sharded)",
+      "Upload coverage blob",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies",
+      "Post Upload coverage blob"
+    ],
+    "ci-coverage-shard-3": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Run tests with coverage (sharded)",
+      "Upload coverage blob",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies",
+      "Post Upload coverage blob"
+    ],
+    "ci-coverage-shard-4": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Run tests with coverage (sharded)",
+      "Upload coverage blob",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies",
+      "Post Upload coverage blob"
+    ],
+    "ci-coverage-merge": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install dependencies",
+      "Download coverage blobs",
+      "Merge reports and enforce coverage thresholds",
+      "Produce actual callable coverage JSON",
+      "Upload actual callable coverage",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Download coverage blobs",
+      "Post Upload actual callable coverage"
+    ],
+    "ci-test": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Verify test/coverage suite succeeded",
+      "Verify callable test/coverage suite",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code"
+    ],
+    "ci-build": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Build",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies"
+    ],
+    "e2e-e2e": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Check authenticated QA secrets",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Install Playwright system dependencies",
+      "Verify system Chrome",
+      "Build application",
+      "Run E2E tests with authenticated journey",
+      "Run E2E tests without secret-backed authenticated journey",
+      "Upload Playwright report",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies",
+      "Post Upload Playwright report"
+    ],
+    "e2e-visual-regression": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Install Playwright Chromium",
+      "Build application",
+      "Run visual regression tests",
+      "Upload visual diff artifacts",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies",
+      "Post Upload visual diff artifacts"
+    ],
+    "lighthouse-lighthouse": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install canvas system dependencies",
+      "Install dependencies",
+      "Build",
+      "Run Lighthouse CI (desktop)",
+      "Run Lighthouse CI (mobile)",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js",
+      "Post Install canvas system dependencies",
+      "Post Run Lighthouse CI (desktop)",
+      "Post Run Lighthouse CI (mobile)"
+    ],
+    "bundle-size-analyze": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install dependencies",
+      "Build",
+      "Analyze bundle",
+      "Enforce per-route bundle budget",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js"
+    ],
+    "knip-knip": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install dependencies",
+      "Run Knip (dead code detection)",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js"
+    ],
+    "license-check-license-check": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install dependencies",
+      "Check production licenses (blocking allowlist)",
+      "Report dev-dependency licenses (non-blocking)",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js"
+    ],
+    "security-gitleaks": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Install Gitleaks",
+      "Run Gitleaks",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code"
+    ],
+    "security-audit": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Setup Node.js",
+      "Install dependencies",
+      "Run security audit (production deps)",
+      "Report all vulnerabilities (informational)",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code",
+      "Post Setup Node.js"
+    ],
+    "security-vercel-env-safety": [
+      "Checkout code",
+      "Verify callable source checkout",
+      "Fail when Vercel credentials are unavailable (trusted event)",
+      "Skip when Vercel credentials are unavailable (secret-withheld PR)",
+      "Assert legacy agent override is absent from Vercel env",
+      "Verify completed callable source checkout",
+      "Set up job",
+      "Complete job",
+      "Post Checkout code"
+    ]
+  },
+  "auxiliaryJobs": [
+    {
+      "name": "ci / Callable source",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Validate callable inputs",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ci / Callable full CI",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Require all callable CI children",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ci / develop_push_source",
+      "conclusions": [
+        "skipped"
+      ],
+      "steps": []
+    },
+    {
+      "name": "e2e / Callable source",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Validate callable inputs",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "e2e / Callable full",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Require every actual callable child",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lighthouse / Callable source",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Validate callable inputs",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lighthouse / Callable full",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Require every actual callable child",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bundle-size / Callable source",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Validate callable inputs",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bundle-size / Callable full",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Require actual source and app success",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "knip / Callable source",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Validate callable inputs",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "knip / Callable full",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Require actual source and app success",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "license-check / Callable source",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Validate callable inputs",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "license-check / Callable full",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Require actual source and app success",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "security / Callable source",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Validate callable inputs",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "security / Callable full",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Require every actual callable child",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Nightly disposition",
+      "conclusions": [
+        "success"
+      ],
+      "steps": [
+        {
+          "name": "Require real full proof or unchanged skip",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Set up job",
+          "conclusions": [
+            "success"
+          ]
+        },
+        {
+          "name": "Complete job",
+          "conclusions": [
+            "success"
+          ]
+        }
+      ]
+    }
+  ],
+  "censusByCaller": {
+    ".github/workflows/ci-nightly.yml": [
+      {
+        "name": "ci / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ci / Callable full CI",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require all callable CI children",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ci / develop_push_source",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
+        "name": "e2e / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "e2e / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require every actual callable child",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lighthouse / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lighthouse / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require every actual callable child",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bundle-size / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bundle-size / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require actual source and app success",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "knip / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "knip / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require actual source and app success",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "license-check / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "license-check / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require actual source and app success",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "security / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "security / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require every actual callable child",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Nightly disposition",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require real full proof or unchanged skip",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      }
+    ],
+    ".github/workflows/ci-cadence.yml": [
+      {
+        "name": "ci / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ci / Callable full CI",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require all callable CI children",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ci / develop_push_source",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
+        "name": "e2e / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "e2e / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require every actual callable child",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lighthouse / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "lighthouse / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require every actual callable child",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bundle-size / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bundle-size / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require actual source and app success",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "knip / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "knip / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require actual source and app success",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "license-check / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "license-check / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require actual source and app success",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "security / Callable source",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Validate callable inputs",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "security / Callable full",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require every actual callable child",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "CI Fast",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Checkout actual native candidate",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Setup reviewed Node runtime",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Acquire reviewed protected launcher",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "CI Fast recovery",
+        "conclusions": [
+          "success"
+        ],
+        "steps": [
+          {
+            "name": "Require every full recovery child",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Set up job",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Complete job",
+            "conclusions": [
+              "success"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

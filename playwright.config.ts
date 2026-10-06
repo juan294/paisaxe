@@ -3,6 +3,7 @@ import { E2E_MCP_SECRET } from "./e2e/fixtures/mcp-secret";
 import {
   BOOKING_PREVIEW_ORIGIN,
   BOOKING_PREVIEW_PORT,
+  isReleaseArtifactRun,
   isReleaseLocalRun,
   localBookingServerEnv,
 } from "./e2e/fixtures/booking-env";
@@ -42,6 +43,7 @@ const releaseBypassSecret =
 const releaseSpecs = [
   "**/release-required.spec.ts",
   "**/release-required-local.spec.ts",
+  "**/release-artifact-smoke.spec.ts",
   "**/booking-access-boundary.spec.ts",
   "**/booking-roundtrip.spec.ts",
 ];
@@ -56,6 +58,12 @@ const releaseSpecs = [
  * the caller's LOCAL Supabase keys; the specs refuse any other datastore.
  */
 const releaseLocalRun = isReleaseLocalRun();
+/**
+ * The release-artifact smoke (preview-smoke.yml) serves only the CI-built
+ * candidate with `npm run start`, so it runs without the local booking servers
+ * and leaves out the booking probes, which need them.
+ */
+const releaseArtifactRun = isReleaseArtifactRun();
 
 function getWebServerCommand() {
   if (isCI) return `npm run start -- --port ${e2ePort}`;
@@ -231,6 +239,17 @@ export default defineConfig({
       // deviation 9). Test-only, and only on this localhost project.
       use: { ...desktopChrome, bypassCSP: true },
       grep: /@local-docker/,
+      ...(releaseArtifactRun ? { testIgnore: ["**/booking-*.spec.ts"] } : {}),
+      timeout: 60_000,
+      retries: 0,
+    },
+    {
+      // Release-PR candidate smoke: production build on loopback against the
+      // local Docker stack, bound to the build manifest. Driven by
+      // .github/workflows/preview-smoke.yml (`npm run test:e2e:release-artifact`).
+      name: "release-artifact-smoke",
+      use: desktopChrome,
+      testMatch: "release-artifact-smoke.spec.ts",
       timeout: 60_000,
       retries: 0,
     },

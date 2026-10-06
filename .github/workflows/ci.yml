@@ -1,55 +1,39 @@
 name: CI
-
-# NOTE: This workflow builds/tests with dummy env vars.
-# It catches compile errors, unit-test failures, and type regressions.
-# It does NOT exercise the real Vercel runtime or real backend services.
-#
-# For PRs targeting main, a SEPARATE required check runs:
-#   .github/workflows/preview-smoke.yml  — "Smoke test Vercel preview"
-# That workflow waits for the Vercel preview deployment and hits
-# /api/health + homepage against real env vars, catching runtime failures
-# that dummy-key builds cannot detect (see incident: Next.js 16.2.1).
-# The health probe fails on non-200 or JSON status != "healthy".
-#
-# DO-H1: Direct `develop` pushes do NOT get an equivalent runtime smoke
-# check. `vercel.json`'s ignoreCommand skips the Vercel build for every
-# non-production deploy with no PR id — i.e. every direct `develop` push —
-# so no preview deployment is ever created for these commits. A prior
-# develop-push smoke job (DO-M5) waited up to 5 minutes for a preview that
-# could never appear, then reported SUCCESS via its timeout branch without
-# having probed anything. It was removed rather than fixed to fail-on-
-# timeout, since deleting it also reclaims the ~5.3 min of runner time it
-# burned on every push for zero signal. Runtime regressions on `develop`
-# commits are now only caught when a PR from `develop` to `main` runs
-# `preview-smoke.yml` ("Smoke test Vercel preview"), which has a real
-# preview to probe. See docs/operations/alerting-runbook.md.
-
 on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Exact admitted app checkout, distinct from caller definition.
+        required: true
+        type: string
+      profile:
+        description: Isolated full or nightly app work.
+        required: true
+        type: string
+      invocation_id:
+        description: Unique caller job ID, safe ASCII and at most 64 characters.
+        required: true
+        type: string
   push:
-    branches: [develop, main]
-    # DO-M7 (#834): skip the full lint/test/build suite for commits that
-    # touch only prose. Filters the `push` trigger ONLY — `pull_request`
-    # below stays unfiltered because "Lint & Typecheck", "Test", and
-    # "Build" are required status checks for the `main` branch protection
-    # rule. Filtering pull_request too could leave a docs-only release PR
-    # waiting forever on a required context that never runs. See
-    # e2e.yml/lighthouse.yml for the same convention.
+    branches:
+      - develop
+      - main
     paths-ignore:
-      - "docs/**"
-      - "README.md"
-      - "CHANGELOG.md"
-      - "ROADMAP.md"
-      - "AGENTS.md"
+      - docs/**
+      - README.md
+      - CHANGELOG.md
+      - ROADMAP.md
+      - AGENTS.md
   pull_request:
-    branches: [develop, main]
-
+    branches:
+      - develop
+      - main
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
+  group: ${{ inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && format('{0}-{1}', github.workflow, github.ref) || format('paisaxe-ci-full-call-{0}-{1}-{2}', github.run_id, github.run_attempt, inputs.invocation_id) }}
+  cancel-in-progress: ${{ inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && github.ref != 'refs/heads/main' }}
 jobs:
   develop_push_source:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && (github.event_name == 'push' && github.ref == 'refs/heads/develop')) }}
     permissions:
       contents: read
       pull-requests: read
@@ -57,166 +41,651 @@ jobs:
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
       required_checks: '["Lint & Typecheck","Test","Build"]'
-
   lint-and-typecheck:
     name: Lint & Typecheck
-    needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    needs:
+      - develop_push_source
+      - callable-source
+    if: ${{ always() && (((inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != '') || !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && ((inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && needs.develop_push_source.outputs.validated_by_pr != 'true') || ((inputs.profile == 'full' || inputs.profile == 'nightly') && needs.callable-source.result == 'success'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify callable source checkout
+        if: ${{ !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) && needs.callable-source.result == 'success' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install canvas system dependencies
         uses: ./.github/actions/install-canvas-deps
-
       - name: Install dependencies
         run: npm ci
-
       - name: Run typecheck
         run: npm run typecheck
-
       - name: Check verification coverage wiring
         run: npm run check-verification-coverage
-
       - name: Run lint
         run: npm run lint
-
       - name: Check env vars documented
         run: npm run check-env
-
       - name: Validate migrations
         run: npm run check-migrations
-
       - name: Check circular dependencies
         run: npm run lint:deps
-
-  # -----------------------------------------------------------------------
-  # Test suite runs ONCE, sharded across 4 runners for wall-clock speed.
-  #
-  # WHY: Previously two jobs ran the same ~400-file suite end-to-end — a
-  # `test` job (`vitest run`) AND a `coverage` job (`vitest run --coverage`),
-  # each ~8-9 min. That double-ran the suite and burned a full extra runner
-  # per CI run for zero added signal (if coverage passes, the tests passed).
-  #
-  # NOW: a single sharded coverage suite. Each shard runs a quarter of the
-  # suite with coverage instrumentation and emits a blob report. Per-shard
-  # coverage thresholds are forced to 0 (a shard only sees 1/4 of the files,
-  # so its partial coverage is meaningless); the REAL thresholds are enforced
-  # exactly once on the merged total in `coverage-merge`. This preserves the
-  # exact coverage gate while cutting the critical-path long pole ~9m -> ~4m.
-  # -----------------------------------------------------------------------
+      - name: Verify completed callable source checkout
+        if: ${{ inputs.profile == 'full' || inputs.profile == 'nightly' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
   coverage-shard:
     name: Coverage (shard ${{ matrix.shard }}/4)
-    needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
-    runs-on: [self-hosted, linux, x64, cirujano-baseline-actions_linux]
+    needs:
+      - develop_push_source
+      - callable-source
+    if: ${{ always() && (((inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != '') || !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && ((inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && needs.develop_push_source.outputs.validated_by_pr != 'true') || ((inputs.profile == 'full' || inputs.profile == 'nightly') && needs.callable-source.result == 'success'))) }}
+    runs-on: ${{ inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)) && fromJSON('["self-hosted","linux","x64","cirujano-baseline-actions_linux"]') || 'ubuntu-latest' }}
     timeout-minutes: 30
     strategy:
-      # Don't cancel sibling shards when one fails — we want the full picture.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
-
+        shard:
+          - 1
+          - 2
+          - 3
+          - 4
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify callable source checkout
+        if: ${{ !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) && needs.callable-source.result == 'success' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install canvas system dependencies
         uses: ./.github/actions/install-canvas-deps
-
       - name: Install dependencies
         run: npm ci
-
-      # No positional path arg: vitest.config.ts's `include` already scopes
-      # both src/** and scripts/** test files; a positional would override it.
-      # --reporter=blob writes .vitest/blob/blob-<shard>-4.json (vitest 5 default; vitest 4 used a
-      # different directory) and --merge-reports reads the same directory by default.
       - name: Run tests with coverage (sharded)
-        run: >-
-          npx vitest run
-          --shard=${{ matrix.shard }}/4
-          --coverage
-          --reporter=blob
-          --coverage.thresholds.lines=0
-          --coverage.thresholds.functions=0
-          --coverage.thresholds.statements=0
-          --coverage.thresholds.branches=0
-
+        run: npx vitest run --shard=${{ matrix.shard }}/4 --coverage --reporter=blob --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 --coverage.thresholds.statements=0 --coverage.thresholds.branches=0
       - name: Upload coverage blob
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-blob-${{ matrix.shard }}
+          name: ${{ inputs.invocation_id == '' && format('coverage-blob-{0}', matrix.shard) || format('coverage-blob-{0}.shard-{1}', inputs.invocation_id, matrix.shard) }}
           path: .vitest/blob/*
           include-hidden-files: true
-          # A missing blob must fail the shard, not warn: the merge job would
-          # otherwise fail later with an opaque ENOENT on the blob directory.
           if-no-files-found: error
           retention-days: 1
-
+      - name: Verify completed callable source checkout
+        if: ${{ inputs.profile == 'full' || inputs.profile == 'nightly' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
   coverage-merge:
     name: Coverage merge
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: coverage-shard
-    # An explicit condition is required because coverage-shard itself depends
-    # on develop_push_source. That source-validation job is intentionally
-    # skipped on PRs, and GitHub's implicit success() would otherwise skip this
-    # job even after all four matrix shards succeeded.
-    if: ${{ always() && needs.coverage-shard.result == 'success' }}
-
+    needs:
+      - callable-source
+      - coverage-shard
+    if: ${{ always() && (((inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != '') || !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && needs.coverage-shard.result == 'success' && ((inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) || ((inputs.profile == 'full' || inputs.profile == 'nightly') && needs.callable-source.result == 'success'))) }}
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify callable source checkout
+        if: ${{ !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) && needs.callable-source.result == 'success' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install dependencies
         run: npm ci
-
       - name: Download coverage blobs
         uses: actions/download-artifact@v8
         with:
-          pattern: coverage-blob-*
+          pattern: ${{ inputs.invocation_id == '' && 'coverage-blob-*' || format('coverage-blob-{0}.shard-*', inputs.invocation_id) }}
           path: .vitest/blob
           merge-multiple: true
-
-      # --merge-reports combines the shard blobs and reports/enforces the REAL
-      # coverage thresholds from vitest.config.ts once, on the combined total.
       - name: Merge reports and enforce coverage thresholds
         run: npx vitest run --merge-reports --coverage
-
-  # Thin aggregator that PRESERVES the `Test` required status check on main.
-  # `main` branch protection requires a check literally named "Test"; deleting
-  # the old `test` job would block every develop->main release PR. This gate
-  # reports green iff the sharded suite + merged coverage gate passed.
+      - name: Produce actual callable coverage JSON
+        if: ${{ inputs.profile == 'full' || inputs.profile == 'nightly' }}
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          NODE_OPTIONS: ""
+          NODE_PATH: ""
+        run: |
+          node --input-type=module <<'NODE'
+          import {spawnSync,execFileSync} from 'node:child_process';
+          import {mkdir,writeFile,rm,mkdtemp} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          import {join} from 'node:path';
+          import {tmpdir} from 'node:os';
+          import {pathToFileURL} from 'node:url';
+          const directory=join(process.env.RUNNER_TEMP,'ci-cadence-app-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT);
+          await mkdir(directory,{mode:0o700});
+          const result=spawnSync('npx',['vitest','run','--merge-reports','--coverage','--reporter=json','--outputFile='+join(directory,'vitest.json')],{stdio:'inherit',timeout:600000});
+          await writeFile(join(directory,'exit.json'),JSON.stringify({code:result.status,signal:result.signal,expired:result.error?.code==='ETIMEDOUT',overflow:false,spawnError:Boolean(result.error)}),{flag:'wx',mode:0o600});
+          if(result.status!==0||result.signal||result.error)throw Error('Actual coverage merge failed');
+          const env={PATH:'/usr/bin:/bin',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_GRAFT_FILE:'/dev/null',GIT_NO_REPLACE_OBJECTS:'1'};
+          const git=(...args)=>execFileSync('/usr/bin/git',['--no-replace-objects','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{env,timeout:10000,maxBuffer:2000000});
+          const temporary=await mkdtemp(join(tmpdir(),'protected-B-producer-'));
+          try{
+          for(const[path,pin]of Object.entries({"scripts/ci-cadence-producer.mjs":"7b21806e84b690deb6ca889d79f60c0fefae1f1ca53a8b6073022970932a0f3e","scripts/ci-cadence-coverage.mjs":"f5a6fa57a388781c7d3714021f2196b83f1b54e59b611327956aa17e1b02bddf","scripts/ci-cadence-native.mjs":"a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d"})){
+          if(!/^100(?:644|755) blob [a-f0-9]{40}\t/.test(git('ls-tree',process.env.GITHUB_SHA,'--',path).toString()))throw Error('Producer mode');
+          const bytes=git('show',process.env.GITHUB_SHA+':'+path);if(createHash('sha256').update(bytes).digest('hex')!==pin)throw Error('Protected producer pin');
+          await writeFile(join(temporary,path.split('/').at(-1)),bytes,{flag:'wx',mode:0o600});}
+          const producer=await import(pathToFileURL(join(temporary,'ci-cadence-producer.mjs')).href);
+          const application=await producer.readMeasuredApplication({root:process.cwd(),candidateSha:process.env.SOURCE_SHA,tests:join(directory,'vitest.json'),coverage:join(process.cwd(),'coverage/coverage-final.json'),exitReceipt:join(directory,'exit.json')});
+          await writeFile(join(directory,'application.json'),JSON.stringify(application),{flag:'wx',mode:0o600});
+          }finally{await rm(temporary,{recursive:true,force:true});}
+          NODE
+      - name: Upload actual callable coverage
+        if: ${{ inputs.profile == 'full' || inputs.profile == 'nightly' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.invocation_id }}.artifact-ci-cadence-app
+          path: ${{ runner.temp }}/ci-cadence-app-${{ github.run_id }}-${{ github.run_attempt }}/application.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Verify completed callable source checkout
+        if: ${{ inputs.profile == 'full' || inputs.profile == 'nightly' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
   test:
     name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [develop_push_source, coverage-shard, coverage-merge]
-    if: always()
-
+    needs:
+      - develop_push_source
+      - callable-source
+      - coverage-shard
+      - coverage-merge
+    if: ${{ always() && (((inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != '') || !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always()) }}
+    permissions:
+      contents: read
     steps:
+      - name: Checkout code
+        if: ${{ !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) && needs.callable-source.result == 'success' }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify callable source checkout
+        if: ${{ !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) && needs.callable-source.result == 'success' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
       - name: Verify test/coverage suite succeeded
+        if: ${{ inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) }}
         run: |
           if [ "${{ needs.develop_push_source.outputs.validated_by_pr }}" = "true" ]; then
             echo "Exact merge SHA already passed every required PR check."
@@ -230,35 +699,300 @@ jobs:
             exit 1
           fi
           echo "Test suite passed (sharded) and coverage thresholds met."
-
+      - name: Verify callable test/coverage suite
+        if: ${{ !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) }}
+        env:
+          SOURCE_RESULT: ${{ needs.callable-source.result }}
+          SHARD_RESULT: ${{ needs.coverage-shard.result }}
+          MERGE_RESULT: ${{ needs.coverage-merge.result }}
+        run: |
+          set -euo pipefail
+          for result in "$SOURCE_RESULT" "$SHARD_RESULT" "$MERGE_RESULT"; do
+            test "$result" = success || { echo "::error::Callable coverage child did not succeed."; exit 1; }
+          done
+      - name: Verify completed callable source checkout
+        if: ${{ inputs.profile == 'full' || inputs.profile == 'nightly' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
   build:
     name: Build
-    needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    needs:
+      - develop_push_source
+      - callable-source
+    if: ${{ always() && (((inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != '') || !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && ((inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && needs.develop_push_source.outputs.validated_by_pr != 'true') || ((inputs.profile == 'full' || inputs.profile == 'nightly') && needs.callable-source.result == 'success'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify callable source checkout
+        if: ${{ !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) && needs.callable-source.result == 'success' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install canvas system dependencies
         uses: ./.github/actions/install-canvas-deps
-
       - name: Install dependencies
         run: npm ci
-
       - name: Build
         run: npm run build
         env:
-          # Dummy values for build (APIs not called during build)
           ANTHROPIC_API_KEY: dummy_key_for_build
           VOYAGE_API_KEY: dummy_key_for_build
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
+      - name: Verify completed callable source checkout
+        if: ${{ inputs.profile == 'full' || inputs.profile == 'nightly' }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
+  callable-source:
+    name: Callable source
+    if: ${{ !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Validate callable inputs
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          PROFILE: ${{ inputs.profile }}
+          INVOCATION_ID: ${{ inputs.invocation_id }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          OWNER_ID: ${{ github.repository_owner_id }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = juan294/paisaxe
+          test "$REPOSITORY_ID" = 1141286326
+          test "$OWNER_ID" = 3944118
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          test "$SOURCE_SHA" != 0000000000000000000000000000000000000000
+          [[ "$PROFILE" == full || "$PROFILE" == nightly ]] || exit 1
+          [[ "$INVOCATION_ID" =~ ^[A-Za-z_][A-Za-z0-9_-]{0,63}$ ]] || exit 1
+  callable-full:
+    name: Callable full CI
+    needs:
+      - callable-source
+      - lint-and-typecheck
+      - coverage-shard
+      - coverage-merge
+      - test
+      - build
+    if: ${{ always() && !(inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Require all callable CI children
+        env:
+          SOURCE_RESULT: ${{ needs.callable-source.result }}
+          LINT_RESULT: ${{ needs.lint-and-typecheck.result }}
+          SHARD_RESULT: ${{ needs.coverage-shard.result }}
+          MERGE_RESULT: ${{ needs.coverage-merge.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          set -euo pipefail
+          for result in "$SOURCE_RESULT" "$LINT_RESULT" "$SHARD_RESULT" "$MERGE_RESULT" "$TEST_RESULT" "$BUILD_RESULT"; do
+            test "$result" = success || { echo "::error::Required callable CI child did not succeed."; exit 1; }
+          done

@@ -1,0 +1,296 @@
+name: CI nightly
+on:
+  schedule:
+    - cron: 0 3 * * *
+permissions: &a1
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: read
+concurrency:
+  group: B-nightly-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
+jobs:
+  admission:
+    name: Cadence admission
+    if: vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions: *a1
+    outputs:
+      decision: ${{ steps.admit.outputs.decision }}
+      source_sha: ${{ steps.admit.outputs.source_sha }}
+      definition_sha: ${{ steps.admit.outputs.definition_sha }}
+      original_run_id: ${{ steps.admit.outputs.original_run_id }}
+      original_attempt: ${{ steps.admit.outputs.original_attempt }}
+      original_run_url: ${{ steps.admit.outputs.original_run_url }}
+      original_completed_at: ${{ steps.admit.outputs.original_completed_at }}
+      original_admission_completed_at: ${{ steps.admit.outputs.original_admission_completed_at }}
+      original_evidence_kind: ${{ steps.admit.outputs.original_evidence_kind }}
+      original_source_sha: ${{ steps.admit.outputs.original_source_sha }}
+      original_target_branch: ${{ steps.admit.outputs.original_target_branch }}
+      original_workflow: ${{ steps.admit.outputs.original_workflow }}
+    steps:
+      - &a3
+        name: Checkout native definition
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - &a4
+        name: Setup reviewed Node runtime
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+      - name: Resolve once and authenticate native source
+        env: &a2
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
+          CI_CADENCE_DEFINITION_SHA: ${{ github.sha }}
+          CI_CADENCE_EVIDENCE_DIR: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          NODE_OPTIONS: ""
+          NODE_PATH: ""
+        run: |
+          set -euo pipefail
+          unset NODE_OPTIONS NODE_PATH
+          while IFS= read -r name; do unset "$name"; done < <(compgen -v | sed -n '/^GIT_/p')
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null
+          [[ "$CI_CADENCE_DEFINITION_SHA" =~ ^[a-f0-9]{40}$ ]]
+          private="$(mktemp -d "$RUNNER_TEMP/B-control.XXXXXXXX")"
+          chmod 700 "$private"
+          trap 'rm -rf "$private"' EXIT
+          git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-launch.mjs" > "$private/ci-cadence-launch.mjs"
+          if ! printf '%s  %s
+          ' '1ed0a7e1979647dac9f1e676bdcf3a80761b25bdf749f821f2308ef630ce72e0' "$private/ci-cadence-launch.mjs" | sha256sum --check --status; then
+            reason='launcher change: the protected base launcher differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the launcher change on the base branch, then set lean again.'
+            echo "::error title=CI cadence::$reason"
+            echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          node "$private/ci-cadence-launch.mjs" > "$RUNNER_TEMP/B-native.json"
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json,os,re
+          with open(os.path.join(os.environ['RUNNER_TEMP'],'B-native.json')) as f: result=json.load(f)
+          assert result.get('lane')=='nightly' and result.get('protectedImported') is True and result.get('allowDeploy') is False
+          source=result.get('sourceSha','')
+          assert re.fullmatch('[a-f0-9]{40}',source)
+          print('CI_CADENCE_SOURCE_SHA='+source)
+          PY
+      - name: Admit actual complete nightly graph
+        id: admit
+        env: *a2
+        run: |
+          set -euo pipefail
+          unset NODE_OPTIONS NODE_PATH
+          while IFS= read -r name; do unset "$name"; done < <(compgen -v | sed -n '/^GIT_/p')
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null
+          [[ "$CI_CADENCE_DEFINITION_SHA" =~ ^[a-f0-9]{40}$ ]]
+          private="$(mktemp -d "$RUNNER_TEMP/B-control.XXXXXXXX")"
+          chmod 700 "$private"
+          trap 'rm -rf "$private"' EXIT
+          git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
+          if ! printf '%s  %s
+          ' 'fb12b64481f7424afee42f5f65e46717745183d7fbbf644729eae177050f2c7d' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+            reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again.'
+            echo "::error title=CI cadence::$reason"
+            echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          node "$private/ci-cadence-control-launch.mjs" admit
+      - name: Upload Cadence admission
+        if: steps.admit.outputs.decision == 'full'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-cadence-admission
+          path: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}/admission.json
+          if-no-files-found: error
+          retention-days: 90
+  ci:
+    needs:
+      - admission
+    if: needs.admission.outputs.decision == 'full'
+    uses: ./.github/workflows/ci.yml
+    permissions: *a1
+    with:
+      source_sha: ${{ needs.admission.outputs.source_sha }}
+      profile: nightly
+      invocation_id: ci
+  e2e:
+    needs:
+      - admission
+    if: needs.admission.outputs.decision == 'full'
+    uses: ./.github/workflows/ci-cadence-e2e-full.yml
+    permissions: *a1
+    with:
+      source_sha: ${{ needs.admission.outputs.source_sha }}
+      profile: nightly
+      invocation_id: e2e
+    secrets:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
+      QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+  lighthouse:
+    needs:
+      - admission
+    if: needs.admission.outputs.decision == 'full'
+    uses: ./.github/workflows/ci-cadence-lighthouse-full.yml
+    permissions: *a1
+    with:
+      source_sha: ${{ needs.admission.outputs.source_sha }}
+      profile: nightly
+      invocation_id: lighthouse
+  bundle-size:
+    needs:
+      - admission
+    if: needs.admission.outputs.decision == 'full'
+    uses: ./.github/workflows/ci-cadence-bundle-size-full.yml
+    permissions: *a1
+    with:
+      source_sha: ${{ needs.admission.outputs.source_sha }}
+      profile: nightly
+      invocation_id: bundle-size
+  knip:
+    needs:
+      - admission
+    if: needs.admission.outputs.decision == 'full'
+    uses: ./.github/workflows/ci-cadence-knip-full.yml
+    permissions: *a1
+    with:
+      source_sha: ${{ needs.admission.outputs.source_sha }}
+      profile: nightly
+      invocation_id: knip
+  license-check:
+    needs:
+      - admission
+    if: needs.admission.outputs.decision == 'full'
+    uses: ./.github/workflows/ci-cadence-license-check-full.yml
+    permissions: *a1
+    with:
+      source_sha: ${{ needs.admission.outputs.source_sha }}
+      profile: nightly
+      invocation_id: license-check
+  security:
+    needs:
+      - admission
+    if: needs.admission.outputs.decision == 'full'
+    uses: ./.github/workflows/ci-cadence-security-full.yml
+    permissions: *a1
+    with:
+      source_sha: ${{ needs.admission.outputs.source_sha }}
+      profile: nightly
+      invocation_id: security
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  measurement:
+    name: Cadence measurement
+    needs:
+      - admission
+      - ci
+      - e2e
+      - lighthouse
+      - bundle-size
+      - knip
+      - license-check
+      - security
+    if: always() && needs.admission.outputs.decision == 'full' && needs.ci.result == 'success' && needs.e2e.result == 'success' && needs.lighthouse.result == 'success' && needs.bundle-size.result == 'success' && needs.knip.result == 'success' && needs.license-check.result == 'success' && needs.security.result == 'success'
+    runs-on: ubuntu-latest
+    permissions: *a1
+    timeout-minutes: 6
+    steps:
+      - *a3
+      - *a4
+      - name: Download actual callable application metrics
+        uses: actions/download-artifact@v8
+        with:
+          name: ci.artifact-ci-cadence-app
+          path: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Produce authenticated native measurement
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
+          CI_CADENCE_DEFINITION_SHA: ${{ needs.admission.outputs.definition_sha }}
+          CI_CADENCE_EVIDENCE_DIR: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          NODE_OPTIONS: ""
+          NODE_PATH: ""
+          CI_CADENCE_SOURCE_SHA: ${{ needs.admission.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          unset NODE_OPTIONS NODE_PATH
+          while IFS= read -r name; do unset "$name"; done < <(compgen -v | sed -n '/^GIT_/p')
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null
+          [[ "$CI_CADENCE_DEFINITION_SHA" =~ ^[a-f0-9]{40}$ ]]
+          private="$(mktemp -d "$RUNNER_TEMP/B-control.XXXXXXXX")"
+          chmod 700 "$private"
+          trap 'rm -rf "$private"' EXIT
+          git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
+          if ! printf '%s  %s
+          ' 'fb12b64481f7424afee42f5f65e46717745183d7fbbf644729eae177050f2c7d' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+            reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again.'
+            echo "::error title=CI cadence::$reason"
+            echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          node "$private/ci-cadence-control-launch.mjs" measure
+      - name: Upload Cadence measurement
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-cadence-measurement
+          path: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}/measurement.json
+          if-no-files-found: error
+          retention-days: 90
+  complete:
+    name: Nightly disposition
+    needs:
+      - admission
+      - ci
+      - e2e
+      - lighthouse
+      - bundle-size
+      - knip
+      - license-check
+      - security
+      - measurement
+    if: ${{ always() && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' }}
+    runs-on: ubuntu-latest
+    permissions: *a1
+    steps:
+      - name: Require real full proof or unchanged skip
+        env:
+          ADMISSION: ${{ needs.admission.result }}
+          DECISION: ${{ needs.admission.outputs.decision }}
+          ORIGINAL_RUN_ID: ${{ needs.admission.outputs.original_run_id }}
+          ORIGINAL_ATTEMPT: ${{ needs.admission.outputs.original_attempt }}
+          ORIGINAL_RUN_URL: ${{ needs.admission.outputs.original_run_url }}
+          ORIGINAL_COMPLETED_AT: ${{ needs.admission.outputs.original_completed_at }}
+          ORIGINAL_ADMISSION_COMPLETED_AT: ${{ needs.admission.outputs.original_admission_completed_at }}
+          ORIGINAL_EVIDENCE_KIND: ${{ needs.admission.outputs.original_evidence_kind }}
+          ORIGINAL_SOURCE_SHA: ${{ needs.admission.outputs.original_source_sha }}
+          ORIGINAL_TARGET_BRANCH: ${{ needs.admission.outputs.original_target_branch }}
+          ORIGINAL_WORKFLOW: ${{ needs.admission.outputs.original_workflow }}
+          MEASURED: ${{ needs.measurement.result }}
+          CHILD_0: ${{ needs.ci.result }}
+          CHILD_1: ${{ needs.e2e.result }}
+          CHILD_2: ${{ needs.lighthouse.result }}
+          CHILD_3: ${{ needs.bundle-size.result }}
+          CHILD_4: ${{ needs.knip.result }}
+          CHILD_5: ${{ needs.license-check.result }}
+          CHILD_6: ${{ needs.security.result }}
+        run: |
+          set -euo pipefail
+          if test "$DECISION" = skip || test "$DECISION" = blocked; then
+            node --input-type=module <<'NODE'
+          const result={action:process.env.DECISION};
+          for(const key of ['RUN_ID','ATTEMPT','RUN_URL','COMPLETED_AT','ADMISSION_COMPLETED_AT','EVIDENCE_KIND','SOURCE_SHA','TARGET_BRANCH','WORKFLOW']){const value=process.env['ORIGINAL_'+key];if(value)result[key.toLowerCase()]=value;}
+          console.log(JSON.stringify(result));
+          if(process.env.GITHUB_STEP_SUMMARY)await (await import('node:fs/promises')).appendFile(process.env.GITHUB_STEP_SUMMARY,JSON.stringify(result)+'\n');
+          NODE
+          fi
+          test "$ADMISSION" = success
+          case "$DECISION" in
+          full) test "$MEASURED" = success; for result in "$CHILD_0" "$CHILD_1" "$CHILD_2" "$CHILD_3" "$CHILD_4" "$CHILD_5" "$CHILD_6"; do test "$result" = success; done ;;
+          skip) test "$MEASURED" = skipped; for result in "$CHILD_0" "$CHILD_1" "$CHILD_2" "$CHILD_3" "$CHILD_4" "$CHILD_5" "$CHILD_6"; do test "$result" = skipped; done ;;
+          *) exit 1 ;;
+          esac

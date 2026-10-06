@@ -1,21 +1,21 @@
 name: Security Scan
-
 on:
   push:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
   pull_request:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
   schedule:
-    # Run daily at 8:00 UTC (was weekly — CVE detection latency reduced from ~6 days to <24h)
-    - cron: '0 8 * * *'
-
+    - cron: 0 8 * * *
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 jobs:
   develop_push_source:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
     permissions:
       contents: read
       pull-requests: read
@@ -23,11 +23,10 @@ jobs:
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
       required_checks: '["Gitleaks secret scan","npm audit","Vercel env safety"]'
-
   gitleaks:
     name: Gitleaks secret scan
     needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && needs.develop_push_source.outputs.validated_by_pr != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -35,86 +34,56 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
       - name: Install Gitleaks
         run: |
           GITLEAKS_VERSION="8.21.2"
           wget -q "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           tar xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           chmod +x gitleaks
-
       - name: Run Gitleaks
         run: ./gitleaks detect --source . --verbose
-
+    permissions:
+      contents: read
   audit:
     name: npm audit
     needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && needs.develop_push_source.outputs.validated_by_pr != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install dependencies
         run: npm ci
-
       - name: Run security audit (production deps)
-        # Audit production dependencies only (dev vulns don't affect the deployed
-        # application). Threshold is "moderate" so medium-severity issues are caught
-        # before they accumulate into high/critical ones.
         run: npm audit --omit=dev --audit-level=moderate
-
       - name: Report all vulnerabilities (informational)
         if: always()
         run: npm audit || true
-
+    permissions:
+      contents: read
   vercel-env-safety:
     name: Vercel env safety
     needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && needs.develop_push_source.outputs.validated_by_pr != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TOKEN: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.VERCEL_TOKEN || '' }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-      SECRETS_WITHHELD_PR: >-
-        ${{
-          github.event_name == 'pull_request' &&
+      SECRETS_WITHHELD_PR: |-
+        ${{ !(github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))) || (github.event_name == 'pull_request' &&
           (github.event.pull_request.head.repo.fork == true ||
-           github.event.pull_request.user.login == 'dependabot[bot]')
-        }}
-
+           github.event.pull_request.user.login == 'dependabot[bot]')) }}
     steps:
-      # `.vercel/project.json` is gitignored, so project/org IDs must come
-      # from repository variables instead of a checked-in metadata file.
-      # Configure `VERCEL_PROJECT_ID` and `VERCEL_ORG_ID` under
-      # Settings → Secrets and variables → Actions → Variables.
-      #
-      # VERCEL_TOKEN (a secret) is REQUIRED for this job to do anything.
-      # DO-M2 (#829): it has never been set, so this job used to skip its one
-      # assertion step and still report success on every push/schedule run —
-      # "requiredness without evidence," the same pattern this project
-      # rejected for Dependabot preview smoke tests (see the Dependabot
-      # branch in preview-smoke.yml). Skip-to-pass is reserved for fork and
-      # Dependabot PRs, where GitHub genuinely withholds secrets (expected
-      # sandboxing, not a gap). On push, schedule, and ordinary same-repo PR
-      # runs, a missing token fails the job loudly instead of silently passing.
-      #
-      # ACTION REQUIRED (human, repo admin): add VERCEL_TOKEN under
-      # Settings → Secrets and variables → Actions → Secrets. Until that is
-      # done, this job is EXPECTED to fail on every push/schedule run — that
-      # is the fix working as intended, not a regression.
       - name: Fail when Vercel credentials are unavailable (trusted event)
-        if: >-
+        if: |-
           ${{
             (env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '') &&
             env.SECRETS_WITHHELD_PR != 'true'
@@ -124,9 +93,8 @@ jobs:
           echo "::error::VERCEL_TOKEN is missing. A human with repo admin access must add it under Settings > Secrets and variables > Actions > Secrets before this job can pass again."
           echo "::error::This is the only automated check on deployed Vercel environment state in this repo (DO-M2 / issue #829) — it must fail rather than silently report success while checking nothing."
           exit 1
-
       - name: Skip when Vercel credentials are unavailable (secret-withheld PR)
-        if: >-
+        if: |-
           ${{
             (env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '') &&
             env.SECRETS_WITHHELD_PR == 'true'
@@ -134,7 +102,6 @@ jobs:
         run: |
           echo "GitHub withholds repository secrets from fork and Dependabot PR workflow runs."
           echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."
-
       - name: Assert legacy agent override is absent from Vercel env
         if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_PROJECT_ID != '' && env.VERCEL_ORG_ID != '' }}
         run: |
@@ -149,3 +116,5 @@ jobs:
             echo "::error::Legacy agent runner override is still configured in Vercel. Remove it before deploy."
             exit 1
           fi
+    permissions:
+      contents: read

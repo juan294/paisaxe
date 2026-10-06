@@ -1,45 +1,29 @@
 name: License Compliance
-
 on:
   pull_request:
-    branches: [develop, main]
-
+    branches:
+      - develop
+      - main
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   license-check:
     name: License Compliance Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install dependencies
         run: npm ci
-
-      # Production deps: enforced as a true allowlist (permissive-only + documented
-      # exceptions), not a denylist. `license-checker --onlyAllow` matches by substring
-      # (e.g. an allowed "MIT" token also silently matches "FSL-1.1-MIT"), so it cannot
-      # actually enforce this policy — see scripts/check-production-licenses.ts for the
-      # exact-SPDX-token matching this uses instead, and docs/project/license-exceptions.md
-      # for the exception list. (#847 / SE-M3)
       - name: Check production licenses (blocking allowlist)
         run: npm run check-licenses
-
-      # Dev/build deps: scan the full tree and report strong-copyleft findings.
-      # Build-time-only tooling (e.g. lightningcss MPL-2.0) never ships to clients,
-      # so this step is non-blocking — it surfaces dev-dep licenses for review.
-      # See docs/project/license-exceptions.md → "Dev-dependency scanning". (#623)
       - name: Report dev-dependency licenses (non-blocking)
         continue-on-error: true
         run: |
@@ -49,3 +33,6 @@ jobs:
           echo "Scanning full dependency tree (incl. devDependencies) for strong copyleft..."
           npx license-checker --failOn "GPL-2.0;GPL-3.0;AGPL-1.0;AGPL-3.0;SSPL-1.0;BSL-1.1;CPAL-1.0;OSL-3.0;CPOL-1.02" \
             || echo "::warning::Strong-copyleft license found in dev/build dependencies — review docs/project/license-exceptions.md"
+    permissions:
+      contents: read
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (!failure() && !cancelled()) }}

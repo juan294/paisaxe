@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "head": {
+    "repository": "example/fleet-A",
+    "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetBranch": "develop",
+    "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "definitionSha": "cccccccccccccccccccccccccccccccccccccccc",
+    "policyFingerprint": "policy-v1",
+    "lockfileFingerprint": "lock-v1",
+    "runtimeFingerprint": "node22-linux"
+  },
+  "now": "2026-10-02T01:00:00Z",
+  "receipts": [
+    {
+      "schemaVersion": 1,
+      "repository": "example/fleet-A",
+      "workflow": ".github/workflows/ci.yml",
+      "workflowDefinitionSha": "dddddddddddddddddddddddddddddddddddddddd",
+      "definitionSha": "cccccccccccccccccccccccccccccccccccccccc",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "targetBranch": "develop",
+      "baseSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "policyFingerprint": "policy-v1",
+      "lockfileFingerprint": "lock-v1",
+      "runtimeFingerprint": "node22-linux",
+      "lane": "full",
+      "runId": 123,
+      "attempt": 1,
+      "completedAt": "2026-10-01T01:00:00Z",
+      "conclusion": "success",
+      "jobs": {
+        "lint": {
+          "result": "success",
+          "needs": []
+        },
+        "test": {
+          "result": "success",
+          "needs": [
+            "lint"
+          ]
+        },
+        "build": {
+          "result": "success",
+          "needs": [
+            "test"
+          ]
+        }
+      },
+      "contexts": {
+        "check": "success"
+      },
+      "runUrl": "https://github.com/example/fleet-A/actions/runs/123",
+      "nativeEvent": "push",
+      "nativeHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "nativeWorkflowBranch": "develop",
+      "workflowRef": "example/fleet-A/.github/workflows/ci.yml@refs/heads/develop",
+      "testedCheckoutSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "complete": true
+}
