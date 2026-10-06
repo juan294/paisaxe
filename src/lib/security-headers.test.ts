@@ -84,6 +84,18 @@ describe("CSP header via buildCspHeader (proxy.ts)", () => {
     expect(mediaSrc).toContain("blob:");
   });
 
+  it("allows the local Supabase in connect-src only in development (#1000)", () => {
+    const connectSrc = (value: string) => value.split(";").find((d) => d.trim().startsWith("connect-src"))!;
+    const local = ["http://127.0.0.1:54321", "ws://127.0.0.1:54321", "http://localhost:54321", "ws://localhost:54321"];
+    const development = connectSrc(buildCspHeader({ nodeEnv: "development" }));
+    const production = connectSrc(buildCspHeader({ nodeEnv: "production" }));
+    for (const origin of local) {
+      expect(development).toContain(origin);
+      expect(production).not.toContain(origin);
+    }
+    expect(production).not.toMatch(/127\.0\.0\.1|localhost/);
+  });
+
   it("should include Vercel Analytics domains in connect-src", () => {
     const connectSrc = csp.split(";").find((d) => d.trim().startsWith("connect-src"))!;
     expect(connectSrc).toContain("https://vitals.vercel-insights.com");
