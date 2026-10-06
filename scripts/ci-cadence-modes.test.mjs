@@ -193,21 +193,21 @@ for (const kind of ['push', 'pull_request']) test(`recovery aggregate (${kind}) 
  * performs no network operation. The launcher is a fixture whose digest is supplied
  * the same way the workflow supplies the reviewed one; `sha256sum` is the only shim
  * (GNU coreutils name, absent on macOS). */
-function entryStep(t, { install = 'complete', launcher, routing, pin, event: kind = 'push', definition: named } = {}) {
+function entryStep(t, { install = 'complete', launcher, routing, pin, event: kind = 'push', definition: named, workflows, pins, change = {} } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'paisaxe-fast-entry-')); t.after(() => rmSync(directory, { recursive: true, force: true }));
   const repository = join(directory, 'repository'), bin = join(directory, 'bin'), temp = join(directory, 'temp');
   for (const path of [repository, bin, temp]) mkdirSync(path);
   const git = (...args) => execFileSync('git', ['-c', 'core.fsmonitor=false', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: repository, encoding: 'utf8', timeout: 5000 }).trim();
   git('init', '--quiet', '--template='); writeFileSync(join(repository, 'README.md'), 'fixture\n');
   const bytes = launcher ?? '';
-  if (install !== 'absent') { mkdirSync(join(repository, 'scripts')); mkdirSync(join(repository, '.github')); writeFileSync(join(repository, '.github/ci-cadence.json'), '{}\n'); writeFileSync(join(repository, 'scripts/ci-cadence.mjs'), '\n'); if (install === 'complete') writeFileSync(join(repository, 'scripts/ci-cadence-launch.mjs'), bytes); }
+  if (install !== 'absent') { mkdirSync(join(repository, 'scripts')); mkdirSync(join(repository, '.github')); writeFileSync(join(repository, '.github/ci-cadence.json'), workflows ? JSON.stringify({ workflows: Object.keys(workflows).map(path => ({ path })) }) : '{}\n'); if (pins) writeFileSync(join(repository, '.github/ci-cadence-native.json'), JSON.stringify({ workflowPins: Object.fromEntries(Object.keys(pins).map(path => [path, 'f'.repeat(40)])) })); for (const [path, text] of Object.entries({ ...workflows, ...pins })) { mkdirSync(join(repository, path, '..'), { recursive: true }); writeFileSync(join(repository, path), text); } writeFileSync(join(repository, 'scripts/ci-cadence.mjs'), '\n'); if (install === 'complete') writeFileSync(join(repository, 'scripts/ci-cadence-launch.mjs'), bytes); }
   git('add', '.'); git('commit', '--quiet', '-m', 'protected base'); const definition = named ?? git('rev-parse', 'HEAD');
-  writeFileSync(join(repository, 'candidate'), 'candidate\n'); git('add', '.'); git('commit', '--quiet', '-m', 'candidate');
+  writeFileSync(join(repository, 'candidate'), 'candidate\n'); for (const [path, text] of Object.entries(change)) { if (text === null) rmSync(join(repository, path)); else { mkdirSync(join(repository, path, '..'), { recursive: true }); writeFileSync(join(repository, path), text); } } git('add', '--all', '.'); git('commit', '--quiet', '-m', 'candidate');
   writeFileSync(join(bin, 'sha256sum'), '#!/bin/bash\nexec shasum -a 256 "$@"\n'); chmodSync(join(bin, 'sha256sum'), 0o755);
   const eventPath = join(directory, 'event.json'), output = join(directory, 'output'), summary = join(directory, 'summary'), marker = join(directory, 'launcher-ran');
   writeFileSync(eventPath, JSON.stringify(kind === 'push' ? { before: definition } : { pull_request: { base: { sha: definition } } })); writeFileSync(output, ''); writeFileSync(summary, '');
   const step = cadenceJob('entry').steps.find(entry => entry.name === 'Acquire reviewed protected launcher');
-  const result = spawnSync('/bin/bash', ['-e', '-o', 'pipefail', '-c', step.run], { cwd: repository, encoding: 'utf8', timeout: 20000, env: { PATH: `${bin}:${process.env.PATH}`, HOME: directory, RUNNER_TEMP: temp, GITHUB_EVENT_PATH: eventPath, GITHUB_EVENT_NAME: kind, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary, GITHUB_TOKEN: 'fixture', LAUNCHER_SHA256: pin ?? createHash('sha256').update(bytes).digest('hex'), CI_CADENCE_MODE: step.env.CI_CADENCE_MODE, ...(routing === undefined ? {} : { ROUTING_MODE: routing }), FIXTURE_MARKER: marker } });
+  const result = spawnSync('/bin/bash', ['-e', '-o', 'pipefail', '-c', step.run], { cwd: repository, encoding: 'utf8', timeout: 20000, env: { PATH: `${bin}:${process.env.PATH}`, HOME: directory, RUNNER_TEMP: temp, GITHUB_EVENT_PATH: eventPath, GITHUB_EVENT_NAME: kind, GITHUB_SHA: git('rev-parse', 'HEAD'), GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary, GITHUB_TOKEN: 'fixture', LAUNCHER_SHA256: pin ?? createHash('sha256').update(bytes).digest('hex'), CI_CADENCE_MODE: step.env.CI_CADENCE_MODE, ...(routing === undefined ? {} : { ROUTING_MODE: routing }), FIXTURE_MARKER: marker } });
   const outputs = Object.fromEntries(readFileSync(output, 'utf8').split('\n').filter(Boolean).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
   let ran = null; try { ran = readFileSync(marker, 'utf8'); } catch {}
   return { status: result.status, stdout: result.stdout, outputs, summary: readFileSync(summary, 'utf8'), ran, definition };
@@ -293,6 +293,30 @@ for (const job of ['admission', 'measurement']) {
     assert.notEqual(run.status, 0); assert.match(run.stderr, /Protected control acquisition failed \(Control identity\)/); assert.doesNotMatch(run.stdout, /control loader change/);
   });
 }
+// Lean statically skips the original workflows and the nightly runs main's
+// definitions, so a candidate that edits a workflow the protected base lists
+// (policy workflows or native pins) would otherwise first execute on the release
+// PR. Lean fails it with the repair; legacy still runs the originals.
+const listed = { '.github/workflows/ci.yml': 'name: CI\n' }, pinned = { '.github/workflows/ci-cadence.yml': 'name: CI cadence\n' };
+const workflowChanges = [['an edited policy workflow', { '.github/workflows/ci.yml': 'name: CI edited\n' }], ['an edited pinned workflow', { '.github/workflows/ci-cadence.yml': 'name: CI cadence edited\n' }], ['a deleted policy workflow', { '.github/workflows/ci.yml': null }]];
+for (const kind of ['push', 'pull_request']) for (const [label, change] of workflowChanges) test(`lean ${kind} with ${label} fails CI Fast with the repair instruction and runs nothing`, t => {
+  const run = entryStep(t, { launcher: stub(passed), routing: 'lean', event: kind, workflows: listed, pins: pinned, change });
+  assert.notEqual(run.status, 0); assert.deepEqual(run.outputs, {}); assert.equal(run.ran, null);
+  assert.match(run.stdout, /::error title=CI Fast::workflow change: .*Set CI_CADENCE_MODE to legacy, land the change on the base branch, then set lean again\./); assert.match(run.summary, /workflow change: /);
+});
+for (const routing of ['legacy', undefined]) for (const [label, change] of workflowChanges) test(`routing ${routing} with ${label} is unaffected by the workflow-change guard`, t => {
+  const run = entryStep(t, { launcher: stub(passed), routing, workflows: listed, pins: pinned, change });
+  assert.equal(run.status, 0); assert.equal(run.ran, 'lean'); assert.equal(run.outputs.decision, 'skip'); assert.doesNotMatch(run.stdout + run.summary, /workflow change/);
+});
+for (const [label, change] of [['no change to a listed workflow', {}], ['an edit to an unlisted workflow', { '.github/workflows/other.yml': 'name: other\n' }]]) test(`lean with ${label} passes the workflow-change guard unchanged`, t => {
+  const run = entryStep(t, { launcher: stub(passed), routing: 'lean', workflows: listed, pins: pinned, change });
+  assert.equal(run.status, 0); assert.equal(run.ran, 'lean'); assert.equal(run.outputs.decision, 'skip'); assert.doesNotMatch(run.stdout + run.summary, /workflow change/);
+});
+test('workflow-change guard reads only the local checkout', () => {
+  const run = cadenceJob('entry').steps.find(entry => entry.name === 'Acquire reviewed protected launcher').run;
+  const guard = run.slice(run.indexOf('Workflow change under lean'), run.indexOf('node "$private/launch.mjs"'));
+  assert.ok(guard.length > 0); assert.doesNotMatch(guard, /\bfetch\b|https?:\/\/|\bclone\b|ls-remote|\bcurl\b|urllib/);
+});
 for (const routing of ['lean', 'legacy', undefined]) test(`four passed Fast checks yield skip under routing ${routing}, having run in lean classification`, t => {
   const run = entryStep(t, { launcher: stub(passed), routing });
   assert.equal(run.status, 0); assert.equal(run.ran, 'lean');

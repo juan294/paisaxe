@@ -358,6 +358,42 @@ jobs:
             echo 'decision=legacy' >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # Workflow change under lean: the original workflows are statically skipped,
+          # recovery starts only on decision=full and the nightly runs main's
+          # definitions, so an edited workflow listed by the protected base (policy
+          # workflows or native pins) would first execute on the release PR. Under
+          # legacy the originals run it, so nothing changes. Only base-listed paths
+          # are compared, from the local checkout; a missing path is a change.
+          if [ "${ROUTING_MODE:-}" = lean ]; then
+            changed="$(python3 - "$definition" <<'PY'
+          import json, os, re, subprocess, sys
+          definition, candidate = sys.argv[1], os.environ['GITHUB_SHA']
+          if not re.fullmatch('[a-f0-9]{40}', candidate):
+              raise SystemExit('invalid candidate identity')
+          def git(*args):
+              return subprocess.run(['git', '--no-replace-objects', *args], capture_output=True, text=True)
+          def listed(path, key):
+              shown = git('show', f'{definition}:{path}')
+              if shown.returncode != 0:
+                  return []
+              value = json.loads(shown.stdout).get(key, [])
+              return [entry['path'] for entry in value] if key == 'workflows' else list(value)
+          paths = sorted(set(listed('.github/ci-cadence.json', 'workflows')) | set(listed('.github/ci-cadence-native.json', 'workflowPins')))
+          for path in paths:
+              if not isinstance(path, str) or not re.fullmatch(r'\.github/workflows/[A-Za-z0-9._-]+\.ya?ml', path):
+                  raise SystemExit('invalid listed workflow path')
+              before, after = (git('rev-parse', '--verify', '--quiet', f'{revision}:{path}') for revision in (definition, candidate))
+              if before.returncode != 0 or after.returncode != 0 or before.stdout != after.stdout:
+                  print(path)
+          PY
+          )"
+            if [ -n "$changed" ]; then
+              reason="workflow change: $(echo "$changed" | paste -sd ' ' -) differs from the protected base, and lean mode skips the original workflows and runs no recovery for it. Set CI_CADENCE_MODE to legacy, land the change on the base branch, then set lean again."
+              echo "::error title=CI Fast::$reason"
+              echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          fi
           node "$private/launch.mjs" > "$private/result.json"
           python3 - "$private/result.json" <<'PYTHON'
           import json,os,re,sys
