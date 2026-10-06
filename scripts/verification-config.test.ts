@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import vm from "node:vm";
+import { isReleaseArtifactRun, isReleaseLocalRun } from "../e2e/fixtures/booking-env";
 
 const root = process.cwd();
 
@@ -177,6 +178,20 @@ describe("verification coverage config", () => {
     expect(playwrightConfig).toContain('name: "release-artifact-smoke"');
     expect(playwrightConfig).toContain('testMatch: "release-artifact-smoke.spec.ts"');
     expect(playwrightConfig).toContain('"**/release-artifact-smoke.spec.ts",');
+    // The artifact smoke serves only the CI-built candidate: selecting
+    // release-artifact-smoke turns off develop's local booking run (dual
+    // build+dev servers and the PayPal stand-in) and leaves its booking probes
+    // out, while develop's own `--project=release-required-local` keeps both.
+    const argv = (script: string) => ["node", "playwright", ...script.split(" ").slice(1)];
+    const artifact = argv(scripts["test:e2e:release-artifact"]);
+    expect(isReleaseArtifactRun(artifact)).toBe(true);
+    expect(isReleaseLocalRun(artifact)).toBe(false);
+    for (const local of [argv("playwright test --project=release-required-local"), argv("playwright test --project release-required-local")]) {
+      expect(isReleaseLocalRun(local)).toBe(true);
+      expect(isReleaseArtifactRun(local)).toBe(false);
+    }
+    expect(isReleaseArtifactRun(argv("playwright test --project release-artifact-smoke"))).toBe(true);
+    expect(playwrightConfig).toContain('...(releaseArtifactRun ? { testIgnore: ["**/booking-*.spec.ts"] } : {}),');
 
     // Identity, readiness and hydration are asserted, and absence throws rather than skips.
     const probe = readText("e2e/release-artifact-smoke.spec.ts");

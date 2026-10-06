@@ -3,6 +3,7 @@ import { E2E_MCP_SECRET } from "./e2e/fixtures/mcp-secret";
 import {
   BOOKING_PREVIEW_ORIGIN,
   BOOKING_PREVIEW_PORT,
+  isReleaseArtifactRun,
   isReleaseLocalRun,
   localBookingServerEnv,
 } from "./e2e/fixtures/booking-env";
@@ -57,6 +58,12 @@ const releaseSpecs = [
  * the caller's LOCAL Supabase keys; the specs refuse any other datastore.
  */
 const releaseLocalRun = isReleaseLocalRun();
+/**
+ * The release-artifact smoke (preview-smoke.yml) serves only the CI-built
+ * candidate with `npm run start`, so it runs without the local booking servers
+ * and leaves out the booking probes, which need them.
+ */
+const releaseArtifactRun = isReleaseArtifactRun();
 
 function getWebServerCommand() {
   if (isCI) return `npm run start -- --port ${e2ePort}`;
@@ -232,6 +239,7 @@ export default defineConfig({
       // deviation 9). Test-only, and only on this localhost project.
       use: { ...desktopChrome, bypassCSP: true },
       grep: /@local-docker/,
+      ...(releaseArtifactRun ? { testIgnore: ["**/booking-*.spec.ts"] } : {}),
       timeout: 60_000,
       retries: 0,
     },

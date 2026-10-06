@@ -21,12 +21,18 @@ export const CANONICAL_ORIGIN = "https://paisaxe.es";
 
 export const FIXTURE_MERCHANT = "demo-rutas-del-sella";
 
-/** True when this Playwright run selects the release-required-local project. */
+function selectsProject(argv: string[], project: string): boolean {
+  return argv.some((arg, i) => arg === `--project=${project}` || (arg === "--project" && argv[i + 1] === project));
+}
+
+/** True when this Playwright run is the release-artifact smoke (preview-smoke.yml), which serves only the CI-built candidate. */
+export function isReleaseArtifactRun(argv: string[] = process.argv): boolean {
+  return selectsProject(argv, "release-artifact-smoke");
+}
+
+/** True when this Playwright run selects the release-required-local project, outside the release-artifact smoke. */
 export function isReleaseLocalRun(argv: string[] = process.argv): boolean {
-  return argv.some(
-    (arg, i) =>
-      arg === "--project=release-required-local" || (arg === "--project" && argv[i + 1] === "release-required-local")
-  );
+  return selectsProject(argv, "release-required-local") && !isReleaseArtifactRun(argv);
 }
 
 /** The server-side environment the local booking probes need on top of the shared webServer env. */
