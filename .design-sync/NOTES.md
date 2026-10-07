@@ -10,10 +10,15 @@ sync works around that, and what a re-sync should watch.
   `src/app/layout.tsx`: `font-sans antialiased bg-neutral-950`). The converter's synth mode
   would re-export every file under `src/` (pages, server-only modules) and break the bundle,
   so the build always passes `--entry ./.design-sync/entry/index.tsx`.
-- **CSS**: the app's real stylesheet, compiled by the Tailwind v4 CLI from
-  `src/app/globals.css` (which `@config`s `tailwind.config.ts`) into
-  `.design-sync/.cache/paisaxe.css` (gitignored; `cfg.buildCmd` regenerates it). Tailwind
-  scans the repo, so only utilities the app already uses exist in it.
+- **CSS**: compiled by the Tailwind v4 CLI from `.design-sync/tailwind.css` into
+  `.design-sync/.cache/paisaxe.css` (gitignored; `cfg.buildCmd` regenerates it). That entry
+  imports the app's `src/app/base.css` and `tailwind.config.ts`, so it is the app CSS plus
+  the classes only the previews use. Tailwind v4 scans every committed file, so the app's
+  `globals.css` has `@source not "../../.design-sync"` (without it, preview classes and the
+  "gap" classes named in conventions.md leaked into production CSS), and the sync entry
+  excludes `conventions.md` and `NOTES.md` for the same reason. Never point the sync at
+  `globals.css`: the exclusion is inherited through `@import` and the previews lose their
+  classes. Otherwise only utilities the app already uses exist.
 - **Types**: no `.d.ts` tree exists, so `cfg.buildCmd` also runs
   `tsc -p .design-sync/tsconfig.dts.json`, emitting declarations into `build/ts/`
   (gitignored), which the converter finds first. Without it every contract degrades to
@@ -34,7 +39,7 @@ sync works around that, and what a re-sync should watch.
 ## Build command (from the repo root)
 
 ```bash
-npx --yes @tailwindcss/cli@4.3.3 -i src/app/globals.css -o .design-sync/.cache/paisaxe.css \
+npx --yes @tailwindcss/cli@4.3.3 -i .design-sync/tailwind.css -o .design-sync/.cache/paisaxe.css \
   && rm -rf build/ts && npx tsc -p .design-sync/tsconfig.dts.json
 node .ds-sync/package-build.mjs --config .design-sync/config.json --node-modules ./node_modules \
   --entry ./.design-sync/entry/index.tsx --out ./ds-bundle

@@ -3,7 +3,7 @@
   "shape": "package",
   "pkg": "paisaxe",
   "globalName": "Paisaxe",
-  "buildCmd": "npx --yes @tailwindcss/cli@4.3.3 -i src/app/globals.css -o .design-sync/.cache/paisaxe.css && rm -rf build/ts && npx tsc -p .design-sync/tsconfig.dts.json",
+  "buildCmd": "npx --yes @tailwindcss/cli@4.3.3 -i .design-sync/tailwind.css -o .design-sync/.cache/paisaxe.css && rm -rf build/ts && npx tsc -p .design-sync/tsconfig.dts.json",
   "tsconfig": "tsconfig.json",
   "cssEntry": ".design-sync/.cache/paisaxe.css",
   "guidelinesGlob": [
