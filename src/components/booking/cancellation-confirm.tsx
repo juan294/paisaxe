@@ -90,7 +90,7 @@ export function CancellationConfirm({ capability, terms: initialTerms, onCancell
         <p>{t("booking.cancel.noRefund").replace("{hours}", String(terms.cancellationWindowHours))}</p>
       )}
       {state !== "unavailable" && (
-        <Button type="button" variant="destructive" className="w-full" disabled={state === "confirming"} onClick={() => void confirm()}>
+        <Button type="button" variant="glassDestructive" className="w-full" disabled={state === "confirming"} onClick={() => void confirm()}>
           {state === "confirming"
             ? t("booking.cancel.confirming")
             : terms.refundCents > 0

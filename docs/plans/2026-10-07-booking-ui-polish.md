@@ -224,3 +224,38 @@ plus `git grep -ln BookingView -- src`.
   rendered pixels; the consumer sweep was a delegated read-only search whose results were
   spot-checked (`booking-status.tsx:154`, `return-status.tsx:64`, `es.ts:458-600`).
 - **Next action:** owner accepts this plan → Phase 1 in the worktree above.
+
+## Progress
+
+### Phase 1 — accepted 2026-10-07
+
+- Commit `d24a84ff` on `feature/booking-ui-polish` (worktree `../paisaxe-booking-ui-polish`),
+  pre-commit hook green: 504 files / 9,438 tests, lint, knip; `tsc --noEmit` clean.
+- Knip did not flag the new exports (their tests import them), so nothing moved to Phase 2.
+- **Deviation D1:** vendored PayPal's full-colour logo
+  (`paypal-ui/logos/svg/paypal-color.svg`, 3,438 bytes, sha256
+  `cda7704463471358975d47c1934b73ae57baea4741abb04c0abfe9e9ebb20659`) as
+  `public/images/paypal-logo.svg`; the planned `paypal-wordmark-color.svg` is black only.
+- **Copy change:** the countdown reads "Te guardamos la plaza: quedan {time}" (a bare
+  time read like a clock time); same in the other five locales.
+
+### Phase 2 — implemented, awaiting acceptance
+
+- New: `journey.ts` (+14 table cases), `payment-receipt.tsx`, `balance-invoice.test.tsx`;
+  restyled `booking-status.tsx`, `return-status.tsx`, `cancellation-confirm.tsx`,
+  `balance-invoice.tsx`. All 30 pre-existing booking-page tests pass with only the
+  `experienceSlug` fixture edit; the return-page tests changed where D7 changes behaviour
+  (confirmed/pending hand over instead of showing a sentence).
+- **Deviation D2:** the planned story photos do not show what their file names say (a
+  festival, a cave, Covadonga), and neither do many others in `public/images/stories`
+  (issue #1012). Photos chosen by content from a contact sheet: canoe → boats on calm
+  water (`camino-camara-santa-de-oviedo.webp`), coastal walk → coastal boardwalk at sunset
+  (`camino-camino-del-norte.webp`), 4x4 viewpoints → green valley from above
+  (`quesos-asturianos.webp`), fallback → river and waterfall (`aventura-en-los-picos.webp`).
+- **Additions from the screenshot review:** straight back from PayPal the confirmed
+  headline is the "¡Pago recibido!…" sentence instead of both sentences; the
+  free-cancellation line shows only in the pay, confirming and confirmed phases.
+- `booking.page.returnPending` is no longer rendered (pending hands over to the booking
+  page, which polls); the key stays in the locales.
+- Screenshots (scratch, not committed): pay, confirming, confirmed + `?paid=1`, cancel
+  open, refunded, expired, balance paid, return slow, return problem at 390 and 1280 px.

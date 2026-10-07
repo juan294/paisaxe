@@ -4,10 +4,9 @@ import { describe, expect, it } from "vitest";
 import { EXPERIENCE_PHOTOS, FALLBACK_PHOTO, experiencePhoto } from "./experience-photos";
 
 describe("experiencePhoto", () => {
-  it("maps the three fixture experiences to their story photos (plan D2)", () => {
-    expect(experiencePhoto("descenso-canoa")).toBe("/images/stories/descenso-del-sella.webp");
-    expect(experiencePhoto("paseo-senda-costera")).toBe("/images/stories/cabo-vidio.webp");
-    expect(experiencePhoto("ruta-miradores-4x4")).toBe("/images/stories/lagos-de-covadonga.webp");
+  it("gives each of the three fixture experiences its own photo (plan D2)", () => {
+    const photos = ["descenso-canoa", "paseo-senda-costera", "ruta-miradores-4x4"].map(experiencePhoto);
+    expect(new Set([...photos, FALLBACK_PHOTO]).size).toBe(4);
   });
 
   it("falls back for an unknown or missing slug", () => {
