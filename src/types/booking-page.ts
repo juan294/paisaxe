@@ -36,6 +36,8 @@ export interface BookingView {
   reference: string;
   status: string;
   experienceTitle: string;
+  /** Picks the ticket's photo (docs/plans/2026-10-07-booking-ui-polish.md, D2); null if the experience row is gone. */
+  experienceSlug: string | null;
   slotDate: string;
   slotTime: string;
   partySize: number;

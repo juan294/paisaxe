@@ -21,3 +21,13 @@ export function dateTime(iso: string, locale: Locale): string {
     timeZone: "Europe/Madrid",
   });
 }
+
+/**
+ * A slot's calendar date ("2026-10-24") as weekday, day and short month ("sáb, 24 oct").
+ * Read at UTC midnight because it is a date, not an instant; anything else is returned unchanged.
+ */
+export function slotDay(date: string, locale: Locale): string {
+  const day = new Date(`${date}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(day.getTime())) return date;
+  return new Intl.DateTimeFormat(toIntlLocale(locale), { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(day);
+}

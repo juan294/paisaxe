@@ -35,6 +35,7 @@ function view(overrides: Partial<BookingView> = {}): BookingView {
     reference: "RS-ABC123",
     status: "pending_payment",
     experienceTitle: "Paseo por la senda costera",
+    experienceSlug: "paseo-senda-costera",
     slotDate: "2026-11-21",
     slotTime: "10:00",
     partySize: 4,
