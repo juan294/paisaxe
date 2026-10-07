@@ -4,9 +4,9 @@
  * Single source of truth — import from here instead of hard-coding price
  * strings in components. Any price change only needs to happen in this file.
  *
- * Tailwind green accent:
- *   green-500 = #22c55e  (brand accent, used across all conversion surfaces)
- *   green-400 = #4ade80  (hover / gradient endpoint)
+ * Brand accent: the `paisaxe-green-*` scale in tailwind.config.ts
+ *   paisaxe-green-500  (the accent, used across all conversion surfaces)
+ *   paisaxe-green-400  (hover / gradient endpoint / text on dark)
  */
 
 export type PricingTierId = "day_pass" | "weekly_pass" | "monthly_pass";

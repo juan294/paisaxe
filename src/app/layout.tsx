@@ -7,7 +7,6 @@
  */
 
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import { VercelAnalytics } from "@/components/analytics";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
@@ -15,11 +14,6 @@ import { getSiteUrl, getSupabaseUrl } from "@/lib/env";
 import { Providers } from "./providers";
 import { PostHogPageView } from "@/components/posthog-provider";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
 
 // LOCATION-SPECIFIC: Site URL from config
 const SITE_URL = getSiteUrl() ?? `https://${LOCATION_CONFIG.domain}`;
@@ -152,7 +146,7 @@ export default function RootLayout({
         layer, ad hoc Tailwind utilities, ~1,969 raw hex literals in admin) is
         tracked separately — see #938.
       */}
-      <body className={`${inter.variable} font-sans antialiased bg-neutral-950`}>
+      <body className="font-sans antialiased bg-neutral-950">
         <JsonLd type="website" />
         <Providers>
           <PostHogPageView />

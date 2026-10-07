@@ -29,13 +29,18 @@ The font is the system stack (`font-sans`), on purpose. Do not load a web font.
 light surfaces, `glass | glassIcon` for the immersive one. `Skeleton` is `bg-white/10`: it is
 only visible on a dark surface. `StatCard` cards are white: put them on `bg-[#f5f3ee]`.
 
+**Brand accent (conversion: pricing, upsell, purchase CTAs)** is the `paisaxe-green-*` scale,
+never raw `green-*`: primary CTA `bg-gradient-to-r from-paisaxe-green-500 to-paisaxe-green-400
+text-black` (hover `hover:from-paisaxe-green-400 hover:to-paisaxe-green-300`), solid
+`bg-paisaxe-green-500`, tints `bg-paisaxe-green-500/10`, `border-paisaxe-green-500/30`, text on
+dark `text-paisaxe-green-400`.
+
 ## Styling rule that matters
 
 Styling is Tailwind utilities, but **only utilities the app already uses exist** in the
 shipped stylesheet (`styles.css` → `_ds_bundle.css`). A class that the app never wrote
 silently does nothing. Before using a utility, check `_ds_bundle.css`. Known gaps: there is no
-`bg-white/30`, `text-7xl`, `bg-[#252320]`, `bg-muted` or `border-border`, and no
-`paisaxe-*` brand color classes. Use `style={{…}}` for anything not in the stylesheet
+`bg-white/30`, `text-7xl`, `bg-[#252320]`, `bg-muted` or `border-border`. Use `style={{…}}` for anything not in the stylesheet
 (exact sizes, custom gradients). `dark:` variants never apply: no `.dark` class is set.
 
 ## Where the truth lives

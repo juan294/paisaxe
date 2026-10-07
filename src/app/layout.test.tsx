@@ -4,14 +4,6 @@ import fs from "fs";
 import path from "path";
 import RootLayout, { metadata } from "./layout";
 
-// Mock next/font/google
-vi.mock("next/font/google", () => ({
-  Inter: () => ({
-    variable: "--font-inter",
-    className: "inter-font",
-  }),
-}));
-
 // Mock language detection to return Spanish (jsdom defaults to English)
 vi.mock("@/lib/i18n/detect-language", () => ({
   resolveLocale: () => "es",
@@ -155,9 +147,14 @@ describe("RootLayout", () => {
       "utf-8"
     );
 
-    it("should not contain Google Fonts preconnect links (next/font self-hosts)", () => {
+    it("should not contain Google Fonts preconnect links", () => {
       expect(layoutSource).not.toContain("fonts.googleapis.com");
       expect(layoutSource).not.toContain("fonts.gstatic.com");
+    });
+
+    it("should not load a web font: font-sans is the system stack (#1010)", () => {
+      // Inter was preloaded on every page (48 KB) but never applied.
+      expect(layoutSource).not.toContain("next/font");
     });
 
     it("should keep Supabase preconnect links", () => {

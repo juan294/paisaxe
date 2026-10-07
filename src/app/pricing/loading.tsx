@@ -14,8 +14,8 @@ export default function PricingLoading() {
         {/* Hero */}
         <div className="text-center mb-12">
           {/* Sound bars icon placeholder */}
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-6">
-            <Skeleton className="h-6 w-6 rounded bg-green-500/20" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-paisaxe-green-500/10 mb-6">
+            <Skeleton className="h-6 w-6 rounded bg-paisaxe-green-500/20" />
           </div>
           {/* Title */}
           <Skeleton className="h-8 w-64 mx-auto mb-2" />

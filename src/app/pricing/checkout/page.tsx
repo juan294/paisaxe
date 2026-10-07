@@ -87,7 +87,7 @@ function CheckoutPageContent() {
           </h1>
           <button
             onClick={() => signInWithGoogle(checkoutPath)}
-            className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            className="w-full px-5 py-3 bg-paisaxe-green-500 text-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
           >
             {t("auth.continue_with_google")}
           </button>
@@ -127,7 +127,7 @@ function CheckoutPageContent() {
             </p>
             <button
               onClick={() => setError(null)}
-              className="px-5 py-2.5 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              className="px-5 py-2.5 bg-paisaxe-green-500 text-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             >
               {t("errors.retry")}
             </button>

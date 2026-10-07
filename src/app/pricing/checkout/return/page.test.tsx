@@ -156,7 +156,7 @@ describe("CheckoutReturnPage", () => {
     it("should render success icon with green background", () => {
       render(<CheckoutReturnPage />);
 
-      const iconContainer = document.querySelector(".bg-green-500\\/10");
+      const iconContainer = document.querySelector(".bg-paisaxe-green-500\\/10");
       expect(iconContainer).toBeInTheDocument();
     });
 
@@ -225,7 +225,7 @@ describe("CheckoutReturnPage", () => {
       });
       expect(ctaLink).toBeInTheDocument();
       // The link should have the green button styling
-      expect(ctaLink.className).toContain("bg-green-500");
+      expect(ctaLink.className).toContain("bg-paisaxe-green-500");
     });
   });
 

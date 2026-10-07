@@ -57,8 +57,8 @@ function CheckoutReturnPageContent() {
     <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6">
       <div className="max-w-sm w-full text-center">
         {/* Success Icon */}
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-8">
-          <Check className="h-7 w-7 text-green-500" />
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-paisaxe-green-500/10 mb-8">
+          <Check className="h-7 w-7 text-paisaxe-green-500" />
         </div>
 
         {/* Title */}
@@ -92,7 +92,7 @@ function CheckoutReturnPageContent() {
         {/* CTA */}
         <Link
           href={immersiveHref}
-          className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+          className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 bg-paisaxe-green-500 text-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
         >
           <Mic className="h-4 w-4" />
           {t("premium.success_cta")}

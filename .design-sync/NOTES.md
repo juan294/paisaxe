@@ -25,9 +25,8 @@ sync works around that, and what a re-sync should watch.
 - **Guidelines**: only `docs/project/project-charter.md` (voice, design principles). The
   default glob picked up an old health report and a QA-agent guide; both excluded.
 - **Fonts**: none shipped, correctly. Production `font-sans` is the system stack
-  (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto…`). `next/font` loads Inter as
-  `--font-inter`, but nothing references that variable (verified against paisaxe.es CSS on
-  2026-10-07), so Inter is never applied in production.
+  (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto…`). The unused Inter load was
+  removed (#1010), so the app ships no web font either.
 - **Scope left out** (need the Next.js runtime: next/link, next/image, router): StoryViewer,
   RelatedStories, BookmarkButton, ChatHeader, ChatMessageList, ChatUpsellCTA; and all admin
   components.
@@ -83,9 +82,9 @@ the render check via `NODE_PATH`.
 
 ## Findings for the app (not sync issues)
 
-- The `paisaxe-*` brand color tokens in `tailwind.config.ts` (green, green-hover, blue,
-  sand) are used nowhere, so no `bg-paisaxe-*` class exists in the compiled CSS.
-- Inter is loaded by `next/font` but never applied (see Fonts above).
+- Both findings from the first sync are fixed: Inter removed (#1010); the brand accent is
+  the `paisaxe-green-200..500` scale, adopted on every conversion surface, with blue and sand
+  dropped (#1011).
 
 ## Re-sync risks
 
@@ -98,7 +97,7 @@ the render check via `NODE_PATH`.
   defining it; the previews are where the agent learns the shape.
 - `.design-sync/conventions.md` (README header) names classes that must exist in the
   compiled CSS, and lists known gaps (`bg-white/30`, `text-7xl`, `bg-[#252320]`, `bg-muted`,
-  `border-border`, `paisaxe-*`). The app changing its class usage can make either list
+  `border-border`) and the `paisaxe-green-*` utilities it recommends. The app changing its class usage can make either list
   stale: re-validate against `_ds_bundle.css` on every sync.
 - The Tailwind CLI version is pinned in `buildCmd` (4.3.3, matching the app); bump both
   together.

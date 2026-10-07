@@ -151,7 +151,7 @@ describe("ChatUpsellCTA", () => {
 
     // Must have a visible focus ring
     expect(purchaseButton.className).toMatch(/focus-visible:ring-2/);
-    expect(purchaseButton.className).toMatch(/focus-visible:ring-green-200/);
+    expect(purchaseButton.className).toMatch(/focus-visible:ring-paisaxe-green-200/);
     expect(purchaseButton.className).toMatch(/focus-visible:ring-offset-2/);
 
     // outline-none is set: ring is the a11y affordance, that's correct
@@ -170,7 +170,7 @@ describe("ChatUpsellCTA", () => {
       render(<ChatUpsellCTA {...defaultProps} />);
 
       const purchaseButton = screen.getByRole("button", { name: /desde/ });
-      expect(purchaseButton.className).toMatch(/from-green-/);
+      expect(purchaseButton.className).toMatch(/from-paisaxe-green-/);
       expect(purchaseButton.className).not.toMatch(/amber-|yellow-/);
     });
 
@@ -178,7 +178,7 @@ describe("ChatUpsellCTA", () => {
       const { container } = render(<ChatUpsellCTA {...defaultProps} />);
 
       const root = container.firstChild as HTMLElement;
-      expect(root.className).toMatch(/from-green-/);
+      expect(root.className).toMatch(/from-paisaxe-green-/);
       expect(root.className).not.toMatch(/amber-|yellow-/);
     });
   });
