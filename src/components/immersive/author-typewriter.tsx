@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 
 const HOME_TEXT = "JG";
@@ -30,17 +31,14 @@ interface AuthorTypewriterProps {
 
 export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
   const textRef = useRef<HTMLSpanElement>(null);
-  const prefersReducedMotion = useRef(false);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    prefersReducedMotion.current = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-  }, []);
-
-  useEffect(() => {
-    if (prefersReducedMotion.current) return;
     if (!textRef.current) return;
+    if (prefersReducedMotion) {
+      textRef.current.textContent = HOME_TEXT;
+      return;
+    }
 
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -107,7 +105,7 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <div

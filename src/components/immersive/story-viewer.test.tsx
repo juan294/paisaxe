@@ -106,11 +106,6 @@ vi.mock("@/hooks/use-favorites", () => ({
   }),
 }));
 
-// Mock useReducedMotion
-vi.mock("@/hooks/use-reduced-motion", () => ({
-  useReducedMotion: () => false,
-}));
-
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
   useRouter: () => ({

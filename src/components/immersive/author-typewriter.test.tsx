@@ -1,24 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
+import { createMatchMedia } from "@/test/match-media";
 
 const HOME = "JG";
 const FIRST_MSG = "hecho con ♥ en Asturias";
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+const MESSAGE_TYPED_AT = 30_000 + HOME.length * 80 + 300 + FIRST_MSG.length * 80;
+const MESSAGE_ERASED_AT = MESSAGE_TYPED_AT + 4_000 + FIRST_MSG.length * 80;
 
 function mockMatchMedia(reducedMotion: boolean) {
+  const media = createMatchMedia({ [REDUCED_MOTION]: reducedMotion });
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     configurable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: query.includes("prefers-reduced-motion: reduce") ? reducedMotion : false,
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
+    value: vi.fn(media.matchMedia),
   });
+  return media;
 }
 
 describe("AuthorTypewriter", () => {
@@ -29,6 +26,7 @@ describe("AuthorTypewriter", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.resetModules();
   });
 
@@ -112,6 +110,75 @@ describe("AuthorTypewriter", () => {
     });
 
     expect(textSpan.textContent).toBe(HOME);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("stops the active cycle when reduced motion is enabled and restarts when disabled", async () => {
+    const media = mockMatchMedia(false);
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container } = render(<AuthorTypewriter />);
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+
+    await act(async () => vi.advanceTimersByTimeAsync(31_000));
+    expect(textSpan.textContent).not.toBe(HOME);
+    act(() => media.setMatches(REDUCED_MOTION, true));
+    expect(textSpan.textContent).toBe(HOME);
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(textSpan.textContent).toBe(HOME);
+
+    act(() => media.setMatches(REDUCED_MOTION, false));
+    expect(vi.getTimerCount()).toBe(1);
+    await act(async () => vi.advanceTimersByTimeAsync(29_999));
+    expect(textSpan.textContent).toBe(HOME);
+    await act(async () => vi.advanceTimersByTimeAsync(1_001));
+    expect(textSpan.textContent).not.toBe(HOME);
+  });
+
+  it("starts after an initially reduced-motion visitor permits motion", async () => {
+    const media = mockMatchMedia(true);
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container } = render(<AuthorTypewriter />);
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => media.setMatches(REDUCED_MOTION, false));
+    await act(async () => vi.advanceTimersByTimeAsync(31_000));
+    expect(textSpan.textContent).not.toBe(HOME);
+  });
+
+  it("keeps only the final cycle after rapid reduced-motion changes", async () => {
+    const media = mockMatchMedia(false);
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container } = render(<AuthorTypewriter />);
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+    await act(async () => vi.advanceTimersByTimeAsync(29_000));
+    for (const matches of [true, false, true, false]) {
+      act(() => media.setMatches(REDUCED_MOTION, matches));
+    }
+    expect(vi.getTimerCount()).toBe(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(textSpan.textContent).toBe(HOME);
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(textSpan.textContent).not.toBe(HOME);
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it("unsubscribes from motion changes and clears the active timer on unmount", async () => {
+    const media = mockMatchMedia(false);
+    const query = media.matchMedia(REDUCED_MOTION);
+    const add = vi.spyOn(query, "addEventListener");
+    const remove = vi.spyOn(query, "removeEventListener");
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { unmount } = render(<AuthorTypewriter />);
+    expect(add).toHaveBeenCalledWith("change", expect.any(Function));
+    const handler = add.mock.calls[0][1];
+    unmount();
+    expect(remove).toHaveBeenCalledWith("change", handler);
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => media.setMatches(REDUCED_MOTION, true));
+    act(() => media.setMatches(REDUCED_MOTION, false));
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("hides on mobile via hidden / md:block classes", async () => {
@@ -168,23 +235,83 @@ describe("AuthorTypewriter", () => {
     expect(textSpan.textContent).toBe(HOME);
   });
 
-  it("cleans up timers on unmount", async () => {
+  it("cycles through every message and wraps to the first without an extra home cycle", async () => {
     const { AuthorTypewriter } = await import("./author-typewriter");
-    const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
-    const { unmount } = render(<AuthorTypewriter />);
-    unmount();
-    expect(clearTimeoutSpy).toHaveBeenCalled();
-    clearTimeoutSpy.mockRestore();
+    const { container } = render(<AuthorTypewriter />);
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+    for (const message of [
+      FIRST_MSG,
+      "a base de sidra",
+      "¡buen Camino!",
+      "seguramente 🏔️ rn",
+      "seguramente 🚴 rn",
+      "escalando alguna pared",
+      "404: sueño no encontrado",
+      FIRST_MSG,
+    ]) {
+      await act(async () => vi.advanceTimersByTimeAsync(
+        30_000 + HOME.length * 80 + 300 + message.length * 80
+      ));
+      expect(textSpan.textContent).toBe(message);
+      await act(async () => vi.advanceTimersByTimeAsync(
+        4_000 + message.length * 80 + 300 + HOME.length * 80
+      ));
+      expect(textSpan.textContent).toBe(HOME);
+    }
   });
 
-  it("does not throw when timers fire after unmount", async () => {
+  it.each([
+    ["home hold", 0],
+    ["erasing home", 30_080],
+    ["empty pause", 30_200],
+    ["typing message", 31_000],
+    ["message hold", 33_000],
+    ["erasing message", 36_500],
+    ["return pause", MESSAGE_ERASED_AT + 100],
+    ["typing home", MESSAGE_ERASED_AT + 300 + 80],
+  ])("clears timers and prevents detached text changes during %s", async (_stage, elapsed) => {
     const { AuthorTypewriter } = await import("./author-typewriter");
-    const { unmount } = render(<AuthorTypewriter />);
+    const { container, unmount } = render(<AuthorTypewriter />);
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+    await act(async () => vi.advanceTimersByTimeAsync(elapsed));
+    expect(vi.getTimerCount()).toBe(1);
+    const textAtUnmount = textSpan.textContent;
     unmount();
+    expect(vi.getTimerCount()).toBe(0);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
-    // No errors → cancelled guard works
+    expect(vi.getTimerCount()).toBe(0);
+    expect(textSpan.textContent).toBe(textAtUnmount);
+  });
+
+  it.each([
+    ["home hold", 30_000],
+    ["home erasure step", 30_080],
+    ["home erased", 30_160],
+    ["empty pause", 30_460],
+    ["message typing step", 30_540],
+    ["message typed", MESSAGE_TYPED_AT],
+    ["message hold", MESSAGE_TYPED_AT + 4_000],
+    ["message erasure step", MESSAGE_TYPED_AT + 4_080],
+    ["message erased", MESSAGE_ERASED_AT],
+    ["return pause", MESSAGE_ERASED_AT + 300],
+    ["home typing step", MESSAGE_ERASED_AT + 380],
+    ["home typed", MESSAGE_ERASED_AT + 460],
+  ])("cancels an already-resolved %s before its continuation runs", async (_stage, boundary) => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container, unmount } = render(<AuthorTypewriter />);
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+    await act(async () => vi.advanceTimersByTimeAsync(boundary - 1));
+    const textAtUnmount = textSpan.textContent;
+    // Resolve the clock's promise, then unmount before the queued continuation.
+    act(() => {
+      vi.advanceTimersByTime(1);
+      unmount();
+    });
+    await act(async () => {});
+    expect(vi.getTimerCount()).toBe(0);
+    expect(textSpan.textContent).toBe(textAtUnmount);
   });
 
   it("stops click propagation on the wrapper", async () => {
