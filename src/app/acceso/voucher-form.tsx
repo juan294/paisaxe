@@ -9,7 +9,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { clientLogger } from "@/lib/client-logger";
 import { csrfHeaders } from "@/lib/csrf-client";
 import { useTranslation } from "@/lib/i18n";
-import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type ErrorKey = "invalid" | "expired" | "exhausted" | "anonFailed" | "rateLimited" | "failed";
 /** One state: idle, in flight, redeemed (navigating away), or the error to show. */
@@ -41,6 +40,8 @@ export function VoucherForm() {
   const error = state === "idle" || state === "submitting" || state === "done" ? null : state;
 
   async function guestToken(): Promise<string | null> {
+    // Loaded on submit, not with the page: the client is most of /acceso's bundle budget.
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase-browser");
     const supabase = createSupabaseBrowserClient();
     if (!supabase) {
       clientLogger.error("[VOUCHER_ANON_SIGNIN_FAILED]", { error: "Supabase is not configured" });

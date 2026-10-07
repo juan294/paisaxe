@@ -132,3 +132,13 @@ describe("VoucherForm", () => {
     expect(await screen.findByText("booking.access.failed")).toBeInTheDocument();
   });
 });
+
+describe("VoucherForm bundle", () => {
+  it("loads the Supabase client only when the visitor submits, not with the page (bundle budget)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(join(process.cwd(), "src/app/acceso/voucher-form.tsx"), "utf8");
+    expect(source).not.toMatch(/^import[^;]*from "@\/lib\/supabase-browser";/m);
+    expect(source).toMatch(/await import\("@\/lib\/supabase-browser"\)/);
+  });
+});
