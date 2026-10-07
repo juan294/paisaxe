@@ -22,7 +22,7 @@
  * placeholders:
  *   {{match.N}}             capture group N of the scenario's expression
  *   {{result.<path>}}       the latest tool_result of this turn (parsed JSON)
- *   {{state.acceptedBookingId}}, {{state.bookings[0].bookingId}}
+ *   {{state.bookings[0].bookingId}}
  *                           the server's state block (agent.ts stateBlock)
  * A path segment `[n]` indexes an array and `[key=value]` picks its first
  * element whose `key` equals `value`. A string that is exactly one
@@ -116,7 +116,7 @@ function resolvePath(root: Json, path: string): Json {
 interface TemplateScope {
   match: RegExpMatchArray;
   result: Json;
-  state: { acceptedBookingId: string | null; bookings: Json[] };
+  state: { bookings: Json[] };
 }
 
 const PLACEHOLDER = /\{\{(match|result|state)((?:\.[^{}:]+|\[[^\]]+\])*)(:number)?\}\}/g;
@@ -162,10 +162,8 @@ function systemText(system: Anthropic.MessageStreamParams["system"]): string {
 
 /** What the replay may read from agent.ts's state block. */
 function readState(system: string): TemplateScope["state"] {
-  const accepted = system.match(/\(bookingId ([0-9a-f-]{36})\)/);
   const bookingsLine = system.match(/^Reservas del visitante: (\[.*\])$/m);
   return {
-    acceptedBookingId: accepted?.[1] ?? null,
     bookings: bookingsLine ? (JSON.parse(bookingsLine[1]) as Json[]) : [],
   };
 }

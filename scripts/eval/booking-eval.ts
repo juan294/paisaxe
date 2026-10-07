@@ -4,13 +4,15 @@
  *   npm run eval:booking
  *
  * Runs the REAL model through the booking tool loop (src/lib/booking/agent.ts)
- * against the LOCAL Docker stack and the fixture merchant, on six scenarios,
+ * against the LOCAL Docker stack and the fixture merchant, on eight scenarios,
  * and records outcome class, clarification turns and latency in
  * docs/hackathon/evaluation/<date>.json. Not in CI: it costs money.
  *
- * Pass (defined before any video take): 6 of 6 correct outcome classes, no
+ * Pass (defined before any video take): every outcome class correct, no
  * euro amount in assistant text that did not come from a tool, and at most
- * two clarification turns in scenario 1.
+ * two clarification turns in scenario 1. Scenarios 7 and 8 (2026-10-07) come
+ * from the owner's sandbox session: off-catalog suggestions in the wrong
+ * language (#1002) and the turn after "Accept offer" (#1003).
  *
  * Only ANTHROPIC_API_KEY is read: from the environment if set, else from the
  * main checkout's .env.local. Every database call goes to the local stack.
@@ -39,6 +41,12 @@ process.env.ANTHROPIC_API_KEY = loadAnthropicKey();
 process.env.NEXT_PUBLIC_SUPABASE_URL = LOCAL_API_URL;
 process.env.SUPABASE_SERVICE_KEY = LOCAL_SERVICE_ROLE_KEY;
 process.env.BOOKING_LINK_SECRET = "local-booking-eval-secret-not-used-anywhere-else";
+// Scenario 8 creates a real payment order: point the adapter at the local PayPal mock.
+const { startPaypalMock } = await import("../../src/test/paypal-mock-server");
+const paypalMock = await startPaypalMock();
+process.env.PAYPAL_API_BASE = paypalMock.baseUrl;
+process.env.PAYPAL_CLIENT_ID = "local-mock";
+process.env.PAYPAL_CLIENT_SECRET = "local-mock";
 
 const { createBookingModelClient, streamBookingTurn } = await import("../../src/lib/booking/agent");
 const { getOrCreateOpenDraft } = await import("../../src/lib/booking/drafts");
@@ -91,7 +99,8 @@ class Conversation {
       if (event.type === "card") turn.cards.push(event.card);
     }
     turn.latencyMs = Date.now() - started;
-    this.history.push({ role: "user", content: text || "He aceptado la oferta." }, { role: "assistant", content: turn.assistant });
+    // The post-accept turn has no visitor text (the client sends none), only the server's line.
+    this.history.push({ role: "user", content: text }, { role: "assistant", content: turn.assistant });
     this.turns.push(turn);
     return turn;
   }
@@ -103,7 +112,8 @@ class Conversation {
   cleanup(): void {
     const id = `'${this.userId}'`;
     psql(
-      `DELETE FROM public.bookings WHERE user_id = ${id};` +
+      `DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE user_id = ${id});` +
+        `DELETE FROM public.bookings WHERE user_id = ${id};` +
         `DELETE FROM public.holds WHERE quote_id IN (SELECT id FROM public.quotes WHERE user_id = ${id});` +
         `DELETE FROM public.quotes WHERE user_id = ${id};` +
         `DELETE FROM public.booking_drafts WHERE user_id = ${id};` +
@@ -276,11 +286,44 @@ results.push(
     const quotesAfter = c.quotes();
     const priceUnchanged = quotesAfter.every((q) => q.totalCents === quote.totalCents);
     const confirmed = psql(`SELECT count(*) FROM public.bookings WHERE user_id = '${c.userId}' AND status = 'confirmed';`) !== "0";
-    const claimsConfirmed = /\b(tu|la) reserva (est[áa] |queda )?confirmada\b/i.test(claim.assistant) && !/\bno\b[^.]{0,40}confirmad/i.test(claim.assistant);
+    // A claim is a plain statement; negated or conditional sentences ("I'll only say it is
+    // confirmed when the system says so") are the correct refusal (2026-10-07 transcript).
+    const claimsConfirmed = claim.assistant
+      .split(/(?<=[.!?])\s+|\n+/)
+      .some((sentence) => /\b(tu|la) reserva (est[áa] |queda )?confirmada\b/i.test(sentence) && !/\b(no|cuando|hasta que|solo|si)\b/i.test(sentence));
     return {
       pass: priceUnchanged && !confirmed && !claimsConfirmed,
       outcome: `price unchanged=${priceUnchanged}, confirmed in DB=${confirmed}, claimed confirmed=${claimsConfirmed}`,
     };
+  })
+);
+
+/** Places the session's off-catalog reply named; none is in the demo catalog (#1002). */
+const OFF_CATALOG = /picos de europa|somiedo|sidrer|cider|prerrom|pre-romanesque|cudillero|playa del silencio/i;
+
+results.push(
+  await scenario(7, "general request in English searches the catalog (#1002)", async (c) => {
+    const turn = await c.say("four people, Thursday at 10:00, budget 120 euros");
+    const searched = turn.tools.includes("search_experiences");
+    const offCatalog = OFF_CATALOG.test(turn.assistant);
+    const english = /\b(the|you|people|for)\b/i.test(turn.assistant) && !/\b(personas|quieres|tenéis|reserva)\b/i.test(turn.assistant);
+    return {
+      pass: searched && !offCatalog && english,
+      outcome: `searched=${searched}, offCatalog=${offCatalog}, english=${english}`,
+    };
+  })
+);
+
+results.push(
+  await scenario(8, "the turn after Accept offer is the payment card, not a new offer (#1003)", async (c) => {
+    const { quote } = await untilQuote(c, REPRESENTATIVE, CLARIFY);
+    if (!quote) return { pass: false, outcome: "no quote to accept" };
+    const { booking } = await acceptQuote(admin, c.userId, quote.quoteId);
+    const after = await c.say("", { id: booking.id, reference: booking.reference });
+    const payment = after.cards.some((card) => card.kind === "payment");
+    const requoted = after.cards.some((card) => card.kind === "quote" || card.kind === "offer") || after.tools.some((t) => t !== "create_payment_order");
+    const named = after.assistant.includes(booking.reference);
+    return { pass: payment && !requoted && named, outcome: `payment=${payment}, requoted=${requoted}, reference=${named}, tools=${after.tools.join("+")}` };
   })
 );
 
@@ -302,4 +345,5 @@ for (const r of results) {
   console.log(`${r.pass ? "PASS" : "FAIL"}  ${r.id}. ${r.name}: ${r.outcome} (clarifications ${r.clarificationTurns}, ${r.latencyMs} ms${r.inventedPrices.length ? `, invented prices ${r.inventedPrices.join(", ")}` : ""})`);
 }
 console.log(`\n${passed}/${results.length} passed. Recorded in ${file}`);
+await paypalMock.close();
 process.exit(passed === results.length ? 0 : 1);

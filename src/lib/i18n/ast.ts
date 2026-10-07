@@ -477,6 +477,8 @@ export const ast: Translations = {
       aiUnavailable: 'L\'asistente nun ta disponible agora. La to reserva sigue disponible nel so enllaz.',
       voiceDiscovery: 'Voz (descubrimientu)',
       requoteMessage: 'Quiero una ufierta nueva',
+      acceptedPayNext: 'Ufierta aceptada: la to reserva {reference} tien la plaza retenida 15 minutos. Paga la señal col botón de PayPal de la tarxeta.',
+      acceptedPayOnPage: 'Ufierta aceptada: reserva {reference}. Pa pagar la señal, abri «Ver la reserva» na tarxeta de la reserva.',
       rateLimited: 'Demasiaos mensaxes seguíos. Espera un momentu.',
     },
     page: {

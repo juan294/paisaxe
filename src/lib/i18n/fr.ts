@@ -478,6 +478,8 @@ export const fr: Translations = {
       aiUnavailable: 'L\'assistant n\'est pas disponible pour le moment. Votre réservation reste accessible depuis son lien.',
       voiceDiscovery: 'Voix (découverte)',
       requoteMessage: 'Je voudrais une nouvelle offre',
+      acceptedPayNext: 'Offre acceptée : la réservation {reference} vous garde la place pendant 15 minutes. Payez l’acompte avec le bouton PayPal de la carte.',
+      acceptedPayOnPage: 'Offre acceptée : réservation {reference}. Pour payer l’acompte, ouvrez « Voir la réservation » sur la carte de la réservation.',
       rateLimited: 'Trop de messages à la suite. Patientez un instant.',
     },
     page: {

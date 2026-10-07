@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { MAX_CACHE_BREAKPOINTS, countCacheBreakpoints } from "@/test/prompt-cache";
 
 vi.mock("@/lib/costs/anthropic-usage", () => ({ recordAnthropicUsageInBackground: vi.fn() }));
+const logger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
+vi.mock("@/lib/logger", () => ({ logger }));
 vi.mock("./tools", () => ({
   executeBookingTool: vi.fn(),
   bookingToolDefinitions: vi.fn(() => [{ name: "search_experiences", description: "d", input_schema: { type: "object" } }]),
@@ -17,7 +19,7 @@ type StreamEvent = { type: string; delta?: { type: string; text?: string } };
 interface FakeTurn {
   texts?: string[];
   content: unknown[];
-  stopReason: "end_turn" | "tool_use" | "max_tokens";
+  stopReason: "end_turn" | "tool_use" | "max_tokens" | "refusal";
   failBeforeEvents?: Error;
   failAfterText?: Error;
 }
@@ -201,7 +203,6 @@ describe("streamBookingTurn", () => {
         input(second.client, {
           draft: { ...draft, partySize: 6 },
           contextText: "El Sella nace en los Picos de Europa.",
-          acceptedBooking: { id: "b1", reference: "RS-ABC123" },
         })
       )
     );
@@ -214,11 +215,7 @@ describe("streamBookingTurn", () => {
     expect(systemB[1].cache_control).toBeUndefined();
     expect(systemB[1].text).toContain('"partySize":6');
     expect(systemB[1].text).toContain("2026-11-20");
-    expect(systemB[1].text).toContain("RS-ABC123");
     expect(systemB[1].text).toContain("El Sella nace en los Picos de Europa.");
-    expect(systemA[1].text).not.toContain("RS-ABC123");
-    // The post-accept line sends the model to the payment tool, never to a link in text.
-    expect(systemB[1].text).toContain("create_payment_order");
     expect(countCacheBreakpoints({ system: systemB })).toBeLessThanOrEqual(MAX_CACHE_BREAKPOINTS);
   });
 
@@ -247,16 +244,11 @@ describe("streamBookingTurn", () => {
       { role: "user", content: "Mañana" },
     ]);
     expect(params.tools).toEqual([{ name: "search_experiences", description: "d", input_schema: { type: "object" } }]);
-    expect(params.model).toBe("claude-sonnet-5");
+    expect(params.model).toBe("claude-sonnet-5-5");
+    // Thinking counts toward max_tokens (#1004): room for it plus the reply, and an explicit effort.
+    expect(params.max_tokens).toBeGreaterThanOrEqual(16000);
+    expect(params.output_config).toEqual({ effort: "low" });
     expect(options.signal).toBe(controller.signal);
-  });
-
-  it("on the post-accept turn with no typed text, speaks for the visitor's button press", async () => {
-    const fake = fakeAnthropic([{ content: [], stopReason: "end_turn" }]);
-
-    await collect(streamBookingTurn(input(fake.client, { message: "", acceptedBooking: { id: "b1", reference: "RS-ABC123" } })));
-
-    expect((fake.calls[0].params.messages as { content: string }[]).at(-1)?.content).toBe("He aceptado la oferta.");
   });
 
   it("separates the text of consecutive model iterations with a paragraph break", async () => {
@@ -276,15 +268,62 @@ describe("streamBookingTurn", () => {
     expect((fake.calls[0].params.system as { text: string }[])[1].text).toContain("Idioma de la interfaz del visitante: en");
   });
 
-  it("the post-accept state names create_payment_order, a registered tool, and never claims payment availability is missing", async () => {
-    const { bookingToolDefinitions } = await vi.importActual<typeof import("./tools")>("./tools");
-    const fake = fakeAnthropic([{ content: [], stopReason: "end_turn" }]);
-    await collect(streamBookingTurn(input(fake.client, { acceptedBooking: { id: "b1", reference: "RS-ABC123" } })));
-    const stateText = (fake.calls[0].params.system as { text: string }[])[1].text;
+  describe("a verified accept (#1003)", () => {
+    const accepted = { id: "b1", reference: "RS-ABC123" };
+    const paymentCard = { kind: "payment", bookingId: "b1", amountCents: 3000 };
+    const textOf = (events: unknown[]) =>
+      events.flatMap((e) => ((e as { type: string }).type === "text" ? [(e as { content: string }).content] : [])).join("");
 
-    expect(bookingToolDefinitions().map((tool) => tool.name)).toContain("create_payment_order");
-    expect(stateText).toContain("create_payment_order");
-    expect(stateText).not.toMatch(/todavía no está disponible/);
+    it("creates the payment order on the server, in the visitor's language, and calls no model", async () => {
+      vi.mocked(executeBookingTool).mockResolvedValue({ isError: false, result: { ok: true }, card: paymentCard as never });
+      const fake = fakeAnthropic([]);
+
+      const events = await collect(streamBookingTurn(input(fake.client, { message: "", acceptedBooking: accepted, locale: "en" })));
+
+      expect(fake.stream).not.toHaveBeenCalled();
+      expect(executeBookingTool).toHaveBeenCalledTimes(1);
+      expect(executeBookingTool).toHaveBeenCalledWith(expect.anything(), "create_payment_order", { bookingId: "b1" });
+      expect(events).toContainEqual({ type: "card", card: paymentCard });
+      expect(textOf(events)).toContain("RS-ABC123");
+      expect(textOf(events)).toMatch(/PayPal/);
+      expect(textOf(events)).not.toMatch(/señal|retenida/);
+    });
+
+    it("speaks Spanish when the visitor's language is Spanish, unknown or not a locale", async () => {
+      vi.mocked(executeBookingTool).mockResolvedValue({ isError: false, result: { ok: true }, card: paymentCard as never });
+      for (const locale of ["es", null, "toString", "xx"]) {
+        const events = await collect(streamBookingTurn(input(fakeAnthropic([]).client, { message: "", acceptedBooking: accepted, locale })));
+        expect(textOf(events)).toContain("RS-ABC123");
+        expect(textOf(events)).toMatch(/señal/);
+      }
+    });
+
+    it("when the order cannot be created, points to the booking page and shows no payment card", async () => {
+      vi.mocked(executeBookingTool).mockResolvedValue({ isError: true, result: { error: "payment_unavailable" } });
+      const fake = fakeAnthropic([]);
+
+      const events = await collect(streamBookingTurn(input(fake.client, { message: "", acceptedBooking: accepted, locale: "en" })));
+
+      expect(fake.stream).not.toHaveBeenCalled();
+      expect(events.some((e) => (e as { type: string }).type === "card")).toBe(false);
+      expect(textOf(events)).toContain("RS-ABC123");
+      expect(textOf(events)).toMatch(/View booking/);
+    });
+  });
+
+  it("logs a turn cut at max_tokens instead of ending it silently (#1004)", async () => {
+    const fake = fakeAnthropic([{ texts: ["Entiendo que quieres seguir, pero la señ"], content: [], stopReason: "max_tokens" }]);
+    await collect(streamBookingTurn(input(fake.client)));
+    expect(logger.warn).toHaveBeenCalledWith("[BOOKING_CHAT_MAX_TOKENS]", expect.objectContaining({ userId: "user-1" }));
+  });
+
+  it("treats a refusal before any text as a model failure (the route answers ai_unavailable)", async () => {
+    const fake = fakeAnthropic([
+      { content: [], stopReason: "refusal" },
+      { content: [], stopReason: "refusal" },
+    ]);
+    await expect(collect(streamBookingTurn(input(fake.client)))).rejects.toThrow(/refusal/);
+    expect(logger.warn).toHaveBeenCalledWith("[BOOKING_CHAT_REFUSAL]", expect.objectContaining({ userId: "user-1" }));
   });
 });
 

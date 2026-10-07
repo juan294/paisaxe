@@ -22,14 +22,6 @@
       ]
     },
     {
-      "name": "accepted",
-      "when": "^He aceptado la oferta\\.$",
-      "steps": [
-        { "tools": [{ "name": "create_payment_order", "input": { "bookingId": "{{state.acceptedBookingId}}" } }] },
-        { "text": "Plaza retenida. Paga la señal con el botón de la tarjeta de pago antes de que caduque la retención." }
-      ]
-    },
-    {
       "name": "cancel",
       "when": "^Quiero cancelar mi reserva$",
       "steps": [

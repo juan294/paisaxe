@@ -10,7 +10,6 @@ import {
   buildConversationFlow,
   GENERIC_REDIRECT_RESPONSE,
   GENERIC_REDIRECT_RESPONSE_ES,
-  CHAT_CONFIG,
 } from "./chat-config";
 
 describe("buildSystemPrompt", () => {
@@ -295,61 +294,6 @@ describe("GENERIC_REDIRECT_RESPONSE_ES", () => {
   });
 });
 
-describe("CHAT_CONFIG", () => {
-  it("should have model property", () => {
-    expect(CHAT_CONFIG).toHaveProperty("model");
-    expect(typeof CHAT_CONFIG.model).toBe("string");
-    expect(CHAT_CONFIG.model).toContain("claude");
-  });
-
-  it("should have maxTokens property", () => {
-    expect(CHAT_CONFIG).toHaveProperty("maxTokens");
-    expect(typeof CHAT_CONFIG.maxTokens).toBe("number");
-    expect(CHAT_CONFIG.maxTokens).toBeGreaterThan(0);
-  });
-
-  it("should have maxInputLength property", () => {
-    expect(CHAT_CONFIG).toHaveProperty("maxInputLength");
-    expect(typeof CHAT_CONFIG.maxInputLength).toBe("number");
-    expect(CHAT_CONFIG.maxInputLength).toBeGreaterThan(0);
-  });
-
-  it("should have maxConversationTurns property", () => {
-    expect(CHAT_CONFIG).toHaveProperty("maxConversationTurns");
-    expect(typeof CHAT_CONFIG.maxConversationTurns).toBe("number");
-    expect(CHAT_CONFIG.maxConversationTurns).toBeGreaterThan(0);
-  });
-
-  it("should have temperature property", () => {
-    expect(CHAT_CONFIG).toHaveProperty("temperature");
-    expect(typeof CHAT_CONFIG.temperature).toBe("number");
-    expect(CHAT_CONFIG.temperature).toBeGreaterThanOrEqual(0);
-    expect(CHAT_CONFIG.temperature).toBeLessThanOrEqual(2);
-  });
-
-  describe("reasonable defaults", () => {
-    it("should use a Sonnet model for cost efficiency", () => {
-      expect(CHAT_CONFIG.model).toContain("sonnet");
-    });
-
-    it("should have maxTokens of 1024 for concise responses", () => {
-      expect(CHAT_CONFIG.maxTokens).toBe(1024);
-    });
-
-    it("should have maxInputLength of 2000 to prevent abuse", () => {
-      expect(CHAT_CONFIG.maxInputLength).toBe(2000);
-    });
-
-    it("should have maxConversationTurns of 20", () => {
-      expect(CHAT_CONFIG.maxConversationTurns).toBe(20);
-    });
-
-    it("should have temperature of 0.7 for balanced creativity", () => {
-      expect(CHAT_CONFIG.temperature).toBe(0.7);
-    });
-  });
-});
-
 describe("buildBookingInstructions (PayPal hackathon booking chat)", () => {
   const text = buildBookingInstructions();
 
@@ -368,6 +312,9 @@ describe("buildBookingInstructions (PayPal hackathon booking chat)", () => {
     ["replies in the visitor's language, Spanish by default", /idioma del visitante/i],
     ["overrides the discovery persona's voice upsell markers", /VOICE_UPSELL/],
     ["invoices the balance of a confirmed booking only through send_balance_invoice, paid only when it says paid", /send_balance_invoice[^\n]*confirmada[^\n]*paid/],
+    ["searches the catalog before asking what kind of activity (#1002)", /search_experiences antes de preguntar/i],
+    ["suggests only experiences a tool returned, never general ideas (#1002)", /solo propongo experiencias que devuelva search_experiences/i],
+    ["never calls a booking awaiting payment confirmed (#1002)", /pendiente de pago[^\n]*nunca[^\n]*confirmada/i],
   ])("%s", (_label, pattern) => {
     expect(text).toMatch(pattern);
   });

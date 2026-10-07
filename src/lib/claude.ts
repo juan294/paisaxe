@@ -18,6 +18,14 @@ import AnthropicSDK from "@anthropic-ai/sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";
 import { CHAT_MODEL } from "@/lib/models";
+
+/**
+ * Claude Sonnet 5.5 thinks before answering (adaptive thinking is on by default)
+ * and its effort levels are recalibrated; low is the starting point for chat
+ * (#1005). Thinking counts toward max_tokens, so chat caps leave room for it (#1004).
+ */
+const CHAT_EFFORT = "low" as const;
+const CHAT_MAX_TOKENS = 16000;
 import { logger } from "@/lib/logger";
 import { recordAnthropicUsageInBackground, type UsageSource } from "@/lib/costs/anthropic-usage";
 import { buildSystemBlocks, type SystemBlock } from "@/lib/cached-system";
@@ -129,6 +137,7 @@ async function* streamWithSDK(
   const params = {
     model,
     max_tokens: maxTokens,
+    output_config: { effort: CHAT_EFFORT },
     system,
     messages,
   };
@@ -188,6 +197,7 @@ async function* streamWithCurl(
   const body = JSON.stringify({
     model,
     max_tokens: maxTokens,
+    output_config: { effort: CHAT_EFFORT },
     system,
     messages,
     stream: true,
@@ -383,6 +393,7 @@ async function callWithSDK(
     {
       model,
       max_tokens: maxTokens,
+      output_config: { effort: CHAT_EFFORT },
       system,
       messages,
     },
@@ -412,6 +423,7 @@ async function callWithCurl(
   const body = JSON.stringify({
     model,
     max_tokens: maxTokens,
+    output_config: { effort: CHAT_EFFORT },
     system,
     messages,
   });
@@ -613,7 +625,7 @@ export async function generateChatResponse(
     buildChatSystem(messageIndex, asturianEnabled),
     [{ role: "user", content: userContent }],
     CHAT_MODEL,
-    1024,
+    CHAT_MAX_TOKENS,
     { ...options, source: "chat" }
   );
 
@@ -646,7 +658,7 @@ export async function* streamChatResponse(
     buildChatSystem(messageIndex, asturianEnabled),
     [{ role: "user", content: userContent }],
     CHAT_MODEL,
-    1024,
+    CHAT_MAX_TOKENS,
     options
   );
 }

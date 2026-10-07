@@ -111,10 +111,7 @@ describe("replayResponse with the committed e2e fixture", () => {
     expect(text.content[0]).toMatchObject({ type: "text", text: expect.stringContaining("Aceptar oferta") });
   });
 
-  it("reads the accepted booking and the confirmed booking from the server's state block", () => {
-    const accepted = replayResponse(fixture, params([{ role: "user", content: "He aceptado la oferta." }]), 1);
-    expect(accepted.content).toMatchObject([{ name: "create_payment_order", input: { bookingId: BOOKING_ID } }]);
-
+  it("reads the confirmed booking from the server's state block", () => {
     const cancel = replayResponse(fixture, params([{ role: "user", content: "Quiero cancelar mi reserva" }]), 1);
     expect(cancel.content).toMatchObject([{ name: "preview_cancellation", input: { bookingId: BOOKING_ID } }]);
   });

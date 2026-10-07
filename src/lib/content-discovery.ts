@@ -263,7 +263,8 @@ export async function generateDescription(
       },
       body: JSON.stringify({
         model: CHAT_MODEL,
-        max_tokens: 300,
+        max_tokens: 16000,
+        output_config: { effort: "low" },
         messages: [
           {
             role: "user",

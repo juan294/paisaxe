@@ -12,8 +12,12 @@
  *
  * Prompt caching (.claude/rules/prompt-caching.md): the persona and the
  * booking rules form the cached system block; the per-turn state (today's
- * date, draft, bookings, the accept event, retrieved guide context) is the
- * unmarked block after it.
+ * date, draft, bookings, retrieved guide context) is the unmarked block after it.
+ *
+ * The turn right after "Accept offer" runs no model (#1003): the server creates
+ * the payment order through the same tool and answers with a fixed line in the
+ * visitor's language. Asking the model to do it made it re-quote, or refuse the
+ * synthetic "I accepted" text as an acceptance by text.
  */
 import "server-only";
 
@@ -22,6 +26,15 @@ import { buildSystemBlocks } from "@/lib/cached-system";
 import { buildBookingInstructions, buildSystemPrompt } from "@/lib/chat-config";
 import { recordAnthropicUsageInBackground } from "@/lib/costs/anthropic-usage";
 import { getEnv } from "@/lib/env";
+import { en } from "@/lib/i18n/en";
+import { es } from "@/lib/i18n/es";
+import { fr } from "@/lib/i18n/fr";
+import { de } from "@/lib/i18n/de";
+import { pt } from "@/lib/i18n/pt";
+import { ast } from "@/lib/i18n/ast";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+import type { Translations } from "@/lib/i18n/types";
+import { logger } from "@/lib/logger";
 import { CHAT_MODEL } from "@/lib/models";
 import type { BookingChatHistoryItem } from "@/types/booking-chat";
 import type { ChatStreamEvent } from "@/types/sse";
@@ -33,9 +46,11 @@ import type { BookingModelClient } from "./model-client";
 export const MAX_TOOL_ITERATIONS = 6;
 export const ITERATION_CAP_MESSAGE =
   "No he podido completar este paso; prueba a concretar fecha y personas.";
-const MAX_TOKENS = 1024;
-/** Stands in for the visitor's words on the turn sent right after the accept button. */
-const ACCEPTED_TURN_TEXT = "He aceptado la oferta.";
+/** Thinking counts toward max_tokens (#1004); streamed, so a large cap is safe. */
+const MAX_TOKENS = 16000;
+/** Claude Sonnet 5.5 effort levels are recalibrated; low is the starting point for chat (#1005). */
+const EFFORT = "low" as const;
+const TRANSLATIONS: Record<string, Translations> = { es, en, fr, de, pt, ast };
 
 export async function createBookingModelClient(): Promise<BookingModelClient> {
   // Local release probes only: a scripted model replaying a recorded tool
@@ -49,7 +64,7 @@ export async function createBookingModelClient(): Promise<BookingModelClient> {
 export interface BookingTurnInput {
   anthropic: BookingModelClient;
   tools: ToolContext;
-  /** The visitor's text; empty only on the post-accept turn. */
+  /** The visitor's text; empty only on the post-accept turn, which runs no model. */
   message: string;
   history: BookingChatHistoryItem[];
   draft: BookingDraft;
@@ -89,14 +104,6 @@ function stateBlock(input: BookingTurnInput, now: Date): string {
     `Reservas del visitante: ${bookings.length > 0 ? JSON.stringify(bookings) : "ninguna"}`,
   ];
   if (input.locale) lines.push(`Idioma de la interfaz del visitante: ${input.locale}`);
-  if (input.acceptedBooking) {
-    lines.push(
-      `El visitante acaba de pulsar el botón y ha aceptado la oferta: reserva ${input.acceptedBooking.reference} ` +
-        `(bookingId ${input.acceptedBooking.id}), plaza retenida 15 minutos. ` +
-        "Confírmaselo en una frase, prepara el pago de la señal con create_payment_order y dile que pague con el botón " +
-        "de la tarjeta de pago antes de que caduque la retención. La reserva no está pagada hasta que get_booking_status diga confirmed."
-    );
-  }
   if (input.contextText) {
     lines.push("", "# CONTEXTO DE LA GUÍA", `<context>${input.contextText}</context>`);
   }
@@ -115,7 +122,7 @@ function conversation(input: BookingTurnInput): Anthropic.MessageParam[] {
   };
 
   for (const item of input.history) append(item.role, item.content);
-  append("user", input.message.trim() || (input.acceptedBooking ? ACCEPTED_TURN_TEXT : ""));
+  append("user", input.message.trim());
   return turns;
 }
 
@@ -127,7 +134,7 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
   let textSent = false;
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const stream = input.anthropic.messages.stream(
-      { model: CHAT_MODEL, max_tokens: MAX_TOKENS, system, tools, messages },
+      { model: CHAT_MODEL, max_tokens: MAX_TOKENS, output_config: { effort: EFFORT }, system, tools, messages },
       { signal: input.signal }
     );
     // A later iteration's text starts a new paragraph after earlier text.
@@ -142,6 +149,16 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
 
     const final = await stream.finalMessage();
     recordAnthropicUsageInBackground({ model: CHAT_MODEL, usage: final.usage, source: "booking_chat" });
+    if (final.stop_reason === "refusal") {
+      logger.warn("[BOOKING_CHAT_REFUSAL]", { userId: input.tools.userId, textSent });
+      // Before any text the route answers ai_unavailable; after it, the turn just ends.
+      if (!textSent) throw new Error("refusal");
+      return;
+    }
+    if (final.stop_reason === "max_tokens") {
+      logger.warn("[BOOKING_CHAT_MAX_TOKENS]", { userId: input.tools.userId, outputTokens: final.usage.output_tokens });
+      return;
+    }
     if (final.stop_reason !== "tool_use") return;
 
     messages.push({ role: "assistant", content: final.content });
@@ -171,6 +188,10 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
  * before anything was sent is retried once (same rule as src/lib/claude.ts).
  */
 export async function* streamBookingTurn(input: BookingTurnInput): AsyncGenerator<ChatStreamEvent> {
+  if (input.acceptedBooking) {
+    yield* acceptedTurn(input, input.acceptedBooking);
+    return;
+  }
   const now = input.now ?? new Date();
   let yieldedAny = false;
 
@@ -185,4 +206,24 @@ export async function* streamBookingTurn(input: BookingTurnInput): AsyncGenerato
       if (yieldedAny || attempt >= 2 || input.signal.aborted) throw error;
     }
   }
+}
+
+/** The fixed post-accept line, in the visitor's language (Spanish when unknown). */
+function acceptedLine(locale: string | null | undefined, key: string, reference: string): string {
+  const translations = locale && Object.hasOwn(TRANSLATIONS, locale) ? TRANSLATIONS[locale] : es;
+  return resolveTranslation(key, translations).replace("{reference}", reference);
+}
+
+/** The turn after "Accept offer": the payment order and its card, no model (#1003). */
+async function* acceptedTurn(input: BookingTurnInput, booking: { id: string; reference: string }): AsyncGenerator<ChatStreamEvent> {
+  yield { type: "tool", name: "create_payment_order", status: "start" };
+  const outcome = await executeBookingTool(input.tools, "create_payment_order", { bookingId: booking.id });
+  yield { type: "tool", name: "create_payment_order", status: outcome.isError ? "error" : "done" };
+  if (outcome.isError) {
+    logger.warn("[BOOKING_CHAT_ACCEPT_PAYMENT_FAILED]", { userId: input.tools.userId, bookingId: booking.id });
+    yield { type: "text", content: acceptedLine(input.locale, "booking.chat.acceptedPayOnPage", booking.reference) };
+    return;
+  }
+  yield { type: "text", content: acceptedLine(input.locale, "booking.chat.acceptedPayNext", booking.reference) };
+  if (outcome.card) yield { type: "card", card: outcome.card };
 }

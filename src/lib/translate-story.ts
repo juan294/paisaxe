@@ -230,7 +230,7 @@ export async function translateStory(
       "You are a professional translator. Return only valid JSON, no other text.",
       [{ role: "user", content: prompt }],
       CHAT_MODEL,
-      2048,
+      16000,
       { source: "translate" }
     );
 

@@ -478,6 +478,8 @@ export const en: Translations = {
       aiUnavailable: 'The assistant is not available right now. Your booking is still available from its link.',
       voiceDiscovery: 'Voice (discovery)',
       requoteMessage: 'I would like a new offer',
+      acceptedPayNext: 'Offer accepted: booking {reference} holds your place for 15 minutes. Pay the deposit with the PayPal button on the card.',
+      acceptedPayOnPage: 'Offer accepted: booking {reference}. To pay the deposit, open “View booking” on the booking card.',
       rateLimited: 'Too many messages in a row. Please wait a moment.',
     },
     page: {

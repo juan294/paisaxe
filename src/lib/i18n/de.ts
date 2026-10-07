@@ -478,6 +478,8 @@ export const de: Translations = {
       aiUnavailable: 'Der Assistent ist gerade nicht verfügbar. Deine Buchung bleibt über ihren Link erreichbar.',
       voiceDiscovery: 'Stimme (Entdecken)',
       requoteMessage: 'Ich möchte ein neues Angebot',
+      acceptedPayNext: 'Angebot angenommen: Buchung {reference} hält Ihren Platz 15 Minuten lang. Zahlen Sie die Anzahlung mit dem PayPal-Button auf der Karte.',
+      acceptedPayOnPage: 'Angebot angenommen: Buchung {reference}. Um die Anzahlung zu zahlen, öffnen Sie „Buchung ansehen“ auf der Buchungskarte.',
       rateLimited: 'Zu viele Nachrichten hintereinander. Bitte warte einen Moment.',
     },
     page: {

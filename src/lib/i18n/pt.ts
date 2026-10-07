@@ -478,6 +478,8 @@ export const pt: Translations = {
       aiUnavailable: 'O assistente não está disponível neste momento. A sua reserva continua acessível através da ligação.',
       voiceDiscovery: 'Voz (descoberta)',
       requoteMessage: 'Quero uma nova oferta',
+      acceptedPayNext: 'Oferta aceite: a reserva {reference} guarda o seu lugar durante 15 minutos. Pague o sinal com o botão PayPal do cartão.',
+      acceptedPayOnPage: 'Oferta aceite: reserva {reference}. Para pagar o sinal, abra «Ver a reserva» no cartão da reserva.',
       rateLimited: 'Demasiadas mensagens seguidas. Aguarde um momento.',
     },
     page: {
