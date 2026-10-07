@@ -87,3 +87,10 @@ test_configs/
 
 # Claude Code tool config
 .summon
+
+# /design-sync (Claude Design): staged converter, build output, machine state
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

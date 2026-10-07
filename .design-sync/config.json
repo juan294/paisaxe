@@ -1,0 +1,108 @@
+{
+  "projectId": "ddb69a35-917f-49fd-831e-517ad569fe90",
+  "shape": "package",
+  "pkg": "paisaxe",
+  "globalName": "Paisaxe",
+  "buildCmd": "npx --yes @tailwindcss/cli@4.3.3 -i src/app/globals.css -o .design-sync/.cache/paisaxe.css && rm -rf build/ts && npx tsc -p .design-sync/tsconfig.dts.json",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/.cache/paisaxe.css",
+  "guidelinesGlob": [
+    "docs/project/project-charter.md"
+  ],
+  "provider": {
+    "component": "PaisaxeRoot"
+  },
+  "componentSrcMap": {
+    "Button": "src/components/ui/button.tsx",
+    "Card": "src/components/ui/card.tsx",
+    "Dialog": "src/components/ui/dialog.tsx",
+    "Input": "src/components/ui/input.tsx",
+    "Label": "src/components/ui/label.tsx",
+    "Select": "src/components/ui/select.tsx",
+    "Skeleton": "src/components/ui/skeleton.tsx",
+    "StatCard": "src/components/ui/stat-card.tsx",
+    "Textarea": "src/components/ui/textarea.tsx",
+    "Tooltip": "src/components/ui/tooltip.tsx",
+    "Logo": "src/components/ui/logo.tsx",
+    "BookingCards": "src/components/immersive/voice-chat/booking-cards.tsx",
+    "BalanceInvoiceStatusView": "src/components/booking/balance-invoice.tsx",
+    "CancellationConfirm": "src/components/booking/cancellation-confirm.tsx",
+    "ChatComposer": "src/components/immersive/voice-chat/chat-composer.tsx",
+    "ChatErrorBanner": "src/components/immersive/voice-chat/chat-error-banner.tsx",
+    "ChatMarkdown": "src/components/immersive/voice-chat/chat-markdown.tsx",
+    "QuestionPrompts": "src/components/immersive/question-prompts.tsx",
+    "StoryInfoPanel": "src/components/immersive/story-info-panel.tsx",
+    "StoryProgressBar": "src/components/immersive/story-progress-bar.tsx",
+    "CategoryFilterBadge": "src/components/immersive/category-filter-badge.tsx",
+    "FreshnessBadge": "src/components/immersive/freshness-badge.tsx",
+    "UserSubmittedBadge": "src/components/immersive/user-submitted-badge.tsx",
+    "StoryCardSkeleton": "src/components/immersive/skeleton-story-card.tsx",
+    "ChatMessageSkeleton": "src/components/immersive/skeleton-chat-message.tsx",
+    "LanguageSwitcher": "src/components/immersive/language-switcher.tsx",
+    "ShareButton": "src/components/immersive/share-button.tsx",
+    "SurpriseMeButton": "src/components/immersive/surprise-me-button.tsx",
+    "PrivacyNotice": "src/components/immersive/privacy-notice.tsx"
+  },
+  "dtsPropsFor": {
+    "BalanceInvoiceStatusView": "status: \"draft\" | \"sent\" | \"payment_pending\" | \"partially_paid\" | \"paid\" | \"cancelled\"; url: string | null;",
+    "Card": "className?: string; children?: React.ReactNode; /** Compose with CardHeader, CardTitle, CardDescription, CardContent, CardFooter (same bundle). Extends <div> attributes. */",
+    "Dialog": "open?: boolean; defaultOpen?: boolean; onOpenChange?: (open: boolean) => void; modal?: boolean; children?: React.ReactNode; /** Radix Dialog root. Compose with DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose. */",
+    "Input": "type?: string; placeholder?: string; value?: string; defaultValue?: string; disabled?: boolean; required?: boolean; id?: string; name?: string; className?: string; onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void; /** Extends <input> attributes. */",
+    "Label": "htmlFor?: string; className?: string; children?: React.ReactNode; /** Radix Label. Extends <label> attributes. */",
+    "Select": "value?: string; defaultValue?: string; onValueChange?: (value: string) => void; disabled?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void; children?: React.ReactNode; /** Radix Select root. Compose with SelectTrigger > SelectValue and SelectContent > SelectItem(value). */",
+    "Skeleton": "className?: string; /** Pulsing placeholder block; size it with Tailwind classes (h-*, w-*, rounded-*). Extends <div> attributes. */",
+    "Textarea": "placeholder?: string; value?: string; defaultValue?: string; rows?: number; disabled?: boolean; className?: string; onChange?: (event: React.ChangeEvent<HTMLTextAreaElement>) => void; /** Extends <textarea> attributes. */",
+    "Tooltip": "open?: boolean; defaultOpen?: boolean; onOpenChange?: (open: boolean) => void; delayDuration?: number; children?: React.ReactNode; /** Radix Tooltip root; needs TooltipProvider above it. Compose with TooltipTrigger and TooltipContent. */",
+    "ChatMessageSkeleton": "/** No props. */",
+    "StoryCardSkeleton": "/** No props. */",
+    "LanguageSwitcher": "/** No props: reads and sets the locale from the LanguageProvider inside PaisaxeRoot. */"
+  },
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "Select": {
+      "cardMode": "single",
+      "viewport": "400x340"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "viewport": "400x240"
+    },
+    "CancellationConfirm": {
+      "cardMode": "column"
+    },
+    "Card": {
+      "cardMode": "column"
+    },
+    "Input": {
+      "cardMode": "column"
+    },
+    "Skeleton": {
+      "cardMode": "column"
+    },
+    "StatCard": {
+      "cardMode": "column"
+    },
+    "Textarea": {
+      "cardMode": "column"
+    },
+    "CategoryFilterBadge": {
+      "cardMode": "column"
+    },
+    "StoryInfoPanel": {
+      "cardMode": "column"
+    },
+    "StoryProgressBar": {
+      "cardMode": "column"
+    },
+    "BookingCards": {
+      "cardMode": "column"
+    },
+    "ChatComposer": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}
