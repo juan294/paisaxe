@@ -579,3 +579,12 @@ Recorded 2026-10-03, when the owner accepted Phase 0.
    APIMatic-generated PayPal Server SDK; no hooks, no MCP servers. It loads in new Claude Code
    sessions. Phase 4 decides whether `src/lib/paypal` uses that SDK (`@paypal/paypal-server-sdk`)
    or plain `fetch` (see `phase-4.md`, Unit [adapter]).
+
+### Owner decisions, 2026-10-06
+
+- **`docs/agents/` history: keep.** No purge before the repository goes public. The history holds the owner's own email (already public as commit author), personal subscription costs from the cost reports and past security reports; gitleaks finds no secrets.
+- **Judge vouchers include the 24-hour voice pass (option C).** The ElevenLabs workspace limit does not stop spending (usage-based extension enabled, up to 250,000 extra characters); the owner accepts the overage risk because judges rarely test submissions. This overrides the Phase 6 handoff's default of issuing judge vouchers without the voice pass.
+
+### Manual sandbox acceptance, 2026-10-07
+
+Phases 4 (steps 1 to 3), 5 and 8 (8a, 8c) were run on the local stack against the real PayPal sandbox with the owner approving as the sandbox buyer; evidence in `2026-10-03-paypal-hackathon-booking-phases/sandbox-acceptance-2026-10-07.md`. Phase 4 step 4 (PostHog) and 8b (phone confirmation) run in production during Phase 7. Defects found: #1000 to #1005.
