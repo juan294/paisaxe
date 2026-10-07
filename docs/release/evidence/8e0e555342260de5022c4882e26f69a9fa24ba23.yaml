@@ -1,0 +1,81 @@
+# Paisaxe production release evidence: v1.8.0 (PayPal booking behind a disabled flag,
+# Claude Sonnet 5.5 chat, fixes) + migrations 112-126.
+#
+# Release PR #1007 (merge commit 623d3229, merge-commit method). Migrations 112-126 were applied
+# to production before the merge (2026-10-07 07:40:32-07:41:08 UTC, DO-M1). paisaxe.es and www
+# were assigned to the production deployment of that exact commit (09:15:39 UTC); the deployed
+# read-only probes, identity check and voice preflight below ran against it. favorite-roundtrip,
+# booking-access-boundary and booking-roundtrip are mutating and ran against the local Docker
+# Supabase stack only (local-only QA user) on this tree. check-migrations and
+# check-required-probes ran on this tree. The production `experience_booking` flag is false.
+
+version: 1
+
+candidate_tree: 8e0e555342260de5022c4882e26f69a9fa24ba23
+shipped_tree: 8e0e555342260de5022c4882e26f69a9fa24ba23
+deployed_tree: 8e0e555342260de5022c4882e26f69a9fa24ba23
+deployed_commit: 623d3229314b7bd99169232a90aa75ba47fcfdbf
+github_deployment_id: 6905184366
+target_url: https://paisaxe.es
+generated_at: "2026-10-07T09:20:00Z"
+
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles: [identity]
+
+  - id: health-status
+    status: passed
+    oracles: [http]
+  - id: health-db
+    status: passed
+    oracles: [http]
+  - id: csp-canary
+    status: passed
+    oracles: [ui]
+  - id: story-read-path
+    status: passed
+    oracles: [http, ui]
+  - id: admin-denial
+    status: passed
+    oracles: [http]
+  - id: webhook-unsigned
+    status: passed
+    oracles: [http]
+  - id: chat-smoke
+    status: passed
+    oracles: [http]
+  - id: booking-gate-closed
+    status: passed
+    oracles: [http, ui]
+
+  - id: elevenlabs-voice-preflight
+    status: passed
+    oracles: [http]
+    provider: ok
+    fingerprint: sha256:1337f33296d87be8
+    fingerprint_matches: true
+    agents: [pelayo, booking, penny, iris, xander]
+    custom_llm: not_applicable
+    target_url: https://paisaxe.es
+    response_url: https://paisaxe.es/api/health/voice
+    github_deployment_id: 6905184366
+    deployment_commit: 623d3229314b7bd99169232a90aa75ba47fcfdbf
+    checked_at: "2026-10-07T09:16:50.568Z"
+
+  - id: booking-access-boundary
+    status: passed
+    oracles: [http, cleanup]
+    cleanup: removed
+  - id: booking-roundtrip
+    status: passed
+    oracles: [ui, datastore, cleanup]
+    cleanup: removed
+  - id: favorite-roundtrip
+    status: passed
+    oracles: [ui, datastore, cleanup]
+    cleanup: removed
+
+  - id: migration-posture
+    status: passed
+    oracles: [static]
