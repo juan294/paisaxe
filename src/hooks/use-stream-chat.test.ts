@@ -1091,6 +1091,37 @@ describe("useStreamChat", () => {
     expect(result.current.messages[1].content).toBe("Hello");
   });
 
+  it("ignores booking-chat tool and card events, which the parser now accepts", async () => {
+    const encoder = new TextEncoder();
+    const events = [
+      `data: ${JSON.stringify({ type: "text", content: "Hello" })}\n\n`,
+      `data: ${JSON.stringify({ type: "tool", name: "search_experiences", status: "start" })}\n\n`,
+      `data: ${JSON.stringify({ type: "card", card: { kind: "offer", options: [] } })}\n\n`,
+      `data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`,
+    ];
+    const combined = encoder.encode(events.join(""));
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(combined);
+        controller.close();
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Test", { context: "ctx", locale: "es", messageIndex: 0 });
+    });
+
+    expect(result.current.messages[1].content).toBe("Hello");
+  });
+
   it("should handle malformed SSE data gracefully", async () => {
     const encoder = new TextEncoder();
     const events = [

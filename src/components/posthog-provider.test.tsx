@@ -362,6 +362,57 @@ describe("PostHog production initialization (non-localhost)", () => {
     expect(screen.getByTestId("app")).toBeInTheDocument();
   });
 
+  it("F05: a booking page view sends the redacted path and no query", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+    const capability = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+    mockUsePathname.mockReturnValue(`/booking/${capability}/return`);
+    mockUseSearchParams.mockReturnValue(new URLSearchParams("token=5O190127TN364715T&PayerID=QYR5Z8XDVJNXQ"));
+
+    render(
+      <PostHogProviderWrapper>
+        <PostHogPageView />
+      </PostHogProviderWrapper>
+    );
+
+    await vi.waitFor(() => expect(mockCapture).toHaveBeenCalled());
+    expect(mockCapture).toHaveBeenCalledWith("$pageview", {
+      $current_url: `${window.origin}/booking/[redacted]/return`,
+    });
+    expect(JSON.stringify(mockCapture.mock.calls)).not.toContain(capability);
+  });
+
+  it("F05: before_send scrubs capabilities from every event's properties", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+    render(
+      <PostHogProviderWrapper>
+        <div>Content</div>
+      </PostHogProviderWrapper>
+    );
+    await vi.waitFor(() => expect(mockInit).toHaveBeenCalled());
+
+    const beforeSend = mockInit.mock.calls[0][1].before_send as (event: unknown) => unknown;
+    const capability = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+    const event = {
+      event: "chat_message_sent",
+      properties: {
+        $current_url: `https://paisaxe.es/booking/${capability}`,
+        $referrer: `https://paisaxe.es/booking/${capability}/return?token=x`,
+        nested: { url: `/operator/${capability}` },
+        story_id: "s1",
+      },
+      // posthog-js sets a real Date before before_send and serializes only Dates.
+      timestamp: new Date("2026-10-03T10:00:00Z"),
+    };
+
+    const sent = beforeSend(event) as typeof event;
+    expect(JSON.stringify(sent)).not.toContain(capability);
+    expect(sent.timestamp).toBeInstanceOf(Date);
+    expect(beforeSend(event)).toMatchObject({
+      properties: { $current_url: "https://paisaxe.es/booking/[redacted]", story_id: "s1" },
+    });
+    expect(beforeSend(null)).toBeNull();
+  });
+
   it("provides the PostHog instance via context after initialization", async () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
 

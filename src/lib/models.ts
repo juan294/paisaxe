@@ -4,4 +4,4 @@
  */
 
 /** Primary Claude model used for chat and non-streaming responses. */
-export const CHAT_MODEL = "claude-sonnet-5";
+export const CHAT_MODEL = "claude-sonnet-5-5";

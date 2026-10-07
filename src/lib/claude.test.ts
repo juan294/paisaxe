@@ -40,6 +40,7 @@ interface RequestBody {
   system: SystemBlock[];
   model: string;
   max_tokens: number;
+  output_config?: { effort: string };
   messages: { role: string; content: string }[];
   cache_control?: { type: "ephemeral" };
 }
@@ -102,8 +103,9 @@ describe("claude", () => {
       expect(response).toBe("This is a response about Asturias");
 
       const body = getCurlBody();
-      expect(body.model).toBe("claude-sonnet-5");
-      expect(body.max_tokens).toBe(1024);
+      expect(body.model).toBe("claude-sonnet-5-5");
+      expect(body.max_tokens).toBe(16000);
+      expect(body.output_config).toEqual({ effort: "low" });
       expect(body.messages).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ role: "user" }),
@@ -215,8 +217,9 @@ describe("claude", () => {
       await generateChatResponse("Test", []);
 
       const body = getCurlBody();
-      expect(body.model).toBe("claude-sonnet-5");
-      expect(body.max_tokens).toBe(1024);
+      expect(body.model).toBe("claude-sonnet-5-5");
+      expect(body.max_tokens).toBe(16000);
+      expect(body.output_config).toEqual({ effort: "low" });
       expect(body.system).toBeDefined();
       expect(body.messages).toHaveLength(1);
       expect(body.messages[0].role).toBe("user");
@@ -1328,7 +1331,7 @@ describe("claude", () => {
       const dIndex = curlArgs.indexOf("-d");
       const body = JSON.parse(curlArgs[dIndex + 1]);
       expect(body.stream).toBe(true);
-      expect(body.model).toBe("claude-sonnet-5");
+      expect(body.model).toBe("claude-sonnet-5-5");
     });
 
     it("throws AbortError immediately when signal is already aborted before streaming starts (line 106)", async () => {
@@ -1602,7 +1605,7 @@ describe("claude", () => {
       const { callAnthropicAPI } = await import("./claude");
       setupMockAPIResponse({ content: [{ type: "text", text: "{}" }], usage: { input_tokens: 1, output_tokens: 1 } });
 
-      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100, {
+      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5-5", 100, {
         source: "translate",
       });
 
@@ -1615,7 +1618,7 @@ describe("claude", () => {
       const { callAnthropicAPI } = await import("./claude");
       const unlabelled = () =>
         // @ts-expect-error options with a source label are required
-        callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100);
+        callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5-5", 100);
       expect(typeof unlabelled).toBe("function");
     });
 
@@ -1623,7 +1626,7 @@ describe("claude", () => {
       const { callAnthropicAPI } = await import("./claude");
       setupMockAPIResponse({ content: [{ type: "text", text: "{}" }] });
 
-      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100, { source: "chat" });
+      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5-5", 100, { source: "chat" });
 
       expect(getCurlBody().system).toEqual([
         { type: "text", text: "sys", cache_control: { type: "ephemeral" } },
@@ -1706,15 +1709,16 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       const result = await callAnthropicAPI(
         "system prompt",
         [{ role: "user", content: "Hello" }],
-        "claude-sonnet-5",
+        "claude-sonnet-5-5",
         1024,
         { source: "chat" }
       );
 
       expect(mockCreate).toHaveBeenCalledWith(
         {
-          model: "claude-sonnet-5",
+          model: "claude-sonnet-5-5",
           max_tokens: 1024,
+          output_config: { effort: "low" },
           system: [{ type: "text", text: "system prompt", cache_control: { type: "ephemeral" } }],
           messages: [{ role: "user", content: "Hello" }],
         },
@@ -1732,7 +1736,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         callAnthropicAPI(
           "system prompt",
           [{ role: "user", content: "Test" }],
-          "claude-sonnet-5",
+          "claude-sonnet-5-5",
           1024,
           { source: "chat" }
         )
@@ -1750,7 +1754,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       await callAnthropicAPI(
         "system prompt",
         [{ role: "user", content: "Hello" }],
-        "claude-sonnet-5",
+        "claude-sonnet-5-5",
         1024,
         { signal: controller.signal, source: "chat" }
       );
@@ -1775,8 +1779,9 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(mockCreate).toHaveBeenCalledTimes(1);
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.model).toBe("claude-sonnet-5");
-      expect(callArgs.max_tokens).toBe(1024);
+      expect(callArgs.model).toBe("claude-sonnet-5-5");
+      expect(callArgs.max_tokens).toBe(16000);
+      expect(callArgs.output_config).toEqual({ effort: "low" });
     });
 
     it("should return empty string when SDK returns no text block", async () => {
@@ -1858,8 +1863,9 @@ describe("claude SDK path (NODE_ENV=production)", () => {
 
       expect(mockStream).toHaveBeenCalledTimes(1);
       const callArgs = mockStream.mock.calls[0][0];
-      expect(callArgs.model).toBe("claude-sonnet-5");
-      expect(callArgs.max_tokens).toBe(1024);
+      expect(callArgs.model).toBe("claude-sonnet-5-5");
+      expect(callArgs.max_tokens).toBe(16000);
+      expect(callArgs.output_config).toEqual({ effort: "low" });
       // PE-M5: system is an array; only the stable persona block is marked.
       // The asturianu addition rides in the unmarked flow block after it.
       expect(Array.isArray(callArgs.system)).toBe(true);
@@ -1990,7 +1996,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       });
 
       const { callAnthropicAPI } = await import("./claude");
-      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5", 512, { source: "chat" });
+      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-5-5", 512, { source: "chat" });
 
       expect(capturedConstructorOptions).toMatchObject({ maxRetries: 3 });
     });
@@ -2201,7 +2207,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       await callAnthropicAPI(
         "my system prompt",
         [{ role: "user", content: "question" }],
-        "claude-sonnet-5",
+        "claude-sonnet-5-5",
         512,
         { source: "chat" }
       );
@@ -2298,7 +2304,7 @@ describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
     const result = await callAnthropicAPI(
       "system",
       [{ role: "user", content: "hi" }],
-      "claude-sonnet-5",
+      "claude-sonnet-5-5",
       100,
       { source: "chat" }
     );
@@ -2321,7 +2327,7 @@ describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
     const result = await callAnthropicAPI(
       "system",
       [{ role: "user", content: "hi" }],
-      "claude-sonnet-5",
+      "claude-sonnet-5-5",
       100,
       { source: "chat" }
     );
@@ -2363,7 +2369,7 @@ describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
     mockCreate.mockResolvedValue({ content: [{ type: "text", text: "sdk response" }] });
 
     const { callAnthropicAPI } = await import("./claude");
-    await callAnthropicAPI("system", [{ role: "user", content: "hi" }], "claude-sonnet-5", 100, { source: "chat" });
+    await callAnthropicAPI("system", [{ role: "user", content: "hi" }], "claude-sonnet-5-5", 100, { source: "chat" });
 
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(localMockExecFile).not.toHaveBeenCalled();

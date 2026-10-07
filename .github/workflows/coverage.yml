@@ -1,43 +1,133 @@
 name: Coverage
-
-# Portfolio's repository health check compares this repository's reported
-# coverage commit against its verified default-branch head
-# (`src/lib/health.ts`). A coverage report that names an older commit is graded
-# `mismatched`, which becomes an ERROR after 180 minutes — not a warning. So
-# coverage has to be re-reported on every default-branch push; a periodic-only
-# report breaks the moment anyone pushes here. The daily run exists only to keep
-# `source_reported_at` inside the 48-hour staleness window on quiet weeks.
-
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   schedule:
-    - cron: "45 3 * * *"
-  workflow_dispatch:
-
+    - cron: 45 3 * * *
+  workflow_dispatch: null
 permissions:
   contents: read
-
 concurrency:
   group: coverage-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   coverage:
     name: Coverage report
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Decide weekly native coverage eligibility
+        id: cadence-calendar
+        env:
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
+          NATIVE_OWNER: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
+        run: |
+          set -euo pipefail
+          if test "$CI_CADENCE_MODE" = lean && test "$NATIVE_OWNER" = true && test "$GITHUB_EVENT_NAME" = schedule && test "$(date -u +%u)" != 1; then
+            echo 'eligible=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'eligible=true' >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7
+        name: Checkout measured main source
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' }}
+      - name: Verify callable source checkout
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 24.21.0
           cache: npm
+        name: Setup reviewed Node runtime
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' }}
       - run: npm ci
+        name: Install dependencies
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' }}
       - name: Run authoritative coverage suite
         id: coverage
         shell: bash
         run: |
+          set -euo pipefail
+          if test "$CI_CADENCE_MODE" = lean && test "$NATIVE_OWNER" = true; then
+          node --input-type=module <<'NODE'
+          import {spawnSync} from 'node:child_process';
+          import {mkdir,writeFile} from 'node:fs/promises';
+          import {join} from 'node:path';
+          const directory=join(process.env.RUNNER_TEMP,'ci-cadence-app-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT);
+          await mkdir(directory,{mode:0o700});
+          const result=spawnSync('npm',['run','test:coverage','--','--reporter=default','--reporter=json','--outputFile='+join(directory,'vitest.json')],{stdio:'inherit',timeout:900000});
+          await writeFile(join(directory,'exit.json'),JSON.stringify({code:result.status,signal:result.signal,expired:result.error?.code==='ETIMEDOUT',overflow:false,spawnError:Boolean(result.error)}),{flag:'wx',mode:0o600});
+          if(result.status!==0||result.signal||result.error)throw Error('Actual standalone coverage failed');
+          NODE
+          else
           set -o pipefail
           npm run test:coverage 2>&1 | tee coverage-output.txt
           METRICS=$(node scripts/coverage-metrics.mjs coverage-output.txt --discover .)
@@ -51,6 +141,115 @@ jobs:
               `coverage_percent=${m.coverage}`,
             ].join("\n") + "\n");
           ' "$METRICS" >> "$GITHUB_OUTPUT"
+
+          fi
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' }}
+        env:
+          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
+          NATIVE_OWNER: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
+      - name: Verify completed callable source checkout
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
+        shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        env:
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          LD_LIBRARY_PATH: ""
+          LD_AUDIT: ""
+          LD_ORIGIN_PATH: ""
+          DYLD_INSERT_LIBRARIES: ""
+          DYLD_LIBRARY_PATH: ""
+          PYTHONPATH: ""
+          PYTHONHOME: ""
+          PYTHONSTARTUP: ""
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I - <<'PY'
+          import os,re,stat,subprocess,hashlib
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          expected=os.environ.get('SOURCE_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected) and expected!='0'*40
+          metadata=root/'.git'
+          assert metadata.is_dir() and not metadata.is_symlink()
+          env={'PATH':'/usr/bin:/bin','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1','GIT_GRAFT_FILE':'/dev/null'}
+          def git(*args):
+           return subprocess.check_output(['/usr/bin/git','--no-replace-objects','--git-dir='+str(metadata),'--work-tree='+str(root),'-c','core.useReplaceRefs=false','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-c','core.ignoreCase=false','-c','core.attributesFile=/dev/null',*args],cwd=root,env=env,timeout=10)
+          assert git('rev-parse','--show-object-format').strip()==b'sha1'
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          assert not (metadata/'info/grafts').exists()
+          assert not git('for-each-ref','--format=%(refname)','refs/replace').strip()
+          committed={}
+          for entry in git('ls-tree','-rz','--full-tree',expected).split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,kind,oid=fields.split()
+           assert kind==b'blob' and mode in (b'100644',b'100755',b'120000')
+           assert name and not name.startswith(b'/') and all(part not in (b'',b'.',b'..',b'.git') for part in name.split(b'/'))
+           committed[name]=(mode,oid)
+          index={}
+          for entry in git('ls-files','--stage','-z').split(b'\0'):
+           if not entry:continue
+           fields,name=entry.split(b'\t',1);mode,oid,stage=fields.split()
+           assert stage==b'0' and name not in index
+           index[name]=(mode,oid)
+          assert committed==index
+          for entry in git('ls-files','-v','-z').split(b'\0'):
+           if entry:assert entry[:2]==b'H '
+          assert not git('ls-files','--others','--exclude-standard','-z')
+          for name,(mode,oid) in committed.items():
+           path=root/os.fsdecode(name)
+           parent=path.parent
+           while parent!=root:
+            assert parent.is_dir() and not parent.is_symlink();parent=parent.parent
+           before=path.lstat()
+           if mode==b'120000':
+            assert stat.S_ISLNK(before.st_mode);data=os.fsencode(os.readlink(path))
+           else:
+            assert stat.S_ISREG(before.st_mode) and before.st_nlink==1 and bool(before.st_mode&0o111)==(mode==b'100755') and before.st_size<=134217728
+            with open(path,'rb') as source:data=source.read(134217729)
+            assert len(data)==before.st_size
+           after=path.lstat()
+           assert (before.st_dev,before.st_ino,before.st_mode,before.st_size,before.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_mode,after.st_size,after.st_mtime_ns)
+           assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
+          assert git('rev-parse','--verify','HEAD').strip().decode()==expected
+          PY
+      - name: Produce measured standalone coverage
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          NODE_OPTIONS: ""
+          NODE_PATH: ""
+        run: |
+          node --input-type=module <<'NODE'
+          import {execFileSync} from 'node:child_process';
+          import {writeFile,rm,mkdtemp} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          import {join} from 'node:path';
+          import {tmpdir} from 'node:os';
+          import {pathToFileURL} from 'node:url';
+          const directory=join(process.env.RUNNER_TEMP,'ci-cadence-app-'+process.env.GITHUB_RUN_ID+'-'+process.env.GITHUB_RUN_ATTEMPT);
+          const env={PATH:'/usr/bin:/bin',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_GRAFT_FILE:'/dev/null',GIT_NO_REPLACE_OBJECTS:'1'};
+          const git=(...args)=>execFileSync('/usr/bin/git',['--no-replace-objects','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{env,timeout:10000,maxBuffer:2000000});
+          const temporary=await mkdtemp(join(tmpdir(),'protected-B-producer-'));
+          try{
+          for(const[path,pin]of Object.entries({"scripts/ci-cadence-producer.mjs":"7b21806e84b690deb6ca889d79f60c0fefae1f1ca53a8b6073022970932a0f3e","scripts/ci-cadence-coverage.mjs":"f5a6fa57a388781c7d3714021f2196b83f1b54e59b611327956aa17e1b02bddf","scripts/ci-cadence-native.mjs":"a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d"})){
+          if(!/^100(?:644|755) blob [a-f0-9]{40}\t/.test(git('ls-tree',process.env.GITHUB_SHA,'--',path).toString()))throw Error('Producer mode');
+          const bytes=git('show',process.env.GITHUB_SHA+':'+path);if(createHash('sha256').update(bytes).digest('hex')!==pin)throw Error('Protected producer pin');
+          await writeFile(join(temporary,path.split('/').at(-1)),bytes,{flag:'wx',mode:0o600});}
+          const producer=await import(pathToFileURL(join(temporary,'ci-cadence-producer.mjs')).href);
+          const application=await producer.readMeasuredApplication({root:process.cwd(),candidateSha:process.env.SOURCE_SHA,tests:join(directory,'vitest.json'),coverage:join(process.cwd(),'coverage/coverage-final.json'),exitReceipt:join(directory,'exit.json')});
+          await writeFile(join(directory,'application.json'),JSON.stringify(application),{flag:'wx',mode:0o600});
+          }finally{await rm(temporary,{recursive:true,force:true});}
+          NODE
+      - name: Upload measured standalone coverage
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-cadence-coverage
+          path: ${{ runner.temp }}/ci-cadence-app-${{ github.run_id }}-${{ github.run_attempt }}/application.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Report coverage to Portfolio
         env:
           COVERAGE_SECRET: ${{ secrets.COVERAGE_SECRET }}
@@ -65,3 +264,6 @@ jobs:
           COVERAGE_WORKFLOW_REF: ${{ github.workflow_ref }}
           SOURCE_TARGET_BRANCH: main
         run: bash scripts/report-coverage.sh
+        if: ${{ steps.cadence-calendar.outputs.eligible == 'true' && !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User'))) && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User')) }}
+    permissions:
+      contents: read

@@ -302,6 +302,16 @@ describe("StoryViewer", () => {
       expect(screen.getByText("Beautiful glacial lakes in the mountains")).toBeInTheDocument();
     });
 
+    it("renders no background image for a story without one (#1001)", async () => {
+      const [first, ...rest] = mockStories;
+      const stories = [{ ...first!, image: "" }, ...rest];
+      await renderWithAuth(<StoryViewer {...getDefaultProps({ stories })} />);
+
+      expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      expect(screen.queryByRole("img", { name: "Lagos de Covadonga" })).not.toBeInTheDocument();
+      expect(document.querySelector('img[src=""]')).toBeNull();
+    });
+
     it("should render progress bar segments capped at story count", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 

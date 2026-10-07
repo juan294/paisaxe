@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "repository": "example/fleet-A",
+  "integrationBranch": "develop",
+  "defaultBranch": "main",
+  "productionBranch": "main",
+  "owners": [
+    "example-owner"
+  ],
+  "refreshHours": 168,
+  "coverageMaxAgeHours": 192,
+  "changedHeadDeadlineHours": 36,
+  "workflows": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "definitionSha": "dddddddddddddddddddddddddddddddddddddddd",
+      "jobs": [
+        {
+          "id": "lint",
+          "needs": []
+        },
+        {
+          "id": "test",
+          "needs": [
+            "lint"
+          ]
+        },
+        {
+          "id": "build",
+          "needs": [
+            "test"
+          ]
+        }
+      ],
+      "contexts": {
+        "check": [
+          "lint",
+          "test",
+          "build"
+        ]
+      }
+    }
+  ]
+}

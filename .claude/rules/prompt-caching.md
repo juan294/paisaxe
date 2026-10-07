@@ -109,6 +109,7 @@ tokenizer, and `CACHE_MIN_SAFETY_MARGIN` = 1.2).
 | Call path | Builder | Cached prefix | `source` |
 | --- | --- | --- | --- |
 | Public chat, streaming (`/api/chat/stream`) | `streamChatResponse` -> `buildChatSystem` (`src/lib/claude.ts`) | `buildSystemPrompt()` persona (`src/lib/chat-config.ts`), about 6K chars. `buildConversationFlow(messageIndex)` and the asturianu addition follow in an unmarked block. RAG context stays in the user message. | `chat_stream` |
+| Booking chat (`/api/booking/chat/stream`) | `streamBookingTurn` (`src/lib/booking/agent.ts`) | `buildSystemPrompt()` persona plus `buildBookingInstructions()` (`src/lib/chat-config.ts`). The per-turn booking state (date, draft, bookings, accept event) and retrieved guide context follow in an unmarked block. The tool definitions precede the system prompt in the cached prefix and are static. | `booking_chat` |
 | Chat, non-streaming | `generateChatResponse` -> `buildChatSystem` | Same as above | `chat` |
 | Story translation | `translateStory` -> `callAnthropicAPI(..., { source: "translate" })` | None that qualifies (see below) | `translate` |
 | Content discovery (weekly cron) | `generateDescription` (`src/lib/content-discovery.ts`, raw fetch) | None | `content_discovery` |
@@ -156,7 +157,7 @@ test asserts the curl and SDK bodies carry identical `system` arrays.
 ### Usage recorder
 
 `source` is the required `UsageSource` union (`src/lib/costs/anthropic-usage.ts`):
-`chat`, `chat_stream`, `translate`, `content_discovery`, `marketing_<agent id>`.
+`chat`, `chat_stream`, `translate`, `content_discovery`, `booking_chat`, `marketing_<agent id>`.
 There is no default, so a new call site must add its label to the union.
 
 Request handlers call `recordAnthropicUsageInBackground`, which starts the

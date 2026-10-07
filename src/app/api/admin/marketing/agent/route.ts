@@ -172,7 +172,8 @@ export async function POST(
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
       model: CHAT_MODEL,
-      max_tokens: 2048,
+      max_tokens: 16000,
+      output_config: { effort: "low" },
       system,
       messages,
       // The full conversationHistory is re-sent every turn: automatic caching

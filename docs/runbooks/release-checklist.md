@@ -15,6 +15,7 @@ never sufficient, and authorization never carries over from a previous conversat
 3. Merge and deploy
 4. Verify the deployed identity
 5. Run the required probes
+   - 5b. Production acceptance step — only when the release plan requires one; separately owner-authorized
 6. Analyze the evidence
 7. Obtain authorization
 8. Tag — **last**
@@ -51,6 +52,7 @@ gh run list --branch develop --limit 3
 npm run test && npm run typecheck && npm run lint
 npm run check-migrations             # required probe: migration-posture
 npm run check-required-probes        # manifest and Playwright must agree
+npm run check-env                    # every process.env read is registered (otherwise CI-only)
 npm run prelaunch
 ```
 
@@ -67,13 +69,27 @@ It falls back explicitly to the `main`/`develop` merge-base — and says so — 
 resolves yet.
 
 Mutating verification runs against the local Docker stack, never a deployed environment —
-Preview shares the production Supabase project and holds live-mode Stripe keys.
+Preview shares the production Supabase project and holds live-mode Stripe keys. The only
+exception is the separately authorized production acceptance step in section 5b.
 
 ```bash
-npx supabase start                   # local Postgres on :54322
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
+npx supabase start -x vector,logflare   # local Postgres on :54322 (the vector container is unhealthy locally)
+eval "$(npx supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+NEXT_PUBLIC_SUPABASE_URL="$API_URL" \
+NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" \
+SUPABASE_SERVICE_KEY="$SERVICE_ROLE_KEY" \
+QA_TEST_USER_EMAIL=<qa-test-<name>@paisaxe.dev, existing in the local stack> \
+QA_TEST_USER_PASSWORD=<its password> \
   npx playwright test --project=release-required-local
 ```
+
+The project runs three probes: `favorite-roundtrip` (signs in as the QA user),
+`booking-access-boundary` and `booking-roundtrip` (PayPal booking). The config starts a PayPal
+mock, `next dev` (the mock's loopback base and the scripted booking model,
+`BOOKING_AGENT_REPLAY`, are refused in production) and a second, production build with
+`VERCEL_ENV=preview` for the Preview-isolation checks, so the first run includes a build. Do not
+run another `next dev` or `next build` in the same checkout meanwhile: the build type-checks
+`.next/dev/types`, which a concurrent dev server rewrites.
 
 Present the summary to the user: commits since the last release, CI status, known risks, and a
 recommendation. **Stop here.**
@@ -89,6 +105,14 @@ gh pr checks                          # all five required checks must pass
 
 Required contexts: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`,
 `Smoke test Vercel preview`.
+
+**Release PR Preview exception (owner decision, 2026-10-02; ADR-0024 decision 11).** The
+`Smoke test Vercel preview` check needs a Vercel Preview of the release pull request, and
+the project rule otherwise forbids creating Previews. The Preview built for the
+`develop` → `main` release pull request is the standing, documented exception. No other
+Preview is created for experimentation, feature work or debugging. Remember that this
+Preview runs against the production Supabase project and live Stripe keys: it is a
+read-only smoke target, never a place to exercise mutating flows.
 
 Report status and **stop**. Only after the user says "merge it":
 
@@ -144,6 +168,31 @@ manifest.
 No probe may be skipped. A probe whose prerequisites are missing fails — that is deliberate, and
 a skipped required probe blocks the release exactly like a failed one.
 
+## 5b. Production acceptance step (owner-authorized, only when a release requires it)
+
+Some features cannot be proven by read-only probes, for example the voucher-gated PayPal
+sandbox booking flow (ADR-0024 decision 12). For those, and only after the required probes
+in step 5 pass:
+
+1. Obtain explicit authorization for this step in the current conversation. Authorization
+   for the release does not include it.
+2. Run exactly the journey the release plan names against the deployed origin, using
+   **fixture data only** (the labelled demo merchant, a voucher, PayPal sandbox accounts).
+   Never touch real users' data and never use live payment credentials.
+3. Record the identifiers it produced (for the booking flow: order, capture, refund and
+   webhook event ids) in the evidence manifest under a separate `acceptance` key. Keep them
+   apart from the probe results: the analyzer's verdict covers the read-only probes, and
+   this step does not change that verdict.
+4. If the step fails, the feature stays disabled by its flag and the failure is fixed on
+   `develop` with a corrective release; if the site itself is affected, roll back first.
+   A failed or skipped acceptance step blocks tagging (step 8) for a release whose plan
+   requires it, even though the analyzer does not read the `acceptance` key.
+5. The fixture rows it writes stay in production, marked as fixtures (for the booking flow,
+   every row belongs to a merchant with `is_fixture = true`), so they can be told apart from
+   real data and excluded from reporting. Do not delete them by hand.
+
+The required probes themselves stay strictly read-only.
+
 ## 6. Analyze the evidence
 
 Record what actually happened in `docs/release/evidence/<candidate-tree>.yaml` (see
@@ -198,3 +247,37 @@ Push to `main` · create or merge a PR into `main` · run production `vercel` de
 production Supabase data, Vercel env vars, DNS, or external service config.
 
 "Fix this bug" is not authorization. "Ship it" about a feature means merge to `develop`.
+
+## Cadence evidence at the release boundary
+
+Phase 4 required-context list (changing branch protection is separately authorized):
+
+- `develop`: `CI Fast` and `CI Fast recovery`. `CI Fast recovery` is skipped, and therefore satisfied, unless `CI Fast` demanded full validation under lean; then it must succeed.
+- `main`: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, and `Release artifact smoke` once it has passed on an eligible release PR (until then `Smoke test Vercel preview`).
+
+`claude-review` stays ungated: automatic model review is outside the cadence change.
+
+Activation is legacy-first. Install the cadence files with `CI_CADENCE_MODE` unset or `legacy`, let `CI Fast` go green on develop, migrate the required contexts, and only then set `lean`. If `lean` is set while the protected base (the push `before` commit or the PR base) has no cadence helper, `CI Fast` fails with the repair instruction: set the mode back to `legacy`, land the helper on the base branch, then set `lean` again. Lean skips the full workflows, so nothing else would validate that event.
+
+Land launcher/control-launch changes while `CI_CADENCE_MODE` is `legacy`. Until such a change is on the protected base, the candidate's reviewed pin cannot match the base's bytes: under legacy `CI Fast` defers to the original workflows with a notice; under lean `CI Fast`, admission and measurement fail with the same repair instruction.
+
+Owner decision before setting `lean`: workflow changes also land under `legacy`. Under lean `CI Fast` fails any candidate that changes a workflow the protected base lists (`.github/ci-cadence.json` workflows or `.github/ci-cadence-native.json` workflow pins), because lean statically skips the original workflows, starts recovery only when `CI Fast` decides full, and the nightly runs main's definitions, so the edited workflow would first execute on the release PR. Separately, a develop push that changes a pinned workflow and reaches a full decision fails at Cadence measurement (`native immutable workflow blob mismatch`) and turns `CI Fast recovery` red. The liveness cost is one legacy toggle per workflow-changing PR: 24 non-merge commits touched the policy workflows on develop in the 60 days to 2026-10-05. The guard protects against honest mistakes, not adversaries: a pull request can edit its own `ci-cadence.yml`, so review before merge is the control.
+
+What changes at installation, even in legacy mode: routed jobs declare job-level `contents: read` and check out with `fetch-depth: 0`; secrets reach only owner events and schedules; the coverage shard uses a hosted runner for non-owner events; the bundle comment is a separate owner-only job; `coverage.yml` pins its Node version and adds `source.attempt` to the coverage payload; and the Sutura repair monitor is off unless `CI_CADENCE_REPAIR_ENABLED` is `true`. Step bodies of the original checks are unchanged.
+
+A green `CI Fast` or unchanged nightly disposition does not satisfy this checklist. Require the original full release contexts and every applicable child, the existing Stripe proof and the post-deploy proof. Any required failure, cancellation or skipped leaf blocks release.
+
+`Release artifact smoke` (`.github/workflows/preview-smoke.yml`) runs on the release PR without secrets or a deployment: it builds the PR candidate, serves the production build on loopback against local Supabase and fails unless `/api/health` reports the candidate commit and tree, the datastore is healthy, the homepage hydrates and the `release-required-local` probes pass. It is local artifact evidence only; steps 4-5 (deployed identity and required probes) remain mandatory. Until main's branch protection is changed under separate authorization, `Smoke test Vercel preview` remains the registered required context. Reproduce locally:
+
+```bash
+npx supabase start
+export $(npx supabase status -o json | node scripts/ci-cadence-smoke-env.mjs | xargs)
+export VERCEL_GIT_COMMIT_SHA=$(git rev-parse HEAD) BUILD_TREE_HASH=$(git rev-parse 'HEAD^{tree}')
+export RELEASE_ARTIFACT_MANIFEST=$(mktemp -d)/manifest.json
+npm run build && node scripts/ci-cadence-artifact.mjs "$VERCEL_GIT_COMMIT_SHA" "$RELEASE_ARTIFACT_MANIFEST"
+CI=true npm run test:e2e:release-artifact
+```
+
+When another local stack must stay untouched, run the smoke and the `*.postgrest-*` suites against a separate one: copy `supabase/` into a scratch directory, change only `project_id` and the published ports, pass that directory as `--workdir` to every Supabase CLI command, and export `SUPABASE_LOCAL_API_URL` and `SUPABASE_LOCAL_DB_CONTAINER` (`supabase_db_<project_id>`) so the suites do not default to `127.0.0.1:54321` and `supabase_db_paisaxe`. Set `PLAYWRIGHT_PORT` and `PLAYWRIGHT_REUSE_SERVER=false` if port 3100 may be in use.
+
+Main-only coverage publication names the original measuring attempt and actual app completion, while develop nightly and calendar skips remain nonpublishing. Default-main schedule/workflow_run installation is a later authorized release operation; local develop adapter work does not activate it.

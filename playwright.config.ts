@@ -1,5 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_MCP_SECRET } from "./e2e/fixtures/mcp-secret";
+import {
+  BOOKING_PREVIEW_ORIGIN,
+  BOOKING_PREVIEW_PORT,
+  isReleaseArtifactRun,
+  isReleaseLocalRun,
+  localBookingServerEnv,
+} from "./e2e/fixtures/booking-env";
 
 const isCI = !!process.env.CI;
 const useDevServer = process.env.PLAYWRIGHT_USE_DEV_SERVER === "true";
@@ -33,13 +40,68 @@ const mobileChrome = {
 const releaseTargetUrl = process.env.RELEASE_TARGET_URL?.trim();
 const releaseBypassSecret =
   process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
-const releaseSpecs = ["**/release-required.spec.ts", "**/release-required-local.spec.ts"];
+const releaseSpecs = [
+  "**/release-required.spec.ts",
+  "**/release-required-local.spec.ts",
+  "**/release-artifact-smoke.spec.ts",
+  "**/booking-access-boundary.spec.ts",
+  "**/booking-roundtrip.spec.ts",
+];
+
+/**
+ * Local booking probes (PayPal hackathon plan, Phase 6). When the
+ * release-required-local project is selected, the local server runs `next dev`
+ * (the PayPal adapter accepts the loopback stand-in and the scripted booking
+ * model runs only outside production) with the PayPal stand-in started by
+ * e2e/booking-global-setup.ts, and a second local server runs a production
+ * build with VERCEL_ENV=preview for the Preview-isolation assertions. Both use
+ * the caller's LOCAL Supabase keys; the specs refuse any other datastore.
+ */
+const releaseLocalRun = isReleaseLocalRun();
+/**
+ * The release-artifact smoke (preview-smoke.yml) serves only the CI-built
+ * candidate with `npm run start`, so it runs without the local booking servers
+ * and leaves out the booking probes, which need them.
+ */
+const releaseArtifactRun = isReleaseArtifactRun();
 
 function getWebServerCommand() {
   if (isCI) return `npm run start -- --port ${e2ePort}`;
   if (useDevServer) return `npm run dev -- --port ${e2ePort}`;
   return `npm run build && npm run start -- --port ${e2ePort}`;
 }
+
+const webServer = {
+  command: getWebServerCommand(),
+  url: `${baseURL}/api/health/live`,
+  // Default local runs to an isolated production-style server because next dev's
+  // issues overlay can intercept mobile clicks and hide real regressions.
+  reuseExistingServer,
+  // Bumped from 180s: the P1 Supabase deferral (async getClient() in
+  // stories-data.ts/realtime.ts) adds an on-demand webpack chunk compile
+  // to the first dev-server request that touches Supabase, widening
+  // cold-start time. Not a production concern (chunks are pre-built).
+  timeout: 240_000,
+  // Wait for the liveness endpoint, not just an open TCP port.
+  ...(isCI && { stdout: "pipe" as const }),
+  env: {
+    ANTHROPIC_API_KEY: "dummy_key_for_e2e",
+    VOYAGE_API_KEY: "dummy_key_for_e2e",
+    // Release-required-local explicitly supplies the local Docker values.
+    // Other local suites keep deterministic dummy defaults.
+    NEXT_PUBLIC_SUPABASE_URL:
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "https://example.supabase.co",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "dummy_key_for_e2e",
+    MAINTENANCE_MODE: "false",
+    STRIPE_SECRET_KEY: "sk_test_dummy_for_e2e",
+    STRIPE_DAY_PASS_PRICE_ID: "price_test_dummy_for_e2e",
+    PLAYWRIGHT_TEST_ORIGIN: baseURL,
+    // Shared with the runner so the MCP probes exercise the authenticated
+    // paths instead of skipping — see e2e/fixtures/mcp-secret.ts.
+    MCP_API_SECRET: E2E_MCP_SECRET,
+  } as Record<string, string>,
+};
 
 export default defineConfig({
   testDir: "./e2e",
@@ -172,43 +234,57 @@ export default defineConfig({
     {
       // Mutating required probes. Localhost only — never a deployed origin.
       name: "release-required-local",
-      use: desktopChrome,
+      // bypassCSP: the site's connect-src allows only https://*.supabase.co,
+      // so a browser on localhost cannot reach the local stack (Phase 2
+      // deviation 9). Test-only, and only on this localhost project.
+      use: { ...desktopChrome, bypassCSP: true },
       grep: /@local-docker/,
+      ...(releaseArtifactRun ? { testIgnore: ["**/booking-*.spec.ts"] } : {}),
+      timeout: 60_000,
+      retries: 0,
+    },
+    {
+      // Release-PR candidate smoke: production build on loopback against the
+      // local Docker stack, bound to the build manifest. Driven by
+      // .github/workflows/preview-smoke.yml (`npm run test:e2e:release-artifact`).
+      name: "release-artifact-smoke",
+      use: desktopChrome,
+      testMatch: "release-artifact-smoke.spec.ts",
       timeout: 60_000,
       retries: 0,
     },
   ],
 
+  // The PayPal stand-in for the local booking probes; a no-op on every other run.
+  globalSetup: "./e2e/booking-global-setup.ts",
+
   // Targeting a deployment means there is nothing to boot locally.
-  webServer: releaseTargetUrl ? undefined : {
-    command: getWebServerCommand(),
-    url: `${baseURL}/api/health/live`,
-    // Default local runs to an isolated production-style server because next dev's
-    // issues overlay can intercept mobile clicks and hide real regressions.
-    reuseExistingServer,
-    // Bumped from 180s: the P1 Supabase deferral (async getClient() in
-    // stories-data.ts/realtime.ts) adds an on-demand webpack chunk compile
-    // to the first dev-server request that touches Supabase, widening
-    // cold-start time. Not a production concern (chunks are pre-built).
-    timeout: 240_000,
-    // Wait for the liveness endpoint, not just an open TCP port.
-    ...(isCI && { stdout: "pipe" }),
-    env: {
-      ANTHROPIC_API_KEY: "dummy_key_for_e2e",
-      VOYAGE_API_KEY: "dummy_key_for_e2e",
-      // Release-required-local explicitly supplies the local Docker values.
-      // Other local suites keep deterministic dummy defaults.
-      NEXT_PUBLIC_SUPABASE_URL:
-        process.env.NEXT_PUBLIC_SUPABASE_URL || "https://example.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY:
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "dummy_key_for_e2e",
-      MAINTENANCE_MODE: "false",
-      STRIPE_SECRET_KEY: "sk_test_dummy_for_e2e",
-      STRIPE_DAY_PASS_PRICE_ID: "price_test_dummy_for_e2e",
-      PLAYWRIGHT_TEST_ORIGIN: baseURL,
-      // Shared with the runner so the MCP probes exercise the authenticated
-      // paths instead of skipping — see e2e/fixtures/mcp-secret.ts.
-      MCP_API_SECRET: E2E_MCP_SECRET,
-    },
-  },
+  webServer: releaseTargetUrl
+    ? undefined
+    : releaseLocalRun
+      ? [
+          // Preview first: Playwright starts web servers in order, and `next
+          // build` type-checks .next/dev/types, which a running `next dev`
+          // rewrites (a concurrent build fails with truncated files).
+          {
+            ...webServer,
+            command: `npm run build && npm run start -- --port ${BOOKING_PREVIEW_PORT}`,
+            url: `${BOOKING_PREVIEW_ORIGIN}/api/health/live`,
+            timeout: 900_000,
+            env: {
+              ...webServer.env,
+              ...localBookingServerEnv(BOOKING_PREVIEW_ORIGIN),
+              PLAYWRIGHT_TEST_ORIGIN: BOOKING_PREVIEW_ORIGIN,
+              VERCEL_ENV: "preview",
+            },
+          },
+          {
+            ...webServer,
+            command: `npm run dev -- --port ${e2ePort}`,
+            // Polling: native watchers hit EMFILE on a busy machine and the dev
+            // server then answers 404 for every route (docs/hackathon/postman/README.md).
+            env: { ...webServer.env, ...localBookingServerEnv(baseURL), WATCHPACK_POLLING: "true" },
+          },
+        ]
+      : webServer,
 });

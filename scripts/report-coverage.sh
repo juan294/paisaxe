@@ -16,6 +16,7 @@ require COVERAGE_WORKFLOW_REF
 require SOURCE_TARGET_BRANCH
 
 COVERAGE_PROVIDER="${COVERAGE_PROVIDER:-github-actions}"
+COVERAGE_RUN_ATTEMPT="${COVERAGE_RUN_ATTEMPT:-${GITHUB_RUN_ATTEMPT:-}}"
 SOURCE_REPOSITORY="${SOURCE_REPOSITORY:-${GITHUB_REPOSITORY:-$REPO}}"
 COVERAGE_REPORTED_AT="${COVERAGE_REPORTED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 COVERAGE_ENDPOINT="${COVERAGE_ENDPOINT:-https://portfolio.thecreativetoken.com/api/coverage}"
@@ -30,6 +31,7 @@ BODY=$(REPO="$REPO" TEST_COUNT="$TEST_COUNT" TEST_FILES="${TEST_FILES:-}" \
   COVERAGE_PERCENT="${COVERAGE_PERCENT:-}" COVERAGE_PROVIDER="$COVERAGE_PROVIDER" \
   SOURCE_REPOSITORY="$SOURCE_REPOSITORY" SOURCE_COMMIT_SHA="$SOURCE_COMMIT_SHA" \
   COVERAGE_REPORTED_AT="$COVERAGE_REPORTED_AT" COVERAGE_RUN_ID="$COVERAGE_RUN_ID" \
+  COVERAGE_RUN_ATTEMPT="$COVERAGE_RUN_ATTEMPT" \
   COVERAGE_WORKFLOW_REF="$COVERAGE_WORKFLOW_REF" SOURCE_TARGET_BRANCH="$SOURCE_TARGET_BRANCH" \
   COVERAGE_ORIGIN="${COVERAGE_ORIGIN:-$(hostname)}" node <<'NODE'
 const env = process.env;
@@ -55,6 +57,11 @@ const reportedAt = new Date(env.COVERAGE_REPORTED_AT ?? "");
 if (!Number.isFinite(reportedAt.getTime())) fail("COVERAGE_REPORTED_AT must be an ISO timestamp");
 const testCount = integer("TEST_COUNT", true);
 if (testCount === 0) fail("TEST_COUNT must be greater than zero for an applicable producer");
+let nativeAttempt;
+if (env.COVERAGE_PROVIDER === "github-actions") {
+  nativeAttempt = integer("COVERAGE_RUN_ATTEMPT", true);
+  if (!Number.isSafeInteger(nativeAttempt) || nativeAttempt < 1) fail("COVERAGE_RUN_ATTEMPT must be a positive safe integer");
+}
 const payload = {
   repo: env.REPO,
   testCount,
@@ -66,6 +73,7 @@ const payload = {
     provider: env.COVERAGE_PROVIDER,
     repository: env.SOURCE_REPOSITORY,
     runId: env.COVERAGE_RUN_ID,
+    ...(nativeAttempt === undefined ? {} : { attempt: nativeAttempt }),
     workflowRef: env.COVERAGE_WORKFLOW_REF,
     targetBranch: env.SOURCE_TARGET_BRANCH,
     commitSha: env.SOURCE_COMMIT_SHA,

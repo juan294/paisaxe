@@ -59,6 +59,36 @@ describe("the committed manifest", () => {
     }
   });
 
+  it("requires the three booking probes with their tiers, projects and selectors (PayPal hackathon Phase 6)", () => {
+    const byId = new Map(committed.probes.map((p) => [p.id, p]));
+
+    expect(byId.get("booking-gate-closed")).toMatchObject({
+      tier: "deployed-readonly",
+      safety: "read-only",
+      runner: {
+        kind: "playwright",
+        project: "release-required",
+        selector: "@release-required booking-gate-closed",
+      },
+    });
+    for (const id of ["booking-access-boundary", "booking-roundtrip"]) {
+      expect(byId.get(id)).toMatchObject({
+        tier: "local-docker",
+        safety: "mutating-local",
+        runner: {
+          kind: "playwright",
+          project: "release-required-local",
+          selector: `@release-required @local-docker ${id}`,
+        },
+      });
+      // A mutating probe must prove it removed what it created.
+      expect(byId.get(id)?.oracles).toContain("cleanup");
+    }
+    expect(byId.get("booking-roundtrip")?.oracles).toEqual(
+      expect.arrayContaining(["ui", "datastore", "cleanup"])
+    );
+  });
+
   it("requires the authenticated five-agent ElevenLabs preflight", () => {
     expect(
       committed.probes.find((probe) => probe.id === "elevenlabs-voice-preflight")
@@ -177,6 +207,21 @@ describe("validateManifest", () => {
 });
 
 describe("compareSelection", () => {
+  it("fails when a local booking probe is dropped from the release-required-local selection", () => {
+    const committed = loadManifest();
+    const local = playwrightProbes(committed)
+      .filter((p) => (p.runner as { project: string }).project === "release-required-local")
+      .map((p) => `${(p.runner as { selector: string }).selector}: title`);
+
+    expect(local).toContain("@release-required @local-docker booking-roundtrip: title");
+    const withoutRoundtrip = local.filter((title) => !title.includes("booking-roundtrip"));
+    expect(
+      compareSelection(committed, { "release-required-local": withoutRoundtrip })
+    ).toContainEqual(
+      expect.stringMatching(/requires "@release-required @local-docker booking-roundtrip"/)
+    );
+  });
+
   const single = manifest([probe()]);
 
   it("accepts an exact match", () => {

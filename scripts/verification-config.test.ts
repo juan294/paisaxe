@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
+import vm from "node:vm";
+import { isReleaseArtifactRun, isReleaseLocalRun } from "../e2e/fixtures/booking-env";
 
 const root = process.cwd();
 
@@ -93,9 +96,22 @@ describe("verification coverage config", () => {
   it("runs coverage merge after successful shards even when the push-source job is skipped", () => {
     const workflow = readText(".github/workflows/ci.yml");
 
-    expect(workflow).toContain(
-      "if: ${{ always() && needs.coverage-shard.result == 'success' }}",
-    );
+    const parsed = parse(workflow) as { jobs: Record<string, { needs: string[]; if: string }> };
+    const merge = parsed.jobs["coverage-merge"];
+    expect(merge.needs).toContain("coverage-shard");
+    const expression = merge.if.replace(/^\$\{\{\s*|\s*\}\}$/g, "")
+      .replace(/needs\.([A-Za-z_][A-Za-z0-9_-]*)/g, (_match: string, key: string) => `needs[${JSON.stringify(key)}]`);
+    for (const result of ["success", "failure", "skipped", "cancelled"]) {
+      const actual = vm.runInNewContext(expression, {
+        always: () => true,
+        format: (template: string, ref: string) => template.replace("{0}", ref),
+        inputs: { profile: "", source_sha: "", invocation_id: "" },
+        vars: { CI_CADENCE_MODE: "legacy" },
+        github: { event_name: "push", ref: "refs/heads/develop", workflow_ref: "juan294/paisaxe/.github/workflows/ci.yml@refs/heads/develop" },
+        needs: { "coverage-shard": { result }, "callable-source": { result: "skipped" } },
+      }, { timeout: 100 });
+      expect(Boolean(actual)).toBe(result === "success");
+    }
   });
 
   it("runs secret-free E2E coverage for Dependabot while preserving authenticated checks elsewhere", () => {
@@ -110,11 +126,83 @@ describe("verification coverage config", () => {
     expect(workflow).toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e");
   });
 
-  it("uses the body-parsing readiness monitor for Vercel health smoke checks, and does not run the dead develop-push smoke job (DO-H1)", () => {
+  it("gates release PRs on a secret-free local artifact smoke that fails without candidate identity, and does not run the dead develop-push smoke job (DO-H1)", () => {
     const ciWorkflow = readText(".github/workflows/ci.yml");
     const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
 
-    expect(previewSmokeWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
+    type Step = { name?: string; if?: string; uses?: string; run?: string; env?: Record<string, string>; with?: Record<string, unknown> };
+    const parsed = parse(previewSmokeWorkflow) as { on: Record<string, { branches: string[] }>; permissions: Record<string, string>; jobs: Record<string, { name: string; if?: string; "timeout-minutes": number; permissions: Record<string, string>; steps: Step[] }> };
+    // Release PRs only, one job, and its name is the required check context.
+    expect(Object.keys(parsed.on)).toEqual(["pull_request"]);
+    expect(parsed.on.pull_request.branches).toEqual(["main"]);
+    expect(Object.keys(parsed.jobs)).toEqual(["preview-smoke"]);
+    const job = parsed.jobs["preview-smoke"];
+    expect(job.name).toBe("Release artifact smoke");
+    // Unconditional: a skipped required context would satisfy branch protection.
+    expect(job.if).toBeUndefined();
+    expect(job["timeout-minutes"]).toBeLessThanOrEqual(20);
+    // Read-only token and no secrets, so fork/Dependabot release PRs run the same job.
+    expect(parsed.permissions).toEqual({ contents: "read" });
+    expect(job.permissions).toEqual({ contents: "read" });
+    expect(previewSmokeWorkflow).not.toMatch(/secrets\.|github\.token|pull_request_target/);
+    expect(previewSmokeWorkflow).not.toContain("VERCEL_AUTOMATION_BYPASS_SECRET");
+    // No deployment is created or awaited.
+    expect(previewSmokeWorkflow).not.toMatch(/deployments|vercel deploy|PREVIEW_URL/);
+
+    const steps = job.steps;
+    const index = (name: string) => {
+      const found = steps.findIndex(step => step.name === name);
+      expect(found, name).toBeGreaterThanOrEqual(0);
+      return found;
+    };
+    const checkout = steps[index("Checkout release candidate")];
+    expect(checkout.with).toEqual({ ref: "${{ github.sha }}", "persist-credentials": false });
+    // Identity comes from the physical checkout and must precede the build that embeds it.
+    const identity = steps[index("Bind candidate identity")];
+    expect(identity.run).toContain('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"');
+    expect(identity.run).toContain('echo "VERCEL_GIT_COMMIT_SHA=$GITHUB_SHA"');
+    expect(identity.run).toContain("BUILD_TREE_HASH=$(git rev-parse 'HEAD^{tree}')");
+    const order = ["Start local Supabase", "Provision synthetic smoke environment", "Bind candidate identity", "Build release candidate", "Record build manifest", "Smoke production server on loopback"].map(index);
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    expect(steps[index("Build release candidate")].run).toBe("npm run build");
+    expect(steps[index("Record build manifest")].run).toBe('node scripts/ci-cadence-artifact.mjs "$GITHUB_SHA" "$RELEASE_ARTIFACT_MANIFEST"');
+    expect(steps[index("Smoke production server on loopback")].run).toBe("npm run test:e2e:release-artifact");
+    // Every gating step is unconditional; only evidence upload uses always().
+    for (const step of steps) if (step.name !== "Upload smoke evidence") expect(step.if, step.name).toBeUndefined();
+
+    // The smoke runs the mutating local release probes plus the identity spec,
+    // against the production server Playwright boots under CI.
+    const scripts = JSON.parse(readText("package.json")).scripts as Record<string, string>;
+    expect(scripts["test:e2e:release-artifact"]).toBe("playwright test --project=release-required-local --project=release-artifact-smoke");
+    const playwrightConfig = readText("playwright.config.ts");
+    expect(playwrightConfig).toContain('name: "release-artifact-smoke"');
+    expect(playwrightConfig).toContain('testMatch: "release-artifact-smoke.spec.ts"');
+    expect(playwrightConfig).toContain('"**/release-artifact-smoke.spec.ts",');
+    // The artifact smoke serves only the CI-built candidate: selecting
+    // release-artifact-smoke turns off develop's local booking run (dual
+    // build+dev servers and the PayPal stand-in) and leaves its booking probes
+    // out, while develop's own `--project=release-required-local` keeps both.
+    const argv = (script: string) => ["node", "playwright", ...script.split(" ").slice(1)];
+    const artifact = argv(scripts["test:e2e:release-artifact"]);
+    expect(isReleaseArtifactRun(artifact)).toBe(true);
+    expect(isReleaseLocalRun(artifact)).toBe(false);
+    for (const local of [argv("playwright test --project=release-required-local"), argv("playwright test --project release-required-local")]) {
+      expect(isReleaseLocalRun(local)).toBe(true);
+      expect(isReleaseArtifactRun(local)).toBe(false);
+    }
+    expect(isReleaseArtifactRun(argv("playwright test --project release-artifact-smoke"))).toBe(true);
+    expect(playwrightConfig).toContain('...(releaseArtifactRun ? { testIgnore: ["**/booking-*.spec.ts"] } : {}),');
+
+    // Identity, readiness and hydration are asserted, and absence throws rather than skips.
+    const probe = readText("e2e/release-artifact-smoke.spec.ts");
+    expect(probe).toContain("if (!manifestPath || !cronSecret) {\n    throw new Error(");
+    expect(probe).not.toMatch(/test\.skip|test\.fixme|\.skip\(/);
+    expect(probe).toContain("assertLocalDatastore(process.env.NEXT_PUBLIC_SUPABASE_URL)");
+    expect(probe).toContain('expect(body.status).toBe("healthy")');
+    expect(probe).toContain("commit: manifest.candidateSha");
+    expect(probe).toContain("tree: manifest.treeSha.slice(0, 12)");
+    expect(probe).toContain('await page.waitForURL("**/immersive")');
+    expect(probe).toContain("toBe(recorded?.sha256)");
     // DO-H4: --require-sentry deliberately stays off the required release gate.
     // sentry.status: "configured" is derived purely from NEXT_PUBLIC_SENTRY_DSN
     // being non-empty (src/app/api/health/route.ts checkSentry()) — it proves
@@ -238,16 +326,14 @@ describe("verification coverage config", () => {
   // ElevenLabs preflight needs HEALTH_PROBE_SECRET on the target, so running it
   // against a preview deployment made the required check unpassable. It is already a
   // required deployed-readonly probe (quality/required-probes.yaml) run post-deploy
-  // against production (release checklist step 5), so the preview smoke keeps only
-  // the health-readiness and homepage checks.
-  it("keeps the required preview smoke free of the secret-dependent ElevenLabs preflight", () => {
+  // against production (release checklist step 5). The release artifact smoke that
+  // replaced the preview smoke is secret-free and keeps the same boundary.
+  it("keeps the required release smoke free of the secret-dependent ElevenLabs preflight", () => {
     const previewSmoke = readText(".github/workflows/preview-smoke.yml");
     const probes = readText("quality/required-probes.yaml");
 
     expect(previewSmoke).not.toContain("check-elevenlabs-voice-preflight");
     expect(previewSmoke).not.toContain("HEALTH_PROBE_SECRET");
-    expect(previewSmoke).toContain("scripts/check-health-readiness.mjs");
-    expect(previewSmoke).toContain("Smoke test - homepage loads");
     // The preflight must stay a required production probe, not disappear.
     expect(probes).toContain("id: elevenlabs-voice-preflight");
     expect(probes).toContain("npm run check-elevenlabs-voice");
@@ -285,11 +371,21 @@ describe("verification coverage config", () => {
 
     // The skip step's last echo line is immediately followed by the next
     // step (no `exit 1` in between) — proves the secret-withheld path passes.
-    expect(workflow).toContain(
-      '          echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."\n' +
-        "\n" +
-        "      - name: Assert legacy agent override is absent from Vercel env"
-    );
+    const parsed = parse(workflow) as { jobs: Record<string, { steps: { name: string; if?: string; run?: string }[] }> };
+    const steps = parsed.jobs["vercel-env-safety"].steps;
+    const skipIndex = steps.findIndex(step => step.name === "Skip when Vercel credentials are unavailable (secret-withheld PR)");
+    const skip = steps[skipIndex];
+    const fail = steps.find(step => step.name === "Fail when Vercel credentials are unavailable (trusted event)")!;
+    expect(skip.run).toContain('echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."');
+    expect(skip.run).not.toMatch(/exit\s+1/);
+    expect(fail.run?.trim()).toMatch(/exit 1$/);
+    expect(steps[skipIndex + 1].name).toBe("Assert legacy agent override is absent from Vercel env");
+    for (const withheld of ["true", "false"]) {
+      const context = { env: { VERCEL_TOKEN: "", VERCEL_PROJECT_ID: "", VERCEL_ORG_ID: "", SECRETS_WITHHELD_PR: withheld } };
+      const evaluate = (condition: string) => Boolean(vm.runInNewContext(condition.replace(/^\$\{\{\s*|\s*\}\}$/g, ""), context, { timeout: 100 }));
+      expect(evaluate(fail.if!)).toBe(withheld === "false");
+      expect(evaluate(skip.if!)).toBe(withheld === "true");
+    }
 
     // The fail path must exclude only fork and Dependabot PRs; the skip path
     // must accept only those same secret-withheld cases. If these conditions

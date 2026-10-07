@@ -37,6 +37,8 @@ BASE_URL = "https://api.elevenlabs.io/v1/convai/agent-testing"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_IDS_PATH = os.path.join(SCRIPT_DIR, "../docs/agents/paisaxe-test-ids.json")
 OUTPUT_FOLDERS_PATH = os.path.join(SCRIPT_DIR, "../docs/agents/paisaxe-elevenlabs-folders.json")
+# docs/agents/ is untracked (Rule #70), so a fresh clone does not have it.
+os.makedirs(os.path.dirname(OUTPUT_IDS_PATH), exist_ok=True)
 
 # ---------------------------------------------------------------------------
 # Helpers

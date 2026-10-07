@@ -20,6 +20,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LOCAL_ANON_KEY as ANON_KEY,
+  LOCAL_API_URL,
   isLocalSupabaseReachable,
   psql,
   warnLocalSupabaseUnreachable,
@@ -41,7 +42,7 @@ describe.skipIf(!dbReachable)(
       process.env = {
         ...originalEnv,
         NODE_ENV: "test", // isDev branch: no in-memory caching between assertions
-        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+        NEXT_PUBLIC_SUPABASE_URL: LOCAL_API_URL,
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
         MAINTENANCE_MODE: undefined,
       };

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-07
+
+### Added
+- Conversational booking of local experiences with a PayPal sandbox deposit, behind the `experience_booking` flag (off in production until enabled): booking domain with quotes, holds and capacity (migrations 112-126); voucher access gate with guest sessions and metering; tool-calling booking chat; PayPal order, approval, capture, webhook and reconciliation cron; cancellation with refund; operator view; balance invoice through PayPal Invoicing; phone-confirmation stretch (authorize, call, capture or void); Zapier notification on confirmed and refunded; Postman collection and local runner.
+- Release probes `booking-gate-closed`, `booking-access-boundary` and `booking-roundtrip`; `Release artifact smoke` workflow and the CI cadence adapter (legacy routing).
+- MIT license and a Hackathon section in the README.
+
+### Changed
+- Chat runs on Claude Sonnet 5.5 with low effort and room for thinking in every response cap.
+- After "Accept offer" the server creates the payment order and shows the payment card itself.
+- Booking assistant searches the catalog first, proposes only bookable experiences and answers in the visitor's language.
+- Vercel builds no Preview for Dependabot or feature pull requests.
+- `@tailwindcss/typography` is a dev dependency (build-time only).
+
+### Fixed
+- Booking replies cut off mid-word when thinking used up the 1,024-token cap.
+- Story viewer and related stories no longer render an image without a source.
+- Local development: the browser can reach the local Supabase (voucher sign-in).
+- Release gate 6 no longer requires a postal code Stripe does not show for Spain; live-database tests have a 20 s budget.
+
+## [1.7.0] - 2026-10-03
+
+See the [v1.7.0 release](https://github.com/juan294/paisaxe/releases/tag/v1.7.0).
+
 ## [1.6.0] - 2026-08-04
 
 ### Added

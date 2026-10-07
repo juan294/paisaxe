@@ -1,32 +1,25 @@
 name: E2E Tests
-
 on:
   push:
-    branches: [develop, main]
-    # DO-M7 (#834): broadened from docs/research|plans|agents/** to the
-    # whole docs/** tree plus root prose files — a docs-only commit outside
-    # those three subfolders (e.g. docs/operations/**, docs/project/**)
-    # was still triggering the full E2E + Visual Regression suite. Filters
-    # `push` only; `pull_request` stays unfiltered because "Playwright E2E"
-    # is a required status check for the `main` branch protection rule —
-    # filtering it there could leave a docs-only release PR waiting forever
-    # on a required context that never runs.
+    branches:
+      - develop
+      - main
     paths-ignore:
-      - "docs/**"
-      - "README.md"
-      - "CHANGELOG.md"
-      - "ROADMAP.md"
-      - "AGENTS.md"
+      - docs/**
+      - README.md
+      - CHANGELOG.md
+      - ROADMAP.md
+      - AGENTS.md
   pull_request:
-    branches: [develop, main]
-
+    branches:
+      - develop
+      - main
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 jobs:
   develop_push_source:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
     permissions:
       contents: read
       pull-requests: read
@@ -34,40 +27,34 @@ jobs:
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
       required_checks: '["Playwright E2E","Visual Regression"]'
-
   e2e:
     name: Playwright E2E
     needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && needs.develop_push_source.outputs.validated_by_pr != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
       PLAYWRIGHT_CHROME_CHANNEL: chrome
-      SECRETS_WITHHELD_PR: >-
-        ${{
-          github.event_name == 'pull_request' &&
+      SECRETS_WITHHELD_PR: |-
+        ${{ !(github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))) || (github.event_name == 'pull_request' &&
           (github.event.pull_request.head.repo.fork == true ||
-           github.event.pull_request.user.login == 'dependabot[bot]')
-        }}
-
+           github.event.pull_request.user.login == 'dependabot[bot]')) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Check authenticated QA secrets
         if: env.SECRETS_WITHHELD_PR != 'true'
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
-          QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
+          SUPABASE_SERVICE_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.SUPABASE_SERVICE_KEY || '' }}
+          QA_TEST_USER_EMAIL: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.QA_TEST_USER_EMAIL || '' }}
+          QA_TEST_USER_PASSWORD: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.QA_TEST_USER_PASSWORD || '' }}
         run: |
           for key in \
             NEXT_PUBLIC_SUPABASE_URL \
@@ -80,33 +67,22 @@ jobs:
               exit 1
             fi
           done
-
       - name: Install canvas system dependencies
         uses: ./.github/actions/install-canvas-deps
-
       - name: Install dependencies
         run: npm ci
-
       - name: Install Playwright system dependencies
         timeout-minutes: 10
         run: npx playwright install-deps chromium
-
       - name: Verify system Chrome
         run: google-chrome --version
-
       - name: Build application
         run: npm run build
         env:
           ANTHROPIC_API_KEY: dummy_key_for_build
           VOYAGE_API_KEY: dummy_key_for_build
-          # Keep the browser bundle deterministic: immersive E2E tests mock
-          # /api/feature-flags per scenario. A live URL here server-seeds the
-          # production flags at build time and bypasses those browser mocks.
-          # The real public credentials remain available to the runtime step
-          # below, where the authenticated QA fixture signs in.
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
-
       - name: Run E2E tests with authenticated journey
         if: env.SECRETS_WITHHELD_PR != 'true'
         run: npm run test:e2e
@@ -114,25 +90,17 @@ jobs:
           CI: true
           ANTHROPIC_API_KEY: dummy_key_for_e2e
           VOYAGE_API_KEY: dummy_key_for_e2e
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
+          SUPABASE_SERVICE_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.SUPABASE_SERVICE_KEY || '' }}
           MAINTENANCE_MODE: "false"
           STRIPE_SECRET_KEY: sk_test_dummy_for_e2e
           STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
-          QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
-          QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
-
-      # GitHub withholds Actions secrets from Dependabot and fork PRs. Run the
-      # deterministic anonymous suite with dummy Supabase values in that trust
-      # context. Authenticated coverage remains mandatory for ordinary PRs and
-      # branch pushes, and every dependency update receives it again after the
-      # vetted change is integrated onto develop.
+          QA_TEST_USER_EMAIL: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.QA_TEST_USER_EMAIL || '' }}
+          QA_TEST_USER_PASSWORD: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))) && secrets.QA_TEST_USER_PASSWORD || '' }}
       - name: Run E2E tests without secret-backed authenticated journey
         if: env.SECRETS_WITHHELD_PR == 'true'
-        run: >-
-          npm run test:e2e --
-          --grep-invert="QA Journey: Authenticated User"
+        run: 'npm run test:e2e -- --grep-invert="QA Journey: Authenticated User"'
         env:
           CI: true
           ANTHROPIC_API_KEY: dummy_key_for_e2e
@@ -142,7 +110,6 @@ jobs:
           MAINTENANCE_MODE: "false"
           STRIPE_SECRET_KEY: sk_test_dummy_for_e2e
           STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
-
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
@@ -150,37 +117,28 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
-
-  # QA-H3 (#441): Visual regression runs in its own job WITHOUT continue-on-error,
-  # so a regression actually fails the workflow and can gate merges via branch
-  # protection. Previously this ran inline with `continue-on-error: true`, which
-  # meant visual diffs could never block a merge.
+    permissions:
+      contents: read
   visual-regression:
     name: Visual Regression
     needs: develop_push_source
-    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && needs.develop_push_source.outputs.validated_by_pr != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install canvas system dependencies
         uses: ./.github/actions/install-canvas-deps
-
       - name: Install dependencies
         run: npm ci
-
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
-
       - name: Build application
         run: npm run build
         env:
@@ -188,7 +146,6 @@ jobs:
           VOYAGE_API_KEY: dummy_key_for_build
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
-
       - name: Run visual regression tests
         run: npm run test:e2e:visual
         env:
@@ -200,7 +157,6 @@ jobs:
           MAINTENANCE_MODE: "false"
           STRIPE_SECRET_KEY: sk_test_dummy_for_e2e
           STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
-
       - name: Upload visual diff artifacts
         uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
@@ -208,3 +164,5 @@ jobs:
           name: visual-regression-results
           path: test-results/
           retention-days: 14
+    permissions:
+      contents: read

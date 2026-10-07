@@ -111,6 +111,40 @@ test("@release-required webhook-unsigned: webhook rejects an unsigned payload", 
   expect([401, 403]).toContain(response.status());
 });
 
+// PayPal hackathon plan, Phase 6 (F10). A ROUTE check only: a 404 for a
+// capability that does not exist proves the route answers, not the access
+// boundary (that is booking-access-boundary, local Docker). Read-only: three
+// GETs. The gate follows the deployed experience_booking flag, read from the
+// public flags endpoint: on, /acceso renders the code form; off, it is a real
+// 404 (the proxy closes the surface). So the probe holds before the release
+// turns the flag on and after (Phase 6 review finding 1).
+test("@release-required booking-gate-closed: an unknown booking capability is 404 and /acceso follows the experience_booking flag", async ({
+  page,
+  request,
+}) => {
+  // Well-formed (uuid + 43-character token), so the 404 comes from the lookup,
+  // not from the capability parser.
+  const unknownCapability = `00000000-0000-4000-8000-000000000000.${"A".repeat(43)}`;
+  const response = await request.get(`/api/booking/bookings/${unknownCapability}`);
+  expect(response.status()).toBe(404);
+  expect(response.headers()["cache-control"]).toContain("no-store");
+
+  const flags = await request.get("/api/feature-flags");
+  expect(flags.status()).toBe(200);
+  const { data } = (await flags.json()) as { data: { flagKey: string; enabled: boolean }[] };
+  const bookingOpen = data.some((flag) => flag.flagKey === "experience_booking" && flag.enabled);
+
+  const access = await page.goto("/acceso");
+  if (bookingOpen) {
+    expect(access?.status()).toBe(200);
+    await expect(page.locator("#voucher-code")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('form button[type="submit"]')).toBeVisible();
+  } else {
+    expect(access?.status()).toBe(404);
+    await expect(page.locator("#voucher-code")).toHaveCount(0);
+  }
+});
+
 // QA-H2 (#869): full rationale in scripts/release/chat-smoke.ts's module
 // docblock. Read-only: `/api/chat/stream` only reads and calls out to
 // Claude/Voyage, never writes. Assertions are on SHAPE only — see chat-smoke.ts.

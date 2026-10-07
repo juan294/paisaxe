@@ -399,7 +399,7 @@ else
     node <<'NODE' 2>/dev/null || true
 const key = process.env.ANTHROPIC_API_KEY;
 const body = {
-  model: "claude-sonnet-5",
+  model: "claude-sonnet-5-5",
   max_tokens: 1,
   messages: [{ role: "user", content: "Reply with OK" }],
 };

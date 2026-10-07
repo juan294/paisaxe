@@ -1,33 +1,32 @@
 name: Dead Code Detection
-
 on:
   pull_request:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
   push:
-    branches: [develop]
-
+    branches:
+      - develop
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   knip:
     name: Knip Dead Code Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install dependencies
         run: npm ci
-
       - name: Run Knip (dead code detection)
         run: npx knip
+    permissions:
+      contents: read
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (!failure() && !cancelled()) }}

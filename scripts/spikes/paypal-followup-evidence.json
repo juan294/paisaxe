@@ -1,0 +1,72 @@
+{
+  "recordedAt": "2026-10-03T14:15:00.663Z",
+  "apiBase": "https://api-m.sandbox.paypal.com",
+  "accessTokenExpiresInSeconds": 31811,
+  "orders": [
+    {
+      "mode": "return",
+      "orderId": "36415640D9739262C",
+      "orderStatus": "COMPLETED",
+      "captureCount": 1,
+      "captures": [
+        {
+          "id": "35T447784Y573942U",
+          "status": "REFUNDED",
+          "value": "30.00"
+        }
+      ]
+    },
+    {
+      "mode": "server-capture",
+      "orderId": "5E496120FM196690K",
+      "orderStatus": "COMPLETED",
+      "captureCount": 1,
+      "captures": [
+        {
+          "id": "55C1718857335004P",
+          "status": "REFUNDED",
+          "value": "30.00"
+        }
+      ]
+    }
+  ],
+  "webhookEventsGeneratedByPayPal": [
+    {
+      "id": "WH-3J7209654T813161G-5HN77081AK644260X",
+      "type": "PAYMENT.CAPTURE.COMPLETED",
+      "createTime": "2026-10-03T14:03:29.018Z",
+      "resourceId": "35T447784Y573942U"
+    },
+    {
+      "id": "WH-6M011179BS010321E-0259884420551042Y",
+      "type": "PAYMENT.CAPTURE.REFUNDED",
+      "createTime": "2026-10-03T14:03:32.542Z",
+      "resourceId": "2CJ83531DN903580J"
+    },
+    {
+      "id": "WH-3CP82577LY0216051-1E1043816M104361P",
+      "type": "CHECKOUT.ORDER.APPROVED",
+      "createTime": "2026-10-03T14:03:33.006Z",
+      "resourceId": "36415640D9739262C"
+    },
+    {
+      "id": "WH-1PV2024973077974R-7X8769942S685491N",
+      "type": "CHECKOUT.ORDER.APPROVED",
+      "createTime": "2026-10-03T14:07:02.449Z",
+      "resourceId": "5E496120FM196690K"
+    },
+    {
+      "id": "WH-3UW196909C4294939-7P922996HL0013837",
+      "type": "PAYMENT.CAPTURE.REFUNDED",
+      "createTime": "2026-10-03T14:07:13.484Z",
+      "resourceId": "9C560786T0139705C"
+    },
+    {
+      "id": "WH-55W95013HR785202P-28H594883V917724T",
+      "type": "PAYMENT.CAPTURE.COMPLETED",
+      "createTime": "2026-10-03T14:08:33.669Z",
+      "resourceId": "55C1718857335004P"
+    }
+  ],
+  "note": "webhookEventsGeneratedByPayPal is PayPal's own event log for the app, read after both runs; an event missing here was not generated, as opposed to generated but not delivered."
+}

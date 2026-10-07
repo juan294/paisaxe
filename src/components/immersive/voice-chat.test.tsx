@@ -49,6 +49,13 @@ vi.mock("@/hooks/use-voice-access", () => ({
   useVoiceAccess: () => mockVoiceAccess,
 }));
 
+// Booking access (PayPal hackathon Phase 3): inactive unless a test opts in,
+// so the discovery-chat tests below see no extra fetch.
+const mockBookingAccess = { active: false, limits: null, isLoading: false };
+vi.mock("@/hooks/use-booking-access", () => ({
+  useBookingAccess: () => mockBookingAccess,
+}));
+
 // Mock PostHog
 const mockCapture = vi.fn();
 const mockReactPostHog = {
@@ -247,6 +254,7 @@ vi.mock("@/components/premium/voice-purchase-cta", () => ({
 // Helper to reset mock voice access state
 const resetMockVoiceAccess = () => {
   mockAuthState.session = null;
+  mockBookingAccess.active = false;
   mockVoiceAccess.canUseVoice = false;
   mockVoiceAccess.needsSignIn = false;
   mockVoiceAccess.needsPurchase = false;
@@ -1910,4 +1918,80 @@ describe("VoiceChat error UI for API failures", () => {
   //    by this component's public API. useStreamChat's own `sendMessage` also
   //    has an independent `isStreaming` re-entrancy guard, so this is a
   //    defensive, structurally dead duplicate check.
+});
+
+describe("VoiceChat booking mode (PayPal hackathon Phase 3, F06)", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+    localStorageMock.setItem("paisaxe-privacy-acknowledged", "true");
+  });
+
+  it("with voice access granted and booking mode on, shows the text booking chat instead of switching to voice", async () => {
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.agentId = "agent-1";
+    mockBookingAccess.active = true;
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} bookingMode />);
+
+    await act(async () => {});
+    expect(screen.queryByTestId("elevenlabs-voice-chat")).toBeNull();
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+    expect(screen.getByText("booking.chat.voiceDiscovery")).toBeInTheDocument();
+  });
+
+  it("without booking mode, granted voice access still switches to voice (unchanged)", async () => {
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.agentId = "agent-1";
+    mockBookingAccess.active = true;
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    expect(await screen.findByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+  });
+
+  it("sends turns to the booking chat route while booking access is active", async () => {
+    mockAuthState.session = { access_token: "token-1" };
+    mockBookingAccess.active = true;
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`));
+          controller.close();
+        },
+      }),
+    });
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} bookingMode />);
+    await userEvent.type(screen.getByRole("textbox"), "Somos cuatro");
+    await userEvent.keyboard("{Enter}");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    expect(mockFetch.mock.calls[0][0]).toBe("/api/booking/chat/stream");
+  });
+
+  it("without booking access, uses the discovery chat route (unchanged)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`));
+          controller.close();
+        },
+      }),
+    });
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} bookingMode />);
+    await userEvent.type(screen.getByRole("textbox"), "Hola");
+    await userEvent.keyboard("{Enter}");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    expect(mockFetch.mock.calls[0][0]).toBe("/api/chat/stream");
+  });
 });

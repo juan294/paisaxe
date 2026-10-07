@@ -50,7 +50,7 @@ develop   # Active development (DEFAULT)
 1. **Push to `main`** — NEVER. Not even a typo fix.
 2. **Create a PR targeting `main`** — NEVER. Only when the user requests a release.
 3. **Merge a PR into `main`** — NEVER. The user merges production PRs themselves or gives explicit authorization.
-4. **Run `vercel` deploy commands** — NEVER for production. Preview deployments on `develop` are fine.
+4. **Run `vercel` deploy commands** — NEVER for production. Do not create Preview deployments either: the only permitted Preview is the release PR's (see Production Release).
 5. **Modify Supabase production data** — NEVER. Migrations must be reviewed.
 6. **Modify Vercel environment variables** — NEVER. The user does this.
 7. **Modify DNS, domain settings, or external service configs** — NEVER.
@@ -91,6 +91,13 @@ improvise a different sequence here or in any other file. Its ordering is:
 6. Analyze the evidence — `npm run analyze-release`
 7. Obtain authorization
 8. **Tag last** — no tag without a passing analyzer run for the shipped tree
+
+Two standing rulings live in the checklist: the release PR's Vercel Preview is the only permitted
+Preview (section 3), and a feature that needs a mutating production check uses the separate,
+owner-authorized acceptance step (section 5b), never the read-only probes. These are
+project-specific overrides of the installed rules: where `.rpi/rules/deployment-safety.md`,
+`AGENTS.md` or `.claude/rules/` say "Never create Vercel Previews", the release PR's Preview
+is the documented exception, and a release must not be stopped over it.
 
 The user requests a release; the agent never initiates one. **Never bypass branch protection.**
 If CI fails on the PR, fix on `develop` first, push, and let the PR update.
@@ -387,3 +394,15 @@ Debug mode, large refactoring, and health check workflows are defined in `.claud
 <!-- rpi:claude-import:start -->
 @AGENTS.md
 <!-- rpi:claude-import:end -->
+
+## Local CI cadence adapter
+
+The cadence source is installed locally with legacy routing by default. `CI_CADENCE_MODE=lean` is an explicit later activation; `CI_CADENCE_REPAIR_ENABLED` remains off unless separately authorized. Regenerate/check native definitions with `node scripts/ci-cadence-native-workflows.mjs [--check]`. The protected entry acquires immutable push-before/PR-base/default modules before imports; contributor helper, policy, Git metadata and YAML do not grant authority.
+
+`CI Fast` is the one job that starts a runner for a lean owner develop push or PR; its source is `.github/ci-cadence-fast-job.yml`, inlined into `ci-cadence.yml` by the generator. Routed workflows are skipped by static job predicates (no per-workflow classifier job) and run in full whenever `CI_CADENCE_MODE` is not `lean` (compared without case, as GitHub's `==` does: `LEAN` is lean, and shell/JS steps receive that normalised value), the base/ref is production, or the event is untrusted. `CI Fast` runs its four cheap checks in legacy too, and is decided for untrusted develop events as well (read-only token, no secrets, base-branch code only): under legacy a full-required or untrusted result passes with a disclosure because the original workflows run, while under lean an untrusted event fails `CI Fast`. Scheduled paths trust repository/owner ids and ref only, never `github.event.sender`. When they demand full validation, lean starts every recovery child and the `CI Fast recovery` aggregate (skipped otherwise; require both contexts), while legacy leaves that to the original workflows. A lean event whose protected base has no helper fails `CI Fast` with the repair instruction: keep `CI_CADENCE_MODE` legacy until the helper is on the base. It never supplies release/main proof. The original main and release contexts, Stripe/provider prerequisites and post-deploy probes remain mandatory. Lean integration nightly resolves develop once, authenticates every original attempt/job/artifact and never publishes main coverage. Main coverage retains its own complete suite; lean periodic refresh is weekly and its completed finalizer signs the original measuring run/attempt after native success. Calendar/unchanged skips do not refresh coverage or create reusable receipts.
+
+No cadence launcher performs a git network operation: the CI Fast bootstrap, the protected launcher and the control loader read the protected base, the candidate and the nightly's develop head from the job's own `fetch-depth: 0` checkout (the launcher's private store shares it through git alternates), and block if any is missing. Its only network use is read-only GitHub REST calls (repository, branch ref, and a compare when a pull request's base lags the tip) and the pinned scanner download. A pull request is admitted when its merge's first parent is `base.sha` or a descendant of it that is on develop; `base.sha` remains the protected definition. A blocked launcher names the failed check from a fixed vocabulary (`unclassified` otherwise). The completed-evidence finalizer runs only after a successful nightly or main coverage run, never after `CI cadence` or pull-request runs, so a lean develop push that needed full recovery is revalidated by the next nightly rather than reused. The real Stripe suite also stands down on lean owner PRs into develop. Activation is legacy-first (see the release checklist).
+
+Release PRs run `Release artifact smoke` (`.github/workflows/preview-smoke.yml`): a plain secret-free job that builds the exact PR candidate, starts local Supabase, serves the production build on loopback and runs `npm run test:e2e:release-artifact` (the `release-required-local` probes plus `e2e/release-artifact-smoke.spec.ts`, which fails when candidate identity is unavailable). It replaces `Smoke test Vercel preview` in main's required checks only after passing on an eligible release PR and with separate authorization.
+
+Run every cadence contract test with `npm run test:ci-cadence`. Source fixture passes do not prove native reusable job names, hosted timing or deployed behavior. No local source change authorizes provider calls, remote variable/settings changes, publication, paid repair or automatic reruns.

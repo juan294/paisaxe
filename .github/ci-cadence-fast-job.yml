@@ -1,0 +1,192 @@
+# Source of the single routine job in .github/workflows/ci-cadence.yml.
+# scripts/ci-cadence-native-workflows.mjs inlines it as the job whose check
+# context is `CI Fast`; edit here and regenerate. It is the only job that
+# starts a runner for a lean owner develop push or pull request.
+name: CI Fast
+outputs:
+  decision: ${{ steps.entry.outputs.decision }}
+  source_sha: ${{ steps.entry.outputs.source_sha }}
+  checkout_sha: ${{ steps.entry.outputs.checkout_sha }}
+  definition_sha: ${{ steps.entry.outputs.definition_sha }}
+  cadence_json: ${{ steps.entry.outputs.cadence_json }}
+# Runs in legacy and lean mode alike, and for untrusted contributors too: CI Fast
+# is a required context, so it must be decided for every integration event. It
+# holds a read-only token and no secrets, and executes only base-branch code.
+# CI_CADENCE_MODE only decides who owns full-suite work.
+if: >-
+  github.repository_id == '1141286326' && github.repository_owner_id == '3944118' &&
+  ((github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+   (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop'))
+runs-on: ubuntu-latest
+timeout-minutes: 6
+steps:
+  - name: Checkout actual native candidate
+    uses: actions/checkout@v7
+    with:
+      fetch-depth: 0
+      persist-credentials: false
+  - name: Setup reviewed Node runtime
+    uses: actions/setup-node@v7
+    with:
+      node-version: '24.21.0'
+  - name: Acquire reviewed protected launcher
+    id: entry
+    env:
+      LAUNCHER_SHA256: 1ed0a7e1979647dac9f1e676bdcf3a80761b25bdf749f821f2308ef630ce72e0
+      GITHUB_TOKEN: ${{ github.token }}
+      # The four Fast checks always execute, so the launcher always
+      # classifies under lean rules. ROUTING_MODE is the repository's real
+      # mode: under legacy the existing full workflows keep running and
+      # own any full-suite work, so the caller starts no recovery children.
+      CI_CADENCE_MODE: lean
+      # Normalised with GitHub's case-insensitive `==`, exactly as the job
+      # predicates of the routed workflows read the variable.
+      ROUTING_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
+    run: |
+      set -euo pipefail
+      unset NODE_OPTIONS NODE_PATH
+      while IFS= read -r name; do unset "$name"; done < <(compgen -v | sed -n '/^GIT_/p')
+      export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null
+      export GIT_TERMINAL_PROMPT=0
+      definition="$(python3 - <<'PY'
+      import json, os, re
+      with open(os.environ['GITHUB_EVENT_PATH']) as source:
+          event = json.load(source)
+      kind = os.environ['GITHUB_EVENT_NAME']
+      # event.before and pull_request.base.sha are native immutable identities.
+      definition = event['before'] if kind == 'push' else event['pull_request']['base']['sha']
+      if not re.fullmatch('[a-f0-9]{40}', definition):
+          raise SystemExit('invalid protected definition')
+      print(definition)
+      PY
+      )"
+      private="$(mktemp -d "$RUNNER_TEMP/cadence-bootstrap.XXXXXXXX")"
+      chmod 700 "$private"
+      trap 'rm -rf "$private"' EXIT
+      # No network: the full-history checkout already holds the push `before`
+      # commit and the pull request base. Absence means a force-push or a
+      # shallow checkout, and nothing trusted can be read.
+      if ! git --no-replace-objects cat-file -e "$definition^{commit}" 2>/dev/null; then
+        reason="protected base $definition is not in this checkout (force-push or shallow history); CI Fast cannot read its trusted definition. Push a commit on top of the current develop."
+        echo "::error title=CI Fast::$reason"
+        echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+        exit 1
+      fi
+      # First installation: the protected base predates the cadence helper,
+      # so nothing trusted exists to run. Under legacy the original workflows
+      # run their complete graph regardless. Under lean they are statically
+      # skipped, so nothing would validate this event: fail with the repair.
+      installed="$(git --no-replace-objects ls-tree --name-only "$definition" -- scripts/ci-cadence-launch.mjs scripts/ci-cadence.mjs .github/ci-cadence.json)"
+      if [ -z "$installed" ]; then
+        if [ "${ROUTING_MODE:-}" = lean ]; then
+          reason='first installation: protected base has no cadence helper, and lean mode skips the full workflows. Set CI_CADENCE_MODE to legacy, land the helper on the base branch, then set lean again.'
+          echo "::error title=CI Fast::$reason"
+          echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        fi
+        reason='first installation: protected base has no cadence helper; the existing full workflows validate this event'
+        echo "::notice title=CI Fast::$reason"
+        echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+        echo 'decision=legacy' >> "$GITHUB_OUTPUT"
+        exit 0
+      fi
+      git --no-replace-objects show "$definition:scripts/ci-cadence-launch.mjs" > "$private/launch.mjs"
+      chmod 600 "$private/launch.mjs"
+      # Launcher change: the candidate carries the pin of its own launcher, which
+      # the protected base cannot match until the change lands. Nothing trusted
+      # can run. Under legacy the original workflows validate this event; under
+      # lean they are skipped, so fail with the same repair as first installation.
+      if ! printf '%s  %s\n' "$LAUNCHER_SHA256" "$private/launch.mjs" | sha256sum --check --status; then
+        if [ "${ROUTING_MODE:-}" = lean ]; then
+          reason='launcher change: the protected base launcher differs from the reviewed pin in this candidate, and lean mode skips the full workflows. Set CI_CADENCE_MODE to legacy, land the launcher change on the base branch, then set lean again.'
+          echo "::error title=CI Fast::$reason"
+          echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        fi
+        reason='launcher change: the protected base launcher differs from the reviewed pin in this candidate; the existing full workflows validate this event under legacy mode'
+        echo "::notice title=CI Fast::$reason"
+        echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+        echo 'decision=legacy' >> "$GITHUB_OUTPUT"
+        exit 0
+      fi
+      # Workflow change under lean: the original workflows are statically skipped,
+      # recovery starts only on decision=full and the nightly runs main's
+      # definitions, so an edited workflow listed by the protected base (policy
+      # workflows or native pins) would first execute on the release PR. Under
+      # legacy the originals run it, so nothing changes. Only base-listed paths
+      # are compared, from the local checkout; a missing path is a change. A pull
+      # request is refs/pull/N/merge on the CURRENT base tip while base.sha can
+      # lag, so its baseline is the merge's first parent: exactly what the PR
+      # introduces (the launcher authenticates that parent against the branch).
+      # This catches honest mistakes, not adversaries: review before merge is the
+      # control for a PR that edits its own workflow.
+      if [ "${ROUTING_MODE:-}" = lean ]; then
+        changed="$(python3 - "$definition" <<'PY'
+      import json, os, re, subprocess, sys
+      definition, candidate = sys.argv[1], os.environ['GITHUB_SHA']
+      if not re.fullmatch('[a-f0-9]{40}', candidate):
+          raise SystemExit('invalid candidate identity')
+      def git(*args):
+          return subprocess.run(['git', '--no-replace-objects', *args], capture_output=True, text=True)
+      baseline = definition
+      if os.environ['GITHUB_EVENT_NAME'] == 'pull_request':
+          parents = git('rev-list', '--parents', '-n', '1', candidate)
+          commits = parents.stdout.split()
+          if parents.returncode != 0 or len(commits) != 3 or commits[0] != candidate or not all(re.fullmatch('[a-f0-9]{40}', c) for c in commits):
+              raise SystemExit('pull request candidate is not a two-parent merge')
+          baseline = commits[1]
+      def listed(path, key):
+          shown = git('show', f'{definition}:{path}')
+          if shown.returncode != 0:
+              return []
+          value = json.loads(shown.stdout).get(key, [])
+          return [entry['path'] for entry in value] if key == 'workflows' else list(value)
+      paths = sorted(set(listed('.github/ci-cadence.json', 'workflows')) | set(listed('.github/ci-cadence-native.json', 'workflowPins')))
+      for path in paths:
+          if not isinstance(path, str) or not re.fullmatch(r'\.github/workflows/[A-Za-z0-9._-]+\.ya?ml', path):
+              raise SystemExit('invalid listed workflow path')
+          before, after = (git('rev-parse', '--verify', '--quiet', f'{revision}:{path}') for revision in (baseline, candidate))
+          if before.returncode != 0 or after.returncode != 0 or before.stdout != after.stdout:
+              print(path)
+      PY
+      )"
+        if [ -n "$changed" ]; then
+          reason="workflow change: $(echo "$changed" | paste -sd ' ' -) differs from the protected base, and lean mode skips the original workflows and runs no recovery for it. Set CI_CADENCE_MODE to legacy, land the change on the base branch, then set lean again."
+          echo "::error title=CI Fast::$reason"
+          echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        fi
+      fi
+      node "$private/launch.mjs" > "$private/result.json"
+      python3 - "$private/result.json" <<'PYTHON'
+      import json,os,re,sys
+      with open(sys.argv[1]) as f: result=json.load(f)
+      required=['commit-secret-scan','policy-validation','lockfile-validation','cadence-contracts']
+      lean=os.environ.get('ROUTING_MODE')=='lean'
+      disclosure=None
+      if result.get('lane')=='fast' and result.get('success') is True and result.get('completed')==required:
+          decision='skip'
+      elif result.get('lane')=='full' and result.get('fullRequired') is True and result.get('success') is False:
+          # Lean: the caller runs every full recovery child. Legacy: the
+          # existing full workflows already validate this event.
+          decision='full' if lean else 'legacy'
+          if not lean: disclosure='full validation is required ('+str(result.get('reason'))+'); the original full workflows validate this event under legacy mode'
+      elif result.get('lane')=='untrusted' and result.get('acceptanceBlocked') is True and result.get('protectedImported') is True:
+          # The original workflows always run their full secret-free graph for
+          # untrusted events. Lean never accepts that as integration proof.
+          if lean:
+              print('::error title=CI Fast::untrusted contribution: acceptance is blocked until a vetted owner integration obtains authenticated proof; the full hosted suite runs without secrets')
+              raise SystemExit(1)
+          decision='legacy'
+          disclosure='untrusted contribution: the original full workflows validate this event without secrets under legacy mode; CI Fast adds no acceptance'
+      else:
+          raise SystemExit('Protected Fast/full admission unavailable')
+      if disclosure: print('::notice title=CI Fast::'+disclosure)
+      values={'decision':decision,'source_sha':result.get('sourceSha'),'checkout_sha':result.get('testedCheckoutSha'),'definition_sha':result.get('definitionSha'),'cadence_json':json.dumps(result,separators=(',',':'))}
+      for key in ['source_sha','checkout_sha','definition_sha']:
+          assert re.fullmatch('[a-f0-9]{40}',values[key] or '')
+      with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+          for key,value in values.items(): f.write(key+'='+value+'\n')
+      with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+          f.write('CI Fast decision: '+decision+' ('+str(disclosure or result.get('reason') or 'four Fast checks passed')+')\n')
+      PYTHON

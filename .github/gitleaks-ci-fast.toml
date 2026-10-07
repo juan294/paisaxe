@@ -1,0 +1,18 @@
+# Rules for CI Fast's introduced-commit secret scan only (scripts/ci-fast.mjs
+# reads this file from the protected base, never from the candidate).
+#
+# It extends the Gitleaks default rules so the scan detects real token shapes;
+# CI Fast proves that on every run with a canary before trusting a clean
+# result. The repository-wide history scan in security.yml keeps using
+# .gitleaks.toml unchanged.
+[extend]
+  useDefault = true
+
+[allowlist]
+  description = "Allowlist for false positives"
+
+  # supabase/functions/README.md contains example curl commands with
+  # placeholder tokens (YOUR_ANON_KEY).
+  paths = [
+    '''supabase/functions/README\.md''',
+  ]

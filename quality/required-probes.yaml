@@ -141,6 +141,59 @@ probes:
       never desktop/mobile (which build with dummy Anthropic/Voyage keys —
       see playwright.config.ts webServer.env).
 
+  - id: booking-gate-closed
+    title: Unknown booking capability is 404 and /acceso follows the experience_booking flag
+    owner: booking
+    tier: deployed-readonly
+    safety: read-only
+    runner:
+      kind: playwright
+      project: release-required
+      selector: "@release-required booking-gate-closed"
+    oracles: [http, ui]
+    notes: >-
+      PayPal hackathon plan, Phase 6 (F10). A route check only: a 404 for a
+      capability that does not exist does not prove the access boundary
+      (booking-access-boundary does, on local Docker). Three GETs. Reads the
+      deployed experience_booking flag from /api/feature-flags: on, /acceso
+      renders the code form; off, /acceso is a real 404. Holds before and after
+      the release turns the flag on.
+
+  - id: booking-access-boundary
+    title: Booking capability, ownership, redemption and Preview gates hold with valid fixtures
+    owner: booking
+    tier: local-docker
+    safety: mutating-local
+    runner:
+      kind: playwright
+      project: release-required-local
+      selector: "@release-required @local-docker booking-access-boundary"
+    oracles: [http, cleanup]
+    notes: >-
+      F10. A valid capability with no cookies opens its booking (a wrong token
+      does not); another user's booking id is not_found in the chat tools; a
+      session without a redemption is 404 on the chat and access routes; the
+      same requests against a local VERCEL_ENV=preview server are 404. The
+      chat model is the scripted replay (BOOKING_AGENT_REPLAY), the tools are
+      real. Every created row is deleted and the deletion verified.
+
+  - id: booking-roundtrip
+    title: Voucher, chat, accept, PayPal approval, return, confirmed, operator view, cancel, refunded
+    owner: booking
+    tier: local-docker
+    safety: mutating-local
+    runner:
+      kind: playwright
+      project: release-required-local
+      selector: "@release-required @local-docker booking-roundtrip"
+    oracles: [ui, datastore, cleanup]
+    notes: >-
+      The whole journey in the browser against next dev, the PayPal stand-in
+      (src/test/paypal-mock-server.ts, started by e2e/booking-global-setup.ts;
+      the sandbox approval page is answered by the test, never requested) and
+      the scripted replay model. Confirmed and refunded are read back from
+      Postgres; the cleanup oracle deletes the run's rows and verifies it.
+
   - id: favorite-roundtrip
     title: Favorite create, datastore read-back, cleanup
     owner: release
@@ -152,8 +205,8 @@ probes:
       selector: "@release-required @local-docker favorite-roundtrip"
     oracles: [ui, datastore, cleanup]
     notes: >-
-      The only mutating required probe. The spec refuses to run unless
-      NEXT_PUBLIC_SUPABASE_URL points at localhost.
+      Mutating, like the two local booking probes. The spec refuses to run
+      unless NEXT_PUBLIC_SUPABASE_URL points at localhost.
 
   - id: migration-posture
     title: Migration posture lint

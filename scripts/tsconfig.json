@@ -3,7 +3,10 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["./**/*.ts"],
+  "include": [
+    "./**/*.ts",
+    "../src/instrumentation.ts"
+  ],
   "exclude": [
     "../node_modules",
     "extract-images.ts"

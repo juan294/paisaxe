@@ -46,13 +46,24 @@ export function buildCspHeader({ nodeEnv = process.env.NODE_ENV }: BuildCspHeade
     .filter(Boolean)
     .join(" ");
 
+  // Development only: the local Docker Supabase (`supabase start`) serves auth
+  // and realtime on 127.0.0.1:54321, which the browser must reach (#1000).
+  const connectSrc = [
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com https://checkout.stripe.com",
+    nodeEnv === "development"
+      ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321"
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return [
     "default-src 'self'",
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com https://*.stripe.com",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com https://checkout.stripe.com",
+    connectSrc,
     "media-src 'self' blob:",
     "worker-src 'self' blob:",
     "frame-src https://js.stripe.com https://checkout.stripe.com",

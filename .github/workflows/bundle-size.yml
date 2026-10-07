@@ -1,47 +1,38 @@
 name: Bundle Size Analysis
-
 on:
   pull_request:
-    branches: [develop, main]
-
+    branches:
+      - develop
+      - main
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   analyze:
     name: Analyze Bundle Size
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     permissions:
       contents: read
-      pull-requests: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
-
+          node-version: "24"
+          cache: npm
       - name: Install dependencies
         run: npm ci
-
       - name: Build
         run: npm run build
         env:
-          # Dummy values for build (APIs not called during build)
           ANTHROPIC_API_KEY: dummy_key_for_build
           VOYAGE_API_KEY: dummy_key_for_build
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
-
       - name: Analyze bundle
         id: bundle
         run: |
@@ -73,24 +64,34 @@ jobs:
           echo "static_size=${STATIC_SIZE:-N/A}" >> "$GITHUB_OUTPUT"
           echo "server_size=${SERVER_SIZE:-N/A}" >> "$GITHUB_OUTPUT"
           echo "total_size=${TOTAL_SIZE}" >> "$GITHUB_OUTPUT"
-
-      # PE-H3: du -sh above is informational only and can never fail. This step is the
-      # actual hard gate — it sums real gzip bytes per route from the Turbopack output
-      # (the bundler that ships to production) and fails the job if any route exceeds
-      # its committed budget in scripts/check-bundle-budget.ts.
       - name: Enforce per-route bundle budget
         id: budget
         run: npm run check-bundle-budget
-
+    outputs:
+      static_size: ${{ steps.bundle.outputs.static_size }}
+      server_size: ${{ steps.bundle.outputs.server_size }}
+      total_size: ${{ steps.bundle.outputs.total_size }}
+      budget_outcome: ${{ steps.budget.outcome }}
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (!failure() && !cancelled()) }}
+  bundle-comment:
+    name: Publish owner bundle comment
+    needs:
+      - analyze
+    if: ${{ always() && (!(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && github.event_name == 'pull_request' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
       - name: Comment on PR
         if: always()
         uses: actions/github-script@v9
         with:
           script: |
-            const staticSize = '${{ steps.bundle.outputs.static_size }}';
-            const serverSize = '${{ steps.bundle.outputs.server_size }}';
-            const totalSize = '${{ steps.bundle.outputs.total_size }}';
-            const budgetOutcome = '${{ steps.budget.outcome }}' === 'success' ? '✅ within budget' : '❌ budget exceeded — see job logs';
+            const staticSize = '${{ needs.analyze.outputs.static_size }}';
+            const serverSize = '${{ needs.analyze.outputs.server_size }}';
+            const totalSize = '${{ needs.analyze.outputs.total_size }}';
+            const budgetOutcome = '${{ needs.analyze.outputs.budget_outcome }}' === 'success' ? '✅ within budget' : '❌ budget exceeded — see job logs';
 
             const body = [
               '## Bundle Size Report',

@@ -48,3 +48,20 @@ describe("VercelAnalytics", () => {
     expect(container).toBeDefined();
   });
 });
+
+describe("VercelAnalytics capability redaction (F05)", () => {
+  it("passes a beforeSend that redacts capability links to both Analytics and Speed Insights", async () => {
+    const { analyticsBeforeSend } = await import("./analytics");
+    const capability = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+
+    expect(analyticsBeforeSend({ type: "pageview", url: `https://paisaxe.es/booking/${capability}?x=1` })).toEqual({
+      type: "pageview",
+      url: "https://paisaxe.es/booking/[redacted]",
+    });
+    expect(analyticsBeforeSend({ type: "pageview", url: "https://paisaxe.es/immersive" })).toEqual({
+      type: "pageview",
+      url: "https://paisaxe.es/immersive",
+    });
+  });
+});
+

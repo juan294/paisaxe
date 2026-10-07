@@ -1,0 +1,67 @@
+# Paisaxe production release evidence: retrieval fix + migrations 101-111 + Next.js security update.
+#
+# Release PR #988 (merge commit d0e920a5, merge-commit method). paisaxe.es and www were assigned to
+# the production deployment of that exact commit; the deployed read-only probes, identity check and
+# voice preflight below ran against it. favorite-roundtrip is mutating and ran against the local
+# Docker Supabase stack only (throwaway local user). check-migrations and check-required-probes
+# ran on this tree.
+
+version: 1
+
+candidate_tree: f467b7a5446bc7e01a753e782046e4326bcf5262
+shipped_tree: f467b7a5446bc7e01a753e782046e4326bcf5262
+deployed_tree: f467b7a5446bc7e01a753e782046e4326bcf5262
+deployed_commit: d0e920a589f3137aee45c3c7893dbe0132b5f46d
+github_deployment_id: 6825668296
+target_url: https://paisaxe.es
+generated_at: "2026-10-03T09:20:00Z"
+
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles: [identity]
+
+  - id: health-status
+    status: passed
+    oracles: [http]
+  - id: health-db
+    status: passed
+    oracles: [http]
+  - id: csp-canary
+    status: passed
+    oracles: [ui]
+  - id: story-read-path
+    status: passed
+    oracles: [http, ui]
+  - id: admin-denial
+    status: passed
+    oracles: [http]
+  - id: webhook-unsigned
+    status: passed
+    oracles: [http]
+  - id: chat-smoke
+    status: passed
+    oracles: [http]
+
+  - id: elevenlabs-voice-preflight
+    status: passed
+    oracles: [http]
+    provider: ok
+    fingerprint: sha256:1337f33296d87be8
+    fingerprint_matches: true
+    agents: [pelayo, booking, penny, iris, xander]
+    custom_llm: not_applicable
+    target_url: https://paisaxe.es
+    response_url: https://paisaxe.es/api/health/voice
+    github_deployment_id: 6825668296
+    deployment_commit: d0e920a589f3137aee45c3c7893dbe0132b5f46d
+    checked_at: "2026-10-03T09:09:39.468Z"
+
+  - id: favorite-roundtrip
+    status: passed
+    oracles: [ui, datastore, cleanup]
+    cleanup: removed
+
+  - id: migration-posture
+    status: passed
+    oracles: [static]
