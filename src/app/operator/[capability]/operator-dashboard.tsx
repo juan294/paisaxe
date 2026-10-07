@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { CalendarCheck, TriangleAlert } from "lucide-react";
+import { CalendarCheck, Hourglass, TriangleAlert, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StatCard } from "@/components/ui/stat-card";
-import { clockTime, money } from "@/lib/booking-format";
+import { clockTime, money, slotDay } from "@/lib/booking-format";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { cn } from "@/lib/utils";
 import type { OperatorBooking, OperatorCapacity, OperatorHold, OperatorView } from "@/lib/booking/operator";
 
 // Merchant-facing copy is Spanish only: the operator is the Asturian provider.
@@ -40,6 +42,7 @@ const HOLD_NOT_LIVE = "Ese bloqueo ya no estaba activo.";
 type Load = { kind: "loading" } | { kind: "notFound" } | { kind: "failed" } | { kind: "ready"; view: OperatorView };
 
 const eur = (cents: number, currency = "EUR") => money(cents, currency, "es");
+const when = (date: string, time: string) => `${slotDay(date, "es")} · ${time}`;
 
 function dayLabel(date: string): string {
   return new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", timeZone: "UTC" }).format(
@@ -60,6 +63,9 @@ export function OperatorDashboard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [issued, setIssued] = useState<{ reference: string; url: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // The booking stays set while the dialog closes, so its title does not blank out mid-animation.
+  const [reissueTarget, setReissueTarget] = useState<OperatorBooking | null>(null);
+  const [reissueOpen, setReissueOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -94,9 +100,14 @@ export function OperatorDashboard() {
     await refresh();
   };
 
+  const askReissue = (booking: OperatorBooking) => {
+    setReissueTarget(booking);
+    setReissueOpen(true);
+  };
+
   const reissue = async (booking: OperatorBooking) => {
-    if (!window.confirm(`¿Reemitir el enlace de ${booking.reference}? El enlace anterior dejará de funcionar.`)) return;
     const response = await post(`/bookings/${booking.id}/reissue-link`);
+    setReissueOpen(false);
     const body = response?.ok ? ((await response.json().catch(() => null)) as { link?: string } | null) : null;
     if (!body?.link) {
       setNotice(ACTION_FAILED);
@@ -130,13 +141,13 @@ export function OperatorDashboard() {
   const upcoming = shown.filter((booking) => booking.slotDate >= view.today);
   const recent = shown.filter((booking) => booking.slotDate < view.today).reverse();
   const table = (bookings: OperatorBooking[]) => (
-    <BookingTable bookings={bookings} disabled={busy} onReissue={(booking) => void reissue(booking)} />
+    <BookingTable bookings={bookings} disabled={busy} onReissue={askReissue} />
   );
 
   return (
     <Shell>
       <header className="space-y-1">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Panel de operador</p>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-[#6b6560]">Panel de operador</p>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{view.merchant.name}</h1>
           {view.merchant.isFixture && (
@@ -155,8 +166,18 @@ export function OperatorDashboard() {
           onClick={() => setOnlyExceptions(false)}
           ariaLabel={`Próximas: ${view.summary.upcoming}`}
         />
-        <MoneyTile testId="tile-deposits" label="Depósitos cobrados" cents={view.summary.depositsCollectedCents} />
-        <MoneyTile testId="tile-balance" label="Pendiente de cobro" cents={view.summary.balanceDueCents} />
+        <MoneyTile
+          testId="tile-deposits"
+          icon={<Wallet className="size-5" />}
+          label="Depósitos cobrados"
+          cents={view.summary.depositsCollectedCents}
+        />
+        <MoneyTile
+          testId="tile-balance"
+          icon={<Hourglass className="size-5" />}
+          label="Pendiente de cobro"
+          cents={view.summary.balanceDueCents}
+        />
         <StatCard
           icon={<TriangleAlert className="size-5" />}
           value={view.summary.exceptions}
@@ -176,7 +197,7 @@ export function OperatorDashboard() {
               <p>
                 Nuevo enlace para {issued.reference}. Cópialo ahora: no se volverá a mostrar. El anterior ya no funciona.
               </p>
-              <code className="block break-all rounded bg-black/5 p-2 text-sm dark:bg-white/10">{issued.url}</code>
+              <code className="block break-all rounded bg-black/5 p-2 text-sm">{issued.url}</code>
               <Button type="button" size="sm" onClick={() => setIssued(null)}>
                 Hecho
               </Button>
@@ -196,8 +217,8 @@ export function OperatorDashboard() {
             {view.holds.map((hold) => (
               <li key={hold.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
                 <span>
-                  <span className="font-mono">{hold.reference ?? hold.id}</span> · {hold.experienceTitle} · {hold.slotDate}{" "}
-                  {hold.slotTime} · {hold.partySize} pers. · caduca a las {clockTime(hold.expiresAt, "es")}
+                  <span className="font-mono">{hold.reference ?? hold.id}</span> · {hold.experienceTitle} ·{" "}
+                  {when(hold.slotDate, hold.slotTime)} · {hold.partySize} pers. · caduca a las {clockTime(hold.expiresAt, "es")}
                 </span>
                 <Button
                   type="button"
@@ -220,7 +241,39 @@ export function OperatorDashboard() {
           <CapacityTable key={experience.id} experience={experience} />
         ))}
       </Section>
+
+      <Dialog open={reissueOpen} onOpenChange={(open) => !open && !busy && setReissueOpen(false)}>
+        <DialogContent hideCloseButton className="w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white text-[#2d2a26]">
+          <DialogHeader>
+            <DialogTitle>Reemitir enlace de {reissueTarget?.reference}</DialogTitle>
+            <DialogDescription className="text-[#6b6560]">El enlace anterior dejará de funcionar.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" disabled={busy} onClick={() => setReissueOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" disabled={busy} onClick={() => reissueTarget && void reissue(reissueTarget)}>
+              {busy ? "Reemitiendo…" : "Reemitir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Shell>
+  );
+}
+
+const COLUMNS = ["Referencia", "Actividad", "Fecha", "Personas", "Estado", "Depósito", "Pendiente", "Pago", "Acciones"] as const;
+
+// Below md each row stacks into a card and each cell into a captioned line (one DOM, D8).
+// The explicit roles keep the table semantics once `display` changes.
+const CELL =
+  "p-2 max-md:flex max-md:items-baseline max-md:justify-between max-md:gap-3 max-md:px-0 max-md:py-1 max-md:text-right max-md:before:shrink-0 max-md:before:text-left max-md:before:font-mono max-md:before:text-[10px] max-md:before:uppercase max-md:before:tracking-widest max-md:before:text-[#6b6560] max-md:before:content-[attr(data-label)]";
+
+function Cell({ label, className, children }: { label: (typeof COLUMNS)[number]; className?: string; children: React.ReactNode }) {
+  return (
+    <td role="cell" data-label={label} className={cn(CELL, className)}>
+      <div className="min-w-0">{children}</div>
+    </td>
   );
 }
 
@@ -234,53 +287,63 @@ function BookingTable({
   onReissue: (booking: OperatorBooking) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full text-left text-sm">
-        <thead className="font-mono text-[10px] uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
-          <tr>
-            {["Referencia", "Actividad", "Fecha", "Personas", "Estado", "Depósito", "Pendiente", "Pago", ""].map((label) => (
-              <th key={label} scope="col" className="p-2">
-                {label}
+    <div className="md:overflow-x-auto md:rounded-xl md:border">
+      <table role="table" className="w-full text-left text-sm max-md:block">
+        <thead role="rowgroup" className="font-mono text-[10px] uppercase tracking-widest text-[#6b6560] max-md:sr-only">
+          <tr role="row">
+            {COLUMNS.map((label) => (
+              <th key={label} role="columnheader" scope="col" className="p-2">
+                {label === "Acciones" ? <span className="sr-only">{label}</span> : label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y">
+        <tbody role="rowgroup" className="divide-y max-md:block max-md:space-y-3 max-md:divide-y-0">
           {bookings.map((booking) => (
             <tr
               key={booking.id}
+              role="row"
               data-exception={String(booking.exception)}
-              className={booking.exception ? "bg-[#c9a55c]/15" : undefined}
+              className={cn(
+                "max-md:block max-md:rounded-xl max-md:border max-md:p-3",
+                booking.exception ? "bg-[#c9a55c]/15" : "max-md:bg-white"
+              )}
             >
-              <td className="p-2 font-mono">{booking.reference}</td>
-              <td className="p-2">{booking.experienceTitle}</td>
-              <td className="whitespace-nowrap p-2">
-                {booking.slotDate} {booking.slotTime}
-              </td>
-              <td className="p-2">{booking.partySize}</td>
-              <td className="p-2">
+              <Cell label="Referencia" className="font-mono">
+                {booking.reference}
+              </Cell>
+              <Cell label="Actividad">{booking.experienceTitle}</Cell>
+              <Cell label="Fecha" className="whitespace-nowrap">
+                {when(booking.slotDate, booking.slotTime)}
+              </Cell>
+              <Cell label="Personas">{booking.partySize}</Cell>
+              <Cell label="Estado">
                 <span>{BOOKING_STATUS[booking.status] ?? booking.status}</span>
                 {booking.exception && (
                   <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#c9a55c]/30 px-2 py-0.5 text-xs font-medium">
                     Incidencia
                   </span>
                 )}
-              </td>
-              <td className="p-2">{eur(booking.depositCents, booking.currency)}</td>
-              <td className="p-2">{eur(booking.balanceCents, booking.currency)}</td>
-              <td className="space-y-0.5 p-2 font-mono text-xs">
+              </Cell>
+              <Cell label="Depósito" className="tabular-nums">
+                {eur(booking.depositCents, booking.currency)}
+              </Cell>
+              <Cell label="Pendiente" className="tabular-nums">
+                {eur(booking.balanceCents, booking.currency)}
+              </Cell>
+              <Cell label="Pago" className="space-y-0.5 font-mono text-xs">
                 {booking.payment ? (
                   <>
                     <span className="block font-sans">{PAYMENT_STATUS[booking.payment.status] ?? booking.payment.status}</span>
-                    {booking.payment.orderId && <span className="block">Pedido {booking.payment.orderId}</span>}
-                    {booking.payment.captureId && <span className="block">Cobro {booking.payment.captureId}</span>}
-                    {booking.payment.refundId && <span className="block">Reembolso {booking.payment.refundId}</span>}
+                    {booking.payment.orderId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Pedido {booking.payment.orderId}</span>}
+                    {booking.payment.captureId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Cobro {booking.payment.captureId}</span>}
+                    {booking.payment.refundId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Reembolso {booking.payment.refundId}</span>}
                   </>
                 ) : (
                   "—"
                 )}
-              </td>
-              <td className="p-2">
+              </Cell>
+              <Cell label="Acciones" className="max-md:items-center">
                 <Button
                   type="button"
                   size="sm"
@@ -291,7 +354,7 @@ function BookingTable({
                 >
                   Reemitir enlace
                 </Button>
-              </td>
+              </Cell>
             </tr>
           ))}
         </tbody>
@@ -314,7 +377,7 @@ function CapacityTable({ experience }: { experience: OperatorCapacity }) {
         <table className="text-center text-xs tabular-nums">
           <thead>
             <tr>
-              <th scope="col" className="p-1 text-left">
+              <th scope="col" className="sticky left-0 bg-card p-1 text-left">
                 Hora
               </th>
               {dates.map((date) => (
@@ -327,7 +390,7 @@ function CapacityTable({ experience }: { experience: OperatorCapacity }) {
           <tbody>
             {times.map((time) => (
               <tr key={time}>
-                <th scope="row" className="p-1 text-left font-mono">
+                <th scope="row" className="sticky left-0 bg-card p-1 text-left font-mono">
                   {time}
                 </th>
                 {dates.map((date) => {
@@ -347,12 +410,15 @@ function CapacityTable({ experience }: { experience: OperatorCapacity }) {
   );
 }
 
-function MoneyTile({ testId, label, cents }: { testId: string; label: string; cents: number }) {
+/** StatCard's look without the button: same container, icon slot and type, so the four tiles line up. */
+function MoneyTile({ testId, icon, label, cents }: { testId: string; icon: React.ReactNode; label: string; cents: number }) {
   return (
-    <Card data-testid={testId} className="rounded-2xl p-5">
-      <p className="text-2xl font-extralight tabular-nums tracking-tight">{eur(cents)}</p>
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">{label}</p>
-    </Card>
+    <div data-testid={testId} className="min-w-0 rounded-2xl bg-white p-5 text-left">
+      <div className="mb-4 text-[#6b6560]">{icon}</div>
+      {/* leading-10 keeps text-4xl's line box at the smaller phone size, so the tile height matches StatCard. */}
+      <p className="text-2xl leading-10 font-extralight tabular-nums tracking-tighter text-[#2d2a26] lg:text-4xl">{eur(cents)}</p>
+      <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-[#6b6560]">{label}</p>
+    </div>
   );
 }
 
@@ -366,12 +432,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">{children}</p>;
+  return <p className="text-sm text-[#6b6560]">{children}</p>;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen bg-[#f5f3ee] px-4 py-10 text-[#2d2a26] dark:bg-[#1c1a17] dark:text-[#f5f3ee]">
+    <main className="min-h-screen bg-[#f5f3ee] px-4 py-10 text-[#2d2a26]">
       <div className="mx-auto w-full max-w-6xl space-y-8">{children}</div>
     </main>
   );

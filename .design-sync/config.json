@@ -41,7 +41,8 @@
     "LanguageSwitcher": "src/components/immersive/language-switcher.tsx",
     "ShareButton": "src/components/immersive/share-button.tsx",
     "SurpriseMeButton": "src/components/immersive/surprise-me-button.tsx",
-    "PrivacyNotice": "src/components/immersive/privacy-notice.tsx"
+    "PrivacyNotice": "src/components/immersive/privacy-notice.tsx",
+    "PaymentReceipt": "src/components/booking/payment-receipt.tsx"
   },
   "dtsPropsFor": {
     "BalanceInvoiceStatusView": "status: \"draft\" | \"sent\" | \"payment_pending\" | \"partially_paid\" | \"paid\" | \"cancelled\"; url: string | null;",
@@ -101,6 +102,12 @@
       "cardMode": "column"
     },
     "ChatComposer": {
+      "cardMode": "column"
+    },
+    "Button": {
+      "cardMode": "column"
+    },
+    "PaymentReceipt": {
       "cardMode": "column"
     }
   },

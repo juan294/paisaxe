@@ -49,6 +49,20 @@ describe("BookingCards", () => {
     expect(onAccept).toHaveBeenCalledWith(QUOTE_ID);
   });
 
+  it("shows the slot as a readable day and accepts with the brand button (U01, U03)", () => {
+    renderCards([quote]);
+    expect(screen.queryByText(/2026-11-21/)).toBeNull();
+    expect(screen.getByText(/21 nov/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "booking.cards.accept" })).toHaveClass("from-paisaxe-green-500");
+  });
+
+  it("labels cards with one quiet neutral chip, not an amber badge (U08)", () => {
+    renderCards([quote]);
+    const chip = screen.getByText("booking.cards.demo");
+    expect(chip).toHaveClass("bg-white/10");
+    expect(chip).not.toHaveClass("bg-amber-400/20");
+  });
+
   it("disables the accept button while accepting", () => {
     renderCards([quote], { [QUOTE_ID]: "accepting" });
     expect(screen.getByRole("button", { name: "booking.cards.accepting" })).toBeDisabled();
@@ -133,12 +147,16 @@ describe("BookingCards", () => {
       },
     ]);
 
-    expect(screen.getByText("booking.cards.sandbox")).toBeInTheDocument();
+    // One "Demo · sandbox" chip replaces the demo badge and the sandbox paragraph (plan D3).
+    expect(screen.getByText("booking.cards.demoSandbox")).toBeInTheDocument();
+    expect(screen.queryByText("booking.cards.sandbox")).toBeNull();
+    expect(screen.queryByText("booking.cards.demo")).toBeNull();
     expect(screen.getByText("booking.cards.payBefore")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "booking.cards.pay" })).toHaveAttribute(
-      "href",
-      "https://www.sandbox.paypal.com/checkoutnow?token=x"
-    );
+    // Still a link named "Pagar con PayPal" (E2E selector, D5), now a PayPal-gold button with the logo (U02).
+    const pay = screen.getByRole("link", { name: "booking.cards.pay" });
+    expect(pay).toHaveAttribute("href", "https://www.sandbox.paypal.com/checkoutnow?token=x");
+    expect(pay).toHaveClass("bg-[#FFC439]");
+    expect(screen.getByRole("img", { name: "PayPal" })).toBeInTheDocument();
   });
 
   it("disables accept and re-quote while a turn is streaming", () => {
@@ -157,6 +175,7 @@ describe("BookingCards", () => {
     const link = screen.getByRole("link", { name: "booking.cards.viewBooking" });
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveClass("bg-white/10");
   });
   describe("invoice card (Phase 8a)", () => {
     const INVOICE_URL = "https://www.sandbox.paypal.com/invoice/p/#INV2-1";
@@ -178,7 +197,8 @@ describe("BookingCards", () => {
       expect(screen.getByText(/90,00/)).toBeInTheDocument();
       expect(screen.getByText("booking.invoice.dueOn")).toBeInTheDocument();
       expect(screen.getByText("booking.invoice.status.sent")).toBeInTheDocument();
-      expect(screen.getByText("booking.cards.sandbox")).toBeInTheDocument();
+      expect(screen.getByText("booking.cards.demoSandbox")).toBeInTheDocument();
+      expect(screen.queryByText("booking.cards.sandbox")).toBeNull();
       const link = screen.getByRole("link", { name: "booking.invoice.pay" });
       expect(link).toHaveAttribute("href", INVOICE_URL);
       expect(link).toHaveAttribute("target", "_blank");

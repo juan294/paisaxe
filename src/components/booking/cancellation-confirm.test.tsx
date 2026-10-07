@@ -27,6 +27,13 @@ beforeEach(() => {
 });
 
 describe("CancellationConfirm", () => {
+  it("never makes cancelling the loudest control: a red tint, not solid red (U04)", () => {
+    render(<CancellationConfirm capability={CAPABILITY} terms={fullRefund} />);
+    const button = screen.getByRole("button", { name: "booking.cancel.confirmRefund" });
+    expect(button).toHaveClass("bg-red-500/10", "text-red-200");
+    expect(button).not.toHaveClass("bg-destructive");
+  });
+
   it("shows the refund and confirms with the refund the visitor saw", async () => {
     const onCancelled = vi.fn();
     mockFetch.mockResolvedValueOnce(json(200, { status: "refund_pending", refundCents: 3000 }));

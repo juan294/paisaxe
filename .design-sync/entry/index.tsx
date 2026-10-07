@@ -7,7 +7,8 @@
  * agreed with the owner on 2026-10-07, from the app's own source files.
  * Components that need the Next.js runtime (next/link, next/image, the
  * router) are left out: StoryViewer, RelatedStories, BookmarkButton,
- * ChatHeader, ChatMessageList, ChatUpsellCTA.
+ * ChatHeader, ChatMessageList, ChatUpsellCTA; and, from the 2026-10-07 booking
+ * polish, TravellerShell/TicketCard (next/image, next/link).
  */
 import type { ReactNode } from "react";
 import { LanguageProvider } from "../../src/lib/i18n/provider";
@@ -41,6 +42,7 @@ export { Logo } from "../../src/components/ui/logo";
 export { BookingCards } from "../../src/components/immersive/voice-chat/booking-cards";
 export { BalanceInvoiceStatusView } from "../../src/components/booking/balance-invoice";
 export { CancellationConfirm } from "../../src/components/booking/cancellation-confirm";
+export { PaymentReceipt } from "../../src/components/booking/payment-receipt";
 export { ChatComposer } from "../../src/components/immersive/voice-chat/chat-composer";
 export { ChatErrorBanner } from "../../src/components/immersive/voice-chat/chat-error-banner";
 export { ChatMarkdown } from "../../src/components/immersive/voice-chat/chat-markdown";

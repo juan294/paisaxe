@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { slotDay } from "@/lib/booking-format";
 import type { OperatorBooking, OperatorView } from "@/lib/booking/operator";
 
 const CAPABILITY = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
@@ -187,15 +188,22 @@ describe("OperatorDashboard", () => {
     expect(await screen.findByText("Ese bloqueo ya no estaba activo.")).toBeInTheDocument();
   });
 
-  it("re-issues a visitor link after confirmation and shows it once", async () => {
+  it("re-issues a visitor link after confirming in the dialog and shows it once", async () => {
     const link = "/booking/b1111111-2222-4333-8444-555555555555.ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210_-zyxwv";
     mockFetch.mockResolvedValueOnce(json(200, view())).mockResolvedValueOnce(json(200, { link }));
     render(<OperatorDashboard />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Reemitir enlace RS-CONF01" }));
 
-    expect(confirm).toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog", { name: "Reemitir enlace de RS-CONF01" });
+    expect(within(dialog).getByText("El enlace anterior dejará de funcionar.")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reemitir" }));
+
     expect(await screen.findByText(`${window.location.origin}${link}`)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(confirm).not.toHaveBeenCalled();
     expect(mockFetch).toHaveBeenNthCalledWith(
       2,
       `/api/operator/${CAPABILITY}/bookings/b1111111-2222-4333-8444-555555555555/reissue-link`,
@@ -206,24 +214,93 @@ describe("OperatorDashboard", () => {
     expect(screen.queryByText(`${window.location.origin}${link}`)).not.toBeInTheDocument();
   });
 
-  it("does nothing when the re-issue is not confirmed", async () => {
-    confirm.mockReturnValue(false);
+  it("closes the dialog without a request when the re-issue is cancelled", async () => {
     mockFetch.mockResolvedValueOnce(json(200, view()));
     render(<OperatorDashboard />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Reemitir enlace RS-CONF01" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reemitir enlace de RS-CONF01" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
 
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("reports a failed action without losing the view", async () => {
+  it("disables the confirm button while the re-issue is in flight", async () => {
+    let settle: (value: unknown) => void = () => {};
+    mockFetch
+      .mockResolvedValueOnce(json(200, view()))
+      .mockReturnValueOnce(new Promise((resolve) => (settle = resolve)));
+    render(<OperatorDashboard />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reemitir enlace RS-CONF01" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reemitir enlace de RS-CONF01" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reemitir" }));
+
+    const pending = await within(dialog).findByRole("button", { name: "Reemitiendo…" });
+    expect(pending).toBeDisabled();
+    fireEvent.click(pending);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    settle(json(200, { link: "/booking/x.y" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("closes the dialog and reports a failed re-issue without losing the view", async () => {
     mockFetch.mockResolvedValueOnce(json(200, view())).mockResolvedValueOnce(json(500, {}));
     render(<OperatorDashboard />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Reemitir enlace RS-CONF01" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reemitir enlace de RS-CONF01" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reemitir" }));
 
     expect(await screen.findByText("No se pudo completar la acción. Inténtalo de nuevo.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByText("RS-CONF01")).toBeInTheDocument();
+  });
+
+  it("shows booking and hold dates as a day, not a raw ISO date", async () => {
+    mockFetch.mockResolvedValueOnce(json(200, view()));
+    render(<OperatorDashboard />);
+
+    const row = (await screen.findByText("RS-CONF01")).closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent(`${slotDay("2026-11-21", "es")} · 10:00`);
+    for (const table of screen.getAllByRole("table").slice(0, 2)) {
+      expect(table.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    }
+    const holds = within(screen.getByRole("region", { name: "Bloqueos activos" }));
+    expect(holds.getByText(new RegExp(`${slotDay("2026-11-22", "es")} · 16:00`))).toBeInTheDocument();
+    expect(holds.queryByText(/2026-11-22/)).not.toBeInTheDocument();
+  });
+
+  it("captions every booking cell for the stacked phone layout", async () => {
+    mockFetch.mockResolvedValueOnce(json(200, view()));
+    render(<OperatorDashboard />);
+
+    const table = within((await screen.findAllByRole("table"))[0]);
+    expect(table.getAllByRole("columnheader")).toHaveLength(9);
+    const rows = within(screen.getByRole("region", { name: "Próximas reservas" })).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      const cells = within(row).getAllByRole("cell");
+      expect(cells).toHaveLength(9);
+      for (const cell of cells) expect(cell.getAttribute("data-label")).toMatch(/\S/);
+    }
+    expect(within(rows[0]).getByRole("cell", { name: /Confirmada/ })).toHaveAttribute("data-label", "Estado");
+  });
+
+  it("shows an icon on the money tiles and sets no dead dark: classes", async () => {
+    mockFetch.mockResolvedValueOnce(json(200, view()));
+    const { container } = render(<OperatorDashboard />);
+
+    expect((await screen.findByTestId("tile-deposits")).querySelector("svg.lucide-wallet")).not.toBeNull();
+    expect(screen.getByTestId("tile-balance").querySelector("svg.lucide-hourglass")).not.toBeNull();
+    // StatCard (src/components/ui/stat-card.tsx) ships its own dark: variants; everything else here must not.
+    const statCards = screen.getAllByRole("button", { name: /^(Próximas|Incidencias): / });
+    const darkOutsideStatCards = [...container.querySelectorAll("[class*='dark:']")].filter(
+      (element) => !statCards.some((card) => card.contains(element))
+    );
+    expect(darkOutsideStatCards).toEqual([]);
   });
 
   it("shows places left out of capacity per start time and day", async () => {

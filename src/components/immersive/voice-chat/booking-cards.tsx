@@ -2,9 +2,10 @@
 
 import { BalanceInvoiceStatusView } from "@/components/booking/balance-invoice";
 import { CancellationConfirm } from "@/components/booking/cancellation-confirm";
-import { Button } from "@/components/ui/button";
+import { PayPalLabel } from "@/components/booking/paypal-label";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { QuoteState } from "@/hooks/use-booking-chat";
-import { clockTime, money } from "@/lib/booking-format";
+import { clockTime, money, slotDay } from "@/lib/booking-format";
 import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n/types";
 import type {
@@ -28,13 +29,17 @@ interface BookingCardsProps {
 
 type T = (key: string) => string;
 
-function CardShell({ title, children, t }: { title: string; children: React.ReactNode; t: T }) {
+/**
+ * Every card carries the fixture label (parent plan, phase 3); payment and invoice
+ * cards say "Demo · sandbox" in place of a separate sandbox sentence (D3, U08).
+ */
+function CardShell({ title, children, t, chip = "demo" }: { title: string; children: React.ReactNode; t: T; chip?: "demo" | "demoSandbox" }) {
   return (
     <section className="mt-3 rounded-xl border border-white/20 bg-white/10 p-3 text-sm text-white">
       <header className="mb-2 flex items-start justify-between gap-2">
         <h3 className="font-semibold">{title}</h3>
-        <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">
-          {t("booking.cards.demo")}
+        <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/70">
+          {t(`booking.cards.${chip}`)}
         </span>
       </header>
       {children}
@@ -50,7 +55,7 @@ function OfferCardView({ card, t, locale }: { card: OfferCard; t: T; locale: Loc
           <li key={option.experienceId} className="rounded-lg bg-white/5 p-2">
             <div className="flex justify-between gap-2">
               <span className="font-medium">{option.title}</span>
-              <span>{money(option.priceCents, option.currency, locale)}</span>
+              <span className="tabular-nums">{money(option.priceCents, option.currency, locale)}</span>
             </div>
             <p className="text-white/70">{t(`booking.cards.suitability.${option.suitability}`)}</p>
             {option.reasons.map((reason) => (
@@ -95,10 +100,10 @@ function QuoteCardView({
 
   return (
     <CardShell title={card.experienceTitle} t={t}>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 tabular-nums">
         <dt className="text-white/70">{t("booking.cards.when")}</dt>
         <dd>
-          {card.slotDate} · {card.slotTime}
+          {slotDay(card.slotDate, locale)} · {card.slotTime}
         </dd>
         <dt className="text-white/70">{t("booking.cards.people")}</dt>
         <dd>{card.partySize}</dd>
@@ -117,7 +122,7 @@ function QuoteCardView({
       {lapsed ? (
         <div className="mt-3 space-y-2" aria-live="polite">
           <p className="text-amber-200">{t(`booking.cards.${state}`)}</p>
-          <Button type="button" variant="secondary" className="w-full" disabled={busy} onClick={onRequote}>
+          <Button type="button" variant="glass" className="w-full rounded-md" disabled={busy} onClick={onRequote}>
             {t("booking.cards.requote")}
           </Button>
         </div>
@@ -125,6 +130,7 @@ function QuoteCardView({
         <div className="mt-3 space-y-1">
           <Button
             type="button"
+            variant="brand"
             className="w-full"
             disabled={busy || state === "accepting"}
             onClick={() => onAccept(card.quoteId)}
@@ -143,7 +149,12 @@ function BookingCardView({ card, t }: { card: BookingSummaryCard; t: T }) {
     <CardShell title={`${t("booking.cards.bookingTitle")} ${card.reference}`} t={t}>
       <p>{t(`booking.cards.status.${card.status}`)}</p>
       {card.link && (
-        <a href={card.link} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block underline">
+        <a
+          href={card.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonVariants({ variant: "glass", className: "mt-3 w-full rounded-md" })}
+        >
           {t("booking.cards.viewBooking")}
         </a>
       )}
@@ -153,12 +164,16 @@ function BookingCardView({ card, t }: { card: BookingSummaryCard; t: T }) {
 
 function PaymentCardView({ card, t, locale }: { card: PaymentCard; t: T; locale: Locale }) {
   return (
-    <CardShell title={t("booking.cards.paymentTitle")} t={t}>
-      <p className="font-semibold">{money(card.amountCents, card.currency, locale)}</p>
-      <p className="text-white/60">{t("booking.cards.payBefore").replace("{time}", clockTime(card.expiresAt, locale))}</p>
-      <p className="text-white/60">{t("booking.cards.sandbox")}</p>
-      <a href={card.approvalUrl} className="mt-2 inline-block underline">
-        {t("booking.cards.pay")}
+    <CardShell title={t("booking.cards.paymentTitle")} t={t} chip="demoSandbox">
+      <p className="text-lg font-semibold tabular-nums">{money(card.amountCents, card.currency, locale)}</p>
+      <p className="text-white/70">{t("booking.cards.payBefore").replace("{time}", clockTime(card.expiresAt, locale))}</p>
+      {/* A link, not a button: the E2E roundtrip selects it by role and name (D5). */}
+      <a
+        href={card.approvalUrl}
+        aria-label={t("booking.cards.pay")}
+        className={buttonVariants({ variant: "paypal", className: "mt-3 w-full" })}
+      >
+        <PayPalLabel prefix={t("booking.cards.payWith")} />
       </a>
     </CardShell>
   );
@@ -174,11 +189,10 @@ function CancellationCardView({ card, t }: { card: CancellationCard; t: T }) {
 
 function InvoiceCardView({ card, t, locale }: { card: InvoiceCard; t: T; locale: Locale }) {
   return (
-    <CardShell title={`${t("booking.invoice.title")} ${card.reference}`} t={t}>
-      <p className="font-semibold">{money(card.amountCents, card.currency, locale)}</p>
-      <p className="text-white/60">{t("booking.invoice.dueOn").replace("{date}", card.dueDate)}</p>
+    <CardShell title={`${t("booking.invoice.title")} ${card.reference}`} t={t} chip="demoSandbox">
+      <p className="font-semibold tabular-nums">{money(card.amountCents, card.currency, locale)}</p>
+      <p className="text-white/70">{t("booking.invoice.dueOn").replace("{date}", slotDay(card.dueDate, locale))}</p>
       <BalanceInvoiceStatusView status={card.status} url={card.invoiceUrl} />
-      <p className="text-white/60">{t("booking.cards.sandbox")}</p>
     </CardShell>
   );
 }

@@ -133,6 +133,30 @@ describe("VoucherForm", () => {
   });
 });
 
+describe("VoucherForm look (docs/plans/2026-10-07-booking-ui-polish.md, U01/U07/U12)", () => {
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue({ user: null, session: null, isLoading: false });
+  });
+
+  it("sits on the traveller page with the Paisaxe mark", () => {
+    render(<VoucherForm />);
+    expect(screen.getByRole("main")).toContainElement(screen.getByRole("heading", { name: "booking.access.title" }));
+    expect(screen.getByRole("link", { name: "Paisaxe" })).toHaveAttribute("href", "/");
+  });
+
+  it("uses a frosted code field, not a white one, and shows the code as the server reads it", () => {
+    render(<VoucherForm />);
+    const input = screen.getByLabelText("booking.access.codeLabel");
+    expect(input).toHaveClass("bg-white/10", "text-white", "uppercase", "font-mono");
+    expect(input).toHaveAttribute("id", "voucher-code");
+  });
+
+  it("submits with the brand button", () => {
+    render(<VoucherForm />);
+    expect(screen.getByRole("button", { name: "booking.access.submit" })).toHaveClass("from-paisaxe-green-500", "text-black");
+  });
+});
+
 describe("VoucherForm bundle", () => {
   it("loads the Supabase client only when the visitor submits, not with the page (bundle budget)", async () => {
     const { readFileSync } = await import("node:fs");
