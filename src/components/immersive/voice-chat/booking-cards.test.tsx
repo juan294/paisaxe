@@ -156,7 +156,7 @@ describe("BookingCards", () => {
     const pay = screen.getByRole("link", { name: "booking.cards.pay" });
     expect(pay).toHaveAttribute("href", "https://www.sandbox.paypal.com/checkoutnow?token=x");
     expect(pay).toHaveClass("bg-[#FFC439]");
-    expect(screen.getByAltText("PayPal")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "PayPal" })).toBeInTheDocument();
   });
 
   it("disables accept and re-quote while a turn is streaming", () => {

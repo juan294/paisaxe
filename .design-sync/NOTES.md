@@ -38,6 +38,10 @@ sync works around that, and what a re-sync should watch.
 
 ## Build command (from the repo root)
 
+Stage the converter first (it is gitignored): copy the skill's scripts into `.ds-sync/`, then
+`echo '{"name":"ds-sync-deps","private":true}' > .ds-sync/package.json && (cd .ds-sync && npm i esbuild ts-morph @types/react)`.
+Without those deps the driver dies on `Cannot find package 'ts-morph'`.
+
 ```bash
 npx --yes @tailwindcss/cli@4.3.3 -i .design-sync/tailwind.css -o .design-sync/.cache/paisaxe.css \
   && rm -rf build/ts && npx tsc -p .design-sync/tsconfig.dts.json
@@ -64,7 +68,8 @@ the render check via `NODE_PATH`.
 - None open. `[GRID_OVERFLOW]` flagged 11 wide previews; resolved with
   `overrides.<Name>.cardMode: "column"` (CancellationConfirm, Card, Input, Skeleton,
   StatCard, Textarea, CategoryFilterBadge, StoryInfoPanel, StoryProgressBar, BookingCards,
-  ChatComposer). A warn not listed here is new.
+  ChatComposer; Button and PaymentReceipt since the 2026-10-07 booking polish). A warn not
+  listed here is new.
 
 ## Authoring previews (what cost a debugging cycle)
 
@@ -84,6 +89,13 @@ the render check via `NODE_PATH`.
   previews pass `new Date().toISOString()`.
 - Re-run the Tailwind CLI after editing previews: it scans `.design-sync/previews/`, so a
   class used only there exists only after recompiling `.design-sync/.cache/paisaxe.css`.
+
+## Booking polish (2026-10-07)
+
+- `PaymentReceipt` joined the scope. `TravellerShell`/`TicketCard` stay out (their file
+  imports next/image and next/link); conventions.md spells out the smoked ticket panel instead.
+- The PayPal logo in `PayPalLabel` is inline SVG on purpose: an app-relative `<img>` rendered
+  as a broken image in the preview cards (and would in every design).
 
 ## Findings for the app (not sync issues)
 

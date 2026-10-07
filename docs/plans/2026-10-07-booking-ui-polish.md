@@ -260,7 +260,7 @@ plus `git grep -ln BookingView -- src`.
 - Screenshots (scratch, not committed): pay, confirming, confirmed + `?paid=1`, cancel
   open, refunded, expired, balance paid, return slow, return problem at 390 and 1280 px.
 
-### Phase 3 — implemented, awaiting acceptance
+### Phase 3 — accepted 2026-10-07 (commit `6fd3bd74`, hook green: 9,483 tests)
 
 - **Execution deviation:** `[operator]` ran as a background agent in
   `.worktrees/booking-ui-operator` (uncommitted, files copied in by the integration owner,
@@ -289,3 +289,36 @@ plus `git grep -ln BookingView -- src`.
   whose `.env.local` points at the hosted Supabase project. The guest sign-in was refused
   ("Anonymous sign-ins are disabled"), so no user or row was created. Later screenshot
   runs must not submit the form against hosted Supabase.
+
+### Phase 4 — verification (in progress)
+
+Gate log, in order (each on the commit named):
+
+1. `6fd3bd74`: pre-commit hook (full suite 9,483, lint, knip) green; `tsc --noEmit` clean;
+   `generate-locale-coverage` no diff.
+2. `6fd3bd74`: `npm run build` green; `check-bundle-budget` all 85 routes within budget,
+   `/acceso` 249.4 KB of 274.4 KB, `/immersive` 279.8 KB of 342.8 KB.
+3. `6fd3bd74`, isolated local Supabase (`paisaxe-uipolish`, ports 573xx, per the release
+   checklist's separate-stack procedure, because another session's stack held 543xx):
+   `CI=true npm run test:e2e:release-artifact` 3/3 (artifact identity, hydration,
+   favorite roundtrip; this mode leaves out the booking probes), then
+   `npx playwright test --project=release-required-local` 3/3 including
+   `booking-roundtrip` (voucher, chat, accept, PayPal approval, return, confirm, cancel,
+   refund) and `booking-access-boundary`, with no spec edits.
+4. **Contrast finding and fix.** Measured on rendered pixels (16 visitor states × 2 widths,
+   brightest pixel in the ticket's padding): the `bg-white/10` ticket over bright photos
+   gave 3.63:1 for pure white text. Fix: smoked ticket `bg-neutral-950/60`; body text on
+   the visitor screens at `text-white/70` or brighter; the voucher error at `text-red-200`.
+   Re-measured worst backdrop `rgb(82,82,81)`: white 7.82, white/80 5.73, white/70 4.83,
+   amber-200 6.28, emerald-300 5.16, red-200 5.40, cancel confirm 5.30, glass button 5.99.
+   Token pairs: brand 9.45 / 11.83, PayPal 11.88, operator captions 5.18 / 5.74.
+5. **PayPal logo is now inline SVG** (`paypal-label.tsx`; `public/images/paypal-logo.svg`
+   removed). The `<img>` rendered broken in the Claude Design previews; inline it renders
+   everywhere and can't fail to load. Sized with `h-[18px]! w-16!` because `Button` forces
+   every descendant svg to 16 px (`[&_svg]:size-4`).
+6. Design sync inputs: `Button` preview gains `BookingActions`; `PaymentReceipt` added with
+   a preview; column cards for both; conventions.md documents the dark variants, the PayPal
+   rule, the smoked ticket, the Demo chip and the date format; NOTES.md records the
+   converter deps and this run. Driver: 30 components, render check 0 bad (full,
+   `--render-sample 0`), Button and PaymentReceipt graded good, upload = Button,
+   PaymentReceipt, bundle, styling, aux; no deletes.

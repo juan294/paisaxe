@@ -83,7 +83,7 @@ export function CancellationConfirm({ capability, terms: initialTerms, onCancell
         <>
           <p>{t("booking.cancel.refund").replace("{amount}", amount)}</p>
           {terms.termsValidUntil && (
-            <p className="text-white/60">{t("booking.cancel.refundUntil").replace("{when}", dateTime(terms.termsValidUntil, locale))}</p>
+            <p className="text-white/70">{t("booking.cancel.refundUntil").replace("{when}", dateTime(terms.termsValidUntil, locale))}</p>
           )}
         </>
       ) : (

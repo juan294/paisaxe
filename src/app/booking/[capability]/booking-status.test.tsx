@@ -362,7 +362,7 @@ describe("BookingStatus as a ticket (docs/plans/2026-10-07-booking-ui-polish.md,
     render(<BookingStatus />);
     const button = await screen.findByRole("button", { name: "booking.cards.pay" });
     expect(button).toHaveClass("bg-[#FFC439]");
-    expect(screen.getByAltText("PayPal")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "PayPal" })).toBeInTheDocument();
   });
 
   it("counts the hold down and switches to the expired state at zero (stuck state ends on its own)", async () => {

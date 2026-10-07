@@ -1,14 +1,17 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { PAYPAL_LOGO_SRC, PayPalLabel } from "./paypal-label";
+import { PayPalLabel } from "./paypal-label";
 
 describe("PayPalLabel", () => {
-  it("renders the prefix and the PayPal logo with alt text for when the image fails", () => {
-    render(<PayPalLabel prefix="Pagar con" />);
+  it("renders the prefix and PayPal's logo inline, named for assistive technology", () => {
+    const { container } = render(<PayPalLabel prefix="Pagar con" />);
     expect(screen.getByText("Pagar con")).toBeInTheDocument();
-    expect(screen.getByAltText("PayPal")).toHaveAttribute("src", PAYPAL_LOGO_SRC);
+    expect(screen.getByRole("img", { name: "PayPal" })).toBeInTheDocument();
+    // Inline: nothing to fetch, so nothing that can fail to load (e.g. in Claude Design).
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelectorAll("svg path")).toHaveLength(7);
+    // Overrides the Button's [&_svg]:size-4, which would shrink the logo to 16px.
+    expect(screen.getByRole("img", { name: "PayPal" })).toHaveClass("h-[18px]!", "w-16!");
   });
 
   it("keeps the caller's accessible name (D5: 'Pagar con PayPal' stays the button name)", () => {
@@ -18,9 +21,5 @@ describe("PayPalLabel", () => {
       </button>
     );
     expect(screen.getByRole("button", { name: "booking.cards.pay" })).toBeInTheDocument();
-  });
-
-  it("ships the logo it points at", () => {
-    expect(existsSync(join(process.cwd(), "public", PAYPAL_LOGO_SRC))).toBe(true);
   });
 });

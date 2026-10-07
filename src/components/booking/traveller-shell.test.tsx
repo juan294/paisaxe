@@ -50,8 +50,10 @@ describe("TravellerShell", () => {
 });
 
 describe("TicketCard", () => {
-  it("is a frosted panel from the design system", () => {
+  it("is a smoked frosted panel, dark enough for white text over any photo", () => {
     render(<TicketCard>ticket</TicketCard>);
-    expect(screen.getByText("ticket")).toHaveClass("bg-white/10", "backdrop-blur-xl", "border-white/20", "rounded-2xl");
+    const card = screen.getByText("ticket");
+    expect(card).toHaveClass("bg-neutral-950/60", "backdrop-blur-xl", "border-white/20", "rounded-2xl");
+    expect(card).not.toHaveClass("bg-white/10");
   });
 });

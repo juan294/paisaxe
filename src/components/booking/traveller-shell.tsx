@@ -36,7 +36,11 @@ export function TravellerShell({ photo, children }: { photo?: string; children: 
   );
 }
 
-/** The frosted panel the booking content sits on. */
+/**
+ * The frosted panel the booking content sits on. Smoked (neutral-950/60) rather
+ * than the white/10 of panels over gradients: over a bright photo white/10 measured
+ * 3.6:1 for white text, the smoked base keeps every text colour above 4.5:1.
+ */
 export function TicketCard({ children }: { children: React.ReactNode }) {
-  return <div className="space-y-5 rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur-xl">{children}</div>;
+  return <div className="space-y-5 rounded-2xl border border-white/20 bg-neutral-950/60 p-5 backdrop-blur-xl">{children}</div>;
 }

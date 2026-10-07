@@ -128,8 +128,8 @@ export function VoucherForm() {
           <div aria-live="polite">
             {error && (
               <div id="voucher-error" className="space-y-1 text-sm">
-                <p className="text-red-300">{t(`booking.access.${error}`)}</p>
-                {REFUSAL_REASONS.has(error) && <p className="text-white/60">{t("booking.access.contactHint")}</p>}
+                <p className="text-red-200">{t(`booking.access.${error}`)}</p>
+                {REFUSAL_REASONS.has(error) && <p className="text-white/70">{t("booking.access.contactHint")}</p>}
               </div>
             )}
             {state === "done" && <p className="text-sm text-emerald-300">{t("booking.access.welcome")}</p>}

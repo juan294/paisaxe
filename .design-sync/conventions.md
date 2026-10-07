@@ -26,14 +26,27 @@ The font is the system stack (`font-sans`), on purpose. Do not load a web font.
 | **Light / operator** | forms, admin | `bg-white` or the cream `bg-[#f5f3ee]` (admin), shadcn tokens `bg-primary` (green), `text-primary-foreground`, `text-muted-foreground`, `bg-card`; ink `text-[#2d2a26]`, `text-[#6b6560]` |
 
 `Button` has both families: `default | secondary | outline | destructive | ghost | link` for
-light surfaces, `glass | glassIcon` for the immersive one. `Skeleton` is `bg-white/10`: it is
+light surfaces, and `glass | glassIcon | brand | paypal | glassDestructive` for dark ones (all
+dark variants share a white `ring-2` focus ring). On dark surfaces never use `default`,
+`secondary` or `destructive`: their text contrast fails there. Style a link as a button with
+`buttonVariants({ variant })`. `Skeleton` is `bg-white/10`: it is
 only visible on a dark surface. `StatCard` cards are white: put them on `bg-[#f5f3ee]`.
 
 **Brand accent (conversion: pricing, upsell, purchase CTAs)** is the `paisaxe-green-*` scale,
-never raw `green-*`: primary CTA `bg-gradient-to-r from-paisaxe-green-500 to-paisaxe-green-400
-text-black` (hover `hover:from-paisaxe-green-400 hover:to-paisaxe-green-300`), solid
-`bg-paisaxe-green-500`, tints `bg-paisaxe-green-500/10`, `border-paisaxe-green-500/30`, text on
-dark `text-paisaxe-green-400`.
+never raw `green-*`: primary CTA `Button variant="brand"` (the gradient `from-paisaxe-green-500
+to-paisaxe-green-400 text-black`), solid `bg-paisaxe-green-500`, tints
+`bg-paisaxe-green-500/10`, `border-paisaxe-green-500/30`, text on dark `text-paisaxe-green-400`.
+
+**Booking and PayPal.** Anything that starts a PayPal payment is `variant="paypal"` (PayPal
+gold `#FFC439`, text `#111111`) with the visible text "Pagar con" + the PayPal logo and
+`aria-label="Pagar con PayPal"` (in a design, the text "Pagar con PayPal" is fine). Cancelling
+is never the loudest control: a quiet text link, then `variant="glassDestructive"` to confirm.
+Booking screens over a photo use a **smoked** panel, `rounded-2xl border border-white/20
+bg-neutral-950/60 p-5 backdrop-blur-xl`, over `bg-black/35` plus the immersive gradient:
+`bg-white/10` over a bright photo measured 3.6:1 for white text. On those screens keep body text
+at `text-white/70` or brighter and errors at `text-red-200`. Every booking card carries a quiet
+chip, `rounded-full bg-white/10 text-[10px] uppercase text-white/70`: "Demo", or "Demo ·
+sandbox" on payment and invoice cards. Dates read "sáb, 24 oct · 10:00", never ISO.
 
 ## Styling rule that matters
 
@@ -41,7 +54,8 @@ Styling is Tailwind utilities, but **only utilities the app already uses exist**
 shipped stylesheet (`styles.css` → `_ds_bundle.css`). A class that the app never wrote
 silently does nothing. Before using a utility, check `_ds_bundle.css`. Known gaps: there is no
 `bg-white/30`, `text-7xl`, `bg-[#252320]`, `bg-muted` or `border-border`. Use `style={{…}}` for anything not in the stylesheet
-(exact sizes, custom gradients). `dark:` variants never apply: no `.dark` class is set.
+(exact sizes, custom gradients). `dark:` variants never apply in designs: no `.dark` class
+is set (only the app's admin area switches themes).
 
 ## Where the truth lives
 

@@ -210,7 +210,7 @@ export function BookingStatus() {
               .replace("{time}", view.slotTime)
               .replace("{people}", String(view.partySize))}
           </p>
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-white/70">
             {t("booking.page.reference")} <span className="font-mono">{view.reference}</span>
           </p>
         </header>
@@ -339,7 +339,7 @@ function JourneySteps({ steps }: { steps: ReturnType<typeof journeySteps> }) {
           <span
             className={cn(
               "text-xs",
-              step.state === "done" || step.state === "current" ? "text-white" : "text-white/60",
+              step.state === "done" || step.state === "current" ? "text-white" : "text-white/70",
               step.state === "stopped" && "line-through"
             )}
           >
