@@ -63,6 +63,15 @@ describe("RelatedStories", () => {
     expect(screen.getByText(new RegExp(mockT("stories.related"), "i"))).toBeInTheDocument();
   });
 
+  it("renders a story without an image as a card with no <img> (#1001)", () => {
+    const [first, second] = mockRelatedStories;
+    render(<RelatedStories stories={[{ ...first!, image: "" }, second!]} onSelectStory={vi.fn()} />);
+
+    expect(screen.getByText(first!.title)).toBeInTheDocument();
+    expect(document.querySelector('img[src=""]')).toBeNull();
+    expect(document.querySelectorAll("img")).toHaveLength(1);
+  });
+
   it("should render all provided stories", () => {
     render(<RelatedStories {...defaultProps} />);
 

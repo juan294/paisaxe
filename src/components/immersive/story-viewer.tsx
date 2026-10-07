@@ -321,22 +321,24 @@ export function StoryViewer({
           isTransitioning ? "opacity-0" : "opacity-100"
         )}
       >
-        <Image
-          src={story.image}
-          alt={localizedStory.title}
-          fill
-          sizes="100vw"
-          // FE-M6 (#768): motion-reduce:animate-none is a CSS-layer backstop —
-          // it suppresses the zoom animation immediately regardless of JS
-          // timing, so reduced-motion visitors never see the one-frame flash
-          // that can occur between the hydration-safe `false` initial state
-          // and the effect that corrects prefersReducedMotion.
-          className={cn("object-cover", zoomClass, "motion-reduce:animate-none")}
-          priority={currentIndex === 0}
-          placeholder="blur"
-          blurDataURL={story.blurDataUrl || darkPlaceholder}
-          key={story.id}
-        />
+        {story.image ? (
+          <Image
+            src={story.image}
+            alt={localizedStory.title}
+            fill
+            sizes="100vw"
+            // FE-M6 (#768): motion-reduce:animate-none is a CSS-layer backstop —
+            // it suppresses the zoom animation immediately regardless of JS
+            // timing, so reduced-motion visitors never see the one-frame flash
+            // that can occur between the hydration-safe `false` initial state
+            // and the effect that corrects prefersReducedMotion.
+            className={cn("object-cover", zoomClass, "motion-reduce:animate-none")}
+            priority={currentIndex === 0}
+            placeholder="blur"
+            blurDataURL={story.blurDataUrl || darkPlaceholder}
+            key={story.id}
+          />
+        ) : null}
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
       </div>

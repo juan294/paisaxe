@@ -70,15 +70,17 @@ export const RelatedStories = memo(function RelatedStories({
           >
             {/* Background Image */}
             <div className="absolute inset-0">
-              <Image
-                src={story.image}
-                alt={story.title}
-                fill
-                className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
-                sizes="(max-width: 768px) 50vw, 33vw"
-                placeholder="blur"
-                blurDataURL={story.blurDataUrl || darkPlaceholder}
-              />
+              {story.image ? (
+                <Image
+                  src={story.image}
+                  alt={story.title}
+                  fill
+                  className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                  sizes="(max-width: 768px) 50vw, 33vw"
+                  placeholder="blur"
+                  blurDataURL={story.blurDataUrl || darkPlaceholder}
+                />
+              ) : null}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
             </div>
 
