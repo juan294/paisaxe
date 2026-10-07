@@ -61,7 +61,9 @@ the render check via `NODE_PATH`.
   out. It is esbuilt from `node_modules/react` (React 19 has no UMD), so it only changes when
   React is bumped: if it times out and React did not change, the remote copy is already
   current. Send it alone; chunk the rest small (~75 files per call worked); `list_files`
-  after any timeout, because a timed-out write can still land.
+  after any timeout, because a timed-out write can still land. On 2026-10-07 (booking
+  polish) `_ds_bundle.js` (748 KB) also timed out three times and reset once before landing
+  on the fifth attempt, sent alone; the other 150 files went in two batches of ~75.
 
 ## Known render warns
 

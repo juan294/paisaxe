@@ -290,7 +290,7 @@ plus `git grep -ln BookingView -- src`.
   ("Anonymous sign-ins are disabled"), so no user or row was created. Later screenshot
   runs must not submit the form against hosted Supabase.
 
-### Phase 4 — verification (in progress)
+### Phase 4 — verification
 
 Gate log, in order (each on the commit named):
 
@@ -322,3 +322,19 @@ Gate log, in order (each on the commit named):
    converter deps and this run. Driver: 30 components, render check 0 bad (full,
    `--render-sample 0`), Button and PaymentReceipt graded good, upload = Button,
    PaymentReceipt, bundle, styling, aux; no deletes.
+7. `74687814` (contrast, inline logo, sync inputs): pre-commit hook green (9,482 tests: the
+   "logo file exists" test went with the file). `release-required-local` on the isolated
+   stack: first run 1 failed / 2 passed in 2.2 min. `booking-roundtrip` timed out waiting
+   30 s for "Ver la reserva"; the failure screenshot shows that link rendered with the
+   assistant's reply still loading, i.e. a cold `next dev` compile. Second run 3/3 in
+   1.0 min, no edits in between. Recorded as a cold-start flake, not a regression.
+8. Claude Design: uploaded to project `ddb69a35-917f-49fd-831e-517ad569fe90` (plan
+   `plan_ddb69a35917f49fd_1ab441f97e88`, no deletes): sentinel, 150 content files
+   (`_vendor/react.js` skipped, hash `45ff7685ac7d2d9f` unchanged), sentinel, `_ds_sync.json`
+   last; `list_files` shows `PaymentReceipt`; `report_validate` total 30, bad 0.
+9. Isolated Supabase stack stopped; other sessions' stacks untouched.
+
+**Next:** merge `feature/booking-ui-polish` into `develop` locally (fast-forward), remove the
+worktree and branch, then the single push of `develop` on the owner's go-ahead, and watch
+every workflow for that commit. After that, the parent plan continues with the demo script,
+then Phase 7.
