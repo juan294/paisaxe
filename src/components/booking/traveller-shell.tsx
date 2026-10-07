@@ -15,6 +15,8 @@ export function TravellerShell({ photo, children }: { photo?: string; children: 
       {photo && (
         <div className="fixed inset-0" aria-hidden="true">
           <Image src={photo} alt="" fill sizes="100vw" priority className="object-cover" />
+          {/* A wash under the immersive gradient keeps the ticket's white text readable on bright photos. */}
+          <div className="absolute inset-0 bg-black/35" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
         </div>
       )}

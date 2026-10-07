@@ -239,7 +239,7 @@ plus `git grep -ln BookingView -- src`.
 - **Copy change:** the countdown reads "Te guardamos la plaza: quedan {time}" (a bare
   time read like a clock time); same in the other five locales.
 
-### Phase 2 — implemented, awaiting acceptance
+### Phase 2 — accepted 2026-10-07 (commit `899fb1ac`, hook green: 9,474 tests)
 
 - New: `journey.ts` (+14 table cases), `payment-receipt.tsx`, `balance-invoice.test.tsx`;
   restyled `booking-status.tsx`, `return-status.tsx`, `cancellation-confirm.tsx`,
@@ -259,3 +259,33 @@ plus `git grep -ln BookingView -- src`.
   page, which polls); the key stays in the locales.
 - Screenshots (scratch, not committed): pay, confirming, confirmed + `?paid=1`, cancel
   open, refunded, expired, balance paid, return slow, return problem at 390 and 1280 px.
+
+### Phase 3 — implemented, awaiting acceptance
+
+- **Execution deviation:** `[operator]` ran as a background agent in
+  `.worktrees/booking-ui-operator` (uncommitted, files copied in by the integration owner,
+  worktree and branch removed); `[cards]` and `[voucher]` were done by the integration
+  owner directly in `../paisaxe-booking-ui-polish`, since their files do not overlap and
+  three concurrent pre-commit runs would starve the test runner.
+- `[cards]`: neutral chip on every card, "Demo · sandbox" on payment and invoice cards
+  with the sandbox sentence dropped (D3); PayPal-gold pay link with the logo, still a link
+  named "Pagar con PayPal" (D5); brand accept, glass re-quote and "Ver la reserva"; slot
+  and due dates through `slotDay`. Two test assertions on the removed sandbox sentence
+  were replaced by the chip assertion, per D3.
+- `[voucher]`: traveller frame with the fallback landscape, frosted uppercase mono code
+  field (the server uppercases codes, `normalizeVoucherCode`), brand submit; `#voucher-code`,
+  `method="post"`, no `name` unchanged.
+- `[operator]`: no `dark:` in the operator page; `slotDay` dates; money tiles styled like
+  `StatCard` with Wallet/Hourglass icons; stacked rows with explicit table roles below
+  `md`; sticky first column in the capacity matrix; reissue through the design-system
+  `Dialog`. PayPal ids wrap only below `md` (desktop keeps them whole). Operator tests
+  11 → 15.
+- **Decision:** `src/components/ui/stat-card.tsx` keeps its `dark:` classes. They are
+  live in `/admin`, which uses `next-themes`; "dark: never applies" holds for the booking
+  surfaces only. `conventions.md` gets that nuance in Phase 4.
+- **Addition from the screenshot review:** `TravellerShell` lays a `bg-black/35` wash
+  under the immersive gradient, so the ticket text stays readable on bright photos.
+- **Incident, no effect:** one screenshot run submitted the voucher form on the dev server,
+  whose `.env.local` points at the hosted Supabase project. The guest sign-in was refused
+  ("Anonymous sign-ins are disabled"), so no user or row was created. Later screenshot
+  runs must not submit the form against hosted Supabase.

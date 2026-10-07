@@ -2,10 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { TicketCard, TravellerShell } from "@/components/booking/traveller-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { experiencePhoto } from "@/lib/booking/experience-photos";
 import { clientLogger } from "@/lib/client-logger";
 import { csrfHeaders } from "@/lib/csrf-client";
 import { useTranslation } from "@/lib/i18n";
@@ -84,49 +86,56 @@ export function VoucherForm() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12 text-white">
-      {/* method="post" and no input name: a submit before hydration must never
-          put the code in the URL (history, logs, analytics page views). */}
-      <form method="post" onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold">{t("booking.access.title")}</h1>
-          <p className="text-white/70">{t("booking.access.intro")}</p>
-        </div>
+    // The fallback landscape: no experience is chosen yet (docs/plans/2026-10-07-booking-ui-polish.md, U12).
+    <TravellerShell photo={experiencePhoto(null)}>
+      <TicketCard>
+        {/* method="post" and no input name: a submit before hydration must never
+            put the code in the URL (history, logs, analytics page views). */}
+        <form method="post" onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold">{t("booking.access.title")}</h1>
+            <p className="text-white/80">{t("booking.access.intro")}</p>
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="voucher-code">{t("booking.access.codeLabel")}</Label>
-          <Input
-            id="voucher-code"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            placeholder={t("booking.access.codePlaceholder")}
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            required
-            minLength={8}
-            maxLength={64}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? "voucher-error" : undefined}
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="voucher-code" className="text-white/80">
+              {t("booking.access.codeLabel")}
+            </Label>
+            <Input
+              id="voucher-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder={t("booking.access.codePlaceholder")}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              required
+              minLength={8}
+              maxLength={64}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "voucher-error" : undefined}
+              // Frosted on the dark ticket (U07); uppercase as the server normalizes codes.
+              className="border-white/20 bg-white/10 font-mono uppercase tracking-widest text-white placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-white/50 focus-visible:ring-white/70 focus-visible:ring-offset-neutral-950"
+            />
+          </div>
 
-        {/* Until auth has loaded a missing session may be a Google user still
-            restoring; signing in as a guest then would replace it. */}
-        <Button type="submit" className="w-full" disabled={isAuthLoading || state === "submitting" || state === "done"}>
-          {state === "submitting" ? t("booking.access.submitting") : t("booking.access.submit")}
-        </Button>
+          {/* Until auth has loaded a missing session may be a Google user still
+              restoring; signing in as a guest then would replace it. */}
+          <Button type="submit" variant="brand" className="w-full" disabled={isAuthLoading || state === "submitting" || state === "done"}>
+            {state === "submitting" ? t("booking.access.submitting") : t("booking.access.submit")}
+          </Button>
 
-        <div aria-live="polite">
-          {error && (
-            <div id="voucher-error" className="space-y-1 text-sm">
-              <p className="text-red-300">{t(`booking.access.${error}`)}</p>
-              {REFUSAL_REASONS.has(error) && <p className="text-white/60">{t("booking.access.contactHint")}</p>}
-            </div>
-          )}
-          {state === "done" && <p className="text-sm text-emerald-300">{t("booking.access.welcome")}</p>}
-        </div>
-      </form>
-    </main>
+          <div aria-live="polite">
+            {error && (
+              <div id="voucher-error" className="space-y-1 text-sm">
+                <p className="text-red-300">{t(`booking.access.${error}`)}</p>
+                {REFUSAL_REASONS.has(error) && <p className="text-white/60">{t("booking.access.contactHint")}</p>}
+              </div>
+            )}
+            {state === "done" && <p className="text-sm text-emerald-300">{t("booking.access.welcome")}</p>}
+          </div>
+        </form>
+      </TicketCard>
+    </TravellerShell>
   );
 }
