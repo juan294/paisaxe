@@ -104,15 +104,13 @@ gh pr checks                          # all five required checks must pass
 ```
 
 Required contexts: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`,
-`Smoke test Vercel preview`.
+`Release artifact smoke`.
 
-**Release PR Preview exception (owner decision, 2026-10-02; ADR-0024 decision 11).** The
-`Smoke test Vercel preview` check needs a Vercel Preview of the release pull request, and
-the project rule otherwise forbids creating Previews. The Preview built for the
-`develop` → `main` release pull request is the standing, documented exception. No other
-Preview is created for experimentation, feature work or debugging. Remember that this
-Preview runs against the production Supabase project and live Stripe keys: it is a
-read-only smoke target, never a place to exercise mutating flows.
+**No Vercel Previews (owner decision, 2026-10-06; swap applied 2026-10-07 for v1.8.0).**
+`Release artifact smoke` builds and checks the release candidate inside GitHub Actions, so the
+release pull request no longer needs a Vercel Preview: `Smoke test Vercel preview` was removed
+from main's required checks, and `vercel.json`'s `ignoreCommand` builds production only. The
+release-PR Preview exception of 2026-10-02 (ADR-0024 decision 11) is retired.
 
 Report status and **stop**. Only after the user says "merge it":
 
@@ -253,7 +251,7 @@ production Supabase data, Vercel env vars, DNS, or external service config.
 Phase 4 required-context list (changing branch protection is separately authorized):
 
 - `develop`: `CI Fast` and `CI Fast recovery`. `CI Fast recovery` is skipped, and therefore satisfied, unless `CI Fast` demanded full validation under lean; then it must succeed.
-- `main`: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, and `Release artifact smoke` once it has passed on an eligible release PR (until then `Smoke test Vercel preview`).
+- `main`: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, and `Release artifact smoke` (it replaced `Smoke test Vercel preview` on 2026-10-07, after passing on release PR #1007).
 
 `claude-review` stays ungated: automatic model review is outside the cadence change.
 
@@ -267,7 +265,7 @@ What changes at installation, even in legacy mode: routed jobs declare job-level
 
 A green `CI Fast` or unchanged nightly disposition does not satisfy this checklist. Require the original full release contexts and every applicable child, the existing Stripe proof and the post-deploy proof. Any required failure, cancellation or skipped leaf blocks release.
 
-`Release artifact smoke` (`.github/workflows/preview-smoke.yml`) runs on the release PR without secrets or a deployment: it builds the PR candidate, serves the production build on loopback against local Supabase and fails unless `/api/health` reports the candidate commit and tree, the datastore is healthy, the homepage hydrates and the `release-required-local` probes pass. It is local artifact evidence only; steps 4-5 (deployed identity and required probes) remain mandatory. Until main's branch protection is changed under separate authorization, `Smoke test Vercel preview` remains the registered required context. Reproduce locally:
+`Release artifact smoke` (`.github/workflows/preview-smoke.yml`) runs on the release PR without secrets or a deployment: it builds the PR candidate, serves the production build on loopback against local Supabase and fails unless `/api/health` reports the candidate commit and tree, the datastore is healthy, the homepage hydrates and the `release-required-local` probes pass. It is local artifact evidence only; steps 4-5 (deployed identity and required probes) remain mandatory. It is the registered required context on `main` since 2026-10-07. Reproduce locally:
 
 ```bash
 npx supabase start

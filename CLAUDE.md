@@ -50,7 +50,7 @@ develop   # Active development (DEFAULT)
 1. **Push to `main`** — NEVER. Not even a typo fix.
 2. **Create a PR targeting `main`** — NEVER. Only when the user requests a release.
 3. **Merge a PR into `main`** — NEVER. The user merges production PRs themselves or gives explicit authorization.
-4. **Run `vercel` deploy commands** — NEVER for production. Do not create Preview deployments either: the only permitted Preview is the release PR's (see Production Release).
+4. **Run `vercel` deploy commands** — NEVER for production. Never create Preview deployments: `vercel.json` builds production only (owner decision, 2026-10-06).
 5. **Modify Supabase production data** — NEVER. Migrations must be reviewed.
 6. **Modify Vercel environment variables** — NEVER. The user does this.
 7. **Modify DNS, domain settings, or external service configs** — NEVER.
@@ -72,7 +72,7 @@ develop   # Active development (DEFAULT)
 **This is a user-initiated process. Agents prepare, users authorize.**
 
 `main` is protected with branch protection rules:
-- **Required status checks**: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Smoke test Vercel preview` must all pass
+- **Required status checks**: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`, `Release artifact smoke` must all pass
 - **Force pushes blocked**, **deletion blocked**
 - **PRs required with 0 approvals** (solo-developer repository; explicit user authorization in the current conversation and green required checks are the human release gate)
 
@@ -92,12 +92,10 @@ improvise a different sequence here or in any other file. Its ordering is:
 7. Obtain authorization
 8. **Tag last** — no tag without a passing analyzer run for the shipped tree
 
-Two standing rulings live in the checklist: the release PR's Vercel Preview is the only permitted
-Preview (section 3), and a feature that needs a mutating production check uses the separate,
-owner-authorized acceptance step (section 5b), never the read-only probes. These are
-project-specific overrides of the installed rules: where `.rpi/rules/deployment-safety.md`,
-`AGENTS.md` or `.claude/rules/` say "Never create Vercel Previews", the release PR's Preview
-is the documented exception, and a release must not be stopped over it.
+Two standing rulings live in the checklist: no Vercel Preview is ever built (section 3;
+`Release artifact smoke` checks the release candidate in GitHub Actions instead), and a feature
+that needs a mutating production check uses the separate, owner-authorized acceptance step
+(section 5b), never the read-only probes.
 
 The user requests a release; the agent never initiates one. **Never bypass branch protection.**
 If CI fails on the PR, fix on `develop` first, push, and let the PR update.
@@ -403,6 +401,6 @@ The cadence source is installed locally with legacy routing by default. `CI_CADE
 
 No cadence launcher performs a git network operation: the CI Fast bootstrap, the protected launcher and the control loader read the protected base, the candidate and the nightly's develop head from the job's own `fetch-depth: 0` checkout (the launcher's private store shares it through git alternates), and block if any is missing. Its only network use is read-only GitHub REST calls (repository, branch ref, and a compare when a pull request's base lags the tip) and the pinned scanner download. A pull request is admitted when its merge's first parent is `base.sha` or a descendant of it that is on develop; `base.sha` remains the protected definition. A blocked launcher names the failed check from a fixed vocabulary (`unclassified` otherwise). The completed-evidence finalizer runs only after a successful nightly or main coverage run, never after `CI cadence` or pull-request runs, so a lean develop push that needed full recovery is revalidated by the next nightly rather than reused. The real Stripe suite also stands down on lean owner PRs into develop. Activation is legacy-first (see the release checklist).
 
-Release PRs run `Release artifact smoke` (`.github/workflows/preview-smoke.yml`): a plain secret-free job that builds the exact PR candidate, starts local Supabase, serves the production build on loopback and runs `npm run test:e2e:release-artifact` (the `release-required-local` probes plus `e2e/release-artifact-smoke.spec.ts`, which fails when candidate identity is unavailable). It replaces `Smoke test Vercel preview` in main's required checks only after passing on an eligible release PR and with separate authorization.
+Release PRs run `Release artifact smoke` (`.github/workflows/preview-smoke.yml`): a plain secret-free job that builds the exact PR candidate, starts local Supabase, serves the production build on loopback and runs `npm run test:e2e:release-artifact` (the `release-required-local` probes plus `e2e/release-artifact-smoke.spec.ts`, which fails when candidate identity is unavailable). It replaced `Smoke test Vercel preview` in main's required checks on 2026-10-07, after passing on release PR #1007 (owner-authorized).
 
 Run every cadence contract test with `npm run test:ci-cadence`. Source fixture passes do not prove native reusable job names, hosted timing or deployed behavior. No local source change authorizes provider calls, remote variable/settings changes, publication, paid repair or automatic reruns.
