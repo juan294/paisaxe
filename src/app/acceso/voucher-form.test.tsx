@@ -17,9 +17,11 @@ vi.mock("@/hooks/use-auth", () => ({
 }));
 
 const mockSignInAnonymously = vi.fn();
+const mockCreateSupabaseBrowserClient = vi.fn();
 vi.mock("@/lib/supabase-browser", () => ({
-  createSupabaseBrowserClient: () => ({ auth: { signInAnonymously: mockSignInAnonymously } }),
+  createSupabaseBrowserClient: () => mockCreateSupabaseBrowserClient(),
 }));
+mockCreateSupabaseBrowserClient.mockReturnValue({ auth: { signInAnonymously: mockSignInAnonymously } });
 
 vi.mock("@/lib/csrf-client", () => ({
   csrfHeaders: () => ({ "x-csrf-token": "csrf-1" }),
@@ -164,5 +166,17 @@ describe("VoucherForm bundle", () => {
     const source = readFileSync(join(process.cwd(), "src/app/acceso/voucher-form.tsx"), "utf8");
     expect(source).not.toMatch(/^import[^;]*from "@\/lib\/supabase-browser";/m);
     expect(source).toMatch(/await import\("@\/lib\/supabase-browser"\)/);
+  });
+});
+
+describe("VoucherForm Supabase failures", () => {
+  it("shows anonFailed and logs [VOUCHER_ANON_SIGNIN_FAILED] when Supabase client is not configured", async () => {
+    mockCreateSupabaseBrowserClient.mockReturnValue(null);
+    render(<VoucherForm />);
+    submitCode();
+
+    expect(await screen.findByText("booking.access.anonFailed")).toBeInTheDocument();
+    expect(clientLogger.error).toHaveBeenCalledWith("[VOUCHER_ANON_SIGNIN_FAILED]", expect.objectContaining({ error: "Supabase is not configured" }));
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
