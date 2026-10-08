@@ -407,6 +407,25 @@ const FUNCTION_DEFINITION_RE =
 // (possibly non-compliant) that would wrongly flag a function that no longer exists.
 const FUNCTION_DROP_RE = /drop\s+function(?:\s+if\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(/g;
 
+function hasEmptySearchPath(header: string): boolean {
+  // Skip quoted values/identifiers so another option's value cannot masquerade
+  // as a SET clause. PostgreSQL applies the last setting for a given parameter.
+  const tokens = /(\$(?:[a-z_][a-z0-9_]*)?\$)[\s\S]*?\1|e'(?:\\[\s\S]|''|[^'\\])*'|'(?:''|[^'])*'|"(?:""|[^"])*"|\bset\s+(?:search_path\b|"search_path")/g;
+  let lastSettingEnd: number | undefined;
+  for (const token of header.matchAll(tokens)) {
+    if (token[0].startsWith("set ")) {
+      lastSettingEnd = token.index + token[0].length;
+    }
+  }
+  if (lastSettingEnd === undefined) return false;
+
+  // Match the entire empty value, followed by the end or another function
+  // option. A comma list, doubled quote or escaped nonempty string is unsafe.
+  return /^\s*(?:=|to\b)\s*''(?=$|\s+(?:language|transform|window|immutable|stable|volatile|not|leakproof|called|returns|strict|external|security|parallel|cost|rows|support|set|as)\b)/.test(
+    header.slice(lastSettingEnd)
+  );
+}
+
 // Every SECURITY DEFINER function in the schema must pin `SET search_path = ''`
 // (see CLAUDE.md's "Database function security" guardrail). Walks migrations in
 // filename order, replaying each migration's CREATE/DROP FUNCTION statements in
@@ -447,7 +466,7 @@ function checkSecurityDefinerSearchPaths(migrations: MigrationFile[]): string[] 
   for (const [functionName, header] of latestHeaders) {
     if (!header.includes("security definer")) continue;
 
-    if (!header.includes("set search_path = ''")) {
+    if (!hasEmptySearchPath(header)) {
       errors.push(
         `SECURITY DEFINER function public.${functionName} must use SET search_path = ''`
       );

@@ -23,7 +23,7 @@ const ORDER_INPUT: CreateOrderInput = {
   description: "Paseo (demo)",
   returnUrl: "https://paisaxe.es/booking/c/return",
   cancelUrl: "https://paisaxe.es/booking/c?cancelled=1",
-  operationKey: "6f1c2d3e-4b5a-4c6d-8e7f-001122334455",
+  operationKey: "00000000-0000-4000-8000-000000000001",
 };
 const UNAVAILABLE = { name: "SERVICE_UNAVAILABLE", message: "down", debug_id: "dbg-503" };
 

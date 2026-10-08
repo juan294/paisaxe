@@ -6,13 +6,14 @@ import { aggregateMeasuredSuites } from './ci-cadence-coverage.mjs';
 import { protectedGitEnvironment } from './ci-cadence-native.mjs';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const required = condition => { if (!condition) throw Error('Native producer evidence incomplete or changed'); };
-// Reviewed describe.skipIf(!dbReachable) groups: they need the local Supabase
-// stack, which no hosted measuring runner has, so they skip as a whole there.
-// Each pins the cases it skips there (census of nightly run 37721477388); they
-// are disclosed and never counted, and any other skip or count change fails.
+// Reviewed whole groups gated by the shared local Supabase reachability probe.
+// The historical nightly supplied the initial inventory; Phase 3's qualified
+// local contract census pins the added/expanded groups (phase3-gated-cases.json).
+// Ordinary coverage discloses these skips and never counts them. The separate
+// required database contract runner rejects every skip, including these groups.
 export const ENVIRONMENT_GATED = Object.freeze([
   { file: 'scripts/booking/create-operator-link.test.ts', describe: 'createOperatorAccess against live local Supabase', cases: 1 },
-  { file: 'src/app/api/feature-flags/route.postgrest-rls.test.ts', describe: 'SE-H1/BE-M9: feature_flags anon PostgREST access (live local Supabase)', cases: 4 },
+  { file: 'src/app/api/feature-flags/route.postgrest-rls.test.ts', describe: 'SE-H1/BE-M9: feature_flags anon PostgREST access (live local Supabase)', cases: 6 },
   { file: 'src/app/api/webhooks/stripe/route.postgrest-integration.test.ts', describe: 'QA-H4: grant_day_pass_idempotent guarantees against live local Supabase', cases: 4 },
   { file: 'src/lib/booking/booking.postgrest-integration.test.ts', describe: 'booking domain against live local Supabase', cases: 50 },
   { file: 'src/lib/booking/cancel.postgrest-integration.test.ts', describe: 'cancellation against live local Supabase', cases: 15 },
@@ -27,6 +28,11 @@ export const ENVIRONMENT_GATED = Object.freeze([
   { file: 'src/lib/match-chunks.postgrest-rls.test.ts', describe: 'match_chunks (live local Supabase)', cases: 5 },
   { file: 'src/lib/proxy/maintenance.postgrest-integration.test.ts', describe: 'SE-H1/BE-M9 regression: isMaintenanceModeEnabled() against live local Supabase', cases: 2 },
   { file: 'src/lib/stories-rls.postgrest-rls.test.ts', describe: 'SE-H2: stories anon PostgREST access (live local Supabase)', cases: 3 },
+  { file: 'src/lib/database-boundaries.postgrest-rls.test.ts', describe: 'Declared database authorization matrix (real PostgREST)', cases: 692 },
+  { file: 'src/lib/booking/retention.postgrest-integration.test.ts', describe: 'Legacy booking retention (real transactions and PostgREST)', cases: 24 },
+  { file: 'src/lib/feature-flag-consumers.postgrest-integration.test.ts', describe: 'Public feature-flag consumers with real local database', cases: 4 },
+  { file: 'src/lib/feature-flag-realtime.postgrest-integration.test.ts', describe: 'Public realtime column privileges (actual local websocket)', cases: 1 },
+  { file: 'src/lib/pg-net.postgrest-integration.test.ts', describe: 'Installed pg_net JSONB transport and transaction boundary', cases: 10 },
 ].map(Object.freeze));
 
 /** The runner supplies paths to its actual exit receipt and fresh native JSON.

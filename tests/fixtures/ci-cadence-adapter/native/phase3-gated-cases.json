@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "source": "Reviewed Phase 3 local contract case census, plus the existing createOperatorAccess gated case. This is a source inventory, not a hosted skip recording.",
+  "contractReceiptSha256": "e8b266b274a6c634f310d733d08a29db28d930a06e2bf335eb3a5ab739bb71cf",
+  "candidateDigest": "073e1370081a4e4e92b49916a26a62e8f4e7e745db13eadf005c3f929b5d2ef1",
+  "executedContractCases": 936,
+  "ordinaryEnvironmentGatedCases": 937,
+  "groups": [
+    {
+      "file": "scripts/booking/create-operator-link.test.ts",
+      "describe": "createOperatorAccess against live local Supabase",
+      "cases": 1
+    },
+    {
+      "file": "src/app/api/feature-flags/route.postgrest-rls.test.ts",
+      "describe": "SE-H1/BE-M9: feature_flags anon PostgREST access (live local Supabase)",
+      "cases": 6
+    },
+    {
+      "file": "src/app/api/webhooks/stripe/route.postgrest-integration.test.ts",
+      "describe": "QA-H4: grant_day_pass_idempotent guarantees against live local Supabase",
+      "cases": 4
+    },
+    {
+      "file": "src/lib/booking/booking.postgrest-integration.test.ts",
+      "describe": "booking domain against live local Supabase",
+      "cases": 50
+    },
+    {
+      "file": "src/lib/booking/cancel.postgrest-integration.test.ts",
+      "describe": "cancellation against live local Supabase",
+      "cases": 15
+    },
+    {
+      "file": "src/lib/booking/capture.postgrest-integration.test.ts",
+      "describe": "deposit flow against live local Supabase",
+      "cases": 28
+    },
+    {
+      "file": "src/lib/booking/invoice.postgrest-integration.test.ts",
+      "describe": "balance invoice against live local Supabase and the PayPal mock",
+      "cases": 14
+    },
+    {
+      "file": "src/lib/booking/operator.postgrest-integration.test.ts",
+      "describe": "operator view against live local Supabase",
+      "cases": 20
+    },
+    {
+      "file": "src/lib/booking/phone-confirmation.postgrest-integration.test.ts",
+      "describe": "phone confirmation against live local Supabase",
+      "cases": 14
+    },
+    {
+      "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
+      "describe": "PayPal webhook inbox and reconciliation against live local Supabase",
+      "cases": 31
+    },
+    {
+      "file": "src/lib/booking/tools.postgrest-integration.test.ts",
+      "describe": "booking tools against the fixture merchant",
+      "cases": 2
+    },
+    {
+      "file": "src/lib/booking/vouchers.postgrest-integration.test.ts",
+      "describe": "vouchers against live local Supabase",
+      "cases": 9
+    },
+    {
+      "file": "src/lib/definer-function-privileges.postgrest-rls.test.ts",
+      "describe": "SECURITY DEFINER function privileges (live local Supabase)",
+      "cases": 2
+    },
+    {
+      "file": "src/lib/match-chunks.postgrest-rls.test.ts",
+      "describe": "match_chunks (live local Supabase)",
+      "cases": 5
+    },
+    {
+      "file": "src/lib/proxy/maintenance.postgrest-integration.test.ts",
+      "describe": "SE-H1/BE-M9 regression: isMaintenanceModeEnabled() against live local Supabase",
+      "cases": 2
+    },
+    {
+      "file": "src/lib/stories-rls.postgrest-rls.test.ts",
+      "describe": "SE-H2: stories anon PostgREST access (live local Supabase)",
+      "cases": 3
+    },
+    {
+      "file": "src/lib/database-boundaries.postgrest-rls.test.ts",
+      "describe": "Declared database authorization matrix (real PostgREST)",
+      "cases": 692
+    },
+    {
+      "file": "src/lib/booking/retention.postgrest-integration.test.ts",
+      "describe": "Legacy booking retention (real transactions and PostgREST)",
+      "cases": 24
+    },
+    {
+      "file": "src/lib/feature-flag-consumers.postgrest-integration.test.ts",
+      "describe": "Public feature-flag consumers with real local database",
+      "cases": 4
+    },
+    {
+      "file": "src/lib/feature-flag-realtime.postgrest-integration.test.ts",
+      "describe": "Public realtime column privileges (actual local websocket)",
+      "cases": 1
+    },
+    {
+      "file": "src/lib/pg-net.postgrest-integration.test.ts",
+      "describe": "Installed pg_net JSONB transport and transaction boundary",
+      "cases": 10
+    }
+  ]
+}

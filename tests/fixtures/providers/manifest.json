@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "scope": "Three existing provider-boundary example families. These are authored tests, not captured provider recordings. This inventory does not claim every provider interaction is covered.",
+  "fixtures": [
+    {
+      "id": "paypal-webhooks",
+      "provider": "PayPal",
+      "kind": "synthetic",
+      "file": "src/lib/paypal/webhooks.test.ts",
+      "sha256": "92e20d38c14f1015456b7094085b94c3f69f3ffe7dd459eb85a7cb927d26fbbb",
+      "refresh_owner": "repository owner",
+      "refresh_action": "Review a separately authorized sanitized PayPal webhook recording against verifyWebhookSignature and normalizePaypalEvent; pin the event API/resource version, bytes, capture date and expiry."
+    },
+    {
+      "id": "elevenlabs-post-call",
+      "provider": "ElevenLabs",
+      "kind": "synthetic",
+      "file": "src/app/api/webhooks/elevenlabs/route.test.ts",
+      "sha256": "f0f2d8ab64756f2b431a1e755af93390e4a72997ddbf5d8fa3b5e2f6f6be9e7b",
+      "refresh_owner": "repository owner",
+      "refresh_action": "Review a separately authorized sanitized post_call_transcription recording against the ElevenLabs webhook parser; pin its schema version, bytes, capture date and expiry."
+    },
+    {
+      "id": "stripe-grant-events",
+      "provider": "Stripe",
+      "kind": "synthetic",
+      "file": "src/app/api/webhooks/stripe/route.postgrest-integration.test.ts",
+      "sha256": "2c92bc2b7fa3dfbd91c76a09fcd679f8a7a329268d0feed6e58aec23a46282a7",
+      "refresh_owner": "repository owner",
+      "refresh_action": "Review a separately authorized sanitized Stripe granting-event recording against the Stripe webhook adapter; pin the event api_version independently of the client API version, bytes, capture date and expiry."
+    }
+  ]
+}

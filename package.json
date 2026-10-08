@@ -74,7 +74,12 @@
     "tools:pull": "tsx scripts/elevenlabs-scoped-ops.ts tool pull",
     "tools:push": "tsx scripts/elevenlabs-scoped-ops.ts tool push",
     "tools:push:dry": "tsx scripts/elevenlabs-scoped-ops.ts tool push:dry",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:contracts": "node scripts/run-contracts.mjs",
+    "prepare:contracts": "node scripts/prepare-contract-stack.mjs",
+    "check-provider-fixtures": "node scripts/check-provider-fixtures.mjs",
+    "check-supabase-guidance": "node scripts/check-supabase-guidance.mjs",
+    "test:contracts:runner": "node --test --test-concurrency=1 scripts/check-supabase-guidance.test.mjs scripts/check-provider-fixtures.test.mjs scripts/run-contracts.test.mjs scripts/prepare-contract-stack.test.mjs scripts/contract-transport.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

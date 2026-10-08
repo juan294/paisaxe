@@ -160,6 +160,46 @@ describe("validateMigrations", () => {
     );
   });
 
+  it.each([
+    "SET search_path=''",
+    "SET search_path = ''",
+    "SET search_path TO ''",
+    "SET search_path='' STABLE",
+    `SET "search_path"=''`,
+    "SET search_path=public SET search_path=''",
+  ])("accepts an empty search_path declaration: %s", (declaration) => {
+    const root = createMigrationFixture({
+      "001_function.sql": `CREATE FUNCTION public.checked_function() RETURNS void
+        LANGUAGE plpgsql SECURITY DEFINER ${declaration}
+        AS $$ BEGIN NULL; END; $$;`,
+    });
+
+    expect(validateMigrations({ root }).errors).toEqual([]);
+  });
+
+  it.each([
+    "SET search_path = '', public",
+    "SET search_path = '' , public",
+    "SET search_path = '''public'''",
+    String.raw`SET search_path = E'\'public\''`,
+    "SET search_path = '' SET search_path=public",
+    `SET search_path = '' SET "search_path"=public`,
+    "SET search_path = '' SET search_path FROM CURRENT",
+    `SET application_name = 'set search_path = '''''`,
+    `SET search_path=public SET application_name = 'set search_path = '''''`,
+    "SET application_name = $q$set search_path='' LANGUAGE $q$",
+  ])("rejects a nonempty or missing search_path declaration: %s", (declaration) => {
+    const root = createMigrationFixture({
+      "001_function.sql": `CREATE FUNCTION public.checked_function() RETURNS void
+        LANGUAGE plpgsql SECURITY DEFINER ${declaration}
+        AS $$ BEGIN NULL; END; $$;`,
+    });
+
+    expect(validateMigrations({ root }).errors).toContain(
+      "SECURITY DEFINER function public.checked_function must use SET search_path = ''"
+    );
+  });
+
   it("fails when SECURITY DEFINER translation functions keep public in search_path", () => {
     const root = createMigrationFixture({
       "001_translation_function.sql": `
