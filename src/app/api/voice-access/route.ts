@@ -1,3 +1,4 @@
+import { checkRequestBudget, rateLimitResponse } from "@/lib/request-rate-limit";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
@@ -20,6 +21,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       { status: 401 }
     );
   }
+
+  const requestLimit = await checkRequestBudget("GET /api/voice-access", user.id);
+  if (!requestLimit.allowed) return rateLimitResponse({ error: "Too many requests. Please try again later." }, requestLimit);
 
   const supabase = await getSupabaseClient(request);
 

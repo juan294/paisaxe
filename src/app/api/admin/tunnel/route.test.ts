@@ -1,3 +1,5 @@
+import { EventEmitter } from "node:events";
+import { NextRequest } from "next/server";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock dependencies
@@ -126,7 +128,7 @@ describe("POST /api/admin/tunnel", () => {
   it("should return 403 in production", async () => {
     process.env = { ...process.env, NODE_ENV: "production" };
 
-    const response = await POST();
+    const response = await POST(mutationRequest("POST"));
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -141,7 +143,7 @@ describe("POST /api/admin/tunnel", () => {
       }) as never,
     });
 
-    const response = await POST();
+    const response = await POST(mutationRequest("POST"));
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -156,7 +158,7 @@ describe("POST /api/admin/tunnel", () => {
 
     mockExec.mockResolvedValue({ stdout: "12345\n" });
 
-    const response = await POST();
+    const response = await POST(mutationRequest("POST"));
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -178,10 +180,13 @@ describe("POST /api/admin/tunnel", () => {
       return { stdout: callCount === 1 ? "" : "12345\n" };
     });
 
-    const mockProcess = { unref: vi.fn() };
-    mockSpawn.mockReturnValue(mockProcess);
+    const mockProcess = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    mockSpawn.mockImplementation(() => {
+      queueMicrotask(() => mockProcess.emit("spawn"));
+      return mockProcess;
+    });
 
-    const response = await POST();
+    const response = await POST(mutationRequest("POST"));
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -207,7 +212,7 @@ describe("POST /api/admin/tunnel", () => {
       throw new Error("cloudflared not found");
     });
 
-    const response = await POST();
+    const response = await POST(mutationRequest("POST"));
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -226,7 +231,7 @@ describe("POST /api/admin/tunnel", () => {
       throw "string error";  
     });
 
-    const response = await POST();
+    const response = await POST(mutationRequest("POST"));
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -243,10 +248,13 @@ describe("POST /api/admin/tunnel", () => {
     // Both calls return empty stdout = not running
     mockExec.mockResolvedValue({ stdout: "" });
 
-    const mockProcess = { unref: vi.fn() };
-    mockSpawn.mockReturnValue(mockProcess);
+    const mockProcess = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    mockSpawn.mockImplementation(() => {
+      queueMicrotask(() => mockProcess.emit("spawn"));
+      return mockProcess;
+    });
 
-    const response = await POST();
+    const response = await POST(mutationRequest("POST"));
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -271,7 +279,7 @@ describe("DELETE /api/admin/tunnel", () => {
   it("should return 403 in production", async () => {
     process.env = { ...process.env, NODE_ENV: "production" };
 
-    const response = await DELETE();
+    const response = await DELETE(mutationRequest("DELETE"));
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -286,7 +294,7 @@ describe("DELETE /api/admin/tunnel", () => {
       }) as never,
     });
 
-    const response = await DELETE();
+    const response = await DELETE(mutationRequest("DELETE"));
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -301,7 +309,7 @@ describe("DELETE /api/admin/tunnel", () => {
 
     mockExec.mockResolvedValue({ stdout: "" });
 
-    const response = await DELETE();
+    const response = await DELETE(mutationRequest("DELETE"));
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -318,7 +326,7 @@ describe("DELETE /api/admin/tunnel", () => {
 
     mockExec.mockRejectedValue(new Error("Permission denied"));
 
-    const response = await DELETE();
+    const response = await DELETE(mutationRequest("DELETE"));
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -334,7 +342,7 @@ describe("DELETE /api/admin/tunnel", () => {
 
     mockExec.mockRejectedValue("non-error string");
 
-    const response = await DELETE();
+    const response = await DELETE(mutationRequest("DELETE"));
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -351,7 +359,7 @@ describe("DELETE /api/admin/tunnel", () => {
     // First call (pkill) succeeds, second call (isTunnelRunning) returns still running
     mockExec.mockResolvedValue({ stdout: "12345\n" });
 
-    const response = await DELETE();
+    const response = await DELETE(mutationRequest("DELETE"));
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -359,3 +367,7 @@ describe("DELETE /api/admin/tunnel", () => {
     expect(data.message).toBe("Failed to stop tunnel");
   });
 });
+
+function mutationRequest(method: string) {
+  return new NextRequest("http://localhost:3006/api/admin/tunnel", { method, headers: { origin: "http://localhost:3006", cookie: "__csrf=fixture", "x-csrf-token": "fixture" } });
+}

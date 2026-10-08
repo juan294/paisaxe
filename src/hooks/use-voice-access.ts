@@ -1,5 +1,6 @@
 "use client";
 
+import { readRetryAfter } from "@/lib/retry-after";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVisitorVoiceAccess } from "@/hooks/use-visitor-voice-access";
@@ -28,21 +29,24 @@ interface UseVoiceAccessResult {
   isLoading: boolean;
   /** Refresh access state (call after purchase) */
   refresh: () => Promise<void>;
+  retryAfter: number | null;
 }
 
 export function useVoiceAccess(): UseVoiceAccessResult {
   const { user, session, isLoading: isAuthLoading } = useAuth();
   const visitorAccess = useVisitorVoiceAccess();
 
-  const [paidAccess, setPaidAccess] = useState<VoiceAccessResponse | null>(
+  const [paidAccess, setPaidAccess] = useState<{ userId: string; accessToken: string; value: VoiceAccessResponse } | null>(
     null
   );
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [isFetchingAccess, setIsFetchingAccess] = useState(false);
   const [hasCheckedPaidAccess, setHasCheckedPaidAccess] = useState(false);
 
   const fetchPaidAccess = useCallback(async () => {
     if (!user || !session?.access_token) {
       setPaidAccess(null);
+      setRetryAfter(null);
       setHasCheckedPaidAccess(true); // Mark as checked even when no user
       return;
     }
@@ -58,8 +62,12 @@ export function useVoiceAccess(): UseVoiceAccessResult {
 
       if (response.ok) {
         const data: VoiceAccessResponse = await response.json();
-        setPaidAccess(data);
+        setPaidAccess({ userId: user.id, accessToken: session.access_token, value: data });
+        setRetryAfter(null);
+      } else if (response.status === 429) {
+        setRetryAfter(readRetryAfter(response));
       } else {
+        setRetryAfter(null);
         setPaidAccess(null);
       }
     } catch (error) {
@@ -76,7 +84,9 @@ export function useVoiceAccess(): UseVoiceAccessResult {
   // Reset checked state when user changes (before fetching)
   useEffect(() => {
     setHasCheckedPaidAccess(false);
-  }, [user?.id]);
+    setPaidAccess(null);
+    setRetryAfter(null);
+  }, [user?.id, session?.access_token]);
 
   // Fetch paid access when user changes
   useEffect(() => {
@@ -93,15 +103,16 @@ export function useVoiceAccess(): UseVoiceAccessResult {
       (!!user && visitorAccess.isLoading);
 
     // Check paid access
-    const hasPaidAccess = paidAccess?.hasAccess ?? false;
+    const confirmedAccess = paidAccess?.userId === user?.id && paidAccess?.accessToken === session?.access_token ? paidAccess?.value : null;
+    const hasPaidAccess = (confirmedAccess?.hasAccess ?? false) && (!confirmedAccess?.expiresAt || Date.parse(confirmedAccess.expiresAt) > Date.now());
 
     // Visitor allowlist authorization now lives on the server boundary.
     const isWhitelisted = false;
     const canUseVoice = hasPaidAccess;
 
     // Parse expiry date for paid access
-    const expiresAt = paidAccess?.expiresAt
-      ? new Date(paidAccess.expiresAt)
+    const expiresAt = confirmedAccess?.expiresAt
+      ? new Date(confirmedAccess.expiresAt)
       : null;
 
     // Calculate hours until expiry
@@ -114,7 +125,7 @@ export function useVoiceAccess(): UseVoiceAccessResult {
 
     // Needs purchase: signed in, not whitelisted, no paid access
     const needsPurchase =
-      !!user && visitorAccess.featureEnabled && !hasPaidAccess;
+      !!user && visitorAccess.featureEnabled && !hasPaidAccess && retryAfter === null;
 
     // Only expose the public visitor agent when access has already been granted.
     const agentId = hasPaidAccess ? ELEVENLABS_AGENT_IDS.pelayo : "";
@@ -130,14 +141,17 @@ export function useVoiceAccess(): UseVoiceAccessResult {
       agentId,
       isLoading,
       refresh: fetchPaidAccess,
+      retryAfter,
     };
   }, [
     isAuthLoading,
     visitorAccess,
     paidAccess,
+    retryAfter,
     isFetchingAccess,
     hasCheckedPaidAccess,
     user,
+    session?.access_token,
     fetchPaidAccess,
   ]);
 }

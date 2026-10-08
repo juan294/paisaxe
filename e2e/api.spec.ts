@@ -154,7 +154,6 @@ test.describe("API route smoke tests", () => {
   const ADMIN_GET_ROUTES = [
     "/api/admin/agent-reports",
     "/api/admin/agents-summary",
-    "/api/admin/agents/run",
     "/api/admin/analytics",
     "/api/admin/costs-analytics",
     "/api/admin/costs-analytics/test-id",
@@ -178,6 +177,27 @@ test.describe("API route smoke tests", () => {
       const response = await request.get(path);
       await expectAuthRequired(response);
     });
+  }
+
+  // Production builds expose an inert local-only capability, independent of
+  // session state. Exercise all methods through the actual proxy and bundle.
+  for (const path of ["/api/admin/agents/run", "/api/admin/tunnel"]) {
+    for (const method of ["get", "post", "delete"] as const) {
+      test(`${method.toUpperCase()} ${path} discloses local-only capability`, async ({ request }) => {
+        const headers = method === "get" ? {} : await getCsrfHeaders(request);
+        const response = await request[method](path, { headers });
+        if (process.env.PLAYWRIGHT_USE_DEV_SERVER === "true") {
+          await expectAuthRequired(response);
+          return;
+        }
+        expect(response.status()).toBe(403);
+        expect(response.headers()["cache-control"]).toBe("private, no-store");
+        expect(await response.json()).toEqual({
+          error: "Solo disponible en desarrollo local. Inicia la aplicación con npm run dev.",
+          localOnly: true,
+        });
+      });
+    }
   }
 
   // State-changing admin routes. Unlike /api/cron/* and /api/health*,

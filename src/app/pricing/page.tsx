@@ -1,5 +1,7 @@
 "use client";
 
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { Suspense, useCallback, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
@@ -36,7 +38,7 @@ export default function PricingPage() {
 
 function PricingPageContent() {
   const { user, session, signInWithGoogle } = useAuth();
-  const { canUseVoice, isWhitelisted, expiresAt, isLoading } = useVoiceAccess();
+  const { canUseVoice, isWhitelisted, expiresAt, isLoading, retryAfter, refresh } = useVoiceAccess();
   const { t, locale } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -125,6 +127,7 @@ function PricingPageContent() {
       </header>
 
       <main className="mx-auto max-w-md px-6 py-16">
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
         {/* Hero */}
         <div className="text-center mb-12">
           {/* Animated sound bars */}
@@ -178,7 +181,7 @@ function PricingPageContent() {
         )}
 
         {/* Pricing Card */}
-        {(!canUseVoice || isResolvingAuthenticatedAccess) && (
+        {retryAfter == null && (!canUseVoice || isResolvingAuthenticatedAccess) && (
           <div className="rounded-xl border border-neutral-800 overflow-hidden">
             {/* Price + tier selector (#137) */}
             <div className="p-6 text-center border-b border-neutral-800">

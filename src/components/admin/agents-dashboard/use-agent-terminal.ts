@@ -7,6 +7,7 @@ interface UseAgentTerminalOptions {
 }
 
 export function useAgentTerminal({ onFinished }: UseAgentTerminalOptions = {}) {
+  const [unavailable, setUnavailable] = useState(false);
   const [activeTerminal, setActiveTerminal] = useState<string | null>(null);
   const [terminalLogs, setTerminalLogs] = useState<AgentLogLine[]>([]);
   const [terminalOffset, setTerminalOffset] = useState(0);
@@ -18,7 +19,7 @@ export function useAgentTerminal({ onFinished }: UseAgentTerminalOptions = {}) {
 
   // Poll logs for the active terminal
   useEffect(() => {
-    if (!activeTerminal) {
+    if (!activeTerminal || unavailable) {
       if (logPollRef.current) {
         clearInterval(logPollRef.current);
         logPollRef.current = null;
@@ -31,6 +32,13 @@ export function useAgentTerminal({ onFinished }: UseAgentTerminalOptions = {}) {
 
     const pollLogs = async () => {
       const result = await fetchAgentLogs(activeTerminal, currentOffset);
+      if (result.unavailable) {
+        setUnavailable(true);
+        setTerminalLogs((prev) => [...prev, { timestamp: new Date().toISOString(), text: "Solo disponible en desarrollo local. Inicia la aplicación con npm run dev." }]);
+        if (logPollRef.current) clearInterval(logPollRef.current);
+        logPollRef.current = null;
+        return;
+      }
       if (!result.data) return;
 
       if (result.data.logs.length > 0) {
@@ -61,7 +69,7 @@ export function useAgentTerminal({ onFinished }: UseAgentTerminalOptions = {}) {
       if (logPollRef.current) clearInterval(logPollRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTerminal]);
+  }, [activeTerminal, unavailable]);
 
   const openTerminal = (agentKey: string, startedAt: string) => {
     setTerminalLogs([]);
@@ -84,6 +92,7 @@ export function useAgentTerminal({ onFinished }: UseAgentTerminalOptions = {}) {
   };
 
   return {
+    unavailable,
     activeTerminal,
     terminalLogs,
     terminalFinished,

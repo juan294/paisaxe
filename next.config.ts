@@ -1,4 +1,6 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
+import path from "node:path";
 import bundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
 
@@ -10,7 +12,27 @@ const withBundleAnalyzer = bundleAnalyzer({
 /** Path prefixes whose URLs carry a booking or operator capability. */
 const CAPABILITY_PATH_PREFIXES = ["/booking", "/operator", "/api/booking/bookings", "/api/operator"];
 
+// Resolve at build time: production routes cannot import local process code.
+const localOperationAliases = Object.fromEntries(
+  ["agents", "tunnel"].map((name) => [
+    `@/lib/local-operations/${name}`,
+    "./src/lib/local-operations/unavailable.ts",
+  ]),
+);
+
+/** Replace exact process imports before Next's TypeScript paths resolver runs. */
+export const resolveLocalOperationModules: NonNullable<NextConfig["webpack"]> = (config, { dev, webpack }) => {
+  if (!dev) {
+    config.plugins.push(new webpack.NormalModuleReplacementPlugin(
+      /^@\/lib\/local-operations\/(?:agents|tunnel)$/,
+      path.resolve(process.cwd(), "src/lib/local-operations/unavailable.ts"),
+    ));
+  }
+  return config;
+};
+
 const nextConfig: NextConfig = {
+  webpack: resolveLocalOperationModules,
   transpilePackages: ["@supabase/ssr"],
   serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
   // Disable dev indicators (Dev Tools badge, ISR status, build activity) to prevent
@@ -125,7 +147,23 @@ const shouldUploadSourcemaps =
   process.env.VERCEL_ENV === "production" ||
   (sentryBranch !== undefined && SENTRY_UPLOAD_BRANCHES.includes(sentryBranch));
 
-export default withSentryConfig(withBundleAnalyzer(nextConfig), {
+export default function configureNext(phase: string) {
+  return withSentryConfig(withBundleAnalyzer({
+    ...nextConfig,
+    outputFileTracingExcludes: {
+      ...nextConfig.outputFileTracingExcludes,
+      // NFT independently resolves original entry imports without webpack's
+      // module replacement. These two sources have no production runtime use.
+      ...(phase === PHASE_DEVELOPMENT_SERVER ? {} : {
+        "/api/admin/agents/run": ["./src/lib/local-operations/agents.ts"],
+        "/api/admin/tunnel": ["./src/lib/local-operations/tunnel.ts"],
+      }),
+    },
+    turbopack: {
+      // The build phase is authoritative even if NODE_ENV was misconfigured.
+      resolveAlias: phase === PHASE_DEVELOPMENT_SERVER ? {} : localOperationAliases,
+    },
+  }), {
   silent: true,
   sourcemaps: {
     // Gate the (slow, quota-consuming) upload to develop/main builds only.
@@ -137,3 +175,4 @@ export default withSentryConfig(withBundleAnalyzer(nextConfig), {
     deleteSourcemapsAfterUpload: true,
   },
 });
+}

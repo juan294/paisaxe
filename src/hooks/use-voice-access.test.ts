@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { useVoiceAccess } from "./use-voice-access";
 
 const mockUseAuth = vi.fn();
@@ -41,6 +41,60 @@ describe("useVoiceAccess", () => {
       ok: false,
       json: async () => ({ error: "Unauthorized" }),
     });
+  });
+
+  it("budget fixture: initial paid check plus six explicit refreshes emits seven reads, without polling", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "fixture-user" }, session: { access_token: "fixture-token" }, isLoading: false });
+    mockUseVisitorVoiceAccess.mockReturnValue({ featureEnabled: true, needsSignIn: false, isLoading: false });
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ hasAccess: true, expiresAt: null, purchaseType: "day_pass" }) });
+    const { result } = renderHook(() => useVoiceAccess());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    for (let i = 0; i < 6; i++) await act(async () => { await result.current.refresh(); });
+    expect(mockFetch.mock.calls.filter(([url]) => url === "/api/voice-access")).toHaveLength(7);
+  });
+
+  it("429 preserves confirmed paid access, exposes retry seconds and recovers without a purchase prompt", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "paid" }, session: { access_token: "paid-token" }, isLoading: false });
+    mockUseVisitorVoiceAccess.mockReturnValue({ featureEnabled: true, needsSignIn: false, isLoading: false });
+    mockFetch.mockResolvedValueOnce(Response.json({ hasAccess: true, expiresAt: "2099-01-01T00:00:00Z", purchaseType: "day_pass" }));
+    const { result } = renderHook(() => useVoiceAccess());
+    await waitFor(() => expect(result.current.hasAccess).toBe(true));
+    mockFetch.mockResolvedValueOnce(Response.json({}, { status: 429, headers: { "Retry-After": "17" } }));
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.hasAccess).toBe(true);
+    expect(result.current.needsPurchase).toBe(false);
+    expect(result.current.retryAfter).toBe(17);
+    mockFetch.mockResolvedValueOnce(Response.json({ hasAccess: true, expiresAt: "2099-01-01T00:00:00Z", purchaseType: "day_pass" }));
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.retryAfter).toBeNull();
+    expect(result.current.hasAccess).toBe(true);
+  });
+
+  it("confirmed grant never carries across token changes or past expiry", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "paid" }, session: { access_token: "paid-token" }, isLoading: false });
+    mockUseVisitorVoiceAccess.mockReturnValue({ featureEnabled: true, needsSignIn: false, isLoading: false });
+    mockFetch.mockResolvedValueOnce(Response.json({ hasAccess: true, expiresAt: "2099-01-01T00:00:00Z", purchaseType: "day_pass" }));
+    const { result, rerender } = renderHook(() => useVoiceAccess());
+    await waitFor(() => expect(result.current.hasAccess).toBe(true));
+    mockUseAuth.mockReturnValue({ user: { id: "paid" }, session: { access_token: "changed-token" }, isLoading: false });
+    mockFetch.mockResolvedValueOnce(Response.json({}, { status: 429, headers: { "Retry-After": "5" } }));
+    rerender();
+    await waitFor(() => expect(result.current.retryAfter).toBe(5));
+    expect(result.current.hasAccess).toBe(false);
+    mockFetch.mockResolvedValueOnce(Response.json({ hasAccess: true, expiresAt: new Date(Date.now() - 1000).toISOString(), purchaseType: "day_pass" }));
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.hasAccess).toBe(false);
+  });
+
+  it("an initially rate-limited access check does not classify unknown access as needing purchase", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "paid" }, session: { access_token: "paid-token" }, isLoading: false });
+    mockUseVisitorVoiceAccess.mockReturnValue({ featureEnabled: true, needsSignIn: false, isLoading: false });
+    mockFetch.mockResolvedValue(Response.json({}, { status: 429, headers: { "Retry-After": "9" } }));
+    const { result } = renderHook(() => useVoiceAccess());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.needsPurchase).toBe(false);
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.retryAfter).toBe(9);
   });
 
   it("treats anonymous users as resolved even if visitor state is still loading", () => {
@@ -102,7 +156,7 @@ describe("useVoiceAccess", () => {
       ok: true,
       json: async () => ({
         hasAccess: true,
-        expiresAt: "2026-03-01T00:00:00Z",
+        expiresAt: "2099-03-01T00:00:00Z",
         purchaseType: "day_pass",
       }),
     });

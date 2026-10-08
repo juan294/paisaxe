@@ -26,7 +26,7 @@ vi.mock("@/lib/supabase", () => ({
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
-  getRateLimitBackendStatus: vi.fn(() => ({
+  probeRateLimitBackend: vi.fn(() => ({
     backend: "memory",
     configured: false,
     degraded: false,

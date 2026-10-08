@@ -1,5 +1,7 @@
 "use client";
 
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { Suspense, useEffect } from "react";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
@@ -22,7 +24,7 @@ export default function CheckoutReturnPage() {
 }
 
 function CheckoutReturnPageContent() {
-  const { canUseVoice, expiresAt, isLoading, refresh } = useVoiceAccess();
+  const { canUseVoice, expiresAt, isLoading, refresh, retryAfter } = useVoiceAccess();
   const { t, locale } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
@@ -56,6 +58,7 @@ function CheckoutReturnPageContent() {
   return (
     <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6">
       <div className="max-w-sm w-full text-center">
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
         {/* Success Icon */}
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-paisaxe-green-500/10 mb-8">
           <Check className="h-7 w-7 text-paisaxe-green-500" />

@@ -10,7 +10,8 @@ import nextConfig from "../../next.config";
  * must come after the site-wide one.
  */
 async function lastHeader(path: string, key: string): Promise<string | undefined> {
-  const entries = (await nextConfig.headers?.()) ?? [];
+  const config = await nextConfig("phase-production-build");
+  const entries = (await config.headers?.()) ?? [];
   let value: string | undefined;
   for (const entry of entries) {
     const pattern = new RegExp(`^${entry.source.replace(/:path\*/, ".*").replace("/(.*)", "/.*")}$`);

@@ -1,3 +1,4 @@
+import { resetRateLimit } from "@/lib/rate-limit";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -70,6 +71,7 @@ function mockVoicePurchaseFrom(result: {
 
 describe("Voice Access API", () => {
   beforeEach(() => {
+    resetRateLimit();
     vi.clearAllMocks();
   });
 

@@ -1,5 +1,7 @@
+import { rateLimitResponse } from "@/lib/request-rate-limit";
+import { getEnv } from "@/lib/env";
 import { NextResponse } from "next/server";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, normalizeIpForRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
 import { withRouteContext } from "@/lib/request-validation";
@@ -180,7 +182,7 @@ async function searchPlaces(
   type?: string,
   city?: string
 ): Promise<PlacesResponse> {
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
+  const apiKey = getEnv("GOOGLE_PLACES_API_KEY");
 
   if (!apiKey) {
     throw new Error("Places API not configured");
@@ -319,7 +321,7 @@ function extractConversationId(source: unknown): string | null {
 function buildPerCallerRateLimitKey(conversationId: string | null, ip: string): string {
   return conversationId
     ? `mcp-places:conv:${conversationId}`
-    : `mcp-places:ip:${ip}`;
+    : `mcp-places:ip:${normalizeIpForRateLimit(ip)}`;
 }
 
 interface RateLimitCheck {
@@ -345,13 +347,7 @@ async function checkPlacesRateLimits(
 }
 
 function tooManyRequestsResponse(retryAfter?: number): NextResponse {
-  return NextResponse.json(
-    { error: "Too many requests" },
-    {
-      status: 429,
-      headers: { "Retry-After": String(retryAfter) },
-    }
-  );
+  return rateLimitResponse({ error: "Too many requests" }, { retryAfter });
 }
 
 // BE-M8 (#789): a safe, stable response for any failure inside searchPlaces().
@@ -424,7 +420,7 @@ async function handleGet(request: Request): Promise<NextResponse> {
   }
   const { query, type, city } = queryParsed.data;
 
-  if (!process.env.GOOGLE_PLACES_API_KEY) {
+  if (!getEnv("GOOGLE_PLACES_API_KEY")) {
     return NextResponse.json(
       { error: "Places API not configured" },
       { status: 500 }
@@ -490,7 +486,7 @@ async function handlePost(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!process.env.GOOGLE_PLACES_API_KEY) {
+  if (!getEnv("GOOGLE_PLACES_API_KEY")) {
     return NextResponse.json(
       { error: "Places API not configured" },
       { status: 500 }
