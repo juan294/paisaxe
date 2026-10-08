@@ -3,23 +3,23 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "4e35a25bee0de1ac8092874c7e3d5c56d0f57435"
+    "blobSha": "295577f8ec9a67babf722653e3303e6c4e923092"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "4e35a25bee0de1ac8092874c7e3d5c56d0f57435"
+      "blobSha": "295577f8ec9a67babf722653e3303e6c4e923092"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "8bb8afb07af3bc3a65dbd9d9bbebf44876b4d5bb"
+      "blobSha": "3b190b39d7cdc09386c59a24f74e975885421900"
     }
   },
   "callees": {
     ".github/workflows/ci.yml": {
       "path": ".github/workflows/ci.yml",
       "prefix": "ci",
-      "blobSha": "00fc8a3b04c4b54305e375904ceb81574ae2cb3e"
+      "blobSha": "a4635b74dae5be8ba0e75151505e8b5116f566a0"
     },
     ".github/workflows/e2e.yml": {
       "path": ".github/workflows/ci-cadence-e2e-full.yml",
@@ -60,7 +60,7 @@
   },
   "coverageOnly": {
     "path": ".github/workflows/coverage.yml",
-    "blobSha": "e5e6dfc6bc0f2aac0b2403c6b50a1b70dc12ade3",
+    "blobSha": "cc91283e6b3075c4fbecc95e0375e825770d65d1",
     "steps": [
       {
         "name": "Decide weekly native coverage eligibility",
@@ -143,9 +143,9 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "4e35a25bee0de1ac8092874c7e3d5c56d0f57435",
-    ".github/workflows/ci-cadence.yml": "8bb8afb07af3bc3a65dbd9d9bbebf44876b4d5bb",
-    ".github/workflows/ci.yml": "00fc8a3b04c4b54305e375904ceb81574ae2cb3e",
+    ".github/workflows/ci-nightly.yml": "295577f8ec9a67babf722653e3303e6c4e923092",
+    ".github/workflows/ci-cadence.yml": "3b190b39d7cdc09386c59a24f74e975885421900",
+    ".github/workflows/ci.yml": "a4635b74dae5be8ba0e75151505e8b5116f566a0",
     ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "d92da9de90ec345d88694c3037884a8da9c68a8e",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",
@@ -258,12 +258,23 @@
     "ci-test": [
       "Checkout code",
       "Verify callable source checkout",
+      "Checkout database contract source",
       "Verify test/coverage suite succeeded",
       "Verify callable test/coverage suite",
+      "Setup database contract Node",
+      "Install database contract dependencies",
+      "Setup database contract Supabase",
+      "Check database contract PostgreSQL client",
+      "Run required database contracts",
+      "Upload sanitized database contract receipt",
       "Verify completed callable source checkout",
       "Set up job",
       "Complete job",
-      "Post Checkout code"
+      "Post Checkout code",
+      "Post Checkout database contract source",
+      "Post Setup database contract Node",
+      "Post Setup database contract Supabase",
+      "Post Upload sanitized database contract receipt"
     ],
     "ci-build": [
       "Checkout code",

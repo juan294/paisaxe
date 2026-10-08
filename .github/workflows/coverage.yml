@@ -233,7 +233,7 @@ jobs:
           const git=(...args)=>execFileSync('/usr/bin/git',['--no-replace-objects','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{env,timeout:10000,maxBuffer:2000000});
           const temporary=await mkdtemp(join(tmpdir(),'protected-B-producer-'));
           try{
-          for(const[path,pin]of Object.entries({"scripts/ci-cadence-producer.mjs":"4d74ebfe878bce9477151313d376d04d830c75a7314cfab09272eb53102e7a78","scripts/ci-cadence-coverage.mjs":"a32f5a65db83b73ad517131520c1be4ac011921e7b2c98131e7d5fc34b125f58","scripts/ci-cadence-native.mjs":"a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d"})){
+          for(const[path,pin]of Object.entries({"scripts/ci-cadence-producer.mjs":"12aa739d3324b0d12b9a1862526c4ec6c652dbf7b07f20ff7dcddb7390e89b58","scripts/ci-cadence-coverage.mjs":"a32f5a65db83b73ad517131520c1be4ac011921e7b2c98131e7d5fc34b125f58","scripts/ci-cadence-native.mjs":"a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d"})){
           if(!/^100(?:644|755) blob [a-f0-9]{40}\t/.test(git('ls-tree',process.env.GITHUB_SHA,'--',path).toString()))throw Error('Producer mode');
           const bytes=git('show',process.env.GITHUB_SHA+':'+path);if(createHash('sha256').update(bytes).digest('hex')!==pin)throw Error('Protected producer pin');
           await writeFile(join(temporary,path.split('/').at(-1)),bytes,{flag:'wx',mode:0o600});}

@@ -6,7 +6,7 @@ const REQUIRED = {
   'ci-lint-and-typecheck': ['Run typecheck','Check verification coverage wiring','Run lint','Check env vars documented','Validate migrations','Check circular dependencies'],
   ...Object.fromEntries([1,2,3,4].map(n=>['ci-coverage-shard-'+n,['Run tests with coverage (sharded)']])),
   'ci-coverage-merge': ['Merge reports and enforce coverage thresholds'],
-  'ci-test': ['Verify callable test/coverage suite'],
+  'ci-test': ['Verify callable test/coverage suite','Run required database contracts'],
   'ci-build': ['Build'],
   'e2e-e2e': ['Run E2E tests with authenticated journey'],
   'e2e-visual-regression': ['Run visual regression tests'],

@@ -5,7 +5,7 @@
  * "phone-confirmation:<payment id>") settles its PayPal authorization: the
  * recorded 'confirmed' captures, anything else voids. Every other call
  * (Pelayo's make-booking) is processed exactly as before: the hook is never
- * reached and the response is the same. route.test.ts is unchanged.
+ * reached and the response is the same.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
@@ -77,6 +77,7 @@ let rpcStatus: string;
 function stubDatabase(row: Record<string, unknown> | null) {
   rpc = vi.fn((fn: string) => {
     if (fn === "process_elevenlabs_event_idempotent") return Promise.resolve({ data: rpcStatus, error: null });
+    if (fn === "claim_booking_sms_job") return Promise.resolve({ data: [], error: null });
     return Promise.resolve({ data: null, error: null });
   });
   const from = vi.fn(() => ({
@@ -112,6 +113,20 @@ describe("ElevenLabs webhook: phone-confirmation calls", () => {
     expect(rpc).toHaveBeenCalledWith("process_elevenlabs_event_idempotent", expect.objectContaining({ p_booking_id: CALL_ID, p_outcome: "confirmed" }));
     expect(phone.settlePhoneConfirmationCall).toHaveBeenCalledWith(client, CALL_ID);
     expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(phone.settlePhoneConfirmationCall.mock.invocationCallOrder[0]);
+  });
+
+  it.each([false, true])("acknowledges a retained replay without settlement or SMS (enabled=%s)", async smsEnabled => {
+    rpcStatus = "retained";
+    vi.mocked(isFeatureFlagEnabled).mockResolvedValue(smsEnabled);
+    stubDatabase({ ...phoneCall, pii_redacted_at: "2026-10-08T12:00:00Z", customer_phone: "" });
+
+    const response = await POST(signed(confirmedCall("conv_phone")));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, status: "retained", smsSent: false });
+    expect(rpc.mock.calls.map(([fn]) => fn)).toEqual(["process_elevenlabs_event_idempotent"]);
+    expect(phone.settlePhoneConfirmationCall).not.toHaveBeenCalled();
+    expect(sendSMS).not.toHaveBeenCalled();
   });
 
   it("a redelivered event (duplicate) settles again: a settlement that failed before is retried, by state", async () => {

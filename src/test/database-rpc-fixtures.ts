@@ -1,0 +1,64 @@
+import { expect } from "vitest";
+import { psql } from "./local-supabase";
+import type { BoundaryFixture } from "./database-boundary-fixtures";
+export interface RpcFixture {
+    signature: string;
+    args: () => Record<string, unknown>;
+    prepare?: () => void;
+    verify: (value: unknown) => void;
+}
+/** Reviewed arguments exercise real local objects, never provider transport. */
+export function databaseRpcFixtures(rows: BoundaryFixture[], owner: () => string, story: string, prefix: string, suggestion: string): RpcFixture[] {
+    const row = (table: string) => rows.find(r => r.table === table)!.payload;
+    const id = (table: string) => String(row(table).id);
+    const now = () => new Date().toISOString();
+    const future = () => new Date(Date.now() + 86400000).toISOString();
+    const sms = () => String(row("booking_sms_jobs").event_key);
+    const translate = () => String(row("translate_webhook_events").event_key);
+    const resetSms = () => psql(`UPDATE public.booking_sms_jobs SET status='pending',attempts=0,lease_expires_at=NULL WHERE event_key='${sms()}';`);
+    const resetTranslate = () => psql(`UPDATE public.translate_webhook_events SET status='pending',attempts=0,next_retry_at=now(),lease_expires_at=NULL WHERE event_key='${translate()}';`);
+    const specs: RpcFixture[] = [];
+    const add = (signature: string, args: RpcFixture["args"], verify: RpcFixture["verify"], prepare?: () => void) => specs.push({ signature, args, verify, prepare });
+    const count = (v: unknown) => expect(Number(v)).toBeGreaterThanOrEqual(0);
+    add("accept_quote(uuid,uuid)", () => ({ p_quote_id: id("quotes"), p_user_id: owner() }), v => expect(v).toMatchObject({ id: id("bookings"), quote_id: id("quotes") }));
+    add("cancellation_terms(uuid,timestamp with time zone)", () => ({ p_booking_id: id("bookings"), p_now: now() }), v => { expect(v).toEqual([expect.objectContaining({ refund_cents: 100 })]); });
+    add("experience_availability(uuid,date)", () => ({ p_experience_id: id("experiences"), p_date: "2088-01-01" }), v => { expect(v).toEqual([expect.objectContaining({ available: expect.any(Number) })]); });
+    add("reacquire_hold(uuid)", () => ({ p_booking_id: id("bookings") }), v => expect(v).toBe(true));
+    add("consume_hold_and_confirm(uuid,text)", () => ({ p_booking_id: id("bookings"), p_capture_id: `${prefix}capture` }), v => expect(v).toBe("confirmed"));
+    add("confirm_cancellation(uuid,integer,timestamp with time zone)", () => ({ p_booking_id: id("bookings"), p_expected_refund_cents: 100, p_now: now() }), v => expect(v).toMatchObject({ outcome: "cancelled", status: "cancel_pending", refund_cents: 100 }));
+    add("expire_holds()", () => ({}), count);
+    add("claim_booking_sms_job(text,integer)", () => ({ p_event_key: sms(), p_lease_seconds: 60 }), v => { expect(v).toEqual([expect.objectContaining({ event_key: sms() })]); }, resetSms);
+    add("claim_retryable_booking_sms_jobs(integer,integer,integer)", () => ({ p_limit: 1, p_lease_seconds: 60, p_max_attempts: 3 }), v => { expect(v).toEqual([expect.objectContaining({ event_key: sms(), attempts: 1 })]); }, resetSms);
+    add("complete_booking_sms_job(text,text,text)", () => ({ p_event_key: sms(), p_provider_sid: `${prefix}sid`, p_outcome_message: "Synthetic complete" }), v => expect(v).toBe(true));
+    add("fail_booking_sms_job(text,text,integer)", () => ({ p_event_key: sms(), p_error: "Synthetic failure", p_max_attempts: 3 }), v => expect(v).toBe(true));
+    add("enqueue_booking_sms_job(text,uuid,text,text)", () => ({ p_event_key: sms(), p_booking_id: id("pending_bookings"), p_to_phone: "+34666666666", p_message: "Synthetic refresh" }), v => expect(v).toBe("queued"));
+    add("claim_daily_booking_call_slot(integer)", () => ({ p_max_per_day: 2147483647 }), v => expect(v).toBe(true));
+    add("enqueue_translate_webhook_event(text,uuid,text[],boolean)", () => ({ p_event_key: translate(), p_story_id: story, p_locales: ["es"], p_force_retranslate: false }), v => expect(v).toBe("queued"), resetTranslate);
+    add("claim_next_translate_webhook_event(text,integer,integer,integer)", () => ({ p_event_key: translate(), p_lease_seconds: 60, p_batch_size: 1, p_max_attempts: 5 }), v => { expect(v).toEqual([expect.objectContaining({ event_key: translate() })]); }, resetTranslate);
+    add("complete_translate_webhook_event(text)", () => ({ p_event_key: translate() }), v => expect(v).toBe(true));
+    add("fail_translate_webhook_event(text,text)", () => ({ p_event_key: translate(), p_error: "Synthetic failure" }), v => expect(v).toBe(true));
+    add("fail_stale_story_translations(timestamp with time zone,integer)", () => ({ p_cutoff: "1900-01-01T00:00:00Z", p_max_attempts: 5 }), count);
+    add("fail_stale_story_translations_locked(timestamp with time zone)", () => ({ p_cutoff: "1900-01-01T00:00:00Z" }), count);
+    add("fail_stale_initiating_bookings(integer)", () => ({ p_stale_minutes: 2147483647 }), count);
+    add("process_translate_event_idempotent(text,uuid)", () => ({ p_event_key: `${prefix}process-translate`, p_story_id: story }), v => expect(v).toBe("queued"));
+    add("patch_story_translation_metadata(uuid,jsonb,jsonb,timestamp with time zone,boolean)", () => ({ p_story_id: story, p_translations: { es: { title: "Synthetic title" } }, p_translation_status: { es: { status: "completed" } }, p_last_translated_at: now(), p_set_last_translated_at: true }), v => expect(v).toBe(true));
+    add("process_elevenlabs_event_idempotent(text,uuid,text)", () => ({ p_event_key: `${prefix}process-legacy`, p_booking_id: id("pending_bookings"), p_outcome: "confirmed" }), v => expect(v).toBe("processed"));
+    add("process_elevenlabs_event_idempotent(text,uuid,text,text,text)", () => ({ p_event_key: `${prefix}process-modern`, p_booking_id: id("pending_bookings"), p_outcome: "confirmed", p_to_phone: "+34666666666", p_sms_message: "Synthetic message" }), v => expect(v).toBe("processed"));
+    add("upsert_paypal_event(text,text,jsonb,text,text,text,text,text)", () => ({ p_event_id: String(row("paypal_webhook_events").event_id), p_event_type: "CONTRACT.SYNTHETIC", p_payload: { synthetic: true }, p_order_id: null, p_capture_id: null, p_refund_id: null, p_custom_id: null, p_verification: "SUCCESS" }), v => expect(v).toBe("pending"));
+    add("mark_paypal_event_failed(text,text)", () => ({ p_event_id: String(row("paypal_webhook_events").event_id), p_error: "Synthetic failure" }), () => expect(psql(`SELECT last_error FROM public.paypal_webhook_events WHERE event_id='${prefix}paypal';`)).toBe("Synthetic failure"));
+    add("mark_paypal_event_processed(text)", () => ({ p_event_id: String(row("paypal_webhook_events").event_id) }), () => expect(psql(`SELECT processed_at IS NOT NULL FROM public.paypal_webhook_events WHERE event_id='${prefix}paypal';`)).toBe("t"));
+    add("grant_day_pass_idempotent(text,text,uuid,text,timestamp with time zone,integer,text)", () => ({ p_event_id: `${prefix}pass-event`, p_event_type: "checkout.session.completed", p_user_id: owner(), p_payment_provider_id: `${prefix}pass`, p_expires_at: future(), p_amount_paid: 100, p_purchase_type: "day_pass" }), v => expect(v).toBe("granted"));
+    add("grant_voucher_voice_pass_idempotent(uuid,timestamp with time zone,timestamp with time zone)", () => ({ p_redemption_id: id("voucher_redemptions"), p_until: future(), p_now: now() }), v => expect(v).toBe("not_included"));
+    add("redeem_voucher(text,uuid,timestamp with time zone,timestamp with time zone)", () => ({ p_code_hash: String(row("vouchers").code_hash), p_user_id: owner(), p_now: now(), p_pass_until: future() }), v => expect(v).toMatchObject({ status: "existing", redemption_id: id("voucher_redemptions") }));
+    add("consume_voucher_counter(uuid,text)", () => ({ p_redemption_id: id("voucher_redemptions"), p_counter: "chat_turns" }), v => expect(v).toMatchObject({ allowed: true }));
+    add("create_story_from_suggestion(uuid,text,text,text,text,text,text,text,text,integer[],jsonb,integer,text)", () => ({ p_suggestion_id: suggestion, p_title: "Synthetic suggested", p_slug: `${prefix}suggested`, p_subtitle: "Synthetic", p_description: "Synthetic description", p_category: "nature", p_location: "Synthetic", p_duration: "1 hour", p_source_pdf: null, p_best_months: [1], p_metadata: { synthetic: true }, p_display_order: 0, p_source_type: "curated" }), v => expect(v).toMatchObject({ slug: `${prefix}suggested`, curation_status: "needs_curation" }));
+    add("cleanup_qa_test_user(text)", () => ({ test_email: `qa-test-${prefix}@paisaxe.dev` }), v => expect(v).toBeTruthy());
+    add("is_story_favorited(uuid,uuid)", () => ({ p_user_id: owner(), p_story_id: story }), v => expect(v).toBe(false));
+    add("get_database_size()", () => ({}), v => expect(Number(v)).toBeGreaterThan(0));
+    add("get_marketing_post_stats()", () => ({}), v => expect(v).toBeTruthy());
+    add("try_acquire_cron_job_lock(text,integer)", () => ({ p_lock_key: `${prefix}rpc-lock`, p_lease_seconds: 60 }), v => expect(v).toMatch(/^[a-f0-9-]{36}$/));
+    add("release_cron_job_lock(text,uuid)", () => ({ p_lock_key: `${prefix}rpc-lock`, p_lock_token: psql(`SELECT lock_token FROM public.cron_job_locks WHERE lock_key='${prefix}rpc-lock';`) || "00000000-0000-4000-8000-000000000000" }), v => expect(v).toBe(true));
+    add("redact_expired_bookings(timestamp with time zone,integer,boolean)", () => ({ p_as_of: now(), p_batch_limit: 1, p_dry_run: true }), v => expect(v).toMatchObject({ redacted: 0 }));
+    add("review_booking_retention_anchor(uuid,timestamp with time zone,text)", () => ({ p_booking_id: id("pending_bookings"), p_expected_updated_at: psql(`SELECT updated_at::text FROM public.pending_bookings WHERE id='${id("pending_bookings")}';`), p_evidence_reference: "contract-review:rpc" }), v => expect(v).toBe(false));
+    return specs;
+}
