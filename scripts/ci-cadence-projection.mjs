@@ -50,6 +50,10 @@ export function projectFullGraph(input) {
     const policy={...protectedPolicy,workflows:[{path:caller.path,definitionSha:caller.blobSha,jobs,contexts}]};
     if(!validatePolicy(policy).valid)throw Error('projected policy');
     const workflowPins=Object.fromEntries(values.map(c=>[c.path,c.blobSha]));workflowPins[caller.path]=caller.blobSha;
+    // GitHub also references the reusable workflows a callee calls (ci.yml calls validate-merged-pr.yml).
+    const nested=input.nestedCallees??[];
+    if(!Array.isArray(nested)||nested.length>8||nested.some(c=>!record(c)||!same(Object.keys(c).sort(),['blobSha','path'])||!path(c.path)||!sha(c.blobSha)||workflowPins[c.path])||new Set(nested.map(c=>c.path)).size!==nested.length)throw Error('nested callees');
+    for(const c of nested)workflowPins[c.path]=c.blobSha;
     const extra=input.auxiliaryWorkflows??[];
     if(!Array.isArray(extra)||extra.length>1||extra.some(c=>profile!=='develop_push'||!record(c)||c.path!=='.github/workflows/ci-fast.yml'||!sha(c.blobSha)||workflowPins[c.path]))throw Error('auxiliary workflow');
     for(const c of extra)workflowPins[c.path]=c.blobSha;
@@ -59,6 +63,6 @@ export function projectFullGraph(input) {
       for(const j of applications){const inventory=input.stepInventory[j.id];if(!Array.isArray(inventory)||new Set(inventory).size!==inventory.length||inventory.some(name=>typeof name!=='string'||!name)||REQUIRED[j.id].some(name=>!inventory.includes(name))||!inventory.includes('Verify callable source checkout'))throw Error('step census');ignoredSteps[j.id]=inventory.filter(name=>!REQUIRED[j.id].includes(name));}
     }
     const calleeSha=profile==='develop_push'?input.sourceSha:definitionSha;if(!sha(calleeSha))throw Error('native callee source');
-    return {available:true,nativeNamesVerified:false,policy,projection:{kind:'full',jobs:bindings,steps:structuredClone(REQUIRED),ignoredSteps,workflowPins,workflowSources:Object.fromEntries(Object.keys(workflowPins).map(p=>[p,p===caller.path?definitionSha:calleeSha])),referencedWorkflows:values.concat(extra).map(c=>({path:`${REPOSITORY}/${c.path}@refs/heads/${profile==='nightly'?'main':'develop'}`,sha:calleeSha,ref:`refs/heads/${profile==='nightly'?'main':'develop'}`})),admissionJob,admissionStep,measurementJob,measurementStep,census:{schemaVersion:1,profile,auxiliaryJobs:structuredClone(auxiliaryJobs)}}};
+    return {available:true,nativeNamesVerified:false,policy,projection:{kind:'full',jobs:bindings,steps:structuredClone(REQUIRED),ignoredSteps,workflowPins,workflowSources:Object.fromEntries(Object.keys(workflowPins).map(p=>[p,p===caller.path?definitionSha:calleeSha])),referencedWorkflows:values.concat(nested,extra).map(c=>({path:`${REPOSITORY}/${c.path}@${calleeSha}`,ref:`refs/heads/${profile==='nightly'?'main':'develop'}`,sha:calleeSha})),admissionJob,admissionStep,measurementJob,measurementStep,census:{schemaVersion:1,profile,auxiliaryJobs:structuredClone(auxiliaryJobs)}}};
   }catch{return{available:false,error:'protected complete B projection unavailable'};}
 }
