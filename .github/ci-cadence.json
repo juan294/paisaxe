@@ -13,7 +13,7 @@
   "workflows": [
     {
       "path": ".github/workflows/ci.yml",
-      "definitionSha": "1a043194edfb3e60d86a2aabd9f6b097950dba94",
+      "definitionSha": "bf9e090e1e9d59a800f443680980829f694cafe1",
       "jobs": [
         {
           "id": "ci-lint-and-typecheck",
