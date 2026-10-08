@@ -1,5 +1,7 @@
 "use client";
 
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -17,7 +19,7 @@ const ITEMS_PER_PAGE = 20;
 const UNDO_TIMEOUT_MS = 6000;
 
 export default function FavoritesPage() {
-  const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth } = useFavorites();
+  const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth, retryAfter, retry } = useFavorites();
   const { stories: allStories, isLoading } = useStories();
   const { signInWithGoogle } = useAuth();
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
@@ -170,6 +172,7 @@ export default function FavoritesPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void retry(); }} />
         {favoriteStories.length === 0 ? (
           <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
             <Bookmark className="h-16 w-16 text-neutral-700 mb-4" />

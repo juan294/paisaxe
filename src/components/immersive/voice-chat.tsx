@@ -1,5 +1,7 @@
 "use client";
 
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Story } from "@/types/immersive";
 import { PrivacyNotice } from "./privacy-notice";
@@ -117,7 +119,8 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
     agentId,
     expiresAt,
     hoursUntilExpiry,
-    isLoading: isVoiceAccessLoading
+    isLoading: isVoiceAccessLoading,
+    retryAfter, refresh
   } = useVoiceAccess();
 
   // Stream chat hooks for SSE message handling. A visitor with an active
@@ -125,7 +128,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
   // discovery chat. Both hooks always run (rules of hooks); one is used.
   const discoveryChat = useStreamChat({ canUseVoice });
   const bookingChat = useBookingChat();
-  const { active: bookingActive } = useBookingAccess();
+  const { active: bookingActive, isLoading: isBookingAccessLoading } = useBookingAccess();
   const chat = bookingActive ? bookingChat : discoveryChat;
   const {
     messages,
@@ -164,8 +167,10 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
     }
   }, [isVoiceAccessLoading, willUseVoiceMode, setUseElevenLabs]);
 
-  // Don't render content until we've determined the default mode
-  const isInitializing = isVoiceAccessLoading;
+  // Don't render content until we've determined the default mode, and which
+  // chat a turn goes to: a turn sent before booking access resolved would go
+  // to the discovery chat and then vanish when the booking chat takes over.
+  const isInitializing = isVoiceAccessLoading || isBookingAccessLoading;
 
   // Reset messages when story changes
   useEffect(() => {
@@ -315,6 +320,8 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
           onClose={handleClose}
           tryVoiceLabel={bookingActive ? t("booking.chat.voiceDiscovery") : undefined}
         />
+
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
 
         {/* Privacy Notice */}
         {!privacyAcknowledged && (

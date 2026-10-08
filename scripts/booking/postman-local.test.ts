@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createServer as createNetServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { startPaypalMock } from "../../src/test/paypal-mock-server";
 import {
@@ -10,13 +11,46 @@ import {
   assertOutsideRepo,
   buildEnvironment,
   isLoopbackUrl,
+  localLinkSecret,
   parseRunnerArgs,
+  removeRunnerOperatorAccess,
   slotDateAfter,
   startControlServer,
   type ControlDeps,
 } from "./postman-local";
 
 const POSTMAN_DIR = resolve(__dirname, "../../docs/hackathon/postman");
+
+describe("removeRunnerOperatorAccess", () => {
+  it("deletes only the runner's operator links, by label prefix", async () => {
+    const like = vi.fn(async () => ({ error: null }));
+    const from = vi.fn(() => ({ delete: () => ({ like }) }));
+
+    await removeRunnerOperatorAccess({ from } as unknown as SupabaseClient);
+
+    expect(from).toHaveBeenCalledWith("operator_access");
+    expect(like).toHaveBeenCalledWith("label", "postman-local-%");
+  });
+
+  it("reports a failed delete", async () => {
+    const from = () => ({ delete: () => ({ like: async () => ({ error: { message: "denied" } }) }) });
+    await expect(removeRunnerOperatorAccess({ from } as unknown as SupabaseClient)).rejects.toThrow(/denied/);
+  });
+});
+
+describe("localLinkSecret", () => {
+  it("creates one owner-only secret beside the environment and returns it on every later call", () => {
+    const dir = mkdtempSync(resolve(tmpdir(), "postman-secret-"));
+    try {
+      const first = localLinkSecret(resolve(dir, "nested"));
+      expect(first).toMatch(/^[0-9a-f]{64}$/);
+      expect(localLinkSecret(resolve(dir, "nested"))).toBe(first);
+      expect(statSync(resolve(dir, "nested", "booking-link-secret")).mode & 0o777).toBe(0o600);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("loopback guard", () => {
   it("accepts only this machine", () => {

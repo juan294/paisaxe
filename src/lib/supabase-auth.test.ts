@@ -39,7 +39,7 @@ describe("DO-M1: getSupabaseClient trims env vars (no bare process.env reads)", 
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    await getSupabaseClient();
+    await getSupabaseClient(new NextRequest("http://localhost/api/test"));
 
     const [url, anonKey] = mockCreateServerClient.mock.calls[0];
     expect(url).toBe("");
@@ -54,7 +54,7 @@ describe("DO-M1: getSupabaseClient trims env vars (no bare process.env reads)", 
     const saved = process.env.NEXT_PUBLIC_SUPABASE_URL;
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co\n";
 
-    await getSupabaseClient();
+    await getSupabaseClient(new NextRequest("http://localhost/api/test"));
 
     const [url] = mockCreateServerClient.mock.calls[0];
     expect(url).toBe("https://test.supabase.co");
@@ -67,7 +67,7 @@ describe("DO-M1: getSupabaseClient trims env vars (no bare process.env reads)", 
     const saved = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "  test-anon-key  ";
 
-    await getSupabaseClient();
+    await getSupabaseClient(new NextRequest("http://localhost/api/test"));
 
     const [, anonKey] = mockCreateServerClient.mock.calls[0];
     expect(anonKey).toBe("test-anon-key");
@@ -82,7 +82,7 @@ describe("getSupabaseClient", () => {
   });
 
   it("should create a Supabase server client with cookies", async () => {
-    await getSupabaseClient();
+    await getSupabaseClient(new NextRequest("http://localhost/api/test"));
 
     expect(createServerClient).toHaveBeenCalledWith(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -103,7 +103,7 @@ describe("getSupabaseClient", () => {
     };
     mockCreateServerClient.mockReturnValue(mockClient as never);
 
-    const client = await getSupabaseClient();
+    const client = await getSupabaseClient(new NextRequest("http://localhost/api/test"));
     expect(client).toBe(mockClient);
   });
 
@@ -135,7 +135,7 @@ describe("getSupabaseClient", () => {
 
   describe("cookies callbacks", () => {
     async function getCookiesConfig() {
-      await getSupabaseClient();
+      await getSupabaseClient(new NextRequest("http://localhost/api/test"));
       const callArgs = mockCreateServerClient.mock.calls[0];
       const options = callArgs[2] as { cookies: { getAll: () => unknown; setAll: (cookies: Array<{ name: string; value: string; options?: object }>) => void } };
       return options.cookies;
@@ -252,6 +252,7 @@ describe("getUserFromRequest", () => {
     expect(user).toEqual(mockUser);
     // Bearer token path: getUser called WITH the token
     expect(mockGetUser).toHaveBeenCalledWith("my-api-token");
+    expect(mockCreateServerClient.mock.calls[0][2]).toMatchObject({ global: { headers: { Authorization: "Bearer my-api-token" } } });
   });
 
   // SE-L2 (#511): Explicit precedence test — bearer token wins when BOTH

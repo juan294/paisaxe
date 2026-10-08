@@ -149,7 +149,6 @@ describe("rate-limit", () => {
   describe("Upstash backend (env vars set)", () => {
     let checkRateLimit: typeof import("./rate-limit").checkRateLimit;
     let resetRateLimit: typeof import("./rate-limit").resetRateLimit;
-    let getRateLimitBackendStatus: typeof import("./rate-limit").getRateLimitBackendStatus;
     let probeRateLimitBackend: typeof import("./rate-limit").probeRateLimitBackend;
 
     const mockLimit = vi.fn();
@@ -182,7 +181,6 @@ describe("rate-limit", () => {
       const mod = await import("./rate-limit");
       checkRateLimit = mod.checkRateLimit;
       resetRateLimit = mod.resetRateLimit;
-      getRateLimitBackendStatus = mod.getRateLimitBackendStatus;
       probeRateLimitBackend = mod.probeRateLimitBackend;
     });
 
@@ -295,41 +293,21 @@ describe("rate-limit", () => {
       expect(mockLimit).toHaveBeenCalledWith("mcp-weather:127.0.0.1");
     });
 
+    it("production backend outage fails closed and restored Redis recovers without resetting policy", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+      mockLimit.mockRejectedValueOnce(new Error("fixture outage"));
+      const denied = await checkRateLimit("recovery-user");
+      expect(denied.allowed).toBe(false);
+      expect(denied.retryAfter).toBe(60);
+      mockLimit.mockResolvedValueOnce({ success: true, limit: 10, remaining: 9, reset: Date.now() + 60_000 });
+      const recovered = await checkRateLimit("recovery-user");
+      expect(recovered.allowed).toBe(true);
+      expect(recovered.limit).toBe(10);
+      vi.unstubAllEnvs();
+    });
+
     it("resetRateLimit does not crash in Upstash mode", () => {
       expect(() => resetRateLimit()).not.toThrow();
-    });
-
-    it("getRateLimitBackendStatus returns healthy upstash status when configured and not degraded", () => {
-      // Covers rate-limit.ts:177 — the non-degraded upstash branch
-      // _rateLimitDegraded is false on module load (no failed calls yet)
-      const status = getRateLimitBackendStatus();
-      expect(status).toEqual({
-        backend: "upstash",
-        configured: true,
-        degraded: false,
-      });
-    });
-
-    it("getRateLimitBackendStatus returns degraded upstash status after a failed Upstash call (line 178)", async () => {
-      vi.stubEnv("NODE_ENV", "test");
-      mockLimit.mockRejectedValue(new Error("Redis connection failed"));
-
-      const loggerModule = await import("./logger");
-      const errorSpy = vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
-      const warnSpy = vi.spyOn(loggerModule.logger, "warn").mockImplementation(() => {});
-
-      await checkRateLimit("user1");
-
-      expect(getRateLimitBackendStatus()).toEqual({
-        backend: "upstash",
-        configured: true,
-        degraded: true,
-        reason: "upstash_unavailable",
-      });
-
-      vi.unstubAllEnvs();
-      errorSpy.mockRestore();
-      warnSpy.mockRestore();
     });
 
     it("stringifies non-Error rejections from Upstash in the fallback log (line 233)", async () => {
@@ -444,7 +422,7 @@ describe("rate-limit", () => {
     });
 
     // DO-H2 (#823): the health probe must reflect LIVE Redis reachability
-    // rather than the per-process `_rateLimitDegraded` flag, which can never
+    // rather than the per-process per-process state flag, which can never
     // be observed across Vercel's separate serverless isolates.
     describe("probeRateLimitBackend (DO-H2 live health probe)", () => {
       it("reports not degraded when the PING succeeds", async () => {
@@ -472,11 +450,11 @@ describe("rate-limit", () => {
         });
       });
 
-      it("does not depend on _rateLimitDegraded / checkRateLimit ever having run in this process", async () => {
+      it("does not depend on per-process state / checkRateLimit ever having run in this process", async () => {
         // No checkRateLimit call has happened in this test — simulating a
         // fresh serverless isolate that only ever runs /api/health. The old
-        // implementation (reading getRateLimitBackendStatus()) would report
-        // "ok" here even during a real outage, because _rateLimitDegraded
+        // implementation (reading a process-local getter) would report
+        // "ok" here even during a real outage, because process-local state
         // starts false and is never set outside of checkRateLimit's own
         // process. The live probe must not have this blind spot.
         mockPing.mockRejectedValue(new Error("ECONNREFUSED"));
@@ -575,7 +553,7 @@ describe("rate-limit", () => {
       delete process.env.UPSTASH_REDIS_REST_URL;
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
-      const { checkRateLimit, getRateLimitStore, getRateLimitBackendStatus } =
+      const { checkRateLimit, getRateLimitStore, probeRateLimitBackend } =
         await import("./rate-limit");
 
       const result = await checkRateLimit("prod-user");
@@ -584,7 +562,7 @@ describe("rate-limit", () => {
       expect(result.remaining).toBe(0);
       expect(result.retryAfter).toBe(60);
       expect(getRateLimitStore().size).toBe(0);
-      expect(getRateLimitBackendStatus()).toEqual({
+      expect(await probeRateLimitBackend()).toEqual({
         backend: "blocked",
         configured: false,
         degraded: true,
@@ -599,45 +577,18 @@ describe("rate-limit", () => {
       delete process.env.UPSTASH_REDIS_REST_URL;
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
-      const { checkRateLimit, getRateLimitStore, getRateLimitBackendStatus } =
+      const { checkRateLimit, getRateLimitStore, probeRateLimitBackend } =
         await import("./rate-limit");
 
       const result = await checkRateLimit("ci-user");
 
       expect(result.allowed).toBe(true);
       expect(getRateLimitStore().size).toBe(1);
-      expect(getRateLimitBackendStatus()).toEqual({
+      expect(await probeRateLimitBackend()).toEqual({
         backend: "memory",
         configured: false,
         degraded: false,
       });
-    });
-  });
-
-  describe("BE-M1: isRateLimitDegraded export", () => {
-    afterEach(() => {
-      vi.useRealTimers();
-      delete process.env.UPSTASH_REDIS_REST_URL;
-      delete process.env.UPSTASH_REDIS_REST_TOKEN;
-      vi.unstubAllEnvs();
-    });
-
-    it("BE-M1: isRateLimitDegraded() is exported from the module", async () => {
-      vi.resetModules();
-      delete process.env.UPSTASH_REDIS_REST_URL;
-      delete process.env.UPSTASH_REDIS_REST_TOKEN;
-
-      const mod = await import("./rate-limit");
-      expect(typeof mod.isRateLimitDegraded).toBe("function");
-    });
-
-    it("BE-M1: isRateLimitDegraded() returns false when no Upstash is configured", async () => {
-      vi.resetModules();
-      delete process.env.UPSTASH_REDIS_REST_URL;
-      delete process.env.UPSTASH_REDIS_REST_TOKEN;
-
-      const { isRateLimitDegraded } = await import("./rate-limit");
-      expect(isRateLimitDegraded()).toBe(false);
     });
   });
 

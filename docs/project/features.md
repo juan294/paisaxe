@@ -341,12 +341,12 @@ The Features tab organizes 17 feature flags into five categories, each with a se
 | Category | Description | Flag count |
 |----------|-------------|------------|
 | Discovery | Help visitors find and explore stories | 7 |
-| Experience | Enhance the viewing experience | 4 |
+| Experience | Enhance the viewing experience | 5 |
 | Social | Community and sharing features | 2 |
 | Voice | Voice assistant features | 3 |
 | System | System settings and maintenance | 1 |
 
-Each flag shows its label, description, current on/off status, and a toggle switch. A global search filters flags by label or description across the active category. A header displays the overall enabled/total count (e.g., "12/18 Active" — the tunnel counts as one extra in System).
+Each flag shows its label, description, current on/off status, and a toggle switch. A global search filters flags by label or description across the active category. A header displays the overall enabled/total count (e.g., "12/19 Active" — the tunnel counts as one extra in System).
 
 Some flags have expandable configuration panels (gear icon): `visitor_voice_agent` opens voice agent settings, and `maintenance_mode` opens maintenance message settings.
 
@@ -703,7 +703,7 @@ Scheduled via pg_cron + pg_net and deployed with `supabase functions deploy keep
 
 ## Feature Flags Reference
 
-All flags are managed from the admin panel and take effect within approximately 1 minute of toggling. Feature flags are split across two tabs: the Features tab (17 flags in 5 categories) and the Agents tab (10 agent flags).
+All flags are managed from the admin panel and take effect within approximately 1 minute of toggling. Feature flags are split across two tabs: the Features tab (18 flags in 5 categories) and the Agents tab (10 agent flags).
 
 ### Discovery Flags (Features tab)
 
@@ -724,6 +724,7 @@ All flags are managed from the admin panel and take effect within approximately 
 | `ambient_discovery` | Ambient mode (slow auto-play with cinematic transitions) |
 | `autoplay_button` | Play/pause button for auto-play in story viewer |
 | `asturianu_touches` | Asturian language labels and titles |
+| `experience_booking` | Day Pass booking experience and access to the `/acceso` redemption page |
 | `fullscreen_button` | Fullscreen button in toolbar (native fullscreen on desktop, Add to Home Screen on iOS/iPad) |
 
 ### Social Flags (Features tab)

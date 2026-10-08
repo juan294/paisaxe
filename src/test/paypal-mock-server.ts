@@ -29,6 +29,11 @@
  *                                                body; any other status -> 422 (issue name assumed)
  *   GET  /v2/invoicing/invoices/:id              amount, due_amount, payments.paid_amount and
  *                                                detail.metadata.recipient_view_url once sent
+ *   GET  /v1/reporting/transactions              Transaction Search (APIMatic plan, Phase 2): a T0006
+ *                                                entry per capture and a T1107 entry per refund
+ *                                                (paypal_reference_id = the capture, negative amount),
+ *                                                within start_date/end_date, paged by page_size/page;
+ *                                                see setLedgerRefreshedAt and setTransactionSearchDenied
  *
  * Authorize / capture / void (Phase 8b, decision R7), for orders created with intent AUTHORIZE:
  *   POST /v2/checkout/orders/:id/authorize       APPROVED -> COMPLETED with one authorization (CREATED);
@@ -64,6 +69,8 @@ import type { AddressInfo } from "node:net";
 export interface RecordedRequest {
   method: string;
   path: string;
+  /** The query string, parsed. */
+  query: URLSearchParams;
   /** Lower-cased header names. */
   headers: Record<string, string>;
   rawBody: string;
@@ -122,6 +129,8 @@ export interface MockCapture {
   status: string;
   amount: WireMoney | null;
   customId: string | null;
+  /** When PayPal recorded it (Transaction Search). */
+  createdAt: Date;
 }
 
 export interface MockRefund {
@@ -129,6 +138,7 @@ export interface MockRefund {
   captureId: string;
   status: string;
   amount: WireMoney | null;
+  createdAt: Date;
 }
 
 /**
@@ -195,6 +205,13 @@ export interface PaypalMock {
   setAuthorizationStatus(authorizationId: string, status: string): void;
   /** PayPal captured the authorization but the response never reached us. Returns the capture. */
   completeAuthorization(authorizationId: string): MockCapture;
+  /**
+   * Transaction Search lag: movements after `at` are not listed yet, and `at` is reported as
+   * last_refreshed_datetime. Null (default): everything is listed, refreshed now.
+   */
+  setLedgerRefreshedAt(at: Date | null): void;
+  /** Transaction Search answers 403 NOT_AUTHORIZED, as for an app without the permission. */
+  setTransactionSearchDenied(denied: boolean): void;
   close(): Promise<void>;
 }
 
@@ -255,6 +272,8 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
   let refundStatus = "COMPLETED";
   let verification: "SUCCESS" | "FAILURE" = "SUCCESS";
   let tokenExpiresIn = 32_400;
+  let ledgerRefreshedAt: Date | null = null;
+  let transactionSearchDenied = false;
   let baseUrl = "";
 
   const idSalt = options.idSalt ?? "";
@@ -369,6 +388,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
       status,
       amount: order.amount,
       customId: order.customId,
+      createdAt: new Date(),
     };
     captures.set(capture.id, capture);
     order.status = "COMPLETED";
@@ -525,6 +545,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
         typeof amount.value === "string" && typeof amount.currency_code === "string"
           ? { currency_code: amount.currency_code, value: amount.value }
           : capture.amount,
+      createdAt: new Date(),
     };
     refunds.set(refund.id, refund);
     if (refund.status === "COMPLETED") capture.status = "REFUNDED";
@@ -641,6 +662,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
       status,
       amount: authorization.amount,
       customId: authorization.customId,
+      createdAt: new Date(),
     };
     captures.set(capture.id, capture);
     authorization.status = "CAPTURED";
@@ -719,16 +741,94 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     response.writeHead(204, { "paypal-debug-id": debugId() }).end();
   }
 
+  /** Transaction Search's date format, as the sandbox answered on 2026-10-08: 2026-10-08T10:00:00Z. */
+  function ledgerDate(date: Date): string {
+    return `${date.toISOString().slice(0, 19)}Z`;
+  }
+
+  /**
+   * PayPal's transaction status letter. The sandbox listed a fully refunded capture as S, with the refund as
+   * its own T1107 entry (2026-10-08); the SDK also documents V ("fully reversed"), which the mock never sends.
+   */
+  const LEDGER_STATUS: Record<string, string> = { REFUNDED: "S", COMPLETED: "S", PARTIALLY_REFUNDED: "S", PENDING: "P" };
+  const ledgerStatus = (status: string): string => LEDGER_STATUS[status] ?? "D";
+
+  function handleTransactionSearch(url: URL, response: ServerResponse): void {
+    if (transactionSearchDenied) {
+      // As observed in the sandbox on 2026-10-08 (debug id f636297435446).
+      sendError(response, 403, "NOT_AUTHORIZED", "NOT_AUTHORIZED");
+      return;
+    }
+    const start = Date.parse(url.searchParams.get("start_date") ?? "");
+    const end = Date.parse(url.searchParams.get("end_date") ?? "");
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start || end - start > 31 * 24 * 3_600_000) {
+      sendError(response, 400, "INVALID_REQUEST", "INVALID_DATE_RANGE");
+      return;
+    }
+    const refreshed = ledgerRefreshedAt ?? new Date();
+    const listed = (at: Date) => at.getTime() >= start && at.getTime() <= end && at.getTime() <= refreshed.getTime();
+    const movements = [
+      ...[...captures.values()].map((capture) => ({
+        at: capture.createdAt,
+        info: {
+          // The sandbox also gives a capture a paypal_reference_id (type TXN) to another transaction id,
+          // neither the order nor anything the adapter uses, so the mock leaves it out.
+          transaction_id: capture.id,
+          transaction_event_code: "T0006",
+          transaction_status: ledgerStatus(capture.status),
+          ...(capture.amount ? { transaction_amount: capture.amount } : {}),
+          ...(capture.customId ? { custom_field: capture.customId } : {}),
+        },
+      })),
+      ...[...refunds.values()].map((refund) => {
+        const customId = captures.get(refund.captureId)?.customId;
+        return {
+          at: refund.createdAt,
+          info: {
+            transaction_id: refund.id,
+            paypal_reference_id: refund.captureId,
+            paypal_reference_id_type: "TXN",
+            transaction_event_code: "T1107",
+            transaction_status: ledgerStatus(refund.status),
+            ...(refund.amount ? { transaction_amount: { ...refund.amount, value: `-${refund.amount.value}` } } : {}),
+            ...(customId ? { custom_field: customId } : {}),
+          },
+        };
+      }),
+    ]
+      .filter((movement) => listed(movement.at))
+      .sort((a, b) => a.at.getTime() - b.at.getTime());
+    const pageSize = Math.min(Math.max(Number(url.searchParams.get("page_size") ?? 100) || 100, 1), 500);
+    const page = Math.max(Number(url.searchParams.get("page") ?? 1) || 1, 1);
+    send(response, 200, {
+      transaction_details: movements.slice((page - 1) * pageSize, page * pageSize).map((movement) => ({
+        transaction_info: {
+          ...movement.info,
+          transaction_initiation_date: ledgerDate(movement.at),
+          transaction_updated_date: ledgerDate(movement.at),
+        },
+      })),
+      account_number: "MOCKMERCHANT",
+      start_date: ledgerDate(new Date(start)),
+      end_date: ledgerDate(new Date(end)),
+      last_refreshed_datetime: ledgerDate(refreshed),
+      page,
+      total_items: movements.length,
+      total_pages: Math.max(1, Math.ceil(movements.length / pageSize)),
+    });
+  }
+
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const rawBody = await readBody(request);
     const method = request.method ?? "GET";
-    const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const path = url.pathname;
     const headers: Record<string, string> = {};
     for (const [name, value] of Object.entries(request.headers)) {
       if (value !== undefined) headers[name] = Array.isArray(value) ? value.join(", ") : value;
     }
     const body = parseJson(rawBody);
-    requests.push({ method, path, headers, rawBody, body });
+    requests.push({ method, path, query: url.searchParams, headers, rawBody, body });
 
     const injectedIndex = injected.findIndex((entry) => entry.method === method && matches(entry.path, path));
     if (injectedIndex >= 0) {
@@ -776,6 +876,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     if (method === "GET" && (match = path.match(/^\/v2\/payments\/refunds\/([^/]+)$/))) {
       return handleGetRefund(match[1], response);
     }
+    if (method === "GET" && path === "/v1/reporting/transactions") return handleTransactionSearch(url, response);
     if (method === "POST" && path === "/v1/notifications/verify-webhook-signature") {
       return send(response, 200, { verification_status: verification });
     }
@@ -886,6 +987,12 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
         throw new Error(`paypal mock: cannot capture authorization ${authorizationId}`);
       }
       return captureAuthorizationNow(authorization, "COMPLETED");
+    },
+    setLedgerRefreshedAt: (at) => {
+      ledgerRefreshedAt = at;
+    },
+    setTransactionSearchDenied: (denied) => {
+      transactionSearchDenied = denied;
     },
     close: () =>
       new Promise<void>((done) => {

@@ -52,16 +52,16 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
     <div
       className={cn(
         "mx-4 mb-4 rounded-xl overflow-hidden",
-        "bg-gradient-to-r from-green-500/20 to-green-400/20",
-        "border border-green-500/30",
+        "bg-gradient-to-r from-paisaxe-green-500/20 to-paisaxe-green-400/20",
+        "border border-paisaxe-green-500/30",
         "animate-in fade-in slide-in-from-bottom-2 duration-300",
         className
       )}
     >
       <div className="flex items-start gap-3 p-3">
         {/* Icon */}
-        <div className="flex-shrink-0 w-9 h-9 rounded-full bg-green-500/20 flex items-center justify-center">
-          <Icon className="h-4 w-4 text-green-400" />
+        <div className="flex-shrink-0 w-9 h-9 rounded-full bg-paisaxe-green-500/20 flex items-center justify-center">
+          <Icon className="h-4 w-4 text-paisaxe-green-400" />
         </div>
 
         {/* Content */}
@@ -78,11 +78,11 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
             onClick={handlePurchase}
             className={cn(
               "mt-2.5 px-4 py-1.5 text-xs font-medium rounded-full",
-              "bg-gradient-to-r from-green-500 to-green-400 text-black",
-              "hover:from-green-400 hover:to-green-300",
+              "bg-gradient-to-r from-paisaxe-green-500 to-paisaxe-green-400 text-black",
+              "hover:from-paisaxe-green-400 hover:to-paisaxe-green-300",
               "transition-all duration-200",
               "flex items-center gap-1.5",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             )}
           >
             {t("upsell.try_voice")} - desde {MIN_PRICE}

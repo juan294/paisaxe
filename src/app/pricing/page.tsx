@@ -1,5 +1,7 @@
 "use client";
 
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { Suspense, useCallback, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
@@ -36,7 +38,7 @@ export default function PricingPage() {
 
 function PricingPageContent() {
   const { user, session, signInWithGoogle } = useAuth();
-  const { canUseVoice, isWhitelisted, expiresAt, isLoading } = useVoiceAccess();
+  const { canUseVoice, isWhitelisted, expiresAt, isLoading, retryAfter, refresh } = useVoiceAccess();
   const { t, locale } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -125,15 +127,16 @@ function PricingPageContent() {
       </header>
 
       <main className="mx-auto max-w-md px-6 py-16">
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
         {/* Hero */}
         <div className="text-center mb-12">
           {/* Animated sound bars */}
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-paisaxe-green-500/10 mb-6">
             <div className="flex items-center justify-center gap-[3px]">
               {[0, 1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className="w-[3px] rounded-full bg-green-500 animate-soundbar"
+                  className="w-[3px] rounded-full bg-paisaxe-green-500 animate-soundbar"
                   style={{
                     height: [12, 18, 24, 18, 12][i],
                     animationDelay: `${i * 100}ms`,
@@ -152,17 +155,17 @@ function PricingPageContent() {
 
         {/* Already has access */}
         {!isResolvingAuthenticatedAccess && canUseVoice && (
-          <div className="mb-8 p-5 rounded-xl bg-green-500/5 border border-green-500/10">
+          <div className="mb-8 p-5 rounded-xl bg-paisaxe-green-500/5 border border-paisaxe-green-500/10">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
-                <Check className="h-4 w-4 text-green-500" />
+              <div className="w-8 h-8 rounded-full bg-paisaxe-green-500/10 flex items-center justify-center">
+                <Check className="h-4 w-4 text-paisaxe-green-500" />
               </div>
               <div>
-                <p className="font-medium text-green-500">
+                <p className="font-medium text-paisaxe-green-500">
                   {isWhitelisted ? t("premium.premium_access") : t("premium.success_subtitle")}
                 </p>
                 {expiresAt && (
-                  <p className="text-xs text-green-500/60">
+                  <p className="text-xs text-paisaxe-green-500/60">
                     {t("premium.success_expires")} {expiresAt.toLocaleString(toIntlLocale(locale))}
                   </p>
                 )}
@@ -170,7 +173,7 @@ function PricingPageContent() {
             </div>
             <Link
               href="/immersive"
-              className="inline-flex items-center justify-center w-full px-5 py-2.5 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
+              className="inline-flex items-center justify-center w-full px-5 py-2.5 bg-paisaxe-green-500 text-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors"
             >
               {t("premium.success_cta")}
             </Link>
@@ -178,11 +181,11 @@ function PricingPageContent() {
         )}
 
         {/* Pricing Card */}
-        {(!canUseVoice || isResolvingAuthenticatedAccess) && (
+        {retryAfter == null && (!canUseVoice || isResolvingAuthenticatedAccess) && (
           <div className="rounded-xl border border-neutral-800 overflow-hidden">
             {/* Price + tier selector (#137) */}
             <div className="p-6 text-center border-b border-neutral-800">
-              <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-4">
+              <p className="text-xs font-medium text-paisaxe-green-500 uppercase tracking-widest mb-4">
                 {voicePassLabel}
               </p>
               <div
@@ -202,9 +205,9 @@ function PricingPageContent() {
                       tabIndex={selected ? 0 : -1}
                       onClick={() => setSelectedTier(tier.id)}
                       onKeyDown={(e) => handleTierKeyDown(e, index)}
-                      className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 ${
+                      className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 ${
                         selected
-                          ? "border-green-500 bg-green-500/10"
+                          ? "border-paisaxe-green-500 bg-paisaxe-green-500/10"
                           : "border-neutral-800 hover:border-neutral-700"
                       }`}
                     >
@@ -247,7 +250,7 @@ function PricingPageContent() {
               <button
                 onClick={handlePurchase}
                 disabled={isResolvingAuthenticatedAccess}
-                className="w-full px-5 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black text-sm font-medium rounded-lg hover:from-green-400 hover:to-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+                className="w-full px-5 py-3 bg-gradient-to-r from-paisaxe-green-500 to-paisaxe-green-400 text-black text-sm font-medium rounded-lg hover:from-paisaxe-green-400 hover:to-paisaxe-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
               >
                 {isResolvingAuthenticatedAccess ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />

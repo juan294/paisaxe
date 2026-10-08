@@ -11,7 +11,7 @@ import { captureOrder, createOrder, getOrder } from "./orders";
 import { PaypalError, type CreateOrderInput } from "./types";
 
 const BOOKING_ID = "11111111-2222-4333-8444-555555555555";
-const OPERATION_KEY = "6f1c2d3e-4b5a-4c6d-8e7f-001122334455";
+const OPERATION_KEY = "00000000-0000-4000-8000-000000000001";
 const SITE = "https://paisaxe.es";
 
 const input: CreateOrderInput = {
@@ -216,6 +216,17 @@ describe("voidAuthorization", () => {
     await captureAuthorization(authorizationId, 4000, OPERATION_KEY);
     const error = await caught(voidAuthorization(authorizationId, OPERATION_KEY));
     expect(error.issue).toBe("PREVIOUSLY_CAPTURED");
+  });
+
+  it("a void answered without a body (204) reads the authorization instead", async () => {
+    const { authorizationId } = await authorized();
+    mock.setAuthorizationStatus(authorizationId, "VOIDED");
+    mock.injectNext({ method: "POST", path: `/v2/payments/authorizations/${authorizationId}/void`, status: 204 });
+
+    const result = await voidAuthorization(authorizationId, OPERATION_KEY);
+
+    expect(result).toMatchObject({ id: authorizationId, status: "VOIDED" });
+    expect(mock.requestsTo("GET", `/v2/payments/authorizations/${authorizationId}`)).toHaveLength(1);
   });
 
   it("an expired authorization is thrown as AUTHORIZATION_EXPIRED", async () => {

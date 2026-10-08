@@ -35,10 +35,12 @@ import { POST, GET, DELETE } from "./route";
 import { resetRunningAgentsForTests } from "./state";
 
 const LEGACY_RUNNER_OVERRIDE = ["ALLOW", "AGENT", "RUN"].join("_");
+const originalNodeEnv = process.env.NODE_ENV;
 const originalVercelEnv = process.env.VERCEL_ENV;
 const originalLegacyOverride = process.env[LEGACY_RUNNER_OVERRIDE];
 
 function restoreAgentRunnerEnv() {
+  vi.stubEnv("NODE_ENV", originalNodeEnv);
   if (originalVercelEnv === undefined) {
     delete process.env.VERCEL_ENV;
   } else {
@@ -54,6 +56,7 @@ function restoreAgentRunnerEnv() {
 
 function resetToLocalRuntime() {
   restoreAgentRunnerEnv();
+  vi.stubEnv("NODE_ENV", "development");
   delete process.env.VERCEL_ENV;
   delete process.env[LEGACY_RUNNER_OVERRIDE];
   resetRunningAgentsForTests();
@@ -63,7 +66,7 @@ function resetToLocalRuntime() {
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost:3006/api/admin/agents/run", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", origin: "http://localhost:3006", cookie: "__csrf=fixture", "x-csrf-token": "fixture" },
     body: JSON.stringify(body),
   });
 }
@@ -81,7 +84,7 @@ function makeGetRequest(params?: Record<string, string>): NextRequest {
 function makeDeleteRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost:3006/api/admin/agents/run", {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", origin: "http://localhost:3006", cookie: "__csrf=fixture", "x-csrf-token": "fixture" },
     body: JSON.stringify(body),
   });
 }
@@ -133,7 +136,7 @@ describe("POST /api/admin/agents/run", () => {
       "http://localhost:3006/api/admin/agents/run",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", origin: "http://localhost:3006", cookie: "__csrf=fixture", "x-csrf-token": "fixture" },
         body: "not json",
       }
     );
@@ -878,7 +881,7 @@ describe("DELETE /api/admin/agents/run", () => {
       "http://localhost:3006/api/admin/agents/run",
       {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", origin: "http://localhost:3006", cookie: "__csrf=fixture", "x-csrf-token": "fixture" },
         body: "not json",
       }
     );
@@ -1034,5 +1037,50 @@ describe("DELETE /api/admin/agents/run", () => {
     expect(response.status).toBe(404);
     const data = await response.json();
     expect(data.error).toBe("Agent is not running");
+  });
+});
+
+
+describe("production process boundary", () => {
+  afterEach(() => { restoreAgentRunnerEnv(); });
+  it("denies every agent method in a plain production Node runtime", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.VERCEL_ENV;
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin" });
+    mockSpawn.mockClear();
+    for (const response of [await GET(makeGetRequest()), await POST(makeRequest({ agentKey: "qa_agent_enabled" })), await DELETE(makeDeleteRequest({ agentKey: "qa_agent_enabled" }))]) {
+      expect(response.status).toBe(403);
+      expect((await response.json()).localOnly).toBe(true);
+    }
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("local process allowlist", () => {
+  afterEach(() => restoreAgentRunnerEnv());
+  it.each(["toString", "__proto__", "constructor"])("rejects inherited script key %s", async (agentKey) => {
+    resetToLocalRuntime();
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin" });
+    mockSpawn.mockClear();
+    expect((await POST(makeRequest({ agentKey }))).status).toBe(400);
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("asynchronous agent failure", () => {
+  afterEach(() => restoreAgentRunnerEnv());
+  it("marks only the current child failed and exposes sanitized recovery diagnostics", async () => {
+    resetToLocalRuntime();
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin" });
+    const child = createMockChild(55009);
+    mockSpawn.mockReturnValue(child);
+    expect((await POST(makeRequest({ agentKey: "qa_agent_enabled" }))).status).toBe(200);
+    child.emit("error", new Error("fixture failure for admin@example.com"));
+    const status = await (await GET(makeGetRequest({ agentKey: "qa_agent_enabled" }))).json();
+    expect(status.finished).toBe(true);
+    expect(status.logs[0].text).toContain("Process failed:");
+    expect(status.logs[0].text).not.toContain("admin@example.com");
   });
 });

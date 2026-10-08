@@ -6,7 +6,7 @@ import { captureOrder, createOrder, getOrder } from "./orders";
 import { PaypalError, type CreateOrderInput } from "./types";
 
 const BOOKING_ID = "11111111-2222-4333-8444-555555555555";
-const OPERATION_KEY = "6f1c2d3e-4b5a-4c6d-8e7f-001122334455";
+const OPERATION_KEY = "00000000-0000-4000-8000-000000000001";
 const SITE = "https://paisaxe.es";
 
 const input: CreateOrderInput = {

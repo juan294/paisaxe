@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Paisaxe booking API (PayPal hackathon)",
-    "description": "The booking journey over HTTP: anonymous session, voucher, quote acceptance, booking status by capability, PayPal deposit (approval + capture), cancellation preview and confirmation, and the PayPal webhook.\n\nRead docs/hackathon/postman/README.md first. Fill an environment from paisaxe-booking.postman_environment.template.json.\n\n- Requests marked \"Local only\" need the local runner (scripts/booking/postman-local.ts) and are skipped when localControlUrl is empty.\n- The PayPal approval is interactive against the real sandbox: open approveUrl as the sandbox buyer, then run \"Capture after approval\".\n- Never point this at production without the owner.",
+    "description": "The booking journey over HTTP: anonymous session, voucher, quote acceptance, booking status by capability, PayPal deposit (approval + capture), cancellation preview and confirmation, the PayPal webhook, and the operator's PayPal ledger check (Transaction Search).\n\nRead docs/hackathon/postman/README.md first. Fill an environment from paisaxe-booking.postman_environment.template.json.\n\n- Requests marked \"Local only\" need the local runner (scripts/booking/postman-local.ts) and are skipped when localControlUrl is empty.\n- The PayPal approval is interactive against the real sandbox: open approveUrl as the sandbox buyer, then run \"Capture after approval\".\n- Never point this at production without the owner.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -1130,6 +1130,48 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/booking/bookings/{{capability}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Operator ledger (PayPal Transaction Search)",
+      "item": [
+        {
+          "name": "PayPal ledger check for the operator panel",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"operatorCapability\")) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200: PayPal's records list this booking's deposit, read-only and never cached\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\");",
+                  "  const ledger = pm.response.json();",
+                  "  pm.expect(ledger.state, JSON.stringify(ledger)).to.equal(\"ok\");",
+                  "  pm.expect(ledger.windowStart).to.be.a(\"string\");",
+                  "  const bookingId = pm.environment.get(\"capability\").split(\".\")[0];",
+                  "  // The deposit was captured and refunded above; PayPal may list it up to about three hours late.",
+                  "  pm.expect(ledger.bookings[bookingId]).to.be.oneOf([\"refunded\", \"matches\", \"pending\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/operator/{{operatorCapability}}/paypal-ledger"
           }
         }
       ]

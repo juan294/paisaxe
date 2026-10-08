@@ -219,7 +219,7 @@ jobs:
       - develop_push_source
       - callable-source
     if: ${{ always() && (((inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != '') || !(vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)))))) && (always() && ((inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && needs.develop_push_source.outputs.validated_by_pr != 'true') || ((inputs.profile == 'full' || inputs.profile == 'nightly') && needs.callable-source.result == 'success'))) }}
-    runs-on: ${{ inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326)) && fromJSON('["self-hosted","linux","x64","cirujano-baseline-actions_linux"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -513,7 +513,7 @@ jobs:
           const git=(...args)=>execFileSync('/usr/bin/git',['--no-replace-objects','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{env,timeout:10000,maxBuffer:2000000});
           const temporary=await mkdtemp(join(tmpdir(),'protected-B-producer-'));
           try{
-          for(const[path,pin]of Object.entries({"scripts/ci-cadence-producer.mjs":"7b21806e84b690deb6ca889d79f60c0fefae1f1ca53a8b6073022970932a0f3e","scripts/ci-cadence-coverage.mjs":"f5a6fa57a388781c7d3714021f2196b83f1b54e59b611327956aa17e1b02bddf","scripts/ci-cadence-native.mjs":"a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d"})){
+          for(const[path,pin]of Object.entries({"scripts/ci-cadence-producer.mjs":"12aa739d3324b0d12b9a1862526c4ec6c652dbf7b07f20ff7dcddb7390e89b58","scripts/ci-cadence-coverage.mjs":"a32f5a65db83b73ad517131520c1be4ac011921e7b2c98131e7d5fc34b125f58","scripts/ci-cadence-native.mjs":"a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d"})){
           if(!/^100(?:644|755) blob [a-f0-9]{40}\t/.test(git('ls-tree',process.env.GITHUB_SHA,'--',path).toString()))throw Error('Producer mode');
           const bytes=git('show',process.env.GITHUB_SHA+':'+path);if(createHash('sha256').update(bytes).digest('hex')!==pin)throw Error('Protected producer pin');
           await writeFile(join(temporary,path.split('/').at(-1)),bytes,{flag:'wx',mode:0o600});}
@@ -600,7 +600,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 50
     needs:
       - develop_push_source
       - callable-source
@@ -684,6 +684,13 @@ jobs:
            assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()==oid
           assert git('rev-parse','--verify','HEAD').strip().decode()==expected
           PY
+      - name: Checkout database contract source
+        if: ${{ inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - name: Verify test/coverage suite succeeded
         if: ${{ inputs.profile == '' && inputs.source_sha == '' && inputs.invocation_id == '' && (github.event_name == 'push' || github.event_name == 'pull_request') && github.workflow_ref == format('juan294/paisaxe/.github/workflows/ci.yml@{0}', github.ref) }}
         run: |
@@ -710,6 +717,33 @@ jobs:
           for result in "$SOURCE_RESULT" "$SHARD_RESULT" "$MERGE_RESULT"; do
             test "$result" = success || { echo "::error::Callable coverage child did not succeed."; exit 1; }
           done
+      - name: Setup database contract Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+      - name: Install database contract dependencies
+        run: npm ci
+      - name: Setup database contract Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+      - name: Check database contract PostgreSQL client
+        run: |-
+          command -v psql
+          psql --version
+      - name: Run required database contracts
+        run: node scripts/ci-contracts.mjs
+        timeout-minutes: 43
+        env:
+          CI_CONTRACT_RECEIPT_DIR: ${{ runner.temp }}/database-contracts-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.invocation_id || 'ordinary' }}
+      - name: Upload sanitized database contract receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: database-contracts-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.invocation_id || 'ordinary' }}
+          path: ${{ runner.temp }}/database-contracts-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.invocation_id || 'ordinary' }}/receipt.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify completed callable source checkout
         if: ${{ inputs.profile == 'full' || inputs.profile == 'nightly' }}
         shell: /usr/bin/env -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u LD_PRELOAD -u LD_LIBRARY_PATH /bin/bash --noprofile --norc -p -e -o pipefail {0}

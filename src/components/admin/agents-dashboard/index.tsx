@@ -38,6 +38,7 @@ function AgentsDashboardInner() {
   const [optimizerReportContent, setOptimizerReportContent] = useState("");
 
   const {
+    unavailable: runnerUnavailable,
     runningAgents,
     lastRunResults,
     handleRunAgent,
@@ -46,6 +47,7 @@ function AgentsDashboardInner() {
   } = useAgentRunner({ onAgentsFinished: refresh });
 
   const {
+    unavailable: terminalUnavailable,
     activeTerminal,
     terminalLogs,
     terminalFinished,
@@ -146,6 +148,12 @@ function AgentsDashboardInner() {
           Agent Intelligence
         </h2>
       </div>
+
+      {(runnerUnavailable || terminalUnavailable) && (
+        <p role="status" className="text-sm text-[#6b6560] dark:text-[#a39e98]">
+          Solo disponible en desarrollo local. Inicia la aplicación con npm run dev para ejecutar agentes. Los informes siguen disponibles.
+        </p>
+      )}
 
       {/* Overall Health Banner */}
       <OverallHealthBanner health={data.overallHealth} agents={data.agents} />

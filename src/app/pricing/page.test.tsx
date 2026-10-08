@@ -575,7 +575,7 @@ describe("PricingPage", () => {
 
       const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
       expect(button.className).toContain("focus-visible:ring-2");
-      expect(button.className).toContain("focus-visible:ring-green-300");
+      expect(button.className).toContain("focus-visible:ring-paisaxe-green-300");
     });
   });
 
@@ -723,7 +723,7 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const button = screen.getByRole("button", { name: "premium.pricing_cta" });
-      expect(button.className).toMatch(/from-green-/);
+      expect(button.className).toMatch(/from-paisaxe-green-/);
       expect(button.className).not.toMatch(/amber-|yellow-/);
     });
   });

@@ -1,5 +1,7 @@
 "use client";
 
+import { readRetryAfter } from "@/lib/retry-after";
+import { RateLimitNotice } from "@/components/rate-limit-notice";
 import { Suspense, useCallback, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -51,6 +53,7 @@ function CheckoutPageContent() {
   // survives the sign-in redirect instead of silently defaulting to day_pass
   // when the user returns from Google OAuth.
   const checkoutPath = buildCheckoutUrl(purchaseType, returnTo ?? undefined);
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchClientSecret = useCallback(async () => {
@@ -64,11 +67,13 @@ function CheckoutPageContent() {
         }),
       });
 
+      if (response.status === 429) setRetryAfter(readRetryAfter(response));
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${response.status}`);
       }
 
+      setRetryAfter(null);
       const { clientSecret } = await response.json();
       return clientSecret;
     } catch (err) {
@@ -87,7 +92,7 @@ function CheckoutPageContent() {
           </h1>
           <button
             onClick={() => signInWithGoogle(checkoutPath)}
-            className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            className="w-full px-5 py-3 bg-paisaxe-green-500 text-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
           >
             {t("auth.continue_with_google")}
           </button>
@@ -125,12 +130,13 @@ function CheckoutPageContent() {
             <p className="text-sm text-neutral-400 mb-6">
               {t("errors.generic_description")}
             </p>
-            <button
+            <RateLimitNotice retryAfter={retryAfter} onRetry={() => { setError(null); setRetryAfter(null); }} />
+            {!retryAfter && <button
               onClick={() => setError(null)}
-              className="px-5 py-2.5 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              className="px-5 py-2.5 bg-paisaxe-green-500 text-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             >
               {t("errors.retry")}
-            </button>
+            </button>}
           </div>
         ) : (
           <div id="checkout" className="rounded-xl overflow-hidden">

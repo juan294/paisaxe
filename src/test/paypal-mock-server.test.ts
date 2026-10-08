@@ -99,3 +99,47 @@ describe("paypal mock server", () => {
     expect((await call("GET", `/v2/payments/refunds/${refund.id as string}`)).body.status).toBe("FAILED");
   });
 });
+
+describe("Transaction Search", () => {
+  async function capture(): Promise<string> {
+    const orderId = await createOrder();
+    mock.approve(orderId);
+    const { body } = await call("POST", `/v2/checkout/orders/${orderId}/capture`, {}, `capture-${orderId}`);
+    const units = body.purchase_units as Array<{ payments: { captures: Array<{ id: string }> } }>;
+    return units[0].payments.captures[0].id;
+  }
+
+  const search = (start: Date, end: Date, page = 1, pageSize = 100) =>
+    call("GET", `/v1/reporting/transactions?start_date=${start.toISOString()}&end_date=${end.toISOString()}&page_size=${pageSize}&page=${page}`);
+
+  it("pages the movements in the window, oldest first", async () => {
+    const first = await capture();
+    const second = await capture();
+    const end = new Date(Date.now() + 1000);
+    const start = new Date(end.getTime() - 3_600_000);
+
+    const page1 = await search(start, end, 1, 1);
+    const page2 = await search(start, end, 2, 1);
+
+    expect(page1.body).toMatchObject({ page: 1, total_items: 2, total_pages: 2 });
+    expect((page1.body.transaction_details as Array<{ transaction_info: { transaction_id: string } }>).map((d) => d.transaction_info.transaction_id)).toEqual([first]);
+    expect((page2.body.transaction_details as Array<{ transaction_info: { transaction_id: string } }>).map((d) => d.transaction_info.transaction_id)).toEqual([second]);
+  });
+
+  it("lists nothing outside start_date..end_date and refuses more than 31 days", async () => {
+    await capture();
+    const past = new Date(Date.now() - 2 * 3_600_000);
+
+    expect((await search(new Date(past.getTime() - 3_600_000), past)).body).toMatchObject({ total_items: 0, transaction_details: [] });
+    expect((await search(new Date(Date.now() - 32 * 86_400_000), new Date())).status).toBe(400);
+  });
+
+  it("answers 403 NOT_AUTHORIZED when denied", async () => {
+    mock.setTransactionSearchDenied(true);
+
+    const { status, body } = await search(new Date(Date.now() - 3_600_000), new Date());
+
+    expect(status).toBe(403);
+    expect(body).toMatchObject({ name: "NOT_AUTHORIZED", details: [{ issue: "NOT_AUTHORIZED" }] });
+  });
+});

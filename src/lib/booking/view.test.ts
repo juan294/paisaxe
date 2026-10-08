@@ -31,7 +31,7 @@ beforeEach(() => {
 describe("loadBookingView", () => {
   it("joins the experience title, the latest payment and the hold's expiry while payment is pending", async () => {
     const fake = createBookingSupabaseFake();
-    fake.onTable("experiences", { data: { title: "Paseo" } });
+    fake.onTable("experiences", { data: { title: "Paseo", slug: "paseo-senda-costera" } });
     const payments = fake.onTable("payments", {
       data: { status: "captured", order_id: "ORDER-1", capture_id: "CAP-1", refund_id: "RF-1" },
     });
@@ -43,6 +43,7 @@ describe("loadBookingView", () => {
     expect(view).toMatchObject({
       reference: "RS-ABC123",
       experienceTitle: "Paseo",
+      experienceSlug: "paseo-senda-costera",
       slotTime: "10:00",
       balanceCents: 9000,
       holdExpiresAt: "2026-11-20T09:20:00Z",
@@ -58,7 +59,7 @@ describe("loadBookingView", () => {
 
     const view = await loadBookingView(fake.client, booking("confirmed"));
 
-    expect(view).toMatchObject({ experienceTitle: "", holdExpiresAt: null, payment: { orderId: null, captureId: null, refundId: null } });
+    expect(view).toMatchObject({ experienceTitle: "", experienceSlug: null, holdExpiresAt: null, payment: { orderId: null, captureId: null, refundId: null } });
 
     fake.onTable("experiences", { data: { title: "Paseo" } });
     fake.onTable("payments", { data: null });

@@ -4,9 +4,14 @@
  *
  * Starts the PayPal stand-in (src/test/paypal-mock-server.ts) on a fixed
  * loopback port, seeds the local Docker database (flag on, fixture
- * experience, a voucher), serves two loopback control routes the collection's
- * "Local only" requests call, and writes a filled Postman environment to the
- * temp directory, never into the repository. Stays up until Ctrl-C.
+ * experience, a voucher, an operator link), serves two loopback control routes
+ * the collection's "Local only" requests call, and writes a filled Postman
+ * environment to the temp directory, never into the repository. Stays up
+ * until Ctrl-C.
+ *
+ * The operator link (APIMatic plan, Phase 2: the PayPal ledger request) is
+ * signed with a local BOOKING_LINK_SECRET kept beside the environment file
+ * (booking-link-secret, created once); `next dev` must read the same file.
  *
  * Control routes (127.0.0.1 only):
  *   POST /quotes {accessToken}                 a fresh and an expired quote for that
@@ -20,12 +25,14 @@
  * docs/hackathon/postman/README.md):
  *   1. npx tsx scripts/booking/postman-local.ts
  *   2. next dev on port 3006 with only local variables, PAYPAL_API_BASE=http://127.0.0.1:4010
+ *      and BOOKING_LINK_SECRET from $TMPDIR/paisaxe-postman/booking-link-secret
  *   3. npx --yes newman@6 run docs/hackathon/postman/paisaxe-booking.postman_collection.json \
  *        -e "$TMPDIR/paisaxe-postman/paisaxe-booking.local.postman_environment.json"
  */
+import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
@@ -51,6 +58,7 @@ export const ENV_KEYS = [
   "csrfToken",
   "accessToken",
   "capability",
+  "operatorCapability",
   "approveUrl",
   "paypalOrderId",
   "captureId",
@@ -216,6 +224,46 @@ function ensureFlagOn(): void {
   );
 }
 
+/**
+ * Issues a local operator link through scripts/booking/create-operator-link.ts in a child process (its
+ * links.ts is server-only and needs the react-server condition) and returns its capability, `<id>.<token>`.
+ */
+function issueOperatorCapability(label: string, secret: string): string {
+  const output = execFileSync(
+    "npx",
+    ["tsx", "--conditions=react-server", resolve(REPO_ROOT, "scripts/booking/create-operator-link.ts"), "--merchant", FIXTURE_MERCHANT, "--label", label],
+    { encoding: "utf8", env: { ...process.env, BOOKING_LINK_SECRET: secret } }
+  );
+  const capability = /\/operator\/(\S+)/.exec(output)?.[1];
+  if (!capability) throw new Error("create-operator-link printed no operator link");
+  return capability;
+}
+
+/** Label prefix of everything the runner issues (its voucher and its operator link). */
+const RUNNER_LABEL_PREFIX = "postman-local-";
+
+/**
+ * Deletes the runner's own operator links (label postman-local-*), at start and on Ctrl-C, so a local
+ * database keeps only the fixture's link, as the booking integration suite expects.
+ */
+export async function removeRunnerOperatorAccess(client: SupabaseClient): Promise<void> {
+  const { error } = await client.from("operator_access").delete().like("label", `${RUNNER_LABEL_PREFIX}%`);
+  if (error) throw new Error(`Failed to remove the runner's operator links: ${error.message}`);
+}
+
+/**
+ * The local BOOKING_LINK_SECRET shared with `next dev`: read from `dir`, or
+ * created there once (owner-only). Local runs only; never a deployment's secret.
+ */
+export function localLinkSecret(dir: string): string {
+  const file = resolve(dir, "booking-link-secret");
+  if (!existsSync(file)) {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, randomBytes(32).toString("hex"), { mode: 0o600, flag: "wx" });
+  }
+  return readFileSync(file, "utf8").trim();
+}
+
 export interface SeededQuotes {
   quoteId: string;
   staleQuoteId: string;
@@ -319,11 +367,16 @@ async function main(): Promise<void> {
   const client = localServiceClient();
   ensureFlagOn();
   const experience = await ensureFixture(client);
+  const label = `${RUNNER_LABEL_PREFIX}${new Date().toISOString().slice(0, 10)}`;
   const { code } = await createVoucher(
     client,
     // Each newman run redeems it once with a new anonymous session; ten runs per runner start.
-    parseVoucherArgs(["--label", `postman-local-${new Date().toISOString().slice(0, 10)}`, "--max", "10", "--no-voice"])
+    parseVoucherArgs(["--label", label, "--max", "10", "--no-voice"])
   );
+  // The PayPal ledger request's operator link, signed like the `next dev` that will serve it.
+  const secretFile = resolve(dirname(options.out), "booking-link-secret");
+  await removeRunnerOperatorAccess(client);
+  const operatorCapability = issueOperatorCapability(label, localLinkSecret(dirname(options.out)));
 
   // The local database keeps earlier runs' payments (order_id is unique): ids must not repeat.
   const mock = await startPaypalMock({ port: options.paypalPort, idSalt: randomBytes(4).toString("hex").toUpperCase() });
@@ -353,6 +406,7 @@ async function main(): Promise<void> {
         supabaseAnonKey: LOCAL_ANON_KEY,
         voucherCode: code,
         localControlUrl: controlUrl,
+        operatorCapability,
       }),
       null,
       2
@@ -364,6 +418,7 @@ async function main(): Promise<void> {
     [
       "Local Postman runner ready (Ctrl-C to stop).",
       `  PayPal mock:    ${mock.baseUrl}   (start next dev with PAYPAL_API_BASE=${mock.baseUrl})`,
+      `  Link secret:    start next dev with BOOKING_LINK_SECRET="$(cat ${secretFile})"`,
       `  Control routes: ${controlUrl}`,
       `  Environment:    ${options.out}`,
       "Then: npx --yes newman@6 run docs/hackathon/postman/paisaxe-booking.postman_collection.json -e <environment>",
@@ -372,7 +427,7 @@ async function main(): Promise<void> {
 
   const stop = () => {
     control.close();
-    void mock.close().then(() => process.exit(0));
+    void Promise.allSettled([mock.close(), removeRunnerOperatorAccess(client)]).then(() => process.exit(0));
   };
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);

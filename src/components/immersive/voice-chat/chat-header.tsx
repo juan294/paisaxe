@@ -82,7 +82,7 @@ export function ChatHeader({
         {!isInitializing && !canUseVoice && (
           <Link
             href={storySlug ? `/pricing?returnTo=${storySlug}` : "/pricing"}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-400 border border-green-500/50 rounded-full hover:bg-green-500/10 hover:border-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/70"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-paisaxe-green-400 border border-paisaxe-green-500/50 rounded-full hover:bg-paisaxe-green-500/10 hover:border-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-400/70"
           >
             <AudioLines className="h-3.5 w-3.5" />
             <span>{t("voice.upgrade_cta")}</span>

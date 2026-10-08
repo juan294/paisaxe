@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock rate-limit module
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/rate-limit", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/rate-limit")>(),
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 19, retryAfter: 0 }),
 }));
 
@@ -68,6 +69,23 @@ describe("/api/mcp/places", () => {
 
   afterEach(() => {
     process.env = originalEnv;
+  });
+
+  it.each(["GET", "POST"])("%s whitespace API key denies transport and correction recovers", async (verb) => {
+    process.env.GOOGLE_PLACES_API_KEY = " \n ";
+    const request = () => new Request("http://localhost/api/mcp/places?query=sidra", {
+      method: verb, headers: { "x-mcp-secret": MCP_SECRET, "Content-Type": "application/json" },
+      ...(verb === "POST" ? { body: JSON.stringify({ query: "sidra" }) } : {}),
+    });
+    const handler = verb === "GET" ? GET : POST;
+    const denied = await handler(request());
+    expect(denied.status).toBe(500);
+    expect(await denied.json()).toEqual({ error: "Places API not configured" });
+    expect(mockFetch).not.toHaveBeenCalled();
+    process.env.GOOGLE_PLACES_API_KEY = " corrected-key ";
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ places: [] }) });
+    expect((await handler(request())).status).toBe(200);
+    expect(new Headers(mockFetch.mock.calls[0][1].headers).get("X-Goog-Api-Key")).toBe("corrected-key");
   });
 
   describe("GET", () => {

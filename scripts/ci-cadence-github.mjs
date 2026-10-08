@@ -27,6 +27,10 @@ function nativeStepWithin(step, interval) {
   return Boolean(interval && Number.isFinite(started) && Number.isFinite(completed) && interval.started <= started && started <= completed && completed <= interval.completed);
 }
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+/** GitHub lists a run's referenced workflows in no fixed order, each exactly {path, ref, sha}. */
+const references = list => Array.isArray(list) && list.every(item => record(item) && same(Object.keys(item).sort(), ['path', 'ref', 'sha']) && [item.path, item.ref, item.sha].every(value => typeof value === 'string'))
+  ? list.map(item => JSON.stringify([item.path, item.ref, item.sha])).sort() : null;
+const sameReferences = (actual, projected) => { const left = references(actual), right = references(projected); return left !== null && right !== null && same(left, right); };
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (record(value)) return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
@@ -59,7 +63,7 @@ export function createGitHubCadenceReader({ token, fetchImpl = fetch, limits = {
     const workflow = policy.workflows[0];
     if (!record(projection) || projection.kind !== 'full' || !record(projection.jobs) || !record(projection.steps) || !record(projection.workflowPins) || !record(projection.workflowSources) || !Array.isArray(projection.referencedWorkflows) || projection.workflowPins[workflow.path] !== workflow.definitionSha || Object.entries(projection.workflowPins).some(([path, blob]) => !/^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/.test(path) || !SHA.test(blob)) || typeof projection.admissionJob !== 'string' || !projection.admissionJob) fail('protected full projection invalid');
     if (!same(Object.keys(projection.workflowSources).sort(), Object.keys(projection.workflowPins).sort()) || Object.values(projection.workflowSources).some(commit => !SHA.test(commit)) || projection.workflowSources[workflow.path] !== expected.definitionSha || typeof projection.admissionStep !== 'string' || !projection.admissionStep) fail('protected definition sources invalid');
-    if (projection.referencedWorkflows.some(entry => !record(entry) || !SHA.test(entry.sha ?? '') || !Object.keys(projection.workflowPins).some(path => path !== workflow.path && entry.path === `${REPOSITORY}/${path}@${entry.ref}` && entry.sha === projection.workflowSources[path]) || !/^refs\/heads\/(main|develop)$/.test(entry.ref ?? '')) || new Set(projection.referencedWorkflows.map(entry => entry.path)).size !== projection.referencedWorkflows.length || projection.referencedWorkflows.length !== Object.keys(projection.workflowPins).length - 1) fail('native callee reference projection invalid');
+    if (projection.referencedWorkflows.some(entry => !record(entry) || !SHA.test(entry.sha ?? '') || !Object.keys(projection.workflowPins).some(path => path !== workflow.path && entry.path === `${REPOSITORY}/${path}@${entry.sha}` && entry.sha === projection.workflowSources[path]) || !/^refs\/heads\/(main|develop)$/.test(entry.ref ?? '')) || new Set(projection.referencedWorkflows.map(entry => entry.path)).size !== projection.referencedWorkflows.length || projection.referencedWorkflows.length !== Object.keys(projection.workflowPins).length - 1) fail('native callee reference projection invalid');
     const referencedPaths = projection.referencedWorkflows.map(entry => entry.path.slice(REPOSITORY.length + 1).split('@')[0]);
     if (!same(referencedPaths.sort(), Object.keys(projection.workflowPins).filter(path => path !== workflow.path).sort())) fail('native callee reference inventory incomplete');
     const ids = workflow.jobs.map(job => job.id);
@@ -155,7 +159,7 @@ export function createGitHubCadenceReader({ token, fetchImpl = fetch, limits = {
   }
   function runIdentity(run, runId, attempt, c) {
     const { expected, policy, workflow } = c;
-    if (!record(run) || run.id !== runId || run.run_attempt !== attempt || run.path !== workflow.path || !repositoryIdentity(run.repository) || !repositoryIdentity(run.head_repository) || !ownerAccount(run.actor) || (Object.hasOwn(run, 'triggering_actor') && !ownerAccount(run.triggering_actor)) || !integer(run.check_suite_id) || !same(run.referenced_workflows ?? [], c.projection.referencedWorkflows) || run.html_url !== `https://github.com/${REPOSITORY}/actions/runs/${runId}`) fail('native run identity mismatch');
+    if (!record(run) || run.id !== runId || run.run_attempt !== attempt || run.path !== workflow.path || !repositoryIdentity(run.repository) || !repositoryIdentity(run.head_repository) || !ownerAccount(run.actor) || (Object.hasOwn(run, 'triggering_actor') && !ownerAccount(run.triggering_actor)) || !integer(run.check_suite_id) || !sameReferences(run.referenced_workflows ?? [], c.projection.referencedWorkflows) || run.html_url !== `https://github.com/${REPOSITORY}/actions/runs/${runId}`) fail('native run identity mismatch');
     if (!['push', 'schedule'].includes(run.event) || !['completed', 'in_progress', 'queued'].includes(run.status) || (run.status === 'completed' ? !['success', 'failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion) : run.conclusion !== null)) fail('native measuring run ineligible');
     const branch = run.event === 'schedule' ? policy.defaultBranch : expected.targetBranch;
     const head = run.event === 'schedule' ? expected.definitionSha : expected.sourceSha;

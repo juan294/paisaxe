@@ -30,7 +30,7 @@ export function buildFullState({ root, definitionSha, authoritySha = definitionS
   for(const [path,pin] of Object.entries(catalogue.workflowPins)) need(git('rev-parse',`${definitionSha}:${path}`).toString().trim() === pin);
   const profile=callerPath===workflow?'nightly':'develop_push';
   const projected = projectFullGraph({ protectedPolicy:policy, profile, definitionSha, sourceSha, caller,
-    callees:Object.fromEntries(Object.entries(catalogue.callees).map(([path,callee])=>[path,{...callee,definitionSha}])),
+    callees:Object.fromEntries(Object.entries(catalogue.callees).map(([path,callee])=>[path,{...callee,definitionSha}])), nestedCallees:Object.values(catalogue.nestedCallees??{}),
     auxiliaryJobs:catalogue.censusByCaller?.[callerPath]??catalogue.auxiliaryJobs, stepInventory:catalogue.stepInventory,
     admissionJob:'Cadence admission', admissionStep:'Upload Cadence admission', measurementJob:'Cadence measurement', measurementStep:'Upload Cadence measurement' });
   need(projected.available);

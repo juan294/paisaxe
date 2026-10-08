@@ -9,17 +9,25 @@
     "src/app/providers.tsx",
     "scripts/**/*.ts"
   ],
-  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.ts"
+  ],
   "ignore": [
     "src/test/**"
   ],
   "ignoreExportsUsedInFile": true,
   "ignoreBinaries": [
     "du",
-    "cloudflared"
+    "cloudflared",
+    "openssl",
+    "supabase",
+    "psql"
   ],
   "paths": {
-    "@/*": ["./src/*"]
+    "@/*": [
+      "./src/*"
+    ]
   },
   "next": {
     "entry": [

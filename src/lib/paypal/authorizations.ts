@@ -1,6 +1,6 @@
 /**
  * Authorize, capture and void through the SDK (PayPal hackathon plan, Phase
- * 8b, decision R7; contract sheet pay-pal-server-sdk-plan.md, "Operations").
+ * 8b, decision R7; contract sheet paypal-server-sdk-plan.md, "Operations").
  *
  * Only a phone-confirmed merchant's AUTHORIZE order reaches these calls. The
  * deposit is authorized when the buyer approves, captured only after the
@@ -15,7 +15,7 @@
  */
 import "server-only";
 
-import type { CapturedPayment, PaymentAuthorization } from "pay-pal-server-sdk";
+import type { CapturedPayment, PaymentAuthorization } from "@paypal/paypal-server-sdk";
 import { callPaypal } from "./client";
 import { centsToValue } from "./money";
 import { getOrder, normalizeAuthorization, normalizeCapture, normalizeOrder } from "./orders";
@@ -38,10 +38,10 @@ export async function authorizeOrder(orderId: string, operationKey: string): Pro
   let order: PaypalOrder;
   let status: number | null = null;
   try {
-    const response = await callPaypal("authorizeOrder", (client) =>
-      client.orders.authorizeOrder({
+    const response = await callPaypal("authorizeOrder", ({ orders }) =>
+      orders.authorizeOrder({
         id: orderId,
-        payPalRequestId: `authorize:${operationKey}`,
+        paypalRequestId: `authorize:${operationKey}`,
         prefer: PREFER_REPRESENTATION,
         body: {},
       }),
@@ -65,10 +65,10 @@ export async function captureAuthorization(
   operationKey: string
 ): Promise<PaypalCapture> {
   const value = centsToValue(amountCents);
-  const { value: capture, status } = await callPaypal("captureAuthorization", (client) =>
-    client.payments.captureAuthorizedPayment({
+  const { value: capture, status } = await callPaypal("captureAuthorization", ({ payments }) =>
+    payments.captureAuthorizedPayment({
       authorizationId,
-      payPalRequestId: `capture-authorization:${operationKey}`,
+      paypalRequestId: `capture-authorization:${operationKey}`,
       prefer: PREFER_REPRESENTATION,
       body: { amount: { currencyCode: "EUR", value }, finalCapture: true },
     }),
@@ -77,8 +77,8 @@ export async function captureAuthorization(
 }
 
 export async function getAuthorization(authorizationId: string): Promise<PaypalAuthorization> {
-  const { value, status } = await callPaypal("getAuthorization", (client) =>
-    client.payments.getAuthorizedPayment({ authorizationId }),
+  const { value, status } = await callPaypal("getAuthorization", ({ payments }) =>
+    payments.getAuthorizedPayment({ authorizationId }),
   );
   return normalizeAuthorization(value, relatedOrderId(value), status);
 }
@@ -91,13 +91,15 @@ export async function getAuthorization(authorizationId: string): Promise<PaypalA
  */
 export async function voidAuthorization(authorizationId: string, operationKey: string): Promise<PaypalAuthorization> {
   try {
-    const { value, status } = await callPaypal("voidAuthorization", (client) =>
-      client.payments.voidPayment({
+    const { value, status } = await callPaypal("voidAuthorization", ({ payments }) =>
+      payments.voidPayment({
         authorizationId,
-        payPalRequestId: `void:${operationKey}`,
+        paypalRequestId: `void:${operationKey}`,
         prefer: PREFER_REPRESENTATION,
       }),
     );
+    // The SDK types the body as nullable (a 204 under return=minimal): read the authorization then.
+    if (!value) return getAuthorization(authorizationId);
     return normalizeAuthorization(value, relatedOrderId(value), status);
   } catch (error) {
     if (error instanceof PaypalError && error.status === 422 && error.issue === "PREVIOUSLY_VOIDED") {

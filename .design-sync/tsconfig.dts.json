@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "../build/ts",
+    "rootDir": "..",
+    "incremental": false,
+    "plugins": [],
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "entry/index.tsx",
+    "../next-env.d.ts",
+    "../src/**/*.d.ts"
+  ],
+  "exclude": [
+    "../node_modules"
+  ]
+}

@@ -95,6 +95,45 @@ function splitExportedMethods(
   return segments;
 }
 
+/** Only these build-resolved routes delegate to guarded development modules. */
+const LOCAL_ADMIN_ROUTES: Record<string, string> = {
+  "src/app/api/admin/agents/run/route.ts": "@/lib/local-operations/agents",
+  "src/app/api/admin/tunnel/route.ts": "@/lib/local-operations/tunnel",
+};
+const LOCAL_METHODS = ["GET", "POST", "DELETE"];
+
+function inspectAdminRoute(
+  file: string,
+  readSource: (file: string) => string = (sourceFile) => fs.readFileSync(sourceFile, "utf-8"),
+): string[] {
+  const rel = path.relative(REPO_ROOT, file);
+  const content = readSource(file);
+  const target = LOCAL_ADMIN_ROUTES[rel];
+  let implementation = content;
+  let implementationRel = rel;
+
+  if (target) {
+    // Reject aliases, wildcard exports, changed targets and extra statements.
+    const withoutComments = content.replace(/^\s*\/\/.*$/gm, "").trim();
+    const reexport = withoutComments.match(/^export\s*\{\s*GET\s*,\s*POST\s*,\s*DELETE\s*\}\s*from\s*(["'])([^"']+)\1\s*;?$/);
+    if (!reexport || reexport[2] !== target) {
+      return [`${rel} — expected only GET, POST, DELETE reexports from ${target}`];
+    }
+    const targetFile = path.join(SRC_DIR, `${target.slice(2)}.ts`);
+    implementation = readSource(targetFile);
+    implementationRel = path.relative(REPO_ROOT, targetFile);
+  }
+
+  const segments = splitExportedMethods(implementation);
+  if (segments.length === 0) return [`${rel} — no exported HTTP method handler found`];
+  if (target && (segments.length !== LOCAL_METHODS.length || LOCAL_METHODS.some((method) => segments.filter((segment) => segment.method === method).length !== 1))) {
+    return [`${rel} → ${implementationRel} — expected one development handler for each GET, POST, DELETE`];
+  }
+  return segments.filter((segment) => !ADMIN_GUARD_PATTERN.test(segment.body)).map((segment) =>
+    `${implementationRel}:${segment.line} — exported ${segment.method} has no admin-auth guard reference${target ? ` (reexported by ${rel})` : ""}`,
+  );
+}
+
 describe("QA-M4 admin-guard invariant", () => {
   it("every exported HTTP method in an admin route references an admin-auth guard", () => {
     const routeFiles = collectRouteFiles(ADMIN_API_DIR);
@@ -103,22 +142,7 @@ describe("QA-M4 admin-guard invariant", () => {
     const violations: string[] = [];
 
     for (const file of routeFiles) {
-      const content = fs.readFileSync(file, "utf-8");
-      const segments = splitExportedMethods(content);
-      const rel = path.relative(REPO_ROOT, file);
-
-      if (segments.length === 0) {
-        violations.push(`${rel} — no exported HTTP method handler found`);
-        continue;
-      }
-
-      for (const segment of segments) {
-        if (!ADMIN_GUARD_PATTERN.test(segment.body)) {
-          violations.push(
-            `${rel}:${segment.line} — exported ${segment.method} has no admin-auth guard reference`
-          );
-        }
-      }
+      violations.push(...inspectAdminRoute(file));
     }
 
     reportViolations(
@@ -128,6 +152,39 @@ describe("QA-M4 admin-guard invariant", () => {
         `withAdmin()/withAdminRead() from "@/lib/admin-auth":`
     );
   });
+
+  it.each(Object.entries(LOCAL_ADMIN_ROUTES).flatMap(([route, target]) =>
+    LOCAL_METHODS.map((method) => ({ route, target, method })),
+  ))("rejects omission of the $method guard in $target", ({ route, target, method }) => {
+    const routeFile = path.join(REPO_ROOT, route);
+    const targetFile = path.join(SRC_DIR, `${target.slice(2)}.ts`);
+    const source = fs.readFileSync(targetFile, "utf-8");
+    expect(inspectAdminRoute(routeFile)).toEqual([]);
+    const segment = splitExportedMethods(source).find((part) => part.method === method)!;
+    expect(segment.body.match(/validateAdminAuth\(/g)).toHaveLength(1);
+    // Change the actual handler's call, keeping all other handlers unchanged.
+    const mutated = source.replace(segment.body, segment.body.replace("validateAdminAuth(", "removedAdminGuard("));
+    const violations = inspectAdminRoute(routeFile, (file) => file === targetFile ? mutated : fs.readFileSync(file, "utf-8"));
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain(`exported ${method} has no admin-auth guard reference`);
+    expect(violations[0]).toContain(path.relative(REPO_ROOT, targetFile));
+  });
+
+  it.each(Object.entries(LOCAL_ADMIN_ROUTES))("rejects redirecting %s to the inert production stub", (route, target) => {
+    const file = path.join(REPO_ROOT, route);
+    const redirected = fs.readFileSync(file, "utf-8").replace(target, "@/lib/local-operations/unavailable");
+    expect(inspectAdminRoute(file, () => redirected)).toEqual([
+      `${route} — expected only GET, POST, DELETE reexports from ${target}`,
+    ]);
+  });
+
+  it("continues to reject an unknown route that reexports a local handler", () => {
+    const file = path.join(ADMIN_API_DIR, "unknown-local/route.ts");
+    expect(inspectAdminRoute(file, () => 'export { GET } from "@/lib/local-operations/agents";')).toEqual([
+      "src/app/api/admin/unknown-local/route.ts — no exported HTTP method handler found",
+    ]);
+  });
+
 });
 
 describe("QA-M4 RPC-name invariant", () => {

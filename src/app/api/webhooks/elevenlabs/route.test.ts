@@ -93,10 +93,11 @@ function buildTranscript(
 }
 
 describe("POST /api/webhooks/elevenlabs", () => {
+  type Rpc = (fn: string, ...args: unknown[]) => Promise<{ data: unknown; error: { message: string } | null }>;
   let mockSelect: ReturnType<typeof vi.fn>;
   let mockUpdate: ReturnType<typeof vi.fn>;
   let mockFrom: ReturnType<typeof vi.fn>;
-  let mockRpc: ReturnType<typeof vi.fn>;
+  let mockRpc: ReturnType<typeof vi.fn<Rpc>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -122,7 +123,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
     mockUpdate = vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     });
-    mockRpc = vi.fn().mockImplementation((fn: string) => {
+    mockRpc = vi.fn<Rpc>().mockImplementation((fn: string) => {
       if (fn === "process_elevenlabs_event_idempotent") {
         return Promise.resolve({ data: "processed", error: null });
       }
@@ -133,12 +134,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
       if (fn === "claim_booking_sms_job") {
         return Promise.resolve({
-          data: {
+          data: [{
             booking_id: "booking-123",
             event_key: "post_call_transcription:conv_456",
             to_phone: "+34612345678",
             message: "Confirmation SMS",
-          },
+          }],
           error: null,
         });
       }
@@ -610,7 +611,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
       }
 
       if (fn === "claim_booking_sms_job") {
-        return Promise.resolve({ data: null, error: null });
+        return Promise.resolve({ data: [], error: null });
       }
 
       return Promise.resolve({ data: null, error: null });
@@ -630,6 +631,51 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(response.status).toBe(200);
     expect(data.status).toBe("duplicate");
     expect(sendSMS).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges retained SMS enqueue without claiming or sending a job", async () => {
+    const normalRpc = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation((fn: string, ...args: unknown[]) =>
+      fn === "enqueue_booking_sms_job"
+        ? Promise.resolve({ data: "retained", error: null })
+        : normalRpc(fn, ...args)
+    );
+
+    const response = await POST(createSignedRequest({
+      conversation_id: "conv_456",
+      analysis: { call_successful: "success" },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, status: "retained", smsSent: false });
+    expect(mockRpc.mock.calls.map(([fn]) => fn)).toEqual([
+      "process_elevenlabs_event_idempotent", "enqueue_booking_sms_job",
+    ]);
+    expect(sendSMS).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("sends the claimed PostgREST array row rather than stale booking SMS data", async () => {
+    const normalRpc = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation((fn: string, ...args: unknown[]) =>
+      fn === "claim_booking_sms_job"
+        ? Promise.resolve({ data: [{
+          booking_id: mockBooking.id,
+          event_key: "post_call_transcription:conv_456",
+          to_phone: "+34600000001",
+          message: "Durable claimed message",
+        }], error: null })
+        : normalRpc(fn, ...args)
+    );
+
+    const response = await POST(createSignedRequest({
+      conversation_id: "conv_456",
+      analysis: { call_successful: "success" },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ smsSent: true });
+    expect(sendSMS).toHaveBeenCalledExactlyOnceWith("+34600000001", "Durable claimed message");
   });
 
   it("should return 500 when the idempotency RPC fails", async () => {
@@ -962,12 +1008,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
       if (fn === "claim_booking_sms_job") {
         callOrder.push("claim_booking_sms_job");
         return Promise.resolve({
-          data: {
+          data: [{
             booking_id: "booking-123",
             event_key: "post_call_transcription:conv_456",
             to_phone: "+34612345678",
             message: "Confirmation SMS",
-          },
+          }],
           error: null,
         });
       }
@@ -1030,12 +1076,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
       if (fn === "claim_booking_sms_job") {
         return Promise.resolve({
-          data: {
+          data: [{
             booking_id: "booking-123",
             event_key: "post_call_transcription:conv_456",
             to_phone: "+34612345678",
             message: "Confirmation SMS",
-          },
+          }],
           error: null,
         });
       }
@@ -1544,12 +1590,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
         }
         if (fn === "claim_booking_sms_job") {
           return Promise.resolve({
-            data: {
+            data: [{
               booking_id: "booking-123",
               event_key: "post_call_transcription:conv_456",
               to_phone: "+34612345678",
               message: "Confirmation SMS",
-            },
+            }],
             error: null,
           });
         }
@@ -1597,12 +1643,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
         }
         if (fn === "claim_booking_sms_job") {
           return Promise.resolve({
-            data: {
+            data: [{
               booking_id: "booking-123",
               event_key: "post_call_transcription:conv_456",
               to_phone: "+34612345678",
               message: "Confirmation SMS",
-            },
+            }],
             error: null,
           });
         }
@@ -1635,12 +1681,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
         }
         if (fn === "claim_booking_sms_job") {
           return Promise.resolve({
-            data: {
+            data: [{
               booking_id: "booking-123",
               event_key: "post_call_transcription:conv_456",
               to_phone: "+34612345678",
               message: "Confirmation SMS",
-            },
+            }],
             error: null,
           });
         }
@@ -1681,12 +1727,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
         }
         if (fn === "claim_booking_sms_job") {
           return Promise.resolve({
-            data: {
+            data: [{
               booking_id: "booking-123",
               event_key: "post_call_transcription:conv_456",
               to_phone: "+34612345678",
               message: "Confirmation SMS",
-            },
+            }],
             error: null,
           });
         }
