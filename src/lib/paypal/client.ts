@@ -29,6 +29,7 @@ import {
   Environment,
   OrdersController,
   PaymentsController,
+  TransactionSearchController,
   type ApiResponse,
   type OAuthToken,
   type RetryConfiguration,
@@ -74,6 +75,7 @@ export interface PaypalSdk {
   client: Client;
   orders: OrdersController;
   payments: PaymentsController;
+  transactions: TransactionSearchController;
 }
 
 let sdk: { key: string } & PaypalSdk | null = null;
@@ -239,7 +241,13 @@ function sdkFor(config: PaypalConfig): PaypalSdk {
     httpClientOptions: { retryConfig: retryConfig(retryInterval) },
     unstable_httpClientOptions: { adapter: "fetch", env: { fetch: sdkFetch(config.baseUrl) } },
   });
-  sdk = { key, client, orders: new OrdersController(client), payments: new PaymentsController(client) };
+  sdk = {
+    key,
+    client,
+    orders: new OrdersController(client),
+    payments: new PaymentsController(client),
+    transactions: new TransactionSearchController(client),
+  };
   return sdk;
 }
 

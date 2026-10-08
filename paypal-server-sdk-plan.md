@@ -173,7 +173,7 @@ one (timeout, connection error, token refusal) learned nothing from PayPal.
 | `PaymentsController.captureAuthorizedPayment` | `authorizationId`, `paypalRequestId: "capture-authorization:" + key`, `prefer`, `body: {amount, finalCapture: true}` | 400, 401, 403, 404, 409, 422, 500, default |
 | `PaymentsController.voidPayment` | `authorizationId`, `paypalRequestId: "void:" + key`, `prefer`; returns `PaymentAuthorization \| null` (null: the adapter reads the authorization) | 401, 403, 404, 409, 422, 500, default |
 | `PaymentsController.getAuthorizedPayment` | `authorizationId` | 401, 403, 404, 500, default |
-| `TransactionSearchController.searchTransactions` (Phase 2) | `startDate`, `endDate` (RFC 3339 with seconds, at most 31 days apart), `fields: "transaction_info"`, `pageSize: 500`, `page: 1` | default `SearchError` (403 `NOT_AUTHORIZED` when the app lacks the Transaction Search permission) |
+| `TransactionSearchController.searchTransactions` (Phase 2) | `startDate`, `endDate` (RFC 3339 with seconds, at most 31 days apart), `fields: "transaction_info"`, `pageSize: 500`, `page: 1` | default `SearchError`: 403 with `name` and `details[0].issue` both `NOT_AUTHORIZED` when the app lacks the Transaction Search permission (observed in the sandbox on 2026-10-08, debug id `f636297435446`) |
 
 Rules:
 - The parameter is `paypalRequestId` (lower-case "pal"); the old SDK's

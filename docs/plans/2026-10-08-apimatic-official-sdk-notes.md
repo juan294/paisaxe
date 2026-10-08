@@ -28,6 +28,51 @@ Plan: [2026-10-08-apimatic-official-sdk.md](2026-10-08-apimatic-official-sdk.md)
    - Plan said: add a request counter and a "fail the next N requests" hook if missing.
    - Found: `requests`/`requestsTo` already record every request, and `injectNext` already queues one-shot answers, so N calls queue N failures.
 
+### Phase 2
+
+1. **Panel copy in Spanish constants, not `operator.ledger.*` keys in six locales.**
+   - Plan said: i18n keys in es, ast, en, fr, de, pt; parity test and `npm run generate-locale-coverage`.
+   - Found: the operator dashboard has no translation hook. Its copy is Spanish constants by design (`operator-dashboard.tsx`: "Merchant-facing copy is Spanish only: the operator is the Asturian provider").
+   - Chose: Spanish constants beside the existing ones (`LEDGER_CHIP`, `LedgerSummary`). No locale files change, so `generate-locale-coverage` has nothing new to cover.
+   - Why: keys for one section of a Spanish-only page would be the only translated text on it.
+2. **Truncation note reworded.**
+   - Plan said: "Mostrando los 500 movimientos más recientes".
+   - Found: the search asks for page 1. Nothing in the SDK's documentation says page 1 holds the most recent movements (not verified against PayPal); the mock lists them oldest first.
+   - Chose: "PayPal tiene más de 500 movimientos en el periodo: solo se comprobaron los primeros 500."
+3. **Matcher refinements.**
+   - Plan said: capture found with status S -> matches or refunded; status differs -> mismatch.
+   - Chose: a capture PayPal lists as P (not settled) is `pending`, not `mismatch`; a refund listed as S or P counts as `refunded`.
+   - Why: a not-yet-settled movement is lag, not disagreement; the warning chip is kept for real disagreement.
+4. **`OperatorPayment.capturedAt` and the tests it touched.**
+   - Plan said: add the capture time to `OperatorPayment` if the view lacks it.
+   - Chose: `payments.captured_at` is selected and mapped. `operator.test.ts`, `operator.postgrest-integration.test.ts` and `operator-dashboard.test.tsx` fixtures gain the field, and one assertion now checks the mapping. No case's intent changed.
+5. **The Postman runner issues an operator link.**
+   - Plan said: add the search request to the collection and run `postman-local.test.ts`.
+   - Found: the request needs an operator capability, and a capability only opens on a server with the same `BOOKING_LINK_SECRET`. The README gave `next dev` a random one.
+   - Chose: the runner keeps a local secret in `$TMPDIR/paisaxe-postman/booking-link-secret` (created once, owner-only), issues an operator link for the fixture merchant through `create-operator-link.ts` in a child process, and fills `operatorCapability`. The README's `next dev` reads the same file, and the runner prints the exact `BOOKING_LINK_SECRET` line. A child process, not an import: `links.ts` is server-only, and `e2e/booking-global-setup.ts` imports the runner, so an import broke `typecheck:e2e` (seen in the first Phase 2 gate run). New request "08 Operator ledger".
+   - Evidence: a full local Newman run, 27 of 27 requests and assertions passed, including 08.
+6. **Route window and the dashboard test's fetch routing.**
+   - The route searches 31 days less 5 s, because the adapter widens the window to whole seconds and PayPal refuses more than 31 days.
+   - `operator-dashboard.test.tsx` routes `/paypal-ledger` to its own mock, so the existing tests' view and action call sequences are unchanged.
+7. **A fully refunded capture (status V) is "refunded" (independent review, major).**
+   - Plan said: capture found with status S -> matches or refunded; any other status -> mismatch.
+   - Found: the SDK documents V as "A successful transaction was fully reversed and funds were refunded to the original sender" (`TransactionInformation.transactionStatus`), so the plan's rule would show "No coincide con PayPal" after every full refund. Whether the sandbox marks the T0006 entry V is not verified yet (the permission was still pending).
+   - Chose: V with the deposit's amount and currency -> `refunded`, with or without a listed refund entry. The mock now lists a fully refunded capture as V, so the tests exercise it.
+8. **Smaller choices not in the plan.**
+   - `searchTransactions(start: Date, end: Date)`, positional, instead of `({ start, end })`.
+   - The summary counts `refunded` as confirmed: "PayPal confirma N de M" counts deposits whose PayPal records agree, refunded or not.
+   - The route logs `not_authorized` and `not_configured` with `warn` (setup states) and everything else with `error`; all under `[OPERATOR_LEDGER_FAILED]`.
+   - The mock answers 400 `INVALID_DATE_RANGE` for an unreadable or over-31-day window (PayPal's own error name not verified).
+   - The Postman runner adds a local `operator_access` row on every start, as it already does a voucher (local database only). The secret file lives beside `--out`; the README's path is the default `--out`.
+   - Layout (review): while the first check loads, the summary keeps its height (and a phone's two-line height), the button is shown `aria-disabled`, and each captured deposit keeps an invisible placeholder chip, so nothing moves when the answer arrives. `aria-disabled` rather than `disabled`, so keyboard focus stays on the button. PayPal's refresh time shows a date when it is not from the view's day.
+9. **Simplify pass (4 angles).**
+   - Applied: the route reads only experiences and bookings (`loadOperatorBookings`, shared with the view through `bookingsOf`) instead of the whole view with its holds and 14 days of availability; `MAX_SEARCH_RANGE_MS` exported from the adapter and the route's window derived from it (less 2 s); `matchLedger` takes a `Date`; the matcher's not-listed branch is one comparison; `LedgerBooking` derived from `OperatorBooking`; one `matches` prop (null while loading) instead of two; a shared pill style for "Incidencia" and the chips; the mock's status table and a hoisted lookup; the runner's label computed once.
+   - Skipped: moving `madridDate` into `booking-format.ts` (it broke `typecheck:e2e`, whose tsconfig has no `@/` paths; importing it from `booking/types` would add zod to the operator page bundle, so the page keeps a one-line copy with a comment); an index for the matcher (500 movements at most); narrowing the window to the oldest capture (changes behaviour); an `operatorCapability` helper in `links.ts` (the runner now parses the script's printed link instead).
+10. **D9: the sandbox permission is set; PayPal has not applied it yet.**
+   - First read-only search (sandbox, last 7 days): token 200 without a reporting scope, then search 403, `name` and `details[0].issue` both `NOT_AUTHORIZED` (debug id `f636297435446`). The mock's 403 now copies that body; it had assumed `PERMISSION_DENIED`.
+   - The developer dashboard needed the owner's PayPal login (Claude does not enter passwords). The owner signed in. Claude ticked "Transaction search" on the Sandbox app "Default Application" (client id prefix matches `.env.local`), saved ("Application was saved successfully.", 2026-10-08 06:31 UTC) and never opened the Live tab. Screenshot kept outside the repository (scratchpad `sandbox-check/transaction-search-enabled-2026-10-08.png`), because it shows the owner's name.
+   - A search with a new token right after still answered 403 (debug id `f965925a195b0`), the token again without a reporting scope. Retried in Phase 3.
+
 ## Handoff
 
 ### Phase 1 (2026-10-08)
@@ -55,3 +100,43 @@ Plan: [2026-10-08-apimatic-official-sdk.md](2026-10-08-apimatic-official-sdk.md)
   `PLAYWRIGHT_REUSE_SERVER=false`.
 - Phase 2 entry: Phase 1 committed on the branch; the Transaction Search controller is
   `TransactionSearchController.searchTransactions` (contract sheet, Operations).
+
+### Phase 2 (2026-10-08)
+
+- Same worktree and branch, on Phase 1's commit `1e4ded3b`. One owner (the parent session) for every
+  unit, in this order: shared contract, adapter and mock, matcher, operator data and route, panel,
+  Postman, sandbox permission. No parallel implementers: the units share `types.ts` and the mock.
+- Capture time: `OperatorPayment.capturedAt` from `payments.captured_at` (a new field, as the plan
+  allowed).
+- Sandbox permission: set on the Sandbox app at 06:31 UTC (deviation 10). Read-only searches at 06:31, 06:35
+  and 06:50 UTC still answered 403 `NOT_AUTHORIZED`. Phase 3 retries.
+- Screenshots (outside the repository, scratchpad `shots/`): `operator-ledger-{ok,pending,unavailable}-{390,1280}.png`,
+  taken with the API answers mocked in the browser and `next dev` on 3120 without the hosted database.
+- Review: an independent reviewer did not approve the first round (1 major: a V capture after a full refund
+  would have shown "No coincide con PayPal"; 5 minor; 2 nits), then approved after fixes. Simplify: deviation 9.
+- Gates on the final Phase 2 tree, run in order, every exit status kept:
+  - `npm run typecheck`: first run **failed** (`typecheck:e2e`: the runner imported `links.ts` and `types.ts`
+    imported `booking-format`, neither resolvable from `e2e/tsconfig.json`), fixed (deviation 5), then 0.
+  - `npm run lint` 0, `npx knip` 0, `npm run lint:deps` 0, `npm run check-licenses` 0,
+    `npm run generate-locale-coverage` 0 (no file changed), `npm run build` 0,
+    `npm run check-bundle-budget` 0.
+  - `npx vitest run --maxWorkers=4`: 0 (513 files, 9593 tests), then after the runner fix **1 failed**
+    (`scripts/lib/qa-journey.test.ts`, "startup timeout has a retained log": the log lacked "booting"; a
+    timing test this change does not touch), which passed 3 of 3 alone.
+  - Booking `*.postgrest-integration` plus `postman-local.test.ts` on the isolated stack:
+    - First run **failed** in `booking.postgrest-integration.test.ts`: the fixture merchant had more than
+      one `operator_access` row, left by this session's Newman runs. Fixed: the runner deletes its own
+      `postman-local-*` links at start and on stop (`removeRunnerOperatorAccess`, tested), and the leftover
+      rows in the isolated stack were deleted.
+    - Then **1 failed** in `reconcile.postgrest-integration.test.ts` ("expires lapsed holds…": the
+      expired-holds count was 0; other files' reconciliation expires holds too). Passed 31 of 31 alone.
+    - Then **1 failed** in `phone-confirmation.postgrest-integration.test.ts` ("two settlements racing…").
+      Its output was not captured; it passed 14 of 14 alone, then 200 of 200 in three full runs.
+      Cause unknown: an open finding for the owner.
+  - `npx playwright test --project=release-required-local`: 3 of 3, then after the runner fix
+    **1 failed** (`booking-roundtrip`: the quote card never appeared; the server log shows the
+    message reached the ordinary chat route, before any PayPal call), then 3 of 3. The same step
+    failed once in Phase 1. Cause unknown: an open finding for the owner (cold `next dev`).
+  - Newman (local runner, `next dev` on 3006, mock): 27 of 27 requests and assertions, twice (before and
+    after the runner fix), including "08 Operator ledger".
+- Phase 3 entry: Phase 2 committed on the branch; the sandbox permission retried before the acceptance.

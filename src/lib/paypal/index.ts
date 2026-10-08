@@ -7,5 +7,6 @@ export { valueToCents } from "./money";
 export { cancelInvoice, createInvoice, getInvoice, sendInvoice } from "./invoices";
 export { captureOrder, createOrder, getOrder } from "./orders";
 export { getCapture, getRefund, refundCapture } from "./payments";
+export { MAX_SEARCH_RANGE_MS, searchTransactions } from "./transactions";
 export { verifyWebhookSignature } from "./webhooks";
 export * from "./types";

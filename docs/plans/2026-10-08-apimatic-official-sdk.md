@@ -196,3 +196,8 @@ refunded; screenshots for the evidence page.
     removed. Skipped: a dummy-token redesign (changes failure reporting and bypasses
     the skill's provider), shared `parseJson` and shared test fixtures (outside this
     diff; the plan keeps those files unchanged).
+- 2026-10-08, Phase 2 done: Transaction Search in the adapter (`searchTransactions`), the matcher
+  (`src/lib/booking/ledger.ts`), `GET /api/operator/<cap>/paypal-ledger`, the panel's chips, summary
+  and buttons, the mock endpoint, the Postman request "08 Operator ledger". The sandbox permission is set
+  and not yet applied by PayPal. Ten deviations and the gate record (including three one-off
+  failures, two with unknown cause) are in the notes, Phase 2.
