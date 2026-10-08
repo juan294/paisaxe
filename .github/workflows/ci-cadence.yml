@@ -68,7 +68,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           if ! printf '%s  %s
-          ' 'fb12b64481f7424afee42f5f65e46717745183d7fbbf644729eae177050f2c7d' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+          ' 'd86f7ac1593bd238fc869b89ae30e33bf2d07434ae0289c66c00985d9c7f3c37' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
             reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again.'
             echo "::error title=CI cadence::$reason"
             echo "$reason" >> "$GITHUB_STEP_SUMMARY"
@@ -214,7 +214,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           if ! printf '%s  %s
-          ' 'fb12b64481f7424afee42f5f65e46717745183d7fbbf644729eae177050f2c7d' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+          ' 'd86f7ac1593bd238fc869b89ae30e33bf2d07434ae0289c66c00985d9c7f3c37' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
             reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again.'
             echo "::error title=CI cadence::$reason"
             echo "$reason" >> "$GITHUB_STEP_SUMMARY"
