@@ -3,16 +3,16 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "c840b93555404ff53fb88ffd544e9a7ba62b7559"
+    "blobSha": "5a9738011b9163704919036fa6df9cc0684b5009"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "c840b93555404ff53fb88ffd544e9a7ba62b7559"
+      "blobSha": "5a9738011b9163704919036fa6df9cc0684b5009"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "273d5de0a61eb0005cc8696c77aab933a21e0a45"
+      "blobSha": "eb9fa794e27924062152d8c3e8db5e80cb3aafca"
     }
   },
   "callees": {
@@ -50,6 +50,12 @@
       "path": ".github/workflows/ci-cadence-security-full.yml",
       "prefix": "security",
       "blobSha": "338ee0896a8a0192af887a584836ae3cf590d54c"
+    }
+  },
+  "nestedCallees": {
+    ".github/workflows/validate-merged-pr.yml": {
+      "path": ".github/workflows/validate-merged-pr.yml",
+      "blobSha": "7c733394f53db4ed685c1cf7cf0e16c9a99f54ff"
     }
   },
   "coverageOnly": {
@@ -137,15 +143,16 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "c840b93555404ff53fb88ffd544e9a7ba62b7559",
-    ".github/workflows/ci-cadence.yml": "273d5de0a61eb0005cc8696c77aab933a21e0a45",
+    ".github/workflows/ci-nightly.yml": "5a9738011b9163704919036fa6df9cc0684b5009",
+    ".github/workflows/ci-cadence.yml": "eb9fa794e27924062152d8c3e8db5e80cb3aafca",
     ".github/workflows/ci.yml": "2453f8ee28e540758c2b54cd074c0a44c6e61628",
     ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "d92da9de90ec345d88694c3037884a8da9c68a8e",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",
     ".github/workflows/ci-cadence-knip-full.yml": "4453408d8ef1231818df8f32fdce1da95706650d",
     ".github/workflows/ci-cadence-license-check-full.yml": "75fd2a1b570303eb0f606cb0d6d9b10cf9933fbf",
-    ".github/workflows/ci-cadence-security-full.yml": "338ee0896a8a0192af887a584836ae3cf590d54c"
+    ".github/workflows/ci-cadence-security-full.yml": "338ee0896a8a0192af887a584836ae3cf590d54c",
+    ".github/workflows/validate-merged-pr.yml": "7c733394f53db4ed685c1cf7cf0e16c9a99f54ff"
   },
   "stepInventory": {
     "ci-lint-and-typecheck": [

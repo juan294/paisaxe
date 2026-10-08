@@ -178,7 +178,10 @@ export function generateNativeWorkflows(root=process.cwd()) {
     if(slug==='ci')auxiliaryJobs.push({name:'ci / develop_push_source',conclusions:['skipped'],steps:[]});
   }
   auxiliaryJobs.push({name:'Nightly disposition',conclusions:['success'],steps:[{name:'Require real full proof or unchanged skip',conclusions:['success']},{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}]});
-  const pins=Object.fromEntries([canonical+'ci-nightly.yml',canonical+'ci-cadence.yml',...Object.values(callees).map(c=>c.path)].map(path=>[path,blob(source(path))]));
+  // GitHub lists every reusable workflow a run reaches, at any depth, in referenced_workflows.
+  const nestedCallees={},calleePaths=new Set(Object.values(callees).map(c=>c.path)),pending=[...calleePaths];
+  while(pending.length){for(const job of Object.values(parse(source(pending.pop())).jobs??{})){const called=/^\.\/(\.github\/workflows\/[A-Za-z0-9_.-]+\.yml)$/.exec(job.uses??'')?.[1];if(job.uses&&!called)throw Error('Unreviewed reusable workflow reference');if(called&&!calleePaths.has(called)&&!nestedCallees[called]){nestedCallees[called]={path:called,blobSha:blob(source(called))};pending.push(called);}}}
+  const pins=Object.fromEntries([canonical+'ci-nightly.yml',canonical+'ci-cadence.yml',...Object.values(callees).map(c=>c.path),...Object.keys(nestedCallees)].map(path=>[path,blob(source(path))]));
   const pushAuxiliary=auxiliaryJobs.filter(j=>j.name!=='Nightly disposition');
   const fast=parse(readFileSync(resolve(root,fastJobPath),'utf8'));
   pushAuxiliary.push({name:fast.name,conclusions:['success'],steps:fast.steps.map(s=>({name:s.name,conclusions:['success']})).concat([{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}])});
@@ -186,7 +189,7 @@ export function generateNativeWorkflows(root=process.cwd()) {
   const coverageDefinition=parse(source(canonical+'coverage.yml'));
   const coverageOnly={path:canonical+'coverage.yml',blobSha:blob(source(canonical+'coverage.yml')),steps:coverageDefinition.jobs.coverage.steps.map(step=>({name:step.name,conclusions:step.name==='Decide weekly native coverage eligibility'?['success']:step.name==='Report coverage to Portfolio'?['skipped']:['success','skipped'],post:Boolean(step.uses)}))};
   const callers=Object.fromEntries(['ci-nightly.yml','ci-cadence.yml'].map(path=>[canonical+path,{path:canonical+path,blobSha:pins[canonical+path]}]));
-  files.push({path:'.github/ci-cadence-native.json',source:JSON.stringify({schemaVersion:1,repository:'juan294/paisaxe',caller:callers[canonical+'ci-nightly.yml'],callers,callees,coverageOnly,workflowPins:pins,stepInventory,auxiliaryJobs,censusByCaller:{[canonical+'ci-nightly.yml']:auxiliaryJobs,[canonical+'ci-cadence.yml']:pushAuxiliary}},null,2)+'\n'});
+  files.push({path:'.github/ci-cadence-native.json',source:JSON.stringify({schemaVersion:1,repository:'juan294/paisaxe',caller:callers[canonical+'ci-nightly.yml'],callers,callees,nestedCallees,coverageOnly,workflowPins:pins,stepInventory,auxiliaryJobs,censusByCaller:{[canonical+'ci-nightly.yml']:auxiliaryJobs,[canonical+'ci-cadence.yml']:pushAuxiliary}},null,2)+'\n'});
   const updatedPolicy=structuredClone(policy);for(const w of updatedPolicy.workflows)w.definitionSha=blob(source(w.path));
   files.push({path:'.github/ci-cadence.json',source:JSON.stringify(updatedPolicy,null,2)+'\n'});
   return files;

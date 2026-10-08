@@ -6,10 +6,10 @@ import { join, dirname, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 const PINS = {
   "scripts/ci-cadence-publish.mjs": "aa7bc0ddec18d73bc732f2cd30fe32d0b73d1c4ddee2d050f70ee30b99711f25",
-  "scripts/ci-cadence-control.mjs": "b0dfdd16f6035e69a7797daad99d74dbc3ee6ed07bbd26796f5ad86ac41a128f",
-  "scripts/ci-cadence-projection.mjs": "aaeea5200fe40d88942796a8187a12b1a0a8dde6b3a5491bbc2e27c87e545b31",
+  "scripts/ci-cadence-control.mjs": "49d3b7b0c81b7220d004b238d80a0feae8f75b9f70fd2a139189cd6bcbb68fca",
+  "scripts/ci-cadence-projection.mjs": "6fa7715ef08772937f668e3d2fc9bba27a01414a9118f9b5dfecf620fb8e0319",
   "scripts/ci-cadence-run.mjs": "ef1b11904bba6fb5cd210a1ec060ac5314fe262f644535deb63a88860f847b84",
-  "scripts/ci-cadence-github.mjs": "b58ff93639ffeaa15b7e63b9fb71069b1600731a588b5e37632361576d4730f4",
+  "scripts/ci-cadence-github.mjs": "8fd9db069e1cef6b2ed191acac2e4877d27ba781a5bac1de118d3e99566e63d8",
   "scripts/ci-cadence-producer.mjs": "90f340deef65014b4bf91019783f255242f0f22210e9ee6aa9d661cd9e5bc4af",
   "scripts/ci-cadence-coverage.mjs": "2bc87bc02ea3d70ef510c8dd7a660faf1002a17a4e1c6e7fb26e384f6dffe424",
   "scripts/ci-cadence-native.mjs": "a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d",
