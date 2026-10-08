@@ -222,3 +222,20 @@ Plan: [2026-10-08-apimatic-official-sdk.md](2026-10-08-apimatic-official-sdk.md)
   - Sending the draft report to APIMatic (D10) and the form answer (`docs/hackathon/apimatic.md`).
 - Local leftovers: the isolated stack `paisaxe-apimatic` (ports 548xx) is still running, holding the
   acceptance and Newman bookings; stop it with `npx supabase stop --workdir <scratchpad>/sb`.
+
+### Follow-up, 2026-10-08: the open test failures
+
+- `booking-roundtrip` (Phases 1 and 2, "cause unknown"): found. `voice-chat.tsx` chose the
+  discovery chat while `/api/booking/access` was still answering, so a first turn typed in that
+  window went to `/api/chat/stream` and then vanished when the booking chat took over (a real
+  visitor could hit it too). The panel now waits for booking access as it already waited for voice
+  access (`isInitializing`); a component test pins it. `release-required-local` then passed 4 of 4,
+  including a cold first run.
+- `reconcile.postgrest-integration.test.ts` ("expires lapsed holds…"): the test now asserts its own
+  rows only; the global sweep's count is pinned by `reconcile.test.ts`.
+- `operator-dashboard.test.tsx`: the PayPal-check tests failed once on a loaded machine (the suite
+  took 9 minutes); this file's async wait is 5 s.
+- CI cadence on `4fe6adc4` (the pushed merge) failed in CI Fast: gitleaks' generic-api-key rule
+  flagged the test operation key `6f1c2d3e-…` (named `operationKey`/`OPERATION_KEY`) in three new
+  test files. False positives; later pushes scan only their own new commits, so it does not
+  recur unless new tests copy that pattern.

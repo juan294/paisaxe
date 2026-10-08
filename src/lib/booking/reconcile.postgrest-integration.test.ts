@@ -699,8 +699,12 @@ describe.skipIf(!dbReachable)("PayPal webhook inbox and reconciliation against l
 
       expect(bookingStatus(id)).toBe("expired");
       expect(psql(`SELECT status FROM public.booking_drafts WHERE id = '${stale}';`)).toBe("abandoned");
-      expect(summary.expiredHolds).toBeGreaterThanOrEqual(1);
-      expect(summary.abandonedDrafts).toBeGreaterThanOrEqual(1);
+      // The hold expiry and the draft sweep are global (expire_holds(), abandonStaleDrafts), and other
+      // live-database files reconcile in parallel workers: whichever run sweeps first gets the count, so
+      // this run's summary may be 0 although its own rows above are expired. The count mapping itself is
+      // pinned in reconcile.test.ts ("counts expired holds and abandoned drafts").
+      expect(summary.expiredHolds).toEqual(expect.any(Number));
+      expect(summary.abandonedDrafts).toEqual(expect.any(Number));
     });
 
     it("logs needs_attention bookings older than 15 minutes", async () => {
