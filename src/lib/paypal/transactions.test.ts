@@ -70,6 +70,8 @@ describe("searchTransactions", () => {
   });
 
   it("lists a capture and its refund as signed entries with PayPal's refresh time", async () => {
+    // Shapes as the sandbox listed a refunded deposit on 2026-10-08: the capture stays S; the refund is a
+    // separate T1107 whose paypal_reference_id is the capture.
     const captureId = await capturedDeposit();
     const refund = await refundCapture(captureId, 3000, OPERATION_KEY);
     const { start, end } = lastWindow();
@@ -81,11 +83,10 @@ describe("searchTransactions", () => {
     expect(ledger.refreshedAt).toMatch(/Z$/);
     expect(ledger.entries).toEqual([
       {
-        // A fully refunded capture is listed as V (fully reversed), as the SDK documents.
         transactionId: captureId,
         referenceId: null,
         eventCode: "T0006",
-        status: "V",
+        status: "S",
         amountCents: 3000,
         currency: "EUR",
         customId: BOOKING_ID,

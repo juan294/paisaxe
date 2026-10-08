@@ -741,13 +741,16 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     response.writeHead(204, { "paypal-debug-id": debugId() }).end();
   }
 
-  /** PayPal's Transaction Search date format: 2026-10-08T10:00:00+0000. */
+  /** Transaction Search's date format, as the sandbox answered on 2026-10-08: 2026-10-08T10:00:00Z. */
   function ledgerDate(date: Date): string {
-    return `${date.toISOString().slice(0, 19)}+0000`;
+    return `${date.toISOString().slice(0, 19)}Z`;
   }
 
-  /** PayPal's transaction status letter; a fully refunded capture is V ("fully reversed", the SDK's TransactionInformation). */
-  const LEDGER_STATUS: Record<string, string> = { REFUNDED: "V", COMPLETED: "S", PARTIALLY_REFUNDED: "S", PENDING: "P" };
+  /**
+   * PayPal's transaction status letter. The sandbox listed a fully refunded capture as S, with the refund as
+   * its own T1107 entry (2026-10-08); the SDK also documents V ("fully reversed"), which the mock never sends.
+   */
+  const LEDGER_STATUS: Record<string, string> = { REFUNDED: "S", COMPLETED: "S", PARTIALLY_REFUNDED: "S", PENDING: "P" };
   const ledgerStatus = (status: string): string => LEDGER_STATUS[status] ?? "D";
 
   function handleTransactionSearch(url: URL, response: ServerResponse): void {
@@ -768,6 +771,8 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
       ...[...captures.values()].map((capture) => ({
         at: capture.createdAt,
         info: {
+          // The sandbox also gives a capture a paypal_reference_id (type TXN) to another transaction id,
+          // neither the order nor anything the adapter uses, so the mock leaves it out.
           transaction_id: capture.id,
           transaction_event_code: "T0006",
           transaction_status: ledgerStatus(capture.status),

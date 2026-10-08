@@ -21,7 +21,7 @@ function rfc3339(time: number): string {
   return `${new Date(time).toISOString().slice(0, 19)}Z`;
 }
 
-/** PayPal's "2026-10-08T10:00:00+0000" as ISO 8601, or null when unreadable. */
+/** PayPal's date ("2026-10-08T10:00:00Z" from the sandbox; "+0000" in its examples) as ISO 8601, or null. */
 function isoOrNull(value: string | undefined): string | null {
   const time = value ? Date.parse(value) : Number.NaN;
   return Number.isNaN(time) ? null : new Date(time).toISOString();

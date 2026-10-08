@@ -73,6 +73,47 @@ Plan: [2026-10-08-apimatic-official-sdk.md](2026-10-08-apimatic-official-sdk.md)
    - The developer dashboard needed the owner's PayPal login (Claude does not enter passwords). The owner signed in. Claude ticked "Transaction search" on the Sandbox app "Default Application" (client id prefix matches `.env.local`), saved ("Application was saved successfully.", 2026-10-08 06:31 UTC) and never opened the Live tab. Screenshot kept outside the repository (scratchpad `sandbox-check/transaction-search-enabled-2026-10-08.png`), because it shows the owner's name.
    - A search with a new token right after still answered 403 (debug id `f965925a195b0`), the token again without a reporting scope. Retried in Phase 3.
 
+### Phase 3
+
+1. **Sandbox acceptance over HTTP, the owner approving in their own browser.**
+   - Plan said: book and pay a deposit on the local app (as on 2026-10-07, through the chat).
+   - Found: the first browser attempt hit a real bug (item 2). After the fix, the automation tab's
+     requests did not reach the server and the tab froze twice.
+   - Chose: the Postman collection for the booking (folders 00 to 04 with the local runner), then
+     the payment, capture and cancellation requests. The owner approved the order as the sandbox
+     buyer in their own browser, and their return page captured it. Same SDK paths; record in
+     `2026-10-08-apimatic-official-sdk-phases/sandbox-acceptance-2026-10-08.md`.
+2. **Development CSP and an isolated Supabase stack (bug found and fixed, outside the plan).**
+   - Found: `src/lib/proxy/csp.ts` allowed a local Supabase only on port 54321 in development, so a
+     browser on an isolated stack (the release checklist's procedure, ports 548xx here) could not
+     start a guest session.
+   - Chose: in development only, allow the loopback origin (http and ws) of
+     `NEXT_PUBLIC_SUPABASE_URL` (through `getSupabaseUrl()`), which replaces the fixed 54321 list
+     (simplify, altitude): the browser's Supabase client only ever calls that URL, so a default
+     stack is still allowed and an isolated one now is. Tests in `src/lib/security-headers.test.ts`
+     cover 127.0.0.1 and localhost on 54321, another port, production, a hosted project, a
+     non-loopback host and an unreadable URL. Production CSP is unchanged.
+   - Simplify skipped: one shared loopback helper for the proxy, `paypal/env.ts` and `zapier.ts`
+     (outside this diff, and those copies disagree on `[::1]`).
+3. **The mock now lists Transaction Search in the sandbox's own shapes.**
+   - Found (sandbox, 2026-10-08, the 2026-10-07 deposits): a fully refunded capture stays `T0006` /
+     `S` (with a `paypal_reference_id` of type `TXN` to another transaction id, not its order), the refund is its own `T1107` / `S` with
+     `paypal_reference_id` = the capture, and `last_refreshed_datetime` ends in `Z`. No `V`.
+   - Chose: the mock lists that, leaving the capture's own reference out (the adapter does not use it); `transactions.test.ts` expects it.
+   - Correction: a first version of this item, the acceptance record and the mock said the capture's reference was its order, of type `ODR`. That came from a listing that did not print the type; the re-listing (scratchpad `sandbox-check/list-2.log`) shows `TXN` and a reference that is not the order. All three were corrected. The matcher keeps its
+     V rule (Phase 2 deviation 7), because the SDK documents V, but nothing observed sends it.
+     Phase 2 deviation 7's premise ("would show No coincide after every full refund") was therefore
+     wrong for the sandbox: the S capture plus the T1107 refund already gave "refunded".
+4. **Testing instructions mention the panel's PayPal check before the release.**
+   - `docs/hackathon/testing-instructions.md` describes production. The check reaches production
+     only with the next release; until then the line describes a feature the live site lacks.
+5. **The plan's manual criterion is met in part.**
+   - Plan said: one deposit "visible as 'PayPal confirma' in the operator panel once PayPal lists it, then refunded; screenshots for the evidence page".
+   - Found: the deposit was refunded two minutes after the capture, before PayPal listed either, so it can only ever show "Pendiente en PayPal" and then "Reembolso en PayPal". "PayPal confirma" against the real sandbox would need a second deposit that is kept (another approval by the owner).
+   - Screenshots stay in the scratchpad, not the repository: the PayPal dashboard one shows the owner's name; the panel and confirmation ones are recorded by path in the acceptance record.
+6. **Measured PayPal lag.** The sandbox's `last_refreshed_datetime` trailed the clock by about
+   1 h 45 min to 2 h (07:26 UTC -> 05:29:59Z; 07:45 UTC -> 05:59:59Z).
+
 ## Handoff
 
 ### Phase 1 (2026-10-08)
