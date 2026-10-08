@@ -184,3 +184,41 @@ Plan: [2026-10-08-apimatic-official-sdk.md](2026-10-08-apimatic-official-sdk.md)
   - Newman (local runner, `next dev` on 3006, mock): 27 of 27 requests and assertions, twice (before and
     after the runner fix), including "08 Operator ledger".
 - Phase 3 entry: Phase 2 committed on the branch; the sandbox permission retried before the acceptance.
+
+### Phase 3 (2026-10-08)
+
+- Branch commits: `d1a7ea61` (evidence page, acceptance record, dev CSP fix, mock shapes) and
+  `de6235fc` (phone race test, booking evaluation 8 of 8). The merge `3f2e2d6b` ("Merge branch
+  'feature/apimatic-sdk' into develop", tree `e96f5689`) was built on `develop` at `68b2b78e`,
+  which had moved by another session's `e17a4b03`; no file overlapped and no dependency or
+  migration changed. `develop` was fast-forwarded to it in the main checkout (the owner's
+  uncommitted files there untouched), and the main checkout got `npm install` for the new SDK.
+- Gates on the branch (`d1a7ea61`, then `de6235fc`), every exit status kept: typecheck, lint,
+  knip, lint:deps, licences, locale coverage 0; full unit suite 0 (513 files, 9596 tests); booking
+  integration on the isolated stack 0 (200); bundle budget 0; `release-required-local` 3 of 3;
+  Newman 27 of 27; `npm run eval:booking` 8 of 8 (`docs/hackathon/evaluation/2026-10-08.json`);
+  release-artifact smoke **failed twice** ("candidate source dirty": `next dev` from the E2E step
+  had rewritten `AGENTS.md`, then the evaluation record was uncommitted), then 3 of 3 on the clean
+  `de6235fc`. The pre-commit suite of the second commit **failed** once on the phone race test
+  (deviation 6, fixed before the commit landed).
+- Gates on the merged tree `3f2e2d6b`: typecheck, lint, knip, lint:deps, licences 0; booking
+  integration 0 (200); release-artifact smoke 3 of 3; bundle budget 0; `release-required-local`
+  3 of 3; full unit suite **failed** once on `reconcile.postgrest-integration.test.ts` ("expires
+  lapsed holds…": the expired-holds count was 0), then 0 (523 files, 9685 tests). Diagnosis: the
+  hold expiry and draft sweep are global, so a reconciliation in another test file running in
+  parallel can expire this test's hold first; its own rows end correct (the line before passed).
+  Not changed here: the fix (scope the sweep in the test, or run the live-database files serially)
+  is the owner's call.
+- Note: the unit suite and the pre-commit hook run the `*.postgrest-integration` files against
+  the default local stack (`127.0.0.1:54321`) when no `SUPABASE_LOCAL_API_URL` is set, so every
+  commit's hook in this session exercised that stack (the `paisaxe` one), as the repository's hook
+  always does; the explicit integration gates used the isolated stack.
+- Open for the owner:
+  - The push of `develop` (not done; needs authorization), then green CI before closing #1013.
+  - The cold-start `booking-roundtrip` failure (Phase 1 and 2 handoffs; cause unknown, before any
+    PayPal call).
+  - The reconcile test's global sweep (above).
+  - "PayPal confirma" against the real sandbox needs a kept deposit (deviation 5).
+  - Sending the draft report to APIMatic (D10) and the form answer (`docs/hackathon/apimatic.md`).
+- Local leftovers: the isolated stack `paisaxe-apimatic` (ports 548xx) is still running, holding the
+  acceptance and Newman bookings; stop it with `npx supabase stop --workdir <scratchpad>/sb`.

@@ -57,8 +57,11 @@ movement in PayPal.
 
 ## Pending
 
-- The panel showing "Reembolso en PayPal" for RS-14A4A0 once PayPal's records reach 07:46 UTC
-  (about two hours after the movement, by the lag measured above).
+- The panel showing "Reembolso en PayPal" for RS-14A4A0. The refund itself completed at once
+  (PayPal answered it COMPLETED; booking and payment `refunded` at 07:46:42). What lags is
+  Transaction Search, PayPal's reporting feed: it publishes in 30-minute blocks about two hours
+  behind (at 08:48 UTC it reached 06:59:59Z), so the 07:44-07:46 movements appear with the block
+  ending 07:59:59Z, around 09:50 UTC. Not waited for; the merge went ahead (owner, 2026-10-08).
 
 Screenshots stay outside the repository (scratchpad `acceptance/`): the owner's confirmation page
 (`booking-confirmed-RS-14A4A0.png`) and the panel (`panel-pending-1280.png`).

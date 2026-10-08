@@ -201,3 +201,8 @@ refunded; screenshots for the evidence page.
   and buttons, the mock endpoint, the Postman request "08 Operator ledger". The sandbox permission is set
   and not yet applied by PayPal. Ten deviations and the gate record (including three one-off
   failures, two with unknown cause) are in the notes, Phase 2.
+- 2026-10-08, Phase 3 done: evidence page `docs/hackathon/apimatic.md` with the draft form answer
+  and the draft APIMatic report; sandbox acceptance (order, capture and refund through the official
+  SDK; Transaction Search against the real sandbox after the permission took effect); a dev CSP
+  fix for isolated local stacks; merged into `develop` locally as `3f2e2d6b`. Not pushed: the push
+  waits for the owner. Handoff and open items in the notes, Phase 3.
