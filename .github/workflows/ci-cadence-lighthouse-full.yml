@@ -162,6 +162,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
           MAINTENANCE_MODE: "false"
+      - name: Remove Lighthouse CI scratch output
+        run: rm -rf .lighthouseci
       - name: Verify completed callable source checkout
         run: |
           set -euo pipefail

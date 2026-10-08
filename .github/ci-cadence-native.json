@@ -29,7 +29,7 @@
     ".github/workflows/lighthouse.yml": {
       "path": ".github/workflows/ci-cadence-lighthouse-full.yml",
       "prefix": "lighthouse",
-      "blobSha": "db256a17ed4718c5911852bc4d98dbba7790cca1"
+      "blobSha": "d92da9de90ec345d88694c3037884a8da9c68a8e"
     },
     ".github/workflows/bundle-size.yml": {
       "path": ".github/workflows/ci-cadence-bundle-size-full.yml",
@@ -49,7 +49,7 @@
     ".github/workflows/security.yml": {
       "path": ".github/workflows/ci-cadence-security-full.yml",
       "prefix": "security",
-      "blobSha": "f177c2f2c21e76e11cf46187d37fb5f2b3e36f38"
+      "blobSha": "338ee0896a8a0192af887a584836ae3cf590d54c"
     }
   },
   "coverageOnly": {
@@ -141,11 +141,11 @@
     ".github/workflows/ci-cadence.yml": "e9cd3078f3caee4a99a0e011fdfd1cf21fbe294f",
     ".github/workflows/ci.yml": "fa583062712c4c2bff78ebfc7c07a825909f240e",
     ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
-    ".github/workflows/ci-cadence-lighthouse-full.yml": "db256a17ed4718c5911852bc4d98dbba7790cca1",
+    ".github/workflows/ci-cadence-lighthouse-full.yml": "d92da9de90ec345d88694c3037884a8da9c68a8e",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",
     ".github/workflows/ci-cadence-knip-full.yml": "4453408d8ef1231818df8f32fdce1da95706650d",
     ".github/workflows/ci-cadence-license-check-full.yml": "75fd2a1b570303eb0f606cb0d6d9b10cf9933fbf",
-    ".github/workflows/ci-cadence-security-full.yml": "f177c2f2c21e76e11cf46187d37fb5f2b3e36f38"
+    ".github/workflows/ci-cadence-security-full.yml": "338ee0896a8a0192af887a584836ae3cf590d54c"
   },
   "stepInventory": {
     "ci-lint-and-typecheck": [
@@ -320,6 +320,7 @@
       "Build",
       "Run Lighthouse CI (desktop)",
       "Run Lighthouse CI (mobile)",
+      "Remove Lighthouse CI scratch output",
       "Verify completed callable source checkout",
       "Set up job",
       "Complete job",
