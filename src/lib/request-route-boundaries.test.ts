@@ -63,11 +63,14 @@ describe("real routes enforce their new budgets", () => {
   it.each(methods)("$method $path rejects auth without charge, denies at boundary with no side effect and recovers after expiry", async ({ path, method, handler, cap, body }) => {
     const unauthorized = await handler(request(path, method, body, false));
     expect(unauthorized.status).toBe(401); expect(getRateLimitStore().size).toBe(0); expect(sideEffects()).toBe(0);
-    for (let i = 0; i < cap; i++) expect((await handler(request(path, method, body))).status).toBe(200);
+    expect((await handler(request(path, method, body))).status).toBe(200);
+    const allowedEffects = sideEffects();
+    expect(allowedEffects).toBeGreaterThan(0);
+    for (let i = 1; i < cap; i++) expect((await handler(request(path, method, body))).status).toBe(200);
     const before = sideEffects(); const denied = await handler(request(path, method, body));
     expect(denied.status).toBe(429); expect(denied.headers.get("Retry-After")).toBe("60"); expect(sideEffects()).toBe(before);
     now += 60_001;
-    expect((await handler(request(path, method, body))).status).toBe(200); expect(sideEffects()).toBe(before + 1);
+    expect((await handler(request(path, method, body))).status).toBe(200); expect(sideEffects()).toBe(before + allowedEffects);
   });
 });
 

@@ -24,6 +24,8 @@ export function databaseBoundaryFixtures(user: string, story: string, prefix: st
     add("booking_sms_jobs", { booking_id: ids.pending, event_key: `${prefix}sms`, to_phone: "+34666666666", message: "Synthetic message", status: "pending" }, { message: "Updated synthetic message" });
     add("elevenlabs_webhook_events", { booking_id: ids.pending, event_key: `${prefix}elevenlabs` }, { event_key: `${prefix}elevenlabs` });
     add("translate_webhook_events", { story_id: story, event_key: `${prefix}translate`, status: "completed" }, { last_error: "Synthetic error" });
+    add("stripe_entitlement_payments", { payment_intent: `${prefix}ledger` }, { matched: false }, ["payment_intent"]);
+    add("stripe_entitlement_facts", { kind: "refund", object_id: `${prefix}refund`, payment_intent: `${prefix}ledger`, status: "pending" }, { status: "failed" }, ["kind", "object_id"]);
     add("stripe_webhook_events", { event_id: `${prefix}stripe` }, { event_id: `${prefix}stripe` });
     add("paypal_webhook_events", { event_id: `${prefix}paypal`, event_type: "CONTRACT.SYNTHETIC", payload: { synthetic: true } }, { last_error: "Synthetic error" });
     add("admin_audit_log", { action: `${prefix}audit`, admin_email: "synthetic@example.test" }, { resource: "synthetic-resource" });

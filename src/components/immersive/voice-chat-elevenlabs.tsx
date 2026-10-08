@@ -27,6 +27,7 @@ interface VoiceChatElevenLabsProps {
   story: Story;
   agentId: string;
   onFallbackToText: () => void;
+  onAccessDenied?: () => Promise<void>;
   userAccessToken?: string | null;
   /** FE-H4: a prompt-chip question captured before voice mode became active. */
   initialMessage?: string;
@@ -119,6 +120,7 @@ export function VoiceChatElevenLabs({
   story,
   agentId,
   onFallbackToText,
+  onAccessDenied,
   userAccessToken,
   initialMessage,
 }: VoiceChatElevenLabsProps) {
@@ -131,6 +133,7 @@ export function VoiceChatElevenLabs({
         story={story}
         agentId={agentId}
         onFallbackToText={onFallbackToText}
+        onAccessDenied={onAccessDenied}
         userAccessToken={userAccessToken}
         initialMessage={initialMessage}
       />
@@ -142,6 +145,7 @@ function VoiceChatElevenLabsContent({
   story,
   agentId,
   onFallbackToText,
+  onAccessDenied,
   userAccessToken,
   initialMessage,
 }: VoiceChatElevenLabsProps) {
@@ -261,6 +265,11 @@ function VoiceChatElevenLabsContent({
         },
         body: JSON.stringify({ agentKey: "pelayo" }),
       });
+      if (signedSessionResponse.status === 403 && onAccessDenied) {
+        await onAccessDenied();
+        onFallbackToText();
+        return;
+      }
       const signedSession = (await signedSessionResponse.json()) as {
         signedUrl?: unknown;
       };

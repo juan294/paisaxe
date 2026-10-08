@@ -11,13 +11,13 @@ import { ENVIRONMENT_GATED } from './ci-cadence-producer.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '');
 const census = JSON.parse(readFileSync(new URL('../tests/fixtures/ci-cadence-adapter/native/nightly-gated-skips.json', import.meta.url), 'utf8'));
 const key = entry => JSON.stringify([entry.file, entry.describe]);
-const reviewed = JSON.parse(readFileSync(new URL('../tests/fixtures/ci-cadence-adapter/native/phase3-gated-cases.json', import.meta.url), 'utf8'));
+const reviewed = JSON.parse(readFileSync(new URL('../tests/fixtures/ci-cadence-adapter/native/phase4-gated-cases.json', import.meta.url), 'utf8'));
 const GATE = /describe\.skipIf\(!(?<probe>dbReachable|reachable)\)\(/g;
 
 /** Every tracked test file's describe.skipIf(!dbReachable) group titles. */
 function sourceGroups() {
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')));
-  const files = execFileSync('git', ['ls-files', '-z', '--', '*.test.ts', '*.test.tsx'], { cwd: root, encoding: 'utf8', env }).split('\0').filter(Boolean);
+  const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', '*.test.ts', '*.test.tsx'], { cwd: root, encoding: 'utf8', env }).split('\0').filter(Boolean);
   const groups = [];
   for (const file of files) {
     const text = readFileSync(`${root}/${file}`, 'utf8');
@@ -53,8 +53,8 @@ test('each gated group is gated only by the local Supabase reachability probe, u
 
 test('each reviewed group pins its actual qualified case count', () => {
   assert.deepEqual(ENVIRONMENT_GATED.map(entry => ({...entry})), reviewed.groups);
-  assert.equal(reviewed.executedContractCases, 937);
-  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), 938);
+  assert.equal(reviewed.declaredContractCases, 1002);
+  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), 1003);
 });
 
 function skippedSuite(groups) {
@@ -81,7 +81,7 @@ test('historical hosted nightly retains its 204-case provenance and cannot quali
 test('current ordinary measurement discloses only whole reviewed groups, never counts their skipped cases', () => {
   const suite=skippedSuite(reviewed.groups);
   const result=aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[structuredClone(suite)],environmentGated:ENVIRONMENT_GATED});
-  assert.equal(result.environmentGatedSkipped,938);assert.equal(result.testCount,1);assert.equal(result.testFiles,1);
+  assert.equal(result.environmentGatedSkipped,1003);assert.equal(result.testCount,1);assert.equal(result.testFiles,1);
   for(const omitted of ENVIRONMENT_GATED) assert.throws(() => aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[structuredClone(suite)],environmentGated:ENVIRONMENT_GATED.filter(entry=>entry!==omitted)}), /mandatory cases skipped or unfinished/, key(omitted));
   const partial=structuredClone(suite);partial.tests.testResults.at(-1).assertionResults[0].status='passed';
   assert.throws(() => aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[partial],environmentGated:ENVIRONMENT_GATED}), /mandatory cases skipped or unfinished/);

@@ -8,6 +8,8 @@ import {
   localBookingServerEnv,
 } from "./e2e/fixtures/booking-env";
 
+const paidVoiceRun = process.argv.some((arg, index) => arg === "--project=paid-voice-local" || (arg === "--project" && process.argv[index + 1] === "paid-voice-local"));
+if (paidVoiceRun && !process.env.PAID_VOICE_LOCAL_NONCE) throw new Error("Use scripts/run-paid-voice-local.mjs for the owned local paid-voice project");
 const isCI = !!process.env.CI;
 const useDevServer = process.env.PLAYWRIGHT_USE_DEV_SERVER === "true";
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER !== "false";
@@ -66,6 +68,7 @@ const releaseLocalRun = isReleaseLocalRun();
 const releaseArtifactRun = isReleaseArtifactRun();
 
 function getWebServerCommand() {
+  if (paidVoiceRun) return `node node_modules/next/dist/bin/next ${process.env.PAID_VOICE_ARTIFACT_MODE === "development" ? "dev" : "start"} --hostname 127.0.0.1 --port ${e2ePort}`;
   if (isCI) return `npm run start -- --port ${e2ePort}`;
   if (useDevServer) return `npm run dev -- --port ${e2ePort}`;
   return `npm run build && npm run start -- --port ${e2ePort}`;
@@ -76,7 +79,7 @@ const webServer = {
   url: `${baseURL}/api/health/live`,
   // Default local runs to an isolated production-style server because next dev's
   // issues overlay can intercept mobile clicks and hide real regressions.
-  reuseExistingServer,
+  reuseExistingServer: paidVoiceRun ? false : reuseExistingServer,
   // Bumped from 180s: the P1 Supabase deferral (async getClient() in
   // stories-data.ts/realtime.ts) adds an on-demand webpack chunk compile
   // to the first dev-server request that touches Supabase, widening
@@ -105,6 +108,7 @@ const webServer = {
 
 export default defineConfig({
   testDir: "./e2e",
+  ...(paidVoiceRun && {outputDir:process.env.PAID_VOICE_TEST_OUTPUT_DIR}),
   fullyParallel: true,
   forbidOnly: isCI,
   // QA-M3: Retries keep the gate green on transient CI flakes but obscure
@@ -141,6 +145,13 @@ export default defineConfig({
 
   projects: [
     {
+      name: "paid-voice-local",
+      testMatch: "paid-voice-local.spec.ts",
+      use: { ...desktopChrome, locale: "en-US", bypassCSP: true, permissions: ["microphone"], launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--autoplay-policy=no-user-gesture-required"] } },
+      timeout: 60_000,
+      retries: 0,
+    },
+    {
       name: "desktop",
       use: desktopChrome,
       testIgnore: [
@@ -148,6 +159,7 @@ export default defineConfig({
         "**/visual-regression.spec.ts",
         "**/stripe-real-checkout.spec.ts",
         "**/favorites-real.spec.ts",
+        "**/paid-voice-local.spec.ts",
         ...releaseSpecs,
       ],
     },
@@ -159,6 +171,7 @@ export default defineConfig({
         "**/visual-regression.spec.ts",
         "**/stripe-real-checkout.spec.ts",
         "**/favorites-real.spec.ts",
+        "**/paid-voice-local.spec.ts",
         ...releaseSpecs,
       ],
     },

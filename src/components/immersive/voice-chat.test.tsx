@@ -32,6 +32,9 @@ vi.mock("@/hooks/use-auth", () => ({
 
 // Mutable mock state for useVoiceAccess
 const mockVoiceAccess = {
+  isSuspended: false,
+  isAccessDenied: false,
+  accessStatus: "none",
   canUseVoice: false,
   needsSignIn: false,
   needsPurchase: false,
@@ -143,21 +146,23 @@ vi.mock("next/dynamic", async () => {
 // Mock VoiceChatElevenLabs component (to avoid navigator.mediaDevices issues in tests)
 // Store onFallbackToText and forwarded props so tests can invoke/assert them
 let capturedOnFallbackToText: (() => void) | undefined;
-let capturedVoiceChatProps: { userAccessToken?: string | null; initialMessage?: string } = {};
+let capturedVoiceChatProps: { onAccessDenied?: () => Promise<void>; userAccessToken?: string | null; initialMessage?: string } = {};
 vi.mock("./voice-chat-elevenlabs", () => ({
   VoiceChatElevenLabs: ({
     story,
     onFallbackToText,
+    onAccessDenied,
     userAccessToken,
     initialMessage,
   }: {
     story: { title: string };
     onFallbackToText?: () => void;
+    onAccessDenied?: () => Promise<void>;
     userAccessToken?: string | null;
     initialMessage?: string;
   }) => {
     capturedOnFallbackToText = onFallbackToText;
-    capturedVoiceChatProps = { userAccessToken, initialMessage };
+    capturedVoiceChatProps = { onAccessDenied, userAccessToken, initialMessage };
     return (
       <div data-testid="elevenlabs-voice-chat">
         Voice chat active for {story.title}
@@ -256,6 +261,9 @@ const resetMockVoiceAccess = () => {
   mockAuthState.session = null;
   mockBookingAccess.active = false;
   mockBookingAccess.isLoading = false;
+  mockVoiceAccess.isSuspended = false;
+  mockVoiceAccess.isAccessDenied = false;
+  mockVoiceAccess.accessStatus = "none";
   mockVoiceAccess.canUseVoice = false;
   mockVoiceAccess.needsSignIn = false;
   mockVoiceAccess.needsPurchase = false;
@@ -1128,6 +1136,42 @@ describe("VoiceChat with voice access", () => {
   afterEach(() => {
     vi.clearAllMocks();
     resetMockVoiceAccess();
+  });
+
+  it("passes authoritative access refresh into the signed-session component", async () => {
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument());
+    await capturedVoiceChatProps.onAccessDenied!();
+    expect(mockVoiceAccess.refresh).toHaveBeenCalledWith({afterIssuanceDenial:true});
+  });
+
+  it("shows suspended support while preserving text input and hiding purchase action", async () => {
+    mockVoiceAccess.canUseVoice = false; mockVoiceAccess.hasAccess = false;
+    mockVoiceAccess.isSuspended = true; mockVoiceAccess.accessStatus = "suspended";
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText(/Voice access is suspended/)).toBeInTheDocument());
+    expect(screen.getByRole("link", {name:"Contact support"})).toHaveAttribute("href","mailto:support@paisaxe.es");
+    expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
+    expect(screen.queryByTestId("voice-purchase-cta")).not.toBeInTheDocument();
+  });
+
+  it("unknown issuance denial shows retry/support and text without inventing dispute or purchase reason", async () => {
+    mockVoiceAccess.canUseVoice=false; mockVoiceAccess.hasAccess=false;
+    mockVoiceAccess.isAccessDenied=true; mockVoiceAccess.needsPurchase=false;
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(()=>expect(screen.getByText(/Voice access is currently unavailable/)).toBeInTheDocument());
+    expect(screen.queryByText(/Voice access is suspended/)).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
+    expect(screen.queryByTestId("voice-purchase-cta")).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="/pricing"]')).toBeNull();
+    fireEvent.click(screen.getByRole("button",{name:"Check voice access"}));
+    expect(mockVoiceAccess.refresh).toHaveBeenCalledWith();
+  });
+
+  it.each(["revoked","expired"])("discloses %s purchase state", async status => {
+    mockVoiceAccess.canUseVoice = false; mockVoiceAccess.accessStatus = status;
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(status === "revoked" ? "This voice pass was revoked" : "Your voice pass has expired"));
   });
 
   it("should default to voice mode when user has voice access", async () => {

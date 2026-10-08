@@ -6,6 +6,7 @@
  */
 export interface VoiceAccessResponse {
   hasAccess: boolean;
+  status?: "active" | "suspended" | "revoked" | "expired" | "none";
   expiresAt: string | null;
   purchaseType: string | null;
 }

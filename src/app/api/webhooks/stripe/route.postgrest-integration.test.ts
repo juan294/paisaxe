@@ -75,6 +75,7 @@ const USER_ID_SQL_LIST = toSqlList(ALL_TEST_USER_IDS);
  * make "granted" assertions flake) and as real teardown.
  */
 function deleteFixtureRows(): void {
+  psql(`DELETE FROM public.stripe_entitlement_payments WHERE payment_intent IN (${PAYMENT_ID_SQL_LIST});`);
   psql(`DELETE FROM public.voice_purchases WHERE payment_provider_id IN (${PAYMENT_ID_SQL_LIST});`);
   psql(`DELETE FROM public.stripe_webhook_events WHERE event_id IN (${EVENT_ID_SQL_LIST});`);
   psql(`DELETE FROM public.user_profiles WHERE user_id IN (${USER_ID_SQL_LIST});`);

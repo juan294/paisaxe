@@ -19,6 +19,10 @@ interface UseVoiceAccessResult {
   needsSignIn: boolean;
   /** User needs to purchase to use voice */
   needsPurchase: boolean;
+  isSuspended: boolean;
+  /** Session issuance denied; the fresh access reason is not yet known. */
+  isAccessDenied: boolean;
+  accessStatus: VoiceAccessResponse["status"];
   /** Expiry date for paid access (null if whitelisted or no access) */
   expiresAt: Date | null;
   /** Hours until expiry (for showing reminders) */
@@ -28,7 +32,7 @@ interface UseVoiceAccessResult {
   /** Loading state */
   isLoading: boolean;
   /** Refresh access state (call after purchase) */
-  refresh: () => Promise<void>;
+  refresh: (options?: {afterIssuanceDenial?: boolean}) => Promise<void>;
   retryAfter: number | null;
 }
 
@@ -39,11 +43,17 @@ export function useVoiceAccess(): UseVoiceAccessResult {
   const [paidAccess, setPaidAccess] = useState<{ userId: string; accessToken: string; value: VoiceAccessResponse } | null>(
     null
   );
+  const [issuanceDenied, setIssuanceDenied] = useState(false);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [isFetchingAccess, setIsFetchingAccess] = useState(false);
   const [hasCheckedPaidAccess, setHasCheckedPaidAccess] = useState(false);
 
-  const fetchPaidAccess = useCallback(async () => {
+  const fetchPaidAccess = useCallback(async (options?: {afterIssuanceDenial?: boolean}) => {
+    if (options?.afterIssuanceDenial) {
+      // A session 403 is authoritative even if the following reason read fails.
+      setPaidAccess(null);
+      setIssuanceDenied(true);
+    }
     if (!user || !session?.access_token) {
       setPaidAccess(null);
       setRetryAfter(null);
@@ -62,6 +72,7 @@ export function useVoiceAccess(): UseVoiceAccessResult {
 
       if (response.ok) {
         const data: VoiceAccessResponse = await response.json();
+        setIssuanceDenied(false);
         setPaidAccess({ userId: user.id, accessToken: session.access_token, value: data });
         setRetryAfter(null);
       } else if (response.status === 429) {
@@ -84,6 +95,7 @@ export function useVoiceAccess(): UseVoiceAccessResult {
   // Reset checked state when user changes (before fetching)
   useEffect(() => {
     setHasCheckedPaidAccess(false);
+    setIssuanceDenied(false);
     setPaidAccess(null);
     setRetryAfter(null);
   }, [user?.id, session?.access_token]);
@@ -104,7 +116,7 @@ export function useVoiceAccess(): UseVoiceAccessResult {
 
     // Check paid access
     const confirmedAccess = paidAccess?.userId === user?.id && paidAccess?.accessToken === session?.access_token ? paidAccess?.value : null;
-    const hasPaidAccess = (confirmedAccess?.hasAccess ?? false) && (!confirmedAccess?.expiresAt || Date.parse(confirmedAccess.expiresAt) > Date.now());
+    const hasPaidAccess = !issuanceDenied && (confirmedAccess?.hasAccess ?? false) && (!confirmedAccess?.expiresAt || Date.parse(confirmedAccess.expiresAt) > Date.now());
 
     // Visitor allowlist authorization now lives on the server boundary.
     const isWhitelisted = false;
@@ -124,8 +136,9 @@ export function useVoiceAccess(): UseVoiceAccessResult {
     const needsSignIn = visitorAccess.needsSignIn;
 
     // Needs purchase: signed in, not whitelisted, no paid access
+    const isSuspended = confirmedAccess?.status === "suspended" && !hasPaidAccess;
     const needsPurchase =
-      !!user && visitorAccess.featureEnabled && !hasPaidAccess && retryAfter === null;
+      !!user && visitorAccess.featureEnabled && !hasPaidAccess && !isSuspended && !issuanceDenied && retryAfter === null;
 
     // Only expose the public visitor agent when access has already been granted.
     const agentId = hasPaidAccess ? ELEVENLABS_AGENT_IDS.pelayo : "";
@@ -136,6 +149,9 @@ export function useVoiceAccess(): UseVoiceAccessResult {
       canUseVoice,
       needsSignIn,
       needsPurchase,
+      isSuspended,
+      isAccessDenied: issuanceDenied,
+      accessStatus: confirmedAccess?.status ?? "none",
       expiresAt,
       hoursUntilExpiry,
       agentId,
@@ -147,6 +163,7 @@ export function useVoiceAccess(): UseVoiceAccessResult {
     isAuthLoading,
     visitorAccess,
     paidAccess,
+    issuanceDenied,
     retryAfter,
     isFetchingAccess,
     hasCheckedPaidAccess,

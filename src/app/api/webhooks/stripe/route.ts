@@ -5,6 +5,7 @@ import { verifyWebhookSignature, calculateExpiryDate } from "@/lib/stripe";
 import type { PurchaseType } from "@/lib/stripe";
 import { logger } from "@/lib/logger";
 import type Stripe from "stripe";
+import { ADJUSTMENT_EVENTS, normalizeStripeAdjustment, stripeObjectId } from "@/lib/stripe-entitlements";
 
 const VALID_PURCHASE_TYPES = new Set<string>(["day_pass", "weekly_pass", "monthly_pass"]);
 const RPC_TIMEOUT_MS = 10_000;
@@ -103,8 +104,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Only handle events that can result in a grant.
-    if (!GRANTING_EVENT_TYPES.has(event.type)) {
+    if (!GRANTING_EVENT_TYPES.has(event.type) && !ADJUSTMENT_EVENTS.has(event.type)) {
       return NextResponse.json({ received: true });
+    }
+    if (ADJUSTMENT_EVENTS.has(event.type)) {
+      const normalized = normalizeStripeAdjustment(event.type, event.data.object, event.created);
+      if (!normalized.paymentIntent) return unrecoverableResponse(event.id, "missing_payment_intent");
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const result = await Promise.race([
+          createAdminClient().rpc("process_stripe_entitlement_event", {
+            p_event_id: event.id, p_event_type: event.type,
+            p_payment_intent: normalized.paymentIntent, p_facts: normalized.facts, p_grant: null,
+          }),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("RPC_TIMEOUT")), RPC_TIMEOUT_MS); }),
+        ]);
+        if (result.error) return NextResponse.json({ error: "Database error" }, { status: 500 });
+        if (result.data === "reconciliation_required" || result.data === "unmatched") {
+          logger.error("[STRIPE_ENTITLEMENT_RECONCILIATION]", { eventId: event.id, status: result.data });
+          Sentry.captureMessage("[STRIPE_ENTITLEMENT_RECONCILIATION]", { level: "error", extra: { eventId: event.id, status: result.data } });
+        }
+        return NextResponse.json({ status: result.data });
+      } finally { clearTimeout(timer); }
     }
     const session = event.data.object as Stripe.Checkout.Session;
 
@@ -129,7 +150,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return unrecoverableResponse(event.id, "missing_user_id");
     }
 
-    const paymentProviderId = session.payment_intent as string | null;
+    const paymentProviderId = stripeObjectId(session.payment_intent);
     if (!paymentProviderId) {
       return unrecoverableResponse(event.id, "missing_payment_intent");
     }
@@ -140,9 +161,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const supabase = createAdminClient();
 
     // BE-L2: wrap in a client-side timeout so Stripe retries if the DB is slow.
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("RPC_TIMEOUT")), RPC_TIMEOUT_MS)
-    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("RPC_TIMEOUT")), RPC_TIMEOUT_MS); });
 
     let data: string | null;
     let error: { message: string } | null;
@@ -181,7 +201,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: "Database timeout" }, { status: 500 });
       }
       throw raceErr;
-    }
+    } finally { clearTimeout(timer); }
 
     if (error) {
       logger.error("[STRIPE_RPC_FAILURE]", {

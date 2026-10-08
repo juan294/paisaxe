@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync, realpathSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { discoverSuites, validateReport, validateManifest, isolatedEnvironment, migrationInventory, runContracts, REQUIRED_SUITES, sha256, candidateDigest } from './run-contracts.mjs';
+import { discoverSuites, validateReport, validateManifest, validateKeys, isolatedEnvironment, migrationInventory, runContracts, REQUIRED_SUITES, sha256, candidateDigest } from './run-contracts.mjs';
 
 const suite = 'src/lib/stories-rls.postgrest-rls.test.ts';
 function report() {
@@ -77,6 +77,20 @@ test('only fresh task-owned loopback manifest identities are admitted', () => {
       assert.throws(() => validateManifest({ ...base, ...change }, root));
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+test('owned-stack keys reject same-port remote or different database identities and invalid JWTs', () => {
+  const manifest = { apiUrl: 'http://127.0.0.1:56321', dbPort: 56322 };
+  const jwt = (role, changes = {}) => 'header.' + Buffer.from(JSON.stringify({ iss: 'supabase-demo', role, exp: Math.floor(Date.now() / 1000) + 600, ...changes })).toString('base64url') + '.signature';
+  const status = { API_URL: manifest.apiUrl, DB_URL: 'postgresql://postgres:postgres@127.0.0.1:56322/postgres', ANON_KEY: jwt('anon'), SERVICE_ROLE_KEY: jwt('service_role') };
+  assert.deepEqual(validateKeys(status, manifest), { anon: status.ANON_KEY, service: status.SERVICE_ROLE_KEY, dbUrl: status.DB_URL });
+  for (const DB_URL of ['postgresql://postgres:postgres@example.com:56322/postgres', 'http://postgres:postgres@127.0.0.1:56322/postgres', 'postgresql://other:postgres@127.0.0.1:56322/postgres', 'postgresql://postgres:postgres@127.0.0.1:56322/other', status.DB_URL + '?host=example.com', status.DB_URL + '#other']) {
+    assert.throws(() => validateKeys({ ...status, DB_URL }, manifest), /database endpoint/);
+  }
+  assert.throws(() => validateKeys({ ...status, API_URL: 'http://127.0.0.1:56323' }, manifest), /API endpoint/);
+  for (const ANON_KEY of [undefined, 'malformed', jwt('service_role'), jwt('anon', { iss: 'remote' }), jwt('anon', { exp: 1 })]) {
+    assert.throws(() => validateKeys({ ...status, ANON_KEY }, manifest), /JWT/);
+  }
+  assert.throws(() => validateKeys({ ...status, SERVICE_ROLE_KEY: jwt('anon') }, manifest), /JWT/);
 });
 test('child environment excludes inherited provider secrets and pins local clients', () => {
   const env = isolatedEnvironment({ PATH: '/bin', HOME: '/tmp', STRIPE_SECRET_KEY: 'live-secret',

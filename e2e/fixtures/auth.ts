@@ -75,7 +75,7 @@ async function signInTestUser(page: Page): Promise<{ userId: string }> {
   return { userId: data.user.id };
 }
 
-async function injectSessionCookies(
+export async function injectSessionCookies(
   page: Page,
   storageKey: string,
   session: Session,

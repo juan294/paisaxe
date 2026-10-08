@@ -116,6 +116,9 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
   const {
     canUseVoice,
     needsPurchase,
+    isSuspended,
+    isAccessDenied,
+    accessStatus,
     agentId,
     expiresAt,
     hoursUntilExpiry,
@@ -314,6 +317,8 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
           useElevenLabs={useElevenLabs}
           isInitializing={isInitializing}
           canUseVoice={canUseVoice}
+          isSuspended={isSuspended}
+          isAccessDenied={isAccessDenied}
           agentId={agentId}
           storySlug={story.slug}
           onToggleMode={handleToggleMode}
@@ -321,6 +326,10 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
           tryVoiceLabel={bookingActive ? t("booking.chat.voiceDiscovery") : undefined}
         />
 
+        {!isInitializing && isAccessDenied && <p role="status">Voice access is currently unavailable. <button type="button" className="underline" onClick={() => { void refresh(); }}>Check voice access</button> or <a href="mailto:support@paisaxe.es" className="underline">contact support</a>.</p>}
+        {!isInitializing && isSuspended && <p role="status">Voice access is suspended while a payment dispute is reviewed. <a href="mailto:support@paisaxe.es" className="underline">Contact support</a> for help.</p>}
+        {!isInitializing && accessStatus === "revoked" && <p role="status">This voice pass was revoked after a payment reversal. <a href="mailto:support@paisaxe.es" className="underline">Contact support</a> if this is unexpected.</p>}
+        {!isInitializing && accessStatus === "expired" && <p role="status">Your voice pass has expired. You can purchase a new pass to continue using voice.</p>}
         <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
 
         {/* Privacy Notice */}
@@ -352,10 +361,11 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
             story={story}
             agentId={agentId}
             onFallbackToText={handleVoiceFallback}
+            onAccessDenied={() => refresh({afterIssuanceDenial:true})}
             userAccessToken={session?.access_token}
             initialMessage={initialMessageRef.current}
           />
-        ) : useElevenLabs && needsPurchase ? (
+        ) : useElevenLabs && needsPurchase && !isSuspended && !isAccessDenied ? (
           /* Show purchase CTA when user wants voice but needs to pay */
           <VoicePurchaseCTA returnTo={story.slug} />
         ) : (

@@ -54,7 +54,7 @@ function mockVoicePurchaseResult(result: {
   mocks.getSupabaseClient.mockResolvedValue({
     from: vi.fn(() => ({
       select: vi.fn(() => ({
-        eq: vi.fn(() => ({
+        eq: vi.fn(() => ({ eq: vi.fn(() => ({
           gt: vi.fn(() => ({
             order: vi.fn(() => ({
               limit: vi.fn(() => ({
@@ -62,7 +62,7 @@ function mockVoicePurchaseResult(result: {
               })),
             })),
           })),
-        })),
+        })) })),
       })),
     })),
   });

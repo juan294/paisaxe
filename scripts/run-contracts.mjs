@@ -14,6 +14,7 @@ export const REQUIRED_SUITES = [
   'src/lib/feature-flag-realtime.postgrest-integration.test.ts',
   'src/app/api/feature-flags/route.postgrest-rls.test.ts',
   'src/app/api/webhooks/stripe/route.postgrest-integration.test.ts',
+  'src/lib/stripe-entitlements.postgrest-integration.test.ts',
   'src/lib/booking/booking.postgrest-integration.test.ts',
   'src/lib/booking/cancel.postgrest-integration.test.ts',
   'src/lib/booking/capture.postgrest-integration.test.ts',
@@ -183,7 +184,7 @@ export async function inspectStack(manifest, env) {
   }
 }
 
-function validateKeys(status, manifest) {
+export function validateKeys(status, manifest) {
   insist(status.API_URL === manifest.apiUrl, 'Supabase status API endpoint differs from task marker');
   const db = new URL(status.DB_URL);
   insist(db.protocol === 'postgresql:' && db.hostname === '127.0.0.1' && db.port === String(manifest.dbPort) &&

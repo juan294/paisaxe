@@ -15,6 +15,8 @@ interface ChatHeaderProps {
   isInitializing: boolean;
   /** True when the user has unlocked voice */
   canUseVoice: boolean;
+  isSuspended?: boolean;
+  isAccessDenied?: boolean;
   /** ElevenLabs agent id — undefined if not configured */
   agentId: string | null | undefined;
   /** Story slug for the upgrade redirect URL */
@@ -42,6 +44,8 @@ export function ChatHeader({
   useElevenLabs,
   isInitializing,
   canUseVoice,
+  isSuspended,
+  isAccessDenied,
   agentId,
   storySlug,
   onToggleMode,
@@ -79,7 +83,7 @@ export function ChatHeader({
           </Button>
         )}
         {/* Upgrade prompt — shown when user has no voice access */}
-        {!isInitializing && !canUseVoice && (
+        {!isInitializing && !canUseVoice && !isSuspended && !isAccessDenied && (
           <Link
             href={storySlug ? `/pricing?returnTo=${storySlug}` : "/pricing"}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-paisaxe-green-400 border border-paisaxe-green-500/50 rounded-full hover:bg-paisaxe-green-500/10 hover:border-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-400/70"

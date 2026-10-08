@@ -49,6 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     .from("voice_purchases")
     .select("id")
     .eq("user_id", user.id)
+    .eq("entitlement_state", "active")
     .gt("expires_at", new Date().toISOString())
     .order("expires_at", { ascending: false })
     .limit(1)

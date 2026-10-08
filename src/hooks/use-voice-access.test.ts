@@ -43,6 +43,14 @@ describe("useVoiceAccess", () => {
     });
   });
 
+  it("a suspended pass exposes support state without a purchase-again prompt", async () => {
+    mockUseAuth.mockReturnValue({user:{id:"suspended-user"},session:{access_token:"local-token"},isLoading:false});
+    mockUseVisitorVoiceAccess.mockReturnValue({canUseVoice:false,featureEnabled:true,needsSignIn:false,isLoading:false});
+    mockFetch.mockResolvedValue({ok:true,json:async()=>({hasAccess:false,expiresAt:null,purchaseType:null,status:"suspended"})});
+    const {result}=renderHook(()=>useVoiceAccess());
+    await waitFor(()=>expect(result.current.isSuspended).toBe(true));
+    expect(result.current.canUseVoice).toBe(false); expect(result.current.needsPurchase).toBe(false); expect(result.current.accessStatus).toBe("suspended");
+  });
   it("budget fixture: initial paid check plus six explicit refreshes emits seven reads, without polling", async () => {
     mockUseAuth.mockReturnValue({ user: { id: "fixture-user" }, session: { access_token: "fixture-token" }, isLoading: false });
     mockUseVisitorVoiceAccess.mockReturnValue({ featureEnabled: true, needsSignIn: false, isLoading: false });
@@ -51,6 +59,35 @@ describe("useVoiceAccess", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     for (let i = 0; i < 6; i++) await act(async () => { await result.current.refresh(); });
     expect(mockFetch.mock.calls.filter(([url]) => url === "/api/voice-access")).toHaveLength(7);
+  });
+
+  it("authoritative issuance denial invalidates the old grant even when reason refresh is rate-limited", async () => {
+    mockUseAuth.mockReturnValue({user:{id:"paid"},session:{access_token:"paid-token"},isLoading:false});
+    mockUseVisitorVoiceAccess.mockReturnValue({featureEnabled:true,needsSignIn:false,isLoading:false});
+    mockFetch.mockResolvedValueOnce(Response.json({hasAccess:true,expiresAt:"2099-01-01T00:00:00Z",purchaseType:"day_pass"}));
+    const {result}=renderHook(()=>useVoiceAccess()); await waitFor(()=>expect(result.current.hasAccess).toBe(true));
+    mockFetch.mockResolvedValueOnce(Response.json({}, {status:429,headers:{"Retry-After":"17"}}));
+    await act(async()=>{await result.current.refresh({afterIssuanceDenial:true});});
+    expect(result.current.canUseVoice).toBe(false); expect(result.current.hasAccess).toBe(false);
+    expect(result.current.needsPurchase).toBe(false); expect(result.current.isSuspended).toBe(false);
+    expect(result.current.retryAfter).toBe(17); expect(result.current.isAccessDenied).toBe(true);
+    mockFetch.mockResolvedValueOnce(Response.json({hasAccess:false,expiresAt:null,purchaseType:null,status:"suspended"}));
+    await act(async()=>{await result.current.refresh();});
+    expect(result.current.isSuspended).toBe(true); expect(result.current.needsPurchase).toBe(false); expect(result.current.isAccessDenied).toBe(false);
+  });
+
+  it("unknown denial stays blocked on a failed reason read and clears only after a successful retry", async () => {
+    mockUseAuth.mockReturnValue({user:{id:"paid"},session:{access_token:"paid-token"},isLoading:false});
+    mockUseVisitorVoiceAccess.mockReturnValue({featureEnabled:true,needsSignIn:false,isLoading:false});
+    mockFetch.mockResolvedValueOnce(Response.json({hasAccess:true,expiresAt:"2099-01-01T00:00:00Z",purchaseType:"day_pass"}));
+    const {result}=renderHook(()=>useVoiceAccess()); await waitFor(()=>expect(result.current.hasAccess).toBe(true));
+    mockFetch.mockRejectedValueOnce(new Error("local reason read unavailable"));
+    await act(async()=>{await result.current.refresh({afterIssuanceDenial:true});});
+    expect(result.current.isAccessDenied).toBe(true); expect(result.current.canUseVoice).toBe(false);
+    expect(result.current.needsPurchase).toBe(false); expect(result.current.isSuspended).toBe(false);
+    mockFetch.mockResolvedValueOnce(Response.json({hasAccess:true,expiresAt:"2099-01-01T00:00:00Z",purchaseType:"day_pass",status:"active"}));
+    await act(async()=>{await result.current.refresh();});
+    expect(result.current.isAccessDenied).toBe(false); expect(result.current.canUseVoice).toBe(true);
   });
 
   it("429 preserves confirmed paid access, exposes retry seconds and recovers without a purchase prompt", async () => {
