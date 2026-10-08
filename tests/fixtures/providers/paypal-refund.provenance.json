@@ -1,0 +1,40 @@
+{
+  "provider": "PayPal",
+  "environment": "sandbox",
+  "retrievalEndpoint": "GET https://api-m.sandbox.paypal.com/v1/notifications/webhooks-events/{retained-event-id}",
+  "documentation": "https://developer.paypal.com/api/webhooks/v1/webhooks-events-get",
+  "sourceEvidence": "scripts/spikes/paypal-followup-evidence.json",
+  "refreshOwner": "Juan (Paisaxe owner)",
+  "refreshAfterDays": 30,
+  "earlierRefreshCriterion": "Review and refresh on PayPal webhook/resource schema or adapter/SDK contract change. No automatic provider requests.",
+  "sanitization": [
+    "Consistent pseudonyms replace all event, resource, account and correlation identifiers, including related links.",
+    "Non-UUID spike custom_id remains non-UUID; values are not changed into production booking UUIDs.",
+    "Names, email addresses, descriptions, references and summaries use harmless example values.",
+    "Amounts, currency, status, event/resource versions, create/update timestamps and object structure remain as exported."
+  ],
+  "authenticity": [
+    "Authenticated direct sandbox API GET confirms provider-retrieved existing notification details.",
+    "These are current GET exports, not byte-identical original HTTP deliveries; some embedded resource states have advanced since the historical event.",
+    "No original transmission headers/signatures were exported. Historical verification SUCCESS exists in retained spike summaries only.",
+    "Sanitization invalidates original signature authenticity. Local adapter replay must stub transport verification with clearly synthetic headers and never call PayPal.",
+    "These fixtures establish adapter compatibility only, not live availability or production readiness."
+  ],
+  "fixtures": [
+    {
+      "file": "paypal-refund.sanitized.json",
+      "sha256": "a1345c94a696b875a474145e8855d2d9cfef72e67494906238b92cc1efb1cbfe",
+      "exportedAt": "2026-10-08T15:16:06.016490+00:00",
+      "expiresAt": "2026-11-07T15:16:06.016490+00:00",
+      "eventType": "PAYMENT.CAPTURE.REFUNDED",
+      "eventVersion": "1.0",
+      "resourceVersion": "2.0",
+      "resourceType": "refund",
+      "observedResourceStatus": "COMPLETED",
+      "originalEventCreateTime": "2026-10-03T14:03:32.542Z",
+      "sourceHttpStatus": 200,
+      "sourceResponseDate": "Thu, 08 Oct 2026 15:16:06 GMT",
+      "rawSha256": "4a975c19821e3df8d9505b5328e997616c2a2a69fca3f860b93fdea764a5886f"
+    }
+  ]
+}

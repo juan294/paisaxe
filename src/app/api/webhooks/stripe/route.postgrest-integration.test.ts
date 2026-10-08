@@ -28,8 +28,12 @@
  *      call the service-role-only RPC nor read the stripe_webhook_events
  *      audit table directly over PostgREST.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import Stripe from "stripe";
+import { NextRequest } from "next/server";
+import recordedCheckout from "../../../../../tests/fixtures/providers/stripe-checkout-completed.sanitized.json";
+import { POST } from "./route";
 import {
   LOCAL_ANON_KEY as ANON_KEY,
   LOCAL_API_URL as API_URL,
@@ -47,12 +51,12 @@ if (!dbReachable) {
 }
 
 /** Fixed UUIDs so fixture setup/teardown is deterministic across runs. */
-const USER_IDEMPOTENCY = "871e7a01-0000-4000-8000-000000000001";
+const USER_IDEMPOTENCY = recordedCheckout.data.object.metadata.user_id;
 const USER_CONCURRENCY = "871e7a01-0000-4000-8000-000000000002";
 const ALL_TEST_USER_IDS = [USER_IDEMPOTENCY, USER_CONCURRENCY];
 
-const EVENT_ID_IDEMPOTENCY = "qa-h4-idempotency-event";
-const PAYMENT_ID_IDEMPOTENCY = "pi_qa_h4_idempotency";
+const EVENT_ID_IDEMPOTENCY = recordedCheckout.id;
+const PAYMENT_ID_IDEMPOTENCY = recordedCheckout.data.object.payment_intent;
 const EVENT_ID_CONCURRENCY = "qa-h4-concurrency-event";
 const PAYMENT_ID_CONCURRENCY = "pi_qa_h4_concurrency";
 const ALL_TEST_PAYMENT_IDS = [PAYMENT_ID_IDEMPOTENCY, PAYMENT_ID_CONCURRENCY];
@@ -132,25 +136,42 @@ describe.skipIf(!dbReachable)(
       deleteFixtureRows();
     });
 
-    it("grants exactly once when the same event is processed twice sequentially (idempotency)", async () => {
-      const first = await callGrantRpc({
-        eventId: EVENT_ID_IDEMPOTENCY,
-        userId: USER_IDEMPOTENCY,
-        paymentProviderId: PAYMENT_ID_IDEMPOTENCY,
-      });
-      expect(first.error).toBeNull();
-      expect(first.data).toBe("granted");
+    it("replays a recorded signed checkout through the real route and grants exactly once", async () => {
+      const secret = "whsec_local_recorded_replay_only";
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", API_URL);
+      vi.stubEnv("SUPABASE_SERVICE_KEY", SERVICE_ROLE_KEY);
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", SERVICE_ROLE_KEY);
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_local_recorded_replay_only");
+      vi.stubEnv("STRIPE_WEBHOOK_SECRET", secret);
+      try {
+        // Sanitized exports cannot retain their original delivery signature.
+        // A synthetic signature exercises the real SDK verifier, route and RPC.
+        const payload = JSON.stringify(recordedCheckout);
+        const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret });
+        const deliver = (body: string) => POST(new NextRequest("http://127.0.0.1/api/webhooks/stripe", {
+          method: "POST", headers: { "stripe-signature": signature }, body,
+        }));
+        expect((await deliver(payload + " ")).status).toBe(401);
+        expect(voicePurchaseCount(PAYMENT_ID_IDEMPOTENCY)).toBe(0);
 
-      // Same Stripe event id delivered again (webhook retry / duplicate delivery).
-      const second = await callGrantRpc({
-        eventId: EVENT_ID_IDEMPOTENCY,
-        userId: USER_IDEMPOTENCY,
-        paymentProviderId: PAYMENT_ID_IDEMPOTENCY,
-      });
-      expect(second.error).toBeNull();
-      expect(second.data).toBe("duplicate");
+        const first = await deliver(payload);
+        expect(first.status).toBe(200);
+        expect(await first.json()).toEqual({ status: "granted" });
+        const purchase = () => JSON.parse(psql(
+          `SELECT row_to_json(p) FROM public.voice_purchases p WHERE payment_provider_id = '${PAYMENT_ID_IDEMPOTENCY}';`
+        ));
+        const granted = purchase();
+        expect(granted).toMatchObject({ user_id: USER_IDEMPOTENCY, purchase_type: "day_pass", amount_paid: 1500 });
+        expect(new Date(granted.expires_at).getTime()).toBeGreaterThan(Date.now());
 
-      expect(voicePurchaseCount(PAYMENT_ID_IDEMPOTENCY)).toBe(1);
+        const second = await deliver(payload);
+        expect(second.status).toBe(200);
+        expect(await second.json()).toEqual({ status: "duplicate" });
+        expect(voicePurchaseCount(PAYMENT_ID_IDEMPOTENCY)).toBe(1);
+        expect(purchase().expires_at).toBe(granted.expires_at);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it("grants exactly once when two callers race on the same event id (concurrency)", async () => {

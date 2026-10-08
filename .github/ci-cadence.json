@@ -13,7 +13,7 @@
   "workflows": [
     {
       "path": ".github/workflows/ci.yml",
-      "definitionSha": "a4635b74dae5be8ba0e75151505e8b5116f566a0",
+      "definitionSha": "1a043194edfb3e60d86a2aabd9f6b097950dba94",
       "jobs": [
         {
           "id": "ci-lint-and-typecheck",
@@ -110,7 +110,7 @@
     },
     {
       "path": ".github/workflows/coverage.yml",
-      "definitionSha": "cc91283e6b3075c4fbecc95e0375e825770d65d1",
+      "definitionSha": "f2cb9fc786ea7a306e5baf290d3ce9af82a313c2",
       "jobs": [
         {
           "id": "coverage-coverage",

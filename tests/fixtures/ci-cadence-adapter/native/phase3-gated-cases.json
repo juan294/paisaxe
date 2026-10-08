@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "source": "Reviewed Phase 3 local contract case census, plus the existing createOperatorAccess gated case. This is a source inventory, not a hosted skip recording.",
-  "contractReceiptSha256": "e8b266b274a6c634f310d733d08a29db28d930a06e2bf335eb3a5ab739bb71cf",
-  "candidateDigest": "073e1370081a4e4e92b49916a26a62e8f4e7e745db13eadf005c3f929b5d2ef1",
-  "executedContractCases": 936,
-  "ordinaryEnvironmentGatedCases": 937,
+  "source": "Reviewed Phase 3 local database case census, plus the existing createOperatorAccess gated case. Database execution passed 937 cases; the combined receipt failed only provider fixture qualification (ElevenLabs unverified). This is a source inventory, not a hosted skip recording.",
+  "contractReceiptSha256": "d1755d01167aa9ed5db80b104f868e771c89ac21b18b7e5b3c75eebdea97a863",
+  "candidateDigest": "8055517aa3f08f177ff2e1576e9e62f7674a3315c6327eeb8c5de7cc25aacfcc",
+  "executedContractCases": 937,
+  "ordinaryEnvironmentGatedCases": 938,
   "groups": [
     {
       "file": "scripts/booking/create-operator-link.test.ts",
@@ -54,7 +54,7 @@
     {
       "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
       "describe": "PayPal webhook inbox and reconciliation against live local Supabase",
-      "cases": 31
+      "cases": 32
     },
     {
       "file": "src/lib/booking/tools.postgrest-integration.test.ts",

@@ -53,8 +53,8 @@ test('each gated group is gated only by the local Supabase reachability probe, u
 
 test('each reviewed group pins its actual qualified case count', () => {
   assert.deepEqual(ENVIRONMENT_GATED.map(entry => ({...entry})), reviewed.groups);
-  assert.equal(reviewed.executedContractCases, 936);
-  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), 937);
+  assert.equal(reviewed.executedContractCases, 937);
+  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), 938);
 });
 
 function skippedSuite(groups) {
@@ -81,7 +81,7 @@ test('historical hosted nightly retains its 204-case provenance and cannot quali
 test('current ordinary measurement discloses only whole reviewed groups, never counts their skipped cases', () => {
   const suite=skippedSuite(reviewed.groups);
   const result=aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[structuredClone(suite)],environmentGated:ENVIRONMENT_GATED});
-  assert.equal(result.environmentGatedSkipped,937);assert.equal(result.testCount,1);assert.equal(result.testFiles,1);
+  assert.equal(result.environmentGatedSkipped,938);assert.equal(result.testCount,1);assert.equal(result.testFiles,1);
   for(const omitted of ENVIRONMENT_GATED) assert.throws(() => aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[structuredClone(suite)],environmentGated:ENVIRONMENT_GATED.filter(entry=>entry!==omitted)}), /mandatory cases skipped or unfinished/, key(omitted));
   const partial=structuredClone(suite);partial.tests.testResults.at(-1).assertionResults[0].status='passed';
   assert.throws(() => aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[partial],environmentGated:ENVIRONMENT_GATED}), /mandatory cases skipped or unfinished/);

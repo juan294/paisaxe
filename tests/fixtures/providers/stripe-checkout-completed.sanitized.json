@@ -1,0 +1,26 @@
+{
+  "object": "event",
+  "api_version": "2025-08-27.basil",
+  "created": 1791471232,
+  "livemode": false,
+  "type": "checkout.session.completed",
+  "id": "evt_recorded_paisaxe_checkout",
+  "data": {
+    "object": {
+      "object": "checkout.session",
+      "amount_total": 1500,
+      "currency": "usd",
+      "livemode": false,
+      "mode": "payment",
+      "payment_status": "paid",
+      "status": "complete",
+      "ui_mode": "embedded",
+      "id": "cs_test_recorded_paisaxe_checkout",
+      "payment_intent": "pi_recorded_paisaxe_checkout",
+      "metadata": {
+        "user_id": "871e7a01-0000-4000-8000-000000000003",
+        "purchase_type": "day_pass"
+      }
+    }
+  }
+}

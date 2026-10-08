@@ -13,6 +13,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 // Live local Supabase: a loaded host can push a test past the 5 s default (#997).
 vi.setConfig({ testTimeout: 20_000, hookTimeout: 20_000 });
 import { NextRequest } from "next/server";
+import { readFileSync } from "node:fs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isLocalSupabaseReachable,
@@ -48,6 +49,11 @@ const { addDays, madridDate } = await import("./types");
 const { logger } = await import("@/lib/logger");
 const { POST: webhook } = await import("@/app/api/webhooks/paypal/route");
 const { GET: cron } = await import("@/app/api/cron/reconcile-bookings/route");
+const { normalizePaypalEvent, processPaypalEvent, processAndRecordPaypalEvent } = await import("./webhook-events");
+const recordedRefund: unknown = JSON.parse(readFileSync(
+  new URL("../../../tests/fixtures/providers/paypal-refund.sanitized.json", import.meta.url), "utf8"
+));
+const RECORDED_REFUND_EVENT_ID = "WH-RECORDED000000005-RECORDED000000005";
 
 const dbReachable = await isLocalSupabaseReachable();
 if (!dbReachable) warnLocalSupabaseUnreachable("reconcile.postgrest-integration.test.ts");
@@ -65,7 +71,7 @@ const created: string[] = [];
 function cleanup(): void {
   const users = sqlList([USER, OTHER]);
   psql(
-    `DELETE FROM public.paypal_webhook_events WHERE event_id LIKE '${EVENT_PREFIX}%';` +
+    `DELETE FROM public.paypal_webhook_events WHERE event_id LIKE '${EVENT_PREFIX}%' OR event_id = '${RECORDED_REFUND_EVENT_ID}';` +
       `DELETE FROM public.payments WHERE booking_id IN (SELECT id FROM public.bookings WHERE experience_id = '${EXPERIENCE}');` +
       `DELETE FROM public.bookings WHERE experience_id = '${EXPERIENCE}';` +
       `DELETE FROM public.holds WHERE experience_id = '${EXPERIENCE}';` +
@@ -276,6 +282,82 @@ describe.skipIf(!dbReachable)("PayPal webhook inbox and reconciliation against l
     paypal.getRefund.mockImplementation(unexpected("getRefund"));
     paypal.getCapture.mockImplementation(unexpected("getCapture"));
   });
+
+it("replays the recorded sandbox refund through real normalization, state transitions and inbox idempotency", async () => {
+  // A booking refund can notify Zapier. Disable that separate outbound adapter explicitly.
+  vi.stubEnv("ZAPIER_BOOKING_HOOK_URL", "");
+  const client = localServiceClient();
+  const normalized = normalizePaypalEvent(recordedRefund);
+  expect(normalized).toMatchObject({
+    event_id: RECORDED_REFUND_EVENT_ID,
+    event_type: "PAYMENT.CAPTURE.REFUNDED",
+    order_id: null,
+    capture_id: "RECORDED000000004",
+    refund_id: "RECORDED000000006",
+    custom_id: "recorded-demo-01",
+  });
+  if (!normalized) throw new Error("Recorded refund did not normalize");
+  const { id } = newBooking();
+  try {
+    // Seed the already captured local state directly. No PayPal stand-in call is used even in setup.
+    const seeded = await client.from("payments").insert({
+      booking_id: id,
+      amount_cents: 3000,
+      currency: "EUR",
+      status: "captured",
+      capture_id: normalized.capture_id,
+      captured_at: "2026-10-03T14:03:29Z",
+    });
+    expect(seeded.error).toBeNull();
+    const record = () => client.rpc("upsert_paypal_event", {
+      p_event_id: normalized.event_id,
+      p_event_type: normalized.event_type,
+      p_payload: normalized.payload,
+      p_order_id: normalized.order_id,
+      p_capture_id: normalized.capture_id,
+      p_refund_id: normalized.refund_id,
+      p_custom_id: normalized.custom_id,
+      // Synthetic local attestation: no claim of original or live provider signature verification.
+      p_verification: "LOCAL_REPLAY_SYNTHETIC",
+    });
+    const first = await record();
+    expect(first.error).toBeNull();
+    expect(first.data).toBe("new");
+    expect(await processAndRecordPaypalEvent(client, normalized)).toBe("recorded");
+    expect(paymentState(id)).toBe("refunded:RECORDED000000004:RECORDED000000006");
+    expect(paymentField(id, "refunded_at IS NOT NULL")).toBe("t");
+    expect(bookingStatus(id)).toBe("refunded");
+    expect(inbox(normalized.event_id, "processed_at IS NOT NULL")).toBe("t");
+    expect(inbox(normalized.event_id, "capture_id || '|' || refund_id || '|' || custom_id"))
+      .toBe("RECORDED000000004|RECORDED000000006|recorded-demo-01");
+    const refundedAt = paymentField(id, "refunded_at");
+    const processedAt = inbox(normalized.event_id, "processed_at");
+
+    // Actual normalized payload is kept in JSONB, not merely its selected IDs.
+    const stored = await client.from("paypal_webhook_events").select("payload").eq("event_id", normalized.event_id).single();
+    expect(stored.error).toBeNull();
+    expect(stored.data?.payload).toEqual(recordedRefund);
+    const again = await record();
+    expect(again.error).toBeNull();
+    expect(again.data).toBe("processed");
+    expect(inbox(normalized.event_id, "attempts")).toBe("1");
+    // A direct replay also proves the real state processor's forward-only guard.
+    expect(await processPaypalEvent(client, normalized)).toBe("out_of_order");
+    expect(paymentState(id)).toBe("refunded:RECORDED000000004:RECORDED000000006");
+    expect(bookingStatus(id)).toBe("refunded");
+    expect(paymentField(id, "refunded_at")).toBe(refundedAt);
+    expect(inbox(normalized.event_id, "processed_at")).toBe(processedAt);
+    expect(admin.createAdminClient).not.toHaveBeenCalled();
+    for (const operation of Object.values(paypal)) expect(operation).not.toHaveBeenCalled();
+  } finally {
+    const removedInbox = await client.from("paypal_webhook_events").delete().eq("event_id", normalized.event_id);
+    const removedPayment = await client.from("payments").delete().eq("booking_id", id);
+    // Run both cleanup actions before checking either outcome.
+    expect(removedInbox.error).toBeNull();
+    expect(removedPayment.error).toBeNull();
+    // Booking/hold/draft are covered by existing experience-scoped afterAll cleanup.
+  }
+});
 
   describe("POST /api/webhooks/paypal (F03 inbox)", () => {
     it("CHECKOUT.ORDER.APPROVED with no browser return ends confirmed (F02)", async () => {

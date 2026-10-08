@@ -3,23 +3,23 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "295577f8ec9a67babf722653e3303e6c4e923092"
+    "blobSha": "2fc47dbb929b2fb65c1b4c7465781c6bda172905"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "295577f8ec9a67babf722653e3303e6c4e923092"
+      "blobSha": "2fc47dbb929b2fb65c1b4c7465781c6bda172905"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "3b190b39d7cdc09386c59a24f74e975885421900"
+      "blobSha": "88d755491b62117e22234494bdf55a4796360a2a"
     }
   },
   "callees": {
     ".github/workflows/ci.yml": {
       "path": ".github/workflows/ci.yml",
       "prefix": "ci",
-      "blobSha": "a4635b74dae5be8ba0e75151505e8b5116f566a0"
+      "blobSha": "1a043194edfb3e60d86a2aabd9f6b097950dba94"
     },
     ".github/workflows/e2e.yml": {
       "path": ".github/workflows/ci-cadence-e2e-full.yml",
@@ -60,7 +60,7 @@
   },
   "coverageOnly": {
     "path": ".github/workflows/coverage.yml",
-    "blobSha": "cc91283e6b3075c4fbecc95e0375e825770d65d1",
+    "blobSha": "f2cb9fc786ea7a306e5baf290d3ce9af82a313c2",
     "steps": [
       {
         "name": "Decide weekly native coverage eligibility",
@@ -143,9 +143,9 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "295577f8ec9a67babf722653e3303e6c4e923092",
-    ".github/workflows/ci-cadence.yml": "3b190b39d7cdc09386c59a24f74e975885421900",
-    ".github/workflows/ci.yml": "a4635b74dae5be8ba0e75151505e8b5116f566a0",
+    ".github/workflows/ci-nightly.yml": "2fc47dbb929b2fb65c1b4c7465781c6bda172905",
+    ".github/workflows/ci-cadence.yml": "88d755491b62117e22234494bdf55a4796360a2a",
+    ".github/workflows/ci.yml": "1a043194edfb3e60d86a2aabd9f6b097950dba94",
     ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "d92da9de90ec345d88694c3037884a8da9c68a8e",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",

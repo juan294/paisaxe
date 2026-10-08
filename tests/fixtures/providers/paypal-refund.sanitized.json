@@ -1,0 +1,68 @@
+{
+  "id": "WH-RECORDED000000005-RECORDED000000005",
+  "create_time": "2026-10-03T14:03:32.542Z",
+  "resource_type": "refund",
+  "event_type": "PAYMENT.CAPTURE.REFUNDED",
+  "summary": "Recorded sandbox PAYMENT.CAPTURE.REFUNDED",
+  "resource": {
+    "seller_payable_breakdown": {
+      "gross_amount": {
+        "currency_code": "EUR",
+        "value": "30.00"
+      },
+      "paypal_fee": {
+        "currency_code": "EUR",
+        "value": "1.02"
+      },
+      "net_amount": {
+        "currency_code": "EUR",
+        "value": "28.98"
+      },
+      "total_refunded_amount": {
+        "currency_code": "EUR",
+        "value": "30.00"
+      }
+    },
+    "amount": {
+      "currency_code": "EUR",
+      "value": "30.00"
+    },
+    "update_time": "2026-10-03T07:03:27-07:00",
+    "create_time": "2026-10-03T07:03:27-07:00",
+    "custom_id": "recorded-demo-01",
+    "links": [
+      {
+        "href": "https://api.sandbox.paypal.com/v2/payments/refunds/RECORDED000000006",
+        "rel": "self",
+        "method": "GET"
+      },
+      {
+        "href": "https://api.sandbox.paypal.com/v2/payments/captures/RECORDED000000004",
+        "rel": "up",
+        "method": "GET"
+      }
+    ],
+    "id": "RECORDED000000006",
+    "payer": {
+      "email_address": "sandbox-person-1@example.invalid",
+      "merchant_id": "RECORDED00002"
+    },
+    "status": "COMPLETED"
+  },
+  "links": [
+    {
+      "href": "https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-RECORDED000000005-RECORDED000000005",
+      "rel": "self",
+      "method": "GET",
+      "encType": "application/json"
+    },
+    {
+      "href": "https://api.sandbox.paypal.com/v1/notifications/webhooks-events/WH-RECORDED000000005-RECORDED000000005/resend",
+      "rel": "resend",
+      "method": "POST",
+      "encType": "application/json"
+    }
+  ],
+  "event_version": "1.0",
+  "resource_version": "2.0"
+}
