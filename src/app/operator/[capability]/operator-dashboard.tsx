@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StatCard } from "@/components/ui/stat-card";
-import { clockTime, money, slotDay } from "@/lib/booking-format";
+import { clockTime, dateTime, money, slotDay } from "@/lib/booking-format";
 import { csrfHeaders } from "@/lib/csrf-client";
 import { cn } from "@/lib/utils";
 import type { OperatorBooking, OperatorCapacity, OperatorHold, OperatorView } from "@/lib/booking/operator";
+import type { LedgerMatch, OperatorLedgerResponse } from "@/types/operator-ledger";
 
 // Merchant-facing copy is Spanish only: the operator is the Asturian provider.
 const BOOKING_STATUS: Record<string, string> = {
@@ -36,10 +37,33 @@ const PAYMENT_STATUS: Record<string, string> = {
   refund_failed: "Reembolso fallido",
 };
 
+/** The PayPal check's chip per booking (APIMatic plan, Phase 2); none for not_applicable. */
+const LEDGER_CHIP: Record<Exclude<LedgerMatch, "not_applicable">, { label: string; attention: boolean }> = {
+  matches: { label: "PayPal confirma", attention: false },
+  refunded: { label: "Reembolso en PayPal", attention: false },
+  pending: { label: "Pendiente en PayPal", attention: false },
+  mismatch: { label: "No coincide con PayPal", attention: true },
+  outside_window: { label: "Fuera del periodo consultado", attention: false },
+};
+
+/**
+ * The Madrid calendar day of an instant, "YYYY-MM-DD" like the view's `today`. Same as madridDate in
+ * src/lib/booking/types.ts, which this client page does not import: that module brings zod with it.
+ */
+const madridDay = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(iso));
+
+/** The matches the summary counts as confirmed by PayPal's records. */
+const CONFIRMED = new Set<LedgerMatch>(["matches", "refunded"]);
+
+/** The small rounded labels in the booking rows; ATTENTION is the "needs a look" tone. */
+const PILL = "inline-flex rounded-full px-2 py-0.5 text-xs font-medium";
+const ATTENTION = "bg-[#c9a55c]/30";
+
 const ACTION_FAILED = "No se pudo completar la acción. Inténtalo de nuevo.";
 const HOLD_NOT_LIVE = "Ese bloqueo ya no estaba activo.";
 
 type Load = { kind: "loading" } | { kind: "notFound" } | { kind: "failed" } | { kind: "ready"; view: OperatorView };
+type Ledger = { checking: boolean; result: OperatorLedgerResponse | null };
 
 const eur = (cents: number, currency = "EUR") => money(cents, currency, "es");
 const when = (date: string, time: string) => `${slotDay(date, "es")} · ${time}`;
@@ -66,6 +90,20 @@ export function OperatorDashboard() {
   // The booking stays set while the dialog closes, so its title does not blank out mid-animation.
   const [reissueTarget, setReissueTarget] = useState<OperatorBooking | null>(null);
   const [reissueOpen, setReissueOpen] = useState(false);
+  const [ledger, setLedger] = useState<Ledger>({ checking: false, result: null });
+
+  // Read-only check of the deposits against PayPal's records; the last answer stays shown while a new one loads.
+  const checkLedger = useCallback(async () => {
+    setLedger((current) => ({ ...current, checking: true }));
+    let result: OperatorLedgerResponse = { state: "unavailable", reason: "error" };
+    try {
+      const response = await fetch(`/api/operator/${capability}/paypal-ledger`, { cache: "no-store" });
+      if (response.ok) result = (await response.json()) as OperatorLedgerResponse;
+    } catch {
+      // Unavailable, as above.
+    }
+    setLedger({ checking: false, result });
+  }, [capability]);
 
   const refresh = useCallback(async () => {
     try {
@@ -81,6 +119,12 @@ export function OperatorDashboard() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Once, after the view first loads (decision D8); later checks come from the button.
+  const ready = load.kind === "ready";
+  useEffect(() => {
+    if (ready) void checkLedger();
+  }, [ready, checkLedger]);
 
   const post = async (path: string) => {
     setBusy(true);
@@ -140,8 +184,10 @@ export function OperatorDashboard() {
   const shown = onlyExceptions ? view.bookings.filter((booking) => booking.exception) : view.bookings;
   const upcoming = shown.filter((booking) => booking.slotDate >= view.today);
   const recent = shown.filter((booking) => booking.slotDate < view.today).reverse();
+  // Null while the first check loads; empty when PayPal could not answer.
+  const matches = ledger.result === null ? null : ledger.result.state === "ok" ? ledger.result.bookings : {};
   const table = (bookings: OperatorBooking[]) => (
-    <BookingTable bookings={bookings} disabled={busy} onReissue={askReissue} />
+    <BookingTable bookings={bookings} disabled={busy} matches={matches} onReissue={askReissue} />
   );
 
   return (
@@ -188,6 +234,8 @@ export function OperatorDashboard() {
           ariaLabel={`Incidencias: ${view.summary.exceptions}`}
         />
       </div>
+
+      <LedgerSummary view={view} ledger={ledger} onCheck={() => void checkLedger()} />
 
       <div aria-live="polite" className="space-y-3">
         {notice && <p className="text-[#8b7355]">{notice}</p>}
@@ -280,10 +328,13 @@ function Cell({ label, className, children }: { label: (typeof COLUMNS)[number];
 function BookingTable({
   bookings,
   disabled,
+  matches,
   onReissue,
 }: {
   bookings: OperatorBooking[];
   disabled: boolean;
+  /** Null while the first PayPal check loads: each captured deposit keeps its chip's space so the rows do not grow. */
+  matches: Record<string, LedgerMatch> | null;
   onReissue: (booking: OperatorBooking) => void;
 }) {
   return (
@@ -320,7 +371,7 @@ function BookingTable({
               <Cell label="Estado">
                 <span>{BOOKING_STATUS[booking.status] ?? booking.status}</span>
                 {booking.exception && (
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#c9a55c]/30 px-2 py-0.5 text-xs font-medium">
+                  <span className={cn(PILL, ATTENTION, "ml-2 items-center gap-1")}>
                     Incidencia
                   </span>
                 )}
@@ -338,6 +389,7 @@ function BookingTable({
                     {booking.payment.orderId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Pedido {booking.payment.orderId}</span>}
                     {booking.payment.captureId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Cobro {booking.payment.captureId}</span>}
                     {booking.payment.refundId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Reembolso {booking.payment.refundId}</span>}
+                    <LedgerChip match={matches?.[booking.id]} reserve={matches === null && booking.payment.captureId !== null} />
                   </>
                 ) : (
                   "—"
@@ -360,6 +412,76 @@ function BookingTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+const CHIP = cn(PILL, "mt-1 font-sans text-[#2d2a26]");
+
+function LedgerChip({ match, reserve }: { match: LedgerMatch | undefined; reserve: boolean }) {
+  if (reserve) {
+    return (
+      <span data-testid="ledger-chip-placeholder" aria-hidden="true" className={cn(CHIP, "invisible")}>
+        {LEDGER_CHIP.matches.label}
+      </span>
+    );
+  }
+  if (!match || match === "not_applicable") return null;
+  const chip = LEDGER_CHIP[match];
+  return (
+    <span data-testid="ledger-chip" className={cn(CHIP, chip.attention ? ATTENTION : "bg-black/5")}>
+      {chip.label}
+    </span>
+  );
+}
+
+
+/**
+ * One line above the bookings: how many deposits PayPal's own records confirm,
+ * as of PayPal's last refresh (it lists movements up to about three hours late).
+ */
+function LedgerSummary({ view, ledger, onCheck }: { view: OperatorView; ledger: Ledger; onCheck: () => void }) {
+  const { result, checking } = ledger;
+  let text = "Comprobando los depósitos con PayPal…";
+  let action = "Comprobar de nuevo";
+  if (result?.state === "unavailable") {
+    text = "La comprobación con PayPal no está disponible ahora.";
+    action = "Reintentar";
+  } else if (result?.state === "ok") {
+    const matched = view.bookings.map((booking) => result.bookings[booking.id]).filter((match) => match && match !== "not_applicable");
+    const confirmed = matched.filter((match) => CONFIRMED.has(match));
+    text = `PayPal confirma ${confirmed.length} de ${matched.length} depósitos`;
+    if (result.refreshedAt) {
+      text +=
+        madridDay(result.refreshedAt) === view.today
+          ? ` · datos de PayPal de las ${clockTime(result.refreshedAt, "es")}`
+          : ` · datos de PayPal del ${dateTime(result.refreshedAt, "es")}`;
+    }
+  }
+  // The minimum heights hold the longest answer ("PayPal confirma N de M depósitos · datos de PayPal del <date>")
+  // wrapped on a phone, so the bookings below do not move when it arrives. Re-measure if that copy changes.
+  return (
+    <section
+      aria-label="Comprobación con PayPal"
+      className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 text-sm max-md:min-h-[4.75rem]"
+    >
+      <p aria-live="polite" className="text-[#2d2a26]">
+        {text}
+        {result?.state === "ok" && result.truncated && (
+          <span className="block text-xs text-[#6b6560]">PayPal tiene más de 500 movimientos en el periodo: solo se comprobaron los primeros 500.</span>
+        )}
+      </p>
+      {/* aria-disabled, not disabled: a keyboard user keeps focus on the button while it checks. */}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        aria-disabled={checking}
+        className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+        onClick={() => !checking && onCheck()}
+      >
+        {action}
+      </Button>
+    </section>
   );
 }
 

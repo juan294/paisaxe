@@ -46,6 +46,8 @@ describe("Security headers in next.config.ts", () => {
 });
 
 describe("CSP header via buildCspHeader (proxy.ts)", () => {
+  const connectSrc = (value: string) => value.split(";").find((d) => d.trim().startsWith("connect-src"))!;
+
   const csp = buildCspHeader();
 
   it("should include unsafe-inline in script-src", () => {
@@ -84,16 +86,27 @@ describe("CSP header via buildCspHeader (proxy.ts)", () => {
     expect(mediaSrc).toContain("blob:");
   });
 
+  it("in development also allows a loopback Supabase on another port (an isolated stack), never in production", () => {
+    const isolated = { supabaseUrl: "http://127.0.0.1:54821" };
+    const development = connectSrc(buildCspHeader({ nodeEnv: "development", ...isolated }));
+    expect(development).toContain("http://127.0.0.1:54821");
+    expect(development).toContain("ws://127.0.0.1:54821");
+    expect(connectSrc(buildCspHeader({ nodeEnv: "production", ...isolated }))).not.toContain("54821");
+    // A hosted project is already covered by *.supabase.co; anything else that is not loopback is never added.
+    expect(connectSrc(buildCspHeader({ nodeEnv: "development", supabaseUrl: "https://abc.supabase.co" }))).not.toContain("https://abc.supabase.co");
+    expect(connectSrc(buildCspHeader({ nodeEnv: "development", supabaseUrl: "http://evil.example:54321" }))).not.toContain("evil");
+    expect(connectSrc(buildCspHeader({ nodeEnv: "development", supabaseUrl: "not a url" }))).not.toContain("not a url");
+  });
+
   it("allows the local Supabase in connect-src only in development (#1000)", () => {
-    const connectSrc = (value: string) => value.split(";").find((d) => d.trim().startsWith("connect-src"))!;
-    const local = ["http://127.0.0.1:54321", "ws://127.0.0.1:54321", "http://localhost:54321", "ws://localhost:54321"];
-    const development = connectSrc(buildCspHeader({ nodeEnv: "development" }));
-    const production = connectSrc(buildCspHeader({ nodeEnv: "production" }));
-    for (const origin of local) {
-      expect(development).toContain(origin);
-      expect(production).not.toContain(origin);
+    for (const host of ["127.0.0.1:54321", "localhost:54321"]) {
+      const supabaseUrl = `http://${host}`;
+      const development = connectSrc(buildCspHeader({ nodeEnv: "development", supabaseUrl }));
+      const production = connectSrc(buildCspHeader({ nodeEnv: "production", supabaseUrl }));
+      expect(development).toContain(`http://${host}`);
+      expect(development).toContain(`ws://${host}`);
+      expect(production).not.toMatch(/127\.0\.0\.1|localhost/);
     }
-    expect(production).not.toMatch(/127\.0\.0\.1|localhost/);
   });
 
   it("should include Vercel Analytics domains in connect-src", () => {

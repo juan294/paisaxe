@@ -26,6 +26,7 @@ const { verifyOperatorCapability } = await import("./links");
 const {
   guardOperatorRoute,
   isOperatorException,
+  loadOperatorBookings,
   loadOperatorView,
   reissueBookingLink,
   releaseOperatorHold,
@@ -45,7 +46,7 @@ function booking(overrides: Partial<OperatorBooking> = {}): OperatorBooking {
     depositCents: 3000,
     balanceCents: 9000,
     currency: "EUR",
-    payment: { status: "captured", orderId: "ORDER-1", captureId: "CAP-1", refundId: null },
+    payment: { status: "captured", orderId: "ORDER-1", captureId: "CAP-1", refundId: null, capturedAt: "2026-11-01T10:00:00Z" },
     exception: false,
     ...overrides,
   };
@@ -82,12 +83,12 @@ describe("summarizeOperatorBookings", () => {
         booking({ slotDate: "2026-11-25", balanceCents: 5000 }),
         // In the past: its deposit was collected, its balance is not due any more.
         booking({ slotDate: "2026-11-18" }),
-        booking({ status: "pending_payment", payment: { status: "created", orderId: "O", captureId: null, refundId: null } }),
+        booking({ status: "pending_payment", payment: { status: "created", orderId: "O", captureId: null, refundId: null, capturedAt: null } }),
         booking({ status: "needs_attention", exception: true, payment: null }),
         booking({
           status: "refund_pending",
           exception: true,
-          payment: { status: "refund_pending", orderId: "O", captureId: "C", refundId: "R" },
+          payment: { status: "refund_pending", orderId: "O", captureId: "C", refundId: "R", capturedAt: "2026-11-01T10:00:00Z" },
         }),
       ],
       today
@@ -144,7 +145,7 @@ describe("loadOperatorView", () => {
           currency: "EUR",
           payments: [
             { status: "expired", order_id: "OLD", capture_id: null, refund_id: null, created_at: "2026-11-01T00:00:00Z" },
-            { status: "refund_failed", order_id: "NEW", capture_id: "CAP", refund_id: "RF", created_at: "2026-11-02T00:00:00Z" },
+            { status: "refund_failed", order_id: "NEW", capture_id: "CAP", refund_id: "RF", created_at: "2026-11-02T00:00:00Z", captured_at: "2026-11-02T00:05:00Z" },
           ],
         },
         {
@@ -179,7 +180,7 @@ describe("loadOperatorView", () => {
       experienceTitle: "Paseo",
       slotTime: "10:00",
       balanceCents: 9000,
-      payment: { status: "refund_failed", orderId: "NEW", captureId: "CAP", refundId: "RF" },
+      payment: { status: "refund_failed", orderId: "NEW", captureId: "CAP", refundId: "RF", capturedAt: "2026-11-02T00:05:00Z" },
       exception: true,
     });
     expect(view.bookings[1]).toMatchObject({ experienceTitle: "", payment: null, exception: false });
@@ -221,6 +222,38 @@ describe("loadOperatorView", () => {
   });
 });
 
+describe("loadOperatorBookings", () => {
+  it("reads only the merchant's experiences and their bookings, mapped as in the view", async () => {
+    const fake = createBookingSupabaseFake();
+    const experiences = fake.onTable("experiences", { data: [{ id: "exp-1", title: "Paseo", capacity_per_slot: 12, active: true }] });
+    const bookings = fake.onTable("bookings", {
+      data: [
+        {
+          id: BOOKING_ID, reference: "RS-1", experience_id: "exp-1", slot_date: "2026-11-21", slot_time: "10:00:00", party_size: 2,
+          status: "confirmed", total_cents: 12000, deposit_cents: 3000, currency: "EUR",
+          payments: [{ status: "captured", capture_id: "CAP", created_at: "2026-11-01T00:00:00Z", captured_at: "2026-11-01T00:01:00Z" }],
+        },
+      ],
+    });
+
+    const list = await loadOperatorBookings(fake.client, access, NOW);
+
+    expect(experiences.eq).toHaveBeenCalledWith("merchant_id", MERCHANT);
+    expect(bookings.in).toHaveBeenCalledWith("experience_id", ["exp-1"]);
+    expect(bookings.gte).toHaveBeenCalledWith("slot_date", "2026-11-13");
+    expect(list).toEqual([
+      expect.objectContaining({
+        id: BOOKING_ID,
+        experienceTitle: "Paseo",
+        depositCents: 3000,
+        payment: { status: "captured", orderId: null, captureId: "CAP", refundId: null, capturedAt: "2026-11-01T00:01:00Z" },
+      }),
+    ]);
+    // No merchant, holds or availability reads: the fake throws on any query it was not given.
+    expect(listAvailability).not.toHaveBeenCalled();
+  });
+});
+
 describe("loadOperatorView null fields", () => {
   it("maps missing payment ids, a hold booking without a reference and a null update reply", async () => {
     const fake = createBookingSupabaseFake();
@@ -241,7 +274,7 @@ describe("loadOperatorView null fields", () => {
 
     const view = await loadOperatorView(fake.client, access, NOW);
 
-    expect(view.bookings[0].payment).toEqual({ status: "created", orderId: null, captureId: null, refundId: null });
+    expect(view.bookings[0].payment).toEqual({ status: "created", orderId: null, captureId: null, refundId: null, capturedAt: null });
     expect(view.holds[0]).toMatchObject({ reference: null, experienceTitle: "" });
   });
 

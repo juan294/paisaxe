@@ -218,6 +218,17 @@ describe("voidAuthorization", () => {
     expect(error.issue).toBe("PREVIOUSLY_CAPTURED");
   });
 
+  it("a void answered without a body (204) reads the authorization instead", async () => {
+    const { authorizationId } = await authorized();
+    mock.setAuthorizationStatus(authorizationId, "VOIDED");
+    mock.injectNext({ method: "POST", path: `/v2/payments/authorizations/${authorizationId}/void`, status: 204 });
+
+    const result = await voidAuthorization(authorizationId, OPERATION_KEY);
+
+    expect(result).toMatchObject({ id: authorizationId, status: "VOIDED" });
+    expect(mock.requestsTo("GET", `/v2/payments/authorizations/${authorizationId}`)).toHaveLength(1);
+  });
+
   it("an expired authorization is thrown as AUTHORIZATION_EXPIRED", async () => {
     const { authorizationId } = await authorized();
     mock.setAuthorizationStatus(authorizationId, "EXPIRED");

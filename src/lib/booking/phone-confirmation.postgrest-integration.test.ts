@@ -338,8 +338,17 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
         settlePhoneConfirmationCall(localServiceClient(), callId),
       ]);
 
-      expect(results.sort()).toEqual(["confirmed", "unchanged"]);
-      expect(mock.requestsTo("POST", /\/v2\/payments\/authorizations\/[^/]+\/capture$/)).toHaveLength(1);
+      // Which outcome the second settlement reports depends on when it reads the payment: before the
+      // other's claim it finds nothing to do ("unchanged"); after it, it resolves the pending capture
+      // and may ask PayPal again with the same PayPal-Request-Id, which PayPal answers with the same
+      // capture (phone-confirmation.ts, resolveAuthorizationCapture). Either way: one capture.
+      results.sort();
+      expect(results[0]).toBe("confirmed");
+      expect(["confirmed", "unchanged"]).toContain(results[1]);
+      const attempts = mock.requestsTo("POST", /\/v2\/payments\/authorizations\/[^/]+\/capture$/);
+      expect(attempts.length).toBeGreaterThanOrEqual(1);
+      expect(new Set(attempts.map((request) => request.headers["paypal-request-id"])).size).toBe(1);
+      expect(mock.captures.size).toBe(1);
       expect(bookingStatus(bookingId)).toBe("confirmed");
     });
 

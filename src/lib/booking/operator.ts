@@ -25,7 +25,10 @@ const MAX_BOOKINGS = 500;
 /** Booking states that need the operator's eye. */
 const EXCEPTION_STATUSES = new Set(["needs_attention", "refund_pending", "cancel_pending"]);
 
-export type OperatorPayment = BookingPaymentView;
+/** The booking page's payment view plus when the deposit was captured (the PayPal ledger check needs it). */
+export interface OperatorPayment extends BookingPaymentView {
+  capturedAt: string | null;
+}
 
 export interface OperatorBooking {
   id: string;
@@ -109,7 +112,7 @@ export function summarizeOperatorBookings(bookings: OperatorBooking[], today: st
 
 function latestPayment(rows: Row[] | null | undefined): OperatorPayment | null {
   const latest = [...(rows ?? [])].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
-  return latest ? toPaymentView(latest) : null;
+  return latest ? { ...toPaymentView(latest), capturedAt: (latest.captured_at as string | null) ?? null } : null;
 }
 
 /** A to-one embed arrives as an object, or as a one-element array when PostgREST cannot tell. */
@@ -121,6 +124,58 @@ function fail(what: string, error: { message: string } | null): void {
   if (error) throw new Error(`Failed to load ${what}: ${error.message}`);
 }
 
+function experiencesOf(client: SupabaseClient, merchantId: string) {
+  return client.from("experiences").select("id, title, capacity_per_slot, active").eq("merchant_id", merchantId).order("title");
+}
+
+/** The bookings of these experiences from HISTORY_DAYS ago onwards, each with its latest payment. */
+async function bookingsOf(client: SupabaseClient, experienceRows: Row[], today: string): Promise<OperatorBooking[]> {
+  const titles = new Map(experienceRows.map((row) => [row.id as string, row.title as string]));
+  const bookings = await client
+    .from("bookings")
+    .select(
+      "id, reference, experience_id, slot_date, slot_time, party_size, status, total_cents, deposit_cents, currency, " +
+        "payments(status, order_id, capture_id, refund_id, created_at, captured_at)"
+    )
+    .in("experience_id", [...titles.keys()])
+    .gte("slot_date", addDays(today, -HISTORY_DAYS))
+    .order("slot_date")
+    .order("slot_time")
+    .limit(MAX_BOOKINGS);
+  fail("bookings", bookings.error);
+
+  return ((bookings.data ?? []) as unknown as Row[]).map((row): OperatorBooking => {
+    const payment = latestPayment(row.payments as Row[] | null);
+    const total = row.total_cents as number;
+    const deposit = row.deposit_cents as number;
+    return {
+      id: row.id as string,
+      reference: row.reference as string,
+      experienceTitle: titles.get(row.experience_id as string) ?? "",
+      slotDate: row.slot_date as string,
+      slotTime: toHhMm(row.slot_time as string),
+      partySize: row.party_size as number,
+      status: row.status as string,
+      depositCents: deposit,
+      balanceCents: total - deposit,
+      currency: row.currency as string,
+      payment,
+      exception: isOperatorException(row.status as string, payment?.status ?? null),
+    };
+  });
+}
+
+/** The bookings the operator view lists, without its holds and capacity (the PayPal ledger check needs only these). */
+export async function loadOperatorBookings(
+  client: SupabaseClient,
+  access: OperatorAccess,
+  now: Date = new Date()
+): Promise<OperatorBooking[]> {
+  const experiences = await experiencesOf(client, access.merchantId);
+  fail("experiences", experiences.error);
+  return bookingsOf(client, (experiences.data ?? []) as Row[], madridDate(now));
+}
+
 export async function loadOperatorView(
   client: SupabaseClient,
   access: OperatorAccess,
@@ -129,11 +184,7 @@ export async function loadOperatorView(
   const today = madridDate(now);
   const [merchant, experiences] = await Promise.all([
     client.from("merchants").select("name, is_fixture").eq("id", access.merchantId).single(),
-    client
-      .from("experiences")
-      .select("id, title, capacity_per_slot, active")
-      .eq("merchant_id", access.merchantId)
-      .order("title"),
+    experiencesOf(client, access.merchantId),
   ]);
   fail("merchant", merchant.error);
   fail("experiences", experiences.error);
@@ -143,18 +194,8 @@ export async function loadOperatorView(
   const titles = new Map(experienceRows.map((row) => [row.id as string, row.title as string]));
   const experienceIds = [...titles.keys()];
 
-  const [bookings, holds, capacity] = await Promise.all([
-    client
-      .from("bookings")
-      .select(
-        "id, reference, experience_id, slot_date, slot_time, party_size, status, total_cents, deposit_cents, currency, " +
-          "payments(status, order_id, capture_id, refund_id, created_at)"
-      )
-      .in("experience_id", experienceIds)
-      .gte("slot_date", addDays(today, -HISTORY_DAYS))
-      .order("slot_date")
-      .order("slot_time")
-      .limit(MAX_BOOKINGS),
+  const [bookingList, holds, capacity] = await Promise.all([
+    bookingsOf(client, experienceRows as Row[], today),
     client
       .from("holds")
       .select("id, experience_id, slot_date, slot_time, party_size, expires_at, bookings(reference)")
@@ -174,28 +215,7 @@ export async function loadOperatorView(
         }))
     ),
   ]);
-  fail("bookings", bookings.error);
   fail("holds", holds.error);
-
-  const bookingList = ((bookings.data ?? []) as unknown as Row[]).map((row): OperatorBooking => {
-    const payment = latestPayment(row.payments as Row[] | null);
-    const total = row.total_cents as number;
-    const deposit = row.deposit_cents as number;
-    return {
-      id: row.id as string,
-      reference: row.reference as string,
-      experienceTitle: titles.get(row.experience_id as string) ?? "",
-      slotDate: row.slot_date as string,
-      slotTime: toHhMm(row.slot_time as string),
-      partySize: row.party_size as number,
-      status: row.status as string,
-      depositCents: deposit,
-      balanceCents: total - deposit,
-      currency: row.currency as string,
-      payment,
-      exception: isOperatorException(row.status as string, payment?.status ?? null),
-    };
-  });
 
   return {
     merchant: { name: merchantRow.name as string, isFixture: merchantRow.is_fixture === true },

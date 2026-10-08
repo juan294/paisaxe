@@ -228,6 +228,7 @@ describe.skipIf(!dbReachable)("operator view against live local Supabase", () =>
         orderId: "IT6-ORDER-2",
         captureId: "IT6-CAP-2",
         refundId: "IT6-REF-2",
+        capturedAt: null,
       });
       expect(byId.get(seeded.confirmed)).toMatchObject({
         experienceTitle: "IT operator walk",

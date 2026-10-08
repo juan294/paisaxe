@@ -19,11 +19,30 @@
  * https://js.stripe.com/v3 in place and does not publish stable integrity
  * hashes for it.
  */
+import { getSupabaseUrl } from "@/lib/env";
+
 type BuildCspHeaderOptions = {
   nodeEnv?: NodeJS.ProcessEnv["NODE_ENV"];
+  /** The browser's Supabase URL; in development a loopback one (a local stack) is allowed. */
+  supabaseUrl?: string;
 };
 
-export function buildCspHeader({ nodeEnv = process.env.NODE_ENV }: BuildCspHeaderOptions = {}): string {
+/** The http and ws origins of a loopback http URL (a local Supabase stack), or null for anything else. */
+function loopbackOrigins(url: string | undefined): string | null {
+  try {
+    const parsed = new URL(url ?? "");
+    if (parsed.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(parsed.hostname)) return null;
+    return `${parsed.origin} ws://${parsed.host}`;
+  } catch {
+    return null;
+  }
+}
+
+export function buildCspHeader({
+  nodeEnv = process.env.NODE_ENV,
+  supabaseUrl = getSupabaseUrl(),
+}: BuildCspHeaderOptions = {}): string {
+  const development = nodeEnv === "development";
   // SE-L2: 'unsafe-inline' is intentional for PPR compatibility (see file header).
   // Compensating controls that MUST remain active CI gates to justify this trade-off:
   //   1. XSS canary — e2e/xss-canary.spec.ts verifies injected <script> and
@@ -38,7 +57,7 @@ export function buildCspHeader({ nodeEnv = process.env.NODE_ENV }: BuildCspHeade
   // layout (which forces the layout dynamic and breaks PPR static shells).
   const scriptSrc = [
     "script-src 'self' 'unsafe-inline'",
-    nodeEnv === "development" ? "'unsafe-eval'" : null,
+    development ? "'unsafe-eval'" : null,
     "blob:",
     "https://js.stripe.com",
     "https://checkout.stripe.com",
@@ -46,13 +65,12 @@ export function buildCspHeader({ nodeEnv = process.env.NODE_ENV }: BuildCspHeade
     .filter(Boolean)
     .join(" ");
 
-  // Development only: the local Docker Supabase (`supabase start`) serves auth
-  // and realtime on 127.0.0.1:54321, which the browser must reach (#1000).
+  // Development only: the browser must reach a local Docker Supabase (#1000),
+  // on 127.0.0.1:54321 for `supabase start` or other ports for an isolated
+  // stack (release checklist): the loopback origin of NEXT_PUBLIC_SUPABASE_URL.
   const connectSrc = [
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com https://checkout.stripe.com",
-    nodeEnv === "development"
-      ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321"
-      : null,
+    development ? loopbackOrigins(supabaseUrl) : null,
   ]
     .filter(Boolean)
     .join(" ");
