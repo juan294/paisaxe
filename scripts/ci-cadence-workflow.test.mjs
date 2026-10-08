@@ -20,6 +20,7 @@ function evaluate(expression, context) {
   let source = expression.replace(/^\$\{\{\s*|\s*\}\}$/g, '').replace(/needs\.([A-Za-z][A-Za-z0-9_-]*)/g, (_, id) => `needs[${JSON.stringify(id)}]`);
   return vm.runInNewContext(source, { ...context, always: () => true, failure:()=>false,cancelled:()=>false, format: (pattern, ...args) => pattern.replace(/\{(\d+)\}/g, (_, n) => args[Number(n)]), fromJSON: JSON.parse }, { timeout: 100 });
 }
+function runner(value, context) { return typeof value === 'string' && value.includes('${{') ? evaluate(value, context) : value; }
 function shell(script, env = {}, cwd = new URL('../', import.meta.url)) { return spawnSync('/bin/bash', ['-c', script], { cwd, env: { ...process.env, ...env }, encoding: 'utf8', timeout: 5000 }); }
 const sourceStep = () => current().jobs['callable-source']?.steps.find(s => s.name === 'Validate callable inputs');
 const sourceEnv = (change = {}) => ({ GITHUB_REPOSITORY: 'juan294/paisaxe', REPOSITORY_ID: '1141286326', OWNER_ID: '3944118', SOURCE_SHA: 'b'.repeat(40), PROFILE: 'nightly', INVOCATION_ID: 'ci_full', ...change });
@@ -47,7 +48,7 @@ for (const profile of ['full', 'nightly']) test(`callable ${profile} forces all 
   assert.equal(Boolean(evaluate(w.jobs.develop_push_source.if, c)), false);
   for (const id of ['lint-and-typecheck', 'coverage-shard', 'coverage-merge', 'test', 'build']) assert.equal(Boolean(evaluate(w.jobs[id].if, c)), true, id);
   assert.deepEqual(w.jobs['coverage-shard'].strategy, baseline.jobs['coverage-shard'].strategy);
-  assert.equal(evaluate(w.jobs['coverage-shard']['runs-on'], c), 'ubuntu-latest');
+  assert.equal(runner(w.jobs['coverage-shard']['runs-on'], c), 'ubuntu-latest');
 });
 test('all-empty inherited call is independently rejected instead of selecting direct legacy work', () => {
   const w = current(); const c = called(); c.inputs = { profile: '', source_sha: '', invocation_id: '' }; c.github.event_name = 'push'; c.github.ref = 'refs/heads/develop'; c.needs['callable-source'].result = 'failure';
@@ -124,5 +125,8 @@ test('direct artifact names and download pattern remain exactly original', () =>
 
 for(const [label,actor,sender,pr]of [['outsider','999','User',null],['bot','3944118','Bot',null],['fork','3944118','User',{user:{id:3944118,type:'User'},head:{repo:{id:999}}}]])test('mandatory native '+label+' never enters self-hosted direct legacy coverage',()=>{
  const c=direct(pr?'refs/pull/7/merge':'refs/heads/develop',pr?'pull_request':'push');c.github.actor_id=actor;c.github.event={sender:{type:sender},...(pr?{pull_request:pr}:{})};
- assert.equal(evaluate(current().jobs['coverage-shard']['runs-on'],c),'ubuntu-latest');
+ assert.equal(runner(current().jobs['coverage-shard']['runs-on'],c),'ubuntu-latest');
+});
+for (const [ref, event] of [['refs/heads/develop', 'push'], ['refs/pull/7/merge', 'pull_request']]) test(`public repository: trusted owner ${event} coverage runs on GitHub-hosted runners`, () => {
+  assert.equal(runner(current().jobs['coverage-shard']['runs-on'], direct(ref, event)), 'ubuntu-latest');
 });

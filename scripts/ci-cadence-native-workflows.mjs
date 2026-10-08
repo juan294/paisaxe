@@ -167,7 +167,7 @@ export function generateNativeWorkflows(root=process.cwd()) {
   if(realpathSync(root)!==root)throw Error('Canonical native generator root required');
   const retainedPath='tests/fixtures/ci-cadence-adapter/native/routing-originals.json';
   const retained=readFileSync(resolve(root,retainedPath));
-  if(sha256(retained)!=='69c7139638b1a7f2c03eb43e693e6160136981c3de4fb3cf8144e6b8fa7d39f5')throw Error('Retained routing source authority changed');
+  if(sha256(retained)!=='010b7c55f2aa3e44cc0d884d7474369e4da6426a2050c238659fdc6bd5be68a1')throw Error('Retained routing source authority changed');
   const originals=JSON.parse(retained).files;
   const routed=originals.map(file=>({path:file.path,source:routeOriginalWorkflow(file.source)}));
   const files=[...routed,...generateRemainingWorkflows(root),...generateExtraWorkflows(root),...nativeWorkflows(root),standaloneCoverage(root)];
