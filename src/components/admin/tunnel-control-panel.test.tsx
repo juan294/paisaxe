@@ -436,17 +436,17 @@ describe("TunnelTableRow", () => {
   });
 
   describe("production environment", () => {
-    it("returns null when API returns 403 (production)", async () => {
+    it("shows a disabled local development capability when API returns 403", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
         new Response(null, { status: 403 })
       );
 
-      const { container } = renderRow();
+      renderRow();
 
       await waitFor(() => {
         // The row should not render anything (returns null)
-        const rows = container.querySelectorAll("tr");
-        expect(rows.length).toBe(0);
+        expect(screen.getByText(/Solo disponible en desarrollo local/)).toBeInTheDocument();
+        expect(screen.getByRole("switch")).toBeDisabled();
       });
     });
 

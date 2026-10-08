@@ -1,3 +1,4 @@
+import { checkRequestBudget, rateLimitResponse } from "@/lib/request-rate-limit";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
@@ -15,6 +16,9 @@ export async function GET(request: NextRequest) {
       { status: 401 }
     );
   }
+
+  const requestLimit = await checkRequestBudget("GET /api/favorites", user.id);
+  if (!requestLimit.allowed) return rateLimitResponse({ error: "Too many requests. Please try again later." }, requestLimit);
 
   const supabase = await getSupabaseClient(request);
 
@@ -62,6 +66,9 @@ export async function POST(request: NextRequest) {
 
   const { storyIds } = parsed.data;
 
+  const requestLimit = await checkRequestBudget("POST /api/favorites", user.id);
+  if (!requestLimit.allowed) return rateLimitResponse({ error: "Too many requests. Please try again later." }, requestLimit);
+
   const supabase = await getSupabaseClient(request);
 
   const rows = storyIds.map((storyId: string) => ({
@@ -104,6 +111,9 @@ export async function DELETE(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  const requestLimit = await checkRequestBudget("DELETE /api/favorites", user.id);
+  if (!requestLimit.allowed) return rateLimitResponse({ error: "Too many requests. Please try again later." }, requestLimit);
 
   const supabase = await getSupabaseClient(request);
 

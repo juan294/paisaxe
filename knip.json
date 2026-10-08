@@ -16,7 +16,8 @@
   "ignoreExportsUsedInFile": true,
   "ignoreBinaries": [
     "du",
-    "cloudflared"
+    "cloudflared",
+    "openssl"
   ],
   "paths": {
     "@/*": ["./src/*"]

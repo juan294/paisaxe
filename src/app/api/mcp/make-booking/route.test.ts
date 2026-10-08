@@ -138,6 +138,29 @@ describe("/api/mcp/make-booking", () => {
     });
   });
 
+  it("whitespace outbound config stays unavailable with no provider/DB I/O and corrected presence is disclosed", async () => {
+    process.env.ELEVENLABS_API_KEY = " \n ";
+    process.env.ELEVENLABS_PHONE_NUMBER_ID = " ";
+    process.env.ELEVENLABS_BOOKING_AGENT_ID = " ";
+    expect((await (await GET()).json()).outbound_configured).toBe(false);
+    const request = () => new Request("http://localhost/api/mcp/make-booking", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "fixture-key" },
+      body: JSON.stringify({ venue_name: "Casa Gerardo", phone_number: "+34 985 88 77 97", party_size: 4, date: "hoy", time: "21:00", customer_name: "Juan García", customer_phone: "612345678" }),
+    });
+    const denied = await POST(request());
+    expect((await denied.json()).status).toBe("not_configured");
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(checkRateLimit).not.toHaveBeenCalled();
+    process.env.ELEVENLABS_API_KEY = " fixture-key ";
+    process.env.ELEVENLABS_PHONE_NUMBER_ID = " fixture-phone ";
+    process.env.ELEVENLABS_BOOKING_AGENT_ID = " fixture-agent ";
+    expect((await (await GET()).json()).outbound_configured).toBe(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ conversation_id: "fixture-conversation" }) });
+    const recovered = await POST(request());
+    expect((await recovered.json()).success).toBe(true);
+  });
+
   describe("POST", () => {
     it("should return 401 when x-mcp-secret header is missing", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {

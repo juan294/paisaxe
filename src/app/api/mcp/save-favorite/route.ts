@@ -1,3 +1,6 @@
+import { checkRequestBudget, rateLimitResponse } from "@/lib/request-rate-limit";
+import { getClientIp } from "@/lib/request-utils";
+import { normalizeIpForRateLimit } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { createAdminClient } from "@/lib/supabase-admin";
@@ -78,6 +81,9 @@ export async function POST(request: Request): Promise<NextResponse<SaveFavoriteR
   // bookmark is still recorded rather than lost.
   const conversationId =
     asString(body.conversationId ?? body.conversation_id) ?? "unknown";
+
+  const requestLimit = await checkRequestBudget("POST /api/mcp/save-favorite", normalizeIpForRateLimit(getClientIp(request)));
+  if (!requestLimit.allowed) return rateLimitResponse({ success: false, message: "Too many requests. Please try again later." }, requestLimit);
 
   try {
     const supabase = createAdminClient();

@@ -1,5 +1,7 @@
 "use client";
 
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { useState, useEffect, useCallback, useRef, useMemo, RefObject } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -110,7 +112,7 @@ export function StoryViewer({
   const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
 
-  const { requiresAuth, isFavorite, toggleFavorite } = useFavorites();
+  const { requiresAuth, isFavorite, toggleFavorite, retryAfter, retry } = useFavorites();
 
   const { signInWithGoogle } = useAuth();
   const router = useRouter();
@@ -274,6 +276,9 @@ export function StoryViewer({
       // it, so its own backdrop/close controls are unaffected.
       inert={chatOpen}
     >
+      <div className="absolute left-4 right-4 top-20 z-50">
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void retry(); }} />
+      </div>
       {/* PE-H1/FE-M3 (#804, #765): adjacent story images, rendered as hidden,
           `priority` next/image elements so Next.js itself generates the
           preload — a hand-built <link rel="preload" href={rawUrl}> pointed at

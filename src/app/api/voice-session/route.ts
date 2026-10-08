@@ -1,3 +1,4 @@
+import { rateLimitResponse } from "@/lib/request-rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import {
   ElevenLabsSignedSessionError,
@@ -33,10 +34,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     VOICE_SESSION_RATE_LIMIT
   );
   if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: buildRateLimitHeaders(rateLimit, true) }
-    );
+    return rateLimitResponse({ error: "Too many requests. Please try again later." }, rateLimit, buildRateLimitHeaders(rateLimit, true));
   }
 
   const body = (await request.json().catch(() => null)) as {

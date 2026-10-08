@@ -159,56 +159,10 @@ async function checkUpstash(
   };
 }
 
-// --- Degradation tracking (BE-M1) ---
-
-// Module-level flag set when Upstash is configured but unreachable.
-// Allows health checks and monitoring to surface the degradation state.
-let _rateLimitDegraded = false;
-
-/**
- * Returns true if Upstash is configured but currently unavailable.
- * Used by health checks to surface the degraded rate-limiting state.
- */
-export function isRateLimitDegraded(): boolean {
-  return _rateLimitDegraded;
-}
-
-export function getRateLimitBackendStatus(): RateLimitBackendStatus {
-  if (useUpstash) {
-    return _rateLimitDegraded
-      ? {
-          backend: "upstash",
-          configured: true,
-          degraded: true,
-          reason: "upstash_unavailable",
-        }
-      : {
-          backend: "upstash",
-          configured: true,
-          degraded: false,
-        };
-  }
-
-  if (isProduction()) {
-    return {
-      backend: "blocked",
-      configured: false,
-      degraded: true,
-      reason: "upstash_missing",
-    };
-  }
-
-  return {
-    backend: "memory",
-    configured: false,
-    degraded: false,
-  };
-}
-
 // --- Live backend probe (DO-H2) ---
 
 /**
- * DO-H2 (#823): `_rateLimitDegraded` above is per-process state — on Vercel,
+ * DO-H2 (#823): per-process state is insufficient — on Vercel,
  * `/api/health` runs in a different isolate than `/api/chat/stream`, so it can
  * never observe a flag set there. This performs a live, side-effect-free Redis
  * PING so health reflects Upstash's CURRENT reachability instead of stale,
@@ -339,11 +293,8 @@ export async function checkRateLimit(
   if (useUpstash) {
     try {
       const result = await checkUpstash(identifier, config);
-      // Clear degraded flag on successful Upstash call
-      _rateLimitDegraded = false;
       return result;
     } catch (err) {
-      _rateLimitDegraded = true;
       logger.error("[RATE_LIMIT_FALLBACK]", {
         identifier,
         error: err instanceof Error ? err.message : String(err),
@@ -361,7 +312,6 @@ export async function checkRateLimit(
   }
 
   if (isProduction()) {
-    _rateLimitDegraded = true;
     logger.warn("[RATE_LIMIT_DEGRADED]", {
       reason: "upstash_missing",
       backend: "blocked",
@@ -374,7 +324,6 @@ export async function checkRateLimit(
 
 export function resetRateLimit(): void {
   store.clear();
-  _rateLimitDegraded = false;
 }
 
 export function getRateLimitStore(): Map<string, RateLimitEntry> {

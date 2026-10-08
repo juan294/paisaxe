@@ -17,7 +17,7 @@ interface TunnelTableRowProps {
 
 /**
  * Tunnel control rendered as a table row for the System category.
- * Development-only - returns null in production.
+ * Development-only - discloses unavailable capability in production.
  *
  * Renders the full UI immediately with default OFF state,
  * then updates in background when status is fetched.
@@ -36,7 +36,7 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
         setStatus(data);
         setError(null);
         onRunningChange?.(data.running);
-      } else if (response.status === 403) {
+      } else if (response.status === 403 || response.status === 404) {
         // Production environment - tunnel control not available
         setIsProduction(true);
       }
@@ -50,6 +50,7 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
   }, [fetchStatus]);
 
   const handleToggle = async () => {
+    if (isProduction) return;
     setIsUpdating(true);
     setError(null);
 
@@ -61,6 +62,8 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
         const data = await response.json();
         setStatus({ running: data.running, url: data.url });
         onRunningChange?.(data.running);
+      } else if (response.status === 403 || response.status === 404) {
+        setIsProduction(true);
       } else {
         const data = await response.json();
         setError(data.error || "Failed to toggle tunnel");
@@ -71,11 +74,6 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
       setIsUpdating(false);
     }
   };
-
-  // Don't render in production
-  if (isProduction) {
-    return null;
-  }
 
   return (
     <tr className={cn("group", status.running && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
@@ -98,7 +96,7 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
         </div>
       </td>
       <td className="py-5 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
-        {status.running && status.url ? (
+        {isProduction ? "Solo disponible en desarrollo local. Inicia la aplicación con npm run dev." : status.running && status.url ? (
           <span>
             Exposes localhost:3000 at{" "}
             <a
@@ -133,7 +131,7 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
       <td className="py-5 text-center align-top">
         <button
           onClick={handleToggle}
-          disabled={isUpdating}
+          disabled={isUpdating || isProduction}
           className={cn(
             "relative h-6 w-11 rounded-full transition-colors",
             status.running

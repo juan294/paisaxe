@@ -1854,6 +1854,8 @@ describe("StoryViewer", () => {
         toggleFavorite: vi.fn(),
         isLoading: false,
         requiresAuth: true,
+        retryAfter: null,
+        retry: async () => {},
       });
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);

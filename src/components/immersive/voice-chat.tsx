@@ -1,5 +1,7 @@
 "use client";
 
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Story } from "@/types/immersive";
 import { PrivacyNotice } from "./privacy-notice";
@@ -117,7 +119,8 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
     agentId,
     expiresAt,
     hoursUntilExpiry,
-    isLoading: isVoiceAccessLoading
+    isLoading: isVoiceAccessLoading,
+    retryAfter, refresh
   } = useVoiceAccess();
 
   // Stream chat hooks for SSE message handling. A visitor with an active
@@ -315,6 +318,8 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
           onClose={handleClose}
           tryVoiceLabel={bookingActive ? t("booking.chat.voiceDiscovery") : undefined}
         />
+
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
 
         {/* Privacy Notice */}
         {!privacyAcknowledged && (

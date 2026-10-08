@@ -283,6 +283,23 @@ describe("CheckoutPage", () => {
       expect(checkoutContainer).toBeInTheDocument();
     });
 
+    it("budget fixture: initial secret and two user retries emit three checkout requests", async () => {
+      render(<CheckoutPage />);
+      for (let i = 0; i < 3; i++) await act(async () => { await capturedFetchClientSecret!(); });
+      expect(mockFetch.mock.calls.filter(([url]) => url === "/api/checkout/embedded")).toHaveLength(3);
+    });
+
+    it("429 shows retry timing and its retry remount allows a successful checkout", async () => {
+      render(<CheckoutPage />);
+      mockFetch.mockResolvedValueOnce(Response.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": "19" } }));
+      await act(async () => { await expect(capturedFetchClientSecret!()).rejects.toThrow(); });
+      expect(screen.getByRole("alert")).toHaveTextContent("19 segundos");
+      fireEvent.click(screen.getByRole("button", { name: "Volver a intentar" }));
+      mockFetch.mockResolvedValueOnce(Response.json({ clientSecret: "recovered-secret" }));
+      await act(async () => { expect(await capturedFetchClientSecret!()).toBe("recovered-secret"); });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
     it("should call /api/checkout/embedded and return client secret on success", async () => {
       render(<CheckoutPage />);
 

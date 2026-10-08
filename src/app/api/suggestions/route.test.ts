@@ -11,7 +11,8 @@ const logger = vi.hoisted(() => ({
 vi.mock("@/lib/logger", () => ({ logger }));
 
 // Mock rate limiter
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/rate-limit", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/rate-limit")>(),
   checkRateLimit: vi.fn(),
 }));
 
@@ -65,6 +66,15 @@ describe("Suggestions API", () => {
       remaining: 0,
       resetAt: Date.now() + 60_000,
     });
+  });
+
+  it("invalid explicit bearer cannot become an anonymous insertion or consume a rate slot", async () => {
+    const from = vi.fn();
+    mockCreateServerClient.mockReturnValueOnce({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: { message: "Invalid token" } }) }, from } as never);
+    const response = await POST(new NextRequest("http://localhost/api/suggestions", { method: "POST", headers: { Authorization: "Bearer invalid" }, body: JSON.stringify({ placeName: "Oviedo" }) }));
+    expect(response.status).toBe(401);
+    expect(from).not.toHaveBeenCalled();
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
   });
 
   // Each request gets a unique IP to avoid rate limit collisions across tests
