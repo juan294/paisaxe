@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clockTime, dateTime, slotDay } from "@/lib/booking-format";
@@ -6,6 +6,10 @@ import type { OperatorBooking, OperatorView } from "@/lib/booking/operator";
 import type { OperatorLedgerResponse } from "@/types/operator-ledger";
 
 const CAPABILITY = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+
+// The PayPal check renders after two chained fetches (the view, then the ledger). On a loaded machine
+// (the full suite at 4 workers took 9 minutes on 2026-10-08) that overran Testing Library's 1 s default.
+configure({ asyncUtilTimeout: 5000 });
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ capability: CAPABILITY }) }));
 vi.mock("@/lib/csrf-client", () => ({ csrfHeaders: () => ({ "x-csrf-token": "csrf-1" }) }));

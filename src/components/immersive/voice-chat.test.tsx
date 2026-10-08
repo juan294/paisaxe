@@ -255,6 +255,7 @@ vi.mock("@/components/premium/voice-purchase-cta", () => ({
 const resetMockVoiceAccess = () => {
   mockAuthState.session = null;
   mockBookingAccess.active = false;
+  mockBookingAccess.isLoading = false;
   mockVoiceAccess.canUseVoice = false;
   mockVoiceAccess.needsSignIn = false;
   mockVoiceAccess.needsPurchase = false;
@@ -1949,6 +1950,36 @@ describe("VoiceChat booking mode (PayPal hackathon Phase 3, F06)", () => {
     render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
     expect(await screen.findByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+  });
+
+  it("shows no composer while booking access is still being checked, so a first turn cannot go to the discovery chat", async () => {
+    mockAuthState.session = { access_token: "token-1" };
+    mockBookingAccess.isLoading = true;
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`));
+          controller.close();
+        },
+      }),
+    });
+
+    const { rerender } = render(<VoiceChat story={mockStory} open={true} onClose={() => {}} bookingMode />);
+    await act(async () => {});
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(document.querySelector(".animate-pulse")).not.toBeNull();
+
+    mockBookingAccess.isLoading = false;
+    mockBookingAccess.active = true;
+    rerender(<VoiceChat story={mockStory} open={true} onClose={() => {}} bookingMode />);
+    await userEvent.type(await screen.findByRole("textbox"), "Somos cuatro");
+    await userEvent.keyboard("{Enter}");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    expect(mockFetch.mock.calls.map((call) => call[0])).toEqual(["/api/booking/chat/stream"]);
   });
 
   it("sends turns to the booking chat route while booking access is active", async () => {
