@@ -111,7 +111,10 @@ Plan: [2026-10-08-apimatic-official-sdk.md](2026-10-08-apimatic-official-sdk.md)
    - Plan said: one deposit "visible as 'PayPal confirma' in the operator panel once PayPal lists it, then refunded; screenshots for the evidence page".
    - Found: the deposit was refunded two minutes after the capture, before PayPal listed either, so it can only ever show "Pendiente en PayPal" and then "Reembolso en PayPal". "PayPal confirma" against the real sandbox would need a second deposit that is kept (another approval by the owner).
    - Screenshots stay in the scratchpad, not the repository: the PayPal dashboard one shows the owner's name; the panel and confirmation ones are recorded by path in the acceptance record.
-6. **Measured PayPal lag.** The sandbox's `last_refreshed_datetime` trailed the clock by about
+6. **The phone-confirmation race test asserted one interleaving; it now asserts the design's guarantee.**
+   - Found: the pre-commit suite on Phase 3's tree failed it again, now with the detail: both concurrent settlements returned "confirmed". `settlePhonePayment` sends a payment it reads as `capture_pending` to `resolveAuthorizationCapture`, which reads the order and, when PayPal has not captured yet, captures again with the same PayPal-Request-Id ("a retry reuses the same key, so never a second capture"). So the second settlement reports "unchanged" only if it read the payment before the first one's claim. The official SDK's slower call path made the other order more frequent; the race itself predates this work.
+   - Chose: the test asserts one capture at PayPal (`mock.captures.size` 1), one request id on every capture request, the booking confirmed, and one "confirmed" with the other "confirmed" or "unchanged". 5 of 5 runs passed. No production code changed. This resolves the Phase 2 handoff's open "two settlements racing…" finding.
+7. **Measured PayPal lag.** The sandbox's `last_refreshed_datetime` trailed the clock by about
    1 h 45 min to 2 h (07:26 UTC -> 05:29:59Z; 07:45 UTC -> 05:59:59Z).
 
 ## Handoff
@@ -173,7 +176,7 @@ Plan: [2026-10-08-apimatic-official-sdk.md](2026-10-08-apimatic-official-sdk.md)
       expired-holds count was 0; other files' reconciliation expires holds too). Passed 31 of 31 alone.
     - Then **1 failed** in `phone-confirmation.postgrest-integration.test.ts` ("two settlements racing…").
       Its output was not captured; it passed 14 of 14 alone, then 200 of 200 in three full runs.
-      Cause unknown: an open finding for the owner.
+      Cause found in Phase 3 (deviation 6): the test asserted one of two safe interleavings.
   - `npx playwright test --project=release-required-local`: 3 of 3, then after the runner fix
     **1 failed** (`booking-roundtrip`: the quote card never appeared; the server log shows the
     message reached the ordinary chat route, before any PayPal call), then 3 of 3. The same step
