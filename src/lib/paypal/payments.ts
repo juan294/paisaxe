@@ -6,7 +6,7 @@
  */
 import "server-only";
 
-import type { Refund } from "pay-pal-server-sdk";
+import type { Refund } from "@paypal/paypal-server-sdk";
 import { callPaypal } from "./client";
 import { centsToValue } from "./money";
 import { normalizeCapture } from "./orders";
@@ -20,8 +20,8 @@ function normalizeRefund(refund: Refund, status: number | null): PaypalRefund {
 }
 
 export async function getCapture(captureId: string): Promise<PaypalCapture> {
-  const { value: capture, status } = await callPaypal("getCapture", (client) =>
-    client.payments.getCapturedPayment({ captureId }),
+  const { value: capture, status } = await callPaypal("getCapture", ({ payments }) =>
+    payments.getCapturedPayment({ captureId }),
   );
   return normalizeCapture(capture, capture.supplementaryData?.relatedIds?.orderId ?? null, status);
 }
@@ -29,10 +29,10 @@ export async function getCapture(captureId: string): Promise<PaypalCapture> {
 /** Refunds `amountCents` EUR of a capture. */
 export async function refundCapture(captureId: string, amountCents: number, operationKey: string): Promise<PaypalRefund> {
   const value = centsToValue(amountCents);
-  const { value: refund, status } = await callPaypal("refundCapture", (client) =>
-    client.payments.refundCapturedPayment({
+  const { value: refund, status } = await callPaypal("refundCapture", ({ payments }) =>
+    payments.refundCapturedPayment({
       captureId,
-      payPalRequestId: `refund:${operationKey}`,
+      paypalRequestId: `refund:${operationKey}`,
       prefer: "return=representation",
       body: { amount: { currencyCode: "EUR", value } },
     }),
@@ -41,6 +41,6 @@ export async function refundCapture(captureId: string, amountCents: number, oper
 }
 
 export async function getRefund(refundId: string): Promise<PaypalRefund> {
-  const { value, status } = await callPaypal("getRefund", (client) => client.payments.getRefund({ refundId }));
+  const { value, status } = await callPaypal("getRefund", ({ payments }) => payments.getRefund({ refundId }));
   return normalizeRefund(value, status);
 }

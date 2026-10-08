@@ -151,3 +151,48 @@ refunded; screenshots for the evidence page.
 
 - 2026-10-08: plan written; owner decisions D8, D9 and three phases recorded. Next:
   Phase 1 in a fresh session after the plugin swap.
+- 2026-10-08, Phase 1 done (owner asked for all phases without stopping; deviations in
+  [the notes](2026-10-08-apimatic-official-sdk-notes.md#phase-1)).
+  - Plugin: `paypal@context-plugins-local` 0.1.0 ("PayPal Server SDKs"), installed by
+    the owner with the deck's command plus `--targets claude --yes --force`
+    (context-plugins CLI 0.12.0) on 2026-10-08 05:35 UTC; source
+    `paypaldev/server-sdk-context-plugin-preview@main`, commit
+    `6aa057126f0d4709a42e15002aab832a94935d92` (2026-09-25). `paypal@context-plugins`
+    0.3.3 (commit `d09ec8bd`) disabled, still installed.
+  - SDK: `@paypal/paypal-server-sdk` 2.5.0 exact; source read at tag `2.5.0`, commit
+    `790be9be9b694be08157e1cd5d50321c72727a76`.
+  - Skills used, by file:
+    - `typescript-getting-started`: exact pin in `package.json`; root-only imports with
+      the value/type split in `orders.ts`, `payments.ts`, `authorizations.ts` and
+      `client.ts`; SDK source read at the pinned tag.
+    - `typescript-client-initialization`: one long-lived `Client` per configuration;
+      controllers built by us beside it (`client.ts` `sdkFor`).
+    - `typescript-authentication`: `clientCredentialsAuthCredentials` with
+      `oAuthTokenProvider`; a provider that never rejects (`client.ts` `tokenProvider`).
+    - `typescript-calling-endpoints`: Form B option objects, `paypalRequestId`,
+      `ApiResponse.result`/`statusCode`/`headers` (`callPaypal` and every operation).
+    - `typescript-models`: enum members instead of strings (`CheckoutPaymentIntent`,
+      `PaypalExperienceUserAction`, `PaypalWalletContextShippingPreference`); the nullable
+      `voidPayment` result (`authorizations.ts`).
+    - `typescript-error-handling`: one `ApiError` branch, `result` versus `body`,
+      PayPal's wire field names in the payload (`client.ts` `toPaypalError`).
+    - `typescript-configuration-resilience`: explicit `timeout` (the default `0` means
+      none), the retry configuration with both budget fields set, and routing below the
+      SDK (`client.ts` `retryConfig`, `sdkFetch`).
+    - `typescript-testing`: the retry interval shortened in tests, every intercepted call
+      recorded and selected by path (`client.test.ts`).
+  - `callRecords` kept, reduced to the status and debug id of each attempt's response.
+    The SDK's "not JSON" error carries no status.
+  - Tests (`it` blocks): `client.test.ts` 15 → 28 (retries, the quirk, the declared
+    500, request ids on every POST, provider recovery, routing); `authorizations.test.ts`
+    19 → 20 (204 void). `orders`, `payments`, `invoices` and `webhooks` test files are
+    unchanged. TDD red verified: without the retry configuration 3 tests failed; with
+    `retryOnTimeout: true`, 6 failed.
+  - Review: an independent reviewer approved after one round. 1 major (500 retries
+    documented wrongly) and 4 minor findings, all fixed; 2 nits, one applied, one
+    tested. Simplify (4 angles): controllers cached with the client, an SDK-only
+    fetch so the shared guard stays strict, unreadable bodies detected from the call
+    record instead of SDK message text, duplicate config read and redundant fallbacks
+    removed. Skipped: a dummy-token redesign (changes failure reporting and bypasses
+    the skill's provider), shared `parseJson` and shared test fixtures (outside this
+    diff; the plan keeps those files unchanged).

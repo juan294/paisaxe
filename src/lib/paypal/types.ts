@@ -1,6 +1,6 @@
 /**
  * The PayPal adapter's contract (PayPal hackathon plan, Phase 4). The rest of
- * the booking code depends on these shapes only, never on pay-pal-server-sdk
+ * the booking code depends on these shapes only, never on @paypal/paypal-server-sdk
  * types. Amounts are integer cents; PayPal's "30.00" strings stay inside the
  * adapter.
  */

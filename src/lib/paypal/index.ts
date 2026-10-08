@@ -1,6 +1,6 @@
 /**
  * The PayPal adapter (PayPal hackathon plan, Phase 4). Booking code imports
- * from here only; pay-pal-server-sdk types stay inside src/lib/paypal.
+ * from here only; @paypal/paypal-server-sdk types stay inside src/lib/paypal.
  */
 export { authorizeOrder, captureAuthorization, getAuthorization, voidAuthorization } from "./authorizations";
 export { valueToCents } from "./money";
