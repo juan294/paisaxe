@@ -82,7 +82,7 @@ test('disjoint line reports retain weighted exact line totals', () => {
 
 // A describe.skipIf(!dbReachable) group skips as a whole on a runner without the
 // local Supabase stack. Only exact reviewed (file, group) pairs may skip, and only whole.
-const GATED = [{ file: 'src/lib/x.postgrest-integration.test.ts', describe: 'x against live local Supabase' }];
+const GATED = [{ file: 'src/lib/x.postgrest-integration.test.ts', describe: 'x against live local Supabase', cases: 2 }];
 function gated(statuses = ['skipped', 'skipped'], describe = GATED[0].describe, file = GATED[0].file) {
   const s = suite('app');
   const cases = statuses.map((status, index) => ({ ancestorTitles: [describe, 'nested'], title: `case ${index}`, fullName: `${describe} nested case ${index}`, status, failureMessages: [] }));
@@ -108,7 +108,11 @@ for (const [name, build, allowlist] of [
   ['a native pending total that exceeds the admitted skips', () => { const s = gated(); s.tests.numPendingTests += 1; s.tests.numTotalTests += 1; return s; }],
   ['a native pending count no case accounts for', () => { const s = gated(); s.tests.numPendingTests += 1; return s; }],
   ['a todo total', () => { const s = gated(); s.tests.numTodoTests = 1; return s; }],
+  ['a case added to a skipped gated group', () => gated(['skipped', 'skipped', 'skipped'])],
+  ['a case moved out of a skipped gated group', () => gated(['skipped'])],
+  ['an allowlist entry without its pinned case count', () => gated(), [{ file: GATED[0].file, describe: GATED[0].describe }]],
+  ['an allowlist entry with a non-positive case count', () => gated(), [{ ...GATED[0], cases: 0 }]],
   ['a skipped describe-level suite census', () => { const s = gated(); s.tests.numPendingTestSuites = 1; s.tests.numTotalTestSuites += 1; return s; }],
-  ['a malformed allowlist', () => gated(), [{ file: GATED[0].file }]],
+  ['a malformed allowlist', () => gated(), [{ file: GATED[0].file, cases: 2 }]],
   ['a duplicated allowlist entry', () => gated(), [GATED[0], GATED[0]]],
 ]) test(`rejects ${name}`, () => assert.throws(() => aggregateGated(build(), allowlist), /Incomplete coverage measurement/));

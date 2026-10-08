@@ -33,6 +33,25 @@ test('the reviewed gated groups are exactly the describe.skipIf(!dbReachable) gr
   assert.deepEqual(ENVIRONMENT_GATED.map(key).sort(), sourceGroups().map(key).sort());
 });
 
+const IMPORT = /import\s*\{[^}]*\bisLocalSupabaseReachable\b[^}]*\}\s*from\s*["'](?:@\/test\/local-supabase|(?:\.\.\/)+src\/test\/local-supabase)["']/;
+const TITLE = /\bdescribe(?:\.\w+(?:\([^)]*\))?)?\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g;
+test('each gated group is gated only by the local Supabase reachability probe, under a unique title', () => {
+  for (const file of new Set(ENVIRONMENT_GATED.map(entry => entry.file))) {
+    const text = readFileSync(`${root}/${file}`, 'utf8');
+    assert.match(text, IMPORT, `${file}: isLocalSupabaseReachable must come from the shared local Supabase helper`);
+    assert.equal(text.match(/\bdbReachable\s*=/g)?.length, 1, `${file}: dbReachable is bound once`);
+    assert.match(text, /^const dbReachable = await isLocalSupabaseReachable\(\);$/m, `${file}: dbReachable is the reachability probe`);
+    // Two describes with one title would merge into one admitted group.
+    const titles = [...text.matchAll(TITLE)].map(match => match[2]);
+    for (const entry of ENVIRONMENT_GATED.filter(item => item.file === file)) assert.equal(titles.filter(title => title === entry.describe).length, 1, `${key(entry)} title is unique in its file`);
+  }
+});
+
+test('each reviewed group pins the number of cases it skips on a hosted runner', () => {
+  for (const group of census.skippedGroups) assert.equal(ENVIRONMENT_GATED.find(entry => key(entry) === key(group))?.cases, group.cases, key(group));
+  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), census.native.numPendingTests);
+});
+
 test('the hosted nightly skip census is wholly admitted, and only by the reviewed groups', () => {
   assert.equal(census.native.numPendingTests, census.skippedGroups.reduce((sum, group) => sum + group.cases, 0));
   assert.equal(census.native.numTodoTests, 0); assert.equal(census.native.numPendingTestSuites, 0);

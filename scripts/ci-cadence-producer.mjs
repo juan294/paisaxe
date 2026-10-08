@@ -8,24 +8,25 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const required = condition => { if (!condition) throw Error('Native producer evidence incomplete or changed'); };
 // Reviewed describe.skipIf(!dbReachable) groups: they need the local Supabase
 // stack, which no hosted measuring runner has, so they skip as a whole there.
-// Their cases are disclosed and never counted; any other skip still fails.
+// Each pins the cases it skips there (census of nightly run 37721477388); they
+// are disclosed and never counted, and any other skip or count change fails.
 export const ENVIRONMENT_GATED = Object.freeze([
-  { file: 'scripts/booking/create-operator-link.test.ts', describe: 'createOperatorAccess against live local Supabase' },
-  { file: 'src/app/api/feature-flags/route.postgrest-rls.test.ts', describe: 'SE-H1/BE-M9: feature_flags anon PostgREST access (live local Supabase)' },
-  { file: 'src/app/api/webhooks/stripe/route.postgrest-integration.test.ts', describe: 'QA-H4: grant_day_pass_idempotent guarantees against live local Supabase' },
-  { file: 'src/lib/booking/booking.postgrest-integration.test.ts', describe: 'booking domain against live local Supabase' },
-  { file: 'src/lib/booking/cancel.postgrest-integration.test.ts', describe: 'cancellation against live local Supabase' },
-  { file: 'src/lib/booking/capture.postgrest-integration.test.ts', describe: 'deposit flow against live local Supabase' },
-  { file: 'src/lib/booking/invoice.postgrest-integration.test.ts', describe: 'balance invoice against live local Supabase and the PayPal mock' },
-  { file: 'src/lib/booking/operator.postgrest-integration.test.ts', describe: 'operator view against live local Supabase' },
-  { file: 'src/lib/booking/phone-confirmation.postgrest-integration.test.ts', describe: 'phone confirmation against live local Supabase' },
-  { file: 'src/lib/booking/reconcile.postgrest-integration.test.ts', describe: 'PayPal webhook inbox and reconciliation against live local Supabase' },
-  { file: 'src/lib/booking/tools.postgrest-integration.test.ts', describe: 'booking tools against the fixture merchant' },
-  { file: 'src/lib/booking/vouchers.postgrest-integration.test.ts', describe: 'vouchers against live local Supabase' },
-  { file: 'src/lib/definer-function-privileges.postgrest-rls.test.ts', describe: 'SECURITY DEFINER function privileges (live local Supabase)' },
-  { file: 'src/lib/match-chunks.postgrest-rls.test.ts', describe: 'match_chunks (live local Supabase)' },
-  { file: 'src/lib/proxy/maintenance.postgrest-integration.test.ts', describe: 'SE-H1/BE-M9 regression: isMaintenanceModeEnabled() against live local Supabase' },
-  { file: 'src/lib/stories-rls.postgrest-rls.test.ts', describe: 'SE-H2: stories anon PostgREST access (live local Supabase)' },
+  { file: 'scripts/booking/create-operator-link.test.ts', describe: 'createOperatorAccess against live local Supabase', cases: 1 },
+  { file: 'src/app/api/feature-flags/route.postgrest-rls.test.ts', describe: 'SE-H1/BE-M9: feature_flags anon PostgREST access (live local Supabase)', cases: 4 },
+  { file: 'src/app/api/webhooks/stripe/route.postgrest-integration.test.ts', describe: 'QA-H4: grant_day_pass_idempotent guarantees against live local Supabase', cases: 4 },
+  { file: 'src/lib/booking/booking.postgrest-integration.test.ts', describe: 'booking domain against live local Supabase', cases: 50 },
+  { file: 'src/lib/booking/cancel.postgrest-integration.test.ts', describe: 'cancellation against live local Supabase', cases: 15 },
+  { file: 'src/lib/booking/capture.postgrest-integration.test.ts', describe: 'deposit flow against live local Supabase', cases: 28 },
+  { file: 'src/lib/booking/invoice.postgrest-integration.test.ts', describe: 'balance invoice against live local Supabase and the PayPal mock', cases: 14 },
+  { file: 'src/lib/booking/operator.postgrest-integration.test.ts', describe: 'operator view against live local Supabase', cases: 20 },
+  { file: 'src/lib/booking/phone-confirmation.postgrest-integration.test.ts', describe: 'phone confirmation against live local Supabase', cases: 14 },
+  { file: 'src/lib/booking/reconcile.postgrest-integration.test.ts', describe: 'PayPal webhook inbox and reconciliation against live local Supabase', cases: 31 },
+  { file: 'src/lib/booking/tools.postgrest-integration.test.ts', describe: 'booking tools against the fixture merchant', cases: 2 },
+  { file: 'src/lib/booking/vouchers.postgrest-integration.test.ts', describe: 'vouchers against live local Supabase', cases: 9 },
+  { file: 'src/lib/definer-function-privileges.postgrest-rls.test.ts', describe: 'SECURITY DEFINER function privileges (live local Supabase)', cases: 2 },
+  { file: 'src/lib/match-chunks.postgrest-rls.test.ts', describe: 'match_chunks (live local Supabase)', cases: 5 },
+  { file: 'src/lib/proxy/maintenance.postgrest-integration.test.ts', describe: 'SE-H1/BE-M9 regression: isMaintenanceModeEnabled() against live local Supabase', cases: 2 },
+  { file: 'src/lib/stories-rls.postgrest-rls.test.ts', describe: 'SE-H2: stories anon PostgREST access (live local Supabase)', cases: 3 },
 ].map(Object.freeze));
 
 /** The runner supplies paths to its actual exit receipt and fresh native JSON.

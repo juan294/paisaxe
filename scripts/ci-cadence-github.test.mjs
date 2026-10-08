@@ -272,6 +272,8 @@ test('native referenced workflows match in any order, but only as path@commit wi
   assert.equal(await available([...twoCallees.referencedWorkflows, { ...e2e, path: `juan294/paisaxe/.github/workflows/other.yml@${sha('b')}` }]), false);
   assert.equal(await available([...twoCallees.referencedWorkflows, e2e]), false);
   assert.equal(await available([projection.referencedWorkflows[0], { ...e2e, extra: true }]), false);
+  // The same path and commit reached through another branch ref is a different native reference.
+  assert.equal(await available([projection.referencedWorkflows[0], { ...e2e, ref: 'refs/heads/develop' }]), false);
 });
 
 test('cancelled after authenticated pre-suite admission but before app work remains known blocked', async () => {

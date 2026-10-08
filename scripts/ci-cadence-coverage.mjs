@@ -23,8 +23,9 @@ function count(value) {
  * admission, immutable artifact provenance and publisher authority remain
  * separate checks. Repeated executions cannot inflate unique test counts.
  * environmentGated lists the exact reviewed (file, top-level describe) groups
- * that skip as a whole without their environment (describe.skipIf); such a
- * group's skipped cases are disclosed, never counted, and any other skip fails.
+ * that skip as a whole without their environment (describe.skipIf), each with
+ * its pinned case count; such a group's skipped cases are disclosed, never
+ * counted, and any other skip, or a group that grew or shrank, fails.
  */
 export function aggregateMeasuredSuites({ root, requiredSuites, suites, environmentGated = [] }) {
   requireEvidence(typeof root === 'string' && isAbsolute(root) && root === resolve(root), 'canonical checkout root required');
@@ -34,10 +35,11 @@ export function aggregateMeasuredSuites({ root, requiredSuites, suites, environm
   requireEvidence(Array.isArray(suites) && suites.length === requiredSuites.length, 'missing or extra suite');
   requireEvidence(suites.every(s => record(s) && requiredSuites.includes(s.id))
     && new Set(suites.map(s => s.id)).size === suites.length, 'wrong or repeated suite');
-  requireEvidence(Array.isArray(environmentGated) && environmentGated.every(entry => record(entry) && Object.keys(entry).length === 2
-    && typeof entry.file === 'string' && /^[^/]/.test(entry.file) && !entry.file.split('/').includes('..') && typeof entry.describe === 'string' && entry.describe.trim().length > 0)
+  requireEvidence(Array.isArray(environmentGated) && environmentGated.every(entry => record(entry) && Object.keys(entry).length === 3
+    && typeof entry.file === 'string' && /^[^/]/.test(entry.file) && !entry.file.split('/').includes('..') && typeof entry.describe === 'string' && entry.describe.trim().length > 0
+    && Number.isSafeInteger(entry.cases) && entry.cases > 0)
     && new Set(environmentGated.map(entry => JSON.stringify([entry.file, entry.describe]))).size === environmentGated.length, 'invalid environment-gated inventory');
-  const gatedGroups = new Set(environmentGated.map(entry => JSON.stringify([entry.file, entry.describe])));
+  const gatedGroups = new Map(environmentGated.map(entry => [JSON.stringify([entry.file, entry.describe]), entry.cases]));
   const cases = new Map(), testFiles = new Set(), lineHits = new Map(), measured = [];
   let observedExecutions = 0, environmentGatedSkipped = 0;
   for (const id of requiredSuites) {
@@ -70,7 +72,7 @@ export function aggregateMeasuredSuites({ root, requiredSuites, suites, environm
       }
       for (const [group, statuses] of groups) {
         if (!statuses.includes('skipped')) continue;
-        requireEvidence(gatedGroups.has(group) && statuses.every(status => status === 'skipped'), 'mandatory cases skipped or unfinished');
+        requireEvidence(gatedGroups.has(group) && statuses.every(status => status === 'skipped') && statuses.length === gatedGroups.get(group), 'mandatory cases skipped or unfinished');
       }
       let fileFailed = false, fileExecuted = false;
       for (const assertion of file.assertionResults) {

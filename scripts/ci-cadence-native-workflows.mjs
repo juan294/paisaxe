@@ -156,6 +156,12 @@ if test "$EVENT" = push; then test "$ADMISSION" = success; test "$MEASURED" = su
   return [{path:canonical+'ci-nightly.yml',source:stringify(nightly,{lineWidth:0})}, {path:canonical+'ci-cadence.yml',source:stringify(fastRoot,{lineWidth:0})},
     {path:canonical+'ci-cadence-finalize.yml',source:stringify({name:'CI cadence completed evidence',on:{workflow_run:{workflows:['CI nightly','Coverage'],types:['completed']}},permissions:permission,concurrency:{group:'B-finalize-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}','cancel-in-progress':false},jobs:{finalize:{if:enabled+" && github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.conclusion == 'success'",'runs-on':'ubuntu-latest',permissions:permission,'timeout-minutes':6,steps:[...native,{name:'Authenticate original completed attempt',env:{...environment,COVERAGE_SECRET:"${{ github.event.workflow_run.path == '.github/workflows/coverage.yml' && secrets.COVERAGE_SECRET || '' }}"},run:acquired('ci-cadence-control-launch.mjs','finalize',root)}]}}},{lineWidth:0})}];
 }
+/** GitHub lists every reusable workflow a run reaches, at any depth, in referenced_workflows. */
+export function findNestedCallees(calleePaths,read,blobOf) {
+  const callees=new Set(calleePaths),nested={},pending=[...callees];
+  while(pending.length){for(const job of Object.values(parse(read(pending.pop())).jobs??{})){const called=/^\.\/(\.github\/workflows\/[A-Za-z0-9_.-]+\.yml)$/.exec(job.uses??'')?.[1];if(job.uses&&!called)throw Error('Unreviewed reusable workflow reference');if(called&&!callees.has(called)&&!nested[called]){nested[called]={path:called,blobSha:blobOf(called)};pending.push(called);}}}
+  return nested;
+}
 export function generateNativeWorkflows(root=process.cwd()) {
   root=resolve(root);
   if(realpathSync(root)!==root)throw Error('Canonical native generator root required');
@@ -178,9 +184,7 @@ export function generateNativeWorkflows(root=process.cwd()) {
     if(slug==='ci')auxiliaryJobs.push({name:'ci / develop_push_source',conclusions:['skipped'],steps:[]});
   }
   auxiliaryJobs.push({name:'Nightly disposition',conclusions:['success'],steps:[{name:'Require real full proof or unchanged skip',conclusions:['success']},{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}]});
-  // GitHub lists every reusable workflow a run reaches, at any depth, in referenced_workflows.
-  const nestedCallees={},calleePaths=new Set(Object.values(callees).map(c=>c.path)),pending=[...calleePaths];
-  while(pending.length){for(const job of Object.values(parse(source(pending.pop())).jobs??{})){const called=/^\.\/(\.github\/workflows\/[A-Za-z0-9_.-]+\.yml)$/.exec(job.uses??'')?.[1];if(job.uses&&!called)throw Error('Unreviewed reusable workflow reference');if(called&&!calleePaths.has(called)&&!nestedCallees[called]){nestedCallees[called]={path:called,blobSha:blob(source(called))};pending.push(called);}}}
+  const nestedCallees=findNestedCallees(Object.values(callees).map(c=>c.path),source,path=>blob(source(path)));
   const pins=Object.fromEntries([canonical+'ci-nightly.yml',canonical+'ci-cadence.yml',...Object.values(callees).map(c=>c.path),...Object.keys(nestedCallees)].map(path=>[path,blob(source(path))]));
   const pushAuxiliary=auxiliaryJobs.filter(j=>j.name!=='Nightly disposition');
   const fast=parse(readFileSync(resolve(root,fastJobPath),'utf8'));

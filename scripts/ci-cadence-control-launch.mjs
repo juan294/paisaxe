@@ -10,8 +10,8 @@ const PINS = {
   "scripts/ci-cadence-projection.mjs": "6fa7715ef08772937f668e3d2fc9bba27a01414a9118f9b5dfecf620fb8e0319",
   "scripts/ci-cadence-run.mjs": "ef1b11904bba6fb5cd210a1ec060ac5314fe262f644535deb63a88860f847b84",
   "scripts/ci-cadence-github.mjs": "8fd9db069e1cef6b2ed191acac2e4877d27ba781a5bac1de118d3e99566e63d8",
-  "scripts/ci-cadence-producer.mjs": "90f340deef65014b4bf91019783f255242f0f22210e9ee6aa9d661cd9e5bc4af",
-  "scripts/ci-cadence-coverage.mjs": "2bc87bc02ea3d70ef510c8dd7a660faf1002a17a4e1c6e7fb26e384f6dffe424",
+  "scripts/ci-cadence-producer.mjs": "4d74ebfe878bce9477151313d376d04d830c75a7314cfab09272eb53102e7a78",
+  "scripts/ci-cadence-coverage.mjs": "a32f5a65db83b73ad517131520c1be4ac011921e7b2c98131e7d5fc34b125f58",
   "scripts/ci-cadence-native.mjs": "a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d",
   "scripts/ci-cadence.mjs": "9f2da9ab55525a3ca4acc311feaf5426fc86d83258c5dda7754dc05405c9a7ab"
 };
