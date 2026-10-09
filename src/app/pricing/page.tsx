@@ -2,7 +2,8 @@
 
 import { RateLimitNotice } from "@/components/rate-limit-notice";
 
-import { Suspense, useCallback, useRef, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
+import { useRovingTabIndex } from "@/hooks/use-roving-tab-index";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
@@ -56,36 +57,19 @@ function PricingPageContent() {
   const selectedTierData =
     PRICING_TIERS.find((tier) => tier.id === selectedTier) ?? PRICING_TIERS[0];
 
-  // UX-M12 (#905): the tier selector declares role="radio"/"radiogroup" —
-  // that markup promises a roving-tabindex, arrow-key-navigable radiogroup.
-  // Without this, a screen-reader user is told "radio group, 1 of 3" and
-  // then finds arrow keys inert, which is worse than no ARIA role at all.
-  // Mirrors the roving-tabindex pattern already implemented in
-  // story-progress-bar.tsx.
-  const tierRefs = useRef<(HTMLButtonElement | null)[]>([]);
-
+  const { itemRefs: tierRefs, getTabIndex, focusForKey } = useRovingTabIndex({
+    count: PRICING_TIERS.length,
+    activeIndex: PRICING_TIERS.findIndex((tier) => tier.id === selectedTier),
+    orientation: "both",
+  });
   const handleTierKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-      const count = PRICING_TIERS.length;
-      let nextIndex: number | null = null;
-
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-        nextIndex = index < count - 1 ? index + 1 : 0;
-      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        nextIndex = index > 0 ? index - 1 : count - 1;
-      } else if (e.key === "Home") {
-        nextIndex = 0;
-      } else if (e.key === "End") {
-        nextIndex = count - 1;
-      }
-
-      if (nextIndex === null) return;
-
-      e.preventDefault();
-      setSelectedTier(PRICING_TIERS[nextIndex].id);
-      tierRefs.current[nextIndex]?.focus();
+    (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      const next = focusForKey(event.key, index);
+      if (next === null) return;
+      event.preventDefault();
+      setSelectedTier(PRICING_TIERS[next].id);
     },
-    []
+    [focusForKey]
   );
   // UX-B1 (#886): the section label, feature bullet, and FAQ answer must
   // describe the *selected* tier's duration — not be hardcoded to the Day
@@ -202,7 +186,7 @@ function PricingPageContent() {
                       type="button"
                       role="radio"
                       aria-checked={selected}
-                      tabIndex={selected ? 0 : -1}
+                      tabIndex={getTabIndex(index)}
                       onClick={() => setSelectedTier(tier.id)}
                       onKeyDown={(e) => handleTierKeyDown(e, index)}
                       className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 ${

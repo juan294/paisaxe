@@ -14,19 +14,17 @@ import {
 import type { Locator } from "@playwright/test";
 
 /**
- * /immersive is PPR-prerendered: the static shell can render a nav button
- * visible+enabled before React attaches its click handler, so an early click
- * is swallowed. Retry click+assert as a unit until the title actually changes.
+ * Native controls remain disabled until hydration is ready. Make one action
+ * and let only the resulting title assertion wait for the transition.
  */
 async function clickAndAwaitTitleChange(
   button: Locator,
   title: Locator,
   previousTitle: string
 ) {
-  await expect(async () => {
-    await button.click();
-    await expect(title).not.toHaveText(previousTitle, { timeout: 1000 });
-  }).toPass({ timeout: 15000 });
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(title).not.toHaveText(previousTitle, { timeout: 15000 });
 }
 
 /**

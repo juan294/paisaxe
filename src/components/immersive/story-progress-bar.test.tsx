@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
+import { useState } from "react";
 import { StoryProgressBar } from "./story-progress-bar";
 
 const defaultProps = {
@@ -223,92 +224,136 @@ describe("StoryProgressBar", () => {
     expect(label).toBe("accessibility.go_to_story");
   });
 
-  // -------------------------------------------------------------------------
-  // Boundary guards in handleKeyDown/handleClick (lines 42,62,75,86,98,110)
-  // When storiesLength > PAGE_SIZE, the last page may have segments that map
-  // to indices beyond storiesLength. E.g., storiesLength=25, currentIndex=22:
-  //   segmentCount=20, base=20, so segments 5-19 map to indices 25-39 (out of bounds).
-  // The guards prevent onIndexChange from being called for those segments.
-  //
-  // Line 86 (Home guard) is genuinely unreachable because base is always derived
-  // from a valid currentIndex, so base is always < storiesLength.
-  //
-  // Lines 38/52 (`if (!target) return`) are also defensive — event delegation
-  // always finds [data-segment-index] via closest() from the segment or its fill div.
-  // -------------------------------------------------------------------------
-  describe("boundary guards with multi-page overflow", () => {
-    // storiesLength=25, currentIndex=22 -> segmentCount=20, base=20, fillPosition=2
-    // Segments 5-19 map to indices 25-39 which are out of bounds.
-    const overflowProps = {
-      storiesLength: 25,
-      currentIndex: 22,
-      onIndexChange: vi.fn(),
-      t: (key: string) => key,
-    };
+  // The former overflow tests encoded invalid buttons as expected UI and
+  // asserted inert End/wrap. The approved contract requires a valid partial
+  // window instead: only existing stories, with focus and absolute selection.
+  describe("Phase 6 partial-page roving contract", () => {
+    function StatefulProgress({ count, initialIndex, onSelect }: {
+      count: number; initialIndex: number; onSelect: (index: number) => void;
+    }) {
+      const [currentIndex, setCurrentIndex] = useState(initialIndex);
+      return <StoryProgressBar {...defaultProps} storiesLength={count} currentIndex={currentIndex}
+        onIndexChange={(index) => { onSelect(index); setCurrentIndex(index); }} />;
+    }
 
-    beforeEach(() => {
-      overflowProps.onIndexChange = vi.fn();
+    it.each([
+      { count: 25, currentIndex: 20, indices: [20, 21, 22, 23, 24], active: 0 },
+      { count: 47, currentIndex: 42, indices: [40, 41, 42, 43, 44, 45, 46], active: 2 },
+    ])("renders only valid absolute indices for $count stories at $currentIndex", ({ count, currentIndex, indices, active }) => {
+      render(<StoryProgressBar {...defaultProps} storiesLength={count} currentIndex={currentIndex} />);
+      const buttons = getSegments();
+      expect(buttons).toHaveLength(indices.length);
+      expect(buttons.map((button) => Number(button.closest("li")?.dataset.storyIndex))).toEqual(indices);
+      expect(buttons[active]).toHaveAttribute("aria-current", "page");
+      expect(buttons.filter((button) => button.tabIndex === 0)).toEqual([buttons[active]]);
     });
 
-    it("does NOT call onIndexChange when clicking an out-of-bounds segment (line 42)", () => {
-      render(<StoryProgressBar {...overflowProps} />);
-    const segments = getSegments();
-      // Segment 5 -> targetIndex = 20 + 5 = 25 >= 25 -> guard prevents call
-      fireEvent.click(segments[5]);
-      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    it.each([
+      { key: "End", from: 0, expected: 24, focused: 4 },
+      { key: "Home", from: 4, expected: 20, focused: 0 },
+      { key: "ArrowLeft", from: 0, expected: 24, focused: 4 },
+      { key: "ArrowRight", from: 4, expected: 20, focused: 0 },
+      { key: "Enter", from: 4, expected: 24, focused: 4 },
+      { key: " ", from: 4, expected: 24, focused: 4 },
+    ])("$key on the partial window selects absolute $expected once and owns propagation", ({ key, from, expected, focused }) => {
+      const onSelect = vi.fn();
+      const parentKeyDown = vi.fn();
+      render(<div onKeyDown={parentKeyDown}><StatefulProgress count={25} initialIndex={20 + from} onSelect={onSelect} /></div>);
+      const target = getSegments()[from]!;
+      target.focus();
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      fireEvent(target, event);
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect).toHaveBeenCalledWith(expected);
+      expect(event.defaultPrevented).toBe(true);
+      expect(parentKeyDown).not.toHaveBeenCalled();
+      expect(getSegments()[focused]).toHaveFocus();
+      expect(getSegments()[focused]).toHaveAttribute("tabindex", "0");
+      expect(getSegments()[focused]).toHaveAttribute("aria-current", "page");
     });
 
-    it("does NOT call onIndexChange on ArrowRight into out-of-bounds (line 62)", () => {
-      render(<StoryProgressBar {...overflowProps} />);
-    const segments = getSegments();
-      // Segment 4 -> ArrowRight -> nextIdx=5, targetIndex=25 >= 25 -> guard
-      fireEvent.keyDown(segments[4], { key: "ArrowRight" });
-      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    it("maps a partial-page inner-fill click to its absolute story and stops bubbling", () => {
+      const onSelect = vi.fn();
+      const parentClick = vi.fn();
+      render(<div onClick={parentClick}><StatefulProgress count={25} initialIndex={20} onSelect={onSelect} /></div>);
+      fireEvent.click(getSegments()[4]!.querySelector("span")!);
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(24);
+      expect(parentClick).not.toHaveBeenCalled();
+      expect(getSegments()[4]).toHaveAttribute("aria-current", "page");
     });
 
-    it("does NOT call onIndexChange on ArrowLeft wrapping to out-of-bounds (line 75)", () => {
-      render(<StoryProgressBar {...overflowProps} />);
-    const segments = getSegments();
-      // Segment 0 -> ArrowLeft -> prevIdx=19, targetIndex=20+19=39 >= 25 -> guard
-      fireEvent.keyDown(segments[0], { key: "ArrowLeft" });
-      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    it("rapid keys use the current focused index and keep one local tab stop", () => {
+      const onSelect = vi.fn();
+      render(<StatefulProgress count={25} initialIndex={20} onSelect={onSelect} />);
+      getSegments()[0]!.focus();
+      for (const [key, absolute] of [
+        ["End", 24], ["ArrowRight", 20], ["ArrowRight", 21],
+        ["ArrowLeft", 20], ["ArrowLeft", 24], ["Home", 20],
+      ] as const) {
+        fireEvent.keyDown(document.activeElement!, { key });
+        const current = getSegments().filter((button) => button.tabIndex === 0);
+        expect(current).toHaveLength(1);
+        expect(current[0]).toHaveFocus();
+        expect(current[0]?.closest("li")).toHaveAttribute("data-story-index", String(absolute));
+      }
+      expect(onSelect.mock.calls.map(([index]) => index)).toEqual([24, 20, 21, 20, 24, 20]);
     });
 
-    it("does NOT call onIndexChange on End key when last segment is out-of-bounds (line 98)", () => {
-      render(<StoryProgressBar {...overflowProps} />);
-    const segments = getSegments();
-      // End -> lastIdx=19, targetIndex=20+19=39 >= 25 -> guard
-      fireEvent.keyDown(segments[2], { key: "End" });
-      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    it("is inert for an empty set and preserves outside focus", () => {
+      const onSelect = vi.fn();
+      render(<><button>Outside focus</button><StoryProgressBar {...defaultProps} storiesLength={0} currentIndex={0} onIndexChange={onSelect} /></>);
+      const outside = screen.getByRole("button", { name: "Outside focus" });
+      outside.focus();
+      expect(within(getProgressNav()).queryAllByRole("button")).toHaveLength(0);
+      for (const key of ["ArrowRight", "ArrowLeft", "Home", "End", "Enter", " "]) {
+        fireEvent.keyDown(getProgressNav(), { key });
+      }
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(outside).toHaveFocus();
     });
 
-    it("does NOT call onIndexChange on Enter for out-of-bounds segment (line 110)", () => {
-      render(<StoryProgressBar {...overflowProps} />);
-    const segments = getSegments();
-      // Segment 10 -> Enter -> targetIndex=20+10=30 >= 25 -> guard
-      fireEvent.keyDown(segments[10], { key: "Enter" });
-      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    it.each([{ count: 1, absolute: 0 }, { count: 21, absolute: 20 }])(
+      "one visible item in $count stories wraps only to absolute $absolute", ({ count, absolute }) => {
+        const onSelect = vi.fn();
+        render(<StatefulProgress count={count} initialIndex={absolute} onSelect={onSelect} />);
+        expect(getSegments()).toHaveLength(1);
+        const button = getSegments()[0]!;
+        button.focus();
+        for (const key of ["ArrowRight", "ArrowLeft", "Home", "End"]) fireEvent.keyDown(button, { key });
+        expect(onSelect.mock.calls.map(([index]) => index)).toEqual([absolute, absolute, absolute, absolute]);
+        expect(button).toHaveFocus();
+        expect(button).toHaveAttribute("tabindex", "0");
+      }
+    );
+
+    it("replaces the page refs when the story set shrinks, without focusing removed segments", () => {
+      const onIndexChange = vi.fn();
+      const view = render(<StoryProgressBar {...defaultProps} storiesLength={50} currentIndex={39} onIndexChange={onIndexChange} />);
+      const removedLast = getSegments()[19]!;
+      view.rerender(<StoryProgressBar {...defaultProps} storiesLength={25} currentIndex={22} onIndexChange={onIndexChange} />);
+      const target = getSegments()[2]!;
+      target.focus();
+      fireEvent.keyDown(target, { key: "End" });
+      expect(onIndexChange).toHaveBeenCalledExactlyOnceWith(24);
+      expect(removedLast).not.toBeInTheDocument();
+      expect(getSegments()[4]).toHaveFocus();
     });
 
-    it("does NOT call onIndexChange on Space for out-of-bounds segment (line 110)", () => {
-      render(<StoryProgressBar {...overflowProps} />);
-    const segments = getSegments();
-      // Segment 6 -> Space -> targetIndex=20+6=26 >= 25 -> guard
-      fireEvent.keyDown(segments[6], { key: " " });
-      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    it("retains horizontal-only story behavior and lets unclaimed vertical/Tab keys bubble", () => {
+      const onIndexChange = vi.fn();
+      const parent = vi.fn();
+      render(<div onKeyDown={parent}><StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} /></div>);
+      const button = getSegments()[2]!;
+      button.focus();
+      for (const key of ["ArrowDown", "ArrowUp", "Tab"]) {
+        const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+        fireEvent(button, event);
+        expect(event.defaultPrevented).toBe(false);
+      }
+      expect(onIndexChange).not.toHaveBeenCalled();
+      expect(parent).toHaveBeenCalledTimes(3);
+      expect(button).toHaveFocus();
     });
-
-    it("still calls onIndexChange for in-bounds segments on the last page", () => {
-      render(<StoryProgressBar {...overflowProps} />);
-    const segments = getSegments();
-      // Segment 4 -> targetIndex=20+4=24 < 25 -> valid
-      fireEvent.click(segments[4]);
-      expect(overflowProps.onIndexChange).toHaveBeenCalledWith(24);
-    });
-
-    // Line 86 (Home guard): base is always derived from a valid currentIndex,
-    // so base is always >= 0 and < storiesLength. The false branch of this guard
-    // is genuinely unreachable via the component's public API.
   });
 
   // -------------------------------------------------------------------------

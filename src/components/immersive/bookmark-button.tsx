@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useTimedValue } from "@/hooks/use-timed-value";
 import { useRouter } from "next/navigation";
 import { Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,16 +27,9 @@ export function BookmarkButton({
   isFavorite = false,
   onToggle,
 }: BookmarkButtonProps) {
-  const [toast, setToast] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { value: toast, show: showToast } = useTimedValue<string>(1500);
   const router = useRouter();
   const { t } = useTranslation();
-
-  const showToast = (message: string) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setToast(message);
-    timerRef.current = setTimeout(() => setToast(null), 1500);
-  };
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

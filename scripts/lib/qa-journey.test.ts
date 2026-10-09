@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -96,10 +96,13 @@ describe("collectJourneyRun", () => {
     options.target = "http://127.0.0.1:1";
     options.startupTimeoutMs = 100;
     options.startCommand = [process.execPath, "-e", 'console.log("booting");setInterval(()=>{},1000)'];
-    options.command = ["does-not-exist"];
+    const launched = join(options.directory, "tests-launched");
+    options.command = [process.execPath, "-e", `require("node:fs").writeFileSync(${JSON.stringify(launched)}, "launched")`];
     const result = await collectJourneyRun(options);
     expect(result).toMatchObject({ status: "startup_failed", failures: 1, action: expect.stringMatching(/start|build/i) });
-    expect(readFileSync(result.logPath, "utf8")).toContain("booting");
+    expect(readFileSync(result.logPath, "utf8")).toContain("startup timeout expired");
+    expect(existsSync(launched)).toBe(false);
+    expect(existsSync(result.reportPath)).toBe(false);
   });
 
   it("does not reuse a stale JSON report on a failed command", async () => {

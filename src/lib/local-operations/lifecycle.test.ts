@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { NextRequest } from "next/server";
@@ -83,7 +84,9 @@ describe("local route lifecycle with real authorization", () => {
     await writeFile(path.join(bin, "pkill"), `#!/bin/sh\nif test -f '${pidFile}'; then kill $(cat '${pidFile}') 2>/dev/null || true; rm -f '${pidFile}'; fi\n`, { mode: 0o755 });
     vi.stubEnv("PATH", `${bin}:${process.env.PATH}`);
     const initial = await (await tunnelStatus()).json(); expect(initial.running).toBe(false);
-    const started = await (await startTunnel(request("POST"))).json(); expect(started.running).toBe(true);
+    expect((await startTunnel(request("POST"))).status).toBe(200);
+    await eventually(() => existsSync(pidFile));
+    expect((await (await tunnelStatus()).json()).running).toBe(true);
     const stopped = await (await stopTunnel(request("DELETE"))).json(); expect(stopped.running).toBe(false);
     expect((await startTunnel(request("POST", false))).status).toBe(403);
     expect((await startTunnel(request("POST"))).status).toBe(200);
@@ -115,7 +118,8 @@ describe("local route lifecycle with real authorization", () => {
     await writeFile(path.join(bin, "cloudflared"), `#!/bin/sh\nprintf '%s' "$$" > '${pidFile}'\nexec /bin/sleep 60\n`, { mode: 0o755 });
     const retry = await startTunnel(request("POST"));
     expect(retry.status).toBe(200);
-    expect((await retry.json()).running).toBe(true);
+    await eventually(() => existsSync(pidFile));
+    expect((await (await tunnelStatus()).json()).running).toBe(true);
     expect((await stopTunnel(request("DELETE"))).status).toBe(200);
   }, 10_000);
   it("blocks tunnel mutation without CSRF before reaching process execution", async () => {

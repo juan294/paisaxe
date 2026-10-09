@@ -670,6 +670,62 @@ describe("PricingPage", () => {
     });
   });
 
+  describe("Phase 6 real pricing roving consumer", () => {
+    it.each([
+      { key: "ArrowDown", expected: 1 },
+      { key: "ArrowUp", expected: 2 },
+    ])("$key selects tier $expected and prevents default while retaining bubbling", ({ key, expected }) => {
+      const parentKeyDown = vi.fn();
+      render(<div onKeyDown={parentKeyDown}><PricingPage /></div>);
+      const radios = screen.getAllByRole("radio");
+      radios[0]!.focus();
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      fireEvent(radios[0]!, event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(parentKeyDown).toHaveBeenCalledTimes(1);
+      expect(screen.getAllByRole("radio")[expected]).toHaveFocus();
+      expect(screen.getAllByRole("radio")[expected]).toHaveAttribute("aria-checked", "true");
+      expect(screen.getAllByRole("radio").filter((radio) => radio.tabIndex === 0)).toEqual([screen.getAllByRole("radio")[expected]]);
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockSignInWithGoogle).not.toHaveBeenCalled();
+    });
+
+    it("rapid mixed-axis/Home/End keys keep selection/focus coherent and purchase the final tier", () => {
+      mockUseAuth.mockReturnValue({ user: { id: "user-123", email: "test@example.com" }, session: { access_token: "token" }, signInWithGoogle: mockSignInWithGoogle, isLoading: false });
+      mockUseSearchParams.mockReturnValue(new URLSearchParams([["returnTo", "oviedo-walking-tour"]]));
+      const parentKeyDown = vi.fn();
+      render(<div onKeyDown={parentKeyDown}><PricingPage /></div>);
+      screen.getAllByRole("radio")[0]!.focus();
+      for (const [key, selected] of [
+        ["ArrowDown", 1], ["End", 2], ["ArrowRight", 0],
+        ["ArrowUp", 2], ["Home", 0], ["ArrowRight", 1],
+      ] as const) {
+        fireEvent.keyDown(document.activeElement!, { key });
+        const radios = screen.getAllByRole("radio");
+        expect(radios[selected]).toHaveFocus();
+        expect(radios[selected]).toHaveAttribute("aria-checked", "true");
+        expect(radios.filter((radio) => radio.tabIndex === 0)).toEqual([radios[selected]]);
+      }
+      expect(parentKeyDown).toHaveBeenCalledTimes(6);
+      expect(mockPush).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "premium.pricing_cta" }));
+      expect(mockPush).toHaveBeenCalledExactlyOnceWith("/pricing/checkout?returnTo=oviedo-walking-tour&tier=weekly_pass");
+    });
+
+    it("leaves Tab unclaimed without changing the selected tier", () => {
+      const parentKeyDown = vi.fn();
+      render(<div onKeyDown={parentKeyDown}><PricingPage /></div>);
+      const selected = screen.getAllByRole("radio")[0]!;
+      selected.focus();
+      const event = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+      fireEvent(selected, event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(parentKeyDown).toHaveBeenCalledTimes(1);
+      expect(selected).toHaveAttribute("aria-checked", "true");
+      expect(selected).toHaveAttribute("tabindex", "0");
+    });
+  });
+
   describe("UX-M4: responsive heading type scale", () => {
     it("should apply responsive text scale classes to the h1 heading", () => {
       render(<PricingPage />);

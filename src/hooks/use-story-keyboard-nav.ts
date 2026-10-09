@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface UseStoryKeyboardNavOptions {
   onNext: () => void;
@@ -9,56 +9,44 @@ interface UseStoryKeyboardNavOptions {
   chatOpen: boolean;
 }
 
-/**
- * Attaches keyboard navigation handlers for the story viewer.
- * ArrowRight / Space → next, ArrowLeft → prev, i → toggle info.
- * Disabled when chatOpen is true or when the target is a form element.
- */
-export function useStoryKeyboardNav({
-  onNext,
-  onPrev,
-  onToggleInfo,
-  chatOpen,
-}: UseStoryKeyboardNavOptions): void {
+// Capture runs before a widget's stopPropagation, so ownership must be checked
+// before claiming a shortcut. The marker covers the story progress control;
+// standard editing/dialog/widget semantics cover other local focus owners.
+const LOCAL_KEYBOARD_OWNER = [
+  "input", "textarea", "select", "form", '[contenteditable]:not([contenteditable="false"])',
+  "dialog", '[role="dialog"]', '[role="menu"]', '[role="menubar"]',
+  '[role="tablist"]', '[role="listbox"]', '[role="combobox"]',
+  '[role="slider"]', '[role="spinbutton"]', '[role="tree"]', '[role="grid"]',
+  "[data-story-keyboard-local]",
+].join(",");
+
+/** One capture listener for story shortcuts, with current callbacks and chat state. */
+export function useStoryKeyboardNav(options: UseStoryKeyboardNavOptions): void {
+  const current = useRef(options);
+  current.current = options;
+
   useEffect(() => {
-    if (chatOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || current.current.chatOpen) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(LOCAL_KEYBOARD_OWNER) ||
+          (target instanceof HTMLElement && target.isContentEditable)) return;
+      // Space activates native controls itself; claiming it here would also
+      // navigate when a visitor activates an unrelated button or link.
+      if (event.key === " " && target?.closest("button, a[href], summary")) return;
 
-    const handledEvents = new WeakSet<KeyboardEvent>();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (handledEvents.has(e)) {
-        return;
-      }
-
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        tag === "SELECT" ||
-        (e.target as HTMLElement)?.isContentEditable
-      ) {
-        return;
-      }
-
-      if (e.key === "ArrowRight" || e.key === " ") {
-        handledEvents.add(e);
-        e.preventDefault();
-        onNext();
-      } else if (e.key === "ArrowLeft") {
-        handledEvents.add(e);
-        e.preventDefault();
-        onPrev();
-      } else if (e.key === "i") {
-        handledEvents.add(e);
-        onToggleInfo();
+      if (event.key === "ArrowRight" || event.key === " ") {
+        event.preventDefault();
+        current.current.onNext();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        current.current.onPrev();
+      } else if (event.key === "i") {
+        current.current.onToggleInfo();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown, { capture: true });
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown, { capture: true });
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [chatOpen, onNext, onPrev, onToggleInfo]);
+    return () => document.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, []);
 }

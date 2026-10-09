@@ -25,7 +25,7 @@ describe("useStoryKeyboardNav", () => {
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })
     );
 
-    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
 
     expect(onNext).toHaveBeenCalledTimes(1);
     expect(onPrev).not.toHaveBeenCalled();
@@ -65,7 +65,7 @@ describe("useStoryKeyboardNav", () => {
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })
     );
 
-    fireEvent.keyDown(window, { key: " " });
+    fireEvent.keyDown(document.body, { key: " " });
 
     expect(onNext).toHaveBeenCalledTimes(1);
   });
@@ -75,7 +75,7 @@ describe("useStoryKeyboardNav", () => {
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })
     );
 
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.keyDown(document.body, { key: "ArrowLeft" });
 
     expect(onPrev).toHaveBeenCalledTimes(1);
     expect(onNext).not.toHaveBeenCalled();
@@ -86,7 +86,7 @@ describe("useStoryKeyboardNav", () => {
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })
     );
 
-    fireEvent.keyDown(window, { key: "i" });
+    fireEvent.keyDown(document.body, { key: "i" });
 
     expect(onToggleInfo).toHaveBeenCalledTimes(1);
     expect(onNext).not.toHaveBeenCalled();
@@ -98,10 +98,10 @@ describe("useStoryKeyboardNav", () => {
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: true })
     );
 
-    fireEvent.keyDown(window, { key: "ArrowRight" });
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
-    fireEvent.keyDown(window, { key: " " });
-    fireEvent.keyDown(window, { key: "i" });
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    fireEvent.keyDown(document.body, { key: "ArrowLeft" });
+    fireEvent.keyDown(document.body, { key: " " });
+    fireEvent.keyDown(document.body, { key: "i" });
 
     expect(onNext).not.toHaveBeenCalled();
     expect(onPrev).not.toHaveBeenCalled();
@@ -142,15 +142,10 @@ describe("useStoryKeyboardNav", () => {
     const div = document.createElement("div");
     div.setAttribute("contenteditable", "true");
     document.body.appendChild(div);
-    // Verify jsdom marks it as contentEditable before firing
-    if (div.isContentEditable) {
-      fireEvent.keyDown(div, { key: "ArrowRight" });
-      expect(onNext).not.toHaveBeenCalled();
-    } else {
-      // jsdom doesn't fully implement isContentEditable via setAttribute in this env;
-      // guard covers the branch — the same code path is tested in story-viewer.test.tsx
-      expect(true).toBe(true);
-    }
+    const child = document.createElement("span");
+    div.appendChild(child);
+    fireEvent.keyDown(child, { key: "ArrowRight" });
+    expect(onNext).not.toHaveBeenCalled();
     document.body.removeChild(div);
   });
 
@@ -159,7 +154,7 @@ describe("useStoryKeyboardNav", () => {
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })
     );
 
-    fireEvent.keyDown(window, { key: "k" });
+    fireEvent.keyDown(document.body, { key: "k" });
 
     expect(onNext).not.toHaveBeenCalled();
     expect(onPrev).not.toHaveBeenCalled();
@@ -167,7 +162,7 @@ describe("useStoryKeyboardNav", () => {
   });
 
   it("should remove event listener on unmount", () => {
-    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+    const removeEventListenerSpy = vi.spyOn(document, "removeEventListener");
 
     const { unmount } = renderHook(() =>
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false })
@@ -177,18 +172,19 @@ describe("useStoryKeyboardNav", () => {
 
     expect(removeEventListenerSpy).toHaveBeenCalledWith(
       "keydown",
-      expect.any(Function)
+      expect.any(Function),
+      { capture: true }
     );
   });
 
-  it("should re-attach listener when chatOpen changes", () => {
+  it("should use the current chat state when it changes", () => {
     let chatOpen = false;
     const { rerender } = renderHook(({ chatOpen: c }) =>
       useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: c }),
       { initialProps: { chatOpen } }
     );
 
-    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
     expect(onNext).toHaveBeenCalledTimes(1);
 
     // Now close chat
@@ -196,7 +192,96 @@ describe("useStoryKeyboardNav", () => {
     rerender({ chatOpen });
     onNext.mockClear();
 
-    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(onNext).not.toHaveBeenCalled();
+  });
+});
+
+// Real DOM dispatch starts at a focused element and reaches document capture.
+// Production has no window-only synthetic dispatcher (consumer inventory, Phase 6).
+describe("story keyboard ownership", () => {
+  afterEach(() => { vi.restoreAllMocks(); document.body.replaceChildren(); });
+
+  it("keeps exactly one capture listener through callback and disabled-state rerenders", () => {
+    const documentAdd = vi.spyOn(document, "addEventListener");
+    const documentRemove = vi.spyOn(document, "removeEventListener");
+    const windowAdd = vi.spyOn(window, "addEventListener");
+    const first = vi.fn();
+    const latest = vi.fn();
+    const { rerender, unmount } = renderHook(({ onNext, chatOpen }) =>
+      useStoryKeyboardNav({ onNext, onPrev: vi.fn(), onToggleInfo: vi.fn(), chatOpen }),
+      { initialProps: { onNext: first, chatOpen: false } });
+    const keyAdds = () => documentAdd.mock.calls.filter(([type]) => type === "keydown");
+    expect(keyAdds()).toHaveLength(1);
+    expect(keyAdds()[0]?.[2]).toEqual({ capture: true });
+    expect(windowAdd.mock.calls.filter(([type]) => type === "keydown")).toHaveLength(0);
+    const listener = keyAdds()[0]?.[1];
+    rerender({ onNext: latest, chatOpen: false });
+    const event = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+    document.body.dispatchEvent(event);
+    expect(first).not.toHaveBeenCalled();
+    expect(latest).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+    rerender({ onNext: latest, chatOpen: true });
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(latest).toHaveBeenCalledTimes(1);
+    rerender({ onNext: latest, chatOpen: false });
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(latest).toHaveBeenCalledTimes(2);
+    expect(keyAdds()).toHaveLength(1);
+    expect(documentRemove.mock.calls.filter(([type]) => type === "keydown")).toHaveLength(0);
+    unmount();
+    expect(documentRemove).toHaveBeenCalledWith("keydown", listener, { capture: true });
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(latest).toHaveBeenCalledTimes(2);
+  });
+
+  it("calls the latest previous/info callbacks without reinstalling navigation", () => {
+    const oldPrev = vi.fn();
+    const oldInfo = vi.fn();
+    const latestPrev = vi.fn();
+    const latestInfo = vi.fn();
+    const { rerender } = renderHook(({ onPrev, onToggleInfo }) =>
+      useStoryKeyboardNav({ onNext: vi.fn(), onPrev, onToggleInfo, chatOpen: false }),
+      { initialProps: { onPrev: oldPrev, onToggleInfo: oldInfo } });
+    rerender({ onPrev: latestPrev, onToggleInfo: latestInfo });
+    fireEvent.keyDown(document.body, { key: "ArrowLeft" });
+    fireEvent.keyDown(document.body, { key: "i" });
+    expect(oldPrev).not.toHaveBeenCalled();
+    expect(oldInfo).not.toHaveBeenCalled();
+    expect(latestPrev).toHaveBeenCalledTimes(1);
+    expect(latestInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    '<form><button>Form action</button></form>',
+    '<div contenteditable="true"><span>Editable descendant</span></div>',
+    '<div role="dialog" aria-modal="true"><button>Dialog action</button></div>',
+    '<div role="menu"><button role="menuitem">Menu action</button></div>',
+    '<div role="tablist"><button role="tab">Local tab</button></div>',
+  ])("preserves local focus ownership for %s", (markup) => {
+    const onNext = vi.fn();
+    const onPrev = vi.fn();
+    const onToggleInfo = vi.fn();
+    renderHook(() => useStoryKeyboardNav({ onNext, onPrev, onToggleInfo, chatOpen: false }));
+    document.body.insertAdjacentHTML("beforeend", markup);
+    const target = document.body.lastElementChild!.lastElementChild!;
+    for (const key of ["ArrowRight", "ArrowLeft", " ", "i"]) {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(onNext).not.toHaveBeenCalled();
+    expect(onPrev).not.toHaveBeenCalled();
+    expect(onToggleInfo).not.toHaveBeenCalled();
+  });
+
+  it("respects an already prevented shortcut without claiming it", () => {
+    const onNext = vi.fn();
+    renderHook(() => useStoryKeyboardNav({ onNext, onPrev: vi.fn(), onToggleInfo: vi.fn(), chatOpen: false }));
+    const event = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+    event.preventDefault();
+    document.body.dispatchEvent(event);
     expect(onNext).not.toHaveBeenCalled();
   });
 });

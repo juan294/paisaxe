@@ -349,13 +349,15 @@ export function StoryViewer({
       </div>
 
       {/* Progress bar - extracted & memoized component with event delegation */}
-      <StoryProgressBar
-        storiesLength={stories.length}
-        currentIndex={currentIndex}
-        onIndexChange={onIndexChange}
-        t={t}
-        storyTitles={storyTitles}
-      />
+      <div data-story-keyboard-local>
+        <StoryProgressBar
+          storiesLength={stories.length}
+          currentIndex={currentIndex}
+          onIndexChange={onIndexChange}
+          t={t}
+          storyTitles={storyTitles}
+        />
+      </div>
 
       {/* Category badge / Filter */}
       <CategoryFilterBadge
@@ -403,7 +405,7 @@ export function StoryViewer({
       />
 
       {/* Navigation arrows — extracted to StoryToolbar (FE-H2) */}
-      <StoryToolbar onPrev={goToPrev} onNext={goToNext} t={t} />
+      <StoryToolbar onPrev={goToPrev} onNext={goToNext} t={t} showReadiness={false} />
 
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
       <nav

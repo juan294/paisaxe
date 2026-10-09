@@ -1,6 +1,7 @@
 "use client";
 
-import { memo, useCallback, useRef, useEffect } from "react";
+import { memo, useCallback } from "react";
+import { useRovingTabIndex } from "@/hooks/use-roving-tab-index";
 import { cn } from "@/lib/utils";
 
 interface StoryProgressBarProps {
@@ -20,17 +21,13 @@ export const StoryProgressBar = memo(function StoryProgressBar({
   storyTitles,
 }: StoryProgressBarProps) {
   const PAGE_SIZE = 20;
-  const segmentCount = Math.min(PAGE_SIZE, storiesLength);
-  const fillPosition = currentIndex % segmentCount;
-  const base = currentIndex - fillPosition;
-
-  // Refs for roving tabindex focus management
-  const segmentRefs = useRef<(HTMLButtonElement | null)[]>([]);
-
-  // Keep refs array sized correctly
-  useEffect(() => {
-    segmentRefs.current = segmentRefs.current.slice(0, segmentCount);
-  }, [segmentCount]);
+  const base = Math.floor(currentIndex / PAGE_SIZE) * PAGE_SIZE;
+  const segmentCount = Math.max(0, Math.min(PAGE_SIZE, storiesLength - base));
+  const fillPosition = currentIndex - base;
+  const { itemRefs: segmentRefs, getTabIndex, focusForKey } = useRovingTabIndex({
+    count: segmentCount,
+    activeIndex: fillPosition,
+  });
 
   const handleSelect = useCallback(
     (idx: number) => {
@@ -43,65 +40,19 @@ export const StoryProgressBar = memo(function StoryProgressBar({
   );
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
-
-      // Arrow-key navigation (roving tabindex pattern)
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        e.stopPropagation();
-        const nextIdx = idx < segmentCount - 1 ? idx + 1 : 0;
-        const targetIndex = base + nextIdx;
-        if (targetIndex >= 0 && targetIndex < storiesLength) {
-          onIndexChange(targetIndex);
-          // Focus will move via useEffect when fillPosition updates
-          segmentRefs.current[nextIdx]?.focus();
-        }
-        return;
-      }
-
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        e.stopPropagation();
-        const prevIdx = idx > 0 ? idx - 1 : segmentCount - 1;
-        const targetIndex = base + prevIdx;
-        if (targetIndex >= 0 && targetIndex < storiesLength) {
-          onIndexChange(targetIndex);
-          segmentRefs.current[prevIdx]?.focus();
-        }
-        return;
-      }
-
-      if (e.key === "Home") {
-        e.preventDefault();
-        e.stopPropagation();
-        const targetIndex = base;
-        if (targetIndex >= 0 && targetIndex < storiesLength) {
-          onIndexChange(targetIndex);
-          segmentRefs.current[0]?.focus();
-        }
-        return;
-      }
-
-      if (e.key === "End") {
-        e.preventDefault();
-        e.stopPropagation();
-        const lastIdx = segmentCount - 1;
-        const targetIndex = base + lastIdx;
-        if (targetIndex >= 0 && targetIndex < storiesLength) {
-          onIndexChange(targetIndex);
-          segmentRefs.current[lastIdx]?.focus();
-        }
-        return;
-      }
-
-      // Enter/Space activation (existing behavior)
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        e.stopPropagation();
-        handleSelect(idx);
+    (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      const next = focusForKey(event.key, index);
+      if (next !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleSelect(next);
+      } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        event.stopPropagation();
+        handleSelect(index);
       }
     },
-    [base, segmentCount, storiesLength, onIndexChange, handleSelect]
+    [focusForKey, handleSelect]
   );
 
   /**
@@ -142,7 +93,7 @@ export const StoryProgressBar = memo(function StoryProgressBar({
               <button
                 type="button"
                 ref={(el) => { segmentRefs.current[i] = el; }}
-                tabIndex={isCurrent ? 0 : -1}
+                tabIndex={getTabIndex(i)}
                 data-segment-index={i}
                 aria-label={getSegmentLabel(targetIndex)}
                 aria-current={isCurrent ? "page" : undefined}

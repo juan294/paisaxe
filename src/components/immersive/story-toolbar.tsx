@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 type TFunction = (key: string) => string;
 
@@ -8,6 +8,18 @@ interface StoryToolbarProps {
   onPrev: () => void;
   onNext: () => void;
   t: TFunction;
+  /** The full page supplies recovery outside its streamed story boundary. */
+  showReadiness?: boolean;
+}
+
+/** Visible even when JavaScript cannot hydrate the story boundary. */
+export function StoryNavigationRecovery({ className }: { className?: string }) {
+  return (
+    <div className={className}>
+      <p role="status" aria-live="polite">Preparando la navegación…</p>
+      <p>Si no puedes navegar, activa JavaScript y prueba a <a href="/immersive" className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">recargar la página</a>.</p>
+    </div>
+  );
 }
 
 /**
@@ -18,11 +30,20 @@ interface StoryToolbarProps {
  * FE-L1: memoized — onPrev/onNext are stabilized with useCallback in StoryViewer
  * so this component doesn't re-render on every index change.
  */
-export const StoryToolbar = memo(function StoryToolbar({ onPrev, onNext, t }: StoryToolbarProps) {
+export const StoryToolbar = memo(function StoryToolbar({ onPrev, onNext, t, showReadiness = true }: StoryToolbarProps) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   return (
     <>
+      {!ready && showReadiness && <StoryNavigationRecovery className="absolute left-4 right-4 top-24 z-50 rounded-lg bg-black/90 p-4 text-center text-sm text-white" />}
+      <span role="status" aria-live="polite" className="sr-only">
+        {ready ? "Navegación lista" : ""}
+      </span>
       {/* Previous — invisible tap zone on mobile, visible button on sm+ */}
       <button
+        type="button"
+        disabled={!ready}
+        data-story-navigation-ready={ready}
         data-testid="prev-story-button"
         onClick={(e) => {
           e.stopPropagation();
@@ -36,6 +57,8 @@ export const StoryToolbar = memo(function StoryToolbar({ onPrev, onNext, t }: St
 
       {/* Next — invisible tap zone on mobile, visible button on sm+ */}
       <button
+        type="button"
+        disabled={!ready}
         data-testid="next-story-button"
         onClick={(e) => {
           e.stopPropagation();

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback } from "react";
+import { useTimedValue } from "./use-timed-value";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { useIsFinePointer } from "@/hooks/use-media-query";
@@ -25,19 +26,16 @@ import type { Story } from "@/types/immersive";
  */
 export function useShareStory(story: Story) {
   const { t, locale } = useTranslation();
-  const [toast, setToast] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { value: toast, show: showToast, clear: clearToast, startIntent } = useTimedValue<string>(
+    1500, JSON.stringify([story.id, story.slug ?? null, locale])
+  );
   // FE-M6 (#768): reuse the existing hydration-safe pointer-type hook instead
   // of re-querying matchMedia inline — one source of truth for pointer detection.
   const isFinePointer = useIsFinePointer();
 
-  const showToast = useCallback((message: string) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setToast(message);
-    timerRef.current = setTimeout(() => setToast(null), 1500);
-  }, []);
-
   const handleShare = useCallback(async () => {
+    const isCurrent = startIntent();
+    if (!isCurrent()) return;
     // UX-H6 (#892): route through getLocalizedStory so a non-Spanish visitor
     // shares their own language's title/subtitle, not the raw Spanish text.
     const { title, subtitle } = getLocalizedStory(story, locale);
@@ -56,25 +54,25 @@ export function useShareStory(story: Story) {
       } else {
         try {
           await navigator.clipboard.writeText(shareUrl);
-          showToast(t("share.link_copied"));
+          if (isCurrent()) showToast(t("share.link_copied"));
         } catch {
           // UX-L3 (#523): show error feedback when clipboard fails.
-          showToast(t("share.copy_error"));
+          if (isCurrent()) showToast(t("share.copy_error"));
         }
       }
     } catch (err) {
       // User cancelled share or clipboard failed - try clipboard as fallback
-      if ((err as Error).name !== "AbortError") {
+      if (isCurrent() && (err as Error).name !== "AbortError") {
         try {
           await navigator.clipboard.writeText(shareUrl);
-          showToast(t("share.link_copied"));
+          if (isCurrent()) showToast(t("share.link_copied"));
         } catch {
           // UX-L3 (#523): show error feedback instead of silently ignoring.
-          showToast(t("share.copy_error"));
+          if (isCurrent()) showToast(t("share.copy_error"));
         }
       }
     }
-  }, [story, locale, t, showToast, isFinePointer]);
+  }, [story, locale, t, showToast, isFinePointer, startIntent]);
 
-  return { toast, handleShare };
+  return { toast, handleShare, clearToast };
 }

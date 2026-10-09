@@ -1,10 +1,10 @@
 # Phase 6: Keyboard, hydration and interaction consistency
 
-Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #939, #917, #772, #721, #929, #928, #909. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: planned, not implemented. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
+Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #939, #917, #772, #721, #929, #928, #909. Planning baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; implementation entry revalidated develop `0b257b02380cf20453928889bd46bb5b21dee7f6`. Status: implemented, independently reviewed and locally verified; owner acceptance pending. See the [implementation record](phase-6-implementation.md). Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
 
 ## Scope and source evidence
 
-Sources: `src/components/admin/story-card.tsx:123`, `src/components/immersive/story-toolbar.tsx:25`, `src/hooks/use-story-keyboard-nav.ts:26`, `src/hooks/use-story-keyboard-nav.ts:57`, `src/components/immersive/story-progress-bar.tsx:45`, `src/app/pricing/page.tsx:65`, `src/components/immersive/bookmark-button.tsx:30`, `src/hooks/use-share-story.ts:29`, `src/app/favorites/page.tsx:34`, `src/components/site-footer.tsx:10`, `src/app/operator/[capability]/operator-dashboard.tsx:7`.
+Current implementation sources: `src/components/admin/story-card.tsx:80`, `src/components/immersive/story-toolbar.tsx:33`, `src/hooks/use-story-keyboard-nav.ts:24`, `src/hooks/use-story-keyboard-nav.ts:49`, `src/components/immersive/story-progress-bar.tsx:27`, `src/app/pricing/page.tsx:60`, `src/components/immersive/bookmark-button.tsx:30`, `src/hooks/use-share-story.ts:29`, `src/app/favorites/page.tsx:36`, `src/components/site-footer.tsx:6`, `src/app/operator/[capability]/operator-dashboard.tsx:7`.
 
 ## Design and work units
 

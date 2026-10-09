@@ -288,6 +288,35 @@ describe("StoryViewer", () => {
     }));
   });
 
+  describe("Phase 6 real navigation ownership", () => {
+    it.each(["ArrowRight", "ArrowLeft", "Home", "End", " "])(
+      "progress %s performs one local selection without a delayed global navigation", async (key) => {
+        await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+        const progress = screen.getByRole("navigation", { name: "Progreso de historias" });
+        const active = within(progress).getAllByRole("button")[1]!;
+        active.focus();
+        fireEvent.keyDown(active, { key });
+        expect(onIndexChange).toHaveBeenCalledTimes(1);
+        const expected = key === "ArrowRight" || key === "End" ? 2 : key === " " ? 1 : 0;
+        expect(onIndexChange).toHaveBeenCalledWith(expected);
+        act(() => vi.advanceTimersByTime(300));
+        expect(onIndexChange).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it("uses the newest real viewer navigation callback after an index change", async () => {
+      const view = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
+      act(() => vi.advanceTimersByTime(300));
+      expect(onIndexChange).toHaveBeenLastCalledWith(1);
+      view.rerender(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
+      act(() => vi.advanceTimersByTime(300));
+      expect(onIndexChange).toHaveBeenCalledTimes(2);
+      expect(onIndexChange).toHaveBeenLastCalledWith(2);
+    });
+  });
+
   describe("rendering", () => {
     it("should render the current story", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
@@ -509,7 +538,7 @@ describe("StoryViewer", () => {
     it("should navigate with keyboard right arrow", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      fireEvent.keyDown(window, { key: "ArrowRight" });
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
       act(() => {
         vi.advanceTimersByTime(300);
       });
@@ -520,7 +549,7 @@ describe("StoryViewer", () => {
     it("should navigate with keyboard left arrow", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
-      fireEvent.keyDown(window, { key: "ArrowLeft" });
+      fireEvent.keyDown(document.body, { key: "ArrowLeft" });
       act(() => {
         vi.advanceTimersByTime(300);
       });
@@ -531,7 +560,7 @@ describe("StoryViewer", () => {
     it("should navigate with spacebar", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      fireEvent.keyDown(window, { key: " " });
+      fireEvent.keyDown(document.body, { key: " " });
       act(() => {
         vi.advanceTimersByTime(300);
       });
@@ -542,7 +571,7 @@ describe("StoryViewer", () => {
     it("should wrap to first story with right arrow on last story", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
 
-      fireEvent.keyDown(window, { key: "ArrowRight" });
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
       act(() => {
         vi.advanceTimersByTime(300);
       });
@@ -553,7 +582,7 @@ describe("StoryViewer", () => {
     it("should wrap to last story with left arrow on first story", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      fireEvent.keyDown(window, { key: "ArrowLeft" });
+      fireEvent.keyDown(document.body, { key: "ArrowLeft" });
       act(() => {
         vi.advanceTimersByTime(300);
       });
@@ -569,7 +598,7 @@ describe("StoryViewer", () => {
       const contentArea = title.closest("article[class*='bottom-0']");
       expect(contentArea).toHaveClass("opacity-100");
 
-      fireEvent.keyDown(window, { key: "i" });
+      fireEvent.keyDown(document.body, { key: "i" });
 
       // After pressing i, info should be hidden
       expect(contentArea).toHaveClass("opacity-0");
@@ -756,7 +785,7 @@ describe("StoryViewer", () => {
       const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
       expect(controlsNav).toHaveClass("opacity-100");
 
-      fireEvent.keyDown(window, { key: "i" });
+      fireEvent.keyDown(document.body, { key: "i" });
 
       // After pressing i, upper-right controls should be hidden
       expect(controlsNav).toHaveClass("opacity-0");
@@ -796,11 +825,11 @@ describe("StoryViewer", () => {
       const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
 
       // First toggle off
-      fireEvent.keyDown(window, { key: "i" });
+      fireEvent.keyDown(document.body, { key: "i" });
       expect(controlsNav).toHaveClass("opacity-0");
 
       // Then toggle back on
-      fireEvent.keyDown(window, { key: "i" });
+      fireEvent.keyDown(document.body, { key: "i" });
       expect(controlsNav).toHaveClass("opacity-100");
     });
 
@@ -809,7 +838,7 @@ describe("StoryViewer", () => {
 
       const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
 
-      fireEvent.keyDown(window, { key: "i" });
+      fireEvent.keyDown(document.body, { key: "i" });
 
       // When hidden, should have pointer-events-none to prevent interaction
       expect(controlsNav).toHaveClass("pointer-events-none");
@@ -1408,11 +1437,11 @@ describe("StoryViewer", () => {
       document.body.removeChild(div);
     });
 
-    it("should ignore unrecognized keys on window without navigating or toggling info (line 159 false branch)", async () => {
+    it("should ignore unrecognized keys on document without navigating or toggling info (line 159 false branch)", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // Fire a key that doesn't match any handler (not ArrowRight, ArrowLeft, Space, or "i")
-      fireEvent.keyDown(window, { key: "k" });
+      fireEvent.keyDown(document.body, { key: "k" });
 
       // Should not navigate
       expect(onIndexChange).not.toHaveBeenCalled();
@@ -1429,7 +1458,7 @@ describe("StoryViewer", () => {
         <StoryViewer {...getDefaultProps({ chatOpen: true })} />
       );
 
-      fireEvent.keyDown(window, { key: "ArrowRight" });
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
 
       expect(onIndexChange).not.toHaveBeenCalled();
     });

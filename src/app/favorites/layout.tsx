@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LOCATION_CONFIG } from "@/config/location";
 import { StoriesProvider } from "@/hooks/use-stories";
+import { SiteFooter } from "@/components/site-footer";
 
 // LOCATION-SPECIFIC: Site URL from config
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
@@ -24,5 +25,5 @@ export default function FavoritesLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <StoriesProvider>{children}</StoriesProvider>;
+  return <StoriesProvider>{children}<SiteFooter variant="flow" /></StoriesProvider>;
 }

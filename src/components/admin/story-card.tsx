@@ -77,7 +77,7 @@ export function StoryCard({
     <button
       onClick={handleClick}
       className={cn(
-        "group relative w-full overflow-hidden rounded-2xl bg-white text-left transition-all hover:shadow-lg dark:bg-[#252320]",
+        "group relative w-full overflow-hidden rounded-2xl bg-white text-left transition-all hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7a5a] focus-visible:ring-offset-2 dark:bg-[#252320]",
         span === 2 && "sm:col-span-2",
         isSelected && "ring-2 ring-[#5a7a5a] ring-offset-2 ring-offset-[#f5f3ee] dark:ring-offset-[#1a1917]"
       )}
@@ -100,13 +100,14 @@ export function StoryCard({
               }
             />
 
-            {/* Gradient overlay - appears on hover */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#2d2a26]/80 via-[#2d2a26]/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            {/* Reveal readable content for hover, keyboard focus and touch. */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#2d2a26]/80 via-[#2d2a26]/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100" />
 
             {/* Selection checkbox - top left */}
             {onToggleSelect && (
               <div
                 role="checkbox"
+                aria-label={`Seleccionar ${story.title}`}
                 aria-checked={isSelected}
                 tabIndex={0}
                 onClick={handleCheckboxClick}
@@ -117,7 +118,7 @@ export function StoryCard({
                   }
                 }}
                 className={cn(
-                  "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all",
+                  "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all group-focus-within:opacity-100 pointer-coarse:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7a5a] focus-visible:ring-offset-2",
                   isSelected
                     ? "border-[#5a7a5a] bg-[#5a7a5a]"
                     : "border-white/80 bg-white/20 opacity-0 backdrop-blur-sm group-hover:opacity-100",
@@ -128,9 +129,9 @@ export function StoryCard({
               </div>
             )}
 
-            {/* Content overlay - appears on hover */}
-            <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 transition-all duration-300 group-hover:opacity-100">
-              <div className="translate-y-2 transform transition-transform duration-300 group-hover:translate-y-0">
+            {/* Content overlay follows the same access modes as the gradient. */}
+            <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 transition-all duration-300 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+              <div className="translate-y-2 transform transition-transform duration-300 group-hover:translate-y-0 group-focus-within:translate-y-0 pointer-coarse:translate-y-0">
                 <p className="text-[10px] font-medium uppercase tracking-wider text-[#f5f3ee]/70">
                   {CATEGORY_LABELS[story.category]}
                 </p>
@@ -174,8 +175,8 @@ export function StoryCard({
                 </span>
               )}
 
-              {/* Edit button - appears on hover */}
-              <div className="flex h-7 w-7 scale-90 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 group-hover:scale-100 group-hover:opacity-100 dark:bg-[#252320]/90">
+              {/* Visual edit affordance for the parent card button. */}
+              <div className="flex h-7 w-7 scale-90 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100 pointer-coarse:scale-100 pointer-coarse:opacity-100 dark:bg-[#252320]/90">
                 <Pencil className="h-3 w-3 text-[#2d2a26] dark:text-[#f5f3ee]" />
               </div>
             </div>
@@ -187,6 +188,7 @@ export function StoryCard({
             {onToggleSelect && (
               <div
                 role="checkbox"
+                aria-label={`Seleccionar ${story.title}`}
                 aria-checked={isSelected}
                 tabIndex={0}
                 onClick={handleCheckboxClick}
@@ -197,7 +199,7 @@ export function StoryCard({
                   }
                 }}
                 className={cn(
-                  "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all",
+                  "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all group-focus-within:opacity-100 pointer-coarse:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5a7a5a] focus-visible:ring-offset-2",
                   isSelected
                     ? "border-[#5a7a5a] bg-[#5a7a5a]"
                     : "border-[#a39e98]/50 bg-white/50 opacity-0 group-hover:opacity-100 dark:bg-[#2d2a26]/50",

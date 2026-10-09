@@ -5,6 +5,7 @@ import { RateLimitNotice } from "@/components/rate-limit-notice";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useTimedValue } from "@/hooks/use-timed-value";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useStories } from "@/hooks/use-stories";
 import { useAuth } from "@/hooks/use-auth";
@@ -32,37 +33,24 @@ export default function FavoritesPage() {
   // toast; undo re-adds via the same toggle rather than delaying the
   // original write (which would change ordering if the backend sorts by
   // creation time — see the issue's regression-risk note).
-  const [undoState, setUndoState] = useState<{ storyId: string; title: string } | null>(null);
-  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearUndoTimeout = useCallback(() => {
-    if (undoTimeoutRef.current !== null) {
-      clearTimeout(undoTimeoutRef.current);
-      undoTimeoutRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => clearUndoTimeout, [clearUndoTimeout]);
+  const { value: undoState, show: showUndo, clear: clearUndo } = useTimedValue<{
+    storyId: string;
+    title: string;
+  }>(UNDO_TIMEOUT_MS);
 
   const handleRemove = useCallback(
     (storyId: string, title: string) => {
       toggleFavorite(storyId);
-      clearUndoTimeout();
-      setUndoState({ storyId, title });
-      undoTimeoutRef.current = setTimeout(() => {
-        setUndoState(null);
-        undoTimeoutRef.current = null;
-      }, UNDO_TIMEOUT_MS);
+      showUndo({ storyId, title });
     },
-    [toggleFavorite, clearUndoTimeout]
+    [toggleFavorite, showUndo]
   );
 
   const handleUndo = useCallback(() => {
     if (!undoState) return;
     toggleFavorite(undoState.storyId);
-    setUndoState(null);
-    clearUndoTimeout();
-  }, [undoState, toggleFavorite, clearUndoTimeout]);
+    clearUndo();
+  }, [undoState, toggleFavorite, clearUndo]);
 
   // requiresAuth is true for anonymous users — they can never have saved favorites.
   const canWaitForStories = !requiresAuth || favorites.length > 0;

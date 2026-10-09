@@ -1,0 +1,21 @@
+/* Keep recovery in the static shell, above the streamed story/skeleton. A
+   hydrated shell alone must not hide it while the story chunk is still blocked. */
+.recovery {
+  position: fixed;
+  top: max(6rem, env(safe-area-inset-top));
+  left: 1rem;
+  right: 1rem;
+  z-index: 60;
+  margin-inline: auto;
+  max-width: 32rem;
+  border-radius: 0.5rem;
+  background: rgb(0 0 0 / 90%);
+  padding: 1rem;
+  color: white;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.page:has([data-story-navigation-ready="true"]) .recovery {
+  display: none;
+}
