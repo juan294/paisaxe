@@ -67,7 +67,7 @@ describe("embeddings", () => {
           inputType: "query",
           outputDimension: 512,
         },
-        { abortSignal: undefined }
+        { abortSignal: undefined, timeoutInSeconds: 12 }
       );
       expect(mockEmbed).not.toHaveBeenCalled();
     });
@@ -89,7 +89,7 @@ describe("embeddings", () => {
 
       expect(mockContextualizedEmbed).toHaveBeenCalledWith(
         expect.objectContaining({ inputs: [["test text"]] }),
-        { abortSignal: controller.signal }
+        { abortSignal: controller.signal, timeoutInSeconds: 12 }
       );
     });
 

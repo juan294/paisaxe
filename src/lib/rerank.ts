@@ -19,8 +19,10 @@ const DEFAULT_TOP_K = 3;
 export async function rerankChunks(
   query: string,
   chunks: Chunk[],
-  topK: number = DEFAULT_TOP_K
+  topK: number = DEFAULT_TOP_K,
+  options: { signal?: AbortSignal; onDegraded?: () => void; timeoutMs?: number } = {}
 ): Promise<Chunk[]> {
+  options.signal?.throwIfAborted();
   if (chunks.length <= topK) {
     return chunks;
   }
@@ -31,7 +33,8 @@ export async function rerankChunks(
       documents: chunks.map((c) => c.content),
       model: RERANK_MODEL,
       topK,
-    });
+    }, { abortSignal: options.signal, timeoutInSeconds: options.timeoutMs === undefined ? undefined : options.timeoutMs / 1000 });
+    options.signal?.throwIfAborted();
 
     // Log token usage
     if (result.usage?.totalTokens) {
@@ -43,16 +46,24 @@ export async function rerankChunks(
 
     if (!result.data) {
       logger.error("[Voyage AI] Rerank returned no data, falling back to original order");
+      options.onDegraded?.();
       return chunks.slice(0, topK);
     }
 
     // Reorder chunks based on reranker scores
-    const reranked = result.data
-      .filter((item) => item.index !== undefined)
-      .map((item) => chunks[item.index!]);
+    const indices = result.data.map(item => item.index);
+    if (indices.length === 0 || indices.some(index => index === undefined || !Number.isInteger(index) || index < 0 || index >= chunks.length)
+      || new Set(indices).size !== indices.length) {
+      options.onDegraded?.();
+      logger.error("[Voyage AI] Rerank returned invalid indices, falling back to original order");
+      return chunks.slice(0, topK);
+    }
+    const reranked = indices.map(index => chunks[index!]);
 
     return reranked;
   } catch (error) {
+    options.signal?.throwIfAborted();
+    options.onDegraded?.();
     logger.error("[Voyage AI] Rerank failed, falling back to original order", {
       error: error instanceof Error ? error.message : String(error),
     });

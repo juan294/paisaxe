@@ -2,6 +2,7 @@ import "server-only";
 import { VoyageAIClient } from "voyageai";
 import { EmbeddingCache } from "./embedding-cache";
 import { logger } from "./logger";
+import { CHAT_STREAM_STAGE_TIMEOUTS_MS } from "./chat-stream-timeouts";
 
 const voyageClient = new VoyageAIClient({
   apiKey: process.env.VOYAGE_API_KEY?.trim(),
@@ -42,8 +43,10 @@ export async function generateEmbedding(
   text: string,
   options: { signal?: AbortSignal } = {}
 ): Promise<number[]> {
+  options.signal?.throwIfAborted();
   // Check cache first
   const cached = await embeddingCache.get(text);
+  options.signal?.throwIfAborted();
   if (cached) {
     return cached;
   }
@@ -55,9 +58,10 @@ export async function generateEmbedding(
       inputType: "query",
       outputDimension: EMBEDDING_DIMENSIONS,
     },
-    { abortSignal: options.signal }
+    { abortSignal: options.signal, timeoutInSeconds: CHAT_STREAM_STAGE_TIMEOUTS_MS.embedding / 1000 }
   );
 
+  options.signal?.throwIfAborted();
   const embedding = result.results?.[0]?.embeddings?.[0] as number[] | undefined;
   if (!embedding) {
     throw new Error("No embedding returned from Voyage AI");

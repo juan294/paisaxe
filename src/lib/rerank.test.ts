@@ -52,7 +52,7 @@ describe("rerank", () => {
         documents: chunks.map((c) => c.content),
         model: "rerank-2.5",
         topK: 3,
-      });
+      }, { abortSignal: undefined, timeoutInSeconds: undefined });
     });
 
     it("should return chunks reordered by relevance score", async () => {
@@ -118,7 +118,8 @@ describe("rerank", () => {
       await rerankChunks("query", chunks);
 
       expect(mockRerank).toHaveBeenCalledWith(
-        expect.objectContaining({ topK: 3 })
+        expect.objectContaining({ topK: 3 }),
+        { abortSignal: undefined, timeoutInSeconds: undefined }
       );
     });
 

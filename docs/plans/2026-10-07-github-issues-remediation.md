@@ -79,3 +79,8 @@ Independent backend/security, frontend/architecture and operations/content revie
 ## Implementation progress, 2026-10-07
 
 Phase 1 is implemented with passing local checks. The literal normal-capacity SSE qualification remains an explicit owner-acceptance limitation because the baseline ran on a heavily loaded host. [Implementation notes](2026-10-07-github-issues-remediation-notes.md) record independent review, fixes, simplify, exact candidate identities, complete local gates, the 40-run SSE matrix, full E2E results and remaining evidence limits. Phase 2 is implemented, independently reviewed and locally qualified on 2026-10-08; unrestricted verification, the favorites ordering repair and normal commit/local integration receipts supersede the earlier permission blockers. See the Phase 2 sections in the implementation notes. No publication, deployment or issue mutation occurred.
+
+
+### Progress update, 2026-10-09
+
+The owner accepted Phase 3 and Phase 4 local work and explicitly authorized Phase 5. Phase 5’s retrieval/cache cancellation, shared generation timer and three-consumer timeout classifier are implemented and independently reviewed. #919 remains open with measured local index deferral; #802 remains open because representative translation workload is unmeasured. The combined provider qualification retains its accepted ElevenLabs evidence gap. Current checks, source identity, native delivery and remaining acceptance boundaries are in the [implementation notes](2026-10-07-github-issues-remediation-notes.md) and Phase 5 handoff. Phase 5 owner acceptance is pending; no Phase 6 or publication authority is inferred.

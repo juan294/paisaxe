@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
 import { SearchResultCache } from "./embedding-cache";
+import { createChildAbortController } from "./chat-stream-timeouts";
 import type { Chunk, ImageResult, SearchResult } from "@/types";
 import { logger } from "@/lib/logger";
 
@@ -15,16 +16,20 @@ const searchResultCache = new SearchResultCache();
 
 export async function searchChunks(
   queryEmbedding: number[],
-  limit: number = 5
+  limit: number = 5,
+  options: { signal?: AbortSignal } = {}
 ): Promise<Chunk[]> {
+  options.signal?.throwIfAborted();
   // The match_chunks RPC uses an HNSW index (migration 084).
   // hnsw.ef_search = 40 is set via SET LOCAL inside the SQL function body,
   // so no client-side session variable setup is needed here.
-  const { data, error } = await supabase.rpc("match_chunks", {
+  const query = supabase.rpc("match_chunks", {
     query_embedding: queryEmbedding,
     match_threshold: 0.5,  // Lowered from 0.7 to get more results
     match_count: limit,
   });
+  const { data, error } = await (options.signal ? query.abortSignal(options.signal) : query);
+  options.signal?.throwIfAborted();
 
   if (error) {
     throw new Error(`Search RPC failed: ${error.message ?? String(error)}`);
@@ -50,16 +55,21 @@ export async function searchChunks(
 }
 
 export async function getRelatedImages(
-  imageRefs: string[]
+  imageRefs: string[],
+  options: { signal?: AbortSignal; onDegraded?: () => void } = {}
 ): Promise<ImageResult[]> {
+  options.signal?.throwIfAborted();
   if (imageRefs.length === 0) return [];
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("images")
     .select("id, path, caption, source_pdf")
     .in("path", imageRefs);
+  const { data, error } = await (options.signal ? query.abortSignal(options.signal) : query);
+  options.signal?.throwIfAborted();
 
   if (error) {
+    options.onDegraded?.();
     logger.error("[TABLE_FALLBACK]", { table: "images", error: error.message ?? String(error) });
     return [];
   }
@@ -85,20 +95,23 @@ export async function getRelatedImages(
 export async function search(
   queryEmbedding: number[],
   limit: number = 5,
-  queryText?: string
+  queryText?: string,
+  options: { signal?: AbortSignal; skipCacheRead?: boolean } = {}
 ): Promise<SearchResult> {
+  options.signal?.throwIfAborted();
   // PE-M2 (#810): a cache hit here skips the vector-search RPC, the rerank
   // call, AND the image lookup — not just the embedding (see embedding-cache.ts).
   // Only cached when queryText is provided; the plain-vector-search fallback
   // path below is not cached (see keying rationale there).
-  if (queryText) {
+  if (queryText && !options.skipCacheRead) {
     const cached = await searchResultCache.get(queryText, limit);
+    options.signal?.throwIfAborted();
     if (cached) return cached;
   }
 
   // When reranking, widen the initial search to get more candidates
   const candidateCount = queryText ? RERANK_CANDIDATE_COUNT : limit;
-  const candidates = await searchChunks(queryEmbedding, candidateCount);
+  const candidates = await searchChunks(queryEmbedding, candidateCount, options);
 
   // PE-H3: fire getRelatedImages concurrently with rerankChunks.
   // getRelatedImages only needs the candidate list (not the reranked order),
@@ -107,18 +120,21 @@ export async function search(
   if (!queryText) {
     const allImageRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
     const uniqueImageRefs = [...new Set(allImageRefs)];
-    const images = await getRelatedImages(uniqueImageRefs);
+    const images = await getRelatedImages(uniqueImageRefs, options);
     return { chunks: candidates, images };
   }
 
   const allCandidateRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
   const uniqueCandidateRefs = [...new Set(allCandidateRefs)];
 
+  let degraded = false;
+  const onDegraded = () => { degraded = true; };
   // Start both in parallel — neither depends on the other's result yet.
   const [rerankOutcome, allImages] = await Promise.all([
-    withRerankTimeout(rerankChunks(queryText, candidates, limit), candidates, limit),
-    getRelatedImages(uniqueCandidateRefs),
+    withRerankTimeout(queryText, candidates, limit, options.signal, onDegraded),
+    getRelatedImages(uniqueCandidateRefs, { signal: options.signal, onDegraded }),
   ]);
+  options.signal?.throwIfAborted();
   const { chunks: rerankedChunks, timedOut } = rerankOutcome;
 
   // Filter images to only those referenced by the reranked top-k chunks.
@@ -130,7 +146,7 @@ export async function search(
   // Don't cache a rerank-timeout fallback: it's a degraded (vector-order-only)
   // result, and caching it would serve that degraded ranking to every repeat
   // query for the full TTL even after a transient rerank slowdown passes.
-  if (!timedOut) {
+  if (!timedOut && !degraded) {
     void searchResultCache.set(queryText, limit, result);
   }
 
@@ -144,22 +160,36 @@ interface RerankOutcome {
 }
 
 function withRerankTimeout(
-  rerankPromise: Promise<Chunk[]>,
+  query: string,
   candidates: Chunk[],
-  limit: number
+  limit: number,
+  signal: AbortSignal | undefined,
+  onDegraded: () => void
 ): Promise<RerankOutcome> {
+  const child = createChildAbortController(signal);
+  const rerankSignal = child.controller.signal;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const cancellation = new Promise<never>((_, reject) => {
+    onAbort = () => reject(rerankSignal.reason);
+    if (rerankSignal.aborted) onAbort();
+    else rerankSignal.addEventListener("abort", onAbort, { once: true });
+  });
   const timeoutPromise = new Promise<RerankOutcome>((resolve) => {
     timer = setTimeout(() => {
       logger.warn("[SEARCH_RERANK_TIMEOUT]", { timeoutMs: RERANK_TIMEOUT_MS });
       resolve({ chunks: candidates.slice(0, limit), timedOut: true });
+      child.controller.abort(new DOMException("Rerank deadline exceeded", "TimeoutError"));
     }, RERANK_TIMEOUT_MS);
   });
-
   return Promise.race([
-    rerankPromise.then((chunks) => ({ chunks, timedOut: false })),
+    rerankChunks(query, candidates, limit, { signal: rerankSignal, onDegraded, timeoutMs: RERANK_TIMEOUT_MS })
+      .then(chunks => ({ chunks, timedOut: false })),
     timeoutPromise,
+    cancellation,
   ]).finally(() => {
-    if (timer !== undefined) clearTimeout(timer);
+    clearTimeout(timer);
+    if (onAbort) rerankSignal.removeEventListener("abort", onAbort);
+    child.dispose();
   });
 }

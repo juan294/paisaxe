@@ -256,3 +256,60 @@ describe("CHAT_STREAM_RESPONSE_TOTAL_CAP_MS", () => {
     );
   });
 });
+
+describe("bounded generation timer", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
+  it("resets idle without renewing the hard cap and invokes timeout exactly once", async () => {
+    const { createBoundedGenerationTimer } = await import("./chat-stream-timeouts");
+    const onTimeout = vi.fn();
+    const timer = createBoundedGenerationTimer({ idleMs: 30, totalMs: 85, onTimeout });
+    for (let i = 0; i < 4; i++) {
+      await vi.advanceTimersByTimeAsync(20);
+      timer.resetIdle();
+    }
+    await vi.advanceTimersByTimeAsync(5);
+    expect(onTimeout).toHaveBeenCalledExactlyOnceWith("total_duration_cap", 85);
+    expect(timer.reason).toBe("total_duration_cap");
+    timer.resetIdle();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(onTimeout).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("idle wins a racing deadline once and a disposed timer cannot fire", async () => {
+    const { createBoundedGenerationTimer } = await import("./chat-stream-timeouts");
+    const onTimeout = vi.fn();
+    const timer = createBoundedGenerationTimer({ idleMs: 30, totalMs: 30, onTimeout });
+    await vi.advanceTimersByTimeAsync(30);
+    expect(onTimeout).toHaveBeenCalledExactlyOnceWith("idle_window", 30);
+    timer.dispose();
+    const freshTimeout = vi.fn();
+    const fresh = createBoundedGenerationTimer({ idleMs: 30, totalMs: 90, onTimeout: freshTimeout });
+    fresh.dispose(); fresh.dispose(); fresh.resetIdle();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(freshTimeout).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("stage cancellation", () => {
+  it("rejects promptly on parent cancellation and disposes the stage timer", async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const abort = new DOMException("client disconnected", "AbortError");
+      const pending = withChatStreamStageTiming("search", new Promise(() => {}), controller);
+      const outcome = pending.catch(error => error);
+      controller.abort(abort);
+      // Race a local settled value: a cancelled stage must already have settled,
+      // independently of its original request or its 5-second timeout.
+      // Drain the current event-loop turn, without advancing the 5s deadline.
+      // Promise.race + async finally may require more than two microtasks.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(await Promise.race([outcome, Promise.resolve("still pending")])).toBe(abort);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.clearAllTimers(); vi.useRealTimers(); }
+  });
+});

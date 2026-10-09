@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { getEnv } from "@/lib/env";
+import { isTimeoutError } from "@/lib/is-timeout-error";
 import type {
   ElevenLabsAnalyticsSummary,
   ElevenLabsAgentBreakdown,
@@ -284,11 +285,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // PE-L2: distinguish a timeout/abort (AbortError / TimeoutError emitted by
     // AbortSignal.timeout) from a definitive ElevenLabs error so a hung
-    // upstream is visible separately from a real API failure. We check
-    // .name directly (not just instanceof Error) because DOMException may
-    // not extend Error in all JS runtimes/environments.
-    const errorName = (error as { name?: string } | null)?.name;
-    const isTimeout = errorName === "AbortError" || errorName === "TimeoutError";
+    // upstream is visible separately from a real API failure.
+    const isTimeout = isTimeoutError(error);
 
     if (error instanceof ElevenLabsCredentialError) {
       logElevenLabsFailure({

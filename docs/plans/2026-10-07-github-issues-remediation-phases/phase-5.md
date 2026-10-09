@@ -1,6 +1,6 @@
 # Phase 5: Retrieval, cancellation and measured backend changes
 
-Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #936, #933, #930, #918, #919, #802. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: planned, not implemented. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
+Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #936, #933, #930, #918, #919, #802. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: implemented and independently reviewed locally on 2026-10-09; owner acceptance pending. Final check and delivery identities are recorded in the [implementation notes](../2026-10-07-github-issues-remediation-notes.md) and private Phase 5 handoff. The carried combined provider gate remains red because ElevenLabs fixture qualification is unverified; #919 and #802 remain open with the dispositions below. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
 
 ## Scope and source evidence
 
@@ -48,3 +48,19 @@ Chat shows existing retry/text path on search failure or timeout; a fresh turn s
 ## Phase acceptance and handoff
 
 Run the parent's applicable sequential integration gates plus the automated criteria above on the integrated candidate. Record exact identity, commands, pass/fail/skip counts, review/simplify findings and fixes, and each issue's local/runtime disposition. Manual or provider evidence is separate; missing evidence leaves the issue open. Stop after acceptance, preserving the plan and implementation receipts; proceed only with authorized continuation. Consumer ownership and command inventory are in [consumer sweep](consumer-sweep.md).
+
+
+## Local implementation disposition, 2026-10-09
+
+The owner accepted Phase 4 and explicitly authorized Phase 5. Work started from develop `3b1bc049a8ae20775f7fe438f7cd9df569b7c3cc` in isolated branch `fix/issues-phase5-retrieval`. Frozen tracked/nonignored input digest: `abc31996a79d3567c717c76d5723de84ba1ed3f64ff457781f4a4ed7efb3192b`. The final commit/tree, native-hook results, local integration and exact-owned cleanup belong to `logs/issues-phase5-2026-10-09/phase5-handoff.json`; no later step is inferred from this precommit document.
+
+| Issue | Local disposition | Remaining boundary |
+| --- | --- | --- |
+| #936 | Complete result-cache lookup precedes embedding, with corruption/TTL recovery and zero-upstream cache-hit controls. | Release/observed runtime and eventual issue closure remain separate. |
+| #933 | Parent and child cancellation reach actual SDK/PostgREST transports; bounded rerank timeout yields uncached vector fallback. | HTTP-boundary fakes are synthetic; no new live provider evidence is claimed. |
+| #930 | Pure exact-name helper adopted by all three consumers; initiating/orphan recovery and Stripe semantics preserved. | Release and eventual issue closure remain separate. |
+| #918 | Shared reset/dispose generation timer preserves idle/total budgets in both routes with exactly-once expiry and fresh-turn recovery. | Release and eventual issue closure remain separate. |
+| #919 | Measured local deferral: candidate index was never selected in 224 plans and supplied no buffer/result benefit. No migration added. | Issue stays open; local synthetic growth is not production workload proof. |
+| #802 | Strategic deferral: representative workload evidence is unmeasured; semantic parser and concrete collection runbook are implemented. Inline execution retained. | Issue stays open; collection scope and any triggered worker architecture/provider/schedule need separate decisions. |
+
+Full ordinary/coverage, required database component, type/lint/Knip, native cadence, builds and browser outcomes are retained separately with exact identities and failed attempts. The combined provider command's exit 1 is not relabeled green. See the [measurement runbook](../../operations/backend-measurements.md) for both strategic next actions and the implementation notes for verification/deviation details. Phase 6 is not started by this artifact.

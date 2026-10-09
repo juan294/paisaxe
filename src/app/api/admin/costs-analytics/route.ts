@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { getEnv } from "@/lib/env";
+import { isTimeoutError } from "@/lib/is-timeout-error";
 import {
   fetchAnthropicCosts,
   fetchAnthropicCostsByDay,
@@ -378,10 +379,7 @@ async function fetchUsageMetrics(
         // emitted by AbortSignal.timeout) from a definitive ElevenLabs
         // error, since this call already degrades to partial data — a
         // hung upstream should be visible separately from a real failure.
-        // We check .name directly (not just instanceof Error) because
-        // DOMException may not extend Error in all JS runtimes/environments.
-        const errorName = (error as { name?: string } | null)?.name;
-        const isTimeout = errorName === "AbortError" || errorName === "TimeoutError";
+        const isTimeout = isTimeoutError(error);
 
         logElevenLabsFailure({
           source: "costs-usage-analytics",

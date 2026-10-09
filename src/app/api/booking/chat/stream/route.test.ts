@@ -259,3 +259,45 @@ describe("POST /api/booking/chat/stream", () => {
   });
 });
 
+
+it("never starts a model turn after an already-cancelled request", async () => {
+  const controller = new AbortController(); controller.abort();
+  const response = await POST(new NextRequest("http://localhost/api/booking/chat/stream", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "hola", history: [] }), signal: controller.signal,
+  }));
+  expect(await response.text()).toBe("");
+  expect(streamBookingTurn).not.toHaveBeenCalled();
+});
+
+
+it("disposes booking idle/cap timers and the request listener at timeout, ignores late output, and permits a fresh turn", async () => {
+  vi.useFakeTimers();
+  try {
+    let resume!: () => void;
+    deps.turn = async function* () {
+      yield { type: "text", content: "Primero" };
+      await new Promise<void>(resolve => { resume = resolve; });
+      yield { type: "text", content: "Tarde" };
+    };
+    const request = new NextRequest("http://localhost/api/booking/chat/stream", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "hola", history: [] }),
+    });
+    const add = vi.spyOn(request.signal, "addEventListener");
+    const remove = vi.spyOn(request.signal, "removeEventListener");
+    const response = await POST(request);
+    const body = events(response);
+    await vi.advanceTimersByTimeAsync(30_000);
+    const sent = await body;
+    expect(sent).toEqual([{ type: "text", content: "Primero" }, { type: "error", message: "response_timeout" }]);
+    expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
+    resume();
+    await vi.advanceTimersByTimeAsync(85_000);
+    expect(sent).toHaveLength(2);
+    expect(vi.getTimerCount()).toBe(0);
+    deps.turn = async function* () { yield { type: "text", content: "Recuperado" }; };
+    expect((await events(await post({ message: "otra vez", history: [] }))).at(-1)?.type).toBe("done");
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { vi.clearAllTimers(); vi.useRealTimers(); }
+});

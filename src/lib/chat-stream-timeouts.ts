@@ -46,6 +46,48 @@ export function isChatStreamStageTimeout(
   return error instanceof ChatStreamStageTimeoutError;
 }
 
+/** A cancellable child whose parent listener is explicitly released by its owner. */
+export function createChildAbortController(parent?: AbortSignal) {
+  const controller = new AbortController();
+  const abort = () => controller.abort(parent?.reason);
+  if (parent?.aborted) abort();
+  else parent?.addEventListener("abort", abort, { once: true });
+  return { controller, dispose: () => parent?.removeEventListener("abort", abort) };
+}
+
+export type GenerationTimeoutReason = "idle_window" | "total_duration_cap";
+
+/** One generation deadline, with a resetting idle window and a fixed hard cap. */
+export function createBoundedGenerationTimer(options: {
+  idleMs: number;
+  totalMs: number;
+  onTimeout: (reason: GenerationTimeoutReason, timeoutMs: number) => void;
+}) {
+  let reason: GenerationTimeoutReason | undefined;
+  let disposed = false;
+  let idleTimer: ReturnType<typeof setTimeout>;
+  let capTimer: ReturnType<typeof setTimeout>;
+  const dispose = () => {
+    disposed = true;
+    clearTimeout(idleTimer);
+    clearTimeout(capTimer);
+  };
+  const expire = (nextReason: GenerationTimeoutReason, timeoutMs: number) => {
+    if (disposed) return;
+    reason = nextReason;
+    dispose();
+    options.onTimeout(nextReason, timeoutMs);
+  };
+  const resetIdle = () => {
+    if (disposed) return;
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => expire("idle_window", options.idleMs), options.idleMs);
+  };
+  resetIdle();
+  capTimer = setTimeout(() => expire("total_duration_cap", options.totalMs), options.totalMs);
+  return { resetIdle, dispose, get reason() { return reason; } };
+}
+
 export async function withChatStreamStageTiming<T>(
   stage: ChatStreamStage,
   promise: Promise<T>,
@@ -53,40 +95,35 @@ export async function withChatStreamStageTiming<T>(
 ): Promise<T> {
   const startedAt = Date.now();
   const timeoutMs = CHAT_STREAM_STAGE_TIMEOUTS_MS[stage];
-  let timer!: ReturnType<typeof setTimeout>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let timedOut = false;
-
+  let onAbort: (() => void) | undefined;
+  const signal = abortController?.signal;
+  const cancellation = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener("abort", onAbort, { once: true });
+  });
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       timedOut = true;
-      // AR-H2 (#856): a bare Promise.race leaves the losing promise running
-      // (and, for an Anthropic call, billing) after the caller has moved on.
-      // Abort the controller the caller wired into `promise`'s construction
-      // so the underlying call is actually cancelled, not just abandoned.
-      abortController?.abort();
-      reject(new ChatStreamStageTimeoutError(stage, timeoutMs));
+      const error = new ChatStreamStageTimeoutError(stage, timeoutMs);
+      // Settle with the typed stage error before cancellation unwinds the transport.
+      reject(error);
+      abortController?.abort(error);
     }, timeoutMs);
   });
 
   try {
-    return await Promise.race([promise, timeoutPromise]);
+    return await Promise.race([promise, timeoutPromise, cancellation]);
   } catch (error) {
-    if (isChatStreamStageTimeout(error)) {
-      logger.warn("[CHAT_STREAM_STAGE_TIMEOUT]", {
-        stage,
-        timeoutMs,
-      });
-    }
+    if (isChatStreamStageTimeout(error)) logger.warn("[CHAT_STREAM_STAGE_TIMEOUT]", { stage, timeoutMs });
     throw error;
   } finally {
-    // timer is always assigned synchronously by the Promise executor above
-    // before this finally block can run.
     clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener("abort", onAbort);
     logger.info("[CHAT_STREAM_STAGE_TIMING]", {
-      stage,
-      durationMs: Date.now() - startedAt,
-      timeoutMs,
-      timedOut,
+      stage, durationMs: Date.now() - startedAt, timeoutMs, timedOut,
     });
   }
 }

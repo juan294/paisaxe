@@ -121,7 +121,14 @@ export class EmbeddingCache {
   }
 
   async get(text: string): Promise<number[] | null> {
-    return redisJsonGet<number[]>(this.hashKey(text), "[EMBEDDING_CACHE_MISS]");
+    const value = await redisJsonGet<unknown>(this.hashKey(text), "[EMBEDDING_CACHE_MISS]");
+    if (value === null) return null;
+    if (!Array.isArray(value) || value.length !== this.dimensions
+      || !value.every(coordinate => typeof coordinate === "number" && Number.isFinite(coordinate))) {
+      logger.warn("[EMBEDDING_CACHE_MISS]", { reason: "invalid_embedding_shape" });
+      return null;
+    }
+    return value;
   }
 
   async set(text: string, embedding: number[]): Promise<void> {
@@ -146,7 +153,13 @@ export class SearchResultCache {
   }
 
   async get(queryText: string, limit: number): Promise<SearchResult | null> {
-    return redisJsonGet<SearchResult>(this.hashKey(queryText, limit), "[SEARCH_RESULT_CACHE_MISS]");
+    const result = await redisJsonGet<unknown>(this.hashKey(queryText, limit), "[SEARCH_RESULT_CACHE_MISS]");
+    if (result === null) return null;
+    if (!isSearchResult(result)) {
+      logger.warn("[SEARCH_RESULT_CACHE_MISS]", { reason: "invalid_result_shape" });
+      return null;
+    }
+    return result;
   }
 
   async set(queryText: string, limit: number, result: SearchResult): Promise<void> {
@@ -157,4 +170,20 @@ export class SearchResultCache {
       "[SEARCH_RESULT_CACHE_SET_FAILED]"
     );
   }
+}
+
+function isSearchResult(value: unknown): value is SearchResult {
+  if (!value || typeof value !== "object") return false;
+  const { chunks, images } = value as Record<string, unknown>;
+  if (!Array.isArray(chunks) || !Array.isArray(images)) return false;
+  const nullableString = (value: unknown) => value == null || typeof value === "string";
+  return chunks.every(chunk => chunk && typeof chunk === "object"
+    && typeof chunk.id === "string" && typeof chunk.content === "string" && typeof chunk.sourcePdf === "string"
+    && nullableString(chunk.sectionTitle)
+    && (chunk.pageNumber == null || typeof chunk.pageNumber === "number")
+    && (chunk.similarity == null || typeof chunk.similarity === "number")
+    && (chunk.imageRefs == null || (Array.isArray(chunk.imageRefs) && chunk.imageRefs.every((ref: unknown) => typeof ref === "string"))))
+    && images.every(image => image && typeof image === "object"
+      && typeof image.id === "string" && typeof image.path === "string" && typeof image.sourcePdf === "string"
+      && nullableString(image.caption));
 }

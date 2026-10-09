@@ -699,7 +699,7 @@ describe("POST /api/chat/stream", () => {
 
     await POST(request);
 
-    expect(search).toHaveBeenCalledWith(mockEmbedding, 3, "Best hiking routes");
+    expect(search).toHaveBeenCalledWith(mockEmbedding, 3, "Best hiking routes", expect.objectContaining({ signal: expect.any(AbortSignal), skipCacheRead: true }));
   });
 
   it("should default asturianu flag to false when feature flag returns false", async () => {
@@ -1400,5 +1400,44 @@ describe("POST /api/chat/stream", () => {
         vi.useRealTimers();
       }
     });
+  });
+});
+
+describe("bounded generation cleanup regression", () => {
+  it("closes exactly once at idle timeout even if the generator ignores cancellation, then permits a fresh turn", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, limit: 10, remaining: 9, resetAt: 0 });
+      vi.mocked(detectInjectionAttempt).mockReturnValue(false);
+      vi.mocked(detectPromptLeakage).mockReturnValue(false);
+      vi.mocked(generateEmbedding).mockResolvedValue(Array(512).fill(0.1));
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      let resume!: () => void;
+      vi.mocked(streamChatResponse).mockImplementation(async function* () {
+        yield "primero";
+        await new Promise<void>(resolve => { resume = resolve; });
+        yield "tarde";
+      });
+      const response = await POST(new NextRequest("http://localhost/api/chat/stream", {
+        method: "POST", body: JSON.stringify({ message: "Hola" }),
+      }));
+      const body = collectStreamEvents(response);
+      await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.response);
+      const result = await Promise.race([body, Promise.resolve("still open")]);
+      // Release the misbehaving boundary before asserting, so the old code unwinds.
+      resume();
+      expect(result).toEqual([
+        { type: "text", content: "primero" },
+        { type: "error", message: "response_timeout" },
+      ]);
+      await vi.advanceTimersByTimeAsync(CHAT_STREAM_RESPONSE_TOTAL_CAP_MS);
+      expect(vi.getTimerCount()).toBe(0);
+      vi.mocked(streamChatResponse).mockImplementation(async function* () { yield "recuperado"; });
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+      const fresh = await POST(new NextRequest("http://localhost/api/chat/stream", {
+        method: "POST", body: JSON.stringify({ message: "Hola otra vez" }),
+      }));
+      expect(await collectStreamEvents(fresh)).toContainEqual({ type: "done", images: [], sources: [] });
+    } finally { vi.clearAllTimers(); vi.useRealTimers(); }
   });
 });

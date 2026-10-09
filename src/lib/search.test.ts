@@ -265,7 +265,8 @@ describe("search", () => {
       expect(rerankChunks).toHaveBeenCalledWith(
         "best restaurants in Asturias",
         expect.arrayContaining([expect.objectContaining({ id: "chunk-0" })]),
-        3
+        3,
+        expect.objectContaining({ signal: expect.any(AbortSignal), onDegraded: expect.any(Function) })
       );
 
       // Result should contain the 3 reranked chunks
@@ -299,7 +300,8 @@ describe("search", () => {
       expect(rerankChunks).toHaveBeenCalledWith(
         "best hiking in Asturias",
         expect.any(Array),
-        3
+        3,
+        expect.objectContaining({ signal: expect.any(AbortSignal), onDegraded: expect.any(Function) })
       );
     });
 

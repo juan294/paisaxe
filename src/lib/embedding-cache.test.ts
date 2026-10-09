@@ -64,7 +64,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
   });
 
   it("returns parsed embedding on cache hit (Redis returns JSON string)", async () => {
-    const vector = [0.1, 0.2, 0.3];
+    const vector = Array.from({ length: TEST_DIMENSIONS }, (_, i) => i / TEST_DIMENSIONS);
     mockRedisGet.mockResolvedValue(JSON.stringify(vector));
 
     const { EmbeddingCache } = await import("./embedding-cache");
@@ -78,7 +78,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
   it("returns embedding directly when Upstash auto-parses JSON (Redis returns Array, not string) — line 34", async () => {
     // Upstash Redis client can auto-parse JSON responses into native JS types.
     // When that happens, the stored embedding arrives as an Array, not a JSON string.
-    const vector = [0.4, 0.5, 0.6];
+    const vector = Array(TEST_DIMENSIONS).fill(0.4);
     mockRedisGet.mockResolvedValue(vector); // already-parsed array, not a string
 
     const { EmbeddingCache } = await import("./embedding-cache");
@@ -489,5 +489,23 @@ describe("SearchResultCache (Redis-backed)", () => {
     const cache = new SearchResultCache();
 
     await expect(cache.set("Oviedo", 3, sampleResult)).resolves.toBeUndefined();
+  });
+});
+
+describe("full-result cache corruption", () => {
+  beforeEach(() => {
+    vi.resetModules(); vi.resetAllMocks();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.com");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-token");
+  });
+  it.each([
+    { chunks: "not-an-array", images: [] },
+    { chunks: [], images: [{ id: "i", path: null }] },
+    { chunks: [{ id: "c", content: null }], images: [] },
+    { arbitrary: true },
+  ])("treats a parsed but invalid cache record as a miss: %j", async (record) => {
+    mockRedisGet.mockResolvedValue(record);
+    const { SearchResultCache } = await import("./embedding-cache");
+    expect(await new SearchResultCache().get("Oviedo", 3)).toBeNull();
   });
 });

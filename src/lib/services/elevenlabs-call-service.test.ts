@@ -264,4 +264,45 @@ describe("elevenlabs-call-service.initiateCall", () => {
     expect(result.success).toBe(false);
     expect(result.timedOut).toBeUndefined();
   });
+
+  it.each(["AbortError", "TimeoutError"])(
+    "preserves booking reconciliation and the next successful call after plain %s",
+    async (name) => {
+      mockFetch.mockRejectedValueOnce({ name }).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ conversation_id: "conv_recovered" }),
+      });
+      const request = { ...baseRequest, booking_id: "pending-reconciliation" };
+
+      const ambiguous = await initiateCall("+34985887797", request);
+      expect(ambiguous).toEqual({
+        success: false,
+        error: "ElevenLabs request timed out",
+        timedOut: true,
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.conversation_initiation_client_data.dynamic_variables.booking_id).toBe(
+        request.booking_id
+      );
+
+      const recovered = await initiateCall("+34985887797", request);
+      expect(recovered.success).toBe(true);
+      expect(recovered.conversationId).toBe("conv_recovered");
+      expect(recovered.timedOut).toBeUndefined();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it.each([null, undefined, { name: "RPC_TIMEOUT" }])(
+    "does not mark an unrelated unknown rejection as an ambiguous booking timeout (%j)",
+    async (error) => {
+      mockFetch.mockRejectedValueOnce(error);
+      const result = await initiateCall("+34985887797", baseRequest);
+      expect(result).toEqual({
+        success: false,
+        error: "ElevenLabs request unavailable",
+      });
+    }
+  );
 });

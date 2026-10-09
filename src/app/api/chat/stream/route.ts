@@ -19,7 +19,7 @@ import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-rout
 import {
   CHAT_STREAM_STAGE_TIMEOUTS_MS,
   CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
-  ChatStreamStageTimeoutError,
+  createBoundedGenerationTimer,
   isChatStreamStageTimeout,
   withChatStreamStageTiming,
 } from "@/lib/chat-stream-timeouts";
@@ -68,6 +68,8 @@ export async function POST(request: NextRequest) {
 const UNTRUSTED_RATE_LIMIT = { windowMs: 60_000, maxRequests: 3, maxEntries: 1 };
 
 async function handlePost(request: NextRequest) {
+  let releaseRequestAbort: (() => void) | undefined;
+  let streamOwnsCleanup = false;
   try {
     // Rate limiting
     const ip = getClientIp(request);
@@ -157,6 +159,8 @@ async function handlePost(request: NextRequest) {
       request.signal.addEventListener("abort", handleRequestAbort, { once: true });
     }
 
+    releaseRequestAbort = () => request.signal.removeEventListener("abort", handleRequestAbort);
+
     // --- Heavy imports: deferred until after all validation passes ---
     // VERIFIED 2026-04-23 on Next.js 16.2.4: keep these imports deferred.
     // They still avoid loading the AI stack for rejected requests, and the repo's
@@ -165,13 +169,11 @@ async function handlePost(request: NextRequest) {
     // without re-running that reproduction with live upstream credentials.
     const [
       { streamChatResponse, extractSourcesFromChunks },
-      { generateEmbedding },
-      { search },
+      { retrieveChatContext },
       { isFeatureFlagEnabled },
     ] = await Promise.all([
       import("@/lib/claude"),
-      import("@/lib/embeddings"),
-      import("@/lib/search"),
+      import("@/lib/retrieve-chat-context"),
       import("@/lib/feature-flags-server"),
     ]);
 
@@ -183,44 +185,22 @@ async function handlePost(request: NextRequest) {
     const asturianEnabledPromise = isFeatureFlagEnabled("asturianu_touches");
     void asturianEnabledPromise.catch(() => {});
 
-    // Generate embedding and search — fail gracefully on upstream errors.
-    // search() depends on the embedding result, so these two steps remain serial.
-    // The feature-flag promise above runs in parallel with both.
-    let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
-    let images: Awaited<ReturnType<typeof search>>["images"] = [];
+    let chunks: Awaited<ReturnType<typeof retrieveChatContext>>["chunks"] = [];
+    let images: Awaited<ReturnType<typeof retrieveChatContext>>["images"] = [];
     try {
-      // BE-M4 (#785): wire an AbortController into the embedding stage so a
-      // stage timeout actually cancels the in-flight Voyage call instead of
-      // leaving it running (and billing) after withChatStreamStageTiming has
-      // already rejected and moved on. Mirrors the AbortSignal threading
-      // already applied to the Anthropic generation stage below (AR-H2, #856).
-      const embeddingAbortController = new AbortController();
-      const queryEmbedding = await withChatStreamStageTiming(
-        "embedding",
-        generateEmbedding(cleanMessage, { signal: embeddingAbortController.signal }),
-        embeddingAbortController
-      );
-      ({ chunks, images } = await withChatStreamStageTiming(
-        "search",
-        search(queryEmbedding, 3, cleanMessage)
-      ));
+      ({ chunks, images } = await retrieveChatContext(cleanMessage, 3, { signal: streamAbortController.signal }));
     } catch (searchErr) {
-      request.signal.removeEventListener("abort", handleRequestAbort);
-      logger.warn("[CHAT_STREAM_SEARCH_UNAVAILABLE]", {
-        error: searchErr,
-        stage: isChatStreamStageTimeout(searchErr) ? searchErr.stage : undefined,
-      });
+      releaseRequestAbort();
       const encoder = new TextEncoder();
       const errorStream = new ReadableStream({
         start(controller) {
-          controller.enqueue(
-            encoder.encode(
-              encodeSseEvent({
-                type: "error",
-                message: "search_unavailable",
-              })
-            )
-          );
+          if (!request.signal.aborted) {
+            logger.warn("[CHAT_STREAM_SEARCH_UNAVAILABLE]", {
+              error: searchErr,
+              stage: isChatStreamStageTimeout(searchErr) ? searchErr.stage : undefined,
+            });
+            controller.enqueue(encoder.encode(encodeSseEvent({ type: "error", message: "search_unavailable" })));
+          }
           controller.close();
         },
       });
@@ -242,190 +222,87 @@ async function handlePost(request: NextRequest) {
     // Create a readable stream for SSE
     const encoder = new TextEncoder();
 
-    // QA-M3 (#631): apply an idle timeout to the generation loop. The
-    // per-stage timeouts above only cover embedding/search/feature-flag; the
-    // for-await generation had no guard, so a stalled upstream stream could
-    // hang the connection indefinitely. We reset an idle timer on every chunk
-    // and abort the stream if no chunk arrives within the configured window.
-    const IDLE_TIMEOUT_MS = CHAT_STREAM_STAGE_TIMEOUTS_MS.response;
-
-    // PE-H5 (#808): `responseTimeoutReason` is the single source of truth for
-    // which of the two generation timers fired, used both to build the
-    // thrown error below and to pick the log line in the catch block — so
-    // the two never have to be re-derived independently.
-    type ResponseTimeoutReason = "idle_window" | "total_duration_cap";
-    let responseTimeoutReason: ResponseTimeoutReason | undefined;
-
-    let idleTimer: ReturnType<typeof setTimeout> | undefined;
-    const clearIdleTimer = () => {
-      if (idleTimer !== undefined) {
-        clearTimeout(idleTimer);
-        idleTimer = undefined;
-      }
+    let ended = false;
+    let generationTimer: ReturnType<typeof createBoundedGenerationTimer> | undefined;
+    let removeGenerationAbort: (() => void) | undefined;
+    const cleanup = () => {
+      generationTimer?.dispose();
+      removeGenerationAbort?.();
+      releaseRequestAbort?.();
     };
-    const resetIdleTimer = () => {
-      clearIdleTimer();
-      idleTimer = setTimeout(() => {
-        responseTimeoutReason = "idle_window";
-        streamAbortController.abort();
-      }, IDLE_TIMEOUT_MS);
-    };
-
-    // The idle timer above resets on every chunk, so a slow-but-alive
-    // trickle (a chunk arriving just under IDLE_TIMEOUT_MS, forever) can keep
-    // resetting it and never trip. This second timer is armed once, at
-    // generation start, and is never reset by chunk arrival — it bounds the
-    // TOTAL generation duration regardless of chunk cadence, keeping this
-    // route's internal budget below the `maxDuration` declared above.
-    const totalCapTimer = setTimeout(() => {
-      responseTimeoutReason = "total_duration_cap";
-      streamAbortController.abort();
-    }, CHAT_STREAM_RESPONSE_TOTAL_CAP_MS);
-
     const stream = new ReadableStream({
       async start(controller) {
-        // BE-H6/AR-H1 (#781, #855): this is the only chat route any real
-        // client calls, so the prompt-leakage output filter must run here.
-        // Detection runs on the FULL accumulated output BEFORE each chunk is
-        // flushed — never after. Once a chunk is enqueued it has already
-        // reached the client and been rendered (use-stream-chat.ts applies
-        // each "text" event to component state immediately), so checking
-        // after enqueue would only degrade to "truncate mid-delivery" with
-        // the leaked text already visible. Checking before enqueue keeps the
-        // original invariant: leaked content never reaches the rendered chat.
+        const send = (event: Parameters<typeof encodeSseEvent>[0]) => {
+          if (ended || request.signal.aborted) return;
+          controller.enqueue(encoder.encode(encodeSseEvent(event)));
+        };
+        const end = () => {
+          if (ended) return;
+          ended = true;
+          cleanup();
+          try { controller.close(); } catch { /* Client cancellation already closed it. */ }
+        };
+        const onAbort = () => {
+          if (!ended) logger.warn("[CHAT_STREAM_ABORTED]", { reason: "client_disconnect" });
+          end();
+        };
+        streamAbortController.signal.addEventListener("abort", onAbort, { once: true });
+        removeGenerationAbort = () => streamAbortController.signal.removeEventListener("abort", onAbort);
+        if (streamAbortController.signal.aborted) { end(); return; }
+        generationTimer = createBoundedGenerationTimer({
+          idleMs: CHAT_STREAM_STAGE_TIMEOUTS_MS.response,
+          totalMs: CHAT_STREAM_RESPONSE_TOTAL_CAP_MS,
+          onTimeout(reason, timeoutMs) {
+            logger.warn(reason === "total_duration_cap" ? "[CHAT_STREAM_RESPONSE_TOTAL_CAP]" : "[CHAT_STREAM_RESPONSE_TIMEOUT]", { timeoutMs, reason });
+            send({ type: "error", message: "response_timeout" });
+            end();
+            streamAbortController.abort();
+          },
+        });
         let accumulatedText = "";
-        let leakDetected = false;
-
         try {
-          // Arm the idle timer before the first chunk so a stream that never
-          // yields is still bounded.
-          resetIdleTimer();
-
-          // Stream text chunks
           for await (const chunk of streamChatResponse(
-            enrichedMessage,
-            chunks,
-            asturianEnabled,
-            messageIndex,
-            images,
+            enrichedMessage, chunks, asturianEnabled, messageIndex, images,
             { signal: streamAbortController.signal }
           )) {
-            if (streamAbortController.signal.aborted) {
-              break;
-            }
-
-            // A chunk arrived — reset the idle window (the total cap timer
-            // is untouched here by design).
-            resetIdleTimer();
-
+            if (ended || streamAbortController.signal.aborted) break;
+            generationTimer.resetIdle();
+            // Check the entire accumulated output before sending any new text.
             accumulatedText += chunk;
             if (detectPromptLeakage(accumulatedText)) {
-              leakDetected = true;
               logger.error("[CHAT_STREAM_SECURITY]", {
-                timestamp: new Date().toISOString(),
-                outputPreview: accumulatedText.slice(0, 200),
+                timestamp: new Date().toISOString(), outputPreview: accumulatedText.slice(0, 200),
               });
+              send({ type: "error", message: "output_filtered" });
+              end();
+              streamAbortController.abort();
               break;
             }
-
-            // Send text chunk as SSE event — only after it has passed the
-            // leak check above.
-            controller.enqueue(encoder.encode(
-              encodeSseEvent({ type: "text", content: chunk })
-            ));
+            send({ type: "text", content: chunk });
           }
-
-          clearIdleTimer();
-          clearTimeout(totalCapTimer);
-
-          if (leakDetected) {
-            streamAbortController.abort();
-            controller.enqueue(encoder.encode(
-              encodeSseEvent({
-                type: "error",
-                message: "output_filtered",
-              })
-            ));
-            return;
+          if (!ended && !streamAbortController.signal.aborted) {
+            send({ type: "done", images, sources: extractSourcesFromChunks(chunks) });
           }
-
-          if (responseTimeoutReason) {
-            throw new ChatStreamStageTimeoutError(
-              "response",
-              responseTimeoutReason === "idle_window"
-                ? IDLE_TIMEOUT_MS
-                : CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
-            );
-          }
-
-          // Send final event with images and sources
-          if (!streamAbortController.signal.aborted) {
-            const sources = extractSourcesFromChunks(chunks);
-            controller.enqueue(encoder.encode(
-              encodeSseEvent({
-                type: "done",
-                images,
-                sources,
-              })
-            ));
-          }
-
         } catch (error) {
-          if (responseTimeoutReason || isChatStreamStageTimeout(error)) {
-            // Distinct log names per reason so platform kills (which never
-            // log anything) and each internal timeout stay distinguishable.
-            const reason = responseTimeoutReason ?? "idle_window";
-            logger.warn(
-              reason === "total_duration_cap"
-                ? "[CHAT_STREAM_RESPONSE_TOTAL_CAP]"
-                : "[CHAT_STREAM_RESPONSE_TIMEOUT]",
-              {
-                timeoutMs:
-                  reason === "total_duration_cap"
-                    ? CHAT_STREAM_RESPONSE_TOTAL_CAP_MS
-                    : IDLE_TIMEOUT_MS,
-                reason,
-              }
-            );
-            controller.enqueue(encoder.encode(
-              encodeSseEvent({
-                type: "error",
-                message: "response_timeout",
-              })
-            ));
+          if (ended) {
+            // The timeout, disconnect or filter already ended the stream.
           } else if (isAbortError(error) || streamAbortController.signal.aborted) {
             logger.warn("[CHAT_STREAM_ABORTED]", { reason: "client_disconnect" });
           } else {
             const err = error instanceof Error ? error : new Error(String(error));
-            logger.error("[CHAT_STREAM_FAILURE]", {
-              error: err.message,
-              type: err.constructor?.name ?? "Error",
-            });
-            controller.enqueue(encoder.encode(
-              encodeSseEvent({
-                type: "error",
-                message: "Error generating response",
-              })
-            ));
+            logger.error("[CHAT_STREAM_FAILURE]", { error: err.message, type: err.constructor?.name ?? "Error" });
+            send({ type: "error", message: "Error generating response" });
           }
-        } finally {
-          clearIdleTimer();
-          clearTimeout(totalCapTimer);
-          request.signal.removeEventListener("abort", handleRequestAbort);
-          try {
-            controller.close();
-          } catch {
-            // Ignore close races caused by upstream cancellation.
-          }
-        }
+        } finally { end(); }
       },
       cancel() {
-        clearIdleTimer();
-        clearTimeout(totalCapTimer);
+        if (!ended) logger.warn("[CHAT_STREAM_ABORTED]", { reason: "client_disconnect" });
+        ended = true;
+        cleanup();
         streamAbortController.abort();
-        request.signal.removeEventListener("abort", handleRequestAbort);
       },
     });
+    streamOwnsCleanup = true;
 
     return new Response(stream, {
       headers: {
@@ -444,5 +321,7 @@ async function handlePost(request: NextRequest) {
         headers: { "Content-Type": "application/json" },
       }
     );
+  } finally {
+    if (!streamOwnsCleanup) releaseRequestAbort?.();
   }
 }
