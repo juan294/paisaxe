@@ -4,6 +4,7 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 import { updateStorySchema } from "@/lib/schemas";
 import { readJsonBody, uuidParam } from "@/lib/request-validation";
+import { invalidateStoryPrompts, sourceQuestionMetadataSchema } from "@/lib/story-prompt-invalidation";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 
 export async function PATCH(
@@ -49,6 +50,9 @@ export async function PATCH(
     }
 
     const body = parsed.data;
+    if (body.metadata !== undefined && !sourceQuestionMetadataSchema.safeParse(body.metadata).success) {
+      return NextResponse.json({ error: "Invalid question prompts" }, { status: 400 });
+    }
 
     const supabase = createAdminClient();
 
@@ -95,7 +99,28 @@ export async function PATCH(
     if (body.duration !== undefined) updateData.duration = body.duration;
     if (body.sourcePdf !== undefined) updateData.source_pdf = body.sourcePdf?.trim() || null;
     if (body.bestMonths !== undefined) updateData.best_months = body.bestMonths;
-    if (body.metadata !== undefined) updateData.metadata = body.metadata;
+    if (body.metadata !== undefined) {
+      // Compare the stored source, not client-supplied translation coverage/counts.
+      // This remains a non-atomic metadata replacement; concurrent writers are
+      // handled separately by the Phase 10 metadata ownership work.
+      const { data: currentStory, error: metadataError } = await supabase
+        .from("stories")
+        .select("metadata")
+        .eq("id", id)
+        .single();
+      if (metadataError?.code === "PGRST116" || (!metadataError && !currentStory)) {
+        return NextResponse.json({ error: "Story not found" }, { status: 404 });
+      }
+      if (metadataError || !currentStory) {
+        logger.error("[ADMIN_STORY_METADATA_READ_FAILED]", { story_id: id, error: metadataError });
+        return NextResponse.json({ error: "Failed to read story metadata" }, { status: 500 });
+      }
+      updateData.metadata = invalidateStoryPrompts(
+        currentStory.metadata as Record<string, unknown> | null,
+        body.metadata,
+        updateData.updated_at as string,
+      );
+    }
 
     // Update the story
     const { data: updatedStory, error: updateError } = await supabase

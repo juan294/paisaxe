@@ -11,7 +11,10 @@ import { VercelAnalytics } from "@/components/analytics";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
 import { getSiteUrl, getSupabaseUrl } from "@/lib/env";
-import { Providers } from "./providers";
+import { es } from "@/lib/i18n/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+import { Suspense } from "react";
+import { RequestPresentationProviderShell } from "./request-presentation-provider-shell";
 import { PostHogPageView } from "@/components/posthog-provider";
 import "./globals.css";
 
@@ -113,10 +116,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // NOTE: locale is resolved client-side in LanguageProvider. Reading headers()
-  // here would make the root layout dynamic and break the PPR static shell
-  // (see CLAUDE.md "CSP and PPR Compatibility"); FE-M4 server-side locale was
-  // reverted for that reason — the i18n first-paint flash remains a known item.
+  // Request reads belong to the streamed server shell, leaving this root static.
   return (
     <html lang={LOCATION_CONFIG.primaryLanguage} suppressHydrationWarning>
       <head>
@@ -148,12 +148,19 @@ export default function RootLayout({
       */}
       <body className="font-sans antialiased bg-neutral-950">
         <JsonLd type="website" />
-        <Providers>
+        <Suspense fallback={
+          <div role="status" aria-busy="true" className="p-6 text-white">
+            <p>{resolveTranslation("navigation.preparing", es)}</p>
+            <p>{resolveTranslation("navigation.recovery", es)} <a href="/immersive" className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{resolveTranslation("navigation.reload", es)}</a>.</p>
+          </div>
+        }>
+        <RequestPresentationProviderShell>
           <PostHogPageView />
           <div id="main-content">
             {children}
           </div>
-        </Providers>
+        </RequestPresentationProviderShell>
+        </Suspense>
         <VercelAnalytics />
       </body>
     </html>

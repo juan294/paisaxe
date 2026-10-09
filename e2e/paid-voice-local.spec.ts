@@ -68,9 +68,11 @@ test("real paid auth/access/session journey, revocation, support and provider re
   const issuance = () => context.request.post(baseURL + "/api/voice-session", { data: { agentKey: "pelayo" }, headers: csrfHeaders(baseURL, { Authorization: "Bearer " + session.access_token }) });
   const openChat = async () => {
     await page.goto("/immersive?story=release-probe-local-story");
-    await expect(page.getByTestId("story-title").first()).toBeVisible();
-    expectedStoryTitle = (await page.getByTestId("story-title").first().innerText()).trim();
-    await page.getByTestId("ask-button").first().click();
+    const activeTitle = page.locator('[data-testid="story-title"]:visible');
+    await expect(activeTitle).toHaveCount(1);
+    await expect(activeTitle).toHaveText("Release Probe Local Story");
+    expectedStoryTitle = (await activeTitle.innerText()).trim();
+    await page.locator('[data-testid="ask-button"]:visible').click();
     await expect(page.getByRole("dialog")).toBeVisible();
   };
     expect((await admin.from("feature_flags").upsert({ flag_key: "visitor_voice_agent", environment: "development", enabled: true, label: "Local paid voice proof", config: {} }, { onConflict: "flag_key,environment" })).error).toBeNull();

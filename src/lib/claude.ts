@@ -29,6 +29,7 @@ const CHAT_MAX_TOKENS = 16000;
 import { logger } from "@/lib/logger";
 import { recordAnthropicUsageInBackground, type UsageSource } from "@/lib/costs/anthropic-usage";
 import { buildSystemBlocks, type SystemBlock } from "@/lib/cached-system";
+import type { Locale } from './i18n/types';
 
 /** Raw Anthropic usage block as it appears on streaming SSE events. */
 interface RawUsage {
@@ -53,6 +54,7 @@ interface AnthropicMessage {
 
 type StreamOptions = {
   signal?: AbortSignal;
+  locale?: Locale;
 };
 
 type CallOptions = StreamOptions & {
@@ -576,11 +578,13 @@ export function formatImagesForContext(images: ImageResult[] | undefined): strin
  * carries the cache marker; the message-index flow and the optional asturianu
  * addition follow it unmarked.
  */
-function buildChatSystem(messageIndex: number, asturianEnabled: boolean): SystemBlock[] {
+function buildChatSystem(messageIndex: number, asturianEnabled: boolean, locale?: Locale): SystemBlock[] {
   const flow = buildConversationFlow(messageIndex);
+  const names: Record<Locale, string> = { es: 'Spanish', en: 'English', fr: 'French', de: 'German', pt: 'European Portuguese', ast: 'Asturian (Asturianu)' };
+  const language = locale ? `\n\nINTERFACE LANGUAGE: ${names[locale]}. Respond entirely in this language, preserving proper place names. Do not mix in a different language.` : '';
   return buildSystemBlocks(
     buildSystemPrompt(),
-    asturianEnabled ? flow + ASTURIANU_PROMPT_ADDITION : flow
+    (asturianEnabled && (!locale || locale === 'ast') ? flow + ASTURIANU_PROMPT_ADDITION : flow) + language
   );
 }
 
@@ -622,7 +626,7 @@ export async function generateChatResponse(
     : `${imageContext ? imageContext + "\n\n" : ""}<user_question>\n${userMessage}\n</user_question>`;
 
   const response = await callWithSystemBlocks(
-    buildChatSystem(messageIndex, asturianEnabled),
+    buildChatSystem(messageIndex, asturianEnabled, options.locale),
     [{ role: "user", content: userContent }],
     CHAT_MODEL,
     CHAT_MAX_TOKENS,
@@ -655,7 +659,7 @@ export async function* streamChatResponse(
     : `${imageContext ? imageContext + "\n\n" : ""}<user_question>\n${userMessage}\n</user_question>`;
 
   yield* streamAnthropicAPI(
-    buildChatSystem(messageIndex, asturianEnabled),
+    buildChatSystem(messageIndex, asturianEnabled, options.locale),
     [{ role: "user", content: userContent }],
     CHAT_MODEL,
     CHAT_MAX_TOKENS,

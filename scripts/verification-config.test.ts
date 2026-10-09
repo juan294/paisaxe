@@ -191,7 +191,7 @@ describe("verification coverage config", () => {
       expect(isReleaseArtifactRun(local)).toBe(false);
     }
     expect(isReleaseArtifactRun(argv("playwright test --project release-artifact-smoke"))).toBe(true);
-    expect(playwrightConfig).toContain('...(releaseArtifactRun ? { testIgnore: ["**/booking-*.spec.ts"] } : {}),');
+    expect(playwrightConfig).toContain('testIgnore: ["**/presentation-local.spec.ts", ...(releaseArtifactRun ? ["**/booking-*.spec.ts"] : [])],');
 
     // Identity, readiness and hydration are asserted, and absence throws rather than skips.
     const probe = readText("e2e/release-artifact-smoke.spec.ts");

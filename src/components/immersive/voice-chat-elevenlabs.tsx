@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { Mic, MicOff, X, AlertCircle } from "lucide-react";
@@ -169,7 +171,7 @@ function VoiceChatElevenLabsContent({
       setError(null);
       addMessage(
         "assistant",
-        t("voice.welcome_message").replace("{title}", localizedStory.title)
+        interpolate(t("voice.welcome_message"), { title: localizedStory.title })
       );
     },
     onDisconnect: () => {

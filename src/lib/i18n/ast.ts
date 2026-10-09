@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const ast: Translations = {
   common: {
+    rateLimited: "Llende temporal. Espera {seconds} segundos y vuelvi intentalo.",
+    retry: "Volver intentalo",
     loading: 'Cargando...',
     close: 'Zarrar',
   },
 
+  navigation: {
+    preparing: "Preparando la navegación…",
+    recovery: "Si los controles nun s’activen, recarga la páxina y comprueba que JavaScript tea habilitáu.",
+    reload: "Recargar la páxina",
+    ready: "La navegación ta llista.",
+  },
+
+  locale: {
+    loadFailed: "Nun se pudo cargar la llingua escoyida. Amuésase español mientres vuelves intentalo.",
+    retry: "Volver cargar la llingua",
+    storyFallback: "Parte del conteníu o les entrugues d’esta historia entá nun tán disponibles na llingua escoyida y amuésense n’español.",
+    legacyMigrated: "Recuperóse la llingua que teníes guardada nesti navegador.",
+  },
+
   chat: {
+    safety_redirect: "¡Bones! Soi {name}, el to guía turísticu de {region}. ¿En qué puedo ayudate a descubrir la nuesa tierra?",
     placeholder: 'Escribi la to entruga...',
     listening: 'Escuchando...',
     thinking: 'Pensando...',
@@ -146,7 +163,7 @@ export const ast: Translations = {
     next_story: 'Historia siguiente',
     play_stories: 'Reproducir histories',
     pause_stories: 'Pausar histories',
-    play_short: 'Play',
+    play_short: 'Reproducir',
     pause_short: 'Pausa',
     story_counter: 'Historia {current} de {total}',
     chat_dialog: 'Chat sobre {title}',
@@ -165,6 +182,8 @@ export const ast: Translations = {
   },
 
   auth: {
+    verificationFailed: "Nun se pudo comprobar la to sesión. Vuelvi intentalo pa siguir.",
+    retryVerification: "Volver comprobar la sesión",
     user: 'Usuariu',
     user_avatar: 'Avatar del usuariu',
     sign_out: 'Zarrar sesión',
@@ -187,6 +206,12 @@ export const ast: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "L’accesu a voz nun ta disponible agora.",
+    checkAccess: "Comprobar l’accesu a voz",
+    contactSupport: "Contautar col sofitu",
+    suspended: "L’accesu a voz ta suspendíu mientres se revisa una reclamación sobre’l pagu.",
+    revoked: "Esti pase de voz revocóse dempués de reverter un pagu.",
+    expired: "El to pase de voz caducó. Pues mercar otru pa siguir usando la voz.",
     try_voice: 'Falar',
     use_text: 'Escribir',
     upgrade_cta: 'Usa la to voz',
@@ -310,13 +335,13 @@ export const ast: Translations = {
   },
 
   errors: {
-    unknown: 'Algo salió mal, inténtalo otra vuelta',
-    generic_title: 'Algo salió mal',
+    unknown: 'Daqué salió mal, inténtalo otra vuelta',
+    generic_title: 'Daqué salió mal',
     generic_description: 'Hebo un error inesperáu. Por favor, inténtalo otra vuelta.',
     retry: 'Reintentar',
     go_home: 'Tornar al aniciu',
     not_found_title: 'Páxina non atopada',
-    not_found_description: 'La páxina que buses nun esiste o foi movida.',
+    not_found_description: 'La páxina que busques nun esiste o foi movida.',
     immersive_title: 'Nun se pudo cargar la esperiencia',
     immersive_description: 'Algo falló al cargar les histories. Inténtalo otra vuelta.',
     favorites_title: 'Nun se pudieron cargar los tos guardaos',
@@ -327,7 +352,7 @@ export const ast: Translations = {
 
   footer: {
     terms: 'Condiciones d\'Usu',
-    privacy: 'Politica de Privacidá',
+    privacy: 'Política de Privacidá',
     content_attribution: 'Conteníu parcialmente basáu en materiales disponibles de baldre en turismoasturias.es',
     ai_disclaimer: 'Les respuestes son xeneraes por IA y deben verificase',
   },
@@ -491,7 +516,7 @@ export const ast: Translations = {
       paying: 'Abriendo PayPal…',
       payFailed: 'Nun se pudo abrir el pagu. Inténtalo otra vegada.',
       paymentUnavailable: 'El pagu nun ta disponible agora. Inténtalo más sero.',
-      holdExpired: 'La plaza retenida caducó. Pidi una oferta nueva nel asistente.',
+      holdExpired: 'La plaza retenida caducó. Pidi una ufierta nueva nel asistente.',
       cancelled: 'Encaboxesti\'l pagu en PayPal. Pues intentalo otra vegada.',
       confirming: 'Confirmando\'l pagu…',
       confirmingHint: 'Pue tardar unos minutos. Nun fai falta que pagues otra vegada.',
@@ -500,7 +525,7 @@ export const ast: Translations = {
       orderId: 'Pidíu de PayPal',
       captureId: 'Cobru de PayPal',
       expiredBody: 'El pagu nun se completó a tiempu y nun se cobró nada.',
-      backToChat: 'Volver al asistente',
+      backToChat: 'Tornar al asistente',
       attentionBody: 'Tamos revisando esti pagu. Si se cobró y nun podemos confirmar la reserva, devolverémoste la señal.',
       refundingBody: 'Tamos devolviendo la señal en PayPal.',
       refundedBody: 'Devolvímoste la señal en PayPal.',
@@ -517,7 +542,7 @@ export const ast: Translations = {
       when: '{day} · {time} · {people} persones',
       steps: {
         label: 'Estáu de la reserva',
-        offer: 'Oferta aceptada',
+        offer: 'Ufierta aceptada',
         deposit: 'Señal pagada',
         balance: 'Restu pagáu',
       },

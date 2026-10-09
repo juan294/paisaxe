@@ -34,6 +34,46 @@ describe("BookmarkButton", () => {
     mockPush.mockClear();
   });
 
+  it.each(["toggle", "auth", "navigation"] as const)(
+    "blocks %s and feedback while disabled, then resumes when enabled",
+    async (mode) => {
+      const user = userEvent.setup();
+      const props = {
+        requiresAuth: mode === "auth",
+        isNavigationMode: mode === "navigation",
+        onToggle,
+        onAuthRequired,
+      };
+      const view = render(<BookmarkButton {...props} disabled />);
+      const button = screen.getByRole("button");
+      expect(button).toBeDisabled();
+      await user.click(button);
+      expect(onToggle).not.toHaveBeenCalled();
+      expect(onAuthRequired).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(screen.queryByText("Guardado en favoritos")).not.toBeInTheDocument();
+      expect(screen.queryByText("Eliminado de favoritos")).not.toBeInTheDocument();
+
+      view.rerender(<BookmarkButton {...props} disabled={false} />);
+      expect(button).toBeEnabled();
+      await user.click(button);
+      if (mode === "toggle") {
+        expect(onToggle).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole("status")).toHaveTextContent("Guardado en favoritos");
+        expect(onAuthRequired).not.toHaveBeenCalled();
+        expect(mockPush).not.toHaveBeenCalled();
+      } else if (mode === "auth") {
+        expect(onAuthRequired).toHaveBeenCalledTimes(1);
+        expect(onToggle).not.toHaveBeenCalled();
+        expect(mockPush).not.toHaveBeenCalled();
+      } else {
+        expect(mockPush).toHaveBeenCalledExactlyOnceWith("/favorites");
+        expect(onToggle).not.toHaveBeenCalled();
+        expect(onAuthRequired).not.toHaveBeenCalled();
+      }
+    },
+  );
+
   describe("toggle mode (default)", () => {
     it("renders with correct title when not bookmarked", () => {
       render(<BookmarkButton isFavorite={false} onToggle={onToggle} />);

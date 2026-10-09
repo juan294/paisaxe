@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { RateLimitNotice } from "@/components/rate-limit-notice";
 
 import { Suspense, useCallback, useState } from "react";
@@ -75,7 +77,7 @@ function PricingPageContent() {
   // describe the *selected* tier's duration — not be hardcoded to the Day
   // Pass's "24 horas" regardless of which tier the user picked.
   const selectedTierDuration = resolveTierDuration(t, selectedTierData);
-  const voicePassLabel = t("premium.voice_pass_label").replace("{duration}", selectedTierDuration);
+  const voicePassLabel = interpolate(t("premium.voice_pass_label"), { duration: selectedTierDuration });
 
   // UX-H4 (#890): carry both `returnTo` and the selected `tier` through the
   // sign-in redirect so the tier survives the OAuth round trip back to /pricing.
@@ -212,7 +214,7 @@ function PricingPageContent() {
               <div className="flex items-center gap-3">
                 <Clock className="h-4 w-4 text-neutral-500 flex-shrink-0" />
                 <span className="text-sm text-neutral-300">
-                  {t("premium.feature_duration").replace("{duration}", selectedTierDuration)}
+                  {interpolate(t("premium.feature_duration"), { duration: selectedTierDuration })}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -271,7 +273,7 @@ function PricingPageContent() {
                 {t("premium.faq_how_long")}
               </h3>
               <p className="text-xs text-neutral-500">
-                {t("premium.faq_how_long_answer").replace("{duration}", selectedTierDuration)}
+                {interpolate(t("premium.faq_how_long_answer"), { duration: selectedTierDuration })}
               </p>
             </div>
           </div>

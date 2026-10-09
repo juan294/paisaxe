@@ -19,6 +19,10 @@ function getSegments() {
 }
 
 describe("StoryProgressBar", () => {
+  it('substitutes repeated counter placeholders in the real navigation label', () => {
+    render(<StoryProgressBar {...defaultProps} t={key => key === 'accessibility.go_to_story' ? 'Story {current}/{current} of {total}/{total}' : key} />);
+    expect(screen.getByRole('button', { name: 'Story 1/1 of 5/5' })).toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });

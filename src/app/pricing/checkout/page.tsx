@@ -35,7 +35,7 @@ export default function CheckoutPage() {
 }
 
 function CheckoutPageContent() {
-  const { user, session, signInWithGoogle } = useAuth();
+  const { user, session, isLoading, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
@@ -82,7 +82,11 @@ function CheckoutPageContent() {
     }
   }, [returnTo, purchaseType, t]);
 
-  // Show sign-in prompt if not authenticated
+  if (isLoading) {
+    return <div role="status" aria-busy="true" className="min-h-screen bg-neutral-950 p-6 text-white">{t('common.loading')}</div>;
+  }
+
+  // Tokens reconcile separately from the narrow server presentation seed.
   if (!user || !session) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6">

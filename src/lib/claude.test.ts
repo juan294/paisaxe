@@ -1633,6 +1633,21 @@ describe("claude", () => {
       ]);
     });
   });
+describe("selected locale in real provider request construction", () => {
+  it.each([["es","Spanish"],["en","English"],["fr","French"],["de","German"],["pt","European Portuguese"],["ast","Asturian (Asturianu)"]] as const)("uses %s in an unmarked block and keeps the shared prefix constant", async (locale, name) => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    setupMockAPIResponse({content:[{type:"text",text:"Response"}]});
+    await generateChatResponse("A question in English", [], true, 0, undefined, {locale});
+    const selected = getCurlBody();
+    expect(selected.system[1].text).toContain(`INTERFACE LANGUAGE: ${name}.`);
+    expect(selected.system[1].cache_control).toBeUndefined();
+    expect(selected.system[1].text.includes("asturianu")).toBe(locale === "ast");
+    await generateChatResponse("Otra pregunta", [], false, 3, undefined, {locale:"es"});
+    expect(getCurlBody().system[0]).toEqual(selected.system[0]);
+    vi.unstubAllEnvs();
+  });
+});
+
 });
 
 // ─── SDK path tests (USE_CURL = false, NODE_ENV = production) ──────────

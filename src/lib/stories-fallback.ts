@@ -3,6 +3,8 @@ import type { Story } from "@/types/immersive";
 // LOCATION-SPECIFIC: Import fallback stories from content directory
 // When replicating, replace content/fallback-stories.json with location-specific stories
 import fallbackStoriesData from "@content/fallback-stories.json";
+import { STORY_TRANSLATIONS } from "@content/translations/story-translations";
+import { TRANSLATION_LOCALES } from "./translation-locales";
 
 /**
  * Client-safe fallback stories dataset.
@@ -19,4 +21,19 @@ import fallbackStoriesData from "@content/fallback-stories.json";
  * unavailable). These stories are loaded from content/fallback-stories.json
  * for easy content management.
  */
-export const FALLBACK_STORIES: Story[] = fallbackStoriesData.stories as Story[];
+export const FALLBACK_STORIES: Story[] = (fallbackStoriesData.stories as Story[]).map(story => {
+  const catalog = STORY_TRANSLATIONS[story.slug ?? story.id];
+  const sourcePrompts = story.metadata?.question_prompts ?? [];
+  const translations = Object.fromEntries(TRANSLATION_LOCALES.flatMap(locale => {
+    const translation = catalog?.[locale];
+    if (!translation) return [];
+    return [[locale, {
+      ...story.metadata?.translations?.[locale],
+      ...translation,
+      // No local source questions exist today. Do not fabricate questions or
+      // claim prompt completeness if a future source gains questions.
+      ...(sourcePrompts.length === 0 ? { question_prompts: [] } : {}),
+    }]];
+  }));
+  return { ...story, metadata: { ...story.metadata, translations: { ...story.metadata?.translations, ...translations } } };
+});

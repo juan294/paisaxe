@@ -1149,8 +1149,8 @@ describe("VoiceChat with voice access", () => {
     mockVoiceAccess.canUseVoice = false; mockVoiceAccess.hasAccess = false;
     mockVoiceAccess.isSuspended = true; mockVoiceAccess.accessStatus = "suspended";
     render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-    await waitFor(() => expect(screen.getByText(/Voice access is suspended/)).toBeInTheDocument());
-    expect(screen.getByRole("link", {name:"Contact support"})).toHaveAttribute("href","mailto:support@paisaxe.es");
+    await waitFor(() => expect(screen.getByText(mockT("voice.suspended"))).toBeInTheDocument());
+    expect(screen.getByRole("link", {name:mockT("voice.contactSupport")})).toHaveAttribute("href","mailto:support@paisaxe.es");
     expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
     expect(screen.queryByTestId("voice-purchase-cta")).not.toBeInTheDocument();
   });
@@ -1159,19 +1159,19 @@ describe("VoiceChat with voice access", () => {
     mockVoiceAccess.canUseVoice=false; mockVoiceAccess.hasAccess=false;
     mockVoiceAccess.isAccessDenied=true; mockVoiceAccess.needsPurchase=false;
     render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-    await waitFor(()=>expect(screen.getByText(/Voice access is currently unavailable/)).toBeInTheDocument());
-    expect(screen.queryByText(/Voice access is suspended/)).not.toBeInTheDocument();
+    await waitFor(()=>expect(screen.getByText(mockT("voice.accessUnavailable"))).toBeInTheDocument());
+    expect(screen.queryByText(mockT("voice.suspended"))).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
     expect(screen.queryByTestId("voice-purchase-cta")).not.toBeInTheDocument();
     expect(document.querySelector('a[href^="/pricing"]')).toBeNull();
-    fireEvent.click(screen.getByRole("button",{name:"Check voice access"}));
+    fireEvent.click(screen.getByRole("button",{name:mockT("voice.checkAccess")}));
     expect(mockVoiceAccess.refresh).toHaveBeenCalledWith();
   });
 
   it.each(["revoked","expired"])("discloses %s purchase state", async status => {
     mockVoiceAccess.canUseVoice = false; mockVoiceAccess.accessStatus = status;
     render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(status === "revoked" ? "This voice pass was revoked" : "Your voice pass has expired"));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(mockT(`voice.${status}`)));
   });
 
   it("should default to voice mode when user has voice access", async () => {

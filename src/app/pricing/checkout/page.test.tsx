@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import CheckoutPage from "./page";
+import { es } from "@/lib/i18n/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 import { Suspense, type ReactElement } from "react";
 
 // --- Mocks ---
@@ -48,7 +50,7 @@ vi.mock("@/hooks/use-auth", () => ({
 
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string) => key === "common.rateLimited" || key === "common.retry" ? resolveTranslation(key, es) : key,
   }),
 }));
 
@@ -81,6 +83,13 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 describe("CheckoutPage", () => {
+  it('shows bounded verification loading before treating a seeded user as signed out', () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'verified', email: 'verified@example.test' }, session: null, signInWithGoogle: mockSignInWithGoogle, isLoading: true });
+    render(<CheckoutPage />);
+    expect(screen.getByRole('status')).toHaveTextContent('common.loading');
+    expect(screen.queryByText('premium.sign_in_to_purchase')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('embedded-checkout-provider')).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     capturedFetchClientSecret = null;

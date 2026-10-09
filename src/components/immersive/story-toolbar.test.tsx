@@ -3,9 +3,10 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
 import { StoryToolbar } from "./story-toolbar";
-import { createMockT } from "@/test/i18n-mock";
+import { es } from "@/lib/i18n/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 
-const mockT = createMockT();
+const mockT = (key: string) => resolveTranslation(key, es);
 
 describe("StoryToolbar", () => {
   let onPrev: (() => void) & ReturnType<typeof vi.fn>;
@@ -142,7 +143,7 @@ describe("Phase 6 navigation readiness", () => {
       expect(next).toBeEnabled();
       expect(prev).toBeEnabled();
       const readyStatus = container.querySelector('[role="status"]');
-      expect(readyStatus?.textContent).toMatch(/navegación lista/i);
+      expect(readyStatus?.textContent).toBe(mockT("navigation.ready"));
       expect(readyStatus).toHaveAttribute("aria-live", "polite");
       act(() => next.click());
       expect(onNext).toHaveBeenCalledTimes(1);

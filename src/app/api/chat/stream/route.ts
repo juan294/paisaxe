@@ -13,7 +13,7 @@ import {
   detectPromptLeakage,
   sanitizeInput,
 } from "@/lib/chat-safety";
-import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
+import { getLocalizedSafetyRedirect } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import {
@@ -130,14 +130,14 @@ async function handlePost(request: NextRequest) {
       );
     }
 
-    const { message, context, messageIndex } = zodResult.data;
+    const { message, context, messageIndex, locale = 'es' } = zodResult.data;
 
     // Security checks
     if (message && detectInjectionAttempt(message)) {
       // Return a non-streaming response with generic redirect
       return new Response(
         JSON.stringify({
-          message: GENERIC_REDIRECT_RESPONSE,
+          message: await getLocalizedSafetyRedirect(locale),
           flagged: true,
         }),
         {
@@ -214,7 +214,7 @@ async function handlePost(request: NextRequest) {
 
     let asturianEnabled = false;
     try {
-      asturianEnabled = await withChatStreamStageTiming("featureFlag", asturianEnabledPromise);
+      asturianEnabled = await withChatStreamStageTiming("featureFlag", asturianEnabledPromise) && locale === 'ast';
     } catch (flagErr) {
       logger.warn("[CHAT_STREAM_FEATURE_FLAG_FALLBACK]", { error: flagErr });
     }
@@ -263,7 +263,7 @@ async function handlePost(request: NextRequest) {
         try {
           for await (const chunk of streamChatResponse(
             enrichedMessage, chunks, asturianEnabled, messageIndex, images,
-            { signal: streamAbortController.signal }
+            { signal: streamAbortController.signal, locale }
           )) {
             if (ended || streamAbortController.signal.aborted) break;
             generationTimer.resetIdle();

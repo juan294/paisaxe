@@ -414,6 +414,9 @@ describe("AuthProvider", () => {
       },
     };
     const newSession = { ...mockSession, user: newUser };
+    // Event storage is only a candidate; the independent SDK user lookup must
+    // return the authoritative identity before the provider publishes it.
+    mockGetUser.mockResolvedValue({ data: { user: newUser }, error: null });
 
     act(() => {
       authChangeCallback!("SIGNED_IN", newSession);
@@ -423,6 +426,7 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("user").textContent).toBe("new@example.com");
       expect(screen.getByTestId("user-name").textContent).toBe("New User");
     });
+    expect(mockGetUser).toHaveBeenLastCalledWith(newSession.access_token);
   });
 
   it("auth state change with null session clears user", async () => {

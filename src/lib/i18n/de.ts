@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const de: Translations = {
   common: {
+    rateLimited: "Vorübergehendes Limit. Warten Sie {seconds} Sekunden und versuchen Sie es erneut.",
+    retry: "Erneut versuchen",
     loading: 'Laden...',
     close: 'Schließen',
   },
 
+  navigation: {
+    preparing: "Navigation wird vorbereitet…",
+    recovery: "Wenn die Bedienelemente nicht verfügbar werden, laden Sie die Seite neu und prüfen Sie, ob JavaScript aktiviert ist.",
+    reload: "Seite neu laden",
+    ready: "Die Navigation ist bereit.",
+  },
+
+  locale: {
+    loadFailed: "Die gewählte Sprache konnte nicht geladen werden. Bis zu einem erneuten Versuch wird Spanisch angezeigt.",
+    retry: "Sprache erneut laden",
+    storyFallback: "Einige Inhalte oder Fragen zu dieser Geschichte sind noch nicht in der gewählten Sprache verfügbar und werden auf Spanisch angezeigt.",
+    legacyMigrated: "Ihre in diesem Browser gespeicherte Spracheinstellung wurde wiederhergestellt.",
+  },
+
   chat: {
+    safety_redirect: "Hallo! Ich bin {name}, Ihr Reiseführer für {region}. Wie kann ich Ihnen helfen, unsere Region zu entdecken?",
     placeholder: 'Fragen Sie nach diesem Ort...',
     listening: 'Hört zu...',
     thinking: 'Denkt nach...',
@@ -165,6 +182,8 @@ export const de: Translations = {
   },
 
   auth: {
+    verificationFailed: "Ihre Sitzung konnte nicht überprüft werden. Versuchen Sie es erneut, um fortzufahren.",
+    retryVerification: "Sitzung erneut überprüfen",
     user: 'Benutzer',
     user_avatar: 'Benutzer-Avatar',
     sign_out: 'Abmelden',
@@ -187,6 +206,12 @@ export const de: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "Der Zugang zum Sprachchat ist derzeit nicht verfügbar.",
+    checkAccess: "Zugang zum Sprachchat prüfen",
+    contactSupport: "Support kontaktieren",
+    suspended: "Der Zugang zum Sprachchat ist gesperrt, während ein Zahlungsstreitfall geprüft wird.",
+    revoked: "Dieser Sprachpass wurde nach einer Zahlungsrückabwicklung widerrufen.",
+    expired: "Ihr Sprachpass ist abgelaufen. Sie können einen neuen Pass kaufen, um den Sprachchat weiter zu nutzen.",
     try_voice: 'Sprechen',
     use_text: 'Schreiben',
     upgrade_cta: 'Nutze deine Stimme',

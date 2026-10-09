@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { RateLimitNotice } from "@/components/rate-limit-notice";
 
 import { useState, useEffect, useCallback, useRef, useMemo, RefObject } from "react";
@@ -51,7 +53,7 @@ const SuggestPlaceDialog = dynamic(
   { ssr: false, loading: () => null }
 );
 import { useTranslation } from "@/lib/i18n";
-import { getLocalizedStory } from "@/lib/localize-story";
+import { getLocalizedStory, hasTranslation } from "@/lib/localize-story";
 import { NavigationHint } from "./navigation-hint";
 import { AuthorTypewriter } from "./author-typewriter";
 import { StoryProgressBar } from "./story-progress-bar";
@@ -114,7 +116,7 @@ export function StoryViewer({
 
   const { requiresAuth, isFavorite, toggleFavorite, retryAfter, retry } = useFavorites();
 
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const story = stories[currentIndex];
@@ -237,7 +239,7 @@ export function StoryViewer({
   }, [stories, currentIndex]);
 
   // Asturianu labels
-  const ast = isEnabled("asturianu_touches");
+  const ast = isEnabled("asturianu_touches") && locale === 'ast';
 
   // Get localized story text based on current locale (falls back to Spanish).
   // FE-M2 (#764): useMemo so this object keeps its identity across renders that
@@ -276,8 +278,9 @@ export function StoryViewer({
       // it, so its own backdrop/close controls are unaffected.
       inert={chatOpen}
     >
-      <div className="absolute left-4 right-4 top-20 z-50">
+      <div className="absolute left-4 right-4 top-32 z-30">
         <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void retry(); }} />
+        {!hasTranslation(story, locale) && <p role="status" className="rounded-lg bg-black/90 p-3 text-sm text-white">{t("locale.storyFallback")}</p>}
       </div>
       {/* PE-H1/FE-M3 (#804, #765): adjacent story images, rendered as hidden,
           `priority` next/image elements so Next.js itself generates the
@@ -299,9 +302,7 @@ export function StoryViewer({
         aria-live="polite"
         className="sr-only"
       >
-        {t("accessibility.story_counter")
-          .replace("{current}", String(currentIndex + 1))
-          .replace("{total}", String(stories.length))}: {localizedStory.title} — {localizedStory.subtitle}
+        {interpolate(t("accessibility.story_counter"), { current: String(currentIndex + 1), total: String(stories.length) })}: {localizedStory.title} — {localizedStory.subtitle}
       </div>
 
       {/* Transparent overlay button for toggling info — desktop (pointer:fine) only.
@@ -411,7 +412,7 @@ export function StoryViewer({
       <nav
         aria-label={t("accessibility.story_controls")}
         className={cn(
-          "absolute top-16 right-4 md:right-6 z-20 flex items-center gap-2 md:gap-3 max-w-[calc(100%-8rem)] transition-all duration-500 motion-reduce:transition-none",
+          "absolute top-16 right-4 md:right-6 z-40 flex items-center gap-2 md:gap-3 max-w-[calc(100%-8rem)] transition-all duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 motion-reduce:translate-y-0 pointer-events-none"
         )}
       >
@@ -523,6 +524,7 @@ export function StoryViewer({
         {isEnabled("fullscreen_button") && <FullscreenButton />}
         {/* Bookmark - always visible, toggles favorite for current story */}
         <BookmarkButton
+          disabled={authLoading}
           requiresAuth={requiresAuth}
           onAuthRequired={signInWithGoogle}
           isFavorite={story ? isFavorite(story.id) : false}

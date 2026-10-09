@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslation } from '@/lib/i18n';
 type TFunction = (key: string) => string;
 
 interface StoryToolbarProps {
@@ -14,10 +15,11 @@ interface StoryToolbarProps {
 
 /** Visible even when JavaScript cannot hydrate the story boundary. */
 export function StoryNavigationRecovery({ className }: { className?: string }) {
+  const { t } = useTranslation();
   return (
     <div className={className}>
-      <p role="status" aria-live="polite">Preparando la navegación…</p>
-      <p>Si no puedes navegar, activa JavaScript y prueba a <a href="/immersive" className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">recargar la página</a>.</p>
+      <p role="status" aria-live="polite">{t('navigation.preparing')}</p>
+      <p>{t('navigation.recovery')} <a href="/immersive" className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{t('navigation.reload')}</a>.</p>
     </div>
   );
 }
@@ -37,7 +39,7 @@ export const StoryToolbar = memo(function StoryToolbar({ onPrev, onNext, t, show
     <>
       {!ready && showReadiness && <StoryNavigationRecovery className="absolute left-4 right-4 top-24 z-50 rounded-lg bg-black/90 p-4 text-center text-sm text-white" />}
       <span role="status" aria-live="polite" className="sr-only">
-        {ready ? "Navegación lista" : ""}
+        {ready ? t('navigation.ready') : ""}
       </span>
       {/* Previous — invisible tap zone on mobile, visible button on sm+ */}
       <button

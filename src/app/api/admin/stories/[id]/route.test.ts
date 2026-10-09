@@ -359,7 +359,12 @@ describe("PATCH /api/admin/stories/[id]", () => {
       }),
     });
 
-    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    const mockFrom = vi.fn().mockReturnValue({
+      update: mockUpdate,
+      select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: { metadata: {} }, error: null }),
+      }) }),
+    });
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
@@ -511,4 +516,107 @@ describe("PATCH /api/admin/stories/[id]", () => {
       story_id: "11111111-1111-4111-8111-111111111111",
     });
   });
+});
+
+describe("admin source question edits invalidate translated prompts", () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  const original = {
+    question_prompts: ["¿Dónde está?", "¿Cuándo abre?"],
+    mood_tags: ["calm"],
+    translations: {
+      en: { title: "Manual title", subtitle: "Manual subtitle", description: "Manual description", question_prompts: ["Where is it?", "When does it open?"] },
+      fr: { title: "Titre", subtitle: "", description: "Description", question_prompts: ["Où ?", "Quand ?"] },
+    },
+    translation_status: {
+      en: { status: "complete", updatedAt: "2026-10-08T00:00:00Z" },
+      fr: { status: "complete", updatedAt: "2026-10-08T00:00:00Z" },
+    },
+    last_translated_at: "2026-10-08T00:00:00Z",
+  };
+
+  function storedMetadata(metadata: Record<string, unknown>, readError: unknown = null) {
+    const update = vi.fn((changes: Record<string, unknown>) => ({
+      eq: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: { id, ...changes }, error: null }),
+      }) }),
+    }));
+    const read = vi.fn().mockResolvedValue({ data: { metadata }, error: readError });
+    vi.mocked(createAdminClient).mockReturnValue({ from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: read }) }),
+      update,
+    }) } as never);
+    return { update, read };
+  }
+
+  async function patchMetadata(metadata: Record<string, unknown>) {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin" });
+    return PATCH(new NextRequest(`http://localhost:3000/api/admin/stories/${id}`, {
+      method: "PATCH", body: JSON.stringify({ metadata }),
+    }), { params: Promise.resolve({ id }) });
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("compares actual stored prompts and invalidates same-count edits while retaining manual text and unrelated metadata", async () => {
+    const store = storedMetadata(original);
+    const next = { ...original, question_prompts: ["¿Cómo se llega?", "¿Cuándo abre?"], mood_tags: ["active"] };
+    const response = await patchMetadata(next);
+    expect(response.status).toBe(200);
+    expect(store.read).toHaveBeenCalledOnce();
+    const saved = (await response.json()).data.metadata;
+    expect(saved.question_prompts).toEqual(next.question_prompts);
+    expect(saved.mood_tags).toEqual(["active"]);
+    expect(saved.last_translated_at).toBe(original.last_translated_at);
+    for (const locale of ["en", "fr"] as const) {
+      expect(saved.translations[locale]).toEqual({ title: original.translations[locale].title, subtitle: original.translations[locale].subtitle, description: original.translations[locale].description });
+      expect(saved.translation_status[locale].status).toBe("pending");
+    }
+  });
+
+  it.each([{prompts:[]}, {prompts:undefined}])("removes ghost translated questions when the source is cleared to %j", async ({prompts}) => {
+    storedMetadata(original);
+    const next: Record<string, unknown> = { ...original };
+    if (prompts === undefined) delete next.question_prompts;
+    else next.question_prompts = prompts;
+    const response = await patchMetadata(next);
+    expect(response.status).toBe(200);
+    const saved = (await response.json()).data.metadata;
+    expect(saved.translations.en.question_prompts).toBeUndefined();
+    expect(saved.translations.fr.question_prompts).toBeUndefined();
+    expect(saved.translation_status.en.status).toBe("pending");
+    expect(saved.translations.en.title).toBe("Manual title");
+  });
+
+  it("preserves translations and status exactly for unchanged source questions", async () => {
+    const store = storedMetadata(original);
+    const response = await patchMetadata({ ...original, mood_tags: ["new mood"] });
+    expect(response.status).toBe(200);
+    expect(store.read).toHaveBeenCalledOnce();
+    const saved = (await response.json()).data.metadata;
+    expect(saved.translations).toEqual(original.translations);
+    expect(saved.translation_status).toEqual(original.translation_status);
+    expect(saved.mood_tags).toEqual(["new mood"]);
+  });
+
+  it.each([{prompts:null}, {prompts:"not-an-array"}, {prompts:[1]}, {prompts:[" "]}])("rejects malformed source question arrays %j", async ({prompts}) => {
+    const store = storedMetadata(original);
+    const response = await patchMetadata({ ...original, question_prompts: prompts });
+    expect(response.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("does not write when the prior metadata cannot be read", async () => {
+    const store = storedMetadata(original, { code: "08006", message: "read failed" });
+    const response = await patchMetadata({ ...original, question_prompts: ["Changed"] });
+    expect(response.status).toBe(500);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+  it.each([null, {code:"PGRST116",message:"0 rows"}])("returns 404 for a missing source story (%j), without updating", async error => {
+    const store = storedMetadata(original);
+    store.read.mockResolvedValue({data:null,error});
+    const response=await patchMetadata({...original,question_prompts:["Changed"]});
+    expect(response.status).toBe(404);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
 });

@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const pt: Translations = {
   common: {
+    rateLimited: "Limite temporário. Aguarde {seconds} segundos e tente novamente.",
+    retry: "Tentar novamente",
     loading: 'Carregando...',
     close: 'Fechar',
   },
 
+  navigation: {
+    preparing: "A preparar a navegação…",
+    recovery: "Se os controlos não ficarem disponíveis, recarregue a página e verifique se o JavaScript está ativado.",
+    reload: "Recarregar a página",
+    ready: "A navegação está pronta.",
+  },
+
+  locale: {
+    loadFailed: "Não foi possível carregar o idioma escolhido. O conteúdo é apresentado em espanhol enquanto tenta novamente.",
+    retry: "Tentar carregar o idioma novamente",
+    storyFallback: "Alguns conteúdos ou perguntas desta história ainda não estão disponíveis no idioma escolhido e são apresentados em espanhol.",
+    legacyMigrated: "A preferência de idioma guardada neste navegador foi recuperada.",
+  },
+
   chat: {
+    safety_redirect: "Olá! Sou {name}, o seu guia turístico de {region}. Como posso ajudar a descobrir a nossa região?",
     placeholder: 'Pergunte sobre este lugar...',
     listening: 'Ouvindo...',
     thinking: 'Pensando...',
@@ -165,6 +182,8 @@ export const pt: Translations = {
   },
 
   auth: {
+    verificationFailed: "Não foi possível verificar a sua sessão. Tente novamente para continuar.",
+    retryVerification: "Verificar a sessão novamente",
     user: 'Utilizador',
     user_avatar: 'Avatar do utilizador',
     sign_out: 'Terminar sessão',
@@ -187,6 +206,12 @@ export const pt: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "O acesso à voz não está disponível neste momento.",
+    checkAccess: "Verificar o acesso à voz",
+    contactSupport: "Contactar o apoio",
+    suspended: "O acesso à voz está suspenso enquanto uma disputa de pagamento é analisada.",
+    revoked: "Este passe de voz foi revogado após a reversão de um pagamento.",
+    expired: "O seu passe de voz expirou. Pode comprar um novo para continuar a usar a voz.",
     try_voice: 'Falar',
     use_text: 'Escrever',
     upgrade_cta: 'Use sua voz',

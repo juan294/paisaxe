@@ -18,6 +18,8 @@ interface BookmarkButtonProps {
   isFavorite?: boolean;
   /** Toggle callback (for toggle mode) */
   onToggle?: () => void;
+  /** Block activation while the caller verifies authentication. */
+  disabled?: boolean;
 }
 
 export function BookmarkButton({
@@ -26,6 +28,7 @@ export function BookmarkButton({
   onAuthRequired,
   isFavorite = false,
   onToggle,
+  disabled = false,
 }: BookmarkButtonProps) {
   const { value: toast, show: showToast } = useTimedValue<string>(1500);
   const router = useRouter();
@@ -61,6 +64,7 @@ export function BookmarkButton({
     <div className="relative">
       <Button
         variant="glassIcon"
+        disabled={disabled}
         onClick={handleClick}
         aria-label={label}
         title={label}

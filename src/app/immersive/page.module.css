@@ -2,7 +2,7 @@
    hydrated shell alone must not hide it while the story chunk is still blocked. */
 .recovery {
   position: fixed;
-  top: max(6rem, env(safe-area-inset-top));
+  bottom: max(1rem, env(safe-area-inset-bottom));
   left: 1rem;
   right: 1rem;
   z-index: 60;

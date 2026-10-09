@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { BalanceInvoiceStatusView } from "@/components/booking/balance-invoice";
 import { CancellationConfirm } from "@/components/booking/cancellation-confirm";
 import { PayPalLabel } from "@/components/booking/paypal-label";
@@ -115,9 +117,9 @@ function QuoteCardView({
         <dd>{money(card.balanceCents, card.currency, locale)}</dd>
       </dl>
       <p className="mt-2 text-white/70">
-        {t("booking.cards.cancellation").replace("{hours}", String(card.cancellationWindowHours))}
+        {interpolate(t("booking.cards.cancellation"), { hours: String(card.cancellationWindowHours) })}
       </p>
-      <p className="text-white/60">{t("booking.cards.validUntil").replace("{time}", expiresAt)}</p>
+      <p className="text-white/60">{interpolate(t("booking.cards.validUntil"), { time: expiresAt })}</p>
 
       {lapsed ? (
         <div className="mt-3 space-y-2" aria-live="polite">
@@ -166,7 +168,7 @@ function PaymentCardView({ card, t, locale }: { card: PaymentCard; t: T; locale:
   return (
     <CardShell title={t("booking.cards.paymentTitle")} t={t} chip="demoSandbox">
       <p className="text-lg font-semibold tabular-nums">{money(card.amountCents, card.currency, locale)}</p>
-      <p className="text-white/70">{t("booking.cards.payBefore").replace("{time}", clockTime(card.expiresAt, locale))}</p>
+      <p className="text-white/70">{interpolate(t("booking.cards.payBefore"), { time: clockTime(card.expiresAt, locale) })}</p>
       {/* A link, not a button: the E2E roundtrip selects it by role and name (D5). */}
       <a
         href={card.approvalUrl}
@@ -191,7 +193,7 @@ function InvoiceCardView({ card, t, locale }: { card: InvoiceCard; t: T; locale:
   return (
     <CardShell title={`${t("booking.invoice.title")} ${card.reference}`} t={t} chip="demoSandbox">
       <p className="font-semibold tabular-nums">{money(card.amountCents, card.currency, locale)}</p>
-      <p className="text-white/70">{t("booking.invoice.dueOn").replace("{date}", slotDay(card.dueDate, locale))}</p>
+      <p className="text-white/70">{interpolate(t("booking.invoice.dueOn"), { date: slotDay(card.dueDate, locale) })}</p>
       <BalanceInvoiceStatusView status={card.status} url={card.invoiceUrl} />
     </CardShell>
   );

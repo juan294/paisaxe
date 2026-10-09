@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act, within } from "@testing-library/react";
+import { render, screen, fireEvent, act, within, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { StoryViewer } from "./story-viewer";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { useAuth } from "@/hooks/use-auth";
+import type { Session, User } from "@supabase/supabase-js";
 import { ReactNode } from "react";
 import { createMockT } from "@/test/i18n-mock";
 import { useState, useEffect } from "react";
@@ -70,14 +73,18 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 // Mock Supabase browser client
+const mockAuthGetSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
+const mockAuthGetUser = vi.fn().mockResolvedValue({ data: { user: null }, error: null });
+const mockAuthOAuth = vi.fn();
 vi.mock("@/lib/supabase-browser", () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      getSession: mockAuthGetSession,
+      getUser: mockAuthGetUser,
       onAuthStateChange: vi.fn().mockReturnValue({
         data: { subscription: { unsubscribe: vi.fn() } },
       }),
-      signInWithOAuth: vi.fn(),
+      signInWithOAuth: mockAuthOAuth,
       signOut: vi.fn(),
     },
   }),
@@ -96,12 +103,13 @@ vi.mock("@/hooks/use-feature-flags", () => ({
 // Mock useFavorites
 const mockToggleFavorite = vi.fn();
 const mockIsFavorite = vi.fn().mockReturnValue(false);
+let mockFavoritesLoading = false;
 vi.mock("@/hooks/use-favorites", () => ({
   useFavorites: () => ({
     favorites: [],
     isFavorite: mockIsFavorite,
     toggleFavorite: mockToggleFavorite,
-    isLoading: false,
+    isLoading: mockFavoritesLoading,
     requiresAuth: false,
   }),
 }));
@@ -286,6 +294,64 @@ describe("StoryViewer", () => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }));
+  });
+
+  it("disables the real bookmark until seeded-user session verification completes", async () => {
+    vi.useRealTimers();
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJ.phase7-local-test");
+    const verifiedUser: User = {
+      id: "phase7-bookmark-user", email: "bookmark@example.test",
+      app_metadata: {}, user_metadata: { full_name: "Bookmark Visitor" },
+      aud: "authenticated", created_at: "2026-10-09T00:00:00.000Z",
+    };
+    const session: Session = {
+      access_token: "phase7-bookmark-token", refresh_token: "phase7-refresh-token",
+      expires_in: 3600, token_type: "bearer", user: verifiedUser,
+    };
+    let resolveUser!: (value: { data: { user: User }; error: null }) => void;
+    mockAuthGetSession.mockResolvedValue({ data: { session }, error: null });
+    mockAuthGetUser.mockImplementation(() => new Promise(resolve => { resolveUser = resolve; }));
+    mockAuthOAuth.mockClear();
+    mockToggleFavorite.mockClear();
+    mockFavoritesLoading = true;
+    function AuthStateProbe() {
+      const auth = useAuth();
+      return <output data-testid="bookmark-auth-state" data-user-id={auth.user?.id} data-has-session={String(Boolean(auth.session))}>{auth.isLoading ? "pending" : auth.session ? "verified" : "anonymous"}</output>;
+    }
+    const view = render(
+      <AuthProvider initialUser={{ id: verifiedUser.id, email: verifiedUser.email!, name: "Bookmark Visitor", avatarUrl: null }}>
+        <AuthStateProbe />
+        <StoryViewer {...getDefaultProps()} />
+      </AuthProvider>,
+    );
+    try {
+      await waitFor(() => expect(mockAuthGetUser).toHaveBeenCalledWith(session.access_token));
+      expect(screen.getByTestId("bookmark-auth-state")).toHaveTextContent("pending");
+      expect(screen.getByTestId("bookmark-auth-state")).toHaveAttribute("data-user-id", verifiedUser.id);
+      expect(screen.getByTestId("bookmark-auth-state")).toHaveAttribute("data-has-session", "false");
+      const button = screen.getByRole("button", { name: "Guardar" });
+      expect(button).toBeDisabled();
+      await userEvent.click(button);
+      expect(mockToggleFavorite).not.toHaveBeenCalled();
+      expect(mockAuthOAuth).not.toHaveBeenCalled();
+      expect(screen.queryByText("Guardado en favoritos")).not.toBeInTheDocument();
+
+      await act(async () => resolveUser({ data: { user: verifiedUser }, error: null }));
+      await waitFor(() => expect(screen.getByTestId("bookmark-auth-state")).toHaveTextContent("verified"));
+      expect(button).toBeEnabled();
+      await userEvent.click(button);
+      expect(mockToggleFavorite).toHaveBeenCalledExactlyOnceWith(mockStories[0].id);
+      expect(within(button.parentElement!).getByRole("status")).toHaveTextContent("Guardado en favoritos");
+      expect(mockAuthOAuth).not.toHaveBeenCalled();
+    } finally {
+      view.unmount();
+      mockAuthGetSession.mockReset().mockResolvedValue({ data: { session: null }, error: null });
+      mockAuthGetUser.mockReset().mockResolvedValue({ data: { user: null }, error: null });
+      mockAuthOAuth.mockClear();
+      mockToggleFavorite.mockClear();
+      mockFavoritesLoading = false;
+      vi.unstubAllEnvs();
+    }
   });
 
   describe("Phase 6 real navigation ownership", () => {
@@ -2786,4 +2852,23 @@ describe("StoryViewer", () => {
       expect(mockToggleFavorite).not.toHaveBeenCalled();
     });
   });
+});
+
+describe('Phase 7 story fallback disclosure', () => {
+  afterEach(() => { mockLocale = 'es'; mockIsEnabled.mockReturnValue(false); });
+  it('discloses missing story translation in the selected UI language', () => {
+    mockLocale = "fr";
+    render(<TestWrapper><StoryViewer stories={[mockStories[0]]} allStories={mockStories} currentIndex={0} onIndexChange={vi.fn()} onAskAbout={vi.fn()} selectedCategory={null} selectedLocation={null} selectedDuration={null} onCategoryChange={vi.fn()} onLocationChange={vi.fn()} onDurationChange={vi.fn()} onClearFilters={vi.fn()} /></TestWrapper>);
+    expect(screen.getByText(mockT("locale.storyFallback"))).toBeInTheDocument();
+  });
+  it('retains translated text and discloses missing translated questions', () => {
+    mockLocale = "fr";
+    mockIsEnabled.mockImplementation(flag => flag === 'contextual_prompts');
+    const story = {...mockStories[0], metadata:{question_prompts:["¿Qué ver?"], translations:{fr:{title:"Un lieu traduit",subtitle:"Sous-titre",description:"Description traduite"}}}};
+    render(<TestWrapper><StoryViewer stories={[story]} allStories={[story]} currentIndex={0} onIndexChange={vi.fn()} onAskAbout={vi.fn()} selectedCategory={null} selectedLocation={null} selectedDuration={null} onCategoryChange={vi.fn()} onLocationChange={vi.fn()} onDurationChange={vi.fn()} onClearFilters={vi.fn()} /></TestWrapper>);
+    expect(screen.getByTestId("story-title")).toHaveTextContent("Un lieu traduit");
+    expect(screen.getByRole("button", {name:"¿Qué ver?"})).toBeInTheDocument();
+    expect(screen.getByText(mockT("locale.storyFallback"))).toBeInTheDocument();
+  });
+
 });

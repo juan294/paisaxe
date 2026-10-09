@@ -7,11 +7,13 @@
     "src/app/**/loading.tsx",
     "src/app/**/error.tsx",
     "src/app/providers.tsx",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "e2e/fixtures/presentation-auth-client.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "e2e/fixtures/presentation-auth-client.ts"
   ],
   "ignore": [
     "src/test/**"

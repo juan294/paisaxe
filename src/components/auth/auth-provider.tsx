@@ -12,7 +12,7 @@ import {
 } from "react";
 import { getSiteUrl, getSupabaseAnonKey } from "@/lib/env";
 import { clientLogger } from "@/lib/client-logger";
-import type { Session, AuthChangeEvent, SupabaseClient } from "@supabase/supabase-js";
+import { isAuthSessionMissingError, type Session, type AuthChangeEvent, type SupabaseClient } from "@supabase/supabase-js";
 import { mapSupabaseUser, type AuthUser, type AuthContextValue } from "@/types/auth";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -20,12 +20,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 interface AuthProviderProps {
   children: ReactNode;
   deferInitialAuth?: boolean;
+  initialUser?: AuthUser | null;
+  initialAuthError?: boolean;
 }
 
-export function AuthProvider({ children, deferInitialAuth = false }: AuthProviderProps) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+export function AuthProvider({ children, deferInitialAuth = false, initialUser = null, initialAuthError = false }: AuthProviderProps) {
+  const [user, setUser] = useState<AuthUser | null>(initialUser);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(!deferInitialAuth);
+  const [authError, setAuthError] = useState(initialAuthError);
+  const [retryGeneration, setRetryGeneration] = useState(0);
+  const retryAuth = useCallback(() => setRetryGeneration(n => n + 1), []);
 
   const supabaseRef = useRef<SupabaseClient | null | undefined>(undefined);
   const getSupabaseClient = useCallback(async () => {
@@ -38,89 +43,110 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
   }, []);
 
   useEffect(() => {
-    if (deferInitialAuth) {
+    if (deferInitialAuth && retryGeneration === 0) {
       setIsLoading(false);
       return;
     }
-
     let cancelled = false;
+    let revision = 0;
     let unsubscribe: (() => void) | undefined;
+    let cancelVerification: (() => void) | undefined;
 
-    const startAuth = async () => {
-      // Skip auth with dummy credentials (CI/E2E) — real Supabase anon keys
-      // are JWTs starting with 'eyJ'. Calling getUser() with dummy credentials
-      // hangs on NXDOMAIN DNS resolution.
-      const anonKey = getSupabaseAnonKey();
-      if (!anonKey || !anonKey.startsWith("eyJ")) {
-        if (!cancelled) setIsLoading(false);
-        return;
-      }
+    const verify = (operation: (current: () => boolean) => Promise<void>, clearUser = false) => {
+      const ticket = ++revision;
+      const current = () => !cancelled && revision === ticket;
+      cancelVerification?.();
+      setSession(null);
+      if (clearUser) setUser(null);
+      setIsLoading(true);
+      setAuthError(false);
 
-      const supabase = await getSupabaseClient().catch((error: unknown) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let release!: () => void;
+      const superseded = new Promise<void>(resolve => { release = resolve; });
+      const cancel = () => { clearTimeout(timer); release(); };
+      cancelVerification = cancel;
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Auth verification timeout")), 1500);
+      });
+
+      // Never await SDK work inside its synchronous auth-event callback.
+      void Promise.race([
+        Promise.resolve().then(() => { if (current()) return operation(current); }),
+        deadline,
+        superseded,
+      ]).catch((error: unknown) => {
+        if (!current()) return;
+        revision++; // A timed-out verification must never publish its late result.
+        setSession(null);
+        setUser(null);
+        setIsLoading(false);
+        setAuthError(true);
         clientLogger.error("[AUTH_INIT_FAILURE]", {
           error: error instanceof Error ? error.message : String(error),
         });
-        return null;
+      }).finally(() => {
+        cancel();
+        if (cancelVerification === cancel) cancelVerification = undefined;
+        if (current()) setIsLoading(false);
       });
-      if (cancelled) return;
-      if (!supabase) {
-        setIsLoading(false);
+    };
+
+    const verifySession = async (supabase: SupabaseClient, candidate: Session | null, current: () => boolean) => {
+      if (candidate && (typeof candidate.access_token !== "string" || !candidate.access_token)) {
+        throw new Error("Auth session token unavailable");
+      }
+      // An explicit token bypasses SDK storage recovery/refresh and verifies
+      // precisely this event's credential. Stored session.user is never authority.
+      const { data: { user: validatedUser }, error } = await supabase.auth.getUser(candidate?.access_token);
+      if (!current()) return;
+      if (error) {
+        if (!isAuthSessionMissingError(error)) throw error;
+        setSession(null);
+        setUser(null);
         return;
       }
+      const verifiedUser = mapSupabaseUser(validatedUser);
+      setSession(verifiedUser && validatedUser && candidate ? { ...candidate, user: validatedUser } : null);
+      setUser(verifiedUser);
+    };
 
-      try {
-        // First get the session (needed for the session object)
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+    verify(async current => {
+      const anonKey = getSupabaseAnonKey();
+      if (!anonKey || !anonKey.startsWith("eyJ")) return;
+      const supabase = await getSupabaseClient();
+      if (!current()) return;
+      if (!supabase) throw new Error("Auth client unavailable");
 
-        // Then validate with server - this also refreshes expired tokens
-        const { data: { user: validatedUser }, error } = await supabase.auth.getUser();
-
-        if (error || !validatedUser) {
-          // Session invalid or expired - clear state
-          if (!cancelled) {
+      // Subscribe before bootstrap: a logout/login during getUser must win.
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event: AuthChangeEvent, newSession: Session | null) => {
+          if (cancelled || event === "INITIAL_SESSION") return;
+          if (event === "SIGNED_OUT" || !newSession) {
+            revision++;
+            cancelVerification?.();
             setSession(null);
             setUser(null);
+            setIsLoading(false);
+            setAuthError(false);
+            return;
           }
-        } else {
-          if (!cancelled) {
-            setSession(currentSession);
-            setUser(mapSupabaseUser(validatedUser));
-          }
-        }
-      } catch (error) {
-        clientLogger.error("[AUTH_INIT_FAILURE]", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        if (!cancelled) {
-          setSession(null);
-          setUser(null);
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-
-      if (cancelled) return;
-
-      // Listen for auth changes after the validated bootstrap completes.
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (_event: AuthChangeEvent, newSession: Session | null) => {
-          if (cancelled) return;
-          setSession(newSession);
-          setUser(mapSupabaseUser(newSession?.user ?? null));
-          setIsLoading(false);
+          verify(nextCurrent => verifySession(supabase, newSession, nextCurrent), true);
         }
       );
       unsubscribe = () => subscription.unsubscribe();
-    };
-
-    setIsLoading(true);
-    void startAuth();
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      if (!current()) return;
+      if (error && !isAuthSessionMissingError(error)) throw error;
+      await verifySession(supabase, error ? null : currentSession, current);
+    });
 
     return () => {
       cancelled = true;
+      cancelVerification?.();
       unsubscribe?.();
     };
-  }, [deferInitialAuth, getSupabaseClient]);
+  }, [deferInitialAuth, getSupabaseClient, retryGeneration]);
 
   const signInWithGoogle = useCallback(async (redirectPath?: string) => {
     const siteUrl = getSiteUrl();
@@ -178,8 +204,8 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
   // FE-M1: memoize the context value so that consumers only re-render when
   // user, session, isLoading, or the stable callbacks actually change.
   const value = useMemo<AuthContextValue>(
-    () => ({ user, session, isLoading, signInWithGoogle, signOut }),
-    [user, session, isLoading, signInWithGoogle, signOut],
+    () => ({ user, session, isLoading, authError, retryAuth, signInWithGoogle, signOut }),
+    [user, session, isLoading, authError, retryAuth, signInWithGoogle, signOut],
   );
 
   return (

@@ -325,3 +325,11 @@ describe("buildBookingInstructions (PayPal hackathon booking chat)", () => {
   });
 });
 
+
+describe("selected interface language policy", () => {
+  it("defers to explicit locale and limits local words to enabled mode", () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain("If an INTERFACE LANGUAGE is specified, it takes precedence");
+    expect(prompt).toContain("Only include local-language expressions when explicitly enabled");
+  });
+});

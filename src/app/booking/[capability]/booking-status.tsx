@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
@@ -205,10 +207,7 @@ export function BookingStatus() {
           </div>
           <h1 className="text-2xl font-semibold leading-tight">{view.experienceTitle}</h1>
           <p className="text-white/80">
-            {t("booking.page.when")
-              .replace("{day}", slotDay(view.slotDate, locale))
-              .replace("{time}", view.slotTime)
-              .replace("{people}", String(view.partySize))}
+            {interpolate(t("booking.page.when"), { day: slotDay(view.slotDate, locale), time: view.slotTime, people: String(view.partySize) })}
           </p>
           <p className="text-xs text-white/70">
             {t("booking.page.reference")} <span className="font-mono">{view.reference}</span>
@@ -227,7 +226,7 @@ export function BookingStatus() {
         </dl>
         {(phase === "pay" || phase === "confirming" || phase === "confirmed") && (
           <p className="text-sm text-white/70">
-            {t("booking.cards.cancellation").replace("{hours}", String(view.cancellationWindowHours))}
+            {interpolate(t("booking.cards.cancellation"), { hours: String(view.cancellationWindowHours) })}
           </p>
         )}
 
@@ -241,11 +240,11 @@ export function BookingStatus() {
                 <p>{t("booking.page.payIntro")}</p>
                 {countdown.label && (
                   <p role="timer" aria-live="off" className="text-sm tabular-nums text-white/80">
-                    {t("booking.page.holdCountdown").replace("{time}", countdown.label)}
+                    {interpolate(t("booking.page.holdCountdown"), { time: countdown.label })}
                   </p>
                 )}
                 {view.holdExpiresAt && (
-                  <p className="sr-only">{t("booking.cards.payBefore").replace("{time}", clockTime(view.holdExpiresAt, locale))}</p>
+                  <p className="sr-only">{interpolate(t("booking.cards.payBefore"), { time: clockTime(view.holdExpiresAt, locale) })}</p>
                 )}
                 <Button
                   type="button"
@@ -301,7 +300,7 @@ export function BookingStatus() {
         {view.invoice && (
           <section className="space-y-1 border-t border-white/10 pt-4 text-sm" aria-live="polite">
             <h2 className="text-base font-semibold">{t("booking.invoice.title")}</h2>
-            <p className="text-white/70">{t("booking.invoice.dueOn").replace("{date}", slotDay(view.slotDate, locale))}</p>
+            <p className="text-white/70">{interpolate(t("booking.invoice.dueOn"), { date: slotDay(view.slotDate, locale) })}</p>
             <BalanceInvoiceStatusView status={view.invoice.status} url={view.invoice.url} />
           </section>
         )}

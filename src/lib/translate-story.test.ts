@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { translateStory, parseTranslationResponse, buildTranslationPrompt, updateStoryTranslation, getStoryTranslations } from "./translate-story";
 import type { StoryTranslation } from "@/types/immersive";
 import { CHAT_MODEL } from "./models";
+import type { StoryLocale } from "@/types/immersive";
 
 // Mock the claude module
 vi.mock("./claude", () => ({
@@ -1386,5 +1387,148 @@ describe("translate-story", () => {
       expect(result.data?.translations).toEqual({});
       expect(result.data?.status).toEqual({});
     });
+  });
+});
+
+describe('Phase 7 translation questions and completion', () => {
+  const source = {
+    id: 'prompt-source', title: 'Un lugar', subtitle: 'Una visita', description: 'Un lugar para visitar.',
+    metadata: { question_prompts: ['¿Qué puedo visitar aquí?'] },
+  };
+  const questions: Record<StoryLocale, string> = {
+    en: 'What can I visit here?', fr: 'Que puis-je visiter ici ?',
+    de: 'Was kann ich hier besichtigen?', pt: 'O que posso visitar aqui?', ast: '¿Qué puedo visitar equí?',
+  };
+  const translations = Object.fromEntries(Object.entries(questions).map(([locale, question]) => [locale, {
+    title: 'Title', subtitle: 'Subtitle', description: 'Description', question_prompts: [question],
+  }])) as Record<StoryLocale, StoryTranslation>;
+
+  beforeEach(() => vi.resetAllMocks());
+
+  // Reuses the file's existing external-boundary scaffolding. These cases
+  // exercise the real prompt/parser/service/RPC-patch construction, not a live
+  // provider, database, native-language review or concurrent metadata write.
+  async function prepare(story: unknown, response: unknown) {
+    const { createAdminClient } = await import('./supabase-admin');
+    const { callAnthropicAPI } = await import('./claude');
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    const update = vi.fn();
+    const select = vi.fn(() => ({ eq: vi.fn(() => ({ single: vi.fn().mockResolvedValue({ data: story, error: null }) })) }));
+    vi.mocked(createAdminClient).mockReturnValue({ from: vi.fn(() => ({ select, update })), rpc } as never);
+    vi.mocked(callAnthropicAPI).mockResolvedValue({ content: [{ type: 'text', text: JSON.stringify(response) }] } as never);
+    return { rpc, update, callAnthropicAPI };
+  }
+
+  it('requests ordered translations of source questions in the provider JSON contract', () => {
+    const prompt = buildTranslationPrompt({ ...source, question_prompts: source.metadata.question_prompts });
+    expect(prompt).toContain('¿Qué puedo visitar aquí?');
+    expect(prompt).toContain('"question_prompts"');
+    expect(prompt).toMatch(/same (?:number|count)/i);
+    expect(prompt).toMatch(/order/i);
+  });
+
+  it.each(Object.keys(questions) as StoryLocale[])('retains actual %s question strings when parsing', (locale) => {
+    const parsed = parseTranslationResponse(JSON.stringify({ [locale]: translations[locale] }));
+    expect(parsed.success).toBe(true);
+    expect(parsed.translations?.[locale]?.question_prompts).toEqual([questions[locale]]);
+  });
+
+  it.each([null, 'What?', [7], ['  ']])('rejects malformed question arrays %j instead of coercing them into a complete translation', (question_prompts) => {
+    const parsed = parseTranslationResponse(JSON.stringify({ en: { ...translations.en, question_prompts } }));
+    expect(parsed.success).toBe(false);
+  });
+
+  it('passes original questions to generation and patches all five translated arrays through the existing RPC', async () => {
+    const { rpc, update, callAnthropicAPI } = await prepare(source, translations);
+    const result = await translateStory(source.id);
+    expect(result).toMatchObject({ success: true, successCount: 5, failedCount: 0 });
+    expect(callAnthropicAPI).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(callAnthropicAPI).mock.calls[0][1][0].content).toContain(source.metadata.question_prompts[0]);
+    expect(rpc).toHaveBeenNthCalledWith(2, 'patch_story_translation_metadata', expect.objectContaining({ p_translations: translations }));
+    for (const locale of Object.keys(questions) as StoryLocale[]) {
+      expect(rpc.mock.calls[1][1].p_translation_status[locale].status).toBe('complete');
+    }
+    expect(update).not.toHaveBeenCalled();
+    expect(rpc.mock.calls[1][1]).not.toHaveProperty('metadata');
+  });
+
+  it.each([
+    { label: 'missing title', delta: { title: '' } },
+    { label: 'non-string title', delta: { title: { unexpected: true } } },
+    { label: 'blank subtitle', delta: { subtitle: ' ' } },
+    { label: 'missing description', delta: { description: '' } },
+    { label: 'missing required questions', delta: { question_prompts: undefined } },
+    { label: 'empty required questions', delta: { question_prompts: [] } },
+    { label: 'wrong question count', delta: { question_prompts: ['One?', 'Two?'] } },
+  ])('does not mark $label complete while retaining another valid locale', async ({ delta }) => {
+    const { rpc } = await prepare(source, { en: { ...translations.en, ...delta }, fr: translations.fr });
+    const result = await translateStory(source.id, { locales: ['en', 'fr'] });
+    expect(result).toMatchObject({ success: false, successCount: 1, failedCount: 1 });
+    expect(result.results?.en.success).toBe(false);
+    expect(result.results?.fr.success).toBe(true);
+    const finalPatch = rpc.mock.calls[1][1];
+    expect(finalPatch.p_translations).not.toHaveProperty('en');
+    expect(finalPatch.p_translations.fr.question_prompts).toEqual([questions.fr]);
+    expect(finalPatch.p_translation_status.en.status).toBe('failed');
+    expect(finalPatch.p_translation_status.fr.status).toBe('complete');
+  });
+
+  it('rechecks a complete status when existing text lacks required question translations', async () => {
+    const { callAnthropicAPI } = await prepare({
+      ...source,
+      metadata: {
+        ...source.metadata,
+        translations: { en: { title: 'Old', subtitle: 'Old', description: 'Old' } },
+        translation_status: { en: { status: 'complete' } },
+      },
+    }, { en: translations.en });
+    const result = await translateStory(source.id, { locales: ['en'] });
+    expect(callAnthropicAPI).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(true);
+  });
+
+  it('keeps the legacy empty-source path valid when an older response omits questions', async () => {
+    await prepare({ ...source, subtitle: '', description: '', metadata: {} }, { en: { title: 'Place', subtitle: '', description: '' } });
+    const result = await translateStory(source.id, { locales: ['en'] });
+    expect(result).toMatchObject({ success: true, successCount: 1, failedCount: 0 });
+  });
+
+  it('rejects manual edits that would label required missing questions complete', async () => {
+    const { rpc } = await prepare(source, {});
+    const result = await updateStoryTranslation(source.id, 'en', { title: 'Place', subtitle: 'Visit', description: 'A place.' });
+    expect(result.success).toBe(false);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('retains valid manual question edits without replacing unrelated metadata', async () => {
+    const { rpc, update } = await prepare(source, {});
+    const result = await updateStoryTranslation(source.id, 'en', translations.en);
+    expect(result.success).toBe(true);
+    expect(rpc).toHaveBeenCalledWith('patch_story_translation_metadata', expect.objectContaining({ p_translations: { en: translations.en } }));
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('returns source questions to the admin original alongside translated questions', async () => {
+    await prepare(source, {});
+    const result = await getStoryTranslations(source.id);
+    expect(result.data?.original).toMatchObject({ question_prompts: source.metadata.question_prompts });
+  });
+
+  it.each([
+    { label: 'required questions missing', translation: { title: 'Place', subtitle: 'Visit', description: 'A place.' } },
+    { label: 'required text missing', translation: { ...translations.en, title: '' } },
+  ])('projects stale complete status as pending when $label in the admin read model', async ({ translation }) => {
+    const { rpc } = await prepare({
+      ...source,
+      metadata: {
+        ...source.metadata,
+        translations: { en: translation, fr: translations.fr },
+        translation_status: { en: { status: 'complete' }, fr: { status: 'complete' } },
+      },
+    }, {});
+    const result = await getStoryTranslations(source.id);
+    expect(result.data?.status.en?.status).toBe('pending');
+    expect(result.data?.status.fr?.status).toBe('complete');
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

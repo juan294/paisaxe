@@ -1,28 +1,102 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { act, render, screen, within } from "@testing-library/react";
 import fs from "fs";
 import path from "path";
 import RootLayout, { metadata } from "./layout";
+import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { RequestPresentationProviderShell } from "./request-presentation-provider-shell";
+import { es } from "@/lib/i18n/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 
-// Mock language detection to return Spanish (jsdom defaults to English)
-vi.mock("@/lib/i18n/detect-language", () => ({
-  resolveLocale: () => "es",
-  storeLocale: vi.fn(),
-  detectBrowserLanguage: () => "es",
-  getStoredLocale: () => null,
-  mapLanguageTag: (tag: string) => tag.startsWith("es") ? "es" : tag.startsWith("en") ? "en" : null,
+// Resolve the actual async server shell before RTL renders the client tree.
+// Next request APIs are the boundary; locale resolution, dictionaries, shell and
+// Providers remain real. The root itself must not perform request reads.
+const requestMocks = vi.hoisted(() => ({
+  headers: vi.fn(async () => ({ get: () => null })),
+  cookies: vi.fn(async () => ({ get: () => undefined, getAll: () => [] })),
 }));
+vi.mock("next/headers", () => requestMocks);
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/about",
+  useSearchParams: () => new URLSearchParams(),
+}));
+vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
+vi.mock("@vercel/speed-insights/next", () => ({ SpeedInsights: () => null }));
 
-// RootLayout is an async server component that awaits headers() (FE-M4 server-side
-// locale resolution). Mock next/headers so server-side locale resolution falls back
-// to 'es' (no cookie / no Accept-Language), matching the default-locale expectations.
-vi.mock("next/headers", () => ({
-  headers: () => Promise.resolve({ get: () => null }),
-}));
+beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
+  localStorage.clear();
+  requestMocks.headers.mockClear();
+  requestMocks.cookies.mockClear();
+});
+afterEach(() => vi.unstubAllEnvs());
+
+async function resolveRequestShell(node: ReactNode): Promise<ReactNode> {
+  if (!isValidElement(node)) return node;
+  const element = node as ReactElement<{ children?: ReactNode }>;
+  if (element.type === RequestPresentationProviderShell) {
+    return RequestPresentationProviderShell({ children: element.props.children });
+  }
+  if (element.props.children === undefined) return element;
+  const children = await Promise.all(Children.toArray(element.props.children).map(resolveRequestShell));
+  return cloneElement(element, undefined, ...children);
+}
+
+async function resolvedRootLayout(props: { children: ReactNode }) {
+  return resolveRequestShell(RootLayout(props));
+}
 
 const SITE_URL = "https://paisaxe.es";
 
 describe("RootLayout", () => {
+  it("keeps readable JavaScript recovery in the static root fallback until streamed content reveals", async () => {
+    let ready = false;
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    function StreamedContent() {
+      if (!ready) throw pending;
+      return <p data-testid="revealed-content">Revealed content</p>;
+    }
+    const tree = RootLayout({ children: <StreamedContent /> });
+    expect(requestMocks.headers).not.toHaveBeenCalled();
+    expect(requestMocks.cookies).not.toHaveBeenCalled();
+    // Resolve the real request island at its SDK boundary, then let React's
+    // actual outer Suspense hide the still-blocked child and show its fallback.
+    const view = render(await resolveRequestShell(tree));
+    try {
+      const recovery = screen.getByRole("status");
+      expect(recovery).toBeVisible();
+      expect(recovery).toHaveTextContent(resolveTranslation("navigation.preparing", es));
+      expect(recovery).toHaveTextContent(resolveTranslation("navigation.recovery", es));
+      expect(recovery).toHaveTextContent(/JavaScript/);
+      const reload = within(recovery).getByRole("link", { name: resolveTranslation("navigation.reload", es) });
+      expect(reload).toBeVisible();
+      expect(reload).toHaveAttribute("href", "/immersive");
+      expect(reload.closest("noscript, [hidden], .sr-only")).toBeNull();
+      expect(screen.queryByTestId("revealed-content")).not.toBeInTheDocument();
+
+      await act(async () => { ready = true; release(); });
+      expect(await screen.findByTestId("revealed-content")).toBeVisible();
+      expect(recovery).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: resolveTranslation("navigation.reload", es) })).not.toBeInTheDocument();
+    } finally {
+      ready = true;
+      release();
+      view.unmount();
+    }
+  });
+
+  it("keeps the root request-independent and resolves request state only inside its real server shell", async () => {
+    const tree = RootLayout({ children: <p data-testid="streamed-child">Streamed</p> });
+    expect(requestMocks.headers).not.toHaveBeenCalled();
+    expect(requestMocks.cookies).not.toHaveBeenCalled();
+    render(await resolveRequestShell(tree));
+    expect(requestMocks.headers).toHaveBeenCalledOnce();
+    expect(requestMocks.cookies).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("streamed-child").closest("[data-request-presentation]"))
+      .toHaveAttribute("lang", "es");
+  });
+
   describe("metadata", () => {
     it("should have correct title", () => {
       expect(metadata.title).toBe("Paisaxe | Descubre Asturias");
@@ -124,7 +198,7 @@ describe("RootLayout", () => {
 
   describe("content target", () => {
     it("renders a non-landmark #main-content target so route pages own the main landmark", async () => {
-      const Component = await RootLayout({ children: <div data-testid="child">Child</div> });
+      const Component = await resolvedRootLayout({ children: <div data-testid="child">Child</div> });
       const { container } = render(Component);
       const mainTarget = container.querySelector("#main-content");
       expect(mainTarget).not.toBeNull();
@@ -133,7 +207,7 @@ describe("RootLayout", () => {
     });
 
     it("places children inside the #main-content target", async () => {
-      const Component = await RootLayout({ children: <div data-testid="inner">Inner</div> });
+      const Component = await resolvedRootLayout({ children: <div data-testid="inner">Inner</div> });
       const { container } = render(Component);
       const mainTarget = container.querySelector("#main-content");
       expect(mainTarget).not.toBeNull();
@@ -188,7 +262,7 @@ describe("RootLayout", () => {
 
   describe("rendering", () => {
     it("should render children", async () => {
-      const Component = await RootLayout({ children: <div data-testid="child">Test Child</div> });
+      const Component = await resolvedRootLayout({ children: <div data-testid="child">Test Child</div> });
       render(Component);
 
       expect(screen.getByTestId("child")).toBeInTheDocument();
@@ -196,7 +270,7 @@ describe("RootLayout", () => {
     });
 
     it("should set html lang to es", async () => {
-      const Component = await RootLayout({ children: <div>Content</div> });
+      const Component = await resolvedRootLayout({ children: <div>Content</div> });
       render(Component);
 
       const html = document.documentElement;
@@ -204,7 +278,7 @@ describe("RootLayout", () => {
     });
 
     it("should apply font classes to body", async () => {
-      const Component = await RootLayout({ children: <div>Content</div> });
+      const Component = await resolvedRootLayout({ children: <div>Content</div> });
       render(Component);
 
       const body = document.body;
@@ -221,7 +295,7 @@ describe("RootLayout", () => {
       // system (see CLAUDE.md-linked docs/agents/pre-launch-report.md UX-M1 —
       // flipping the root token palette is out of scope; it would invert the
       // ~41 existing `.dark`-semantics token consumers, including admin).
-      const Component = await RootLayout({ children: <div>Content</div> });
+      const Component = await resolvedRootLayout({ children: <div>Content</div> });
       render(Component);
 
       const body = document.body;
@@ -229,7 +303,7 @@ describe("RootLayout", () => {
     });
 
     it("should render JsonLd WebSite component", async () => {
-      const Component = await RootLayout({ children: <div>Content</div> });
+      const Component = await resolvedRootLayout({ children: <div>Content</div> });
       const { container } = render(Component);
       const script = container.querySelector(
         'script[type="application/ld+json"]'

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_MCP_SECRET } from "./e2e/fixtures/mcp-secret";
+import { assertLocalDatastore } from "./scripts/release/probe-guards";
 import {
   BOOKING_PREVIEW_ORIGIN,
   BOOKING_PREVIEW_PORT,
@@ -8,6 +9,15 @@ import {
   localBookingServerEnv,
 } from "./e2e/fixtures/booking-env";
 
+const presentationLocalRun = process.argv.some((arg, index) => arg === "--project=presentation-local" || (arg === "--project" && process.argv[index + 1] === "presentation-local"));
+if (presentationLocalRun) {
+  assertLocalDatastore(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL !== process.env.SUPABASE_LOCAL_API_URL) throw new Error("presentation-local requires the exact owned API endpoint");
+  if (process.env.RELEASE_TARGET_URL?.trim() || !process.env.SUPABASE_LOCAL_DB_MARKER || !process.env.QA_TEST_USER_EMAIL || !process.env.QA_TEST_USER_PASSWORD) {
+    throw new Error("presentation-local requires the owned local QA fixture and database marker; deployed targets are forbidden");
+  }
+  if (process.env.PLAYWRIGHT_USE_DEV_SERVER === "true") throw new Error("presentation-local requires a production artifact");
+}
 const paidVoiceRun = process.argv.some((arg, index) => arg === "--project=paid-voice-local" || (arg === "--project" && process.argv[index + 1] === "paid-voice-local"));
 if (paidVoiceRun && !process.env.PAID_VOICE_LOCAL_NONCE) throw new Error("Use scripts/run-paid-voice-local.mjs for the owned local paid-voice project");
 const isCI = !!process.env.CI;
@@ -68,6 +78,7 @@ const releaseLocalRun = isReleaseLocalRun();
 const releaseArtifactRun = isReleaseArtifactRun();
 
 function getWebServerCommand() {
+  if (presentationLocalRun) return isCI ? `npm run start -- --port ${e2ePort}` : `npm run build && npm run start -- --port ${e2ePort}`;
   if (paidVoiceRun) return `node node_modules/next/dist/bin/next ${process.env.PAID_VOICE_ARTIFACT_MODE === "development" ? "dev" : "start"} --hostname 127.0.0.1 --port ${e2ePort}`;
   if (isCI) return `npm run start -- --port ${e2ePort}`;
   if (useDevServer) return `npm run dev -- --port ${e2ePort}`;
@@ -79,7 +90,7 @@ const webServer = {
   url: `${baseURL}/api/health/live`,
   // Default local runs to an isolated production-style server because next dev's
   // issues overlay can intercept mobile clicks and hide real regressions.
-  reuseExistingServer: paidVoiceRun ? false : reuseExistingServer,
+  reuseExistingServer: paidVoiceRun || presentationLocalRun ? false : reuseExistingServer,
   // Bumped from 180s: the P1 Supabase deferral (async getClient() in
   // stories-data.ts/realtime.ts) adds an on-demand webpack chunk compile
   // to the first dev-server request that touches Supabase, widening
@@ -96,6 +107,7 @@ const webServer = {
       process.env.NEXT_PUBLIC_SUPABASE_URL || "https://example.supabase.co",
     NEXT_PUBLIC_SUPABASE_ANON_KEY:
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "dummy_key_for_e2e",
+    ...(presentationLocalRun && { NEXT_PUBLIC_SITE_URL: baseURL, NODE_ENV: "production" }),
     MAINTENANCE_MODE: "false",
     STRIPE_SECRET_KEY: "sk_test_dummy_for_e2e",
     STRIPE_DAY_PASS_PRICE_ID: "price_test_dummy_for_e2e",
@@ -145,6 +157,15 @@ export default defineConfig({
 
   projects: [
     {
+      name: "presentation-local",
+      testMatch: "presentation-local.spec.ts",
+      use: { ...desktopChrome, locale: "en-US", bypassCSP: true, trace: "on" },
+      fullyParallel: false,
+      workers: 1,
+      timeout: 60_000,
+      retries: 0,
+    },
+    {
       name: "paid-voice-local",
       testMatch: "paid-voice-local.spec.ts",
       use: { ...desktopChrome, locale: "en-US", bypassCSP: true, permissions: ["microphone"], launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--autoplay-policy=no-user-gesture-required"] } },
@@ -160,6 +181,7 @@ export default defineConfig({
         "**/stripe-real-checkout.spec.ts",
         "**/favorites-real.spec.ts",
         "**/paid-voice-local.spec.ts",
+        "**/presentation-local.spec.ts",
         ...releaseSpecs,
       ],
     },
@@ -172,6 +194,7 @@ export default defineConfig({
         "**/stripe-real-checkout.spec.ts",
         "**/favorites-real.spec.ts",
         "**/paid-voice-local.spec.ts",
+        "**/presentation-local.spec.ts",
         ...releaseSpecs,
       ],
     },
@@ -252,7 +275,7 @@ export default defineConfig({
       // deviation 9). Test-only, and only on this localhost project.
       use: { ...desktopChrome, bypassCSP: true },
       grep: /@local-docker/,
-      ...(releaseArtifactRun ? { testIgnore: ["**/booking-*.spec.ts"] } : {}),
+      testIgnore: ["**/presentation-local.spec.ts", ...(releaseArtifactRun ? ["**/booking-*.spec.ts"] : [])],
       timeout: 60_000,
       retries: 0,
     },

@@ -6,6 +6,9 @@ import { MOCK_FEATURE_FLAGS } from "./fixtures/mock-data";
 test.describe("Phase 6 visitor navigation readiness", () => {
   test.beforeEach(async ({ page, baseURL }) => {
     expect(["localhost", "127.0.0.1", "[::1]"]).toContain(new URL(baseURL!).hostname);
+    // These Spanish-copy probes must select Spanish explicitly now that SSR
+    // honors the browser preference. The six-locale matrix is separate.
+    await page.context().addCookies([{ name: "paisaxe-locale", value: "es", url: baseURL! }]);
     await page.route((url) => !["localhost", "127.0.0.1", "[::1]", "example.supabase.co"].includes(url.hostname),
       (route) => route.abort("blockedbyclient"));
     await page.route("**/api/feature-flags", (route) => route.fulfill({
@@ -65,7 +68,7 @@ test.describe("Phase 6 visitor navigation readiness", () => {
     await page.goto("/immersive", { waitUntil: "domcontentloaded" });
     await expect(page.getByTestId("next-story-button")).toBeDisabled();
     await expect(page.getByTestId("prev-story-button")).toBeDisabled();
-    await expect(page.getByText(/JavaScript/i)).toBeVisible();
+    await expect(page.locator("p:visible").filter({ hasText: /JavaScript/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /recargar/i })).toBeVisible();
   });
 
@@ -73,6 +76,7 @@ test.describe("Phase 6 visitor navigation readiness", () => {
     // browser.newContext does not inherit the project's mobile viewport automatically.
     const context = await browser.newContext({
       javaScriptEnabled: false,
+      locale: "es-ES",
       baseURL,
       viewport: testInfo.project.use.viewport,
       isMobile: testInfo.project.use.isMobile,
@@ -83,7 +87,7 @@ test.describe("Phase 6 visitor navigation readiness", () => {
       await page.route((url) => !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname),
         (route) => route.abort("blockedbyclient"));
       await page.goto("/immersive", { waitUntil: "domcontentloaded" });
-      await expect(page.getByText(/JavaScript/i)).toBeVisible();
+      await expect(page.locator("p:visible").filter({ hasText: /JavaScript/i })).toBeVisible();
       const recovery = page.getByRole("link", { name: /recargar/i });
       await expect(recovery).toBeVisible();
       expect(await recovery.getAttribute("href")).toBeTruthy();

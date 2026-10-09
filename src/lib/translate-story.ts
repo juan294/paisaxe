@@ -1,7 +1,7 @@
 /**
  * Story translation service using Claude API.
  *
- * Generates translations for story content (title, subtitle, description)
+ * Generates translations for story text and ordered suggested questions
  * into 5 supported locales: en, fr, de, pt, ast.
  */
 
@@ -11,6 +11,7 @@ import { CHAT_MODEL } from "./models";
 import { callAnthropicAPI } from "./claude";
 import { createAdminClient } from "./supabase-admin";
 import { TRANSLATION_LOCALES } from "./translation-locales";
+import { hasCompleteStoryTranslation } from "./localize-story";
 
 export { TRANSLATION_LOCALES };
 
@@ -39,6 +40,7 @@ interface StoryContent {
   title: string;
   subtitle: string;
   description: string;
+  question_prompts?: string[];
 }
 
 interface TranslationMetadataPatch {
@@ -76,6 +78,7 @@ SPANISH ORIGINAL:
 Title: ${story.title}
 Subtitle: ${story.subtitle || "(empty)"}
 Description: ${story.description || "(empty)"}
+Question prompts (in source order): ${JSON.stringify(story.question_prompts ?? [])}
 
 TARGET LANGUAGES: ${localeList}
 
@@ -92,13 +95,15 @@ IMPORTANT GUIDELINES:
 3. For Asturian (ast), use authentic Asturianu vocabulary and grammar, not just Spanish with minor changes
 4. If the original is empty, leave the translation empty as well
 5. Preserve any formatting or punctuation style
+6. Translate question_prompts with the same number of questions and the same order as the source. Return [] for an empty source; never add questions.
 
 Return ONLY valid JSON in this exact format (no markdown, no explanation):
 {
   ${locales.map(locale => `"${locale}": {
     "title": "translated title",
     "subtitle": "translated subtitle",
-    "description": "translated description"
+    "description": "translated description",
+    "question_prompts": ${JSON.stringify((story.question_prompts ?? []).map((_, index) => `translated question ${index + 1}`))}
   }`).join(",\n  ")}
 }`;
 }
@@ -128,10 +133,16 @@ export function parseTranslationResponse(responseText: string): ParseResult {
     for (const locale of TRANSLATION_LOCALES) {
       if (parsed[locale]) {
         const t = parsed[locale];
+        if (t.question_prompts !== undefined &&
+          (!Array.isArray(t.question_prompts) ||
+            t.question_prompts.some((prompt: unknown) => typeof prompt !== "string" || !prompt.trim()))) {
+          throw new Error(`Invalid question_prompts for ${locale}`);
+        }
         translations[locale] = {
-          title: String(t.title || ""),
-          subtitle: String(t.subtitle || ""),
-          description: String(t.description || ""),
+          title: typeof t.title === "string" ? t.title : "",
+          subtitle: typeof t.subtitle === "string" ? t.subtitle : "",
+          description: typeof t.description === "string" ? t.description : "",
+          ...(t.question_prompts !== undefined ? { question_prompts: t.question_prompts } : {}),
         };
       }
     }
@@ -173,6 +184,12 @@ export async function translateStory(
   const metadata = (story.metadata || {}) as StoryMetadata;
   const existingTranslations = metadata.translations || {};
   const existingStatus = metadata.translation_status || {};
+  const source: StoryContent = {
+    title: story.title,
+    subtitle: story.subtitle || "",
+    description: story.description || "",
+    question_prompts: metadata.question_prompts,
+  };
 
   // Determine which locales need translation
   const localesToTranslate: StoryLocale[] = [];
@@ -182,7 +199,7 @@ export async function translateStory(
   >;
 
   for (const locale of locales) {
-    const hasExisting = existingTranslations[locale] && existingStatus[locale]?.status === "complete";
+    const hasExisting = existingStatus[locale]?.status === "complete" && hasCompleteStoryTranslation(source, existingTranslations[locale]);
 
     if (hasExisting && !forceRetranslate) {
       // Skip - already translated
@@ -218,11 +235,7 @@ export async function translateStory(
   // Call Claude API
   try {
     const prompt = buildTranslationPrompt(
-      {
-        title: story.title,
-        subtitle: story.subtitle || "",
-        description: story.description || "",
-      },
+      source,
       localesToTranslate
     );
 
@@ -254,7 +267,8 @@ export async function translateStory(
     let failedCount = 0;
 
     for (const locale of localesToTranslate) {
-      if (parseResult.translations[locale]) {
+      const translation = parseResult.translations[locale];
+      if (hasCompleteStoryTranslation(source, translation)) {
         completedTranslations[locale] = parseResult.translations[locale];
         completedStatus[locale] = {
           status: "complete",
@@ -263,12 +277,13 @@ export async function translateStory(
         results[locale] = { success: true };
         successCount++;
       } else {
+        const error = translation ? "Translation is incomplete for source text or questions" : "Translation not returned by API";
         completedStatus[locale] = {
           status: "failed",
-          error: "Translation not returned by API",
+          error,
           updatedAt: new Date().toISOString(),
         };
-        results[locale] = { success: false, error: "Translation not returned by API" };
+        results[locale] = { success: false, error };
         failedCount++;
       }
     }
@@ -343,7 +358,7 @@ export async function updateStoryTranslation(
   // Fetch current metadata
   const { data: story, error: fetchError } = await supabase
     .from("stories")
-    .select("metadata")
+    .select("title, subtitle, description, metadata")
     .eq("id", storyId)
     .single();
 
@@ -352,6 +367,15 @@ export async function updateStoryTranslation(
       success: false,
       error: `Story not found: ${fetchError?.message || "No data returned"}`,
     };
+  }
+
+  if (!hasCompleteStoryTranslation({
+    title: story.title || "",
+    subtitle: story.subtitle || "",
+    description: story.description || "",
+    question_prompts: (story.metadata as StoryMetadata | null)?.question_prompts,
+  }, translation)) {
+    return { success: false, error: "Translation is incomplete for source text or questions" };
   }
 
   const status: TranslationStatus = {
@@ -404,16 +428,30 @@ export async function getStoryTranslations(storyId: string): Promise<{
 
   const metadata = (story.metadata || {}) as StoryMetadata;
 
+  const original: StoryContent = {
+    title: story.title,
+    subtitle: story.subtitle || "",
+    description: story.description || "",
+    question_prompts: metadata.question_prompts || [],
+  };
+  const translations = metadata.translations || {};
+  const status = { ...metadata.translation_status };
+  for (const locale of TRANSLATION_LOCALES) {
+    if (status[locale]?.status === "complete" && !hasCompleteStoryTranslation(original, translations[locale])) {
+      status[locale] = {
+        ...status[locale],
+        status: "pending",
+        error: "Translation is incomplete for current source text or questions",
+      };
+    }
+  }
+
   return {
     success: true,
     data: {
-      original: {
-        title: story.title,
-        subtitle: story.subtitle || "",
-        description: story.description || "",
-      },
-      translations: metadata.translations || {},
-      status: metadata.translation_status || {},
+      original,
+      translations,
+      status,
       lastTranslatedAt: metadata.last_translated_at,
     },
   };

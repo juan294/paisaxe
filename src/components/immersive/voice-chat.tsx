@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { RateLimitNotice } from "@/components/rate-limit-notice";
 
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
@@ -301,7 +303,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
       className="fixed inset-0 z-50 flex items-end justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] md:items-center"
       role="dialog"
       aria-modal="true"
-      aria-label={t("accessibility.chat_dialog").replace("{title}", localizedStory.title)}
+      aria-label={interpolate(t("accessibility.chat_dialog"), { title: localizedStory.title })}
     >
       {/* Backdrop */}
       <div
@@ -326,10 +328,10 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
           tryVoiceLabel={bookingActive ? t("booking.chat.voiceDiscovery") : undefined}
         />
 
-        {!isInitializing && isAccessDenied && <p role="status">Voice access is currently unavailable. <button type="button" className="underline" onClick={() => { void refresh(); }}>Check voice access</button> or <a href="mailto:support@paisaxe.es" className="underline">contact support</a>.</p>}
-        {!isInitializing && isSuspended && <p role="status">Voice access is suspended while a payment dispute is reviewed. <a href="mailto:support@paisaxe.es" className="underline">Contact support</a> for help.</p>}
-        {!isInitializing && accessStatus === "revoked" && <p role="status">This voice pass was revoked after a payment reversal. <a href="mailto:support@paisaxe.es" className="underline">Contact support</a> if this is unexpected.</p>}
-        {!isInitializing && accessStatus === "expired" && <p role="status">Your voice pass has expired. You can purchase a new pass to continue using voice.</p>}
+        {!isInitializing && isAccessDenied && <p role="status">{t("voice.accessUnavailable")} <button type="button" className="underline" onClick={() => { void refresh(); }}>{t("voice.checkAccess")}</button> <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
+        {!isInitializing && isSuspended && <p role="status">{t("voice.suspended")} <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
+        {!isInitializing && accessStatus === "revoked" && <p role="status">{t("voice.revoked")} <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
+        {!isInitializing && accessStatus === "expired" && <p role="status">{t("voice.expired")}</p>}
         <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
 
         {/* Privacy Notice */}
@@ -341,9 +343,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
         {canUseVoice && hoursUntilExpiry !== null && hoursUntilExpiry < 6 && expiresAt && (
           <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-amber-500/10 p-3 border border-amber-500/20">
             <p className="text-xs text-amber-200">
-              {t("premium.voice_pass_expiry")
-                .replace("{hours}", String(Math.ceil(hoursUntilExpiry)))
-                .replace("{time}", expiresAt.toLocaleTimeString(toIntlLocale(locale), { hour: '2-digit', minute: '2-digit' }))}
+              {interpolate(t("premium.voice_pass_expiry"), { hours: String(Math.ceil(hoursUntilExpiry)), time: expiresAt.toLocaleTimeString(toIntlLocale(locale), { hour: '2-digit', minute: '2-digit' }) })}
             </p>
           </div>
         )}

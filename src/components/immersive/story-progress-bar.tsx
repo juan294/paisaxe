@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { memo, useCallback } from "react";
 import { useRovingTabIndex } from "@/hooks/use-roving-tab-index";
 import { cn } from "@/lib/utils";
@@ -61,9 +63,7 @@ export const StoryProgressBar = memo(function StoryProgressBar({
    */
   const getSegmentLabel = useCallback(
     (targetIndex: number): string => {
-      const baseLabel = t("accessibility.go_to_story")
-        .replace("{current}", String(targetIndex + 1))
-        .replace("{total}", String(storiesLength));
+      const baseLabel = interpolate(t("accessibility.go_to_story"), { current: String(targetIndex + 1), total: String(storiesLength) });
 
       if (storyTitles && storyTitles[targetIndex]) {
         return `${storyTitles[targetIndex]} — ${baseLabel}`;
@@ -80,9 +80,7 @@ export const StoryProgressBar = memo(function StoryProgressBar({
       className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4"
     >
       <span className="sr-only">
-        {t("accessibility.story_counter")
-          .replace("{current}", String(currentIndex + 1))
-          .replace("{total}", String(storiesLength))}
+        {interpolate(t("accessibility.story_counter"), { current: String(currentIndex + 1), total: String(storiesLength) })}
       </span>
       <ol role="list" className="flex w-full items-center gap-1">
         {Array.from({ length: segmentCount }, (_, i) => {

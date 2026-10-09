@@ -252,3 +252,74 @@ describe('trimStoryTranslations', () => {
     expect(trimmed).toBe(stories);
   });
 });
+
+describe('Phase 7 source-aware story completeness', () => {
+  const questions = {
+    en: 'What can I visit here?',
+    fr: 'Que puis-je visiter ici ?',
+    de: 'Was kann ich hier besichtigen?',
+    pt: 'O que posso visitar aqui?',
+    ast: '¿Qué puedo visitar equí?',
+  } as const;
+  const story: Story = {
+    id: 'locale-prompt-fixture', slug: 'locale-prompt-fixture',
+    title: 'Un lugar', subtitle: 'Una visita', description: 'Un lugar para visitar.',
+    image: '/test.jpg', category: 'culture', sourcePdf: 'test.pdf',
+    metadata: { question_prompts: ['¿Qué puedo visitar aquí?'] },
+  };
+
+  it.each(Object.entries(questions))('requires and retains the %s question translation', (locale, question) => {
+    const target = locale as keyof typeof questions;
+    const localized: Story = {
+      ...story,
+      metadata: {
+        ...story.metadata,
+        translations: {
+          [target]: { title: 'Title', subtitle: 'Subtitle', description: 'Description', question_prompts: [question] },
+        },
+      },
+    };
+    expect(hasTranslation(localized, target)).toBe(true);
+    expect(trimStoryTranslations(localized, target).metadata?.translations?.[target]?.question_prompts).toEqual([question]);
+    expect(localized.metadata?.question_prompts).toEqual(['¿Qué puedo visitar aquí?']);
+  });
+
+  it.each([
+    { label: 'missing', prompts: undefined },
+    { label: 'empty', prompts: [] },
+    { label: 'blank', prompts: ['  '] },
+    { label: 'wrong count', prompts: ['What can I visit?', 'When?'] },
+    { label: 'non-string', prompts: [7] },
+  ])('does not advertise complete translation with $label translated questions', ({ prompts }) => {
+    const localized: Story = {
+      ...story,
+      metadata: {
+        ...story.metadata,
+        translations: {
+          en: { title: 'Place', subtitle: 'Visit', description: 'A place to visit.', question_prompts: prompts as string[] | undefined },
+        },
+      },
+    };
+    expect(hasTranslation(localized, 'en')).toBe(false);
+  });
+
+  it('accepts empty optional source fields without inventing content or questions', () => {
+    const emptyOptional: Story = {
+      ...story, subtitle: '', description: '',
+      metadata: { translations: { en: { title: 'Place', subtitle: '', description: '', question_prompts: [] } } },
+    };
+    expect(hasTranslation(emptyOptional, 'en')).toBe(true);
+    expect(getLocalizedStory(emptyOptional, 'en')).toEqual({ title: 'Place', subtitle: '', description: '' });
+  });
+
+  it.each(['title', 'subtitle', 'description'] as const)('does not count whitespace-only %s as a complete translation', (field) => {
+    const localized: Story = {
+      ...story,
+      metadata: {
+        translations: { en: { title: 'Place', subtitle: 'Visit', description: 'A place to visit.', [field]: '  ' } },
+      },
+    };
+    expect(hasTranslation(localized, 'en')).toBe(false);
+    expect(getLocalizedStory(localized, 'en')[field]).toBe(story[field]);
+  });
+});

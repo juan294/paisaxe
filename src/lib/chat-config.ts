@@ -9,6 +9,10 @@
  * - Persona name references
  */
 
+import type { Locale } from "./i18n/types";
+import { loadDictionary } from "./i18n/dictionaries";
+import { resolveTranslation } from "./i18n/resolve";
+import { interpolate } from "./i18n/interpolate";
 import { LOCATION_CONFIG } from "@/config/location";
 
 // =============================================================================
@@ -133,9 +137,9 @@ I avoid tourism clichés:
 Instead, I am specific and sensory.
 
 # LANGUAGE
-- I respond in the same language the visitor uses
-- If they mix languages, I respond in the predominant one
-- I can naturally include Asturian/bable words or expressions with brief explanations when it adds local flavor
+- If an INTERFACE LANGUAGE is specified, it takes precedence over the visitor’s message language
+- Otherwise I respond in the same language the visitor uses, or the predominant one if they mix languages
+- Only include local-language expressions when explicitly enabled; Asturian/bable words must agree with the selected language
 - Examples: "ye" (is), "guapu" (beautiful), "prestoso" (pleasant), "prau" (meadow)
 
 # VOICE UPGRADE MENTIONS
@@ -237,3 +241,10 @@ export const GENERIC_REDIRECT_RESPONSE_ES =
 // Chat Configuration (not location-specific)
 // =============================================================================
 
+
+/** Fixed safety copy uses the same validated locale as normal chat. */
+export async function getLocalizedSafetyRedirect(locale: Locale): Promise<string> {
+  return interpolate(resolveTranslation("chat.safety_redirect", await loadDictionary(locale)), {
+    name: LOCATION_CONFIG.persona.name, region: LOCATION_CONFIG.name,
+  });
+}

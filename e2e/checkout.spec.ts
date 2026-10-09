@@ -206,13 +206,14 @@ test.describe("Checkout flow", () => {
     );
     expect(response?.ok()).toBe(true);
 
-    // Wait for the return page to finish loading
-    await expect(page.locator("body")).not.toBeEmpty();
+    // Wait for the actual success screen, beyond the root readiness fallback.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
     // Success screen must contain a link to the immersive experience.
     // This verifies the redirect→success wiring: session_id + returnTo →
     // immersive href with ?story=<slug>&voice=ready.
-    const immersiveLink = page.locator('a[href*="/immersive"]');
+    const immersiveLink = page.locator('a[href*="/immersive"]:visible');
+    await expect(immersiveLink).toHaveCount(1);
     await expect(immersiveLink).toBeVisible({ timeout: 10_000 });
 
     // Verify the returnTo slug is reflected in the immersive link

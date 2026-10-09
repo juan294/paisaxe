@@ -70,7 +70,7 @@ export function SiteInfoMenu() {
     }
   }, []);
 
-  if (isLoading) {
+  if (isLoading && !user) {
     return (
       <div className="h-10 w-10 rounded-full bg-white/10 animate-pulse" />
     );

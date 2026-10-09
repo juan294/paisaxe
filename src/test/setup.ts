@@ -3,6 +3,11 @@ import { afterEach, vi } from "vitest";
 
 afterEach(() => {
   vi.useRealTimers();
+  // Explicit locale preferences now live in cookies as well as localStorage.
+  // Each test owns its browser preferences; same-test reloads retain them.
+  if (typeof document !== 'undefined') {
+    document.cookie = 'paisaxe-locale=; Max-Age=0; Path=/';
+  }
 });
 
 // Node 24+ (and 26) sets global.localStorage = undefined (experimental Web Storage

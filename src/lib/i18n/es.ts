@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const es: Translations = {
   common: {
+    rateLimited: "Límite temporal. Espera {seconds} segundos y vuelve a intentarlo.",
+    retry: "Volver a intentar",
     loading: 'Cargando...',
     close: 'Cerrar',
   },
 
+  navigation: {
+    preparing: "Preparando la navegación…",
+    recovery: "Si los controles no se activan, recarga la página y comprueba que JavaScript esté habilitado.",
+    reload: "Recargar la página",
+    ready: "La navegación está lista.",
+  },
+
+  locale: {
+    loadFailed: "No se pudo cargar el idioma elegido. Se muestra español mientras lo intentas de nuevo.",
+    retry: "Reintentar la carga del idioma",
+    storyFallback: "Parte del contenido o las preguntas de esta historia aún no están disponibles en el idioma elegido y se muestran en español.",
+    legacyMigrated: "Se ha recuperado el idioma que tenías guardado en este navegador.",
+  },
+
   chat: {
+    safety_redirect: "¡Hola! Soy {name}, tu guía turístico de {region}. ¿En qué puedo ayudarte a descubrir nuestra tierra?",
     placeholder: 'Escribe tu pregunta...',
     listening: 'Escuchando...',
     thinking: 'Pensando...',
@@ -165,6 +182,8 @@ export const es: Translations = {
   },
 
   auth: {
+    verificationFailed: "No se pudo comprobar tu sesión. Vuelve a intentarlo para continuar.",
+    retryVerification: "Volver a comprobar la sesión",
     user: 'Usuario',
     user_avatar: 'Avatar del usuario',
     sign_out: 'Cerrar sesión',
@@ -187,6 +206,12 @@ export const es: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "El acceso a voz no está disponible en este momento.",
+    checkAccess: "Comprobar el acceso a voz",
+    contactSupport: "Contactar con soporte",
+    suspended: "El acceso a voz está suspendido mientras se revisa una disputa sobre el pago.",
+    revoked: "Este pase de voz se ha revocado tras la reversión de un pago.",
+    expired: "Tu pase de voz ha caducado. Puedes comprar otro para seguir usando la voz.",
     try_voice: 'Hablar',
     use_text: 'Escribir',
     upgrade_cta: 'Usa tu voz',

@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const en: Translations = {
   common: {
+    rateLimited: "Temporary limit. Wait {seconds} seconds and try again.",
+    retry: "Try again",
     loading: 'Loading...',
     close: 'Close',
   },
 
+  navigation: {
+    preparing: "Preparing navigation…",
+    recovery: "If the controls do not become available, reload the page and check that JavaScript is enabled.",
+    reload: "Reload the page",
+    ready: "Navigation is ready.",
+  },
+
+  locale: {
+    loadFailed: "The selected language could not be loaded. Spanish is shown while you try again.",
+    retry: "Retry loading the language",
+    storyFallback: "Some story content or questions are not yet available in the selected language and are shown in Spanish.",
+    legacyMigrated: "Your language preference saved in this browser has been restored.",
+  },
+
   chat: {
+    safety_redirect: "Hello! I’m {name}, your {region} tourism guide. How can I help you discover our region?",
     placeholder: 'Ask about this place...',
     listening: 'Listening...',
     thinking: 'Thinking...',
@@ -165,6 +182,8 @@ export const en: Translations = {
   },
 
   auth: {
+    verificationFailed: "Your session could not be verified. Try again to continue.",
+    retryVerification: "Verify the session again",
     user: 'User',
     user_avatar: 'User avatar',
     sign_out: 'Sign out',
@@ -187,6 +206,12 @@ export const en: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "Voice access is currently unavailable.",
+    checkAccess: "Check voice access",
+    contactSupport: "Contact support",
+    suspended: "Voice access is suspended while a payment dispute is reviewed.",
+    revoked: "This voice pass was revoked after a payment reversal.",
+    expired: "Your voice pass has expired. You can purchase a new pass to continue using voice.",
     try_voice: 'Talk',
     use_text: 'Type',
     upgrade_cta: 'Use your voice',

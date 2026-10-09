@@ -250,6 +250,11 @@ test.describe("Navigation behavior", () => {
 
     await page.goto("/immersive");
     await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
+    // A server-rendered title can appear before the keyboard listener mounts.
+    const navigation = page.locator('[data-story-navigation-ready]:visible');
+    await expect(navigation).toHaveCount(1);
+    await expect(navigation).toHaveAttribute("data-story-navigation-ready", "true");
+    await expect(navigation).toBeEnabled();
   });
 
   test("right arrow key advances to next story", async ({
