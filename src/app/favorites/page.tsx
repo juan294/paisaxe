@@ -1,5 +1,6 @@
 "use client";
 
+import { CacheRetryNotice } from "@/components/cache-retry-notice";
 import { RateLimitNotice } from "@/components/rate-limit-notice";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -20,8 +21,8 @@ const ITEMS_PER_PAGE = 20;
 const UNDO_TIMEOUT_MS = 6000;
 
 export default function FavoritesPage() {
-  const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth, retryAfter, retry } = useFavorites();
-  const { stories: allStories, isLoading } = useStories();
+  const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth, retryAfter, retry, error: favoritesError } = useFavorites();
+  const { stories: allStories, isLoading, error: storiesError, refresh: refreshStories } = useStories();
   const { signInWithGoogle } = useAuth();
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -160,6 +161,8 @@ export default function FavoritesPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <CacheRetryNotice error={storiesError} onRetry={() => void refreshStories()} />
+        <CacheRetryNotice error={retryAfter == null ? favoritesError : null} onRetry={() => void retry()} />
         <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void retry(); }} />
         {favoriteStories.length === 0 ? (
           <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">

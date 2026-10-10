@@ -2,11 +2,20 @@
 import { describe, expect, it } from 'vitest';
 import fallback from '../../content/fallback-stories.json';
 import { STORY_TRANSLATIONS } from '../../content/translations/story-translations';
+import { FALLBACK_STORY_TRANSLATIONS } from '../../content/translations/fallback-story-translations.generated';
 import { FALLBACK_STORIES } from './stories-fallback';
 import { getLocalizedStory, hasTranslation } from './localize-story';
 import { TRANSLATION_LOCALES } from './translation-locales';
 
 describe('Phase 7 actually served local fallback content', () => {
+  it('ships exactly the fallback translations with every approved field intact', () => {
+    const slugs = fallback.stories.map(story => story.slug ?? story.id);
+    expect(Object.keys(FALLBACK_STORY_TRANSLATIONS).sort()).toEqual([...slugs].sort());
+    for (const slug of slugs) {
+      expect(FALLBACK_STORY_TRANSLATIONS[slug], `${slug}: regenerate fallback translations`).toEqual(STORY_TRANSLATIONS[slug]);
+    }
+  });
+
   it('preserves the original 25 story identities and Spanish source fields', () => {
     expect(FALLBACK_STORIES).toHaveLength(25);
     expect(FALLBACK_STORIES.map(({ metadata: _metadata, ...story }) => story)).toEqual(fallback.stories);

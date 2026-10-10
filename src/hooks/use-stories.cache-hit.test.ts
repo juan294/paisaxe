@@ -107,39 +107,12 @@ describe("useStories fetchStories cache-hit (line 142)", () => {
     const callsAfterMount = mockGetStoriesFromDB.mock.calls.length;
     expect(callsAfterMount).toBeGreaterThanOrEqual(1);
 
-    // Step 2: Mock Date.now with sequential values.
-    // IMPORTANT: jsdom's Event constructor also calls Date.now() internally
-    // (to set event.timeStamp), so we need to account for that extra call.
-    //
-    // Call sequence:
-    //   #1 — new Event("focus") [jsdom internal] → doesn't matter, return staleTime
-    //   #2 — handleFocus staleness check → must return staleTime (>TTL from cache.timestamp)
-    //   #3 — fetchStories staleness check → must return freshTime (within TTL)
-    const realNow = Date.now();
-    const staleTime = realNow + 6 * 60 * 1000; // 6 min ahead → appears stale
-    const freshTime = realNow;                   // original time → appears fresh
-
-    let dateNowCallCount = 0;
-    vi.spyOn(Date, "now").mockImplementation(() => {
-      dateNowCallCount++;
-      // Calls 1 and 2 return staleTime (jsdom Event + handleFocus check)
-      // Call 3+ returns freshTime (fetchStories check → cache hit at line 142)
-      return dateNowCallCount <= 2 ? staleTime : freshTime;
-    });
-
-    // Step 3: Dispatch focus event
-    // handleFocus sees stale (call #2) → calls fetchStories
-    // fetchStories sees fresh (call #3) → returns cache.data at line 142
-    await act(async () => {
-      window.dispatchEvent(new Event("focus"));
-    });
-
-    // Verify Date.now was called >= 3 times (Event ctor + handleFocus + fetchStories)
-    expect(dateNowCallCount).toBeGreaterThanOrEqual(3);
-
-    // No additional DB fetch — fetchStories returned cached data at line 142
-    expect(mockGetStoriesFromDB.mock.calls.length).toBe(callsAfterMount);
-
-    vi.spyOn(Date, "now").mockRestore();
+    // A real fresh focus event reuses the query result without a network read.
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(mockGetStoriesFromDB).toHaveBeenCalledTimes(callsAfterMount);
+    const { result: follower } = renderHook(() => useStories(), { wrapper });
+    expect(follower.current.stories).toEqual(mockStories);
+    expect(follower.current.isLoading).toBe(false);
+    expect(mockGetStoriesFromDB).toHaveBeenCalledTimes(callsAfterMount);
   });
 });

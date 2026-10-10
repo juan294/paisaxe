@@ -1,5 +1,7 @@
 "use client";
 
+import { PrivateQueryIdentityProvider } from "@/lib/client-query";
+
 import {
   createContext,
   useContext,
@@ -210,7 +212,7 @@ export function AuthProvider({ children, deferInitialAuth = false, initialUser =
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      <PrivateQueryIdentityProvider userId={user?.id} token={session?.access_token} loading={isLoading}>{children}</PrivateQueryIdentityProvider>
     </AuthContext.Provider>
   );
 }

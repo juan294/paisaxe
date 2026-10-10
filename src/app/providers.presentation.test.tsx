@@ -154,7 +154,7 @@ describe('real request presentation and stable Providers', () => {
     expect(mocks.mount).toHaveBeenCalledOnce();
     expect(mocks.unmount).not.toHaveBeenCalled();
     expect(mocks.unsubscribe).not.toHaveBeenCalled();
-    expect(fetch).toHaveBeenCalledWith('/api/feature-flags');
+    expect(fetch).toHaveBeenCalledWith('/api/feature-flags', { signal: expect.any(AbortSignal) });
     view.unmount();
     expect(mocks.unmount).toHaveBeenCalledOnce();
     expect(mocks.unsubscribe).toHaveBeenCalledOnce();

@@ -1,5 +1,4 @@
 "use client";
-
 import {
   createContext,
   createElement,
@@ -10,39 +9,29 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
+import { useQuery } from "@tanstack/react-query";
+import { publicQueryKey, useClientQueryClient } from "@/lib/client-query";
 import { clientLogger } from "@/lib/client-logger";
-
-interface FlagsCache {
-  data: FeatureFlag[] | null;
-  timestamp: number;
-  promise: Promise<FeatureFlag[]> | null;
-}
-
-const CACHE_TTL = 60_000; // 1 minute
-const E2E_SUPABASE_URL = "https://example.supabase.co";
-
-const cache: FlagsCache = {
-  data: null,
-  timestamp: 0,
-  promise: null,
-};
-
+import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
+const EMPTY_FLAGS: FeatureFlag[] = [];
+const CACHE_TTL = 60_000;
+const key = publicQueryKey("feature-flags");
 interface UseFeatureFlagsResult {
   flags: FeatureFlag[];
+  error: Error | null;
+  refresh: () => Promise<void>;
   isReady: boolean;
   isEnabled: (key: FeatureFlagKey) => boolean;
-  isEnabledWithDefault: (key: FeatureFlagKey, defaultValue?: boolean) => boolean;
+  isEnabledWithDefault: (
+    key: FeatureFlagKey,
+    defaultValue?: boolean,
+  ) => boolean;
 }
 
 const FeatureFlagsContext = createContext<UseFeatureFlagsResult | null>(null);
 
-/**
- * Convert a `Partial<Record<FeatureFlagKey, boolean>>` map (as passed by a
- * server component) into the full `FeatureFlag[]` shape expected by the hook.
- */
 function initialFlagsToArray(
-  initial: Partial<Record<FeatureFlagKey, boolean>>
+  initial: Partial<Record<FeatureFlagKey, boolean>>,
 ): FeatureFlag[] {
   return Object.entries(initial).map(([key, enabled]) => ({
     id: `initial-${key}`,
@@ -57,162 +46,118 @@ function initialFlagsToArray(
   }));
 }
 
-/**
- * Feature flags hook with deferred loading.
- *
- * Returns flags immediately with defaults (all disabled) and fetches actual
- * values in the background. This prevents blocking the initial render while
- * still enabling feature flags to control UI behavior.
- *
- * Pass `initialFlags` from a server component to eliminate the flag flash:
- * the hook will use those values immediately and skip the initial client fetch.
- * A background refetch still occurs after CACHE_TTL (60 s) to stay fresh.
- *
- * Use `isReady` to determine if flags have actually been loaded from the server.
- * Use `isEnabled` to check individual flags (returns false if not loaded).
- */
 function useFeatureFlagsState(
   initialFlags?: Partial<Record<FeatureFlagKey, boolean>>,
-  enabled: boolean = true
-) : UseFeatureFlagsResult {
-  // If initialFlags are provided, seed the state and skip the first fetch.
-  // We still use the shared module-level cache so multiple hook instances
-  // on the same page share a single in-flight request on refetch.
-  const [flags, setFlags] = useState<FeatureFlag[]>(() => {
-    if (initialFlags) return initialFlagsToArray(initialFlags);
-    return cache.data ?? [];
-  });
-  // isReady is true immediately when initialFlags are provided — no flash.
-  const [isReady, setIsReady] = useState(initialFlags !== undefined || !!cache.data);
-  const isE2EDummySupabase =
-    process.env.NEXT_PUBLIC_SUPABASE_URL === E2E_SUPABASE_URL;
-  const shouldUseServerSeedOnly =
-    initialFlags !== undefined &&
-    !isE2EDummySupabase;
-
-  const fetchFlags = useCallback(async (): Promise<FeatureFlag[]> => {
-    const now = Date.now();
-    const isStale = now - cache.timestamp > CACHE_TTL;
-
-    if (cache.data && !isStale && !isE2EDummySupabase) {
-      return cache.data;
-    }
-
-    if (cache.promise && !isE2EDummySupabase) {
-      return cache.promise;
-    }
-
-    cache.promise = fetch("/api/feature-flags")
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch flags");
-        const json = await res.json();
-        cache.data = json.data;
-        cache.timestamp = Date.now();
-        cache.promise = null;
-        return json.data;
-      })
-      .catch((err) => {
-        cache.promise = null;
-        if (cache.data) {
-          clientLogger.warn("Failed to refresh feature flags, using cached", { error: err instanceof Error ? err.message : String(err) });
-          return cache.data;
+  enabled = true,
+  initialUpdatedAt?: number,
+): UseFeatureFlagsResult {
+  const client = useClientQueryClient();
+  const [ready, setReady] = useState(false);
+  const seed = useMemo(
+    () =>
+      initialFlags === undefined
+        ? undefined
+        : initialFlagsToArray(initialFlags),
+    [initialFlags],
+  );
+  const dummy =
+    process.env.NEXT_PUBLIC_SUPABASE_URL === "https://example.supabase.co";
+  const query = useQuery(
+    {
+      queryKey: key,
+      enabled: ready && enabled,
+      staleTime: dummy ? 0 : CACHE_TTL,
+      queryFn: async ({ signal }) => {
+        try {
+          const response = await fetch("/api/feature-flags", { signal });
+          if (!response.ok) throw new Error("Failed to fetch flags");
+          const payload: { data: FeatureFlag[] } = await response.json();
+          signal.throwIfAborted();
+          return payload.data;
+        } catch (error) {
+          if (!signal.aborted)
+            clientLogger.warn(
+              client.getQueryData(key)
+                ? "Failed to refresh feature flags, using cached"
+                : "Failed to fetch feature flags, defaulting all to false",
+              { error: error instanceof Error ? error.message : String(error) },
+            );
+          throw error instanceof Error ? error : new Error(String(error));
         }
-        clientLogger.warn("Failed to fetch feature flags, defaulting all to false", { error: err instanceof Error ? err.message : String(err) });
-        return [];
-      });
-
-    return cache.promise;
-  }, [isE2EDummySupabase]);
-
+      },
+    },
+    client,
+  );
   useEffect(() => {
-    if (!enabled) {
-      return;
+    const cachedAt = client.getQueryState(key)?.dataUpdatedAt;
+    if (
+      seed &&
+      (!client.getQueryData(key) ||
+        (initialUpdatedAt !== undefined &&
+          Number.isFinite(initialUpdatedAt) &&
+          initialUpdatedAt > (cachedAt ?? 0)))
+    ) {
+      // A newer seed supersedes reads started against the previous snapshot.
+      void client.cancelQueries({ queryKey: key, exact: true });
+      client.setQueryData(
+        key,
+        seed,
+        initialUpdatedAt === undefined
+          ? undefined
+          : { updatedAt: initialUpdatedAt },
+      );
     }
-
-    let mounted = true;
-
-    async function load() {
-      try {
-        const data = await fetchFlags();
-        if (mounted) {
-          setFlags(data);
-          setIsReady(true);
-        }
-      } catch {
-        if (mounted) {
-          setFlags([]);
-          setIsReady(true);
-        }
-      }
-    }
-
-    if (shouldUseServerSeedOnly) {
-      // Skip the immediate fetch — the caller provided fresh server-rendered values.
-      // Schedule a background refresh once the stale window has elapsed so the
-      // client eventually re-validates without causing a flash on first paint.
-      const delay = CACHE_TTL;
-      const timerId = setTimeout(() => {
-        if (mounted) load();
-      }, delay);
-      return () => {
-        mounted = false;
-        clearTimeout(timerId);
-      };
-    }
-
-    load();
-    return () => { mounted = false; };
-  }, [enabled, fetchFlags, shouldUseServerSeedOnly]);
-
+    setReady(true);
+  }, [client, seed, initialUpdatedAt]);
+  useEffect(() => {
+    if (!enabled || !seed || dummy) return;
+    const timer = setTimeout(() => {
+      const updatedAt = client.getQueryState(key)?.dataUpdatedAt;
+      if (updatedAt !== undefined && Date.now() - updatedAt >= CACHE_TTL)
+        void client.refetchQueries(
+          { queryKey: key, exact: true, type: "active" },
+          { cancelRefetch: false },
+        );
+    }, CACHE_TTL);
+    return () => clearTimeout(timer);
+  }, [client, enabled, seed, dummy]);
+  const flags = (!ready && seed ? seed : (query.data ?? seed)) ?? EMPTY_FLAGS;
+  const isReady = seed !== undefined || query.isSuccess || query.isError;
   const isEnabled = useCallback(
-    (key: FeatureFlagKey): boolean => {
-      const flag = flags.find((f) => f.flagKey === key);
-      return flag?.enabled ?? false;
-    },
-    [flags]
+    (name: FeatureFlagKey) =>
+      flags.find((flag) => flag.flagKey === name)?.enabled ?? false,
+    [flags],
   );
-
-  /**
-   * Check if a flag is enabled, with a fallback value while loading.
-   * Use this when you want to show UI optimistically during initial load.
-   */
   const isEnabledWithDefault = useCallback(
-    (key: FeatureFlagKey, defaultValue: boolean = false): boolean => {
-      if (!isReady) return defaultValue;
-      const flag = flags.find((f) => f.flagKey === key);
-      return flag?.enabled ?? false;
-    },
-    [flags, isReady]
+    (name: FeatureFlagKey, fallback = false) =>
+      isReady ? isEnabled(name) : fallback,
+    [isReady, isEnabled],
   );
-
-  // #673: memoize the returned value so that FeatureFlagsProvider consumers
-  // only re-render when flags, readiness, or the stable callbacks actually change.
+  const refetch = query.refetch;
+  const refresh = useCallback(async () => {
+    if (enabled) await refetch();
+  }, [enabled, refetch]);
+  const error = enabled ? query.error : null;
   return useMemo(
-    () => ({
-      flags,
-      /** Whether flags have been loaded from server */
-      isReady,
-      /** Check if a flag is enabled (returns false while loading) */
-      isEnabled,
-      /** Check if a flag is enabled with a default value while loading */
-      isEnabledWithDefault,
-    }),
-    [flags, isReady, isEnabled, isEnabledWithDefault],
+    () => ({ flags, isReady, isEnabled, isEnabledWithDefault, error, refresh }),
+    [flags, isReady, isEnabled, isEnabledWithDefault, error, refresh],
   );
 }
 
 interface FeatureFlagsProviderProps {
   children?: ReactNode;
   initialFlags?: Partial<Record<FeatureFlagKey, boolean>>;
+  initialUpdatedAt?: number;
   enabled?: boolean;
 }
 
 export function FeatureFlagsProvider({
   children,
   initialFlags,
+  initialUpdatedAt,
   enabled = true,
 }: FeatureFlagsProviderProps) {
-  const value = useFeatureFlagsState(initialFlags, enabled);
+  const value = useFeatureFlagsState(initialFlags, enabled, initialUpdatedAt);
 
   return createElement(FeatureFlagsContext.Provider, { value }, children);
 }
@@ -220,7 +165,9 @@ export function FeatureFlagsProvider({
 export function useFeatureFlags(): UseFeatureFlagsResult {
   const context = useContext(FeatureFlagsContext);
   if (!context) {
-    throw new Error("useFeatureFlags must be used within a FeatureFlagsProvider");
+    throw new Error(
+      "useFeatureFlags must be used within a FeatureFlagsProvider",
+    );
   }
   return context;
 }

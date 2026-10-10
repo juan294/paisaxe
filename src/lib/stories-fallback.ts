@@ -3,7 +3,7 @@ import type { Story } from "@/types/immersive";
 // LOCATION-SPECIFIC: Import fallback stories from content directory
 // When replicating, replace content/fallback-stories.json with location-specific stories
 import fallbackStoriesData from "@content/fallback-stories.json";
-import { STORY_TRANSLATIONS } from "@content/translations/story-translations";
+import { FALLBACK_STORY_TRANSLATIONS } from "@content/translations/fallback-story-translations.generated";
 import { TRANSLATION_LOCALES } from "./translation-locales";
 
 /**
@@ -22,7 +22,7 @@ import { TRANSLATION_LOCALES } from "./translation-locales";
  * for easy content management.
  */
 export const FALLBACK_STORIES: Story[] = (fallbackStoriesData.stories as Story[]).map(story => {
-  const catalog = STORY_TRANSLATIONS[story.slug ?? story.id];
+  const catalog = FALLBACK_STORY_TRANSLATIONS[story.slug ?? story.id];
   const sourcePrompts = story.metadata?.question_prompts ?? [];
   const translations = Object.fromEntries(TRANSLATION_LOCALES.flatMap(locale => {
     const translation = catalog?.[locale];

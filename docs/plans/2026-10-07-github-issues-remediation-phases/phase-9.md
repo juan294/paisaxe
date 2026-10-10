@@ -1,10 +1,10 @@
 # Phase 9: Client cache consolidation
 
-Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #766. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: planned, not implemented. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
+Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #766. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: authorized by the owner on 2026-10-10; implementation and local runtime qualification complete; native hooks and local delivery pending, with their outcomes to be recorded in the final private handoff. Owner acceptance remains pending. Current entry baseline is accepted Phase 8 develop `e41ba9e1dc234b677fa82775cfde1a509898fe47`. See [implementation record](phase-9-implementation.md). Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
 
 ## Scope and source evidence
 
-The owner selected incremental TanStack Query adoption preserving shared state and persistence. Sources: `src/hooks/use-stories.ts:37`, `src/hooks/use-stories.ts:149`, `src/hooks/use-feature-flags.ts:22`, `src/hooks/use-feature-flags.ts:80`, `src/components/admin/analytics-cache-context.tsx:106`, `src/components/admin/analytics-cache-context.tsx:118`, `src/hooks/use-favorites.ts:8`, `src/hooks/use-favorites.ts:95`, `src/hooks/use-favorites.ts:137`, `src/hooks/use-voice-access.ts:43`.
+The owner selected incremental TanStack Query adoption preserving shared state and persistence. Current implementation anchors after the authorized migration: `src/hooks/use-stories.ts:122`, `src/hooks/use-stories.ts:203`, `src/hooks/use-feature-flags.ts:49`, `src/hooks/use-feature-flags.ts:111`, `src/components/admin/analytics-cache-context.tsx:24`, `src/components/admin/analytics-cache-context.tsx:47`, `src/hooks/use-favorites.ts:57`, `src/hooks/use-favorites.ts:132`, `src/hooks/use-favorites.ts:187`, `src/hooks/use-voice-access.ts:102`, `src/hooks/use-voice-access.ts:121`. The parent planning baseline remains historical; the implementation record identifies the actual entry and candidate.
 
 ## Design and ownership
 

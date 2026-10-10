@@ -59,7 +59,7 @@ describe("useFeatureFlags", () => {
       expect(result.current.isReady).toBe(true);
     });
 
-    expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags");
+    expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags", expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(result.current.flags).toEqual(flags);
   });
 
@@ -384,7 +384,7 @@ describe("useFeatureFlags initialFlags", () => {
     await vi.runAllTimersAsync();
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags");
+      expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags", expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
 
     await waitFor(() => {
@@ -413,7 +413,7 @@ describe("useFeatureFlags initialFlags", () => {
       expect(result.current.isReady).toBe(true);
     });
 
-    expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags");
+    expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags", expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(result.current.isEnabled("contextual_prompts")).toBe(true);
   });
 });
@@ -545,74 +545,31 @@ describe("useFeatureFlags cache behavior", () => {
     vi.restoreAllMocks();
   });
 
-  it("should set flags to [] when useEffect load() catch block triggers (lines 81-83)", async () => {
-    // The catch block in the useEffect's load() only triggers if fetchFlags()
-    // rejects with an unhandled error. Since fetchFlags() has its own .catch()
-    // that always resolves (returning [] or cache.data), the outer catch is
-    // effectively unreachable under normal conditions.
-    //
-    // To trigger it, we need fetchFlags itself to throw synchronously or the
-    // promise to reject in a way that bypasses the inner .catch().
-    // We can achieve this by mocking the module's fetchFlags to reject.
-
-    // Import fresh module
-    const mod = await import("./use-feature-flags");
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(mod.FeatureFlagsProvider, null, children);
-
-    // Spy on the hook's internal behavior by making fetch throw in a way
-    // that causes the load() promise chain to reject.
-    // The inner .catch() handles fetch rejections, but if Date.now itself
-    // throws, fetchFlags will throw synchronously before creating the promise.
-    const dateNowSpy = vi.spyOn(Date, "now").mockImplementation(() => {
-      throw new Error("Date.now exploded");
-    });
-
-    const { result } = renderHook(() => mod.useFeatureFlags(), { wrapper });
-
-    await waitFor(() => {
-      expect(result.current.isReady).toBe(true);
-    });
-
-    // The catch block sets flags to []
+  it("exposes a rejected network read and executable retry without freezing followers", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ ok: true, json: async () => ({ data: [makeFlag("contextual_prompts", true)] }) });
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
+    await waitFor(() => expect(result.current.error?.message).toBe("offline"));
     expect(result.current.flags).toEqual([]);
-
-    dateNowSpy.mockRestore();
+    const { act } = await import("@testing-library/react");
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.isEnabled("contextual_prompts")).toBe(true);
+    expect(result.current.error).toBeNull();
   });
 
-  it("should not update state when component unmounts before fetch rejects (line 81 mounted=false in catch)", async () => {
-    // This exercises the `if (mounted)` guard on line 81 inside the catch block of load().
-    // When the component unmounts before fetchFlags() rejects, mounted becomes false,
-    // so setFlags/setIsReady should NOT be called.
-    //
-    // To reach the catch block (lines 80-84), fetchFlags() itself must throw.
-    // The inner .catch() in fetchFlags handles fetch rejections by resolving.
-    // We force fetchFlags to throw by making Date.now() throw synchronously.
-
+  it("aborts an unmounted request and never adopts its later rejection", async () => {
+    let reject!: (error: Error) => void;
+    mockFetch.mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
     const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(FeatureFlagsProvider, null, children);
-
-    const dateNowSpy = vi.spyOn(Date, "now").mockImplementation(() => {
-      throw new Error("Date.now exploded");
-    });
-
+    const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(FeatureFlagsProvider, null, children);
     const { result, unmount } = renderHook(() => useFeatureFlags(), { wrapper });
-
-    // Hook starts loading — fetchFlags will throw synchronously due to Date.now
-    // but the error is caught asynchronously in load(). Unmount before the
-    // microtask resolves.
+    const signal = mockFetch.mock.calls[0]![1].signal as AbortSignal;
     unmount();
-
-    // Give the microtask queue time to process
-    await new Promise((r) => setTimeout(r, 10));
-
-    // The mounted guard in the catch block should have prevented state updates.
-    // isReady should still be false (initial value) since we unmounted before
-    // the catch handler could set it.
+    expect(signal.aborted).toBe(true);
+    reject(new Error("late failure"));
+    await Promise.resolve();
     expect(result.current.isReady).toBe(false);
-
-    dateNowSpy.mockRestore();
   });
 
   it("should not update state when component unmounts before fetch resolves (line 76 mounted=false)", async () => {

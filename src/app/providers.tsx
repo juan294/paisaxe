@@ -6,7 +6,9 @@ import type { InitialPresentation } from '@/types/presentation';
 import { SkipLink } from '@/components/a11y/skip-link';
 import { LangSync } from '@/components/a11y/lang-sync';
 import { PostHogProviderWrapper } from '@/components/posthog-provider';
-import { FeatureFlagsProvider } from '@/hooks/use-feature-flags';
+import { CacheRetryNotice } from "@/components/cache-retry-notice";
+import { FeatureFlagsProvider, useFeatureFlags } from '@/hooks/use-feature-flags';
+import { ClientQueryProvider } from "@/lib/client-query";
 import { usePathname } from "next/navigation";
 
 interface ProvidersProps {
@@ -58,11 +60,13 @@ function pathConsumesFeatureFlags(pathname: string): boolean {
 function PresentationRegion({ children }: { children: React.ReactNode }) {
   const { t, locale, dictionaryLocale, loadError, isLanguageLoading, retryLanguage, legacyMigrated } = useTranslation();
   const { authError, retryAuth, signInWithGoogle } = useAuthContext();
+  const { error: flagsError, refresh: refreshFlags } = useFeatureFlags();
   return <div lang={dictionaryLocale ?? locale} data-request-presentation>
     {isLanguageLoading && <p role="status">{t('common.loading')}</p>}
     {loadError && <div role="alert" className="relative z-50 bg-neutral-950 px-4 py-3 text-sm text-white"><p>{t('locale.loadFailed')}</p><button type="button" className="mr-3 mt-2 rounded px-3 py-2 underline focus-visible:outline focus-visible:outline-2" onClick={retryLanguage}>{t('locale.retry')}</button></div>}
     {legacyMigrated && <p role="status">{t('locale.legacyMigrated')}</p>}
     {authError && <div role="alert" className="relative z-50 bg-neutral-950 px-4 py-3 text-sm text-white"><p>{t('auth.verificationFailed')}</p><button type="button" className="mr-3 mt-2 rounded px-3 py-2 underline focus-visible:outline focus-visible:outline-2" onClick={retryAuth}>{t('auth.retryVerification')}</button><button type="button" className="mr-3 mt-2 rounded px-3 py-2 underline focus-visible:outline focus-visible:outline-2" onClick={() => void signInWithGoogle()}>{t('auth.sign_in')}</button></div>}
+    <CacheRetryNotice error={flagsError} onRetry={() => void refreshFlags()} />
     {children}
   </div>;
 }
@@ -75,7 +79,7 @@ export function Providers({ children, initialPresentation }: ProvidersProps) {
   const rootFeatureFlagsEnabled = pathname ? pathConsumesFeatureFlags(pathname) : true;
 
   return (
-    <PostHogProviderWrapper>
+    <ClientQueryProvider><PostHogProviderWrapper>
       <LanguageProvider initialLocale={initialPresentation?.locale} initialDictionary={initialPresentation?.dictionary} initialDictionaryLocale={initialPresentation?.dictionaryLocale} initialLanguageError={initialPresentation?.languageError} reconcileLegacyPreference={initialPresentation !== undefined && initialPresentation.localeSource !== 'cookie'}>
         <FeatureFlagsProvider enabled={rootFeatureFlagsEnabled}>
           <AuthProvider deferInitialAuth={deferInitialAuth} initialUser={initialPresentation?.user} initialAuthError={initialPresentation?.authError}>
@@ -87,6 +91,6 @@ export function Providers({ children, initialPresentation }: ProvidersProps) {
           </AuthProvider>
         </FeatureFlagsProvider>
       </LanguageProvider>
-    </PostHogProviderWrapper>
+    </PostHogProviderWrapper></ClientQueryProvider>
   );
 }

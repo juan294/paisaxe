@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, Suspense, useTransition, useCallb
 import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
+import { CacheRetryNotice } from "@/components/cache-retry-notice";
 import { StoriesProvider, useStories } from "@/hooks/use-stories";
 import type { Story } from "@/types/immersive";
 import { useStoryFilters } from "@/hooks/use-story-filters";
@@ -37,6 +38,7 @@ interface ImmersivePageContentProps {
   serverShuffleSeed: number | null;
   /** Server-fetched stories to seed the client cache and skip loading state */
   initialStories?: Story[];
+  initialDataUpdatedAt?: number;
   /**
    * Server-fetched feature flags.
    * When provided, useFeatureFlags uses these as the initial state and sets
@@ -45,10 +47,10 @@ interface ImmersivePageContentProps {
   initialFlags?: Partial<Record<import("@/types/feature-flags").FeatureFlagKey, boolean>>;
 }
 
-export function ImmersivePageContent({ serverShuffleSeed, initialStories, initialFlags }: ImmersivePageContentProps) {
+export function ImmersivePageContent({ serverShuffleSeed, initialStories, initialFlags, initialDataUpdatedAt }: ImmersivePageContentProps) {
   return (
-    <StoriesProvider initialStories={initialStories}>
-      <FeatureFlagsProvider initialFlags={initialFlags}>
+    <StoriesProvider initialStories={initialStories} initialUpdatedAt={initialDataUpdatedAt}>
+      <FeatureFlagsProvider initialFlags={initialFlags} initialUpdatedAt={initialDataUpdatedAt}>
         <ImmersivePageContentInner serverShuffleSeed={serverShuffleSeed} />
       </FeatureFlagsProvider>
     </StoriesProvider>
@@ -60,7 +62,7 @@ interface ImmersivePageContentInnerProps {
 }
 
 function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentInnerProps) {
-  const { stories: allStories, isLoading } = useStories();
+  const { stories: allStories, isLoading, error: storiesError, refresh: refreshStories } = useStories();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   // Opened from the voucher entry (/acceso redirects to ?booking=1): the chat
@@ -83,7 +85,7 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
 
   // Pass server-fetched initialFlags so the hook is ready immediately on first
   // paint — no client fetch on mount, no flag-gated UI flash.
-  const { isEnabled, isReady: flagsReady } = useFeatureFlags();
+  const { isEnabled, isReady: flagsReady, error: flagsError, refresh: refreshFlags } = useFeatureFlags();
   const { t, locale } = useTranslation();
   const { viewedIndices, markViewed } = useViewedStories();
   const searchParams = useSearchParams();
@@ -236,6 +238,8 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
   if (filteredStories.length === 0) {
     return (
       <div role="alert" aria-live="assertive" className="fixed inset-0 flex flex-col items-center justify-center bg-black">
+        <CacheRetryNotice error={storiesError} onRetry={() => void refreshStories()} />
+        <CacheRetryNotice error={flagsError} onRetry={() => void refreshFlags()} />
         <div className="text-white text-lg mb-4">{t("stories.no_results")}</div>
         <button
           onClick={() => {
@@ -252,6 +256,8 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
 
   return (
     <>
+      <CacheRetryNotice error={storiesError} onRetry={() => void refreshStories()} />
+      <CacheRetryNotice error={flagsError} onRetry={() => void refreshFlags()} />
       {/* Mood overlay */}
       {showMoodOverlay && (
         <MoodOverlay onSelectMood={handleMoodSelect} onDismiss={handleMoodDismiss} />

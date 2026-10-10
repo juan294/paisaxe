@@ -24,6 +24,7 @@ export async function ImmersiveDataLoader() {
       serverShuffleSeed={serverShuffleSeed}
       initialStories={serverStories}
       initialFlags={initialFlags}
+      initialDataUpdatedAt={Date.now()}
     />
   );
 }

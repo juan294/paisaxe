@@ -5,12 +5,19 @@
  * Nested consumers must receive the server-provided values immediately on first
  * render — no client fetch on mount, no flag-gated UI flash.
  */
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { FeatureFlagsProvider, useFeatureFlags } from "@/hooks/use-feature-flags";
+import { getBrowserQueryClient } from "@/lib/client-query";
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
+// Each test represents a new browser; same-test consumers still share one cache.
+beforeEach(() => {
+  getBrowserQueryClient().clear();
+  mockFetch.mockReset();
+});
+afterEach(() => getBrowserQueryClient().clear());
 
 /**
  * A test component that reads flags from context and renders its state.

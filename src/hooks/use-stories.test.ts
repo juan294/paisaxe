@@ -197,7 +197,7 @@ describe("useStories", () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toBe("Failed to load stories");
+    expect(result.current.error?.message).toBe("Failed to fetch stories");
   });
 
   it("should refresh and force-fetch new data", async () => {
@@ -283,9 +283,9 @@ describe("useStories", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // Cached stories are retained (no throw, no error state).
+    // Safe stale stories remain visible, with an error for executable retry.
     expect(result.current.stories).toEqual(mockStories);
-    expect(result.current.error).toBeNull();
+    expect(result.current.error?.message).toBe("Failed to fetch stories");
 
     consoleSpy.mockRestore();
   });
@@ -337,7 +337,7 @@ describe("useStories", () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toBe("Failed to refresh stories");
+    expect(result.current.error?.message).toBe("Failed to fetch stories");
   });
 
   it("should revalidate stale data on window focus", async () => {
@@ -676,7 +676,7 @@ describe("useStories with initialStories", () => {
     // Second: render with initialStories — initialStories overwrites cache
     // to ensure post-deploy freshness (FE-M2)
     const wrapperWithInitial = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(StoriesProvider, { initialStories: serverStories }, children);
+      React.createElement(StoriesProvider, { initialStories: serverStories, initialUpdatedAt: Date.now() + 1 }, children);
     const { result: result2 } = renderHook(() => useStories(), { wrapper: wrapperWithInitial });
     expect(result2.current.stories).toEqual(serverStories);
     expect(result2.current.isLoading).toBe(false);

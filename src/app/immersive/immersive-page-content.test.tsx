@@ -148,7 +148,7 @@ function setupDefaults(overrides?: { isLoading?: boolean; stories?: Story[] }) {
   vi.mocked(useStoryFilters).mockReturnValue(filtersMock);
 
   vi.mocked(useFeatureFlags).mockReturnValue({
-    flags: [],
+    flags: [], error: null, refresh: async () => {},
     isReady: true,
     isEnabled: () => false,
     isEnabledWithDefault: () => false,
@@ -259,7 +259,7 @@ describe("ImmersivePageContent", () => {
     setupDefaults();
     // Enable mood_discovery flag
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "mood_discovery",
       isEnabledWithDefault: () => false,
@@ -289,7 +289,7 @@ describe("ImmersivePageContent", () => {
     setupDefaults();
     // Enable mood_discovery
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "mood_discovery",
       isEnabledWithDefault: () => false,
@@ -460,7 +460,7 @@ describe("ImmersivePageContent", () => {
     const { applySeasonalWeighting } = await import("@/lib/seasonal-weighting");
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "seasonal_surfacing",
       isEnabledWithDefault: () => false,
@@ -537,7 +537,7 @@ describe("ImmersivePageContent", () => {
 
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "mood_discovery",
       isEnabledWithDefault: () => false,
@@ -603,7 +603,7 @@ describe("ImmersivePageContent", () => {
     // that cannot be exercised in jsdom without overriding globals.
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "mood_discovery",
       isEnabledWithDefault: () => false,
@@ -617,7 +617,7 @@ describe("ImmersivePageContent", () => {
   it("renders story-viewer when visitor_voice_agent is enabled", () => {
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "visitor_voice_agent",
       isEnabledWithDefault: () => false,
@@ -638,7 +638,7 @@ describe("ImmersivePageContent", () => {
 
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "visitor_voice_agent",
       isEnabledWithDefault: () => false,

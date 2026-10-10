@@ -41,6 +41,7 @@ Object.defineProperty(window, "localStorage", { value: localStorageMock });
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+import { favoritesStorageKey } from "@/lib/client-query";
 import { useFavorites } from "./use-favorites";
 
 describe("useFavorites", () => {
@@ -85,7 +86,7 @@ describe("useFavorites", () => {
     });
     expect(result.current.favorites).toEqual(["story-1"]);
     expect(result.current.retryAfter).toBeNull();
-    expect(localStorageMock._getStore().paisaxe_favorites).toBe(JSON.stringify(["story-1"]));
+    expect(JSON.parse(localStorageMock._getStore()[favoritesStorageKey("fixture-user")]!).data).toEqual(["story-1"]);
   });
 
   it.each([200, 429, 500])("reconciles existing cloud favorites after an overlapping mutation completes (%s)", async (status) => {
@@ -108,7 +109,7 @@ describe("useFavorites", () => {
       await pendingWrite;
     });
     await waitFor(() => expect(result.current.favorites).toEqual(expected));
-    expect(localStorageMock._getStore().paisaxe_favorites).toBe(JSON.stringify(expected));
+    expect(JSON.parse(localStorageMock._getStore()[favoritesStorageKey("fixture-user")]!).data).toEqual(expected);
     expect(result.current.retryAfter).toBe(status === 429 ? 13 : null);
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
@@ -149,7 +150,7 @@ describe("useFavorites", () => {
     expect(mockFetch).toHaveBeenCalledTimes(before);
     mockFetch.mockResolvedValueOnce(Response.json({ success: true }));
     await act(async () => { await result.current.toggleFavorite("B-story"); });
-    expect(mockFetch.mock.calls.at(-1)?.[1]).toMatchObject({ method: "POST", headers: expect.objectContaining({ Authorization: "Bearer token-B" }), body: JSON.stringify({ storyIds: ["B-story"] }) });
+    expect(mockFetch.mock.calls.filter(([, init]) => init?.method === "POST").at(-1)?.[1]).toMatchObject({ method: "POST", headers: expect.objectContaining({ Authorization: "Bearer token-B" }), body: JSON.stringify({ storyIds: ["B-story"] }) });
     expect(result.current.retryAfter).toBeNull();
     expect(result.current.favorites).toContain("B-story");
   });
@@ -196,7 +197,7 @@ describe("useFavorites", () => {
       mockAuthReturn.session = { access_token: "test-token" };
 
       localStorageMock.getItem.mockReturnValue(
-        JSON.stringify(["story-1", "story-2"])
+        JSON.stringify({ version: 1, userId: "user-1", data: ["story-1", "story-2"], timestamp: Date.now() })
       );
 
       // Mock the cloud sync GET to return same favorites
@@ -221,7 +222,7 @@ describe("useFavorites", () => {
       mockAuthReturn.session = null;
 
       localStorageMock.getItem.mockReturnValue(
-        JSON.stringify(["story-1", "story-2"])
+        JSON.stringify({ version: 1, userId: "user-1", data: ["story-1", "story-2"], timestamp: Date.now() })
       );
 
       const { result } = renderHook(() => useFavorites());
@@ -550,9 +551,9 @@ describe("useFavorites", () => {
       expect(result.current.favorites).not.toContain("story-1");
 
       const lastSetCall = localStorageMock.setItem.mock.calls
-        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .filter((call: unknown[]) => call[0] === favoritesStorageKey("user-1"))
         .pop();
-      expect(JSON.parse(lastSetCall![1])).toEqual([]);
+      expect(JSON.parse(lastSetCall![1]).data).toEqual([]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Error syncing favorite to cloud")
@@ -596,9 +597,9 @@ describe("useFavorites", () => {
 
       // localStorage should be reverted to pre-toggle value
       const lastSetCall = localStorageMock.setItem.mock.calls
-        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .filter((call: unknown[]) => call[0] === favoritesStorageKey("user-1"))
         .pop();
-      const savedFavorites = JSON.parse(lastSetCall![1]);
+      const savedFavorites = JSON.parse(lastSetCall![1]).data;
       expect(savedFavorites).toContain("story-1");
 
       consoleSpy.mockRestore();
@@ -635,9 +636,9 @@ describe("useFavorites", () => {
       expect(result.current.favorites).toContain("story-1");
 
       const lastSetCall = localStorageMock.setItem.mock.calls
-        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .filter((call: unknown[]) => call[0] === favoritesStorageKey("user-1"))
         .pop();
-      expect(JSON.parse(lastSetCall![1])).toEqual(["story-1"]);
+      expect(JSON.parse(lastSetCall![1]).data).toEqual(["story-1"]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Error syncing favorite to cloud")
@@ -781,10 +782,10 @@ describe("useFavorites", () => {
 
       // localStorage should be updated with cloud favorites only
       const setItemCalls = localStorageMock.setItem.mock.calls.filter(
-        (call: unknown[]) => call[0] === "paisaxe_favorites"
+        (call: unknown[]) => call[0] === favoritesStorageKey("user-1")
       );
       const lastCall = setItemCalls[setItemCalls.length - 1];
-      const savedFavorites = JSON.parse(lastCall[1]);
+      const savedFavorites = JSON.parse(lastCall[1]).data;
       expect(savedFavorites).toEqual(["story-2"]);
     });
 

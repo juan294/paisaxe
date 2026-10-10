@@ -1,3 +1,4 @@
+import { favoritesStorageKey } from "@/lib/client-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -44,6 +45,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   cleanup();
+  vi.restoreAllMocks();
   vi.useRealTimers();
   if (sdk) {
     await sdk.auth.signOut({ scope: "local" });
@@ -272,12 +274,12 @@ describe("Phase 6 favorites undo through real auth/stories/favorites providers",
     vi.useFakeTimers();
   }
 
-  const removeFirst = () => fireEvent.click(screen.getAllByRole("button", { name: "Quitar de guardados" })[0]!);
+  const removeFirst = async () => { await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: "Quitar de guardados" })[0]!); }); };
   const undo = () => screen.queryByRole("button", { name: "Deshacer" });
 
   it("expires at exactly 6000ms and a late successful DELETE cannot revive Undo", async () => {
     await renderFavorites();
-    removeFirst();
+    await removeFirst();
     expect(undo()).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(5999));
     expect(undo()).toBeInTheDocument();
@@ -286,23 +288,26 @@ describe("Phase 6 favorites undo through real auth/stories/favorites providers",
     await act(async () => { removed.resolve(json({})); });
     expect(undo()).not.toBeInTheDocument();
     expect(serverIds).toEqual([second.id]);
-    expect(JSON.parse(localStorage.getItem("paisaxe_favorites")!)).toEqual([second.id]);
+    expect(JSON.parse(localStorage.getItem(favoritesStorageKey(user.id))!).data).toEqual([second.id]);
     expect(fetchBoundary.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
   });
 
   it("Undo clears the timer immediately while pending DELETE/POST outcomes remain real", async () => {
     await renderFavorites();
-    const baseline = vi.getTimerCount();
-    removeFirst();
+    const timers = vi.spyOn(globalThis, "setTimeout");
+    const clearTimer = vi.spyOn(globalThis, "clearTimeout");
+    await removeFirst();
+    const ownedTimer = timers.mock.results[timers.mock.calls.findIndex(([, delay]) => delay === 6000)]!.value;
+    expect(ownedTimer).toBeDefined();
     fireEvent.click(undo()!);
     expect(undo()).not.toBeInTheDocument();
-    expect(vi.getTimerCount()).toBe(baseline);
+    expect(clearTimer).toHaveBeenCalledWith(ownedTimer);
     await act(async () => { removed.resolve(json({})); });
     expect(undo()).not.toBeInTheDocument();
     await act(async () => { added.resolve(json({})); });
     expect(undo()).not.toBeInTheDocument();
     expect(new Set(serverIds)).toEqual(new Set([story.id, second.id]));
-    expect(new Set(JSON.parse(localStorage.getItem("paisaxe_favorites")!))).toEqual(new Set([story.id, second.id]));
+    expect(new Set(JSON.parse(localStorage.getItem(favoritesStorageKey(user.id))!).data)).toEqual(new Set([story.id, second.id]));
     const writes = fetchBoundary.mock.calls.filter(([, init]) => init?.method === "DELETE" || init?.method === "POST");
     expect(writes.map(([, init]) => init?.method)).toEqual(["DELETE", "POST"]);
     expect(writes[1]?.[1]?.body).toBe(JSON.stringify({ storyIds: [story.id] }));
@@ -313,30 +318,34 @@ describe("Phase 6 favorites undo through real auth/stories/favorites providers",
 
   it("replacement removal gets a fresh 6000ms and unmount cancels the owned timer", async () => {
     await renderFavorites();
-    const baseline = vi.getTimerCount();
-    removeFirst();
+    const timers = vi.spyOn(globalThis, "setTimeout");
+    const clearTimer = vi.spyOn(globalThis, "clearTimeout");
+    await removeFirst();
     act(() => vi.advanceTimersByTime(1000));
-    removeFirst();
+    await removeFirst();
     expect(screen.getByRole("status")).toHaveTextContent("Lugar dos");
     act(() => vi.advanceTimersByTime(5000));
     expect(undo()).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(999));
     expect(undo()).toBeInTheDocument();
+    const index = timers.mock.calls.map(([, delay]) => delay).lastIndexOf(6000);
+    const ownedTimer = timers.mock.results[index]!.value;
+    expect(ownedTimer).toBeDefined();
     cleanup();
-    expect(vi.getTimerCount()).toBe(baseline);
+    expect(clearTimer).toHaveBeenCalledWith(ownedTimer);
     await act(async () => { removed.resolve(json({})); });
     expect(undo()).not.toBeInTheDocument();
   });
 
   it("failed re-add preserves the real rollback without reviving a cleared Undo notice", async () => {
     await renderFavorites();
-    removeFirst();
+    await removeFirst();
     fireEvent.click(undo()!);
     await act(async () => { removed.resolve(json({})); });
     await act(async () => { added.resolve(new Response("rejected", { status: 500 })); });
     expect(undo()).not.toBeInTheDocument();
     expect(serverIds).toEqual([second.id]);
-    expect(JSON.parse(localStorage.getItem("paisaxe_favorites")!)).toEqual([second.id]);
+    expect(JSON.parse(localStorage.getItem(favoritesStorageKey(user.id))!).data).toEqual([second.id]);
     expect(within(screen.getByRole("main")).queryByText(story.title)).not.toBeInTheDocument();
     act(() => vi.advanceTimersByTime(6000));
     expect(undo()).not.toBeInTheDocument();
