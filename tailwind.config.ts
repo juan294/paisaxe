@@ -43,6 +43,32 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        // Fixed swatches preserve the explicit light/dark and alpha pairings.
+        admin: {
+          ink: "#2d2a26",
+          paper: "#f5f3ee",
+          muted: "#6b6560",
+          subtle: "#a39e98",
+          line: "#e5e3de",
+          depth: "#3d3a36",
+          panel: "#252320",
+          secondary: "#4d4944",
+          "canvas-dark": "#1a1917",
+          approve: "#5a7a5a",
+          "approve-hover": "#4a6a4a",
+          "health-success": "#7a9e7a",
+          warning: "#c9a55c",
+          "warning-hover": "#b89545",
+          "health-error": "#c97a7a",
+          delete: "#a85454",
+          "delete-hover": "#8b4444",
+          "skeleton-dot": "#d5d3ce",
+        },
+        scene: {
+          black: "#000",
+          white: "#fff",
+          canvas: "oklch(14.5% 0 none)",
+        },
         // Brand accent (#1011): the conversion-surface green, as one scale to
         // retune in one place. Use `paisaxe-green-*`, never raw `green-*`
         // utilities (brand-colors.test.ts enforces it). Values equal

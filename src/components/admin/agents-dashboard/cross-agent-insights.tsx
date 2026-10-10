@@ -18,7 +18,7 @@ export function CrossAgentInsights({ entries }: { entries: SharedContextEntry[] 
 
   return (
     <section>
-      <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+      <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
         Cross-Agent Insights
       </h2>
 
@@ -27,7 +27,7 @@ export function CrossAgentInsights({ entries }: { entries: SharedContextEntry[] 
         <button
           onClick={() => setSelectedIndex(Math.max(0, index - 1))}
           disabled={index === 0}
-          className="shrink-0 rounded-full p-1 text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] disabled:opacity-30 dark:hover:bg-[#3d3a36]"
+          className="shrink-0 rounded-full p-1 text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted disabled:opacity-30 dark:hover:bg-admin-depth"
           aria-label="Previous agent insight"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -40,8 +40,8 @@ export function CrossAgentInsights({ entries }: { entries: SharedContextEntry[] 
               className={cn(
                 "shrink-0 rounded-full px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors",
                 i === index
-                  ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-                  : "bg-[#f5f3ee] text-[#6b6560] hover:bg-[#e5e3de] dark:bg-[#3d3a36] dark:text-[#a39e98] dark:hover:bg-[#4a4540]"
+                  ? "bg-admin-ink text-admin-paper dark:bg-admin-paper dark:text-admin-ink"
+                  : "bg-admin-paper text-admin-muted hover:bg-admin-line dark:bg-admin-depth dark:text-admin-subtle dark:hover:bg-[#4a4540]"
               )}
             >
               {entry.agentName}
@@ -51,7 +51,7 @@ export function CrossAgentInsights({ entries }: { entries: SharedContextEntry[] 
         <button
           onClick={() => setSelectedIndex(Math.min(uniqueEntries.length - 1, index + 1))}
           disabled={index === uniqueEntries.length - 1}
-          className="shrink-0 rounded-full p-1 text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] disabled:opacity-30 dark:hover:bg-[#3d3a36]"
+          className="shrink-0 rounded-full p-1 text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted disabled:opacity-30 dark:hover:bg-admin-depth"
           aria-label="Next agent insight"
         >
           <ChevronRight className="h-4 w-4" />
@@ -62,7 +62,7 @@ export function CrossAgentInsights({ entries }: { entries: SharedContextEntry[] 
       {selected && <SharedContextCard entry={selected} />}
 
       {/* Entry counter */}
-      <p className="mt-2 text-center font-mono text-[10px] text-[#a39e98] dark:text-[#6b6560]">
+      <p className="mt-2 text-center font-mono text-[10px] text-admin-subtle dark:text-admin-muted">
         {index + 1} / {uniqueEntries.length}
       </p>
     </section>
@@ -71,16 +71,16 @@ export function CrossAgentInsights({ entries }: { entries: SharedContextEntry[] 
 
 function SharedContextCard({ entry }: { entry: SharedContextEntry }) {
   return (
-    <div className="rounded-2xl bg-white p-5 dark:bg-[#252320]">
+    <div className="rounded-2xl bg-white p-5 dark:bg-admin-panel">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+        <span className="text-xs font-medium text-admin-ink dark:text-admin-paper">
           {entry.agentName}
         </span>
-        <span className="font-mono text-[10px] text-[#a39e98] dark:text-[#6b6560]">
+        <span className="font-mono text-[10px] text-admin-subtle dark:text-admin-muted">
           {relativeTime(entry.timestamp)}
         </span>
       </div>
-      <div className="mt-2 space-y-2 text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98] [&_ul]:mt-1">
+      <div className="mt-2 space-y-2 text-xs leading-relaxed text-admin-muted dark:text-admin-subtle [&_ul]:mt-1">
         <SafeMarkdown content={entry.content} />
       </div>
     </div>

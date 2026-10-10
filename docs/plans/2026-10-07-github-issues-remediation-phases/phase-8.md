@@ -1,6 +1,6 @@
 # Phase 8: Measured frontend performance and palette consolidation
 
-Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #941, #926, #820, #938. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: planned, not implemented. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
+Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #941, #926, #820, #938. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: locally implemented and qualified on the revalidated Phase 7 base; owner acceptance pending after normal local delivery. See the [implementation record](phase-8-implementation.md) and its private final handoff for exact checks, retained failures, delivery identity and measured #820 deferral. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
 
 ## Scope and source evidence
 

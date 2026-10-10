@@ -53,11 +53,11 @@ export function GitHubAnalyticsPanel() {
     <div className="space-y-12">
       {/* Controls */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+        <h2 className="text-lg font-medium text-admin-ink dark:text-admin-paper">
           GitHub Traffic
         </h2>
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+          <div className="flex items-center gap-2 font-mono text-xs text-admin-muted dark:text-admin-subtle">
             <input
               type="date"
               value={dateRange.from}
@@ -76,7 +76,7 @@ export function GitHubAnalyticsPanel() {
             onClick={handleSync}
             disabled={isSyncing}
             aria-label="Sync GitHub data"
-            className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+            className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-admin-muted transition-colors hover:text-admin-ink disabled:opacity-50 dark:text-admin-subtle dark:hover:text-admin-paper"
           >
             <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
             {isSyncing ? "Syncing..." : "Sync Now"}
@@ -84,7 +84,7 @@ export function GitHubAnalyticsPanel() {
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+            className="font-mono text-xs uppercase tracking-widest text-admin-muted transition-colors hover:text-admin-ink disabled:opacity-50 dark:text-admin-subtle dark:hover:text-admin-paper"
           >
             {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -93,7 +93,7 @@ export function GitHubAnalyticsPanel() {
 
       {/* Last synced + sync error */}
       {data?.lastSyncedAt && (
-        <p className="font-mono text-xs text-[#a39e98]">
+        <p className="font-mono text-xs text-admin-subtle">
           Last synced: {new Date(data.lastSyncedAt).toLocaleString("en-US", {
             month: "short",
             day: "numeric",
@@ -126,9 +126,9 @@ export function GitHubAnalyticsPanel() {
         <SkeletonGitHubDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[200px] flex-col items-center justify-center gap-4">
-          <GitBranch className="h-8 w-8 text-[#e5e3de]" />
-          <p className="text-xl font-extralight text-[#a39e98]">No traffic data yet</p>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <GitBranch className="h-8 w-8 text-admin-line" />
+          <p className="text-xl font-extralight text-admin-subtle">No traffic data yet</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Click &quot;Sync Now&quot; to fetch data from GitHub
           </p>
         </div>
@@ -229,8 +229,8 @@ const statColorClasses: Record<string, { value: string; icon: string }> = {
     icon: "text-violet-500 dark:text-violet-400",
   },
   stone: {
-    value: "text-[#6b6560] dark:text-[#a39e98]",
-    icon: "text-[#a39e98]",
+    value: "text-admin-muted dark:text-admin-subtle",
+    icon: "text-admin-subtle",
   },
 };
 
@@ -240,11 +240,11 @@ function StatCard({ value, label, suffix, icon, color = "stone" }: StatCardProps
     <div className="space-y-2">
       <div className={`flex items-center gap-2 ${colors.icon}`}>
         {icon}
-        <span className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">{label}</span>
+        <span className="font-mono text-xs uppercase tracking-widest text-admin-subtle">{label}</span>
       </div>
       <p className={`text-3xl font-extralight tabular-nums tracking-tight ${colors.value}`}>
         {typeof value === "number" ? value.toLocaleString() : value}
-        {suffix && <span className="ml-1 text-lg text-[#a39e98]">{suffix}</span>}
+        {suffix && <span className="ml-1 text-lg text-admin-subtle">{suffix}</span>}
       </p>
     </div>
   );
@@ -286,17 +286,17 @@ function TrafficChart({ daily }: { daily: GitHubTrafficDaily[] }) {
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         Daily Traffic
       </h3>
       <div className="flex items-center gap-6 mb-3">
         <div className="flex items-center gap-2">
           <div className="h-0.5 w-4 bg-blue-500" />
-          <span className="font-mono text-xs text-[#a39e98]">Views</span>
+          <span className="font-mono text-xs text-admin-subtle">Views</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="h-0.5 w-4 bg-emerald-500" />
-          <span className="font-mono text-xs text-[#a39e98]">Clones</span>
+          <span className="font-mono text-xs text-admin-subtle">Clones</span>
         </div>
       </div>
       <svg
@@ -313,7 +313,7 @@ function TrafficChart({ daily }: { daily: GitHubTrafficDaily[] }) {
             x2={chartWidth - padding.right}
             y2={padding.top + h * (1 - frac)}
             stroke="currentColor"
-            className="text-[#e5e3de] dark:text-[#3d3a36]"
+            className="text-admin-line dark:text-admin-depth"
             strokeWidth={0.5}
           />
         ))}
@@ -332,7 +332,7 @@ function TrafficChart({ daily }: { daily: GitHubTrafficDaily[] }) {
               x={padding.left + i * xStep}
               y={chartHeight - 5}
               textAnchor="middle"
-              className="fill-[#a39e98] font-mono"
+              className="fill-admin-subtle font-mono"
               fontSize={9}
             >
               {new Date(d.date + "T12:00:00").toLocaleDateString("en-US", {
@@ -351,42 +351,42 @@ function ReferrersTable({ number, referrers }: { number: string; referrers: GitH
   if (referrers.length === 0) {
     return (
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           {number} — Top Referrers
         </h3>
-        <p className="py-6 text-center font-mono text-xs text-[#a39e98]">No referrer data</p>
+        <p className="py-6 text-center font-mono text-xs text-admin-subtle">No referrer data</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — Top Referrers
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
               <Globe className="inline h-3 w-3 mr-1" />
               Referrer
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Unique
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Views
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {referrers.map((ref, idx) => (
             <tr key={ref.referrer}>
-              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
+              <td className="py-2 font-mono text-sm tabular-nums text-admin-subtle">
                 {String(idx + 1).padStart(2, "0")}
               </td>
-              <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+              <td className="py-2 text-sm text-admin-secondary dark:text-admin-subtle">
                 {ref.referrer}
               </td>
               <td className="py-2 text-right font-mono text-xs tabular-nums text-violet-500 dark:text-violet-400">
@@ -407,45 +407,45 @@ function PathsTable({ number, paths }: { number: string; paths: GitHubTrafficPat
   if (paths.length === 0) {
     return (
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           {number} — Popular Paths
         </h3>
-        <p className="py-6 text-center font-mono text-xs text-[#a39e98]">No path data</p>
+        <p className="py-6 text-center font-mono text-xs text-admin-subtle">No path data</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — Popular Paths
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
               <FileText className="inline h-3 w-3 mr-1" />
               Path
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Unique
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Views
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {paths.map((p, idx) => (
             <tr key={p.path}>
-              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
+              <td className="py-2 font-mono text-sm tabular-nums text-admin-subtle">
                 {String(idx + 1).padStart(2, "0")}
               </td>
-              <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+              <td className="py-2 text-sm text-admin-secondary dark:text-admin-subtle">
                 <span className="font-mono text-xs">{p.path}</span>
                 {p.title && (
-                  <span className="ml-2 text-xs text-[#a39e98]">({p.title})</span>
+                  <span className="ml-2 text-xs text-admin-subtle">({p.title})</span>
                 )}
               </td>
               <td className="py-2 text-right font-mono text-xs tabular-nums text-violet-500 dark:text-violet-400">
@@ -473,19 +473,19 @@ function SkeletonGitHubDashboard() {
         {["blue", "violet", "emerald", "amber", "stone"].map((color) => (
           <div key={color} className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="h-4 w-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
-              <div className="h-3 w-20 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+              <div className="h-4 w-4 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
+              <div className="h-3 w-20 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
             </div>
-            <div className="h-9 w-16 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+            <div className="h-9 w-16 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
           </div>
         ))}
       </section>
 
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           Daily Traffic
         </h3>
-        <div className="h-40 w-full animate-pulse rounded bg-[#f5f3ee] dark:bg-[#3d3a36]" />
+        <div className="h-40 w-full animate-pulse rounded bg-admin-paper dark:bg-admin-depth" />
       </section>
 
       <div className="grid gap-12 lg:grid-cols-2">
@@ -499,28 +499,28 @@ function SkeletonGitHubDashboard() {
 function SkeletonTable({ number, title }: { number: string; title: string }) {
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — {title}
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Name</th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Name</th>
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Count
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {[1, 2, 3].map((idx) => (
             <tr key={idx}>
-              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
+              <td className="py-2 font-mono text-sm tabular-nums text-admin-subtle">
                 {String(idx).padStart(2, "0")}
               </td>
               <td className="py-2">
                 <div
-                  className="h-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]"
+                  className="h-4 animate-pulse rounded bg-admin-line dark:bg-admin-depth"
                   style={{ width: `${65 - idx * 10}%` }}
                 />
               </td>

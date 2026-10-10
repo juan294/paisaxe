@@ -463,15 +463,15 @@ describe("ElevenLabsAnalyticsPanel", () => {
       expect(screen.getByText("Active calls: 0")).toBeInTheDocument();
     });
 
-    // The indicator dot should have idle styling (bg-[#a39e98]), NOT animate-pulse
+    // The indicator dot should have idle styling (bg-admin-subtle), NOT animate-pulse
     const activeCallsText = screen.getByText("Active calls: 0");
     const widgetContainer = activeCallsText.closest("[class*='inline-flex']")!;
     const indicatorDot = widgetContainer.querySelector("span[class*='rounded-full'][class*='h-2.5']")!;
 
-    expect(indicatorDot.className).toContain("bg-[#a39e98]");
+    expect(indicatorDot.className).toContain("bg-admin-subtle");
     expect(indicatorDot.className).not.toContain("animate-pulse");
     // Container should have neutral background, not emerald
-    expect(widgetContainer.className).toContain("bg-[#f5f3ee]");
+    expect(widgetContainer.className).toContain("bg-admin-paper");
     expect(widgetContainer.className).not.toContain("bg-emerald-50");
   });
 

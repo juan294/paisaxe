@@ -10,12 +10,12 @@ export function SkeletonCostsDashboard() {
       </section>
 
       <section>
-        <div className="mb-6 h-3 w-32 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+        <div className="mb-6 h-3 w-32 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
         <SkeletonChart />
       </section>
 
       <section>
-        <div className="mb-4 h-3 w-40 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+        <div className="mb-4 h-3 w-40 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
         <SkeletonTable />
       </section>
     </>
@@ -35,14 +35,14 @@ function SkeletonStatCard({ color }: { color: "rose" | "orange" | "blue" | "emer
       <div
         className={`h-12 w-28 animate-pulse rounded lg:h-16 lg:w-36 ${skeletonColorClasses[color]}`}
       />
-      <div className="mt-4 h-3 w-24 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+      <div className="mt-4 h-3 w-24 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
     </div>
   );
 }
 
 function SkeletonChart() {
   return (
-    <div className="h-[200px] w-full max-w-3xl animate-pulse rounded bg-[#f5f3ee] dark:bg-[#2d2a26]" />
+    <div className="h-[200px] w-full max-w-3xl animate-pulse rounded bg-admin-paper dark:bg-admin-ink" />
   );
 }
 
@@ -51,10 +51,10 @@ function SkeletonTable() {
     <div className="space-y-3">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="flex gap-4">
-          <div className="h-4 w-32 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="h-4 w-20 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+          <div className="h-4 w-32 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
+          <div className="h-4 w-20 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
           <div className="h-4 w-16 animate-pulse rounded bg-rose-200 dark:bg-rose-900/30" />
-          <div className="h-4 w-16 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+          <div className="h-4 w-16 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
         </div>
       ))}
     </div>

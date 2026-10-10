@@ -45,24 +45,24 @@ export function formatElapsed(startedAt: string): string {
 }
 
 export const HEALTH_COLORS: Record<AgentHealthStatus, string> = {
-  green: "bg-[#7a9e7a]",
-  yellow: "bg-[#c9a55c]",
-  red: "bg-[#c97a7a]",
-  unknown: "bg-[#a39e98]",
+  green: "bg-admin-health-success",
+  yellow: "bg-admin-warning",
+  red: "bg-admin-health-error",
+  unknown: "bg-admin-subtle",
 };
 
 export const HEALTH_TEXT_COLORS: Record<AgentHealthStatus, string> = {
-  green: "text-[#7a9e7a]",
-  yellow: "text-[#c9a55c]",
-  red: "text-[#c97a7a]",
-  unknown: "text-[#a39e98]",
+  green: "text-admin-health-success",
+  yellow: "text-admin-warning",
+  red: "text-admin-health-error",
+  unknown: "text-admin-subtle",
 };
 
 export const HEALTH_BG: Record<AgentHealthStatus, string> = {
-  green: "bg-[#7a9e7a]/10 border-[#7a9e7a]/20",
-  yellow: "bg-[#c9a55c]/10 border-[#c9a55c]/20",
-  red: "bg-[#c97a7a]/10 border-[#c97a7a]/20",
-  unknown: "bg-[#a39e98]/10 border-[#a39e98]/20",
+  green: "bg-admin-health-success/10 border-admin-health-success/20",
+  yellow: "bg-admin-warning/10 border-admin-warning/20",
+  red: "bg-admin-health-error/10 border-admin-health-error/20",
+  unknown: "bg-admin-subtle/10 border-admin-subtle/20",
 };
 
 export const HEALTH_LABELS: Record<AgentHealthStatus, string> = {

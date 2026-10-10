@@ -8,44 +8,44 @@ export function ProductBreakdownTable({ number, title, items }: ProductBreakdown
   if (items.length === 0) {
     return (
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           {number} — {title}
         </h3>
-        <p className="py-6 text-center font-mono text-xs text-[#a39e98]">No product data available</p>
+        <p className="py-6 text-center font-mono text-xs text-admin-subtle">No product data available</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — {title}
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Product
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Orders
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Revenue
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {items.map((item, idx) => (
             <tr key={item.productId}>
-              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
+              <td className="py-2 font-mono text-sm tabular-nums text-admin-subtle">
                 {String(idx + 1).padStart(2, "0")}
               </td>
-              <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+              <td className="py-2 text-sm text-admin-secondary dark:text-admin-subtle">
                 {item.productName}
               </td>
-              <td className="py-2 text-right font-mono text-sm tabular-nums text-[#6b6560] dark:text-[#a39e98]">
+              <td className="py-2 text-right font-mono text-sm tabular-nums text-admin-muted dark:text-admin-subtle">
                 {item.orderCount}
               </td>
               <td className="py-2 text-right font-mono text-sm font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
@@ -63,41 +63,41 @@ export function RecentOrdersTable({ number, title, orders }: RecentOrdersTablePr
   if (orders.length === 0) {
     return (
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           {number} — {title}
         </h3>
-        <p className="py-6 text-center font-mono text-xs text-[#a39e98]">No orders yet</p>
+        <p className="py-6 text-center font-mono text-xs text-admin-subtle">No orders yet</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — {title}
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Date</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Date</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Product
             </th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Status
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Amount
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {orders.slice(0, 10).map((order) => (
             <tr key={order.id}>
-              <td className="py-2 font-mono text-xs tabular-nums text-[#6b6560]">
+              <td className="py-2 font-mono text-xs tabular-nums text-admin-muted">
                 {formatOrderDate(order.createdAt)}
               </td>
-              <td className="max-w-[150px] truncate py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+              <td className="max-w-[150px] truncate py-2 text-sm text-admin-secondary dark:text-admin-subtle">
                 {order.productName}
               </td>
               <td className="py-2">
@@ -106,7 +106,7 @@ export function RecentOrdersTable({ number, title, orders }: RecentOrdersTablePr
               <td className="py-2 text-right font-mono text-sm tabular-nums">
                 {order.refundedAmount > 0 ? (
                   <div>
-                    <span className="text-[#a39e98] line-through">{order.totalFormatted}</span>
+                    <span className="text-admin-subtle line-through">{order.totalFormatted}</span>
                     <span className="ml-1 text-xs font-medium text-rose-600 dark:text-rose-400">
                       -{order.refundedAmountFormatted}
                     </span>

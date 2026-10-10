@@ -125,7 +125,7 @@
     },
     {
       "path": ".github/workflows/lighthouse.yml",
-      "definitionSha": "ed465dc895e329013ccd9b39c3b8693aabe23846",
+      "definitionSha": "88891f4b1f50b418a8e70de29379af02a9962ff1",
       "jobs": [
         {
           "id": "lighthouse-lighthouse",

@@ -88,3 +88,8 @@ The owner accepted Phase 3, Phase 4 and Phase 5 local work and explicitly author
 ### Phase 7 authorization and work, 2026-10-09
 
 The owner accepted Phase 6 and authorized Phase 7 local implementation. Locale, story-question and request-presentation changes are implemented and locally verified; owner acceptance remains pending. The [Phase 7 implementation record](2026-10-07-github-issues-remediation-phases/phase-7-implementation.md) preserves scope, independent review and retained failures. Native-language review and production translation coverage remain unmeasured. This update supersedes the earlier absence of Phase 7 authority; it grants no Phase 8, publication or production authority.
+
+
+### Phase 8 local qualification, 2026-10-10
+
+The owner accepted Phase 7 and authorized Phase 8. The [implementation record](2026-10-07-github-issues-remediation-phases/phase-8-implementation.md) preserves lazy DSN-gated boundaries, restored measured mobile budgets, equivalent palette roles and measured #820 deferral. Full local coverage passes 10,967 cases at unchanged thresholds; mobile medians are 0.89 / 3,738.57 ms / 46.5 ms. Required actual DB passes 1,002 cases while the combined provider gate retains the accepted ElevenLabs RED. Owner acceptance remains pending after normal native hooks, local integration and owned cleanup recorded in the private final handoff. This supersedes the earlier absence of Phase 8 authority; Phase 9 remains unstarted. No publication or issue mutation is inferred.

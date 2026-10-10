@@ -98,14 +98,14 @@ function PricingPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950">
+    <div className="min-h-screen bg-scene-canvas">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-neutral-950/80 backdrop-blur-md">
+      <header className="sticky top-0 z-40 bg-scene-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
           <Link
             href="/immersive"
             aria-label={t("accessibility.go_back")}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-scene-white"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -131,7 +131,7 @@ function PricingPageContent() {
               ))}
             </div>
           </div>
-          <h1 className="text-2xl md:text-3xl lg:text-4xl font-semibold text-white tracking-tight mb-2">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-semibold text-scene-white tracking-tight mb-2">
             {t("premium.pricing_title")}
           </h1>
           <p className="text-neutral-400">
@@ -159,7 +159,7 @@ function PricingPageContent() {
             </div>
             <Link
               href="/immersive"
-              className="inline-flex items-center justify-center w-full px-5 py-2.5 bg-paisaxe-green-500 text-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors"
+              className="inline-flex items-center justify-center w-full px-5 py-2.5 bg-paisaxe-green-500 text-scene-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors"
             >
               {t("premium.success_cta")}
             </Link>
@@ -197,7 +197,7 @@ function PricingPageContent() {
                           : "border-neutral-800 hover:border-neutral-700"
                       }`}
                     >
-                      <span className="text-lg font-semibold text-white">
+                      <span className="text-lg font-semibold text-scene-white">
                         {tier.price}
                       </span>
                       <span className="mt-1 text-[11px] text-neutral-400">
@@ -236,7 +236,7 @@ function PricingPageContent() {
               <button
                 onClick={handlePurchase}
                 disabled={isResolvingAuthenticatedAccess}
-                className="w-full px-5 py-3 bg-gradient-to-r from-paisaxe-green-500 to-paisaxe-green-400 text-black text-sm font-medium rounded-lg hover:from-paisaxe-green-400 hover:to-paisaxe-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+                className="w-full px-5 py-3 bg-gradient-to-r from-paisaxe-green-500 to-paisaxe-green-400 text-scene-black text-sm font-medium rounded-lg hover:from-paisaxe-green-400 hover:to-paisaxe-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-scene-canvas"
               >
                 {isResolvingAuthenticatedAccess ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
@@ -260,7 +260,7 @@ function PricingPageContent() {
           </h2>
           <div className="space-y-5">
             <div>
-              <h3 className="text-sm text-white mb-1">
+              <h3 className="text-sm text-scene-white mb-1">
                 {t("premium.faq_what_included")}
               </h3>
               <p className="text-xs text-neutral-500">
@@ -269,7 +269,7 @@ function PricingPageContent() {
               </p>
             </div>
             <div>
-              <h3 className="text-sm text-white mb-1">
+              <h3 className="text-sm text-scene-white mb-1">
                 {t("premium.faq_how_long")}
               </h3>
               <p className="text-xs text-neutral-500">

@@ -153,7 +153,7 @@ const renderWithAuth = async (ui: ReactNode) => {
 
 // Mock next/image — captures blur placeholder props for verification
 vi.mock("next/image", () => ({
-  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL, sizes }: {
+  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL, sizes, loading, fetchPriority }: {
     src: string;
     alt: string;
     className?: string;
@@ -162,6 +162,8 @@ vi.mock("next/image", () => ({
     placeholder?: string;
     blurDataURL?: string;
     sizes?: string;
+    loading?: "eager" | "lazy";
+    fetchPriority?: "high" | "low" | "auto";
   }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -173,6 +175,8 @@ vi.mock("next/image", () => ({
       data-placeholder={placeholder}
       data-blur-data-url={blurDataURL}
       data-sizes={sizes}
+      loading={loading}
+      fetchPriority={fetchPriority}
     />
   ),
 }));
@@ -501,6 +505,7 @@ describe("StoryViewer", () => {
       const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-priority", "true");
+      expect(img).toHaveAttribute("fetchpriority", "high");
     });
 
     it("PE-M2: should set priority=false for stories after index 0", async () => {
@@ -509,6 +514,7 @@ describe("StoryViewer", () => {
       const img = container.querySelector(`img[src="${mockStories[1].image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-priority", "false");
+      expect(img).toHaveAttribute("fetchpriority", "high");
     });
 
     it("should use darkPlaceholder fallback when story has no blurDataUrl", async () => {
@@ -2599,9 +2605,9 @@ describe("StoryViewer", () => {
     // the raw origin URL, while the real <Image> requests the optimizer URL —
     // the two never coincided, so the preload warmed nothing and ~350KB of
     // origin image bytes were wasted per navigation. Adjacent images are now
-    // rendered as hidden, `priority` next/image elements instead, so Next.js
-    // itself owns generating the (correct) preload for the exact URL it will
-    // reuse once that image becomes the current one.
+    // rendered as hidden next/image elements so the optimizer URL matches.
+    // Phase 8 keeps eager warming at low priority, leaving the initial preload
+    // and high fetch priority to the visible image.
     it("does not render a hand-built preload link for adjacent images", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
@@ -2613,17 +2619,17 @@ describe("StoryViewer", () => {
       expect(manualPreloadLinks.length).toBe(0);
     });
 
-    it("renders the next and previous story images as hidden, priority next/image elements", async () => {
+    it("warms next and previous optimizer images eagerly at low priority", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
       );
 
       // currentIndex 1 → prev = story-1 (lagos), next = story-3 (sidra)
       const lagosImg = document.querySelector(
-        'img[src="/images/lagos.jpg"][data-priority="true"]'
+        'img[src="/images/lagos.jpg"][loading="eager"][fetchpriority="low"]'
       );
       const sidraImg = document.querySelector(
-        'img[src="/images/sidra.jpg"][data-priority="true"]'
+        'img[src="/images/sidra.jpg"][loading="eager"][fetchpriority="low"]'
       );
 
       expect(lagosImg).not.toBeNull();
@@ -2633,6 +2639,8 @@ describe("StoryViewer", () => {
       // actually be requested once this image becomes the current one.
       expect(lagosImg).toHaveAttribute("data-sizes", "100vw");
       expect(sidraImg).toHaveAttribute("data-sizes", "100vw");
+      expect(lagosImg).not.toHaveAttribute("data-priority", "true");
+      expect(sidraImg).not.toHaveAttribute("data-priority", "true");
     });
 
     it("wraps around: renders preload images for next and previous from index 0", async () => {
@@ -2642,10 +2650,10 @@ describe("StoryViewer", () => {
 
       // currentIndex 0 → next = story-2 (cathedral), prev wraps to story-3 (sidra)
       const cathedralImg = document.querySelector(
-        'img[src="/images/cathedral.jpg"][data-priority="true"]'
+        'img[src="/images/cathedral.jpg"][loading="eager"][fetchpriority="low"]'
       );
       const sidraImg = document.querySelector(
-        'img[src="/images/sidra.jpg"][data-priority="true"]'
+        'img[src="/images/sidra.jpg"][loading="eager"][fetchpriority="low"]'
       );
 
       expect(cathedralImg).not.toBeNull();

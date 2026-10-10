@@ -353,7 +353,7 @@ describe("OperatorDashboard PayPal check", () => {
     expect(within(screen.getByText("RS-CONF01").closest("tr") as HTMLElement).getByTestId("ledger-chip")).toHaveTextContent("PayPal confirma");
     const mismatch = within(screen.getByText("RS-ATTN02").closest("tr") as HTMLElement).getByTestId("ledger-chip");
     expect(mismatch).toHaveTextContent("No coincide con PayPal");
-    expect(mismatch.className).toContain("bg-[#c9a55c]/30");
+    expect(mismatch.className).toContain("bg-admin-warning/30");
     expect(within(screen.getByText("RS-PAST03").closest("tr") as HTMLElement).getByTestId("ledger-chip")).toHaveTextContent(
       "Reembolso en PayPal"
     );

@@ -47,9 +47,9 @@ const STATUS_COLORS: Record<SuggestionStatus, { bg: string; text: string; dot: s
     dot: "bg-emerald-500",
   },
   rejected: {
-    bg: "bg-[#f5f3ee] dark:bg-[#3d3a36]",
-    text: "text-[#6b6560] dark:text-[#a39e98]",
-    dot: "bg-[#a39e98]",
+    bg: "bg-admin-paper dark:bg-admin-depth",
+    text: "text-admin-muted dark:text-admin-subtle",
+    dot: "bg-admin-subtle",
   },
 };
 
@@ -172,7 +172,7 @@ export function SuggestionsPanel() {
   if (isLoading && suggestions.length === 0) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
+        <RefreshCw className="h-5 w-5 animate-spin text-admin-subtle" />
       </div>
     );
   }
@@ -180,21 +180,21 @@ export function SuggestionsPanel() {
   return (
     <div className="space-y-16">
       {/* Header */}
-      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
+      <header className="flex items-end justify-between border-b border-admin-line pb-6 dark:border-admin-depth">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">Admin / Content</p>
-          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-subtle">Admin / Content</p>
+          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-admin-ink dark:text-admin-paper">
             Story Suggestions
           </h2>
         </div>
         <div className="flex items-center gap-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
             {suggestions.length} Total
           </p>
           <button
             onClick={loadSuggestions}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
+            className="font-mono text-xs uppercase tracking-widest text-admin-subtle transition-colors hover:text-admin-ink disabled:opacity-50 dark:hover:text-admin-paper"
           >
             {isLoading ? "Loading..." : "Refresh"}
           </button>
@@ -215,8 +215,8 @@ export function SuggestionsPanel() {
           className={cn(
             "px-4 py-2 rounded-lg font-mono text-xs uppercase tracking-widest transition-colors",
             filterStatus === null
-              ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-              : "text-[#a39e98] hover:bg-[#f5f3ee] dark:hover:bg-[#3d3a36]"
+              ? "bg-admin-ink text-admin-paper dark:bg-admin-paper dark:text-admin-ink"
+              : "text-admin-subtle hover:bg-admin-paper dark:hover:bg-admin-depth"
           )}
         >
           All ({suggestions.length})
@@ -228,8 +228,8 @@ export function SuggestionsPanel() {
             className={cn(
               "px-4 py-2 rounded-lg font-mono text-xs uppercase tracking-widest transition-colors flex items-center gap-2",
               filterStatus === status
-                ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-                : "text-[#a39e98] hover:bg-[#f5f3ee] dark:hover:bg-[#3d3a36]"
+                ? "bg-admin-ink text-admin-paper dark:bg-admin-paper dark:text-admin-ink"
+                : "text-admin-subtle hover:bg-admin-paper dark:hover:bg-admin-depth"
             )}
           >
             <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_COLORS[status].dot)} />
@@ -240,11 +240,11 @@ export function SuggestionsPanel() {
 
       {/* Suggestions List */}
       {filteredSuggestions.length === 0 ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white dark:bg-[#2d2a26]">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5f3ee] dark:bg-[#3d3a36]">
-            <Lightbulb className="h-8 w-8 text-[#a39e98]" />
+        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white dark:bg-admin-ink">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-admin-paper dark:bg-admin-depth">
+            <Lightbulb className="h-8 w-8 text-admin-subtle" />
           </div>
-          <p className="mt-4 text-sm font-medium text-[#6b6560]">
+          <p className="mt-4 text-sm font-medium text-admin-muted">
             {filterStatus ? `No ${filterStatus} suggestions` : "No suggestions yet"}
           </p>
         </div>
@@ -254,8 +254,8 @@ export function SuggestionsPanel() {
             <div
               key={suggestion.id}
               className={cn(
-                "rounded-2xl bg-white p-5 transition-all dark:bg-[#2d2a26]",
-                expandedId === suggestion.id && "ring-1 ring-[#e5e3de] dark:ring-[#4d4944]"
+                "rounded-2xl bg-white p-5 transition-all dark:bg-admin-ink",
+                expandedId === suggestion.id && "ring-1 ring-admin-line dark:ring-admin-secondary"
               )}
             >
               {/* Main Row */}
@@ -263,7 +263,7 @@ export function SuggestionsPanel() {
                 {/* Expand Button */}
                 <button
                   onClick={() => toggleExpanded(suggestion.id)}
-                  className="mt-1 flex h-6 w-6 items-center justify-center rounded text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
+                  className="mt-1 flex h-6 w-6 items-center justify-center rounded text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted dark:hover:bg-admin-depth"
                   aria-label={expandedId === suggestion.id ? "Collapse" : "Expand"}
                 >
                   {expandedId === suggestion.id ? (
@@ -277,15 +277,15 @@ export function SuggestionsPanel() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                      <h3 className="text-lg font-medium text-admin-ink dark:text-admin-paper">
                         {suggestion.placeName}
                       </h3>
                       {suggestion.comment && (
-                        <p className="mt-1 text-sm text-[#6b6560] line-clamp-1">
+                        <p className="mt-1 text-sm text-admin-muted line-clamp-1">
                           {suggestion.comment}
                         </p>
                       )}
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#a39e98]">
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-admin-subtle">
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" />
                           {suggestion.userId ? (suggestion.userEmail || "Unknown user") : "Anonymous"}
@@ -326,15 +326,15 @@ export function SuggestionsPanel() {
 
               {/* Expanded Details */}
               {expandedId === suggestion.id && (
-                <div className="mt-5 border-t border-[#f5f3ee] pt-5 dark:border-[#3d3a36]">
+                <div className="mt-5 border-t border-admin-paper pt-5 dark:border-admin-depth">
                   {/* Full Comment */}
                   {suggestion.comment && (
                     <div className="mb-4">
-                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-[#a39e98]">
+                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-admin-subtle">
                         <MessageSquare className="h-3 w-3" />
                         Comment
                       </label>
-                      <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
+                      <p className="text-sm text-admin-muted dark:text-admin-subtle">
                         {suggestion.comment}
                       </p>
                     </div>
@@ -343,11 +343,11 @@ export function SuggestionsPanel() {
                   {/* Attribution */}
                   {suggestion.attribution && (
                     <div className="mb-4">
-                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-[#a39e98]">
+                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-admin-subtle">
                         <AtSign className="h-3 w-3" />
                         Credit As
                       </label>
-                      <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
+                      <p className="text-sm text-admin-muted dark:text-admin-subtle">
                         {suggestion.attribution}
                       </p>
                     </div>
@@ -355,7 +355,7 @@ export function SuggestionsPanel() {
 
                   {/* Admin Notes */}
                   <div className="mb-4">
-                    <label htmlFor={`admin-notes-${suggestion.id}`} className="mb-1 block text-xs font-medium uppercase tracking-widest text-[#a39e98]">
+                    <label htmlFor={`admin-notes-${suggestion.id}`} className="mb-1 block text-xs font-medium uppercase tracking-widest text-admin-subtle">
                       Admin Notes
                     </label>
                     <textarea
@@ -366,12 +366,12 @@ export function SuggestionsPanel() {
                       }
                       placeholder="Add internal notes..."
                       rows={3}
-                      className="w-full rounded-lg border border-[#e5e3de] bg-[#f5f3ee] px-3 py-2 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:border-[#a39e98] focus-visible:outline-none dark:border-[#4d4944] dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
+                      className="w-full rounded-lg border border-admin-line bg-admin-paper px-3 py-2 text-sm text-admin-ink placeholder:text-admin-subtle focus-visible:border-admin-subtle focus-visible:outline-none dark:border-admin-secondary dark:bg-admin-depth dark:text-admin-paper"
                     />
                     <button
                       onClick={() => handleSaveNotes(suggestion.id)}
                       disabled={updatingId === suggestion.id}
-                      className="mt-2 font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
+                      className="mt-2 font-mono text-xs uppercase tracking-widest text-admin-subtle transition-colors hover:text-admin-ink disabled:opacity-50 dark:hover:text-admin-paper"
                     >
                       {updatingId === suggestion.id ? "Saving..." : "Save Notes"}
                     </button>
@@ -401,8 +401,8 @@ export function SuggestionsPanel() {
                         disabled={updatingId === suggestion.id}
                         className={cn(
                           "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
-                          "bg-[#f5f3ee] text-[#6b6560] hover:bg-[#e5e3de]",
-                          "dark:bg-[#3d3a36] dark:text-[#a39e98] dark:hover:bg-[#4d4944]",
+                          "bg-admin-paper text-admin-muted hover:bg-admin-line",
+                          "dark:bg-admin-depth dark:text-admin-subtle dark:hover:bg-admin-secondary",
                           "disabled:opacity-50"
                         )}
                       >
@@ -448,7 +448,7 @@ export function SuggestionsPanel() {
         </div>
       )}
 
-      <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <p className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
         Suggestions from visitors
       </p>
 

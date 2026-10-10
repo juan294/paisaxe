@@ -9,13 +9,13 @@ const statColorClasses = {
 
 export function StatCard({ value, label, color }: StatCardProps) {
   const displayValue = typeof value === "number" ? value.toLocaleString() : value;
-  const colorClass = color ? statColorClasses[color] : "text-[#2d2a26] dark:text-[#f5f3ee]";
+  const colorClass = color ? statColorClasses[color] : "text-admin-ink dark:text-admin-paper";
   return (
     <div>
       <p className={`text-6xl font-extralight tabular-nums tracking-tighter lg:text-8xl ${colorClass}`}>
         {displayValue}
       </p>
-      <p className="mt-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+      <p className="mt-4 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
         {label}
       </p>
     </div>
@@ -118,7 +118,7 @@ export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
               x={padding.left + i * xStep}
               y={height - 8}
               textAnchor="middle"
-              className="fill-[#a39e98] font-mono text-[10px]"
+              className="fill-admin-subtle font-mono text-[10px]"
             >
               {formatDateShort(d.date)}
             </text>
@@ -130,7 +130,7 @@ export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
           x={padding.left - 10}
           y={padding.top + 4}
           textAnchor="end"
-          className="fill-[#a39e98] font-mono text-[10px]"
+          className="fill-admin-subtle font-mono text-[10px]"
         >
           {maxValue.toLocaleString()}
         </text>
@@ -138,7 +138,7 @@ export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
           x={padding.left - 10}
           y={padding.top + chartHeight + 4}
           textAnchor="end"
-          className="fill-[#a39e98] font-mono text-[10px]"
+          className="fill-admin-subtle font-mono text-[10px]"
         >
           0
         </text>
@@ -163,7 +163,7 @@ export function NewVsReturningBar({ newVisitors, returningVisitors }: NewVsRetur
   const total = newVisitors + returningVisitors;
   if (total === 0) {
     return (
-      <p className="py-8 text-center font-mono text-xs text-[#a39e98]">No visitor data available</p>
+      <p className="py-8 text-center font-mono text-xs text-admin-subtle">No visitor data available</p>
     );
   }
 

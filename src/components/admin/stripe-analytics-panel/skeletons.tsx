@@ -10,7 +10,7 @@ function SkeletonStatCard({ color }: { color: "blue" | "emerald" | "amber" | "vi
   return (
     <div>
       <div className={`h-12 w-28 animate-pulse rounded lg:h-16 lg:w-36 ${skeletonColorClasses[color]}`} />
-      <div className="mt-4 h-3 w-24 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+      <div className="mt-4 h-3 w-24 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
     </div>
   );
 }
@@ -20,13 +20,13 @@ function SkeletonRevenueChart() {
     <div className="overflow-x-auto">
       <div className="relative h-[200px] w-full max-w-3xl">
         {/* Chart area placeholder */}
-        <div className="absolute inset-0 animate-pulse rounded bg-[#f5f3ee] dark:bg-[#2d2a26]">
+        <div className="absolute inset-0 animate-pulse rounded bg-admin-paper dark:bg-admin-ink">
           {/* Grid lines */}
-          <div className="absolute left-14 right-5 top-5 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="absolute left-14 right-5 top-1/4 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="absolute left-14 right-5 top-1/2 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="absolute left-14 right-5 top-3/4 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="absolute bottom-8 left-14 right-5 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
+          <div className="absolute left-14 right-5 top-5 h-px bg-admin-line dark:bg-admin-depth" />
+          <div className="absolute left-14 right-5 top-1/4 h-px bg-admin-line dark:bg-admin-depth" />
+          <div className="absolute left-14 right-5 top-1/2 h-px bg-admin-line dark:bg-admin-depth" />
+          <div className="absolute left-14 right-5 top-3/4 h-px bg-admin-line dark:bg-admin-depth" />
+          <div className="absolute bottom-8 left-14 right-5 h-px bg-admin-line dark:bg-admin-depth" />
 
           {/* Bar placeholders */}
           <div className="absolute bottom-8 left-16 flex items-end gap-2">
@@ -53,38 +53,38 @@ function SkeletonRevenueChart() {
 function SkeletonProductTable({ number, title }: { number: string; title: string }) {
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — {title}
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Product
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Orders
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Revenue
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {[1, 2, 3].map((idx) => (
             <tr key={idx}>
-              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
+              <td className="py-2 font-mono text-sm tabular-nums text-admin-subtle">
                 {String(idx).padStart(2, "0")}
               </td>
               <td className="py-2">
                 <div
-                  className="h-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]"
+                  className="h-4 animate-pulse rounded bg-admin-line dark:bg-admin-depth"
                   style={{ width: `${70 - idx * 10}%` }}
                 />
               </td>
               <td className="py-2 text-right">
-                <div className="ml-auto h-4 w-8 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+                <div className="ml-auto h-4 w-8 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
               </td>
               <td className="py-2 text-right">
                 <div className="ml-auto h-4 w-14 animate-pulse rounded bg-emerald-200 dark:bg-emerald-900/30" />
@@ -100,33 +100,33 @@ function SkeletonProductTable({ number, title }: { number: string; title: string
 function SkeletonOrdersTable({ number, title }: { number: string; title: string }) {
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — {title}
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Date</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Date</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Product
             </th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Status
             </th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Amount
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {[1, 2, 3, 4, 5].map((idx) => (
             <tr key={idx}>
               <td className="py-2">
-                <div className="h-3 w-24 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+                <div className="h-3 w-24 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
               </td>
               <td className="py-2">
                 <div
-                  className="h-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]"
+                  className="h-4 animate-pulse rounded bg-admin-line dark:bg-admin-depth"
                   style={{ width: `${60 - idx * 5}%` }}
                 />
               </td>
@@ -157,7 +157,7 @@ export function SkeletonRevenueDashboard() {
 
       {/* Revenue Chart Skeleton */}
       <section>
-        <div className="mb-6 h-3 w-32 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+        <div className="mb-6 h-3 w-32 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
         <SkeletonRevenueChart />
       </section>
 

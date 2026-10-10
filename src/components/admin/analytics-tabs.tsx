@@ -83,10 +83,10 @@ export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTab
   return (
     <div className="space-y-8">
       {/* Header */}
-      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
+      <header className="flex items-end justify-between border-b border-admin-line pb-6 dark:border-admin-depth">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Admin / Analytics</p>
-          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">Admin / Analytics</p>
+          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-admin-ink dark:text-admin-paper">
             Analytics
           </h2>
         </div>
@@ -103,8 +103,8 @@ export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTab
             className={cn(
               "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
               activeTab === tab.value
-                ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-                : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
+                ? "bg-admin-ink text-admin-paper dark:bg-admin-paper dark:text-admin-ink"
+                : "text-admin-muted hover:bg-white dark:text-admin-subtle dark:hover:bg-admin-panel"
             )}
           >
             {tab.icon}
@@ -112,8 +112,8 @@ export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTab
             <span className={cn(
               "rounded-full px-2 py-0.5 text-xs",
               activeTab === tab.value
-                ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
-                : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
+                ? "bg-admin-canvas-dark text-admin-subtle dark:bg-admin-line dark:text-admin-muted"
+                : "bg-admin-line text-admin-muted dark:bg-admin-depth dark:text-admin-subtle"
             )}>
               {"⌘" + tab.shortcut.toUpperCase()}
             </span>

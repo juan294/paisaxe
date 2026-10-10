@@ -76,7 +76,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
   if (isLoading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
+        <RefreshCw className="h-5 w-5 animate-spin text-admin-subtle" />
       </div>
     );
   }
@@ -85,14 +85,14 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
     <div className="space-y-4">
       {/* Header with create button */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-[#6b6560]">
+        <p className="text-sm text-admin-muted">
           {drafts.length === 0
             ? "No drafts yet. Chat with the marketing agents to create content."
             : `${drafts.length} draft${drafts.length === 1 ? "" : "s"} ready to post`}
         </p>
         <button
           onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
+          className="flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-admin-subtle transition-colors hover:text-admin-ink dark:hover:text-admin-paper"
         >
           <Plus className="h-3 w-3" />
           New Draft
@@ -101,26 +101,26 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
 
       {/* Drafts list */}
       {drafts.length > 0 && (
-        <div className="divide-y divide-[#f5f3ee] border border-[#e5e3de] dark:divide-[#3d3a36] dark:border-[#3d3a36]">
+        <div className="divide-y divide-admin-paper border border-admin-line dark:divide-admin-depth dark:border-admin-depth">
           {drafts.map((draft) => (
             <div key={draft.id} className="p-4">
               <div className="flex items-start gap-3">
                 {/* Platform badge */}
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border border-[#e5e3de] font-mono text-xs font-medium text-[#6b6560] dark:border-[#4d4944] dark:text-[#a39e98]">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border border-admin-line font-mono text-xs font-medium text-admin-muted dark:border-admin-secondary dark:text-admin-subtle">
                   {PLATFORM_BADGES[draft.platform]}
                 </div>
 
                 {/* Content */}
                 <div className="min-w-0 flex-1">
-                  <p className="whitespace-pre-wrap text-sm text-[#4d4944] dark:text-[#a39e98]">
+                  <p className="whitespace-pre-wrap text-sm text-admin-secondary dark:text-admin-subtle">
                     {draft.content}
                   </p>
                   {draft.hashtags.length > 0 && (
-                    <p className="mt-2 text-xs text-[#a39e98]">
+                    <p className="mt-2 text-xs text-admin-subtle">
                       {draft.hashtags.join(" ")}
                     </p>
                   )}
-                  <p className="mt-2 font-mono text-[10px] text-[#a39e98]">
+                  <p className="mt-2 font-mono text-[10px] text-admin-subtle">
                     Created {new Date(draft.createdAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -129,7 +129,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
                 <div className="flex flex-shrink-0 items-center gap-1">
                   <button
                     onClick={() => handleCopy(draft.content, draft.id)}
-                    className="flex h-8 w-8 items-center justify-center text-[#a39e98] transition-colors hover:text-[#6b6560]"
+                    className="flex h-8 w-8 items-center justify-center text-admin-subtle transition-colors hover:text-admin-muted"
                     title="Copy content"
                   >
                     {copiedId === draft.id ? (
@@ -147,7 +147,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
                   </button>
                   <button
                     onClick={() => handleDelete(draft.id)}
-                    className="flex h-8 w-8 items-center justify-center text-[#a39e98] transition-colors hover:text-red-500"
+                    className="flex h-8 w-8 items-center justify-center text-admin-subtle transition-colors hover:text-red-500"
                     title="Delete draft"
                   >
                     <Trash2 className="h-4 w-4" />

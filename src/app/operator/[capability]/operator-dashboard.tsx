@@ -57,7 +57,7 @@ const CONFIRMED = new Set<LedgerMatch>(["matches", "refunded"]);
 
 /** The small rounded labels in the booking rows; ATTENTION is the "needs a look" tone. */
 const PILL = "inline-flex rounded-full px-2 py-0.5 text-xs font-medium";
-const ATTENTION = "bg-[#c9a55c]/30";
+const ATTENTION = "bg-admin-warning/30";
 
 const ACTION_FAILED = "No se pudo completar la acción. Inténtalo de nuevo.";
 const HOLD_NOT_LIVE = "Ese bloqueo ya no estaba activo.";
@@ -193,11 +193,11 @@ export function OperatorDashboard() {
   return (
     <Shell>
       <header className="space-y-1">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-[#6b6560]">Panel de operador</p>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-admin-muted">Panel de operador</p>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{view.merchant.name}</h1>
           {view.merchant.isFixture && (
-            <span className="rounded-full bg-[#c9a55c]/20 px-2 py-0.5 font-mono text-xs uppercase text-[#8b7355]">demo</span>
+            <span className="rounded-full bg-admin-warning/20 px-2 py-0.5 font-mono text-xs uppercase text-[#8b7355]">demo</span>
           )}
         </div>
       </header>
@@ -240,7 +240,7 @@ export function OperatorDashboard() {
       <div aria-live="polite" className="space-y-3">
         {notice && <p className="text-[#8b7355]">{notice}</p>}
         {issued && (
-          <Card className="border-[#c9a55c]">
+          <Card className="border-admin-warning">
             <CardContent className="space-y-2 pt-6">
               <p>
                 Nuevo enlace para {issued.reference}. Cópialo ahora: no se volverá a mostrar. El anterior ya no funciona.
@@ -291,10 +291,10 @@ export function OperatorDashboard() {
       </Section>
 
       <Dialog open={reissueOpen} onOpenChange={(open) => !open && !busy && setReissueOpen(false)}>
-        <DialogContent hideCloseButton className="w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white text-[#2d2a26]">
+        <DialogContent hideCloseButton className="w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white text-admin-ink">
           <DialogHeader>
             <DialogTitle>Reemitir enlace de {reissueTarget?.reference}</DialogTitle>
-            <DialogDescription className="text-[#6b6560]">El enlace anterior dejará de funcionar.</DialogDescription>
+            <DialogDescription className="text-admin-muted">El enlace anterior dejará de funcionar.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" disabled={busy} onClick={() => setReissueOpen(false)}>
@@ -315,7 +315,7 @@ const COLUMNS = ["Referencia", "Actividad", "Fecha", "Personas", "Estado", "Dep�
 // Below md each row stacks into a card and each cell into a captioned line (one DOM, D8).
 // The explicit roles keep the table semantics once `display` changes.
 const CELL =
-  "p-2 max-md:flex max-md:items-baseline max-md:justify-between max-md:gap-3 max-md:px-0 max-md:py-1 max-md:text-right max-md:before:shrink-0 max-md:before:text-left max-md:before:font-mono max-md:before:text-[10px] max-md:before:uppercase max-md:before:tracking-widest max-md:before:text-[#6b6560] max-md:before:content-[attr(data-label)]";
+  "p-2 max-md:flex max-md:items-baseline max-md:justify-between max-md:gap-3 max-md:px-0 max-md:py-1 max-md:text-right max-md:before:shrink-0 max-md:before:text-left max-md:before:font-mono max-md:before:text-[10px] max-md:before:uppercase max-md:before:tracking-widest max-md:before:text-admin-muted max-md:before:content-[attr(data-label)]";
 
 function Cell({ label, className, children }: { label: (typeof COLUMNS)[number]; className?: string; children: React.ReactNode }) {
   return (
@@ -340,7 +340,7 @@ function BookingTable({
   return (
     <div className="md:overflow-x-auto md:rounded-xl md:border">
       <table role="table" className="w-full text-left text-sm max-md:block">
-        <thead role="rowgroup" className="font-mono text-[10px] uppercase tracking-widest text-[#6b6560] max-md:sr-only">
+        <thead role="rowgroup" className="font-mono text-[10px] uppercase tracking-widest text-admin-muted max-md:sr-only">
           <tr role="row">
             {COLUMNS.map((label) => (
               <th key={label} role="columnheader" scope="col" className="p-2">
@@ -357,7 +357,7 @@ function BookingTable({
               data-exception={String(booking.exception)}
               className={cn(
                 "max-md:block max-md:rounded-xl max-md:border max-md:p-3",
-                booking.exception ? "bg-[#c9a55c]/15" : "max-md:bg-white"
+                booking.exception ? "bg-admin-warning/15" : "max-md:bg-white"
               )}
             >
               <Cell label="Referencia" className="font-mono">
@@ -415,7 +415,7 @@ function BookingTable({
   );
 }
 
-const CHIP = cn(PILL, "mt-1 font-sans text-[#2d2a26]");
+const CHIP = cn(PILL, "mt-1 font-sans text-admin-ink");
 
 function LedgerChip({ match, reserve }: { match: LedgerMatch | undefined; reserve: boolean }) {
   if (reserve) {
@@ -464,10 +464,10 @@ function LedgerSummary({ view, ledger, onCheck }: { view: OperatorView; ledger: 
       aria-label="Comprobación con PayPal"
       className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 text-sm max-md:min-h-[4.75rem]"
     >
-      <p aria-live="polite" className="text-[#2d2a26]">
+      <p aria-live="polite" className="text-admin-ink">
         {text}
         {result?.state === "ok" && result.truncated && (
-          <span className="block text-xs text-[#6b6560]">PayPal tiene más de 500 movimientos en el periodo: solo se comprobaron los primeros 500.</span>
+          <span className="block text-xs text-admin-muted">PayPal tiene más de 500 movimientos en el periodo: solo se comprobaron los primeros 500.</span>
         )}
       </p>
       {/* aria-disabled, not disabled: a keyboard user keeps focus on the button while it checks. */}
@@ -518,7 +518,7 @@ function CapacityTable({ experience }: { experience: OperatorCapacity }) {
                 {dates.map((date) => {
                   const places = placesAt.get(`${date} ${time}`);
                   return (
-                    <td key={date} className={places === 0 ? "p-1 text-[#6b6560]" : "p-1"}>
+                    <td key={date} className={places === 0 ? "p-1 text-admin-muted" : "p-1"}>
                       {places === undefined ? "—" : `${places}/${experience.capacity}`}
                     </td>
                   );
@@ -536,10 +536,10 @@ function CapacityTable({ experience }: { experience: OperatorCapacity }) {
 function MoneyTile({ testId, icon, label, cents }: { testId: string; icon: React.ReactNode; label: string; cents: number }) {
   return (
     <div data-testid={testId} className="min-w-0 rounded-2xl bg-white p-5 text-left">
-      <div className="mb-4 text-[#6b6560]">{icon}</div>
+      <div className="mb-4 text-admin-muted">{icon}</div>
       {/* leading-10 keeps text-4xl's line box at the smaller phone size, so the tile height matches StatCard. */}
-      <p className="text-2xl leading-10 font-extralight tabular-nums tracking-tighter text-[#2d2a26] lg:text-4xl">{eur(cents)}</p>
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-[#6b6560]">{label}</p>
+      <p className="text-2xl leading-10 font-extralight tabular-nums tracking-tighter text-admin-ink lg:text-4xl">{eur(cents)}</p>
+      <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-admin-muted">{label}</p>
     </div>
   );
 }
@@ -554,12 +554,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-[#6b6560]">{children}</p>;
+  return <p className="text-sm text-admin-muted">{children}</p>;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen bg-[#f5f3ee] px-4 py-10 text-[#2d2a26]">
+    <main className="min-h-screen bg-admin-paper px-4 py-10 text-admin-ink">
       <div className="mx-auto w-full max-w-6xl space-y-8">{children}</div>
     </main>
   );

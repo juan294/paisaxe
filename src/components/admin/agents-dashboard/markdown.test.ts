@@ -125,12 +125,12 @@ describe("agents-dashboard/markdown", () => {
 
     it("applies correct CSS classes to headings", () => {
       const result = renderMarkdown("# Title");
-      expect(result).toContain('class="text-[#2d2a26] dark:text-[#f5f3ee]"');
+      expect(result).toContain('class="text-admin-ink dark:text-admin-paper"');
     });
 
     it("applies correct CSS classes to bold text", () => {
       const result = renderMarkdown("This is **bold**");
-      expect(result).toContain('class="text-[#2d2a26] dark:text-[#f5f3ee]"');
+      expect(result).toContain('class="text-admin-ink dark:text-admin-paper"');
     });
 
     it("applies correct CSS class to <ul>", () => {

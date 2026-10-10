@@ -32,11 +32,11 @@ export function ElevenLabsAnalyticsPanel() {
     <div className="space-y-12">
       {/* Controls */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+        <h2 className="text-lg font-medium text-admin-ink dark:text-admin-paper">
           Voice Analytics
         </h2>
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+          <div className="flex items-center gap-2 font-mono text-xs text-admin-muted dark:text-admin-subtle">
             <input
               type="date"
               value={dateRange.from}
@@ -54,7 +54,7 @@ export function ElevenLabsAnalyticsPanel() {
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+            className="font-mono text-xs uppercase tracking-widest text-admin-muted transition-colors hover:text-admin-ink disabled:opacity-50 dark:text-admin-subtle dark:hover:text-admin-paper"
           >
             {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -66,17 +66,17 @@ export function ElevenLabsAnalyticsPanel() {
         <div className={`inline-flex items-center gap-3 rounded-full px-4 py-2 ${
           data.activeCalls > 0
             ? "bg-emerald-50 dark:bg-emerald-900/20"
-            : "bg-[#f5f3ee] dark:bg-[#3d3a36]"
+            : "bg-admin-paper dark:bg-admin-depth"
         }`}>
           <span
             className={`h-2.5 w-2.5 rounded-full ${
-              data.activeCalls > 0 ? "animate-pulse bg-emerald-500" : "bg-[#a39e98]"
+              data.activeCalls > 0 ? "animate-pulse bg-emerald-500" : "bg-admin-subtle"
             }`}
           />
           <span className={`font-mono text-sm font-medium ${
             data.activeCalls > 0
               ? "text-emerald-700 dark:text-emerald-400"
-              : "text-[#6b6560] dark:text-[#a39e98]"
+              : "text-admin-muted dark:text-admin-subtle"
           }`}>
             Active calls: {data.activeCalls}
           </span>
@@ -98,9 +98,9 @@ export function ElevenLabsAnalyticsPanel() {
         <SkeletonVoiceDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[200px] flex-col items-center justify-center gap-4">
-          <Mic className="h-8 w-8 text-[#e5e3de]" />
-          <p className="text-xl font-extralight text-[#a39e98]">No conversations yet</p>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <Mic className="h-8 w-8 text-admin-line" />
+          <p className="text-xl font-extralight text-admin-subtle">No conversations yet</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Voice agent data will appear here once conversations begin
           </p>
         </div>
@@ -261,8 +261,8 @@ const statColorClasses: Record<string, { value: string; icon: string }> = {
     icon: "text-yellow-500 dark:text-yellow-400",
   },
   stone: {
-    value: "text-[#6b6560] dark:text-[#a39e98]",
-    icon: "text-[#a39e98]",
+    value: "text-admin-muted dark:text-admin-subtle",
+    icon: "text-admin-subtle",
   },
 };
 
@@ -272,11 +272,11 @@ function StatCard({ value, label, suffix, icon, color = "stone" }: StatCardProps
     <div className="space-y-2">
       <div className={`flex items-center gap-2 ${colors.icon}`}>
         {icon}
-        <span className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">{label}</span>
+        <span className="font-mono text-xs uppercase tracking-widest text-admin-subtle">{label}</span>
       </div>
       <p className={`text-3xl font-extralight tabular-nums tracking-tight ${colors.value}`}>
         {typeof value === "number" ? value.toLocaleString() : value}
-        {suffix && <span className="ml-1 text-lg text-[#a39e98]">{suffix}</span>}
+        {suffix && <span className="ml-1 text-lg text-admin-subtle">{suffix}</span>}
       </p>
     </div>
   );
@@ -302,41 +302,41 @@ function BreakdownTable<T>({
   if (items.length === 0) {
     return (
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           {number} — {title}
         </h3>
-        <p className="py-6 text-center font-mono text-xs text-[#a39e98]">No data available</p>
+        <p className="py-6 text-center font-mono text-xs text-admin-subtle">No data available</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — {title}
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Name</th>
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Name</th>
             {getSecondary && (
-              <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+              <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
                 Time
               </th>
             )}
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Count
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {items.map((item, idx) => (
             <tr key={idx}>
-              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
+              <td className="py-2 font-mono text-sm tabular-nums text-admin-subtle">
                 {String(idx + 1).padStart(2, "0")}
               </td>
-              <td className="py-2 text-sm capitalize text-[#4d4944] dark:text-[#a39e98]">
+              <td className="py-2 text-sm capitalize text-admin-secondary dark:text-admin-subtle">
                 {renderItem(item)}
               </td>
               {getSecondary && (
@@ -364,33 +364,33 @@ function RecentConversationsTable({ number, conversations }: RecentConversations
   if (conversations.length === 0) {
     return (
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           {number} — Recent Conversations
         </h3>
-        <p className="py-6 text-center font-mono text-xs text-[#a39e98]">No conversations yet</p>
+        <p className="py-6 text-center font-mono text-xs text-admin-subtle">No conversations yet</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — Recent Conversations
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Time</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Status</th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Time</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Status</th>
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Duration
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {conversations.map((conv) => (
             <tr key={conv.conversation_id}>
-              <td className="py-2 font-mono text-xs tabular-nums text-[#6b6560]">
+              <td className="py-2 font-mono text-xs tabular-nums text-admin-muted">
                 {formatTime(conv.start_time_unix)}
               </td>
               <td className="py-2">
@@ -400,7 +400,7 @@ function RecentConversationsTable({ number, conversations }: RecentConversations
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                       : conv.status === "failed"
                       ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
-                      : "bg-[#f5f3ee] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
+                      : "bg-admin-paper text-admin-muted dark:bg-admin-depth dark:text-admin-subtle"
                   }`}
                 >
                   {formatStatus(conv.status)}
@@ -425,9 +425,9 @@ function SkeletonVoiceDashboard() {
   return (
     <>
       {/* Active Calls Widget Skeleton */}
-      <div className="inline-flex items-center gap-3 rounded-full bg-[#f5f3ee] px-4 py-2 dark:bg-[#3d3a36]">
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#d5d3ce] dark:bg-[#4d4944]" />
-        <div className="h-4 w-24 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+      <div className="inline-flex items-center gap-3 rounded-full bg-admin-paper px-4 py-2 dark:bg-admin-depth">
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-admin-skeleton-dot dark:bg-admin-secondary" />
+        <div className="h-4 w-24 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
       </div>
 
       {/* Summary Stats Skeleton */}
@@ -458,15 +458,15 @@ const skeletonColorClasses: Record<string, string> = {
   rose: "bg-rose-200 dark:bg-rose-900/30",
   violet: "bg-violet-200 dark:bg-violet-900/30",
   yellow: "bg-yellow-200 dark:bg-yellow-900/30",
-  stone: "bg-[#e5e3de] dark:bg-[#3d3a36]",
+  stone: "bg-admin-line dark:bg-admin-depth",
 };
 
 function SkeletonStatCard({ color }: { color: string }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <div className="h-4 w-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
-        <div className="h-3 w-20 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+        <div className="h-4 w-4 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
+        <div className="h-3 w-20 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
       </div>
       <div className={`h-9 w-16 animate-pulse rounded ${skeletonColorClasses[color] || skeletonColorClasses.stone}`} />
     </div>
@@ -476,28 +476,28 @@ function SkeletonStatCard({ color }: { color: string }) {
 function SkeletonBreakdownTable({ number, title }: { number: string; title: string }) {
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — {title}
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Name</th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Name</th>
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Count
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {[1, 2, 3].map((idx) => (
             <tr key={idx}>
-              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
+              <td className="py-2 font-mono text-sm tabular-nums text-admin-subtle">
                 {String(idx).padStart(2, "0")}
               </td>
               <td className="py-2">
                 <div
-                  className="h-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]"
+                  className="h-4 animate-pulse rounded bg-admin-line dark:bg-admin-depth"
                   style={{ width: `${65 - idx * 10}%` }}
                 />
               </td>
@@ -515,24 +515,24 @@ function SkeletonBreakdownTable({ number, title }: { number: string; title: stri
 function SkeletonRecentConversations({ number }: { number: string }) {
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-subtle">
         {number} — Recent Conversations
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Time</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Status</th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Time</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">Status</th>
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Duration
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {[1, 2, 3, 4, 5].map((idx) => (
             <tr key={idx}>
               <td className="py-2">
-                <div className="h-3 w-28 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+                <div className="h-3 w-28 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
               </td>
               <td className="py-2">
                 <div className="h-5 w-16 animate-pulse rounded-full bg-emerald-100 dark:bg-emerald-900/30" />

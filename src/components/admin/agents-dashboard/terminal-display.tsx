@@ -97,25 +97,25 @@ export function AgentTerminal({
         ? `Failed (exit ${exitCode})`
         : "Completed";
   const statusColor = !finished
-    ? "text-[#c9a55c]"
+    ? "text-admin-warning"
     : stoppedByUser
-      ? "text-[#c9a55c]"
+      ? "text-admin-warning"
       : failed
-        ? "text-[#c97a7a]"
-        : "text-[#7a9e7a]";
+        ? "text-admin-health-error"
+        : "text-admin-health-success";
 
   return (
     <section>
-      <div className="overflow-hidden rounded-2xl border border-[#3d3a36]">
+      <div className="overflow-hidden rounded-2xl border border-admin-depth">
         {/* Header bar */}
         <div className="flex items-center justify-between bg-[#1a1a1a] px-4 py-3">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-[#e5e3de]">{agentName}</span>
+            <span className="text-sm font-medium text-admin-line">{agentName}</span>
             <span className={cn("flex items-center gap-1.5 font-mono text-xs", statusColor)}>
-              {!finished && <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#c9a55c]" />}
+              {!finished && <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-admin-warning" />}
               {statusLabel}
             </span>
-            <span className="font-mono text-xs text-[#6b6560]">{elapsed}</span>
+            <span className="font-mono text-xs text-admin-muted">{elapsed}</span>
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -126,14 +126,14 @@ export function AgentTerminal({
                   setTimeout(() => setCopied(false), 2000);
                 });
               }}
-              className="rounded p-1 text-[#6b6560] transition-colors hover:bg-[#3d3a36] hover:text-[#e5e3de]"
+              className="rounded p-1 text-admin-muted transition-colors hover:bg-admin-depth hover:text-admin-line"
               aria-label="Copy terminal output"
             >
-              {copied ? <Check className="h-4 w-4 text-[#7a9e7a]" /> : <Copy className="h-4 w-4" />}
+              {copied ? <Check className="h-4 w-4 text-admin-health-success" /> : <Copy className="h-4 w-4" />}
             </button>
             <button
               onClick={onClose}
-              className="rounded p-1 text-[#6b6560] transition-colors hover:bg-[#3d3a36] hover:text-[#e5e3de]"
+              className="rounded p-1 text-admin-muted transition-colors hover:bg-admin-depth hover:text-admin-line"
               aria-label="Close terminal"
             >
               <X className="h-4 w-4" />
@@ -146,7 +146,7 @@ export function AgentTerminal({
           className="max-h-[400px] overflow-y-auto bg-[#111] p-4 font-mono text-xs leading-relaxed"
         >
           {logs.length === 0 ? (
-            <p className="text-[#6b6560]">Waiting for output...</p>
+            <p className="text-admin-muted">Waiting for output...</p>
           ) : (
             logs.map((line, i) => (
               <div key={i} className="flex gap-3">
@@ -155,7 +155,7 @@ export function AgentTerminal({
                 </span>
                 <span className={cn(
                   "whitespace-pre-wrap break-all",
-                  line.text.startsWith("[stderr]") ? "text-[#c97a7a]" : "text-[#d4d0ca]",
+                  line.text.startsWith("[stderr]") ? "text-admin-health-error" : "text-[#d4d0ca]",
                 )}>
                   {line.text}
                 </span>

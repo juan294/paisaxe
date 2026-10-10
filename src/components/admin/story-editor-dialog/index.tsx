@@ -90,14 +90,14 @@ export function StoryEditorDialog({
   return (
     <>
       <Dialog open={!!story} onOpenChange={doResetAndClose}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto bg-white dark:bg-[#252320] sm:max-w-xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto bg-white dark:bg-admin-panel sm:max-w-xl">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle className="text-[#2d2a26] dark:text-[#f5f3ee]">
+                <DialogTitle className="text-admin-ink dark:text-admin-paper">
                   Edit Story
                 </DialogTitle>
-                <DialogDescription className="text-[#6b6560] dark:text-[#a39e98]">
+                <DialogDescription className="text-admin-muted dark:text-admin-subtle">
                   Update story details and image
                 </DialogDescription>
               </div>
@@ -130,14 +130,14 @@ export function StoryEditorDialog({
           )}
 
           {/* Main Tabs */}
-          <div className="flex gap-1 rounded-xl bg-[#f5f3ee] p-1 dark:bg-[#2d2a26]">
+          <div className="flex gap-1 rounded-xl bg-admin-paper p-1 dark:bg-admin-ink">
             <button
               onClick={() => state.setActiveTab("details")}
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
                 state.activeTab === "details"
-                  ? "bg-white text-[#2d2a26] shadow-sm dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
-                  : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+                  ? "bg-white text-admin-ink shadow-sm dark:bg-admin-depth dark:text-admin-paper"
+                  : "text-admin-muted hover:text-admin-ink dark:text-admin-subtle dark:hover:text-admin-paper"
               )}
             >
               <FileText className="h-4 w-4" />
@@ -148,8 +148,8 @@ export function StoryEditorDialog({
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
                 state.activeTab === "image"
-                  ? "bg-white text-[#2d2a26] shadow-sm dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
-                  : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+                  ? "bg-white text-admin-ink shadow-sm dark:bg-admin-depth dark:text-admin-paper"
+                  : "text-admin-muted hover:text-admin-ink dark:text-admin-subtle dark:hover:text-admin-paper"
               )}
             >
               <ImageIcon className="h-4 w-4" />
@@ -160,8 +160,8 @@ export function StoryEditorDialog({
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
                 state.activeTab === "translations"
-                  ? "bg-white text-[#2d2a26] shadow-sm dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
-                  : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+                  ? "bg-white text-admin-ink shadow-sm dark:bg-admin-depth dark:text-admin-paper"
+                  : "text-admin-muted hover:text-admin-ink dark:text-admin-subtle dark:hover:text-admin-paper"
               )}
             >
               <Languages className="h-4 w-4" />
@@ -240,14 +240,14 @@ export function StoryEditorDialog({
                 variant="outline"
                 onClick={doResetAndClose}
                 disabled={state.isLoading}
-                className="border-[#e5e3de] dark:border-[#3d3a36]"
+                className="border-admin-line dark:border-admin-depth"
               >
                 Cancel
               </Button>
               <Button
                 onClick={onSave}
                 disabled={state.isLoading || !state.hasChanges}
-                className="bg-[#2d2a26] text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+                className="bg-admin-ink text-admin-paper hover:bg-admin-depth dark:bg-admin-paper dark:text-admin-ink dark:hover:bg-admin-line"
               >
                 {state.isLoading ? (
                   <>

@@ -50,6 +50,6 @@ describe("StatCard", () => {
     );
 
     const valueEl = container.querySelector('[class*="text-5xl"]');
-    expect(valueEl?.className).toContain("text-[#2d2a26]");
+    expect(valueEl?.className).toContain("text-admin-ink");
   });
 });

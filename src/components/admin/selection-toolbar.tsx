@@ -24,16 +24,16 @@ export function SelectionToolbar({
 
   return (
     <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-200">
-      <div className="flex items-center gap-2 rounded-2xl bg-[#2d2a26] px-4 py-3 shadow-2xl dark:bg-[#f5f3ee]">
+      <div className="flex items-center gap-2 rounded-2xl bg-admin-ink px-4 py-3 shadow-2xl dark:bg-admin-paper">
         {/* Selection count */}
-        <div className="flex items-center gap-2 border-r border-white/20 pr-4 dark:border-[#2d2a26]/20">
-          <span className="text-sm font-medium text-white dark:text-[#2d2a26]">
+        <div className="flex items-center gap-2 border-r border-white/20 pr-4 dark:border-admin-ink/20">
+          <span className="text-sm font-medium text-white dark:text-admin-ink">
             {selectedCount} selected
           </span>
           <button
             onClick={onClearSelection}
             disabled={isLoading}
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white dark:text-[#2d2a26]/60 dark:hover:bg-[#2d2a26]/10 dark:hover:text-[#2d2a26]"
+            className="flex h-6 w-6 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white dark:text-admin-ink/60 dark:hover:bg-admin-ink/10 dark:hover:text-admin-ink"
           >
             <X className="h-4 w-4" />
           </button>
@@ -46,7 +46,7 @@ export function SelectionToolbar({
             disabled={isLoading}
             className={cn(
               "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all",
-              "bg-[#5a7a5a] text-white hover:bg-[#4a6a4a]",
+              "bg-admin-approve text-white hover:bg-admin-approve-hover",
               "disabled:cursor-not-allowed disabled:opacity-50"
             )}
           >
@@ -63,7 +63,7 @@ export function SelectionToolbar({
             disabled={isLoading}
             className={cn(
               "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all",
-              "bg-[#c9a55c] text-white hover:bg-[#b89545]",
+              "bg-admin-warning text-white hover:bg-admin-warning-hover",
               "disabled:cursor-not-allowed disabled:opacity-50"
             )}
           >
@@ -80,7 +80,7 @@ export function SelectionToolbar({
             disabled={isLoading}
             className={cn(
               "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all",
-              "bg-[#a85454] text-white hover:bg-[#8b4444]",
+              "bg-admin-delete text-white hover:bg-admin-delete-hover",
               "disabled:cursor-not-allowed disabled:opacity-50"
             )}
           >

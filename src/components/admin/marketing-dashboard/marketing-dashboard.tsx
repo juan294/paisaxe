@@ -111,7 +111,7 @@ export function MarketingDashboard() {
   if (isLoading && !data) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
+        <RefreshCw className="h-5 w-5 animate-spin text-admin-subtle" />
       </div>
     );
   }
@@ -123,7 +123,7 @@ export function MarketingDashboard() {
         <p className="font-mono text-xs text-red-600">{error}</p>
         <button
           onClick={loadData}
-          className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
+          className="font-mono text-xs uppercase tracking-widest text-admin-subtle transition-colors hover:text-admin-ink dark:hover:text-admin-paper"
         >
           Retry
         </button>
@@ -136,17 +136,17 @@ export function MarketingDashboard() {
   return (
     <div className="space-y-16">
       {/* Header */}
-      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
+      <header className="flex items-end justify-between border-b border-admin-line pb-6 dark:border-admin-depth">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">Admin / Marketing</p>
-          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-subtle">Admin / Marketing</p>
+          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-admin-ink dark:text-admin-paper">
             Marketing Automation
           </h2>
         </div>
         <button
           onClick={loadData}
           disabled={isLoading}
-          className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
+          className="font-mono text-xs uppercase tracking-widest text-admin-subtle transition-colors hover:text-admin-ink disabled:opacity-50 dark:hover:text-admin-paper"
         >
           {isLoading ? "Loading..." : "Refresh"}
         </button>
@@ -154,7 +154,7 @@ export function MarketingDashboard() {
 
       {/* Connected Accounts */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           01 — Connected Accounts
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -178,7 +178,7 @@ export function MarketingDashboard() {
 
       {/* Stats Overview */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           02 — Performance Overview
         </h2>
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -193,24 +193,24 @@ export function MarketingDashboard() {
       <div className="grid gap-16 lg:grid-cols-2">
         {/* Upcoming Posts */}
         <section>
-          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-subtle">
             03 — Upcoming Posts
           </h2>
           {data.upcomingPosts.length === 0 ? (
-            <p className="py-8 text-center font-mono text-xs text-[#a39e98]">
+            <p className="py-8 text-center font-mono text-xs text-admin-subtle">
               No scheduled posts
             </p>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Platform</th>
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Content</th>
-                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">Scheduled</th>
+                <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-subtle">Platform</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-subtle">Content</th>
+                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">Scheduled</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+              <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
                 {data.upcomingPosts.slice(0, 5).map((post, idx) => (
                   <PostRow key={post.id} post={post} index={idx} />
                 ))}
@@ -221,24 +221,24 @@ export function MarketingDashboard() {
 
         {/* Recent Posts */}
         <section>
-          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-subtle">
             04 — Recent Posts
           </h2>
           {data.recentPosts.length === 0 ? (
-            <p className="py-8 text-center font-mono text-xs text-[#a39e98]">
+            <p className="py-8 text-center font-mono text-xs text-admin-subtle">
               No posts yet
             </p>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Platform</th>
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Content</th>
-                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">Status</th>
+                <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-subtle">#</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-subtle">Platform</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-subtle">Content</th>
+                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+              <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
                 {data.recentPosts.slice(0, 5).map((post, idx) => (
                   <PostRow key={post.id} post={post} index={idx} />
                 ))}
@@ -250,36 +250,36 @@ export function MarketingDashboard() {
 
       {/* Posting Schedule */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           05 — Posting Schedule
         </h2>
         {data.schedules.length === 0 ? (
-          <p className="py-8 text-center font-mono text-xs text-[#a39e98]">
+          <p className="py-8 text-center font-mono text-xs text-admin-subtle">
             No schedules configured
           </p>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Platform</th>
-                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Day</th>
-                <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">Time (UTC)</th>
+              <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-subtle">Platform</th>
+                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-subtle">Day</th>
+                <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">Time (UTC)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+            <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
               {data.schedules
                 .filter((s) => s.isActive)
                 .map((schedule) => (
                   <tr key={schedule.id}>
                     <td className="py-3">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-[#e5e3de] font-mono text-[10px] font-medium text-[#6b6560] dark:border-[#4d4944] dark:text-[#a39e98]">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-admin-line font-mono text-[10px] font-medium text-admin-muted dark:border-admin-secondary dark:text-admin-subtle">
                         {PLATFORM_BADGES[schedule.platform]}
                       </span>
                     </td>
-                    <td className="py-3 text-sm text-[#4d4944] dark:text-[#a39e98]">
+                    <td className="py-3 text-sm text-admin-secondary dark:text-admin-subtle">
                       {schedule.dayOfWeek !== null ? DAY_NAMES[schedule.dayOfWeek] : "Daily"}
                     </td>
-                    <td className="py-3 text-right font-mono text-sm tabular-nums text-[#2d2a26] dark:text-[#f5f3ee]">
+                    <td className="py-3 text-right font-mono text-sm tabular-nums text-admin-ink dark:text-admin-paper">
                       {schedule.timeUtc}
                     </td>
                   </tr>
@@ -291,7 +291,7 @@ export function MarketingDashboard() {
 
       {/* Marketing Agents Chat */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           06 — Marketing Agents
         </h2>
         <VoiceAgentChat agentIds={ELEVENLABS_AGENT_IDS} />
@@ -299,7 +299,7 @@ export function MarketingDashboard() {
 
       {/* Content Drafts */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-subtle">
           07 — Content Drafts
         </h2>
         <DraftsPanel onDraftPosted={loadData} />
@@ -307,11 +307,11 @@ export function MarketingDashboard() {
 
       {/* Setup Instructions */}
       {data.accounts.length === 0 && (
-        <section className="border-t border-[#e5e3de] pt-8 text-center dark:border-[#3d3a36]">
-          <p className="text-lg font-extralight text-[#a39e98]">
+        <section className="border-t border-admin-line pt-8 text-center dark:border-admin-depth">
+          <p className="text-lg font-extralight text-admin-subtle">
             No accounts connected
           </p>
-          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Click on any platform above to connect your social media accounts
           </p>
         </section>

@@ -66,11 +66,11 @@ export function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
     <section>
       <button
         onClick={handleToggle}
-        className="flex w-full items-center justify-between rounded-lg px-1 py-2 transition-colors hover:bg-[#f5f3ee] dark:hover:bg-[#2d2a26]"
+        className="flex w-full items-center justify-between rounded-lg px-1 py-2 transition-colors hover:bg-admin-paper dark:hover:bg-admin-ink"
       >
         <div className="flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-[#a39e98]" />
-          <h3 className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <ShieldAlert className="h-4 w-4 text-admin-subtle" />
+          <h3 className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Tier Upgrade Alerts
           </h3>
           {!isExpanded && nonSafeAlerts.length > 0 && (
@@ -80,7 +80,7 @@ export function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
           )}
         </div>
         <ChevronDown
-          className={`h-4 w-4 text-[#a39e98] transition-transform ${isExpanded ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-admin-subtle transition-transform ${isExpanded ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -88,20 +88,20 @@ export function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
         <div className="mt-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <p className="animate-pulse font-mono text-xs text-[#a39e98]">
+              <p className="animate-pulse font-mono text-xs text-admin-subtle">
                 Analyzing usage patterns...
               </p>
             </div>
           ) : !alerts ? (
             <div className="flex flex-col items-center justify-center gap-2 py-8">
-              <p className="font-mono text-xs text-[#a39e98]">
+              <p className="font-mono text-xs text-admin-subtle">
                 No usage data available yet
               </p>
             </div>
           ) : (
             <>
               {usageMetrics && usageMetrics.periodDays < 30 && (
-                <p className="mb-3 font-mono text-xs text-[#a39e98]">
+                <p className="mb-3 font-mono text-xs text-admin-subtle">
                   Based on {usageMetrics.periodDays} days of data
                 </p>
               )}
@@ -113,7 +113,7 @@ export function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
                   </p>
                   <button
                     onClick={() => setShowAll(true)}
-                    className="font-mono text-xs text-[#a39e98] underline hover:text-[#6b6560]"
+                    className="font-mono text-xs text-admin-subtle underline hover:text-admin-muted"
                   >
                     Show all services
                   </button>
@@ -123,28 +123,28 @@ export function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                        <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
                             Service
                           </th>
-                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
                             Metric
                           </th>
-                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
                             Usage
                           </th>
-                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
                             Projected Limit
                           </th>
-                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
                             Status
                           </th>
-                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
                             Action
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+                      <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
                         {displayAlerts.map((alert) => (
                           <TierAlertRow
                             key={`${alert.serviceId}-${alert.metricLabel}`}
@@ -158,7 +158,7 @@ export function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
                   {!showAll && alerts.length > nonSafeAlerts.length && (
                     <button
                       onClick={() => setShowAll(true)}
-                      className="mt-3 font-mono text-xs text-[#a39e98] underline hover:text-[#6b6560]"
+                      className="mt-3 font-mono text-xs text-admin-subtle underline hover:text-admin-muted"
                     >
                       Show all ({alerts.length - nonSafeAlerts.length} safe)
                     </button>
@@ -166,7 +166,7 @@ export function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
                   {showAll && nonSafeAlerts.length < (alerts?.length ?? 0) && (
                     <button
                       onClick={() => setShowAll(false)}
-                      className="mt-3 font-mono text-xs text-[#a39e98] underline hover:text-[#6b6560]"
+                      className="mt-3 font-mono text-xs text-admin-subtle underline hover:text-admin-muted"
                     >
                       Hide safe services
                     </button>
@@ -191,7 +191,7 @@ function TierAlertRow({ alert }: { alert: TierAlert }) {
 
   return (
     <tr>
-      <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+      <td className="py-2 text-sm text-admin-secondary dark:text-admin-subtle">
         <div className="flex flex-col">
           <span className="flex items-center gap-1">
             {alert.serviceName}
@@ -200,25 +200,25 @@ function TierAlertRow({ alert }: { alert: TierAlert }) {
                 href={platformService.dashboardUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#a39e98] hover:text-[#4d4944] dark:hover:text-[#f5f3ee]"
+                className="text-admin-subtle hover:text-admin-secondary dark:hover:text-admin-paper"
               >
                 <ExternalLink className="h-3 w-3" />
               </a>
             )}
           </span>
-          <span className="text-xs text-[#a39e98]">{alert.currentTierName}</span>
+          <span className="text-xs text-admin-subtle">{alert.currentTierName}</span>
         </div>
       </td>
-      <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+      <td className="py-2 text-sm text-admin-secondary dark:text-admin-subtle">
         {alert.metricLabel}
       </td>
       <td className="py-2">
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-xs tabular-nums text-[#4d4944] dark:text-[#a39e98]">
+          <span className="font-mono text-xs tabular-nums text-admin-secondary dark:text-admin-subtle">
             {formatNum(alert.currentUsage)} / {formatNum(alert.monthlyLimit)}{" "}
             {alert.unit}
           </span>
-          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-[#e5e3de] dark:bg-[#3d3a36]">
+          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-admin-line dark:bg-admin-depth">
             <div
               className={`h-full rounded-full transition-all ${alertBarColor(alert.alertLevel)}`}
               style={{ width: `${Math.min(alert.usagePercent, 100)}%` }}
@@ -226,7 +226,7 @@ function TierAlertRow({ alert }: { alert: TierAlert }) {
           </div>
         </div>
       </td>
-      <td className="py-2 font-mono text-xs tabular-nums text-[#4d4944] dark:text-[#a39e98]">
+      <td className="py-2 font-mono text-xs tabular-nums text-admin-secondary dark:text-admin-subtle">
         {alert.projectedDate ? (
           <span>
             {alert.projectedDaysToLimit === 0
@@ -234,13 +234,13 @@ function TierAlertRow({ alert }: { alert: TierAlert }) {
               : `~${alert.projectedDaysToLimit}d (${formatDateShort(alert.projectedDate)})`}
           </span>
         ) : (
-          <span className="text-[#a39e98]">—</span>
+          <span className="text-admin-subtle">—</span>
         )}
       </td>
       <td className="py-2">
         <AlertLevelBadge level={alert.alertLevel} />
       </td>
-      <td className="py-2 text-xs text-[#4d4944] dark:text-[#a39e98]">
+      <td className="py-2 text-xs text-admin-secondary dark:text-admin-subtle">
         {alert.recommendation ? (
           <span>
             → {alert.recommendation.tierName} ($
@@ -250,7 +250,7 @@ function TierAlertRow({ alert }: { alert: TierAlert }) {
             )
           </span>
         ) : (
-          <span className="text-[#a39e98]">—</span>
+          <span className="text-admin-subtle">—</span>
         )}
       </td>
     </tr>

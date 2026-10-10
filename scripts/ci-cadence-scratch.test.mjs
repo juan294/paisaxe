@@ -15,12 +15,17 @@ const GUARD = 'Verify completed callable source checkout';
 const childEnv = extra => ({ ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), ...extra });
 
 /** A committed checkout with files a release tarball also carries, a separate RUNNER_TEMP and stub tools. */
-function sandbox(body) {
+function sandbox(body, trackedFiles = {}) {
   const base = mkdtempSync(join(tmpdir(), 'cadence-scratch-'));
   const root = join(base, 'checkout'), temp = join(base, 'runner-temp'), bin = join(base, 'bin');
   for (const directory of [root, temp, bin]) mkdirSync(directory);
   const git = (...args) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.test', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: root, encoding: 'utf8', env: childEnv({}) });
   writeFileSync(join(root, 'README.md'), 'tracked readme\n'); writeFileSync(join(root, 'LICENSE'), 'tracked license\n'); writeFileSync(join(root, '.gitignore'), 'node_modules/\n');
+  for (const [path, bytes] of Object.entries(trackedFiles)) {
+    const target = join(root, path);
+    mkdirSync(join(target, '..'), { recursive: true });
+    writeFileSync(target, bytes);
+  }
   git('init', '-q'); git('add', '.'); git('commit', '-qm', 'base');
   const tool = (name, script) => { writeFileSync(join(bin, name), `#!/bin/bash\n${script}`); chmodSync(join(bin, name), 0o755); };
   const run = (script, extra = {}) => spawnSync('bash', ['-e', '-c', script], { cwd: root, encoding: 'utf8', env: childEnv({ PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: temp, ...extra }) });
@@ -69,11 +74,23 @@ test('Lighthouse CI output is removed before the completed source guard', () => 
   const guard = steps.findIndex(step => step.name === GUARD), last = steps.findLastIndex(step => step.uses === 'treosh/lighthouse-ci-action@v12');
   assert.ok(last >= 0 && last < guard);
   // treosh/lighthouse-ci-action writes .lighthouseci into the working directory.
-  mkdirSync(join(root, '.lighthouseci')); writeFileSync(join(root, '.lighthouseci', 'lhr-1.json'), '{}');
+  const resultsPath = join(root, '.lighthouseci');
+  mkdirSync(resultsPath);
+  for (let index = 1; index <= 3; index++) writeFileSync(join(resultsPath, `lhr-${index}.json`), JSON.stringify({
+    lighthouseVersion: '12.6.1', fetchTime: `2026-10-10T10:00:0${index}.000Z`,
+    requestedUrl: 'http://localhost:3000/immersive', finalDisplayedUrl: 'http://localhost:3000/immersive', finalUrl: 'http://localhost:3000/immersive',
+    configSettings: {
+      formFactor: 'mobile', throttlingMethod: 'simulate', disableStorageReset: false,
+      screenEmulation: { mobile: true, disabled: false, width: 412, height: 823, deviceScaleFactor: 1.75 },
+      throttling: { rttMs: 150, throughputKbps: 1638.4, requestLatencyMs: 562.5, downloadThroughputKbps: 1474.5600000000002, uploadThroughputKbps: 675, cpuSlowdownMultiplier: 4 },
+    },
+    categories: { performance: { score: 0.8 } },
+    audits: { 'largest-contentful-paint': { numericValue: 3900 }, 'total-blocking-time': { numericValue: 450 } },
+  }));
   for (const step of steps.slice(last + 1, guard)) {
     assert.ok(step.run && !step.if && !step.uses, `${step.name}: an unconditional shell step`);
-    const result = run(step.run);
+    const result = run(step.run, { LIGHTHOUSE_RESULTS_PATH: resultsPath });
     assert.equal(result.status, 0, result.stderr);
   }
   assert.equal(clean(), '');
-}));
+}, { 'scripts/check-mobile-lighthouse.mjs': readFileSync(new URL('./check-mobile-lighthouse.mjs', import.meta.url)) }));

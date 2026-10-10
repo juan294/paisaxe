@@ -16,7 +16,7 @@ export function ThemeToggle() {
   if (!mounted) {
     return (
       <div className="flex h-9 w-9 items-center justify-center rounded-xl">
-        <div className="h-4 w-4 animate-pulse rounded bg-[#a39e98]/30" />
+        <div className="h-4 w-4 animate-pulse rounded bg-admin-subtle/30" />
       </div>
     );
   }
@@ -26,8 +26,8 @@ export function ThemeToggle() {
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
       className={cn(
         "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
-        "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
-        "dark:text-[#a39e98] dark:hover:bg-[#252320] dark:hover:text-[#f5f3ee]"
+        "text-admin-muted hover:bg-white hover:text-admin-ink",
+        "dark:text-admin-subtle dark:hover:bg-admin-panel dark:hover:text-admin-paper"
       )}
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
     >

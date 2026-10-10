@@ -114,18 +114,18 @@ function AgentsDashboardInner() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
-        <Loader2 className="h-6 w-6 animate-spin text-[#a39e98]" />
-        <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">Loading agents...</p>
+      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-admin-panel">
+        <Loader2 className="h-6 w-6 animate-spin text-admin-subtle" />
+        <p className="mt-4 text-sm text-admin-muted dark:text-admin-subtle">Loading agents...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
-        <AlertCircle className="h-8 w-8 text-[#c97a7a]" />
-        <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">{error}</p>
+      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-admin-panel">
+        <AlertCircle className="h-8 w-8 text-admin-health-error" />
+        <p className="mt-4 text-sm text-admin-muted dark:text-admin-subtle">{error}</p>
       </div>
     );
   }
@@ -141,16 +141,16 @@ function AgentsDashboardInner() {
 
       {/* Header */}
       <div>
-        <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+        <p className="font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
           Admin / Agents
         </p>
-        <h2 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+        <h2 className="mt-2 text-4xl font-extralight tracking-tight text-admin-ink dark:text-admin-paper">
           Agent Intelligence
         </h2>
       </div>
 
       {(runnerUnavailable || terminalUnavailable) && (
-        <p role="status" className="text-sm text-[#6b6560] dark:text-[#a39e98]">
+        <p role="status" className="text-sm text-admin-muted dark:text-admin-subtle">
           Solo disponible en desarrollo local. Inicia la aplicación con npm run dev para ejecutar agentes. Los informes siguen disponibles.
         </p>
       )}
@@ -161,20 +161,20 @@ function AgentsDashboardInner() {
       {/* Agent Toggles (local config) */}
       {agentConfig && (
         <section>
-          <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+          <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
             Agent Toggles
           </h2>
-          <div className="rounded-2xl bg-white dark:bg-[#252320]">
+          <div className="rounded-2xl bg-white dark:bg-admin-panel">
             <table className="w-full">
-              <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+              <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
                 {/* Master toggle */}
-                <tr className={cn(agentConfig.master_enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
+                <tr className={cn(agentConfig.master_enabled && "bg-admin-paper/50 dark:bg-admin-panel/50")}>
                   <td className="py-4 pl-5 align-top">
-                    <span className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                    <span className="text-sm font-medium text-admin-ink dark:text-admin-paper">
                       All Automated Agents
                     </span>
                   </td>
-                  <td className="py-4 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
+                  <td className="py-4 pr-4 align-top text-sm text-admin-muted dark:text-admin-subtle">
                     Master toggle for all agents
                   </td>
                   <td className="w-20 py-4 pr-5 text-center align-top">
@@ -184,8 +184,8 @@ function AgentsDashboardInner() {
                       className={cn(
                         "relative h-6 w-11 rounded-full transition-colors",
                         agentConfig.master_enabled
-                          ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
-                          : "bg-[#e5e3de] dark:bg-[#3d3a36]",
+                          ? "bg-admin-ink dark:bg-admin-paper"
+                          : "bg-admin-line dark:bg-admin-depth",
                         updatingKey === "master" && "cursor-wait opacity-50"
                       )}
                       role="switch"
@@ -195,8 +195,8 @@ function AgentsDashboardInner() {
                       <span className={cn(
                         "absolute top-0.5 h-5 w-5 rounded-full transition-all",
                         agentConfig.master_enabled
-                          ? "left-[22px] bg-white dark:bg-[#2d2a26]"
-                          : "left-0.5 bg-white dark:bg-[#6b6560]"
+                          ? "left-[22px] bg-white dark:bg-admin-ink"
+                          : "left-0.5 bg-white dark:bg-admin-muted"
                       )} />
                     </button>
                   </td>
@@ -207,13 +207,13 @@ function AgentsDashboardInner() {
                   if (!agent) return null;
                   const name = AGENT_NAMES[key] ?? key;
                   return (
-                    <tr key={key} className={cn(agent.enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
+                    <tr key={key} className={cn(agent.enabled && "bg-admin-paper/50 dark:bg-admin-panel/50")}>
                       <td className="py-4 pl-5 align-top">
-                        <span className="pl-4 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                        <span className="pl-4 text-sm font-medium text-admin-ink dark:text-admin-paper">
                           {name}
                         </span>
                       </td>
-                      <td className="py-4 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
+                      <td className="py-4 pr-4 align-top text-sm text-admin-muted dark:text-admin-subtle">
                         {"\u2014"}
                       </td>
                       <td className="w-20 py-4 pr-5 text-center align-top">
@@ -223,8 +223,8 @@ function AgentsDashboardInner() {
                           className={cn(
                             "relative h-6 w-11 rounded-full transition-colors",
                             agent.enabled
-                              ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
-                              : "bg-[#e5e3de] dark:bg-[#3d3a36]",
+                              ? "bg-admin-ink dark:bg-admin-paper"
+                              : "bg-admin-line dark:bg-admin-depth",
                             updatingKey === key && "cursor-wait opacity-50"
                           )}
                           role="switch"
@@ -234,8 +234,8 @@ function AgentsDashboardInner() {
                           <span className={cn(
                             "absolute top-0.5 h-5 w-5 rounded-full transition-all",
                             agent.enabled
-                              ? "left-[22px] bg-white dark:bg-[#2d2a26]"
-                              : "left-0.5 bg-white dark:bg-[#6b6560]"
+                              ? "left-[22px] bg-white dark:bg-admin-ink"
+                              : "left-0.5 bg-white dark:bg-admin-muted"
                           )} />
                         </button>
                       </td>
@@ -250,7 +250,7 @@ function AgentsDashboardInner() {
 
       {/* Agent Status Grid */}
       <section>
-        <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+        <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
           Agent Status
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -308,10 +308,10 @@ function AgentsDashboardInner() {
       {/* Recent Activity Timeline */}
       {data.recentActivity.length > 0 && (
         <section>
-          <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+          <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
             Recent Activity
           </h2>
-          <div className="rounded-2xl bg-white p-6 dark:bg-[#252320]">
+          <div className="rounded-2xl bg-white p-6 dark:bg-admin-panel">
             <div className="space-y-0">
               {data.recentActivity.map((item, i) => (
                 <ActivityItem

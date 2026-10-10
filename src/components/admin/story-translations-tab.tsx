@@ -216,7 +216,7 @@ export function StoryTranslationsTab({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-[#6b6560]" />
+        <Loader2 className="h-6 w-6 animate-spin text-admin-muted" />
       </div>
     );
   }
@@ -224,8 +224,8 @@ export function StoryTranslationsTab({
   return (
     <div className="space-y-4">
       {/* Status Bar */}
-      <div className="flex items-center justify-between rounded-lg bg-[#f5f3ee] px-4 py-3 dark:bg-[#2d2a26]">
-        <div className="flex items-center gap-2 text-sm text-[#6b6560] dark:text-[#a39e98]">
+      <div className="flex items-center justify-between rounded-lg bg-admin-paper px-4 py-3 dark:bg-admin-ink">
+        <div className="flex items-center gap-2 text-sm text-admin-muted dark:text-admin-subtle">
           <Languages className="h-4 w-4" />
           <span>
             {completeCount}/{TRANSLATION_LOCALES.length} complete
@@ -235,7 +235,7 @@ export function StoryTranslationsTab({
           size="sm"
           onClick={handleGenerateAll}
           disabled={isGenerating}
-          className="bg-[#2d2a26] text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+          className="bg-admin-ink text-admin-paper hover:bg-admin-depth dark:bg-admin-paper dark:text-admin-ink dark:hover:bg-admin-line"
         >
           {isGenerating ? (
             <>
@@ -266,7 +266,7 @@ export function StoryTranslationsTab({
       )}
 
       {/* Locale Tabs */}
-      <div className="flex gap-1 overflow-x-auto rounded-xl bg-[#f5f3ee] p-1 dark:bg-[#2d2a26]">
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-admin-paper p-1 dark:bg-admin-ink">
         {TRANSLATION_LOCALES.map((locale) => {
           const state = localeStates[locale];
           const status = state.status?.status;
@@ -277,8 +277,8 @@ export function StoryTranslationsTab({
               className={cn(
                 "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition-all",
                 selectedLocale === locale
-                  ? "bg-white text-[#2d2a26] shadow-sm dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
-                  : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+                  ? "bg-white text-admin-ink shadow-sm dark:bg-admin-depth dark:text-admin-paper"
+                  : "text-admin-muted hover:text-admin-ink dark:text-admin-subtle dark:hover:text-admin-paper"
               )}
             >
               {locale.toUpperCase()}
@@ -294,48 +294,48 @@ export function StoryTranslationsTab({
       {/* Side-by-Side Editor */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Original (Spanish) */}
-        <div className="space-y-3 rounded-xl border border-[#e5e3de] bg-[#f5f3ee]/50 p-4 dark:border-[#3d3a36] dark:bg-[#2d2a26]/50">
+        <div className="space-y-3 rounded-xl border border-admin-line bg-admin-paper/50 p-4 dark:border-admin-depth dark:bg-admin-ink/50">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-[#6b6560] dark:text-[#a39e98]">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-admin-muted dark:text-admin-subtle">
               Spanish (Original)
             </h4>
           </div>
 
           <div className="space-y-3">
             <div>
-              <Label className="text-xs text-[#6b6560] dark:text-[#a39e98]">
+              <Label className="text-xs text-admin-muted dark:text-admin-subtle">
                 Title
               </Label>
-              <div className="mt-1 rounded-md bg-white/80 px-3 py-2 text-sm dark:bg-[#252320]/80">
-                {original.title || <span className="italic text-[#a39e98]">Empty</span>}
+              <div className="mt-1 rounded-md bg-white/80 px-3 py-2 text-sm dark:bg-admin-panel/80">
+                {original.title || <span className="italic text-admin-subtle">Empty</span>}
               </div>
             </div>
 
             <div>
-              <Label className="text-xs text-[#6b6560] dark:text-[#a39e98]">
+              <Label className="text-xs text-admin-muted dark:text-admin-subtle">
                 Subtitle
               </Label>
-              <div className="mt-1 rounded-md bg-white/80 px-3 py-2 text-sm dark:bg-[#252320]/80">
-                {original.subtitle || <span className="italic text-[#a39e98]">Empty</span>}
+              <div className="mt-1 rounded-md bg-white/80 px-3 py-2 text-sm dark:bg-admin-panel/80">
+                {original.subtitle || <span className="italic text-admin-subtle">Empty</span>}
               </div>
             </div>
 
             <div>
-              <Label className="text-xs text-[#6b6560] dark:text-[#a39e98]">
+              <Label className="text-xs text-admin-muted dark:text-admin-subtle">
                 Description
               </Label>
-              <div className="mt-1 min-h-[80px] rounded-md bg-white/80 px-3 py-2 text-sm dark:bg-[#252320]/80">
-                {original.description || <span className="italic text-[#a39e98]">Empty</span>}
+              <div className="mt-1 min-h-[80px] rounded-md bg-white/80 px-3 py-2 text-sm dark:bg-admin-panel/80">
+                {original.description || <span className="italic text-admin-subtle">Empty</span>}
               </div>
             </div>
           </div>
         </div>
 
         {/* Translation */}
-        <div className="space-y-3 rounded-xl border border-[#e5e3de] p-4 dark:border-[#3d3a36]">
+        <div className="space-y-3 rounded-xl border border-admin-line p-4 dark:border-admin-depth">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-[#6b6560] dark:text-[#a39e98]">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-admin-muted dark:text-admin-subtle">
                 {LOCALE_NAMES[selectedLocale]}
               </h4>
               {currentState.status && (
@@ -355,7 +355,7 @@ export function StoryTranslationsTab({
             <button
               onClick={() => handleRegenerateLocale(selectedLocale)}
               disabled={isGenerating}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-[#6b6560] transition-colors hover:bg-[#f5f3ee] dark:text-[#a39e98] dark:hover:bg-[#3d3a36]"
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-admin-muted transition-colors hover:bg-admin-paper dark:text-admin-subtle dark:hover:bg-admin-depth"
             >
               <RefreshCw className={cn("h-3 w-3", isGenerating && "animate-spin")} />
               Regenerate
@@ -366,7 +366,7 @@ export function StoryTranslationsTab({
             <div>
               <Label
                 htmlFor="trans-title"
-                className="text-xs text-[#6b6560] dark:text-[#a39e98]"
+                className="text-xs text-admin-muted dark:text-admin-subtle"
               >
                 Title
               </Label>
@@ -375,14 +375,14 @@ export function StoryTranslationsTab({
                 value={currentState.translation.title}
                 onChange={(e) => updateField("title", e.target.value)}
                 placeholder={original.title}
-                className="mt-1 bg-white dark:bg-[#252320]"
+                className="mt-1 bg-white dark:bg-admin-panel"
               />
             </div>
 
             <div>
               <Label
                 htmlFor="trans-subtitle"
-                className="text-xs text-[#6b6560] dark:text-[#a39e98]"
+                className="text-xs text-admin-muted dark:text-admin-subtle"
               >
                 Subtitle
               </Label>
@@ -391,14 +391,14 @@ export function StoryTranslationsTab({
                 value={currentState.translation.subtitle}
                 onChange={(e) => updateField("subtitle", e.target.value)}
                 placeholder={original.subtitle}
-                className="mt-1 bg-white dark:bg-[#252320]"
+                className="mt-1 bg-white dark:bg-admin-panel"
               />
             </div>
 
             <div>
               <Label
                 htmlFor="trans-description"
-                className="text-xs text-[#6b6560] dark:text-[#a39e98]"
+                className="text-xs text-admin-muted dark:text-admin-subtle"
               >
                 Description
               </Label>
@@ -407,7 +407,7 @@ export function StoryTranslationsTab({
                 value={currentState.translation.description}
                 onChange={(e) => updateField("description", e.target.value)}
                 placeholder={original.description}
-                className="mt-1 min-h-[80px] w-full resize-none rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#252320]"
+                className="mt-1 min-h-[80px] w-full resize-none rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-admin-panel"
                 style={{ fieldSizing: 'content' } as React.CSSProperties}
               />
             </div>

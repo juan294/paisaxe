@@ -7,7 +7,7 @@ import { PLATFORM_BADGES } from "./constants";
 
 export function PostRow({ post, index }: { post: MarketingPost; index: number }) {
   const statusStyles = {
-    draft: "text-[#a39e98]",
+    draft: "text-admin-subtle",
     scheduled: "text-amber-600",
     posting: "text-blue-600",
     posted: "text-emerald-600",
@@ -27,22 +27,22 @@ export function PostRow({ post, index }: { post: MarketingPost; index: number })
 
   return (
     <tr>
-      <td className="py-3 font-mono text-sm tabular-nums text-[#a39e98]">
+      <td className="py-3 font-mono text-sm tabular-nums text-admin-subtle">
         {String(index + 1).padStart(2, '0')}
       </td>
       <td className="py-3">
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-[#e5e3de] font-mono text-[10px] font-medium text-[#6b6560] dark:border-[#4d4944] dark:text-[#a39e98]">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-admin-line font-mono text-[10px] font-medium text-admin-muted dark:border-admin-secondary dark:text-admin-subtle">
           {PLATFORM_BADGES[post.platform]}
         </span>
       </td>
       <td className="max-w-xs py-3">
-        <p className="truncate text-sm text-[#4d4944] dark:text-[#a39e98]">
+        <p className="truncate text-sm text-admin-secondary dark:text-admin-subtle">
           {post.content}
         </p>
       </td>
       <td className="py-3 text-right">
         {post.status === "scheduled" && post.scheduledFor ? (
-          <span className="font-mono text-xs text-[#6b6560]">
+          <span className="font-mono text-xs text-admin-muted">
             {formatDate(post.scheduledFor)}
           </span>
         ) : (
@@ -55,7 +55,7 @@ export function PostRow({ post, index }: { post: MarketingPost; index: number })
             href={post.postUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-2 inline-block text-[#a39e98] hover:text-[#6b6560]"
+            className="ml-2 inline-block text-admin-subtle hover:text-admin-muted"
           >
             <ExternalLink className="h-3 w-3" />
           </a>

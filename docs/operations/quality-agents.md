@@ -351,35 +351,20 @@ Opens PRs weekly for:
 
 ### Lighthouse CI
 
-**Files**: `.github/workflows/lighthouse.yml` + `lighthouserc.json`
+**Files**: `.github/workflows/lighthouse.yml`, `lighthouserc.json`, `lighthouserc.mobile.json` and `scripts/check-mobile-lighthouse.mjs`.
 
-Runs on every PR against `http://localhost:3000/immersive`.
+The local production artifact at `http://localhost:3000/immersive` retains the complete 25-story fallback fixture and authentication providers. Desktop and default mobile slow-4G/4x CPU profiles each collect three runs. The required mobile step consumes the mobile action's raw reports and checks an independent numeric median for each required metric.
 
-**Thresholds**:
+| Measurement | Desktop | Mobile | Level |
+| --- | --- | --- | --- |
+| Performance | >= 0.7 | median >= 0.7 | Error |
+| Accessibility | >= 0.8 | >= 0.8 | Error |
+| LCP | <= 4000ms | median <= 4000ms | Error |
+| TBT | <= 500ms | median < 500ms | Desktop warning; mobile error |
+| CLS | <= 0.25 | <= 0.25 | Error |
+| FCP | <= 3000ms | <= 3000ms | Warning |
 
-| Category | Minimum |
-|----------|---------|
-| Performance | 70% |
-| Accessibility | 80% |
-
-**Core Web Vitals Budgets**:
-
-| Metric | Maximum (desktop) | Maximum (mobile) |
-|--------|-------------------|------------------|
-| FCP | 3000ms | 3000ms |
-| LCP | 4000ms | 5500ms |
-| CLS | 0.25 | 0.25 |
-| TBT | 500ms | 500ms |
-
-**Category score minimums**: performance >= 0.7 desktop / >= 0.6 mobile;
-accessibility >= 0.8 on both.
-
-The mobile thresholds are looser because Lighthouse's mobile emulation applies 4x
-CPU throttling and slow-4G network on top of a deliberately inflated 25-story
-fallback fixture. Both were originally copied from the desktop config and neither
-held: LCP ran 4064-4551ms against a 4000ms budget, and the performance score runs
-0.64-0.70+ against a 0.7 minimum — inside the noise band, so the gate flaked.
-Bringing `/immersive` up so both columns can match is tracked in #926.
+The mobile checker rejects missing, malformed, mixed-profile or incomplete reports. Exactly 500ms TBT fails the strict gate. The three mobile LHCI budget assertions use numeric `median`; other desktop and mobile assertions retain their existing aggregation. Local evidence does not establish hosted timing or deployed performance. Do not run Lighthouse upload during local qualification.
 
 ### Bundle Size
 

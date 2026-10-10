@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import * as Sentry from "@sentry/nextjs";
+import { loadSentryIfConfigured } from "@/lib/sentry-client-init";
 import { resolveLocale } from "@/lib/i18n/detect-language";
 import type { Locale } from "@/lib/i18n/types";
 
@@ -61,7 +61,15 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error(error);
-    Sentry.captureException(error);
+    let active = true;
+    void loadSentryIfConfigured()
+      .then((Sentry) => {
+        if (active) return Sentry?.captureException(error);
+      })
+      .catch(() => {
+        // Reporting failure must not interrupt recovery or report recursively.
+      });
+    return () => { active = false; };
   }, [error]);
 
   const locale = useMemo(() => resolveLocale(), []);

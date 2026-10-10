@@ -268,7 +268,7 @@ export function StoryViewer({
 
   return (
     <main
-      className="relative h-dvh w-screen overflow-hidden bg-black"
+      className="relative h-dvh w-screen overflow-hidden bg-scene-black"
       aria-hidden={chatOpen ? "true" : undefined}
       // UX-H2 (#888): aria-hidden alone doesn't stop keyboard focus — nav,
       // toggles, and arrows inside stayed Tab-reachable while announced as
@@ -280,19 +280,14 @@ export function StoryViewer({
     >
       <div className="absolute left-4 right-4 top-32 z-30">
         <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void retry(); }} />
-        {!hasTranslation(story, locale) && <p role="status" className="rounded-lg bg-black/90 p-3 text-sm text-white">{t("locale.storyFallback")}</p>}
+        {!hasTranslation(story, locale) && <p role="status" className="rounded-lg bg-scene-black/90 p-3 text-sm text-scene-white">{t("locale.storyFallback")}</p>}
       </div>
-      {/* PE-H1/FE-M3 (#804, #765): adjacent story images, rendered as hidden,
-          `priority` next/image elements so Next.js itself generates the
-          preload — a hand-built <link rel="preload" href={rawUrl}> pointed at
-          the raw origin URL while the real <Image> below requests the
-          optimizer URL, so nothing was ever actually warmed (~350KB wasted
-          per navigation). `sizes` must match the visible <Image> ("100vw")
-          so the computed optimizer URL/srcset is identical to what gets
-          requested once this image becomes current. */}
+      {/* Warm adjacent optimizer URLs without competing with the current image's
+          critical preload. Matching sizes keeps the eventual visible request
+          identical; eager low-priority loading preserves navigation warming. */}
       {adjacentImages.map((src) => (
         <div key={src} aria-hidden="true" className="sr-only pointer-events-none">
-          <Image src={src} alt="" fill sizes="100vw" priority />
+          <Image src={src} alt="" fill sizes="100vw" loading="eager" fetchPriority="low" />
         </div>
       ))}
 
@@ -340,13 +335,14 @@ export function StoryViewer({
             // and the effect that corrects prefersReducedMotion.
             className={cn("object-cover", zoomClass, "motion-reduce:animate-none")}
             priority={currentIndex === 0}
+            fetchPriority="high"
             placeholder="blur"
             blurDataURL={story.blurDataUrl || darkPlaceholder}
             key={story.id}
           />
         ) : null}
         {/* Gradient overlays */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-scene-black/80 via-scene-black/20 to-scene-black/40" />
       </div>
 
       {/* Progress bar - extracted & memoized component with event delegation */}
@@ -436,7 +432,7 @@ export function StoryViewer({
             }}
             className={cn(
               "flex p-2",
-              ambientMode && "ring-1 ring-white/30"
+              ambientMode && "ring-1 ring-scene-white/30"
             )}
             aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
             title={
@@ -447,9 +443,9 @@ export function StoryViewer({
             aria-pressed={autoPlay}
           >
             {autoPlay ? (
-              <Pause className="h-5 w-5 text-white" />
+              <Pause className="h-5 w-5 text-scene-white" />
             ) : (
-              <Play className="h-5 w-5 text-white" />
+              <Play className="h-5 w-5 text-scene-white" />
             )}
           </Button>
         )}
@@ -537,7 +533,7 @@ export function StoryViewer({
       {/* Keyboard hints - hidden on mobile and touch-only devices */}
       <div
         className={cn(
-          "hidden md:block desktop-pointer-only absolute bottom-4 right-4 z-20 text-white/60 text-xs transition-opacity duration-500 motion-reduce:transition-none",
+          "hidden md:block desktop-pointer-only absolute bottom-4 right-4 z-20 text-scene-white/60 text-xs transition-opacity duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100" : "opacity-0"
         )}
         aria-hidden="true"

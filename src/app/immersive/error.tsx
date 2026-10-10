@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import * as Sentry from "@sentry/nextjs";
+import { loadSentryIfConfigured } from "@/lib/sentry-client-init";
 import { useTranslation } from "@/lib/i18n";
 import {
   GLASS_RETRY_BUTTON_CLASS,
@@ -18,7 +18,15 @@ export default function ImmersiveError({
 }) {
   useEffect(() => {
     console.error(error);
-    Sentry.captureException(error);
+    let active = true;
+    void loadSentryIfConfigured()
+      .then((Sentry) => {
+        if (active) return Sentry?.captureException(error);
+      })
+      .catch(() => {
+        // Reporting failure must not interrupt recovery or report recursively.
+      });
+    return () => { active = false; };
   }, [error]);
 
   const { t } = useTranslation();

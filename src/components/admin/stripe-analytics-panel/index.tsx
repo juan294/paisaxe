@@ -45,11 +45,11 @@ export function StripeAnalyticsPanel() {
     <div className="space-y-12">
       {/* Controls */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+        <h2 className="text-lg font-medium text-admin-ink dark:text-admin-paper">
           Revenue Data
         </h2>
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+          <div className="flex items-center gap-2 font-mono text-xs text-admin-muted dark:text-admin-subtle">
             <input
               type="date"
               value={dateRange.from}
@@ -67,7 +67,7 @@ export function StripeAnalyticsPanel() {
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+            className="font-mono text-xs uppercase tracking-widest text-admin-muted transition-colors hover:text-admin-ink disabled:opacity-50 dark:text-admin-subtle dark:hover:text-admin-paper"
           >
             {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -105,16 +105,16 @@ export function StripeAnalyticsPanel() {
         <SkeletonRevenueDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-4">
-          <DollarSign className="h-8 w-8 text-[#e5e3de]" />
-          <p className="text-2xl font-extralight text-[#a39e98]">No revenue data yet</p>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+          <DollarSign className="h-8 w-8 text-admin-line" />
+          <p className="text-2xl font-extralight text-admin-subtle">No revenue data yet</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
             Revenue data will appear here once sales begin
           </p>
           <a
             href="https://dashboard.stripe.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 flex items-center gap-2 rounded-full bg-[#2d2a26] px-4 py-2 text-sm font-medium text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+            className="mt-4 flex items-center gap-2 rounded-full bg-admin-ink px-4 py-2 text-sm font-medium text-admin-paper hover:bg-admin-depth dark:bg-admin-paper dark:text-admin-ink dark:hover:bg-admin-line"
           >
             Open Stripe Dashboard
             <ExternalLink className="h-4 w-4" />
@@ -147,7 +147,7 @@ export function StripeAnalyticsPanel() {
           </section>
 
           {/* Revenue Breakdown */}
-          <div className="font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+          <div className="font-mono text-xs text-admin-muted dark:text-admin-subtle">
             Gross: {data.summary.totalRevenueFormatted}
             {" — "}Refunds: {data.summary.totalRefundsFormatted}
             {" = "}Net: {data.summary.netRevenueFormatted}
@@ -156,7 +156,7 @@ export function StripeAnalyticsPanel() {
           {/* Revenue Chart */}
           {data.revenueByDay.length > 0 && (
             <section>
-              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
                 Revenue Over Time
               </h2>
               <RevenueChart data={data.revenueByDay} currency={data.summary.currency} />
@@ -183,7 +183,7 @@ export function StripeAnalyticsPanel() {
               href="https://dashboard.stripe.com/"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-full border border-[#e5e3de] bg-white px-6 py-3 text-sm font-medium text-[#6b6560] transition-colors hover:border-[#2d2a26] hover:text-[#2d2a26] dark:border-[#3d3a36] dark:bg-[#252320] dark:text-[#a39e98] dark:hover:border-[#f5f3ee] dark:hover:text-[#f5f3ee]"
+              className="flex items-center gap-2 rounded-full border border-admin-line bg-white px-6 py-3 text-sm font-medium text-admin-muted transition-colors hover:border-admin-ink hover:text-admin-ink dark:border-admin-depth dark:bg-admin-panel dark:text-admin-subtle dark:hover:border-admin-paper dark:hover:text-admin-paper"
             >
               <TrendingUp className="h-4 w-4" />
               View Full Dashboard on Stripe

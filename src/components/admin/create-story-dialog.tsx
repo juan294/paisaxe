@@ -200,12 +200,12 @@ export function CreateStoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto bg-white dark:bg-[#252320] sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto bg-white dark:bg-admin-panel sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-[#2d2a26] dark:text-[#f5f3ee]">
+          <DialogTitle className="text-admin-ink dark:text-admin-paper">
             {suggestion ? "Convert Suggestion to Story" : "Create New Story"}
           </DialogTitle>
-          <DialogDescription className="text-[#6b6560] dark:text-[#a39e98]">
+          <DialogDescription className="text-admin-muted dark:text-admin-subtle">
             {suggestion
               ? "Create a new story from this user suggestion."
               : "Fill in the details to create a new story."}
@@ -214,7 +214,7 @@ export function CreateStoryDialog({
 
         {/* Attribution notice when converting */}
         {suggestion?.attribution && (
-          <div className="flex items-center gap-2 rounded-lg bg-[#f5f3ee] px-3 py-2 text-sm text-[#6b6560] dark:bg-[#2d2a26] dark:text-[#a39e98]">
+          <div className="flex items-center gap-2 rounded-lg bg-admin-paper px-3 py-2 text-sm text-admin-muted dark:bg-admin-ink dark:text-admin-subtle">
             <AtSign className="h-4 w-4 flex-shrink-0" />
             <span>
               Credit: <strong>{suggestion.attribution}</strong>
@@ -235,7 +235,7 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="title"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               Title <span className="text-red-500">*</span>
             </Label>
@@ -245,7 +245,7 @@ export function CreateStoryDialog({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter story title"
               className={cn(
-                "bg-[#f5f3ee] dark:bg-[#2d2a26]",
+                "bg-admin-paper dark:bg-admin-ink",
                 fieldErrors.title && "border-red-500"
               )}
             />
@@ -258,18 +258,18 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="slug"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               URL Slug
             </Label>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[#a39e98]">/story/</span>
+              <span className="text-sm text-admin-subtle">/story/</span>
               <Input
                 id="slug"
                 value={slug}
                 onChange={(e) => handleSlugChange(e.target.value)}
                 placeholder="auto-generated-from-title"
-                className="flex-1 bg-[#f5f3ee] dark:bg-[#2d2a26]"
+                className="flex-1 bg-admin-paper dark:bg-admin-ink"
               />
             </div>
           </div>
@@ -278,7 +278,7 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="category"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               Category <span className="text-red-500">*</span>
             </Label>
@@ -289,7 +289,7 @@ export function CreateStoryDialog({
               <SelectTrigger
                 id="category"
                 className={cn(
-                  "bg-[#f5f3ee] dark:bg-[#2d2a26]",
+                  "bg-admin-paper dark:bg-admin-ink",
                   fieldErrors.category && "border-red-500"
                 )}
               >
@@ -312,7 +312,7 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="subtitle"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               Subtitle
             </Label>
@@ -321,7 +321,7 @@ export function CreateStoryDialog({
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder="Optional subtitle"
-              className="bg-[#f5f3ee] dark:bg-[#2d2a26]"
+              className="bg-admin-paper dark:bg-admin-ink"
             />
           </div>
 
@@ -329,7 +329,7 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="description"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               Description
             </Label>
@@ -339,7 +339,7 @@ export function CreateStoryDialog({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
               rows={3}
-              className="w-full rounded-md border border-input bg-[#f5f3ee] px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#2d2a26]"
+              className="w-full rounded-md border border-input bg-admin-paper px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-admin-ink"
             />
           </div>
 
@@ -347,7 +347,7 @@ export function CreateStoryDialog({
           <button
             type="button"
             onClick={() => setShowOptionalFields(!showOptionalFields)}
-            className="flex w-full items-center justify-between rounded-lg bg-[#f5f3ee] px-3 py-2 text-sm font-medium text-[#6b6560] transition-colors hover:bg-[#e5e3de] dark:bg-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#3d3a36]"
+            className="flex w-full items-center justify-between rounded-lg bg-admin-paper px-3 py-2 text-sm font-medium text-admin-muted transition-colors hover:bg-admin-line dark:bg-admin-ink dark:text-admin-subtle dark:hover:bg-admin-depth"
           >
             <span>Optional Fields</span>
             {showOptionalFields ? (
@@ -359,12 +359,12 @@ export function CreateStoryDialog({
 
           {/* Optional Fields Section */}
           {showOptionalFields && (
-            <div className="space-y-4 rounded-lg bg-[#f5f3ee]/50 p-4 dark:bg-[#2d2a26]/50">
+            <div className="space-y-4 rounded-lg bg-admin-paper/50 p-4 dark:bg-admin-ink/50">
               {/* Location */}
               <div className="space-y-2">
                 <Label
                   htmlFor="location"
-                  className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+                  className="text-sm font-medium text-admin-ink dark:text-admin-paper"
                 >
                   Location
                 </Label>
@@ -374,7 +374,7 @@ export function CreateStoryDialog({
                 >
                   <SelectTrigger
                     id="location"
-                    className="bg-white dark:bg-[#252320]"
+                    className="bg-white dark:bg-admin-panel"
                   >
                     <SelectValue placeholder="Select a region" />
                   </SelectTrigger>
@@ -392,7 +392,7 @@ export function CreateStoryDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="duration"
-                  className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+                  className="text-sm font-medium text-admin-ink dark:text-admin-paper"
                 >
                   Duration
                 </Label>
@@ -402,7 +402,7 @@ export function CreateStoryDialog({
                 >
                   <SelectTrigger
                     id="duration"
-                    className="bg-white dark:bg-[#252320]"
+                    className="bg-white dark:bg-admin-panel"
                   >
                     <SelectValue placeholder="Select visit duration" />
                   </SelectTrigger>
@@ -420,7 +420,7 @@ export function CreateStoryDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="sourcePdf"
-                  className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+                  className="text-sm font-medium text-admin-ink dark:text-admin-paper"
                 >
                   Source PDF
                 </Label>
@@ -429,7 +429,7 @@ export function CreateStoryDialog({
                   value={sourcePdf}
                   onChange={(e) => setSourcePdf(e.target.value)}
                   placeholder="guide.pdf"
-                  className="bg-white dark:bg-[#252320]"
+                  className="bg-white dark:bg-admin-panel"
                 />
               </div>
             </div>
@@ -441,14 +441,14 @@ export function CreateStoryDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
-            className="border-[#e5e3de] dark:border-[#3d3a36]"
+            className="border-admin-line dark:border-admin-depth"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="bg-[#2d2a26] text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+            className="bg-admin-ink text-admin-paper hover:bg-admin-depth dark:bg-admin-paper dark:text-admin-ink dark:hover:bg-admin-line"
           >
             {isSubmitting ? (
               <>
