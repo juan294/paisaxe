@@ -1,6 +1,6 @@
 import { rejectUnsafeMutation } from "./request";
 import { NextRequest, NextResponse } from "next/server";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdminSession } from "@/lib/admin-auth";
 import { spawn } from "child_process";
 import path from "path";
 import { logger } from "@/lib/logger";
@@ -116,127 +116,128 @@ function pruneFinishedAgents(now = Date.now()) {
  * Body: { agentKey: string }
  */
 export async function POST(request: NextRequest) {
-  const auth = await validateAdminAuth({ skipCache: true });
-  if (!auth.valid) return auth.error;
+  return withAdminSession(async () => {
 
-  const localOnlyResponse = ensureLocalRuntime();
-  if (localOnlyResponse) {
-    return localOnlyResponse;
-  }
+    const localOnlyResponse = ensureLocalRuntime();
+    if (localOnlyResponse) {
+      return localOnlyResponse;
+    }
 
-  const csrfError = rejectUnsafeMutation(request);
-  if (csrfError) return csrfError;
+    const csrfError = rejectUnsafeMutation(request);
+    if (csrfError) return csrfError;
 
-  let body: { agentKey?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const { agentKey } = body;
-  if (!agentKey || !Object.prototype.hasOwnProperty.call(AGENT_SCRIPTS, agentKey)) {
-    return NextResponse.json(
-      { error: `Unknown agent key: ${agentKey}` },
-      { status: 400 },
-    );
-  }
-
-  // Check if already running
-  const existing = runningAgents.get(agentKey);
-  if (existing && !existing.finished) {
-    // Verify the process is still alive
+    let body: { agentKey?: string };
     try {
-      process.kill(existing.pid, 0);
-      return NextResponse.json(
-        { error: "Agent is already running", startedAt: existing.startedAt },
-        { status: 409 },
-      );
+      body = await request.json();
     } catch {
-      // Process died without us noticing — mark as finished
-      markAgentFinished(existing, existing.exitCode);
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { agentKey } = body;
+    if (!agentKey || !Object.prototype.hasOwnProperty.call(AGENT_SCRIPTS, agentKey)) {
+      return NextResponse.json(
+        { error: `Unknown agent key: ${agentKey}` },
+        { status: 400 },
+      );
+    }
+
+    // Check if already running
+    const existing = runningAgents.get(agentKey);
+    if (existing && !existing.finished) {
+      // Verify the process is still alive
+      try {
+        process.kill(existing.pid, 0);
+        return NextResponse.json(
+          { error: "Agent is already running", startedAt: existing.startedAt },
+          { status: 409 },
+        );
+      } catch {
+        // Process died without us noticing — mark as finished
+        markAgentFinished(existing, existing.exitCode);
+        pruneFinishedAgents();
+      }
+    }
+
+    // Use specific subdirectory to avoid Turbopack tracing the entire project root.
+    const projectRoot = process.cwd();
+    const scriptPath = path.join(projectRoot, "scripts", AGENT_SCRIPTS[agentKey]);
+    const startedAt = new Date().toISOString();
+
+    const child = spawn("bash", [scriptPath], {
+      cwd: projectRoot,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      // SE-L1 (#542): pass an explicit allowlist, never the whole process env.
+      env: buildChildEnv(),
+    });
+
+    // spawn failures emit asynchronously, including after a no-pid response.
+    child.on("error", (error) => {
+      logger.error("[AGENT_RUNNER] Failed to start agent process", { error: error.message });
+      const failed = runningAgents.get(agentKey);
+      if (failed?.process === child) {
+        appendLog(failed, `Process failed: ${error.message}`);
+        markAgentFinished(failed, null);
+        pruneFinishedAgents();
+      }
+    });
+    child.unref();
+
+    if (!child.pid) {
+      return NextResponse.json(
+        { error: "Failed to start agent process" },
+        { status: 500 },
+      );
+    }
+
+    const agent: RunningAgent = {
+      pid: child.pid,
+      startedAt,
+      logs: [],
+      process: child,
+      finished: false,
+      exitCode: null,
+      stoppedByUser: false,
+      finishedAt: null,
+    };
+
+    // Listen to stdout/stderr and push to ring buffer
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdoutBuffer += chunk.toString();
+      const lines = stdoutBuffer.split("\n");
+      stdoutBuffer = lines.pop()!; // split() always returns >=1 element
+      for (const line of lines) {
+        if (line.trim()) appendLog(agent, line);
+      }
+    });
+
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderrBuffer += chunk.toString();
+      const lines = stderrBuffer.split("\n");
+      stderrBuffer = lines.pop()!; // split() always returns >=1 element
+      for (const line of lines) {
+        if (line.trim()) appendLog(agent, `[stderr] ${line}`);
+      }
+    });
+
+    // Clean up when process exits
+    child.on("exit", (code) => {
+      // Flush remaining buffers
+      if (stdoutBuffer.trim()) appendLog(agent, stdoutBuffer);
+      if (stderrBuffer.trim()) appendLog(agent, `[stderr] ${stderrBuffer}`);
+      appendLog(agent, `Process exited with code ${code ?? "unknown"}`);
+      markAgentFinished(agent, code ?? null);
       pruneFinishedAgents();
-    }
-  }
+    });
 
-  // Use specific subdirectory to avoid Turbopack tracing the entire project root.
-  const projectRoot = process.cwd();
-  const scriptPath = path.join(projectRoot, "scripts", AGENT_SCRIPTS[agentKey]);
-  const startedAt = new Date().toISOString();
+    runningAgents.set(agentKey, agent);
 
-  const child = spawn("bash", [scriptPath], {
-    cwd: projectRoot,
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    // SE-L1 (#542): pass an explicit allowlist, never the whole process env.
-    env: buildChildEnv(),
-  });
+    return NextResponse.json({ started: true, agentKey, startedAt });
 
-  // spawn failures emit asynchronously, including after a no-pid response.
-  child.on("error", (error) => {
-    logger.error("[AGENT_RUNNER] Failed to start agent process", { error: error.message });
-    const failed = runningAgents.get(agentKey);
-    if (failed?.process === child) {
-      appendLog(failed, `Process failed: ${error.message}`);
-      markAgentFinished(failed, null);
-      pruneFinishedAgents();
-    }
-  });
-  child.unref();
-
-  if (!child.pid) {
-    return NextResponse.json(
-      { error: "Failed to start agent process" },
-      { status: 500 },
-    );
-  }
-
-  const agent: RunningAgent = {
-    pid: child.pid,
-    startedAt,
-    logs: [],
-    process: child,
-    finished: false,
-    exitCode: null,
-    stoppedByUser: false,
-    finishedAt: null,
-  };
-
-  // Listen to stdout/stderr and push to ring buffer
-  let stdoutBuffer = "";
-  let stderrBuffer = "";
-
-  child.stdout?.on("data", (chunk: Buffer) => {
-    stdoutBuffer += chunk.toString();
-    const lines = stdoutBuffer.split("\n");
-    stdoutBuffer = lines.pop()!; // split() always returns >=1 element
-    for (const line of lines) {
-      if (line.trim()) appendLog(agent, line);
-    }
-  });
-
-  child.stderr?.on("data", (chunk: Buffer) => {
-    stderrBuffer += chunk.toString();
-    const lines = stderrBuffer.split("\n");
-    stderrBuffer = lines.pop()!; // split() always returns >=1 element
-    for (const line of lines) {
-      if (line.trim()) appendLog(agent, `[stderr] ${line}`);
-    }
-  });
-
-  // Clean up when process exits
-  child.on("exit", (code) => {
-    // Flush remaining buffers
-    if (stdoutBuffer.trim()) appendLog(agent, stdoutBuffer);
-    if (stderrBuffer.trim()) appendLog(agent, `[stderr] ${stderrBuffer}`);
-    appendLog(agent, `Process exited with code ${code ?? "unknown"}`);
-    markAgentFinished(agent, code ?? null);
-    pruneFinishedAgents();
-  });
-
-  runningAgents.set(agentKey, agent);
-
-  return NextResponse.json({ started: true, agentKey, startedAt });
+  }, request);
 }
 
 /**
@@ -246,53 +247,54 @@ export async function POST(request: NextRequest) {
  *   - since: number — return logs starting from this offset (0-based)
  */
 export async function GET(request: NextRequest) {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) return auth.error;
+  return withAdminSession(async () => {
 
-  const localOnlyResponse = ensureLocalRuntime();
-  if (localOnlyResponse) {
-    return localOnlyResponse;
-  }
-
-  const { searchParams } = request.nextUrl;
-  const agentKey = searchParams.get("agentKey");
-  const sinceParam = searchParams.get("since");
-
-  // If requesting logs for a specific agent
-  if (agentKey) {
-    const agent = runningAgents.get(agentKey);
-    if (!agent) {
-      return NextResponse.json({ logs: [], offset: 0, finished: true });
+    const localOnlyResponse = ensureLocalRuntime();
+    if (localOnlyResponse) {
+      return localOnlyResponse;
     }
 
-    const since = sinceParam ? parseInt(sinceParam, 10) : 0;
-    const logs = agent.logs.slice(since);
+    const { searchParams } = request.nextUrl;
+    const agentKey = searchParams.get("agentKey");
+    const sinceParam = searchParams.get("since");
 
-    return NextResponse.json({
-      logs,
-      offset: agent.logs.length,
-      finished: agent.finished,
-      exitCode: agent.exitCode,
-      stoppedByUser: agent.stoppedByUser,
-    });
-  }
+    // If requesting logs for a specific agent
+    if (agentKey) {
+      const agent = runningAgents.get(agentKey);
+      if (!agent) {
+        return NextResponse.json({ logs: [], offset: 0, finished: true });
+      }
 
-  // Default: return running status (backwards compatible)
-  const running: Record<string, { startedAt: string }> = {};
+      const since = sinceParam ? parseInt(sinceParam, 10) : 0;
+      const logs = agent.logs.slice(since);
 
-  for (const [key, agent] of runningAgents) {
-    if (agent.finished) continue;
-    try {
-      process.kill(agent.pid, 0);
-      running[key] = { startedAt: agent.startedAt };
-    } catch {
-      // Process no longer alive — mark finished
-      markAgentFinished(agent, agent.exitCode);
-      pruneFinishedAgents();
+      return NextResponse.json({
+        logs,
+        offset: agent.logs.length,
+        finished: agent.finished,
+        exitCode: agent.exitCode,
+        stoppedByUser: agent.stoppedByUser,
+      });
     }
-  }
 
-  return NextResponse.json({ running });
+    // Default: return running status (backwards compatible)
+    const running: Record<string, { startedAt: string }> = {};
+
+    for (const [key, agent] of runningAgents) {
+      if (agent.finished) continue;
+      try {
+        process.kill(agent.pid, 0);
+        running[key] = { startedAt: agent.startedAt };
+      } catch {
+        // Process no longer alive — mark finished
+        markAgentFinished(agent, agent.exitCode);
+        pruneFinishedAgents();
+      }
+    }
+
+    return NextResponse.json({ running });
+
+  }, request);
 }
 
 /**
@@ -300,50 +302,51 @@ export async function GET(request: NextRequest) {
  * Body: { agentKey: string }
  */
 export async function DELETE(request: NextRequest) {
-  const auth = await validateAdminAuth({ skipCache: true });
-  if (!auth.valid) return auth.error;
+  return withAdminSession(async () => {
 
-  const localOnlyResponse = ensureLocalRuntime();
-  if (localOnlyResponse) {
-    return localOnlyResponse;
-  }
-
-  const csrfError = rejectUnsafeMutation(request);
-  if (csrfError) return csrfError;
-
-  let body: { agentKey?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const { agentKey } = body;
-  if (!agentKey) {
-    return NextResponse.json({ error: "agentKey is required" }, { status: 400 });
-  }
-
-  const agent = runningAgents.get(agentKey);
-  if (!agent || agent.finished) {
-    return NextResponse.json({ error: "Agent is not running" }, { status: 404 });
-  }
-
-  try {
-    // Kill the process group (negative PID kills the group since we used detached: true)
-    process.kill(-agent.pid, "SIGTERM");
-  } catch {
-    // Process may have already exited
-    try {
-      process.kill(agent.pid, "SIGTERM");
-    } catch {
-      // Already dead
+    const localOnlyResponse = ensureLocalRuntime();
+    if (localOnlyResponse) {
+      return localOnlyResponse;
     }
-  }
 
-  appendLog(agent, "Process stopped by user");
-  agent.stoppedByUser = true;
-  markAgentFinished(agent, agent.exitCode);
-  pruneFinishedAgents();
+    const csrfError = rejectUnsafeMutation(request);
+    if (csrfError) return csrfError;
 
-  return NextResponse.json({ stopped: true, agentKey });
+    let body: { agentKey?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { agentKey } = body;
+    if (!agentKey) {
+      return NextResponse.json({ error: "agentKey is required" }, { status: 400 });
+    }
+
+    const agent = runningAgents.get(agentKey);
+    if (!agent || agent.finished) {
+      return NextResponse.json({ error: "Agent is not running" }, { status: 404 });
+    }
+
+    try {
+      // Kill the process group (negative PID kills the group since we used detached: true)
+      process.kill(-agent.pid, "SIGTERM");
+    } catch {
+      // Process may have already exited
+      try {
+        process.kill(agent.pid, "SIGTERM");
+      } catch {
+        // Already dead
+      }
+    }
+
+    appendLog(agent, "Process stopped by user");
+    agent.stoppedByUser = true;
+    markAgentFinished(agent, agent.exitCode);
+    pruneFinishedAgents();
+
+    return NextResponse.json({ stopped: true, agentKey });
+
+  }, request);
 }

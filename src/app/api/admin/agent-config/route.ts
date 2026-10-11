@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdminSession } from "@/lib/admin-auth";
 import { promises as fs } from "fs";
 import path from "path";
 import type { AgentConfigFile } from "@/types/agent-config";
@@ -37,27 +37,27 @@ async function writeConfig(config: AgentConfigFile): Promise<void> {
  * GET /api/admin/agent-config
  * Returns the local agent configuration. Dev-only.
  */
-export async function GET() {
+export async function GET(request?: NextRequest) {
   if (!isDev()) {
     return NextResponse.json(
       { error: "Agent config is only available in development" },
       { status: 403 },
     );
   }
+  return withAdminSession(async () => {
 
-  const auth = await validateAdminAuth();
-  if (!auth.valid) return auth.error;
+    try {
+      const config = await readConfig();
+      return NextResponse.json({ data: config });
+    } catch (error) {
+      logger.error("Failed to read agent config:", { error: error instanceof Error ? error.message : String(error) });
+      return NextResponse.json(
+        { error: "Failed to read agent config" },
+        { status: 500 },
+      );
+    }
 
-  try {
-    const config = await readConfig();
-    return NextResponse.json({ data: config });
-  } catch (error) {
-    logger.error("Failed to read agent config:", { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json(
-      { error: "Failed to read agent config" },
-      { status: 500 },
-    );
-  }
+  }, request);
 }
 
 /**
@@ -74,55 +74,55 @@ export async function PUT(request: NextRequest) {
       { status: 403 },
     );
   }
+  return withAdminSession(async () => {
 
-  const auth = await validateAdminAuth();
-  if (!auth.valid) return auth.error;
+    try {
+      const rawBody = await request.json().catch(() => null);
 
-  try {
-    const rawBody = await request.json().catch(() => null);
+      // Validate body shape before reading/writing config to avoid unnecessary I/O
+      const masterParsed = agentConfigMasterSchema.safeParse(rawBody);
+      const hasKey = rawBody !== null && typeof rawBody === "object" && "key" in (rawBody as object);
+      const agentParsed = hasKey ? agentConfigEnableSchema.safeParse(rawBody) : null;
 
-    // Validate body shape before reading/writing config to avoid unnecessary I/O
-    const masterParsed = agentConfigMasterSchema.safeParse(rawBody);
-    const hasKey = rawBody !== null && typeof rawBody === "object" && "key" in (rawBody as object);
-    const agentParsed = hasKey ? agentConfigEnableSchema.safeParse(rawBody) : null;
-
-    if (!masterParsed.success && (!agentParsed || !agentParsed.success || !hasKey)) {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 },
-      );
-    }
-
-    const config = await readConfig();
-
-    if (masterParsed.success) {
-      config.master_enabled = masterParsed.data.master_enabled;
-    } else if (agentParsed?.success) {
-      const body = agentParsed.data;
-      const agent = config.agents[body.key];
-      if (!agent) {
+      if (!masterParsed.success && (!agentParsed || !agentParsed.success || !hasKey)) {
         return NextResponse.json(
-          { error: `Unknown agent key: ${body.key}` },
+          { error: "Invalid request body" },
           { status: 400 },
         );
       }
 
-      if (body.enabled !== undefined) {
-        agent.enabled = body.enabled;
+      const config = await readConfig();
+
+      if (masterParsed.success) {
+        config.master_enabled = masterParsed.data.master_enabled;
+      } else if (agentParsed?.success) {
+        const body = agentParsed.data;
+        const agent = config.agents[body.key];
+        if (!agent) {
+          return NextResponse.json(
+            { error: `Unknown agent key: ${body.key}` },
+            { status: 400 },
+          );
+        }
+
+        if (body.enabled !== undefined) {
+          agent.enabled = body.enabled;
+        }
+
+        if (body.config_key !== undefined && "value" in body) {
+          agent.config[body.config_key] = body.value;
+        }
       }
 
-      if (body.config_key !== undefined && "value" in body) {
-        agent.config[body.config_key] = body.value;
-      }
+      await writeConfig(config);
+      return NextResponse.json({ data: config });
+    } catch (error) {
+      logger.error("Failed to update agent config:", { error: error instanceof Error ? error.message : String(error) });
+      return NextResponse.json(
+        { error: "Failed to update agent config" },
+        { status: 500 },
+      );
     }
 
-    await writeConfig(config);
-    return NextResponse.json({ data: config });
-  } catch (error) {
-    logger.error("Failed to update agent config:", { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json(
-      { error: "Failed to update agent config" },
-      { status: 500 },
-    );
-  }
+  }, request);
 }

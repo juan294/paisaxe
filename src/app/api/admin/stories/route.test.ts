@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
 import { logger } from "@/lib/logger";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Mock withAdmin (mutations) and withAdminRead (GET reads) independently.
 // Both helpers set up whichever HOF the caller cares about.
@@ -14,9 +15,8 @@ import { withAdmin, withAdminRead } from "@/lib/admin-auth";
 
 // Helper: authorize both HOFs so GET (withAdminRead) and POST (withAdmin) both work.
 function mockWithAdminAuthorized(mockSupabase: unknown) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const callThrough = async (handler: (client: any) => Promise<unknown>) =>
-    handler(mockSupabase);
+  const callThrough = async (handler: Parameters<typeof withAdmin>[0]) =>
+    handler(mockSupabase as SupabaseClient, { userId: "test-admin" });
   vi.mocked(withAdmin).mockImplementation(callThrough);
   vi.mocked(withAdminRead).mockImplementation(callThrough);
 }

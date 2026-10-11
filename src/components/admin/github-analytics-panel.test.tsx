@@ -475,7 +475,7 @@ describe("GitHubAnalyticsPanel", () => {
   // 2. Line 246: `{typeof value === "number" ? value.toLocaleString() : value}`
   //    The string branch (`: value`) never runs because all 5 StatCard call sites in
   //    GitHubAnalyticsPanel pass number values from the API summary object.
-  //    StatCard is a non-exported internal function so it cannot be called externally.
+  //    The public panel only passes number values to its colocated StatCard component.
 
   it("documents StatCard || fallback and string-value branch (lines 238, 246) as unreachable dead code", async () => {
     // Confirm: all StatCard call sites pass valid colors and number values.

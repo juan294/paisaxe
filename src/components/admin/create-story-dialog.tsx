@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -20,55 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, ChevronDown, ChevronUp, AtSign, AlertCircle } from "lucide-react";
-import { createStory } from "@/lib/admin-api";
 import { cn } from "@/lib/utils";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
-import type { CreateStoryRequest, CreateStoryResponse } from "@/types/admin";
-import type { AdminStorySuggestion } from "@/types/suggestions";
 
-const CATEGORIES: { value: StoryCategory; label: string }[] = [
-  { value: "nature", label: "Nature" },
-  { value: "cities", label: "Cities" },
-  { value: "food", label: "Food" },
-  { value: "culture", label: "Culture" },
-  { value: "activities", label: "Activities" },
-];
-
-const LOCATIONS: { value: StoryLocation; label: string }[] = [
-  { value: "eastern", label: "Eastern Asturias" },
-  { value: "central", label: "Central Asturias" },
-  { value: "western", label: "Western Asturias" },
-];
-
-const DURATIONS: { value: StoryDuration; label: string }[] = [
-  { value: "day-trip", label: "Day Trip" },
-  { value: "weekend", label: "Weekend" },
-  { value: "week", label: "Week" },
-];
-
-/**
- * Generate a URL-safe slug from a title.
- * Handles Spanish diacritics and special characters.
- */
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/ñ/g, "n")
-    .replace(/[\s_]+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-interface CreateStoryDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreated: (story: CreateStoryResponse) => void;
-  /** Optional suggestion to pre-fill form data from */
-  suggestion?: AdminStorySuggestion | null;
-}
+import { CATEGORIES, LOCATIONS, DURATIONS, type CreateStoryDialogProps } from "./create-story-dialog/model";
+import { useCreateStoryForm } from "./create-story-dialog/use-create-story-form";
 
 export function CreateStoryDialog({
   open,
@@ -76,127 +31,30 @@ export function CreateStoryDialog({
   onCreated,
   suggestion,
 }: CreateStoryDialogProps) {
-  // Form state
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [category, setCategory] = useState<StoryCategory | "">("");
-  const [subtitle, setSubtitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState<StoryLocation | "">("");
-  const [duration, setDuration] = useState<StoryDuration | "">("");
-  const [sourcePdf, setSourcePdf] = useState("");
-
-  // UI state
-  const [showOptionalFields, setShowOptionalFields] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  // Reset form when dialog opens/closes or suggestion changes
-  const resetForm = useCallback(() => {
-    if (suggestion) {
-      // Pre-fill from suggestion
-      setTitle(suggestion.placeName);
-      setSlug(generateSlug(suggestion.placeName));
-      setSlugManuallyEdited(false);
-      setCategory("");
-      setSubtitle("");
-      setDescription(suggestion.comment || "");
-      setLocation(suggestion.location || "");
-      setDuration("");
-      setSourcePdf("");
-      setShowOptionalFields(!!suggestion.location);
-    } else {
-      // Clean slate
-      setTitle("");
-      setSlug("");
-      setSlugManuallyEdited(false);
-      setCategory("");
-      setSubtitle("");
-      setDescription("");
-      setLocation("");
-      setDuration("");
-      setSourcePdf("");
-      setShowOptionalFields(false);
-    }
-    setError("");
-    setFieldErrors({});
-  }, [suggestion]);
-
-  useEffect(() => {
-    if (open) {
-      resetForm();
-    }
-  }, [open, resetForm]);
-
-  // Auto-generate slug from title if not manually edited
-  useEffect(() => {
-    if (!slugManuallyEdited && title) {
-      setSlug(generateSlug(title));
-    }
-  }, [title, slugManuallyEdited]);
-
-  const handleSlugChange = (value: string) => {
-    setSlugManuallyEdited(true);
-    setSlug(value);
-  };
-
-  const validate = (): boolean => {
-    const errors: Record<string, string> = {};
-
-    if (!title.trim()) {
-      errors.title = "Title is required";
-    }
-
-    if (!category) {
-      errors.category = "Category is required";
-    }
-
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError("");
-
-    const data: CreateStoryRequest = {
-      title: title.trim(),
-      slug: slug || generateSlug(title),
-      category: category as StoryCategory,
-      subtitle: subtitle.trim() || undefined,
-      description: description.trim() || undefined,
-      location: location || undefined,
-      duration: duration || undefined,
-      sourcePdf: sourcePdf.trim() || undefined,
-    };
-
-    // If creating from a suggestion, add source tracking
-    if (suggestion) {
-      data.sourceType = "user_submitted";
-      data.suggestionId = suggestion.id;
-    }
-
-    const result = await createStory(data);
-
-    if (result.error) {
-      setError(result.error);
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (result.data) {
-      onCreated(result.data);
-      onOpenChange(false);
-    }
-
-    setIsSubmitting(false);
-  };
+  const {
+    title,
+    setTitle,
+    slug,
+    category,
+    setCategory,
+    subtitle,
+    setSubtitle,
+    description,
+    setDescription,
+    location,
+    setLocation,
+    duration,
+    setDuration,
+    sourcePdf,
+    setSourcePdf,
+    showOptionalFields,
+    setShowOptionalFields,
+    isSubmitting,
+    error,
+    fieldErrors,
+    handleSlugChange,
+    handleSubmit,
+  } = useCreateStoryForm({ open, onOpenChange, onCreated, suggestion });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

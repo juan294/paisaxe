@@ -11,9 +11,10 @@ const logger = vi.hoisted(() => ({
 vi.mock("@/lib/logger", () => ({ logger }));
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn().mockResolvedValue({ valid: true }),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn().mockResolvedValue({ valid: true }));
+});
 
 // Mock config
 vi.mock("@/config/elevenlabs-agents", () => ({
@@ -1286,3 +1287,6 @@ describe("ElevenLabs Analytics API Route", () => {
     );
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

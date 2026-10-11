@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { NextRequest, NextResponse } from "next/server";
+import { withAdminSession } from "@/lib/admin-auth";
 import { promises as fs } from "fs";
 import path from "path";
 import type {
@@ -183,73 +183,72 @@ function computeOverallHealth(agents: AgentStatus[]): AgentHealthStatus {
   return "green";
 }
 
-export async function GET() {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+export async function GET(request?: NextRequest) {
+  return withAdminSession(async () => {
 
-  try {
-    // Use specific subdirectory to avoid Turbopack tracing the entire project root.
-    const reportsDir = path.join(process.cwd(), "docs", "agents");
-    const agentStatuses: AgentStatus[] = [];
+    try {
+      // Use specific subdirectory to avoid Turbopack tracing the entire project root.
+      const reportsDir = path.join(process.cwd(), "docs", "agents");
+      const agentStatuses: AgentStatus[] = [];
 
-    for (const agent of AGENTS) {
-      const filePath = path.join(reportsDir, agent.reportFilename);
-      const reportFile = `${REPORTS_DIR}/${agent.reportFilename}`;
-      let lastRun: string | null = null;
-      let health: AgentHealthStatus = "unknown";
-      let healthSummary = "Report not found.";
+      for (const agent of AGENTS) {
+        const filePath = path.join(reportsDir, agent.reportFilename);
+        const reportFile = `${REPORTS_DIR}/${agent.reportFilename}`;
+        let lastRun: string | null = null;
+        let health: AgentHealthStatus = "unknown";
+        let healthSummary = "Report not found.";
 
-      try {
-        const stats = await fs.stat(filePath);
-        lastRun = stats.mtime.toISOString();
+        try {
+          const stats = await fs.stat(filePath);
+          lastRun = stats.mtime.toISOString();
 
-        const content = await fs.readFile(filePath, "utf-8");
-        health = parseHealth(content);
-        healthSummary = parseHealthSummary(content);
-      } catch {
-        // File doesn't exist or can't be read
+          const content = await fs.readFile(filePath, "utf-8");
+          health = parseHealth(content);
+          healthSummary = parseHealthSummary(content);
+        } catch {
+          // File doesn't exist or can't be read
+        }
+
+        agentStatuses.push({
+          flagKey: agent.flagKey,
+          name: agent.name,
+          schedule: agent.schedule,
+          reportFile,
+          lastRun,
+          health,
+          healthSummary,
+        });
       }
 
-      agentStatuses.push({
-        flagKey: agent.flagKey,
-        name: agent.name,
-        schedule: agent.schedule,
-        reportFile,
-        lastRun,
-        health,
-        healthSummary,
+      // Parse shared context
+      let sharedContext: SharedContextEntry[] = [];
+      try {
+        const sharedContextPath = path.join(reportsDir, "shared-context.md");
+        const sharedContextContent = await fs.readFile(sharedContextPath, "utf-8");
+        sharedContext = parseSharedContext(sharedContextContent);
+      } catch {
+        // shared-context.md doesn't exist yet
+      }
+
+      const data: AgentsDashboardData = {
+        overallHealth: computeOverallHealth(agentStatuses),
+        agents: agentStatuses,
+        sharedContext,
+        recentActivity: buildActivity(agentStatuses),
+      };
+
+      return NextResponse.json({ data }, {
+        headers: {
+          "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
+        },
       });
+    } catch (error) {
+      logger.error("Error building agents summary:", { error: error instanceof Error ? error.message : String(error) });
+      return NextResponse.json(
+        { error: "Failed to build agents summary" },
+        { status: 500 }
+      );
     }
 
-    // Parse shared context
-    let sharedContext: SharedContextEntry[] = [];
-    try {
-      const sharedContextPath = path.join(reportsDir, "shared-context.md");
-      const sharedContextContent = await fs.readFile(sharedContextPath, "utf-8");
-      sharedContext = parseSharedContext(sharedContextContent);
-    } catch {
-      // shared-context.md doesn't exist yet
-    }
-
-    const data: AgentsDashboardData = {
-      overallHealth: computeOverallHealth(agentStatuses),
-      agents: agentStatuses,
-      sharedContext,
-      recentActivity: buildActivity(agentStatuses),
-    };
-
-    return NextResponse.json({ data }, {
-      headers: {
-        "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
-      },
-    });
-  } catch (error) {
-    logger.error("Error building agents summary:", { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json(
-      { error: "Failed to build agents summary" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }

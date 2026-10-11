@@ -2,21 +2,21 @@
 
 **Purpose**: Manual testing scenarios for LLM chat, voice agents, and overall site experience before public launch.
 
-**How to use**: Go through each section, perform the test, and document results in the `Result` column. Mark as ✅ Pass, ❌ Fail, or ⚠️ Needs Review.
+**How to use**: Go through each section, perform the test, and document results in the `Result` column. Mark as Pass, Fail, or Needs Review.
 
 ## Test Coverage
 
 | Type | Description | Run by |
 |------|-------------|--------|
-| 🤖 **Automated** | Tested weekly by QA Agent (`npm run test:qa`) | QA Agent |
-| 👤 **Manual** | Requires human judgment, voice, or visual assessment | You |
-| 🔄 **Both** | Automated sampling + manual verification recommended | Both |
+|  **Automated** | Tested weekly by QA Agent (`npm run test:qa`) | QA Agent |
+|  **Manual** | Requires human judgment, voice, or visual assessment | You |
+|  **Both** | Automated sampling + manual verification recommended | Both |
 
 See `docs/agents/qa-report.md` for latest automated test results.
 
 ---
 
-## 1. RAG Quality & Source Grounding 🔄
+## 1. RAG Quality & Source Grounding
 
 Verify the AI uses PDF content as the primary/exclusive data source.
 
@@ -35,7 +35,7 @@ Verify the AI uses PDF content as the primary/exclusive data source.
 
 ---
 
-## 2. LLM Safety & Security 🔄
+## 2. LLM Safety & Security
 
 Test for prompt injection, jailbreaking, and unsafe outputs.
 
@@ -56,7 +56,7 @@ Test for prompt injection, jailbreaking, and unsafe outputs.
 
 ---
 
-## 3. Voice Agent Testing — Pelayo (ElevenLabs) 👤
+## 3. Voice Agent Testing — Pelayo (ElevenLabs)
 
 Test the visitor-facing voice agent: **Pelayo** (tourism guide).
 
@@ -80,7 +80,7 @@ Test the visitor-facing voice agent: **Pelayo** (tourism guide).
 
 ---
 
-## 4. Conversation Limits & Performance 👤
+## 4. Conversation Limits & Performance
 
 Test behavior at scale and edge cases.
 
@@ -101,7 +101,7 @@ Test behavior at scale and edge cases.
 
 ---
 
-## 5. User Experience Quality 👤
+## 5. User Experience Quality
 
 Subjective but critical experience factors.
 
@@ -122,7 +122,7 @@ Subjective but critical experience factors.
 
 ---
 
-## 6. Content Boundaries & Off-Topic Handling 🔄
+## 6. Content Boundaries & Off-Topic Handling
 
 Verify the AI stays in scope gracefully.
 
@@ -141,7 +141,7 @@ Verify the AI stays in scope gracefully.
 
 ---
 
-## 7. Localization & Language 🔄
+## 7. Localization & Language
 
 > **Automated**: QA Agent tests Spanish and place name handling. **Manual**: Verify nuanced language quality.
 
@@ -155,7 +155,7 @@ Verify the AI stays in scope gracefully.
 
 ---
 
-## 8. Admin & Auth Edge Cases 👤
+## 8. Admin & Auth Edge Cases
 
 > **Manual only**: OAuth flows, session handling, and role verification require real authentication.
 
@@ -169,7 +169,7 @@ Verify the AI stays in scope gracefully.
 
 ---
 
-## 9. Critical Paths & Smoke Tests 🤖
+## 9. Critical Paths & Smoke Tests
 
 Essential functionality that must work.
 
@@ -189,7 +189,7 @@ Essential functionality that must work.
 
 ---
 
-## 10. Compliance & Legal 👤
+## 10. Compliance & Legal
 
 > **Manual only**: Legal review of policies, cookie consent UX, and data handling verification.
 
@@ -205,7 +205,7 @@ Essential functionality that must work.
 
 ---
 
-## 11. Payments & Day Pass (Stripe) 👤
+## 11. Payments & Day Pass (Stripe)
 
 Test the voice access purchase flow using real/test Stripe credentials.
 
@@ -240,7 +240,7 @@ SELECT * FROM voice_purchases WHERE user_id = 'your-user-id' ORDER BY created_at
 
 ---
 
-## 12. Restaurant Booking System 👤
+## 12. Restaurant Booking System
 
 Test Pelayo's ability to call restaurants and make reservations.
 
@@ -275,7 +275,7 @@ FROM pending_bookings ORDER BY created_at DESC LIMIT 5;
 
 ---
 
-## 13. SMS Notifications (Twilio) 👤
+## 13. SMS Notifications (Twilio)
 
 Test SMS delivery for booking confirmations and alerts.
 
@@ -288,9 +288,9 @@ Test SMS delivery for booking confirmations and alerts.
 
 | # | Test Case | Steps | Expected Behavior | Result | Notes |
 |---|-----------|-------|-------------------|--------|-------|
-| 13.1 | **Confirmation SMS received** | Complete successful booking flow | SMS received: "✓ Reserva confirmada" with details | | |
-| 13.2 | **Unavailable SMS received** | Booking denied by restaurant | SMS received: "✗ No disponible" with restaurant phone | | |
-| 13.3 | **No answer SMS received** | Restaurant doesn't answer | SMS received: "📞 Sin respuesta" with direct number | | |
+| 13.1 | **Confirmation SMS received** | Complete successful booking flow | SMS received: "Reserva confirmada (check mark icon)" with details | | |
+| 13.2 | **Unavailable SMS received** | Booking denied by restaurant | SMS received: "No disponible (cross icon)" with restaurant phone | | |
+| 13.3 | **No answer SMS received** | Restaurant doesn't answer | SMS received: "Sin respuesta (phone icon)" with direct number | | |
 | 13.4 | **Failed call SMS received** | Call fails to connect | SMS received with error message and fallback | | |
 | 13.5 | **SMS formatting correct** | Check received SMS | Contains venue name, date, time, party size, phone | | |
 | 13.6 | **SMS disabled gracefully** | Disable `sms_booking_confirmation` flag | Booking completes but no SMS sent | | |
@@ -305,7 +305,7 @@ Test SMS delivery for booking confirmations and alerts.
 
 ---
 
-## 14. Stress & Edge Cases 👤
+## 14. Stress & Edge Cases
 
 Unusual but possible scenarios.
 
@@ -324,7 +324,7 @@ Unusual but possible scenarios.
 
 ---
 
-## 15. Story Viewer & Navigation 🖥️
+## 15. Story Viewer & Navigation
 
 Test the immersive story viewer UI, navigation, and display.
 
@@ -368,7 +368,7 @@ Test the immersive story viewer UI, navigation, and display.
 
 ---
 
-## 16. Story Filters Panel 🖥️
+## 16. Story Filters Panel
 
 Test the collapsible filters panel for stories.
 
@@ -388,7 +388,7 @@ Test the collapsible filters panel for stories.
 
 ---
 
-## 17. Toolbar Actions 🖥️
+## 17. Toolbar Actions
 
 Test the toolbar buttons on the story viewer (bookmark, share, surprise me, fullscreen, auth).
 
@@ -408,7 +408,7 @@ Test the toolbar buttons on the story viewer (bookmark, share, surprise me, full
 
 ---
 
-## 18. Favorites Page 🖥️
+## 18. Favorites Page
 
 Test the `/favorites` page with gallery view, sync, and interactions.
 
@@ -429,7 +429,7 @@ Test the `/favorites` page with gallery view, sync, and interactions.
 
 ---
 
-## 19. Language Switcher 🖥️
+## 19. Language Switcher
 
 Test the language switcher component and i18n behavior.
 
@@ -452,7 +452,7 @@ Test the language switcher component and i18n behavior.
 
 ---
 
-## 20. Mood Discovery Overlay 🖥️
+## 20. Mood Discovery Overlay
 
 Test the mood-based story filtering overlay shown on first visit.
 
@@ -468,7 +468,7 @@ Test the mood-based story filtering overlay shown on first visit.
 
 ---
 
-## 21. Chat UI & Upsell Banners 🖥️
+## 21. Chat UI & Upsell Banners
 
 Test the text chat panel UI and voice upsell features.
 
@@ -492,7 +492,7 @@ Test the text chat panel UI and voice upsell features.
 
 ---
 
-## 22. Pricing & VoicePass Pages 🖥️
+## 22. Pricing & VoicePass Pages
 
 Test the pricing page display and success page (not payment processing).
 
@@ -511,7 +511,7 @@ Test the pricing page display and success page (not payment processing).
 
 ---
 
-## 23. Related Stories & Story Badges 🖥️
+## 23. Related Stories & Story Badges
 
 Test related stories section and story metadata badges.
 
@@ -527,7 +527,7 @@ Test related stories section and story metadata badges.
 
 ---
 
-## 24. Legal Pages 🖥️
+## 24. Legal Pages
 
 Test that privacy policy and terms of service pages render correctly.
 
@@ -543,7 +543,7 @@ Test that privacy policy and terms of service pages render correctly.
 
 ---
 
-## 25. Responsive Design Matrix 🖥️
+## 25. Responsive Design Matrix
 
 Test all key pages at mobile (375px), tablet (768px), and desktop (1280px).
 
@@ -566,7 +566,7 @@ Test all key pages at mobile (375px), tablet (768px), and desktop (1280px).
 
 ---
 
-## 26. Maintenance / Coming Soon Page 🖥️
+## 26. Maintenance / Coming Soon Page
 
 Test the splash page shown during maintenance mode.
 
@@ -582,7 +582,7 @@ Test the splash page shown during maintenance mode.
 
 ---
 
-## 27. Admin Dashboard Performance 🔄
+## 27. Admin Dashboard Performance
 
 Test that performance optimizations to the admin dashboard work correctly without breaking functionality.
 
@@ -608,7 +608,7 @@ Test that performance optimizations to the admin dashboard work correctly withou
 
 ---
 
-## 28. Performance Regression Checks 🖥️
+## 28. Performance Regression Checks
 
 Verify that performance optimizations haven't regressed. Run these after any deploy that touches the affected files.
 
@@ -664,8 +664,8 @@ Verify that performance optimizations haven't regressed. Run these after any dep
 
 ## Post-Testing Actions
 
-- [ ] All ❌ failures have issues created
-- [ ] All ⚠️ items have decisions documented
+- [ ] All failures have issues created
+- [ ] All Needs Review items have decisions documented
 - [ ] Re-test any fixes before launch
 - [ ] Sign-off from stakeholders
 - [ ] Launch checklist completed (see pre-launch-checklist.md)

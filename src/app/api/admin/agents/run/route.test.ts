@@ -11,9 +11,10 @@ const { logger } = vi.hoisted(() => ({
 }));
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 vi.mock("@/lib/logger", () => ({
   logger,
@@ -1084,3 +1085,6 @@ describe("asynchronous agent failure", () => {
     expect(status.logs[0].text).not.toContain("admin@example.com");
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

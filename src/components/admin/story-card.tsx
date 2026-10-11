@@ -1,42 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { ImageIcon, Pencil, Check } from "lucide-react";
+import { ImageIcon, Pencil } from "lucide-react";
 import type { AdminStory } from "@/types/admin";
 import { CATEGORY_LABELS } from "@/types/immersive";
-import type { StoryMetadata, TranslationStatus } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
-import { TRANSLATION_LOCALES } from "@/lib/translation-locales";
-
-/**
- * Check if a story is missing any translations.
- */
-function hasMissingTranslations(story: AdminStory): boolean {
-  const metadata = story.metadata as StoryMetadata | undefined;
-  if (!metadata) return true;
-
-  const translations = metadata.translations || {};
-  const status = metadata.translation_status || {};
-
-  for (const locale of TRANSLATION_LOCALES) {
-    const translation = translations[locale];
-    const localeStatus = status[locale] as TranslationStatus | undefined;
-
-    // Missing if no translation content or status is not complete
-    const hasContent = translation && (
-      translation.title?.trim() ||
-      translation.subtitle?.trim() ||
-      translation.description?.trim()
-    );
-
-    if (!hasContent || localeStatus?.status !== "complete") {
-      return true;
-    }
-  }
-
-  return false;
-}
+import { hasMissingTranslations } from "@/lib/admin-formatters";
+import { StorySelectionCheckbox } from "./story-card/selection-checkbox";
 
 interface StoryCardProps {
   story: AdminStory;
@@ -105,28 +76,7 @@ export function StoryCard({
 
             {/* Selection checkbox - top left */}
             {onToggleSelect && (
-              <div
-                role="checkbox"
-                aria-label={`Seleccionar ${story.title}`}
-                aria-checked={isSelected}
-                tabIndex={0}
-                onClick={handleCheckboxClick}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleCheckboxClick(e as unknown as React.MouseEvent);
-                  }
-                }}
-                className={cn(
-                  "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all group-focus-within:opacity-100 pointer-coarse:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-approve focus-visible:ring-offset-2",
-                  isSelected
-                    ? "border-admin-approve bg-admin-approve"
-                    : "border-white/80 bg-white/20 opacity-0 backdrop-blur-sm group-hover:opacity-100",
-                  selectionMode && !isSelected && "opacity-100"
-                )}
-              >
-                {isSelected && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
-              </div>
+              <StorySelectionCheckbox storyTitle={story.title} isSelected={isSelected} selectionMode={selectionMode} onClick={handleCheckboxClick} hasImage={true} />
             )}
 
             {/* Content overlay follows the same access modes as the gradient. */}
@@ -186,28 +136,7 @@ export function StoryCard({
           <div className="relative flex h-full flex-col items-center justify-center gap-3">
             {/* Selection checkbox - top left */}
             {onToggleSelect && (
-              <div
-                role="checkbox"
-                aria-label={`Seleccionar ${story.title}`}
-                aria-checked={isSelected}
-                tabIndex={0}
-                onClick={handleCheckboxClick}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleCheckboxClick(e as unknown as React.MouseEvent);
-                  }
-                }}
-                className={cn(
-                  "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all group-focus-within:opacity-100 pointer-coarse:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-approve focus-visible:ring-offset-2",
-                  isSelected
-                    ? "border-admin-approve bg-admin-approve"
-                    : "border-admin-subtle/50 bg-white/50 opacity-0 group-hover:opacity-100 dark:bg-admin-ink/50",
-                  selectionMode && !isSelected && "opacity-100"
-                )}
-              >
-                {isSelected && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
-              </div>
+              <StorySelectionCheckbox storyTitle={story.title} isSelected={isSelected} selectionMode={selectionMode} onClick={handleCheckboxClick} hasImage={false} />
             )}
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white dark:bg-admin-ink">
               <ImageIcon className="h-6 w-6 text-admin-subtle" />

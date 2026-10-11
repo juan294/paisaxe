@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exec, spawn, ChildProcess } from "child_process";
 import { promisify } from "util";
 import { once } from "node:events";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdminSession } from "@/lib/admin-auth";
 
 const execAsync = promisify(exec);
 
@@ -26,7 +26,7 @@ async function isTunnelRunning(): Promise<boolean> {
  * GET /api/admin/tunnel
  * Returns the current tunnel status
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(request?: NextRequest): Promise<NextResponse> {
   // Only allow in development
   if (process.env.NODE_ENV !== "development" || process.env.VERCEL_ENV !== undefined) {
     return NextResponse.json(
@@ -34,18 +34,16 @@ export async function GET(): Promise<NextResponse> {
       { status: 403 }
     );
   }
+  return withAdminSession(async () => {
 
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+    const running = await isTunnelRunning();
 
-  const running = await isTunnelRunning();
+    return NextResponse.json({
+      running,
+      url: running ? "https://paisaxe.tunnelfor.me" : null,
+    });
 
-  return NextResponse.json({
-    running,
-    url: running ? "https://paisaxe.tunnelfor.me" : null,
-  });
+  }, request);
 }
 
 /**
@@ -60,63 +58,61 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 403 }
     );
   }
+  return withAdminSession(async () => {
 
-  const auth = await validateAdminAuth({ skipCache: true });
-  if (!auth.valid) {
-    return auth.error;
-  }
+    const csrfError = rejectUnsafeMutation(request);
+    if (csrfError) return csrfError;
 
-  const csrfError = rejectUnsafeMutation(request);
-  if (csrfError) return csrfError;
+    // Check if already running
+    if (await isTunnelRunning()) {
+      return NextResponse.json({
+        running: true,
+        url: "https://paisaxe.tunnelfor.me",
+        message: "Tunnel is already running",
+      });
+    }
 
-  // Check if already running
-  if (await isTunnelRunning()) {
-    return NextResponse.json({
-      running: true,
-      url: "https://paisaxe.tunnelfor.me",
-      message: "Tunnel is already running",
-    });
-  }
+    try {
+      // Start the tunnel process
+      const configPath = `${process.env.HOME}/.cloudflared/config-paisaxe.yml`;
 
-  try {
-    // Start the tunnel process
-    const configPath = `${process.env.HOME}/.cloudflared/config-paisaxe.yml`;
+      tunnelProcess = spawn("cloudflared", [
+        "tunnel",
+        "--config",
+        configPath,
+        "run",
+        "paisaxe",
+      ], {
+        detached: true,
+        stdio: "ignore",
+      });
 
-    tunnelProcess = spawn("cloudflared", [
-      "tunnel",
-      "--config",
-      configPath,
-      "run",
-      "paisaxe",
-    ], {
-      detached: true,
-      stdio: "ignore",
-    });
+      // A missing executable emits error asynchronously, outside the spawn call.
+      // Await startup so the failure reaches this handler's error response.
+      await once(tunnelProcess, "spawn");
 
-    // A missing executable emits error asynchronously, outside the spawn call.
-    // Await startup so the failure reaches this handler's error response.
-    await once(tunnelProcess, "spawn");
+      // Unref so Node.js can exit even if tunnel is running
+      tunnelProcess.unref();
 
-    // Unref so Node.js can exit even if tunnel is running
-    tunnelProcess.unref();
+      // Wait a moment for the tunnel to start
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // Wait a moment for the tunnel to start
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+      const running = await isTunnelRunning();
 
-    const running = await isTunnelRunning();
+      return NextResponse.json({
+        running,
+        url: running ? "https://paisaxe.tunnelfor.me" : null,
+        message: running ? "Tunnel started successfully" : "Failed to start tunnel",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json(
+        { error: `Failed to start tunnel: ${message}` },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({
-      running,
-      url: running ? "https://paisaxe.tunnelfor.me" : null,
-      message: running ? "Tunnel started successfully" : "Failed to start tunnel",
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json(
-      { error: `Failed to start tunnel: ${message}` },
-      { status: 500 }
-    );
-  }
+  }, request);
 }
 
 /**
@@ -131,36 +127,34 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       { status: 403 }
     );
   }
+  return withAdminSession(async () => {
 
-  const auth = await validateAdminAuth({ skipCache: true });
-  if (!auth.valid) {
-    return auth.error;
-  }
+    const csrfError = rejectUnsafeMutation(request);
+    if (csrfError) return csrfError;
 
-  const csrfError = rejectUnsafeMutation(request);
-  if (csrfError) return csrfError;
+    try {
+      // Kill any cloudflared tunnel processes for paisaxe
+      await execAsync("pkill -f 'cloudflared tunnel.*paisaxe' || true");
 
-  try {
-    // Kill any cloudflared tunnel processes for paisaxe
-    await execAsync("pkill -f 'cloudflared tunnel.*paisaxe' || true");
+      tunnelProcess = null;
 
-    tunnelProcess = null;
+      // Wait a moment for the process to stop
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Wait a moment for the process to stop
-    await new Promise((resolve) => setTimeout(resolve, 500));
+      const running = await isTunnelRunning();
 
-    const running = await isTunnelRunning();
+      return NextResponse.json({
+        running,
+        url: null,
+        message: running ? "Failed to stop tunnel" : "Tunnel stopped successfully",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json(
+        { error: `Failed to stop tunnel: ${message}` },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({
-      running,
-      url: null,
-      message: running ? "Failed to stop tunnel" : "Tunnel stopped successfully",
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json(
-      { error: `Failed to stop tunnel: ${message}` },
-      { status: 500 }
-    );
-  }
+  }, request);
 }

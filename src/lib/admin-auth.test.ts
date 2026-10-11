@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   validateAdminAuth,
   withAdmin,
+  withAdminSession,
+  withAdminDeferred,
   withAdminRead,
   invalidateRoleCache,
   ROLE_CACHE_MAX_ENTRIES,
@@ -765,5 +767,64 @@ describe("validateAdminAuth", () => {
         ]);
       }).not.toThrow();
     });
+  });
+});
+
+
+describe("withAdminSession identity-only boundary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateRoleCache("session-wrapper-admin");
+    mockGetAll.mockReturnValue([]);
+    mockGetUser.mockResolvedValue({data: {user: {id: "session-wrapper-admin"}}, error: null});
+    setupProfileMock({role: "admin"});
+  });
+
+  it("passes the verified actor without constructing a service client", async () => {
+    const { createAdminClient } = await import("./supabase-admin");
+    const handler = vi.fn(async (auth) => auth.userId);
+    const request = new Request("http://localhost/admin", {method: "POST"});
+    expect(await withAdminSession(handler, request)).toBe("session-wrapper-admin");
+    expect(handler).toHaveBeenCalledWith({userId: "session-wrapper-admin"});
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("revalidates a warm role on mutation and does not invoke the handler after revocation", async () => {
+    expect((await validateAdminAuth()).valid).toBe(true);
+    setupProfileMock({role: "member"});
+    const handler = vi.fn(async () => new Response());
+    const response = await withAdminSession(handler, new Request("http://localhost/admin", {method: "DELETE"}));
+    expect(response.status).toBe(403);
+    expect(handler).not.toHaveBeenCalled();
+    expect(mockSingle).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe("validated actor supplied to every admin boundary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateRoleCache("phase10-verified-actor");
+    mockGetAll.mockReturnValue([]);
+    mockGetUser.mockResolvedValue({data: {user: {id: "phase10-verified-actor"}}, error: null});
+    setupProfileMock({role: "admin"});
+  });
+  it("passes the verified identity and original service client to withAdmin", async () => {
+    const handler = vi.fn(async (client, auth) => ({client, actor: auth.userId}));
+    expect(await withAdmin(handler)).toEqual({client: mockAdminClient, actor: "phase10-verified-actor"});
+    expect(handler).toHaveBeenCalledWith(mockAdminClient, {userId: "phase10-verified-actor"});
+  });
+  it("passes the verified identity and defers service construction until explicitly needed", async () => {
+    const { createAdminClient } = await import("./supabase-admin");
+    const handler = vi.fn(async (_getClient, auth) => auth.userId);
+    expect(await withAdminDeferred(handler)).toBe("phase10-verified-actor");
+    expect(handler).toHaveBeenCalledWith(createAdminClient, {userId: "phase10-verified-actor"});
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+  it("passes the same verified identity with an RLS session client", async () => {
+    const handler = vi.fn(async (client, auth) => ({client, actor: auth.userId}));
+    const result = await withAdminRead(handler);
+    expect(result).toEqual({client: expect.objectContaining({from: mockFrom}), actor: "phase10-verified-actor"});
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({from: mockFrom}), {userId: "phase10-verified-actor"});
   });
 });

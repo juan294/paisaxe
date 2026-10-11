@@ -1,10 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
-import { fileURLToPath } from "url";
-
-const ROOT = process.cwd();
-const ENV_EXAMPLE = join(ROOT, ".env.example");
-const INVENTORY_DOC = join(ROOT, "docs/operations/secret-inventory.md");
+import { parseEnvExampleKeys } from "./lib/env-example";
+import { isMain } from "./lib/is-main";
 
 // Credential-shaped: ends in one of these suffixes. NEXT_PUBLIC_* vars are
 // client-exposed by design and are never treated as secrets regardless of name.
@@ -19,32 +16,14 @@ export const EXTERNAL_ONLY_ALLOWLIST = ["VERCEL_TOKEN"];
 /**
  * Extract credential-shaped env var names from .env.example content —
  * both active (`KEY=value`) and commented-optional (`# KEY=value`) lines.
- * Mirrors the key-extraction approach in check-env.ts.
+ * Uses the shared documented-key grammar; credential filtering belongs here.
  */
 export function extractCredentialKeysFromEnvExample(content: string): Set<string> {
-  const keys = new Set<string>();
-  for (const rawLine of content.split("\n")) {
-    const trimmed = rawLine.trim();
-    let key: string | undefined;
-
-    if (!trimmed.startsWith("#") && trimmed.includes("=")) {
-      key = trimmed.split("=")[0].trim();
-    } else if (trimmed.startsWith("# ") && trimmed.includes("=")) {
-      const rest = trimmed.slice(2).trim();
-      if (/^[A-Z][A-Z0-9_]*=/.test(rest)) {
-        key = rest.split("=")[0].trim();
-      }
-    }
-
-    if (
-      key &&
-      CREDENTIAL_SUFFIX.test(key) &&
-      !key.startsWith("NEXT_PUBLIC_")
-    ) {
-      keys.add(key);
-    }
-  }
-  return keys;
+  return new Set(
+    [...parseEnvExampleKeys(content)].filter(
+      (key) => CREDENTIAL_SUFFIX.test(key) && !key.startsWith("NEXT_PUBLIC_")
+    )
+  );
 }
 
 /**
@@ -91,9 +70,10 @@ export function diffSecretInventory({
 }
 
 /* c8 ignore start */
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const envExampleContent = readFileSync(ENV_EXAMPLE, "utf-8");
-  const inventoryContent = readFileSync(INVENTORY_DOC, "utf-8");
+if (isMain(import.meta.url)) {
+  const root = process.cwd();
+  const envExampleContent = readFileSync(join(root, ".env.example"), "utf-8");
+  const inventoryContent = readFileSync(join(root, "docs/operations/secret-inventory.md"), "utf-8");
   const { missingFromInventory, staleInInventory } = diffSecretInventory({
     envExampleContent,
     inventoryContent,

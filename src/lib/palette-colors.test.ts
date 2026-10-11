@@ -91,7 +91,7 @@ const RAW_EXCEPTIONS: Record<string, readonly string[]> = {
   "src/components/admin/agents-dashboard/cross-agent-insights.tsx": ["#4a4540"],
   "src/components/admin/agents-dashboard/terminal-display.tsx": ["#111", "#1a1a1a", "#4a4540", "#d4d0ca"],
   "src/components/admin/costs-analytics-panel/index.tsx": ["#4d4a44"],
-  "src/components/admin/github-analytics-panel.tsx": ["#10b981", "#3b82f6"],
+  "src/components/admin/github-analytics-panel/chart.tsx": ["#10b981", "#3b82f6"],
   "src/components/admin/maintenance-config-panel.tsx": ["#030303"],
   "src/components/admin/stories-tab-panel.tsx": ["#8b6c2e", "#d4b876"],
   "src/components/admin/visitors-analytics-panel/chart.tsx": ["#10b981", "#3b82f6"],

@@ -1,229 +1,40 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
-import { fetchFeatureFlags, updateFeatureFlag } from "@/lib/admin-api";
+import { Fragment } from "react";
 import {
   RefreshCw,
   AlertCircle,
   Settings,
-  Compass,
-  Sparkles,
-  Users,
-  Mic,
-  Cog,
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import { VisitorVoiceConfigPanel } from "./visitor-voice-config-panel";
 import { MaintenanceConfigPanel } from "./maintenance-config-panel";
 import { TunnelTableRow } from "./tunnel-control-panel";
 
-// Feature flag categories
-type FlagCategory = "discovery" | "experience" | "social" | "voice" | "system";
-
-interface CategoryConfig {
-  key: FlagCategory;
-  label: string;
-  icon: React.ReactNode;
-  description: string;
-}
-
-const CATEGORIES: CategoryConfig[] = [
-  {
-    key: "discovery",
-    label: "Discovery",
-    icon: <Compass className="h-4 w-4" />,
-    description: "Help visitors find and explore stories",
-  },
-  {
-    key: "experience",
-    label: "Experience",
-    icon: <Sparkles className="h-4 w-4" />,
-    description: "Enhance the viewing experience",
-  },
-  {
-    key: "social",
-    label: "Social",
-    icon: <Users className="h-4 w-4" />,
-    description: "Community and sharing features",
-  },
-  {
-    key: "voice",
-    label: "Voice",
-    icon: <Mic className="h-4 w-4" />,
-    description: "Voice assistant features",
-  },
-  {
-    key: "system",
-    label: "System",
-    icon: <Cog className="h-4 w-4" />,
-    description: "System settings and maintenance",
-  },
-];
-
-// Map each flag to its category
-const FLAG_CATEGORIES: Partial<Record<FeatureFlagKey, FlagCategory>> = {
-  // Discovery - help users find stories
-  contextual_prompts: "discovery",
-  related_stories: "discovery",
-  randomized_order: "discovery",
-  surprise_me: "discovery",
-  seasonal_surfacing: "discovery",
-  mood_discovery: "discovery",
-  story_freshness: "discovery",
-  // Experience - enhance viewing
-  ambient_discovery: "experience",
-  autoplay_button: "experience",
-  asturianu_touches: "experience",
-  fullscreen_button: "experience",
-  // Social - community features
-  story_sharing: "social",
-  user_story_suggestions: "social",
-  // Voice - AI assistant
-  visitor_voice_agent: "voice",
-  booking_system: "voice",
-  sms_booking_confirmation: "voice",
-  // System - settings and maintenance
-  maintenance_mode: "system",
-};
-
-// Flags that have configurable settings
-const CONFIGURABLE_FLAGS = [
-  "visitor_voice_agent",
-  "maintenance_mode",
-];
+import { CATEGORIES } from "./feature-toggles-panel/categories";
+import { useFeatureToggles } from "./feature-toggles-panel/use-feature-toggles";
 
 export function FeatureTogglesPanel() {
-  const [flags, setFlags] = useState<FeatureFlag[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [updatingKey, setUpdatingKey] = useState<string | null>(null);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<FlagCategory>("discovery");
-  const [searchQuery, setSearchQuery] = useState("");
-  // Track tunnel running state (always count as available in system category)
-  const [tunnelRunning, setTunnelRunning] = useState(false);
-
-  const loadFlags = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-
-    const result = await fetchFeatureFlags();
-    if (result.error) {
-      setError(result.error);
-    } else if (result.data) {
-      setFlags(result.data);
-    }
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    loadFlags();
-  }, [loadFlags]);
-
-  const handleToggle = async (flag: FeatureFlag) => {
-    setUpdatingKey(flag.flagKey);
-    const result = await updateFeatureFlag(flag.flagKey, !flag.enabled);
-
-    if (result.error) {
-      setError(result.error);
-    } else if (result.data) {
-      setFlags((prev) =>
-        prev.map((f) => (f.flagKey === flag.flagKey ? result.data! : f))
-      );
-    }
-    setUpdatingKey(null);
-  };
-
-  const handleFlagUpdate = (updatedFlag: FeatureFlag) => {
-    setFlags((prev) =>
-      prev.map((f) => (f.flagKey === updatedFlag.flagKey ? updatedFlag : f))
-    );
-  };
-
-  const toggleExpanded = (flagKey: string) => {
-    setExpandedKey((prev) => (prev === flagKey ? null : flagKey));
-  };
-
-  const isConfigurable = (flagKey: string) => CONFIGURABLE_FLAGS.includes(flagKey);
-
-  // Group flags by category
-  const flagsByCategory = useMemo(() => {
-    const grouped: Record<FlagCategory, FeatureFlag[]> = {
-      discovery: [],
-      experience: [],
-      social: [],
-      voice: [],
-      system: [],
-    };
-
-    flags.forEach((flag) => {
-      const category = FLAG_CATEGORIES[flag.flagKey];
-      if (category) {
-        grouped[category].push(flag);
-      }
-    });
-
-    return grouped;
-  }, [flags]);
-
-  // Count enabled flags per category (including tunnel in system)
-  const enabledByCategory = useMemo(() => {
-    const counts: Record<FlagCategory, { enabled: number; total: number }> & { all: { enabled: number; total: number } } = {
-      all: { enabled: 0, total: 0 },
-      discovery: { enabled: 0, total: 0 },
-      experience: { enabled: 0, total: 0 },
-      social: { enabled: 0, total: 0 },
-      voice: { enabled: 0, total: 0 },
-      system: { enabled: 0, total: 0 },
-    };
-
-    flags.forEach((flag) => {
-      const category = FLAG_CATEGORIES[flag.flagKey];
-      if (category) {
-        counts[category].total++;
-        counts.all.total++;
-        if (flag.enabled) {
-          counts[category].enabled++;
-          counts.all.enabled++;
-        }
-      }
-    });
-
-    // Always include tunnel in system category count (dev only, hides in production)
-    counts.system.total++;
-    counts.all.total++;
-    if (tunnelRunning) {
-      counts.system.enabled++;
-      counts.all.enabled++;
-    }
-
-    return counts;
-  }, [flags, tunnelRunning]);
-
-  // Filter flags based on active category and search query
-  const filteredFlags = useMemo(() => {
-    let result = flagsByCategory[activeCategory];
-
-    // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter((flag) => {
-        const categoryLabel = CATEGORIES.find(
-          (c) => c.key === FLAG_CATEGORIES[flag.flagKey]
-        )?.label.toLowerCase();
-
-        return (
-          flag.label.toLowerCase().includes(query) ||
-          (flag.description?.toLowerCase().includes(query) ?? false) ||
-          (categoryLabel?.includes(query) ?? false)
-        );
-      });
-    }
-
-    return result;
-  }, [flagsByCategory, activeCategory, searchQuery]);
+  const {
+    flags,
+    isLoading,
+    error,
+    updatingKey,
+    expandedKey,
+    activeCategory,
+    setActiveCategory,
+    searchQuery,
+    setSearchQuery,
+    setTunnelRunning,
+    loadFlags,
+    handleToggle,
+    handleFlagUpdate,
+    toggleExpanded,
+    isConfigurable,
+    enabledByCategory,
+    filteredFlags,
+  } = useFeatureToggles();
 
   if (isLoading && flags.length === 0) {
     return (

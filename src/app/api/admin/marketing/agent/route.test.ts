@@ -66,9 +66,10 @@ vi.mock("fs/promises", async () => {
 });
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }));
+});
 
 // Shared mock data for Supabase context queries
 let mockStoryCount: number | null = 10;
@@ -644,3 +645,6 @@ describe("/api/admin/marketing/agent", () => {
     expect(logger.error).toHaveBeenCalled();
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

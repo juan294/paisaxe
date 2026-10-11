@@ -3,9 +3,10 @@ import { NextRequest } from "next/server";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock dependencies
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 const { mockExec, mockSpawn } = vi.hoisted(() => ({
   mockExec: vi.fn(),
@@ -371,3 +372,6 @@ describe("DELETE /api/admin/tunnel", () => {
 function mutationRequest(method: string) {
   return new NextRequest("http://localhost:3006/api/admin/tunnel", { method, headers: { origin: "http://localhost:3006", cookie: "__csrf=fixture", "x-csrf-token": "fixture" } });
 }
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

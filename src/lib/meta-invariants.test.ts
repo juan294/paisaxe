@@ -39,7 +39,7 @@ const HTTP_METHODS = [
  * in sync with the exports of src/lib/admin-auth.ts — a new guard wrapper
  * needs to be added here too, or this check will false-positive.
  */
-const ADMIN_GUARD_PATTERN = /validateAdminAuth\(|withAdmin\(|withAdminRead\(/;
+const ADMIN_GUARD_PATTERN = /validateAdminAuth\(|withAdmin\(|withAdminRead\(|withAdminSession\(|withAdminDeferred\(/;
 
 function collectRouteFiles(dir: string): string[] {
   return collectFiles(dir, (name) => name === "route.ts");
@@ -149,7 +149,7 @@ describe("QA-M4 admin-guard invariant", () => {
       violations,
       `Found ${violations.length} admin route handler(s) without an admin-auth guard. ` +
         `Every admin route method must call validateAdminAuth(), or be wrapped in ` +
-        `withAdmin()/withAdminRead() from "@/lib/admin-auth":`
+        `withAdmin()/withAdminRead()/withAdminSession()/withAdminDeferred() from "@/lib/admin-auth":`
     );
   });
 
@@ -161,13 +161,22 @@ describe("QA-M4 admin-guard invariant", () => {
     const source = fs.readFileSync(targetFile, "utf-8");
     expect(inspectAdminRoute(routeFile)).toEqual([]);
     const segment = splitExportedMethods(source).find((part) => part.method === method)!;
-    expect(segment.body.match(/validateAdminAuth\(/g)).toHaveLength(1);
+    expect(segment.body.match(new RegExp(ADMIN_GUARD_PATTERN.source, "g"))).toHaveLength(1);
     // Change the actual handler's call, keeping all other handlers unchanged.
-    const mutated = source.replace(segment.body, segment.body.replace("validateAdminAuth(", "removedAdminGuard("));
+    const mutated = source.replace(segment.body, segment.body.replace(ADMIN_GUARD_PATTERN, "removedAdminGuard("));
     const violations = inspectAdminRoute(routeFile, (file) => file === targetFile ? mutated : fs.readFileSync(file, "utf-8"));
     expect(violations).toHaveLength(1);
     expect(violations[0]).toContain(`exported ${method} has no admin-auth guard reference`);
     expect(violations[0]).toContain(path.relative(REPO_ROOT, targetFile));
+  });
+
+  it.each(["withAdminSession", "withAdminDeferred"])("accepts only the named %s boundary and still rejects its omission", guard => {
+    const file = path.join(ADMIN_API_DIR, "fixture/route.ts");
+    const guarded = `export async function POST(request: Request) { return ${guard}(async () => new Response(), request); }`;
+    expect(inspectAdminRoute(file, () => guarded)).toEqual([]);
+    const violations = inspectAdminRoute(file, () => guarded.replace(`${guard}(`, "removedAdminGuard("));
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain("exported POST has no admin-auth guard reference");
   });
 
   it.each(Object.entries(LOCAL_ADMIN_ROUTES))("rejects redirecting %s to the inert production stub", (route, target) => {

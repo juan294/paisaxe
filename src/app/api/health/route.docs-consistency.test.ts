@@ -2,6 +2,9 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "./route";
+import { NextRequest } from "next/server";
+import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
+import { findMigrationProblems, parseCronCurlExamples, cronFixtureRequest } from "../../../../scripts/lib/runbook-contracts";
 
 // DO-H5: operational runbooks under docs/operations/ contain `jq` expressions
 // that read fields off the /api/health response body. When a field is removed
@@ -153,5 +156,39 @@ describe("docs-vs-code: /api/health jq references in docs/operations", () => {
       );
 
     expect(failures).toEqual([]);
+  });
+});
+
+function operationalDocuments(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? operationalDocuments(path) : entry.name.endsWith(".md") ? [path] : [];
+  });
+}
+
+describe("docs-vs-code: migration and cron command contracts", () => {
+  const documents = ["docs/operations", "docs/runbooks"].flatMap(operationalDocuments);
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("every concrete migration basename exists or is explicitly annotated historical", () => {
+    const migrations = new Set(readdirSync("supabase/migrations").filter(name => name.endsWith(".sql")));
+    expect(documents.flatMap(file => findMigrationProblems(readFileSync(file, "utf8"), file, migrations))).toEqual([]);
+  });
+
+  it("every fenced cron curl command names a real route method and matches its declared auth outcome with fixture secrets", () => {
+    vi.stubEnv("CRON_SECRET", "docs-cron-fixture");
+    vi.stubEnv("WEBHOOK_SECRET", "docs-webhook-fixture");
+    const examples = documents.flatMap(file => parseCronCurlExamples(readFileSync(file, "utf8"), file));
+    expect(examples.length).toBeGreaterThan(0);
+    for (const example of examples) {
+      const routeFile = join("src/app", example.path, "route.ts");
+      const source = readFileSync(routeFile, "utf8");
+      expect(source, `${example.file}:${example.line}: route method ${example.method} missing`).toMatch(
+        new RegExp(`export (?:async function|const) ${example.method}\\b`)
+      );
+      const request = new NextRequest(cronFixtureRequest(example));
+      const allowed = request.method === "GET" ? verifyVercelCron(request) : verifyWebhookSecret(request);
+      expect(allowed, `${example.file}:${example.line}: ${example.method} cron auth rejected; use GET Authorization: Bearer $CRON_SECRET or POST x-webhook-secret: $WEBHOOK_SECRET`).toBe(example.expectedAuth);
+    }
   });
 });

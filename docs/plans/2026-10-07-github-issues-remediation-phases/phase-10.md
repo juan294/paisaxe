@@ -1,6 +1,6 @@
 # Phase 10: Admin, tooling and documentation contracts
 
-Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #940, #927, #931, #943, #916. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: planned, not implemented. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
+Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #940, #927, #931, #943, #916. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: local implementation, independent review, simplify and runtime qualification complete; owner acceptance pending. Entry base: develop `d1481e89d676042f01f9dc7a5ad36af27a652001`. Normal hooks and local delivery require separate receipts in the private final handoff. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
 
 ## Scope and source evidence
 

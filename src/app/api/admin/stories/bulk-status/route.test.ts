@@ -12,9 +12,10 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 // Mock supabase
 vi.mock("@/lib/supabase-admin", () => ({

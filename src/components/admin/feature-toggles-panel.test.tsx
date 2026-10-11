@@ -697,4 +697,24 @@ describe("FeatureTogglesPanel", () => {
       });
     });
   });
+  it("preserves focused filtering and flag state through failed toggle and successful retry", async () => {
+    const user = userEvent.setup();
+    vi.mocked(updateFeatureFlag).mockResolvedValueOnce({ error: "Retry toggle" }).mockResolvedValueOnce({ data: { ...mockFlags[0], enabled: false } });
+    render(<FeatureTogglesPanel />);
+    const search = await screen.findByPlaceholderText(/search/i);
+    await user.type(search, "contextual");
+    expect(search).toHaveFocus();
+    expect(screen.getByPlaceholderText(/search/i)).toBe(search);
+    const toggle = screen.getByRole("switch", { name: /toggle contextual prompts/i });
+    await user.click(toggle);
+    expect(screen.getByText("Retry toggle")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(search).toHaveValue("contextual");
+    expect(screen.queryByText("Related Stories")).not.toBeInTheDocument();
+    await user.click(toggle);
+    expect(updateFeatureFlag).toHaveBeenNthCalledWith(2, "contextual_prompts", false);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(search).toHaveValue("contextual");
+  });
+
 });

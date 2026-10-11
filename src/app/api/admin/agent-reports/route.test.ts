@@ -4,9 +4,10 @@ import type { Stats } from "fs";
 import { promises as fsPromises } from "fs";
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 import { GET } from "./route";
 import { validateAdminAuth } from "@/lib/admin-auth";
@@ -106,3 +107,6 @@ describe("Agent Reports API", () => {
     });
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

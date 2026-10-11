@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase-admin";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdminDeferred } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 import { updateStorySchema } from "@/lib/schemas";
 import { readJsonBody, uuidParam } from "@/lib/request-validation";
@@ -11,167 +10,165 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  // Validate admin auth
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+  return withAdminDeferred(async (getClient, { userId }) => {
 
-  try {
-    const { id: rawId } = await params;
+    try {
+      const { id: rawId } = await params;
 
-    // Validate the dynamic route param is a UUID (BE-M2 #570)
-    const idResult = uuidParam(rawId, "story id");
-    if (!idResult.ok) {
-      return idResult.error;
-    }
-    const id = idResult.value;
-
-    const bodyResult = await readJsonBody(request);
-    if (!bodyResult.ok) {
-      return bodyResult.error;
-    }
-
-    // Zod schema validation (BE-M1)
-    const parsed = updateStorySchema.safeParse(bodyResult.data);
-    if (!parsed.success) {
-      const flat = parsed.error.flatten();
-      // Preserve backward-compatible single-field error messages
-      if (flat.fieldErrors.category?.length) {
-        return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+      // Validate the dynamic route param is a UUID (BE-M2 #570)
+      const idResult = uuidParam(rawId, "story id");
+      if (!idResult.ok) {
+        return idResult.error;
       }
-      if (flat.fieldErrors.location?.length) {
-        return NextResponse.json({ error: "Invalid location" }, { status: 400 });
+      const id = idResult.value;
+
+      const bodyResult = await readJsonBody(request);
+      if (!bodyResult.ok) {
+        return bodyResult.error;
       }
-      if (flat.fieldErrors.duration?.length) {
-        return NextResponse.json({ error: "Invalid duration" }, { status: 400 });
+
+      // Zod schema validation (BE-M1)
+      const parsed = updateStorySchema.safeParse(bodyResult.data);
+      if (!parsed.success) {
+        const flat = parsed.error.flatten();
+        // Preserve backward-compatible single-field error messages
+        if (flat.fieldErrors.category?.length) {
+          return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+        }
+        if (flat.fieldErrors.location?.length) {
+          return NextResponse.json({ error: "Invalid location" }, { status: 400 });
+        }
+        if (flat.fieldErrors.duration?.length) {
+          return NextResponse.json({ error: "Invalid duration" }, { status: 400 });
+        }
+        return NextResponse.json({ errors: flat.fieldErrors }, { status: 400 });
       }
-      return NextResponse.json({ errors: flat.fieldErrors }, { status: 400 });
-    }
 
-    const body = parsed.data;
-    if (body.metadata !== undefined && !sourceQuestionMetadataSchema.safeParse(body.metadata).success) {
-      return NextResponse.json({ error: "Invalid question prompts" }, { status: 400 });
-    }
+      const body = parsed.data;
+      if (body.metadata !== undefined && !sourceQuestionMetadataSchema.safeParse(body.metadata).success) {
+        return NextResponse.json({ error: "Invalid question prompts" }, { status: 400 });
+      }
 
-    const supabase = createAdminClient();
+      const supabase = getClient();
 
-    // Check if slug is being changed and if it conflicts
-    if (body.slug) {
-      const { data: existingStory, error: slugCheckError } = await supabase
+      // Check if slug is being changed and if it conflicts
+      if (body.slug) {
+        const { data: existingStory, error: slugCheckError } = await supabase
+          .from("stories")
+          .select("id, slug")
+          .eq("slug", body.slug)
+          .neq("id", id)
+          .single();
+
+        if (slugCheckError && slugCheckError.code !== "PGRST116") {
+          logger.error("[ADMIN_STORY_SLUG_CHECK_FAILED]", {
+            story_id: id,
+            slug: body.slug,
+            error: slugCheckError,
+          });
+          return NextResponse.json(
+            { error: "Failed to validate slug" },
+            { status: 500 }
+          );
+        }
+
+        if (existingStory) {
+          return NextResponse.json(
+            { error: "A story with this slug already exists" },
+            { status: 409 }
+          );
+        }
+      }
+
+      // Build update object (only include fields that are present in the request)
+      const updateData: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (body.title !== undefined) updateData.title = body.title.trim();
+      if (body.slug !== undefined) updateData.slug = body.slug.trim();
+      if (body.subtitle !== undefined) updateData.subtitle = body.subtitle?.trim() || null;
+      if (body.description !== undefined) updateData.description = body.description?.trim() || null;
+      if (body.category !== undefined) updateData.category = body.category;
+      if (body.location !== undefined) updateData.location = body.location;
+      if (body.duration !== undefined) updateData.duration = body.duration;
+      if (body.sourcePdf !== undefined) updateData.source_pdf = body.sourcePdf?.trim() || null;
+      if (body.bestMonths !== undefined) updateData.best_months = body.bestMonths;
+      if (body.metadata !== undefined) {
+        // Compare the stored source, not client-supplied translation coverage/counts.
+        // This remains a non-atomic metadata replacement; concurrent writers are
+        // handled separately by the Phase 10 metadata ownership work.
+        const { data: currentStory, error: metadataError } = await supabase
+          .from("stories")
+          .select("metadata")
+          .eq("id", id)
+          .single();
+        if (metadataError?.code === "PGRST116" || (!metadataError && !currentStory)) {
+          return NextResponse.json({ error: "Story not found" }, { status: 404 });
+        }
+        if (metadataError || !currentStory) {
+          logger.error("[ADMIN_STORY_METADATA_READ_FAILED]", { story_id: id, error: metadataError });
+          return NextResponse.json({ error: "Failed to read story metadata" }, { status: 500 });
+        }
+        updateData.metadata = invalidateStoryPrompts(
+          currentStory.metadata as Record<string, unknown> | null,
+          body.metadata,
+          updateData.updated_at as string,
+        );
+      }
+
+      // Update the story
+      const { data: updatedStory, error: updateError } = await supabase
         .from("stories")
-        .select("id, slug")
-        .eq("slug", body.slug)
-        .neq("id", id)
+        .update(updateData)
+        .eq("id", id)
+        .select("id, slug, title, subtitle, description, category, location, duration, source_pdf, metadata, updated_at")
         .single();
 
-      if (slugCheckError && slugCheckError.code !== "PGRST116") {
-        logger.error("[ADMIN_STORY_SLUG_CHECK_FAILED]", {
-          story_id: id,
-          slug: body.slug,
-          error: slugCheckError,
-        });
+      if (updateError) {
+        logger.error("[ADMIN_STORY_UPDATE_FAILED]", { story_id: id, error: updateError });
         return NextResponse.json(
-          { error: "Failed to validate slug" },
+          { error: "Failed to update story" },
           { status: 500 }
         );
       }
 
-      if (existingStory) {
+      if (!updatedStory) {
         return NextResponse.json(
-          { error: "A story with this slug already exists" },
-          { status: 409 }
+          { error: "Story not found" },
+          { status: 404 }
         );
       }
-    }
 
-    // Build update object (only include fields that are present in the request)
-    const updateData: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    };
+      // SE-M4: Audit log for admin mutations
+      logger.info("[ADMIN_AUDIT]", {
+        event: "story.update",
+        actor: userId,
+        story_id: id,
+      });
 
-    if (body.title !== undefined) updateData.title = body.title.trim();
-    if (body.slug !== undefined) updateData.slug = body.slug.trim();
-    if (body.subtitle !== undefined) updateData.subtitle = body.subtitle?.trim() || null;
-    if (body.description !== undefined) updateData.description = body.description?.trim() || null;
-    if (body.category !== undefined) updateData.category = body.category;
-    if (body.location !== undefined) updateData.location = body.location;
-    if (body.duration !== undefined) updateData.duration = body.duration;
-    if (body.sourcePdf !== undefined) updateData.source_pdf = body.sourcePdf?.trim() || null;
-    if (body.bestMonths !== undefined) updateData.best_months = body.bestMonths;
-    if (body.metadata !== undefined) {
-      // Compare the stored source, not client-supplied translation coverage/counts.
-      // This remains a non-atomic metadata replacement; concurrent writers are
-      // handled separately by the Phase 10 metadata ownership work.
-      const { data: currentStory, error: metadataError } = await supabase
-        .from("stories")
-        .select("metadata")
-        .eq("id", id)
-        .single();
-      if (metadataError?.code === "PGRST116" || (!metadataError && !currentStory)) {
-        return NextResponse.json({ error: "Story not found" }, { status: 404 });
-      }
-      if (metadataError || !currentStory) {
-        logger.error("[ADMIN_STORY_METADATA_READ_FAILED]", { story_id: id, error: metadataError });
-        return NextResponse.json({ error: "Failed to read story metadata" }, { status: 500 });
-      }
-      updateData.metadata = invalidateStoryPrompts(
-        currentStory.metadata as Record<string, unknown> | null,
-        body.metadata,
-        updateData.updated_at as string,
-      );
-    }
-
-    // Update the story
-    const { data: updatedStory, error: updateError } = await supabase
-      .from("stories")
-      .update(updateData)
-      .eq("id", id)
-      .select("id, slug, title, subtitle, description, category, location, duration, source_pdf, metadata, updated_at")
-      .single();
-
-    if (updateError) {
-      logger.error("[ADMIN_STORY_UPDATE_FAILED]", { story_id: id, error: updateError });
+      return NextResponse.json({
+        data: {
+          id: updatedStory.id,
+          slug: updatedStory.slug,
+          title: updatedStory.title,
+          subtitle: updatedStory.subtitle,
+          description: updatedStory.description,
+          category: updatedStory.category as StoryCategory,
+          location: updatedStory.location as StoryLocation | null,
+          duration: updatedStory.duration as StoryDuration | null,
+          sourcePdf: updatedStory.source_pdf,
+          metadata: updatedStory.metadata as Record<string, unknown> | null,
+          updatedAt: updatedStory.updated_at,
+        },
+      });
+    } catch (error) {
+      logger.error("[ADMIN_STORY_UPDATE_UNHANDLED_ERROR]", { error });
       return NextResponse.json(
-        { error: "Failed to update story" },
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
 
-    if (!updatedStory) {
-      return NextResponse.json(
-        { error: "Story not found" },
-        { status: 404 }
-      );
-    }
-
-    // SE-M4: Audit log for admin mutations
-    logger.info("[ADMIN_AUDIT]", {
-      event: "story.update",
-      actor: auth.userId,
-      story_id: id,
-    });
-
-    return NextResponse.json({
-      data: {
-        id: updatedStory.id,
-        slug: updatedStory.slug,
-        title: updatedStory.title,
-        subtitle: updatedStory.subtitle,
-        description: updatedStory.description,
-        category: updatedStory.category as StoryCategory,
-        location: updatedStory.location as StoryLocation | null,
-        duration: updatedStory.duration as StoryDuration | null,
-        sourcePdf: updatedStory.source_pdf,
-        metadata: updatedStory.metadata as Record<string, unknown> | null,
-        updatedAt: updatedStory.updated_at,
-      },
-    });
-  } catch (error) {
-    logger.error("[ADMIN_STORY_UPDATE_UNHANDLED_ERROR]", { error });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }

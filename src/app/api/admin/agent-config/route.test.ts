@@ -16,9 +16,10 @@ const { mockReadFile, mockWriteFile } = vi.hoisted(() => ({
 }));
 
 // Mock dependencies before importing the route
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
@@ -413,3 +414,6 @@ describe("PUT /api/admin/agent-config", () => {
     expect(logger.error).toHaveBeenCalled();
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

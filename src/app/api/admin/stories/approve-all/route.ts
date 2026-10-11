@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase-admin";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdminDeferred } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 
 // BE-H3: cap bulk fan-out so a large approval batch does not create unbounded
@@ -85,62 +84,60 @@ async function runWithConcurrencyLimit(
 }
 
 export async function POST(_request: NextRequest) {
-  // Validate admin auth
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+  return withAdminDeferred(async (getClient) => {
 
-  try {
-    const supabase = createAdminClient();
+    try {
+      const supabase = getClient();
 
-    // Update all stories with needs_curation status to approved
-    const { data, error } = await supabase
-      .from("stories")
-      .update({ curation_status: "approved" })
-      .eq("curation_status", "needs_curation")
-      .select("id");
+      // Update all stories with needs_curation status to approved
+      const { data, error } = await supabase
+        .from("stories")
+        .update({ curation_status: "approved" })
+        .eq("curation_status", "needs_curation")
+        .select("id");
 
-    if (error) {
-      logger.error("Approve all error:", { error: error.message });
+      if (error) {
+        logger.error("Approve all error:", { error: error.message });
+        return NextResponse.json(
+          { error: "Failed to approve stories" },
+          { status: 500 }
+        );
+      }
+
+      const approvedIds = data?.map((s) => s.id) || [];
+
+      // BE-H3: fan out webhook pings with a concurrency cap to avoid unbounded
+      // concurrent HTTP calls when a large batch is approved.  The DB trigger has
+      // already durably enqueued translation jobs, so these pings are best-effort
+      // worker wake-ups.  Errors are logged but do not fail the request.
+      if (approvedIds.length > 0) {
+        const baseUrl = resolveWebhookBaseUrl();
+        if (!baseUrl) {
+          // BE-L2: log once for the whole batch, not once per loop iteration.
+          logger.warn("[APPROVE_ALL_WEBHOOK_BASE_URL_MISSING]", {
+            approved_count: approvedIds.length,
+          });
+        } else {
+          const pingTasks = approvedIds.map(
+            (id) => () => pingTranslateWebhook(id, baseUrl)
+          );
+          await runWithConcurrencyLimit(pingTasks, WEBHOOK_FAN_OUT_CONCURRENCY);
+        }
+      }
+
+      return NextResponse.json({
+        data: {
+          approvedCount: approvedIds.length,
+          approvedIds,
+        },
+      });
+    } catch (error) {
+      logger.error("Admin approve-all API error:", { error: error instanceof Error ? error.message : String(error) });
       return NextResponse.json(
-        { error: "Failed to approve stories" },
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
 
-    const approvedIds = data?.map((s) => s.id) || [];
-
-    // BE-H3: fan out webhook pings with a concurrency cap to avoid unbounded
-    // concurrent HTTP calls when a large batch is approved.  The DB trigger has
-    // already durably enqueued translation jobs, so these pings are best-effort
-    // worker wake-ups.  Errors are logged but do not fail the request.
-    if (approvedIds.length > 0) {
-      const baseUrl = resolveWebhookBaseUrl();
-      if (!baseUrl) {
-        // BE-L2: log once for the whole batch, not once per loop iteration.
-        logger.warn("[APPROVE_ALL_WEBHOOK_BASE_URL_MISSING]", {
-          approved_count: approvedIds.length,
-        });
-      } else {
-        const pingTasks = approvedIds.map(
-          (id) => () => pingTranslateWebhook(id, baseUrl)
-        );
-        await runWithConcurrencyLimit(pingTasks, WEBHOOK_FAN_OUT_CONCURRENCY);
-      }
-    }
-
-    return NextResponse.json({
-      data: {
-        approvedCount: approvedIds.length,
-        approvedIds,
-      },
-    });
-  } catch (error) {
-    logger.error("Admin approve-all API error:", { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  }, _request);
 }

@@ -1478,3 +1478,26 @@ describe("ImageEditorDialog", () => {
     });
   });
 });
+
+it("retains the focused image draft after a failed save and retries the same URL", async () => {
+  mockUpdateStoryImageUrl.mockReset().mockResolvedValueOnce({ error: "Retry image" }).mockResolvedValueOnce({ data: { image: "https://example.com/retry.jpg", imageSource: "Retained attribution" } });
+  const onClose = vi.fn();
+  const onUpdate = vi.fn();
+  render(<ImageEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />);
+  fireEvent.click(screen.getByText("URL"));
+  const url = screen.getByPlaceholderText("https://example.com/image.jpg");
+  url.focus();
+  fireEvent.change(url, { target: { value: "https://example.com/retry.jpg" } });
+  expect(url).toHaveFocus();
+  expect(screen.getByPlaceholderText("https://example.com/image.jpg")).toBe(url);
+  fireEvent.change(screen.getByLabelText("Image Source / Attribution"), { target: { value: "Retained attribution" } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
+  expect(screen.getByText("Retry image")).toBeInTheDocument();
+  expect(url).toHaveValue("https://example.com/retry.jpg");
+  expect(screen.getByLabelText("Image Source / Attribution")).toHaveValue("Retained attribution");
+  expect(onClose).not.toHaveBeenCalled();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
+  expect(mockUpdateStoryImageUrl).toHaveBeenNthCalledWith(2, "story-1", "https://example.com/retry.jpg", "Retained attribution");
+  expect(onUpdate).toHaveBeenCalledWith("story-1", { image: "https://example.com/retry.jpg", imageSource: "Retained attribution" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+});

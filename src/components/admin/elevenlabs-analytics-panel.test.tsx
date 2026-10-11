@@ -639,9 +639,9 @@ describe("ElevenLabsAnalyticsPanel", () => {
   // Line 270: `statColorClasses[color] || statColorClasses.stone` — the `||` fallback is unreachable.
   // The StatCard `color` prop is typed as a union of valid keys ("blue" | "emerald" | ... | "stone")
   // with a default of "stone". The parent component only passes valid color strings.
-  // The fallback is defensive code that cannot be triggered through the component's public API.
+  // The fallback is defensive code that cannot be triggered through the panel's public API.
   //
   // Line 471: `skeletonColorClasses[color] || skeletonColorClasses.stone` — same pattern.
-  // SkeletonStatCard is a private component called with hardcoded valid color strings.
-  // The fallback is defensive code that cannot be triggered through the component's public API.
+  // SkeletonStatCard is internal to the skeleton module and called with hardcoded valid color strings.
+  // The fallback is defensive code that cannot be triggered through the panel's public API.
 });

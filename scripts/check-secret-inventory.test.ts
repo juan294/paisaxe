@@ -1,4 +1,10 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   EXTERNAL_ONLY_ALLOWLIST,
   diffSecretInventory,
@@ -7,6 +13,14 @@ import {
 } from "./check-secret-inventory";
 
 describe("extractCredentialKeysFromEnvExample", () => {
+  it("shares optional whitespace syntax while filtering credentials only here", () => {
+    expect([...extractCredentialKeysFromEnvExample([
+      "# OPTIONAL_SECRET = $VALUE=a=b", "# SECOND_TOKEN=", "ACTIVE_PASSWORD=",
+      "NEXT_PUBLIC_SERVICE_KEY=value", "# NEXT_PUBLIC_OPTIONAL_KEY =value",
+      "PUBLIC_URL=value", "#lowercase_TOKEN=value", "# prose_KEY=value",
+      "ACTIVE_PASSWORD=duplicate",
+    ].join("\r\n"))]).toEqual(["OPTIONAL_SECRET", "SECOND_TOKEN", "ACTIVE_PASSWORD"]);
+  });
   it("picks up active and commented credential-shaped keys", () => {
     const content = [
       "ANTHROPIC_API_KEY=sk-ant-xxxxx",
@@ -41,6 +55,34 @@ describe("extractCredentialKeysFromEnvExample", () => {
 
     expect(keys.size).toBe(0);
   });
+});
+
+it("runs the real inventory CLI: matching 0, stale and missing 1, corrected 0", () => {
+  const root = mkdtempSync(join(tmpdir(), "paisaxe-inventory-cli-"));
+  try {
+    mkdirSync(join(root, "docs/operations"), { recursive: true });
+    writeFileSync(join(root, ".env.example"), "# SERVICE_SECRET = $OTHER==\r\nNEXT_PUBLIC_SERVICE_KEY=value\r\n");
+    const path = join(root, "docs/operations/secret-inventory.md");
+    writeFileSync(path, "| `SERVICE_SECRET` | fixture |\n| `VERCEL_TOKEN` | external |\n");
+    const loader = fileURLToPath(import.meta.resolve("tsx"));
+    const script = fileURLToPath(new URL("./check-secret-inventory.ts", import.meta.url));
+    const run = () => spawnSync(process.execPath, ["--import", loader, script], { cwd: root, encoding: "utf8", timeout: 15_000 });
+    const matching = run();
+    expect(matching.status, matching.stderr).toBe(0);
+    writeFileSync(path, "| `SERVICE_SECRET` | fixture |\n| `RETIRED_TOKEN` | stale |\n");
+    const stale = run();
+    expect(stale.status).toBe(1);
+    expect(stale.stderr).toContain("RETIRED_TOKEN");
+    expect(stale.stderr).toContain("no longer found in .env.example");
+    writeFileSync(path, "| `VERCEL_TOKEN` | external |\n");
+    const missing = run();
+    expect(missing.status).toBe(1);
+    expect(missing.stderr).toContain("SERVICE_SECRET");
+    expect(missing.stderr).toContain("missing from docs/operations/secret-inventory.md");
+    writeFileSync(path, "| `SERVICE_SECRET` | fixture |\n");
+    const corrected = run();
+    expect(corrected.status, corrected.stderr).toBe(0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 describe("extractDocumentedSecrets", () => {

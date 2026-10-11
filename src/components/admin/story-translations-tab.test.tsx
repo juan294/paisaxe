@@ -818,4 +818,25 @@ describe("StoryTranslationsTab", () => {
       expect(screen.getByText("From API Description")).toBeInTheDocument();
     });
   });
+  it("retains focused dirty locale edits on generation failure and allows a successful retry", async () => {
+    const user = userEvent.setup();
+    const onTranslationChange = vi.fn();
+    vi.mocked(generateStoryTranslations).mockResolvedValueOnce({ error: "Retry translations" }).mockResolvedValueOnce({ data: mockGenerateResponse });
+    render(<StoryTranslationsTab story={mockStory} onTranslationChange={onTranslationChange} />);
+    const title = await screen.findByLabelText("Title", { selector: "input" });
+    await user.clear(title);
+    await user.type(title, "Retained translation");
+    expect(title).toHaveFocus();
+    expect(screen.getByLabelText("Title", { selector: "input" })).toBe(title);
+    await user.click(screen.getByRole("button", { name: /generate all translations/i }));
+    expect(screen.getByText("Retry translations")).toBeInTheDocument();
+    expect(title).toHaveValue("Retained translation");
+    expect(onTranslationChange).toHaveBeenLastCalledWith(true, [expect.objectContaining({ locale: "en", translation: expect.objectContaining({ title: "Retained translation" }) })]);
+    await user.click(screen.getByRole("button", { name: /generate all translations/i }));
+    expect(await screen.findByText("Generated 4/5 translations")).toBeInTheDocument();
+    expect(generateStoryTranslations).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText("Title", { selector: "input" })).toHaveValue("Test Story");
+    expect(onTranslationChange).toHaveBeenLastCalledWith(false, []);
+  });
+
 });
