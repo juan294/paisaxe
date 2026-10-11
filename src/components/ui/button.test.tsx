@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Button, buttonVariants } from "./button";
@@ -260,7 +261,7 @@ describe("Button", () => {
       const ref = vi.fn();
       render(<Button ref={ref}>Ref Button</Button>);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLButtonElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/button.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/button.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLButtonElement);
     });
   });
 

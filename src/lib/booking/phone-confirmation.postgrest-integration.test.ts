@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * The phone-confirmation stretch against the live local stack (PayPal
@@ -241,7 +242,7 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
         `INSERT INTO public.payments (booking_id, amount_cents, status, authorization_id, phone_call_id) ` +
           `VALUES ('${bookingId}', 4000, 'authorized', 'AUTH-IT-${bookingId.slice(0, 8)}', '${callId}') RETURNING id;`
       ).split("\n")[0];
-      return { paymentId, callId };
+      return { paymentId: requiredValue(paymentId, "src/lib/booking/phone-confirmation.postgrest-integration.test.ts:245 paymentId"), callId: requiredValue(callId, "src/lib/booking/phone-confirmation.postgrest-integration.test.ts:245 callId") };
     }
     const claim = (paymentId: string) => psql(`UPDATE public.payments SET status = 'capture_pending' WHERE id = '${paymentId}';`);
 
@@ -275,7 +276,7 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
       expect(paymentOf(bookingId)).toBe("authorized:-");
       expect(bookingStatus(bookingId)).toBe("pending_payment");
       expect(dial.initiateCall).toHaveBeenCalledTimes(1);
-      expect(dial.initiateCall.mock.calls[0][0]).toBe(TEST_PHONE);
+      expect(requiredValue(dial.initiateCall.mock.calls[0], "src/lib/booking/phone-confirmation.postgrest-integration.test.ts:278 dial.initiateCall.mock.calls[0]")[0]).toBe(TEST_PHONE);
       expect(one(`SELECT status || ':' || venue_phone || ':' || idempotency_key FROM public.pending_bookings WHERE id = '${callOf(bookingId)}';`)).toMatch(
         /^pending:\+34612345678:phone-confirmation:/
       );
@@ -288,7 +289,7 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
       expect(paymentOf(bookingId)).toBe("captured:confirmed");
       expect(mock.captures.size).toBe(1);
       const [capture] = [...mock.captures.values()];
-      expect(one(`SELECT capture_id FROM public.payments WHERE booking_id = '${bookingId}';`)).toBe(capture.id);
+      expect(one(`SELECT capture_id FROM public.payments WHERE booking_id = '${bookingId}';`)).toBe(requiredValue(capture, "src/lib/booking/phone-confirmation.postgrest-integration.test.ts:292 capture").id);
       expect(mock.authorizations.get(authorizationOf(bookingId))?.status).toBe("CAPTURED");
 
       // Redelivery and a reconciliation run change nothing and never capture again.

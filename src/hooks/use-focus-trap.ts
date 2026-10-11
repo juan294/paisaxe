@@ -39,8 +39,9 @@ export function useFocusTrap(
     const focusFirstIfNeeded = () => {
       if (!container.contains(document.activeElement)) {
         const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-        if (focusable.length > 0) {
-          focusable[0].focus();
+        const first = focusable[0];
+        if (first) {
+          first.focus();
         }
       }
     };
@@ -58,10 +59,9 @@ export function useFocusTrap(
       if (e.key !== 'Tab') return;
 
       const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-      if (focusable.length === 0) return;
-
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
 
       // UX-H2: the listener is bound to `document` (not the container) so it
       // still fires when focus has escaped the trap entirely — e.g. a click

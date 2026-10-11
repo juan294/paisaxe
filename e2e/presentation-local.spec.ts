@@ -1,3 +1,4 @@
+import { requiredValue } from "../src/test/required-value";
 import { createHash, createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { test, expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
@@ -272,7 +273,7 @@ for (const kind of ['forged', 'expired'] as const) {
   test(`${kind} auth cookie and forged presentation hints remain anonymous-safe before and after hydration`, async ({ page, context }) => {
     const session = await passwordSession();
     const parts = session.access_token.split('.');
-    const claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    const claims = JSON.parse(Buffer.from(requiredValue(parts[1], 'local session JWT payload'), 'base64url').toString('utf8'));
     // GoTrue can issue ES256 user tokens while also accepting the local legacy
     // JWT secret used by the stack's anon/service keys. Prove that authenticator
     // accepts our HS256 signature before testing an expired token signed by it.
@@ -320,9 +321,9 @@ test('real form draft and SDK auth continuity, product SPA links/history, locale
   // The actual page-local dialog remains mounted while closed. Route departure
   // intentionally unmounts this form; cross-route draft persistence is not its contract.
   await page.locator('button[data-suggest-place-trigger]:visible').first().click();
-  const values = ['Phase7 local draft', 'Keep this unsubmitted note', 'Local visitor'];
-  const selectors = ['#place-name', '#comment', '#attribution'];
-  for (const [index, selector] of selectors.entries()) await page.locator(selector).fill(values[index]);
+  const fields = [['#place-name', 'Phase7 local draft'], ['#comment', 'Keep this unsubmitted note'], ['#attribution', 'Local visitor']] as const;
+  const selectors = fields.map(([selector]) => selector);
+  for (const [selector, value] of fields) await page.locator(selector).fill(value);
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByRole('group', { name: 'Language switcher', exact: true }).getByRole('button', { expanded: false }).click();
   await page.getByRole('option', { name: 'Français (FR)', exact: true }).click();
@@ -331,7 +332,7 @@ test('real form draft and SDK auth continuity, product SPA links/history, locale
   await page.locator('button[data-suggest-place-trigger]:visible').first().click();
   await expect(page.getByRole('dialog').getByRole('heading', { name: 'Suggérer un lieu', exact: true })).toBeVisible();
   const handles = await Promise.all(selectors.map(selector => page.locator(selector).elementHandle()));
-  for (const [index, selector] of selectors.entries()) await expect(page.locator(selector)).toHaveValue(values[index]);
+  for (const [selector, value] of fields) await expect(page.locator(selector)).toHaveValue(value);
   await page.addScriptTag({ content: presentationAuthClientSource(datastore, anonKey) });
   const login = await page.evaluate(async ({ email, password }) => window.__presentationAuthClient.login(email, password), { email, password });
   expect(login.error).toBeNull();
@@ -344,9 +345,11 @@ test('real form draft and SDK auth continuity, product SPA links/history, locale
   // The modal hides outside controls from the accessibility tree; require the
   // actual AuthProvider-driven name update before inspecting retained fields.
   await expect(page.getByRole('button', { name, exact: true, includeHidden: true })).toHaveCount(1);
-  for (const [index, selector] of selectors.entries()) {
-    expect(await handles[index]!.evaluate((node, query) => node.isConnected && node === document.querySelector(query), selector)).toBe(true);
-    await expect(page.locator(selector)).toHaveValue(values[index]);
+  for (const [index, [selector, value]] of fields.entries()) {
+    const handle = requiredValue(handles[index], `form control ${selector}`);
+    if (!handle) throw new Error(`Form control ${selector} is not mounted`);
+    expect(await handle.evaluate((node, query) => node.isConnected && node === document.querySelector(query), selector)).toBe(true);
+    await expect(page.locator(selector)).toHaveValue(value);
   }
   await page.getByRole('button', { name: 'Annuler', exact: true }).click();
   await expect(page.getByRole('button', { name, exact: true })).toBeVisible();

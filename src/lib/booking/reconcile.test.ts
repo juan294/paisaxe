@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * reconcileBookings against the scripted Supabase fake. The capture path,
@@ -183,7 +184,7 @@ function updatesTo(table: string): unknown[] {
     .mocked(fake.client.from)
     .mock.calls.map(([name], index) => [name, vi.mocked(fake.client.from).mock.results[index]?.value as FakeQuery | undefined] as const)
     .filter(([name, query]) => name === table && query && query.update.mock.calls.length > 0)
-    .map(([, query]) => (query as FakeQuery).update.mock.calls[0][0]);
+    .map(([, query]) => requiredValue((query as FakeQuery).update.mock.calls[0], "src/lib/booking/reconcile.test.ts:186 (query as FakeQuery).update.mock.calls[0]")[0]);
 }
 
 const attentionLogs = () => logger.error.mock.calls.filter(([tag]) => tag === "[CRON_RECONCILE_ATTENTION]");
@@ -206,8 +207,8 @@ describe("reconcileBookings: the run", () => {
     await expect(reconcileBookings(fake.client)).resolves.toEqual(ZERO);
 
     expect(fake.rpc).toHaveBeenCalledWith("expire_holds");
-    expect(fake.rpc.mock.invocationCallOrder[0]).toBeLessThan(drafts.abandonStaleDrafts.mock.invocationCallOrder[0]);
-    expect(drafts.abandonStaleDrafts.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(fake.client.from).mock.invocationCallOrder[0]);
+    expect(fake.rpc.mock.invocationCallOrder[0]).toBeLessThan(requiredValue(drafts.abandonStaleDrafts.mock.invocationCallOrder[0], "src/lib/booking/reconcile.test.ts:209 drafts.abandonStaleDrafts.mock.invocationCallOrder[0]"));
+    expect(drafts.abandonStaleDrafts.mock.invocationCallOrder[0]).toBeLessThan(requiredValue(vi.mocked(fake.client.from).mock.invocationCallOrder[0], "src/lib/booking/reconcile.test.ts:210 vi.mocked(fake.client.from).mock.invocationCallOrder[0]"));
     expect(drafts.abandonStaleDrafts).toHaveBeenCalledWith(fake.client);
     expect(tablesQueried()).toEqual(["paypal_webhook_events", "payments", "payments", "payments", "payments", "payments", "bookings", "bookings"]);
     expect(logger.error).not.toHaveBeenCalled();
@@ -410,8 +411,8 @@ describe("step 3: open orders", () => {
     const summary = await reconcileBookings(fake.client);
 
     expect(summary).toEqual(ZERO);
-    expect(writes[0].select).toHaveBeenCalledWith("expires_at, consumed_at, released_at");
-    expect(writes[0].eq).toHaveBeenCalledWith("id", "hold-1");
+    expect(requiredValue(writes[0], "src/lib/booking/reconcile.test.ts:413 writes[0]").select).toHaveBeenCalledWith("expires_at, consumed_at, released_at");
+    expect(requiredValue(writes[0], "src/lib/booking/reconcile.test.ts:414 writes[0]").eq).toHaveBeenCalledWith("id", "hold-1");
     expect(updatesTo("payments")).toEqual([]);
     expect(updatesTo("bookings")).toEqual([]);
   });
@@ -427,12 +428,12 @@ describe("step 3: open orders", () => {
 
     expect(summary).toEqual({ ...ZERO, expired: 1 });
     const [, paymentGuard, bookingGuard] = writes;
-    expect(paymentGuard.update).toHaveBeenCalledWith({ status: "expired" });
-    expect(paymentGuard.eq).toHaveBeenCalledWith("id", "pay-101");
-    expect(paymentGuard.in).toHaveBeenCalledWith("status", ["created", "approved"]);
-    expect(bookingGuard.update).toHaveBeenCalledWith({ status: "expired" });
-    expect(bookingGuard.eq).toHaveBeenCalledWith("id", B1);
-    expect(bookingGuard.in).toHaveBeenCalledWith("status", ["pending_payment"]);
+    expect(requiredValue(paymentGuard, "src/lib/booking/reconcile.test.ts:431 paymentGuard").update).toHaveBeenCalledWith({ status: "expired" });
+    expect(requiredValue(paymentGuard, "src/lib/booking/reconcile.test.ts:432 paymentGuard").eq).toHaveBeenCalledWith("id", "pay-101");
+    expect(requiredValue(paymentGuard, "src/lib/booking/reconcile.test.ts:433 paymentGuard").in).toHaveBeenCalledWith("status", ["created", "approved"]);
+    expect(requiredValue(bookingGuard, "src/lib/booking/reconcile.test.ts:434 bookingGuard").update).toHaveBeenCalledWith({ status: "expired" });
+    expect(requiredValue(bookingGuard, "src/lib/booking/reconcile.test.ts:435 bookingGuard").eq).toHaveBeenCalledWith("id", B1);
+    expect(requiredValue(bookingGuard, "src/lib/booking/reconcile.test.ts:436 bookingGuard").in).toHaveBeenCalledWith("status", ["pending_payment"]);
   });
 
   it("does not expire the booking when another caller moved the payment first", async () => {
@@ -489,11 +490,11 @@ describe("step 4: capture_pending (R2-02)", () => {
     await reconcileBookings(fake.client);
 
     const [passWrite] = writes;
-    expect(passWrite.update).toHaveBeenCalledWith({ reconcile_passes: 2 });
-    expect(passWrite.eq).toHaveBeenCalledWith("id", "pay-101");
-    expect(passWrite.eq).toHaveBeenCalledWith("status", "capture_pending");
-    expect(passWrite.eq).toHaveBeenCalledWith("reconcile_passes", 1);
-    expect(passWrite.select).toHaveBeenCalledWith("id");
+    expect(requiredValue(passWrite, "src/lib/booking/reconcile.test.ts:493 passWrite").update).toHaveBeenCalledWith({ reconcile_passes: 2 });
+    expect(requiredValue(passWrite, "src/lib/booking/reconcile.test.ts:494 passWrite").eq).toHaveBeenCalledWith("id", "pay-101");
+    expect(requiredValue(passWrite, "src/lib/booking/reconcile.test.ts:495 passWrite").eq).toHaveBeenCalledWith("status", "capture_pending");
+    expect(requiredValue(passWrite, "src/lib/booking/reconcile.test.ts:496 passWrite").eq).toHaveBeenCalledWith("reconcile_passes", 1);
+    expect(requiredValue(passWrite, "src/lib/booking/reconcile.test.ts:497 passWrite").select).toHaveBeenCalledWith("id");
   });
 
   it("flags the booking on the third inconclusive pass, keeps the payment capture_pending, and logs the attention", async () => {
@@ -844,8 +845,8 @@ describe("step 4b: phone-confirmation authorizations (Phase 8b)", () => {
     const order = phone.reconcilePhoneAuthorizations.mock.invocationCallOrder[0];
     const fromCalls = vi.mocked(fake.client.from).mock.invocationCallOrder;
     // from() calls: inbox, open, pending, captured, refunds, cancels, stale
-    expect(order).toBeGreaterThan(fromCalls[2]);
-    expect(order).toBeLessThan(fromCalls[3]);
+    expect(order).toBeGreaterThan(requiredValue(fromCalls[2], "src/lib/booking/reconcile.test.ts:847 fromCalls[2]"));
+    expect(order).toBeLessThan(requiredValue(fromCalls[3], "src/lib/booking/reconcile.test.ts:848 fromCalls[3]"));
     expect(phone.reconcilePhoneAuthorizations).toHaveBeenCalledWith(fake.client, [B1], expect.any(Function));
   });
 

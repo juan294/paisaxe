@@ -833,6 +833,7 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
     const injectedIndex = injected.findIndex((entry) => entry.method === method && matches(entry.path, path));
     if (injectedIndex >= 0) {
       const [entry] = injected.splice(injectedIndex, 1);
+      if (!entry) throw new Error("paypal mock: selected injected response is missing");
       send(response, entry.status, entry.body ?? "", entry.headers);
       return;
     }
@@ -843,52 +844,52 @@ export async function startPaypalMock(options: PaypalMockOptions = {}): Promise<
       return;
     }
 
-    let match: RegExpMatchArray | null;
+    let resourceId: string | undefined;
     if (method === "POST" && path === "/v2/checkout/orders") return handleCreateOrder(request, body, response);
-    if (method === "GET" && (match = path.match(/^\/v2\/checkout\/orders\/([^/]+)$/))) {
-      const order = orders.get(match[1]);
+    if (method === "GET" && (resourceId = path.match(/^\/v2\/checkout\/orders\/([^/]+)$/)?.[1]) !== undefined) {
+      const order = orders.get(resourceId);
       if (!order) return sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
       return send(response, 200, orderWire(order));
     }
-    if (method === "POST" && (match = path.match(/^\/v2\/checkout\/orders\/([^/]+)\/capture$/))) {
-      return handleCapture(match[1], request, response);
+    if (method === "POST" && (resourceId = path.match(/^\/v2\/checkout\/orders\/([^/]+)\/capture$/)?.[1]) !== undefined) {
+      return handleCapture(resourceId, request, response);
     }
-    if (method === "POST" && (match = path.match(/^\/v2\/checkout\/orders\/([^/]+)\/authorize$/))) {
-      return handleAuthorize(match[1], request, response);
+    if (method === "POST" && (resourceId = path.match(/^\/v2\/checkout\/orders\/([^/]+)\/authorize$/)?.[1]) !== undefined) {
+      return handleAuthorize(resourceId, request, response);
     }
-    if (method === "GET" && (match = path.match(/^\/v2\/payments\/authorizations\/([^/]+)$/))) {
-      const authorization = authorizations.get(match[1]);
+    if (method === "GET" && (resourceId = path.match(/^\/v2\/payments\/authorizations\/([^/]+)$/)?.[1]) !== undefined) {
+      const authorization = authorizations.get(resourceId);
       if (!authorization) return sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
       return send(response, 200, authorizationWire(authorization));
     }
-    if (method === "POST" && (match = path.match(/^\/v2\/payments\/authorizations\/([^/]+)\/capture$/))) {
-      return handleCaptureAuthorization(match[1], request, response);
+    if (method === "POST" && (resourceId = path.match(/^\/v2\/payments\/authorizations\/([^/]+)\/capture$/)?.[1]) !== undefined) {
+      return handleCaptureAuthorization(resourceId, request, response);
     }
-    if (method === "POST" && (match = path.match(/^\/v2\/payments\/authorizations\/([^/]+)\/void$/))) {
-      return handleVoid(match[1], request, response);
+    if (method === "POST" && (resourceId = path.match(/^\/v2\/payments\/authorizations\/([^/]+)\/void$/)?.[1]) !== undefined) {
+      return handleVoid(resourceId, request, response);
     }
-    if (method === "GET" && (match = path.match(/^\/v2\/payments\/captures\/([^/]+)$/))) {
-      return handleGetCapture(match[1], response);
+    if (method === "GET" && (resourceId = path.match(/^\/v2\/payments\/captures\/([^/]+)$/)?.[1]) !== undefined) {
+      return handleGetCapture(resourceId, response);
     }
-    if (method === "POST" && (match = path.match(/^\/v2\/payments\/captures\/([^/]+)\/refund$/))) {
-      return handleRefund(match[1], request, body, response);
+    if (method === "POST" && (resourceId = path.match(/^\/v2\/payments\/captures\/([^/]+)\/refund$/)?.[1]) !== undefined) {
+      return handleRefund(resourceId, request, body, response);
     }
-    if (method === "GET" && (match = path.match(/^\/v2\/payments\/refunds\/([^/]+)$/))) {
-      return handleGetRefund(match[1], response);
+    if (method === "GET" && (resourceId = path.match(/^\/v2\/payments\/refunds\/([^/]+)$/)?.[1]) !== undefined) {
+      return handleGetRefund(resourceId, response);
     }
     if (method === "GET" && path === "/v1/reporting/transactions") return handleTransactionSearch(url, response);
     if (method === "POST" && path === "/v1/notifications/verify-webhook-signature") {
       return send(response, 200, { verification_status: verification });
     }
     if (method === "POST" && path === "/v2/invoicing/invoices") return handleCreateInvoice(request, body, response);
-    if (method === "POST" && (match = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)\/send$/))) {
-      return handleSendInvoice(match[1], request, response);
+    if (method === "POST" && (resourceId = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)\/send$/)?.[1]) !== undefined) {
+      return handleSendInvoice(resourceId, request, response);
     }
-    if (method === "POST" && (match = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)\/cancel$/))) {
-      return handleCancelInvoice(decodeURIComponent(match[1]), response);
+    if (method === "POST" && (resourceId = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)\/cancel$/)?.[1]) !== undefined) {
+      return handleCancelInvoice(decodeURIComponent(resourceId), response);
     }
-    if (method === "GET" && (match = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)$/))) {
-      const invoice = invoices.get(match[1]);
+    if (method === "GET" && (resourceId = path.match(/^\/v2\/invoicing\/invoices\/([^/]+)$/)?.[1]) !== undefined) {
+      const invoice = invoices.get(resourceId);
       if (!invoice) return sendError(response, 404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
       return send(response, 200, invoiceWire(invoice));
     }

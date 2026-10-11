@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -375,7 +376,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
     expect(dateInputs.length).toBeGreaterThanOrEqual(2);
 
     // Use fireEvent.change for date inputs to avoid invalid intermediate states
-    fireEvent.change(dateInputs[0], { target: { value: "2024-06-01" } });
+    fireEvent.change(requiredValue(dateInputs[0], "src/components/admin/elevenlabs-analytics-panel.test.tsx: dateInputs[0]"), { target: { value: "2024-06-01" } });
 
     expect(dateInputs[0]).toHaveValue("2024-06-01");
   });
@@ -393,7 +394,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
 
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/);
 
-    fireEvent.change(dateInputs[1], { target: { value: "2024-12-31" } });
+    fireEvent.change(requiredValue(dateInputs[1], "src/components/admin/elevenlabs-analytics-panel.test.tsx: dateInputs[1]"), { target: { value: "2024-12-31" } });
 
     expect(dateInputs[1]).toHaveValue("2024-12-31");
   });
@@ -511,7 +512,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
     });
 
     // The em dash separator between from/to date inputs
-    const dateContainer = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/)[0].closest("div")!;
+    const dateContainer = requiredValue(screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/)[0], "src/components/admin/elevenlabs-analytics-panel.test.tsx: screen.getAllByDisplayValue(/\\d{4}-\\d{2}-\\d{2}/)[0]").closest("div")!;
     const dashSpan = dateContainer.querySelector("span");
     expect(dashSpan).toBeInTheDocument();
     expect(dashSpan!.textContent).toBe("—");

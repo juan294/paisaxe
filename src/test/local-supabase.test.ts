@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { execFileSync, spawn } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,7 +33,7 @@ describe("task-owned native SQL fixtures", () => {
     execute.mockReturnValue("DO\nINSERT 0 1\n");
     expect((await helper())("INSERT INTO fixture VALUES (1);")).toBe("INSERT 0 1");
     expect(execute).toHaveBeenCalledTimes(1);
-    const [binary, args, options] = execute.mock.calls[0];
+    const [binary, args, options] = requiredValue(execute.mock.calls[0], "src/test/local-supabase.test.ts:35 execute.mock.calls[0]");
     expect(binary).toBe("psql");
     expect(args).toEqual(expect.arrayContaining(["-X", "-w", "ON_ERROR_STOP=1", "127.0.0.1", "55432", "postgres"]));
     const commands = (args as string[]).flatMap((arg, index, all) => arg === "-c" ? [all[index + 1]] : []);
@@ -58,7 +59,7 @@ describe("task-owned native SQL fixtures", () => {
     const { spawnLocalPsql } = await import("./local-supabase");
     expect(spawnLocalPsql(sql)).toBe(session);
     expect(startSession).toHaveBeenCalledTimes(1);
-    const [binary, args, options] = startSession.mock.calls[0];
+    const [binary, args, options] = requiredValue(startSession.mock.calls[0], "src/test/local-supabase.test.ts:61 startSession.mock.calls[0]");
     expect(binary).toBe("psql");
     expect(args).toEqual(expect.arrayContaining(["-X", "-w", "ON_ERROR_STOP=1"]));
     const commands = (args as string[]).flatMap((arg, index, all) => arg === "-c" ? [all[index + 1]] : []);
@@ -76,8 +77,8 @@ describe("task-owned native SQL fixtures", () => {
     vi.stubEnv("SUPABASE_LOCAL_DB_MARKER", undefined);
     const { spawnLocalPsql } = await import("./local-supabase");
     spawnLocalPsql();
-    expect(startSession.mock.calls[0][0]).toBe("docker");
-    expect(startSession.mock.calls[0][1]).toEqual(expect.arrayContaining(["exec", "-i", container, "psql", "ON_ERROR_STOP=1"]));
+    expect(requiredValue(startSession.mock.calls[0], "src/test/local-supabase.test.ts:79 startSession.mock.calls[0]")[0]).toBe("docker");
+    expect(requiredValue(startSession.mock.calls[0], "src/test/local-supabase.test.ts:80 startSession.mock.calls[0]")[1]).toEqual(expect.arrayContaining(["exec", "-i", container, "psql", "ON_ERROR_STOP=1"]));
   });
 
   it.each([
@@ -123,7 +124,7 @@ describe("task-owned native SQL fixtures", () => {
     for (const name of ["PGHOSTADDR", "PGSERVICE", "PGSERVICEFILE", "PGOPTIONS", "PGPASSFILE", "PSQLRC", "PGDATABASE", "PGPORT", "PGUSER"]) vi.stubEnv(name, "remote-canary");
     execute.mockReturnValue("DO\n1\n");
     expect((await helper())("SELECT 1;")).toBe("1");
-    const options = execute.mock.calls[0][2] as { env: Record<string, string> };
+    const options = requiredValue(execute.mock.calls[0], "src/test/local-supabase.test.ts:126 execute.mock.calls[0]")[2] as { env: Record<string, string> };
     expect(Object.values(options.env)).not.toContain("remote-canary");
   });
 
@@ -140,7 +141,7 @@ describe("task-owned native SQL fixtures", () => {
     const psql = await helper();
     expect(() => psql("SELECT 'caller-sql';")).toThrow(failure);
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[0][0]).toBe("psql");
+    expect(requiredValue(execute.mock.calls[0], "src/test/local-supabase.test.ts:143 execute.mock.calls[0]")[0]).toBe("psql");
   });
 
   it("keeps the existing Docker path when native SQL is not opted in", async () => {

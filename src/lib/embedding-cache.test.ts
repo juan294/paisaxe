@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createHash } from "crypto";
 
@@ -127,8 +128,8 @@ describe("EmbeddingCache (Redis-backed)", () => {
     await cacheOldModel.get("same query text");
     await cacheNewModel.get("same query text");
 
-    const [oldKey] = mockRedisGet.mock.calls[0];
-    const [newKey] = mockRedisGet.mock.calls[1];
+    const [oldKey] = requiredValue(mockRedisGet.mock.calls[0], "src/lib/embedding-cache.test.ts:131 mock call tuple");
+    const [newKey] = requiredValue(mockRedisGet.mock.calls[1], "src/lib/embedding-cache.test.ts:132 mock call tuple");
     expect(newKey).not.toBe(oldKey);
   });
 
@@ -144,8 +145,8 @@ describe("EmbeddingCache (Redis-backed)", () => {
     await cacheOldDims.get("same query text");
     await cacheNewDims.get("same query text");
 
-    const [oldKey] = mockRedisGet.mock.calls[0];
-    const [newKey] = mockRedisGet.mock.calls[1];
+    const [oldKey] = requiredValue(mockRedisGet.mock.calls[0], "src/lib/embedding-cache.test.ts:148 mock call tuple");
+    const [newKey] = requiredValue(mockRedisGet.mock.calls[1], "src/lib/embedding-cache.test.ts:149 mock call tuple");
     expect(newKey).not.toBe(oldKey);
   });
 
@@ -305,7 +306,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     await cache.get("text B");
 
     const calls = mockRedisGet.mock.calls;
-    expect(calls[0][0]).not.toBe(calls[1][0]);
+    expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:308 calls[0]")[0]).not.toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:308 calls[1]")[0]);
   });
 
   it("same text always produces the same Redis key (deterministic hash)", async () => {
@@ -316,7 +317,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
     await cache.get("repeated text");
 
     const calls = mockRedisGet.mock.calls;
-    expect(calls[0][0]).toBe(calls[1][0]);
+    expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:319 calls[0]")[0]).toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:319 calls[1]")[0]);
   });
 
   // ── PE-L5 (#819): normalize query text before hashing ─────────────────────
@@ -329,8 +330,8 @@ describe("EmbeddingCache (Redis-backed)", () => {
       await cache.get("  Oviedo  ");
 
       const calls = mockRedisGet.mock.calls;
-      expect(calls[0][0]).toBe(calls[1][0]);
-      expect(calls[0][0]).toBe(redisKey("Oviedo"));
+      expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:332 calls[0]")[0]).toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:332 calls[1]")[0]);
+      expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:333 calls[0]")[0]).toBe(redisKey("Oviedo"));
     });
 
     it("collapses internal whitespace runs before hashing", async () => {
@@ -341,7 +342,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
       await cache.get("best restaurants in Asturias");
 
       const calls = mockRedisGet.mock.calls;
-      expect(calls[0][0]).toBe(calls[1][0]);
+      expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:344 calls[0]")[0]).toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:344 calls[1]")[0]);
     });
 
     it("does NOT fold case — embeddings are case-sensitive, so 'Oviedo' and 'oviedo' must stay distinct entries", async () => {
@@ -352,7 +353,7 @@ describe("EmbeddingCache (Redis-backed)", () => {
       await cache.get("oviedo");
 
       const calls = mockRedisGet.mock.calls;
-      expect(calls[0][0]).not.toBe(calls[1][0]);
+      expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:355 calls[0]")[0]).not.toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:355 calls[1]")[0]);
     });
 
     it("exports normalizeQueryText for reuse by other cache keys (e.g. SearchResultCache)", async () => {
@@ -440,7 +441,7 @@ describe("SearchResultCache (Redis-backed)", () => {
     await cache.get("Oviedo", 5);
 
     const calls = mockRedisGet.mock.calls;
-    expect(calls[0][0]).not.toBe(calls[1][0]);
+    expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:443 calls[0]")[0]).not.toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:443 calls[1]")[0]);
   });
 
   it("normalizes whitespace before hashing, consistent with the embedding cache", async () => {
@@ -451,7 +452,7 @@ describe("SearchResultCache (Redis-backed)", () => {
     await cache.get("Oviedo", 3);
 
     const calls = mockRedisGet.mock.calls;
-    expect(calls[0][0]).toBe(calls[1][0]);
+    expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:454 calls[0]")[0]).toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:454 calls[1]")[0]);
   });
 
   it("skips Redis calls when cache env vars are missing", async () => {

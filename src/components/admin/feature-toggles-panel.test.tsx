@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -114,7 +115,7 @@ describe("FeatureTogglesPanel", () => {
       error: undefined,
     });
     vi.mocked(updateFeatureFlag).mockResolvedValue({
-      data: mockFlags[0],
+      data: requiredValue(mockFlags[0], "src/components/admin/feature-toggles-panel.test.tsx: mockFlags[0]"),
       error: undefined,
     });
   });
@@ -488,7 +489,7 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       // Flag with null description
       const flagsWithNullDesc = [
-        { ...mockFlags[0], description: null },
+        { ...requiredValue(mockFlags[0], "src/components/admin/feature-toggles-panel.test.tsx: mockFlags[0]"), description: null },
         ...mockFlags.slice(1),
       ];
       vi.mocked(fetchFeatureFlags).mockResolvedValue({
@@ -699,7 +700,7 @@ describe("FeatureTogglesPanel", () => {
   });
   it("preserves focused filtering and flag state through failed toggle and successful retry", async () => {
     const user = userEvent.setup();
-    vi.mocked(updateFeatureFlag).mockResolvedValueOnce({ error: "Retry toggle" }).mockResolvedValueOnce({ data: { ...mockFlags[0], enabled: false } });
+    vi.mocked(updateFeatureFlag).mockResolvedValueOnce({ error: "Retry toggle" }).mockResolvedValueOnce({ data: { ...requiredValue(mockFlags[0], "src/components/admin/feature-toggles-panel.test.tsx: mockFlags[0]"), enabled: false } });
     render(<FeatureTogglesPanel />);
     const search = await screen.findByPlaceholderText(/search/i);
     await user.type(search, "contextual");

@@ -18,7 +18,7 @@ if (typeof window !== "undefined" && global.localStorage === undefined) {
   let _store: Record<string, string> = {};
   const _mockStorage: Storage = {
     getItem: (key: string) =>
-      Object.prototype.hasOwnProperty.call(_store, key) ? _store[key] : null,
+      Object.prototype.hasOwnProperty.call(_store, key) ? (_store[key] ?? null) : null,
     setItem: (key: string, value: string) => {
       _store[key] = String(value);
     },

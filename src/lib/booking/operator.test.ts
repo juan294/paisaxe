@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -274,7 +275,7 @@ describe("loadOperatorView null fields", () => {
 
     const view = await loadOperatorView(fake.client, access, NOW);
 
-    expect(view.bookings[0].payment).toEqual({ status: "created", orderId: null, captureId: null, refundId: null, capturedAt: null });
+    expect(requiredValue(view.bookings[0], "src/lib/booking/operator.test.ts:277 view.bookings[0]").payment).toEqual({ status: "created", orderId: null, captureId: null, refundId: null, capturedAt: null });
     expect(view.holds[0]).toMatchObject({ reference: null, experienceTitle: "" });
   });
 

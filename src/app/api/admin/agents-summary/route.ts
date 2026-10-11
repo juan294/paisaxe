@@ -52,7 +52,7 @@ function parseHealth(content: string): AgentHealthStatus {
 
   // Pattern 1: "Health Status: GREEN/YELLOW/RED" (with optional markdown heading)
   const healthLine = normalized.match(/health\s*status\s*:\s*(green|yellow|red)/i);
-  if (healthLine) {
+  if (healthLine?.[1] !== undefined) {
     return healthLine[1].toLowerCase() as AgentHealthStatus;
   }
 
@@ -93,14 +93,14 @@ function parseHealth(content: string): AgentHealthStatus {
 function parseHealthSummary(content: string): string {
   // Try executive summary first
   const execMatch = content.match(/##\s*Executive\s*Summary\s*\n+(.+)/i);
-  if (execMatch) {
+  if (execMatch?.[1] !== undefined) {
     return extractFirstSentence(execMatch[1]);
   }
 
   // Try line right after health status (strip emojis so \w+ can match the status word)
   const stripped = content.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, "");
   const afterHealth = stripped.match(/health\s*status\s*:\s*\w+[^\n]*\n+(.+)/i);
-  if (afterHealth) {
+  if (afterHealth?.[1] !== undefined) {
     const clean = afterHealth[1].replace(/\*+/g, "").replace(/^[-#>\s]+/, "").trim();
     if (clean.length > 5) {
       return extractFirstSentence(clean);
@@ -109,13 +109,13 @@ function parseHealthSummary(content: string): string {
 
   // Try summary section
   const summaryMatch = content.match(/##\s*Summary\s*\n+(.+)/i);
-  if (summaryMatch) {
+  if (summaryMatch?.[1] !== undefined) {
     return extractFirstSentence(summaryMatch[1]);
   }
 
   // Fallback: first non-empty paragraph after any ## heading that isn't a table or code
   const fallback = content.match(/^##\s+.+\n+(?:>[^\n]*\n+)?([^#|`\n][^\n]{10,})/m);
-  if (fallback) {
+  if (fallback?.[1] !== undefined) {
     return extractFirstSentence(fallback[1]);
   }
 
@@ -124,7 +124,7 @@ function parseHealthSummary(content: string): string {
 
 function extractFirstSentence(raw: string): string {
   const clean = raw.replace(/\*+/g, "").replace(/^[-|>\s]+/, "").trim();
-  const firstSentence = clean.split(/\.\s/)[0];
+  const firstSentence = clean.split(/\.\s/)[0] ?? "";
   if (firstSentence.length > 120) return firstSentence.slice(0, 117) + "...";
   return firstSentence.endsWith(".") ? firstSentence : firstSentence + ".";
 }
@@ -139,9 +139,9 @@ function parseSharedContext(content: string): SharedContextEntry[] {
 
   let match;
   while ((match = entryRegex.exec(content)) !== null) {
-    const agentFlag = match[1];
-    const timestamp = match[2];
-    let entryContent = match[3].replace(/<!--\s*ENTRY:END\s*-->/g, "").trim();
+    const [, agentFlag, timestamp, body] = match;
+    if (agentFlag === undefined || timestamp === undefined || body === undefined) continue;
+    let entryContent = body.replace(/<!--\s*ENTRY:END\s*-->/g, "").trim();
 
     // Clean up the content — remove trailing markers
     entryContent = entryContent.replace(/<!--[^>]*-->/g, "").trim();

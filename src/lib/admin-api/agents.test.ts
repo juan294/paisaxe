@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   fetchAgentsSummary,
@@ -37,7 +38,7 @@ describe("admin-api/agents", () => {
       const result = await fetchAgentsSummary();
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/agents.test.ts:40 mock call tuple");
       expect(String(url)).toBe("/api/admin/agents-summary");
       expect(result).toEqual({ data: { agents: [] } });
     });
@@ -87,7 +88,7 @@ describe("admin-api/agents", () => {
       const result = await triggerAgentRun("xander");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/agents.test.ts:90 mock call tuple");
       expect(String(url)).toBe("/api/admin/agents/run");
       expect(init.method).toBe("POST");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -140,7 +141,7 @@ describe("admin-api/agents", () => {
       const result = await fetchRunningAgents();
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/agents.test.ts:143 mock call tuple");
       expect(String(url)).toBe("/api/admin/agents/run");
       expect(result).toEqual({ data: responseData });
     });
@@ -190,7 +191,7 @@ describe("admin-api/agents", () => {
       const result = await stopAgent("xander");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/agents.test.ts:193 mock call tuple");
       expect(String(url)).toBe("/api/admin/agents/run");
       expect(init.method).toBe("DELETE");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -243,7 +244,7 @@ describe("admin-api/agents", () => {
       const result = await fetchAgentLogs("xander");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/agents.test.ts:246 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("agentKey")).toBe("xander");
       expect(result).toEqual({ data: responseData });
@@ -256,7 +257,7 @@ describe("admin-api/agents", () => {
 
       await fetchAgentLogs("xander", 12345);
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/agents.test.ts:259 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("agentKey")).toBe("xander");
       expect(parsedUrl.searchParams.get("since")).toBe("12345");
@@ -267,7 +268,7 @@ describe("admin-api/agents", () => {
 
       await fetchAgentLogs("xander");
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/agents.test.ts:270 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.has("since")).toBe(false);
     });

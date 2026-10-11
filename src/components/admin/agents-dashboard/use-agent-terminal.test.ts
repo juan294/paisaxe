@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAgentTerminal } from "./use-agent-terminal";
@@ -165,7 +166,7 @@ describe("useAgentTerminal", () => {
       });
 
       expect(result.current.terminalLogs).toHaveLength(2);
-      expect(result.current.terminalLogs[1].text).toBe("Line 2");
+      expect(requiredValue(result.current.terminalLogs[1], "src/components/admin/agents-dashboard/use-agent-terminal.test.ts: result.current.terminalLogs[1]").text).toBe("Line 2");
     });
 
     it("skips appending when no new logs", async () => {

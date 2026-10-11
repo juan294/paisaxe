@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { PATCH } from "./route";
@@ -383,7 +384,7 @@ describe("PATCH /api/admin/stories/[id]", () => {
     expect(response.status).toBe(200);
 
     // Verify update was called — the data passed should have null values
-    const updateCall = mockUpdate.mock.calls[0][0];
+    const updateCall = requiredValue(mockUpdate.mock.calls[0], "src/app/api/admin/stories/[id]/route.test.ts:386 mockUpdate.mock.calls[0]")[0];
     expect(updateCall.subtitle).toBeNull();
     expect(updateCall.description).toBeNull();
     expect(updateCall.source_pdf).toBeNull();

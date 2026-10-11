@@ -360,6 +360,10 @@ export async function runDiscovery(deps: {
 
   // 2. Pick a random query for variety
   const query = DISCOVERY_QUERIES[Math.floor(Math.random() * DISCOVERY_QUERIES.length)];
+  if (query === undefined) {
+    result.errors.push("No discovery queries available");
+    return result;
+  }
 
   // 3. Search Google Places
   let places: PlaceResult[];

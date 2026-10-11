@@ -282,7 +282,7 @@ Generate up to ${maxStories} stories. Return ONLY valid JSON, no explanations.`;
       console.log(formatUsageLine(pdfName, attempt, response.usage));
 
       const content = response.content[0];
-      if (content.type !== "text") {
+      if (!content || content.type !== "text") {
         throw new Error("Unexpected response type");
       }
 

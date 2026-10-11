@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   encrypt,
@@ -74,7 +75,7 @@ describe("encryption", () => {
 
       // Tamper with the ciphertext
       const buffer = Buffer.from(encrypted, "base64");
-      buffer[buffer.length - 1] ^= 0xff; // Flip bits in last byte
+      buffer[buffer.length - 1] = requiredValue(buffer[buffer.length - 1], "ciphertext final byte") ^ 0xff; // Flip bits in last byte
       const tampered = buffer.toString("base64");
 
       expect(() => decrypt(tampered)).toThrow();

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock @supabase/ssr before importing the module
@@ -43,7 +44,7 @@ describe("supabase-browser", () => {
 
     createSupabaseBrowserClient();
 
-    const [url] = vi.mocked(createBrowserClient).mock.calls[0];
+    const [url] = requiredValue(vi.mocked(createBrowserClient).mock.calls[0], "src/lib/supabase-browser.test.ts:46 vi.mocked(createBrowserClient).mock.calls[0]");
     expect(url).toBe("https://test.supabase.co");
     expect(url).not.toMatch(/\n/);
   });
@@ -57,7 +58,7 @@ describe("supabase-browser", () => {
 
     createSupabaseBrowserClient();
 
-    const [, anonKey] = vi.mocked(createBrowserClient).mock.calls[0];
+    const [, anonKey] = requiredValue(vi.mocked(createBrowserClient).mock.calls[0], "src/lib/supabase-browser.test.ts:61 vi.mocked(createBrowserClient).mock.calls[0]");
     expect(anonKey).toBe("test-anon-key");
   });
 

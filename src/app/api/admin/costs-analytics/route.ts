@@ -59,8 +59,8 @@ export async function GET(request: NextRequest) {
       const now = new Date();
       const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1)
         .toISOString()
-        .split("T")[0];
-      const defaultTo = now.toISOString().split("T")[0];
+        .replace(/T.*$/, "");
+      const defaultTo = now.toISOString().replace(/T.*$/, "");
 
       const fromParam = url.searchParams.get("from") || defaultFrom;
       const toParam = url.searchParams.get("to") || defaultTo;
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
         d <= endDate;
         d.setDate(d.getDate() + 1)
       ) {
-        const dateKey = d.toISOString().split("T")[0];
+        const dateKey = d.toISOString().replace(/T.*$/, "");
         costsByDayMap.set(dateKey, 0);
       }
 

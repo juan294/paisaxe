@@ -447,7 +447,7 @@ function LedgerSummary({ view, ledger, onCheck }: { view: OperatorView; ledger: 
     text = "La comprobación con PayPal no está disponible ahora.";
     action = "Reintentar";
   } else if (result?.state === "ok") {
-    const matched = view.bookings.map((booking) => result.bookings[booking.id]).filter((match) => match && match !== "not_applicable");
+    const matched = view.bookings.map((booking) => result.bookings[booking.id]).filter((match): match is LedgerMatch => Boolean(match) && match !== "not_applicable");
     const confirmed = matched.filter((match) => CONFIRMED.has(match));
     text = `PayPal confirma ${confirmed.length} de ${matched.length} depósitos`;
     if (result.refreshedAt) {

@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
 import { LOCALE_COVERAGE } from "@/lib/i18n/locale-coverage.generated";
 export { LOCALE_COVERAGE };
 
-const ALL_LANGUAGES: { code: Locale; label: string; fullName: string }[] = [
+type Language = { code: Locale; label: string; fullName: string };
+const ALL_LANGUAGES: [Language, ...Language[]] = [
   { code: "es", label: "ES", fullName: "Espa\u00f1ol (ES)" },
   { code: "ast", label: "AST", fullName: "Asturianu (AST)" },
   { code: "en", label: "EN", fullName: "English (EN)" },
@@ -108,21 +109,22 @@ export function LanguageSwitcher() {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       const next = currentIndex < options.length - 1 ? currentIndex + 1 : 0;
-      options[next].focus();
+      options[next]?.focus();
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       const prev = currentIndex > 0 ? currentIndex - 1 : options.length - 1;
-      options[prev].focus();
+      options[prev]?.focus();
     } else if (event.key === "Home") {
       event.preventDefault();
-      options[0].focus();
+      options[0]?.focus();
     } else if (event.key === "End") {
       event.preventDefault();
-      options[options.length - 1].focus();
+      options[options.length - 1]?.focus();
     } else if (event.key === "Enter") {
       event.preventDefault();
-      if (currentIndex >= 0) {
-        handleLanguageSelect(languages[currentIndex].code);
+      const language = languages[currentIndex];
+      if (language) {
+        handleLanguageSelect(language.code);
       }
     }
   }, [handleLanguageSelect, languages]);

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Transaction Search against the local PayPal stand-in (APIMatic plan, Phase 2).
@@ -60,7 +61,7 @@ describe("searchTransactions", () => {
     await searchTransactions(start, end);
 
     const [request] = mock.requestsTo("GET", SEARCH_PATH);
-    expect(Object.fromEntries(request.query)).toEqual({
+    expect(Object.fromEntries(requiredValue(request, "src/lib/paypal/transactions.test.ts:63 request").query)).toEqual({
       start_date: "2026-09-10T08:30:15Z",
       end_date: "2026-10-08T08:30:16Z",
       fields: "transaction_info",

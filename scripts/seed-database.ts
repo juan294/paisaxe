@@ -373,11 +373,12 @@ async function generateContextualizedEmbeddingsWithRetry(
       });
 
       // voyageai 0.4.x ExtendedClient returns { results: [{ embeddings: number[][] }], totalTokens }
-      if (!result.results || result.results.length === 0 || !result.results[0].embeddings) {
+      const firstResult = result.results?.[0];
+      if (!firstResult?.embeddings) {
         throw new Error(`No contextualized embeddings returned for ${sourcePdf}`);
       }
 
-      const chunkEmbeddings = result.results[0].embeddings.map((embedding) => ({ embedding }));
+      const chunkEmbeddings = firstResult.embeddings.map((embedding) => ({ embedding }));
       return {
         data: chunkEmbeddings,
         totalTokens: result.totalTokens || 0,
@@ -540,12 +541,14 @@ async function seedChunks(): Promise<void> {
 
       // Prepare records for database
       const records = groupChunks.map((chunk, idx) => {
+        const embedding = result.data[idx];
+        if (!embedding) throw new Error(`Embedding count mismatch for ${sourcePdf}: missing chunk ${idx}`);
         const refsKey = `${chunk.sourcePdf}:${chunk.pageNumber}`;
         const refs = imageRefsMap[refsKey] || [];
         if (refs.length > 0) chunksWithImages++;
         return {
           content: chunk.content,
-          embedding: result.data[idx].embedding,
+          embedding: embedding.embedding,
           source_pdf: chunk.sourcePdf,
           page_number: chunk.pageNumber,
           section_title: chunk.sectionTitle || null,

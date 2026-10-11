@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { ChatActions } from "./chat-actions";
@@ -70,7 +71,7 @@ describe("ChatActions", () => {
       });
 
       // Should include both user and assistant messages
-      const clipboardContent = mockClipboard.writeText.mock.calls[0][0];
+      const clipboardContent = requiredValue(requiredValue(mockClipboard.writeText.mock.calls[0], "src/components/immersive/chat-actions.test.tsx: mockClipboard.writeText.mock.calls[0]")[0], "src/components/immersive/chat-actions.test.tsx: mockClipboard.writeText.mock.calls[0][0]");
       expect(clipboardContent).toContain("What is the phone number?");
       expect(clipboardContent).toContain("The number is 985 123 456.");
     });

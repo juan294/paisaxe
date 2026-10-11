@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock rate-limit module
@@ -50,7 +51,7 @@ describe("/api/mcp/weather", () => {
     const recovered = await handler(makeRequest());
     expect(recovered.status).toBe(200);
     expect(recovered.headers.get("Cache-Control")).toBe("private, max-age=300");
-    expect(mockFetch.mock.calls[0][0]).toContain("appid=corrected-key&");
+    expect(requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/weather/route.test.ts:53 mockFetch.mock.calls[0]")[0]).toContain("appid=corrected-key&");
   });
 
   describe("GET", () => {
@@ -639,7 +640,7 @@ describe("/api/mcp/weather", () => {
       await GET(request);
 
       // Should use coordinates endpoint, not city name search
-      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      const fetchUrl = requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/weather/route.test.ts:642 mockFetch.mock.calls[0]")[0] as string;
       expect(fetchUrl).toContain("lat=43.3619");
       expect(fetchUrl).toContain("lon=-5.8494");
       expect(fetchUrl).not.toContain("q=oviedo");
@@ -763,7 +764,7 @@ describe("/api/mcp/weather", () => {
       );
       await GET(request);
 
-      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      const fetchUrl = requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/weather/route.test.ts:766 mockFetch.mock.calls[0]")[0] as string;
       expect(fetchUrl).toContain("q=Santander");
       expect(fetchUrl).toContain(",ES");
       expect(fetchUrl).not.toContain("lat=");

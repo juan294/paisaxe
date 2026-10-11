@@ -84,9 +84,13 @@ export async function collectJourneyRun(options: JourneyOptions): Promise<Journe
     // Do not retain unbounded lines or a potentially truncated credential.
     if (pendingLine.length > 16_384) { appendLine("[Oversized diagnostic line omitted]\n"); pendingLine = ""; discardLine = true; }
   };
-  const launch = (command: string[]) => spawn(command[0], command.slice(1), {
-    env, detached: true, stdio: ["ignore", "pipe", "pipe"],
-  });
+  const launch = (command: string[]) => {
+    const executable = command[0];
+    if (!executable) throw new Error("Journey command requires a nonempty executable");
+    return spawn(executable, command.slice(1), {
+      env, detached: true, stdio: ["ignore", "pipe", "pipe"],
+    });
+  };
   const result: JourneyResult = {
     status: "disabled", passed: 0, failed: 0, flaky: 0, skipped: 0, failures: 1,
     exitCode: null, target: options.target, identity: { ...options.identity }, logPath, reportPath,
@@ -118,14 +122,15 @@ export async function collectJourneyRun(options: JourneyOptions): Promise<Journe
     if (!await probe()) {
       if (!options.startCommand) throw new Error("Configured journey server is not ready.");
       checkInterrupted();
-      server = launch(options.startCommand);
-      server.stdout?.on("data", capture);
-      server.stderr?.on("data", capture);
+      const startedServer = launch(options.startCommand);
+      server = startedServer;
+      startedServer.stdout?.on("data", capture);
+      startedServer.stderr?.on("data", capture);
       let startupError: Error | undefined;
-      server.on("error", error => { startupError = error; });
+      startedServer.on("error", error => { startupError = error; });
       const deadline = Date.now() + (options.startupTimeoutMs ?? 240_000);
       while (!await probe()) {
-        if (interrupted || startupError || server.exitCode !== null || Date.now() >= deadline) {
+        if (interrupted || startupError || startedServer.exitCode !== null || Date.now() >= deadline) {
           throw startupError ?? new Error("Journey build/server failed or startup timeout expired.");
         }
         await delay(50);
@@ -150,7 +155,7 @@ export async function collectJourneyRun(options: JourneyOptions): Promise<Journe
         throw new Error("Production build stamp does not match the candidate; rebuild the artifact.");
       }
       const html = await (await fetch(new URL("/immersive", url), { signal: AbortSignal.timeout(15_000) })).text();
-      const assets = [...new Set([...html.matchAll(/src="(\/_next\/static\/[A-Za-z0-9_./%-]+\.js)"/g)].map(match => match[1]))];
+      const assets = [...new Set([...html.matchAll(/src="(\/_next\/static\/[A-Za-z0-9_./%-]+\.js)"/g)].flatMap(match => match[1] === undefined ? [] : [match[1]]))];
       if (!assets.length) throw new Error("Candidate artifact has no verifiable served client bundle.");
       for (const asset of assets) {
         checkInterrupted();
@@ -164,12 +169,13 @@ export async function collectJourneyRun(options: JourneyOptions): Promise<Journe
     checkInterrupted();
     result.status = "invalid_report";
     result.action = `Inspect ${reportPath} and ${logPath}; correct the JSON reporter/selection and rerun real non-skipped tests.`;
-    testProcess = launch(options.command);
-    testProcess.stdout?.on("data", capture);
-    testProcess.stderr?.on("data", capture);
+    const launchedTests = launch(options.command);
+    testProcess = launchedTests;
+    launchedTests.stdout?.on("data", capture);
+    launchedTests.stderr?.on("data", capture);
     result.exitCode = await new Promise<number | null>((resolve, reject) => {
-      testProcess!.once("error", reject);
-      testProcess!.once("close", code => resolve(code));
+      launchedTests.once("error", reject);
+      launchedTests.once("close", code => resolve(code));
     });
     checkInterrupted();
     const report = JSON.parse(readFileSync(reportPath, "utf8")) as PlaywrightJsonReport;

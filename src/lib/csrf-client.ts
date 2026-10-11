@@ -10,7 +10,7 @@ export function getCsrfToken(): string | null {
   if (typeof document === "undefined") return null;
   const cookies = document.cookie.split(";");
   for (const cookie of cookies) {
-    const [name, ...rest] = cookie.split("=");
+    const [name = "", ...rest] = cookie.split("=");
     if (name.trim() === CSRF_COOKIE_NAME) {
       return rest.join("=").trim() || null;
     }

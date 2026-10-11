@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -26,7 +27,7 @@ function sourceFiles(dir: string): string[] {
 describe("brand colors (#1011)", () => {
   it("defines the paisaxe green scale and nothing unused", () => {
     expect(Object.keys(paisaxe)).toEqual(["green"]);
-    expect(Object.keys(paisaxe.green).sort()).toEqual([...SHADES]);
+    expect(Object.keys(requiredValue(paisaxe.green, "src/lib/brand-colors.test.ts:30 paisaxe")).sort()).toEqual([...SHADES]);
   });
 
   it("keeps each shade identical to the Tailwind green it replaced", () => {
@@ -35,7 +36,7 @@ describe("brand colors (#1011)", () => {
     for (const shade of SHADES) {
       const match = theme.match(new RegExp(`--color-green-${shade}:\\s*([^;]+);`));
       expect(match, `green-${shade} in tailwindcss/theme.css`).not.toBeNull();
-      expect(paisaxe.green[shade]).toBe(match![1].trim());
+      expect(requiredValue(requiredValue(paisaxe.green, "src/lib/brand-colors.test.ts:39 paisaxe")[shade], "src/lib/brand-colors.test.ts:38 paisaxe.green[shade]")).toBe(requiredValue(match![1], "src/lib/brand-colors.test.ts:38 match![1]").trim());
     }
   });
 

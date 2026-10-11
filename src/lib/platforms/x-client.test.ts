@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { XClient, checkXPostingAvailable } from "./x-client";
@@ -216,8 +217,8 @@ describe("XClient", () => {
       const results = await client.postThread(tweets);
 
       expect(results).toHaveLength(2);
-      expect(results[0].success).toBe(true);
-      expect(results[1].success).toBe(false);
+      expect(requiredValue(results[0], "src/lib/platforms/x-client.test.ts:219 results[0]").success).toBe(true);
+      expect(requiredValue(results[1], "src/lib/platforms/x-client.test.ts:220 results[1]").success).toBe(false);
     });
   });
 

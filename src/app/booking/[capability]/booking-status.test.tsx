@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BookingView } from "@/types/booking-page";
@@ -102,7 +103,7 @@ describe("BookingStatus", () => {
     fireEvent.click(await screen.findByRole("button", { name: "booking.cards.pay" }));
 
     await waitFor(() => expect(assign).toHaveBeenCalledWith("https://www.sandbox.paypal.com/checkoutnow?token=T1"));
-    const [url, init] = mockFetch.mock.calls[1];
+    const [url, init] = requiredValue(mockFetch.mock.calls[1], "src/app/booking/[capability]/booking-status.test.tsx:106 mock call tuple");
     expect(url).toBe(`/api/booking/bookings/${CAPABILITY}/payment`);
     expect(init).toMatchObject({ method: "POST", headers: { "x-csrf-token": "csrf-1" } });
   });
@@ -280,8 +281,8 @@ describe("BookingStatus", () => {
       fireEvent.click(await screen.findByRole("button", { name: "confirm 3000" }));
 
       expect(await screen.findByText("booking.cancel.refundPending")).toBeInTheDocument();
-      expect(mockFetch.mock.calls[1][0]).toBe(`/api/booking/bookings/${CAPABILITY}/cancellation-preview`);
-      expect(mockFetch.mock.calls[1][1]).toMatchObject({ cache: "no-store" });
+      expect(requiredValue(requiredValue(mockFetch.mock.calls[1], "src/app/booking/[capability]/booking-status.test.tsx: mockFetch.mock.calls[1]")[0], "src/app/booking/[capability]/booking-status.test.tsx: mockFetch.mock.calls[1][0]")).toBe(`/api/booking/bookings/${CAPABILITY}/cancellation-preview`);
+      expect(requiredValue(requiredValue(mockFetch.mock.calls[1], "src/app/booking/[capability]/booking-status.test.tsx: mockFetch.mock.calls[1]")[1], "src/app/booking/[capability]/booking-status.test.tsx: mockFetch.mock.calls[1][1]")).toMatchObject({ cache: "no-store" });
       expect(screen.getByText("RF-1")).toBeInTheDocument();
     });
 

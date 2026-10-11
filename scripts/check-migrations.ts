@@ -90,7 +90,7 @@ function parseMigrations(migrationsDir: string): {
 
   for (const entry of entries) {
     const match = MIGRATION_PATTERN.exec(entry);
-    if (!match) {
+    if (!match?.[1]) {
       errors.push(`  Invalid filename format: ${entry} (expected NNN_description.sql)`);
       continue;
     }
@@ -130,6 +130,7 @@ function checkForUnexpectedGaps(migrations: MigrationFile[]): string[] {
   for (let i = 1; i < numbers.length; i++) {
     const prev = numbers[i - 1];
     const curr = numbers[i];
+    if (prev === undefined || curr === undefined) continue;
     const gapSize = curr - prev - 1;
 
     if (gapSize <= 0) continue;
@@ -269,18 +270,23 @@ function collectTableEvents(sql: string): TableEvent[] {
   const events: TableEvent[] = [];
 
   for (const match of sql.matchAll(CREATE_TABLE_RE)) {
+    if (match[1] === undefined) continue;
     events.push({ index: match.index ?? 0, kind: "create", name: match[1] });
   }
   for (const match of sql.matchAll(DROP_TABLE_RE)) {
+    if (match[1] === undefined) continue;
     events.push({ index: match.index ?? 0, kind: "drop", name: match[1] });
   }
   for (const match of sql.matchAll(RENAME_TABLE_RE)) {
+    if (match[1] === undefined || match[2] === undefined) continue;
     events.push({ index: match.index ?? 0, kind: "rename", from: match[1], to: match[2] });
   }
   for (const match of sql.matchAll(RLS_TOGGLE_RE)) {
+    if (match[1] === undefined || match[2] === undefined) continue;
     events.push({ index: match.index ?? 0, kind: "rls", name: match[1], enabled: match[2] === "enable" });
   }
   for (const match of sql.matchAll(REVOKE_ROLES_RE)) {
+    if (match[1] === undefined || match[2] === undefined) continue;
     events.push({
       index: match.index ?? 0,
       kind: "revoke",
@@ -455,6 +461,7 @@ function checkSecurityDefinerSearchPaths(migrations: MigrationFile[]): string[] 
     ].sort((a, b) => a.index - b.index);
 
     for (const event of events) {
+      if (event.name === undefined) continue;
       if (event.kind === "create") {
         latestHeaders.set(event.name, extractHeader(sql, event.index));
       } else {

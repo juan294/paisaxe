@@ -488,7 +488,7 @@ export function StoryViewer({
                   .filter((i) => !viewedIndices.has(i) && i !== currentIndex);
                 if (unviewed.length > 0) {
                   const randomIndex = unviewed[Math.floor(Math.random() * unviewed.length)];
-                  onIndexChange(randomIndex);
+                  if (randomIndex !== undefined) onIndexChange(randomIndex);
                 } else {
                   // All viewed, pick random
                   const randomIndex = Math.floor(Math.random() * stories.length);

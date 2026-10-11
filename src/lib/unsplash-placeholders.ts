@@ -132,6 +132,9 @@ export function getPlaceholderForStory(
   const pool = UNSPLASH_POOLS[category];
   const index = hashString(slug) % pool.length;
   const chosen = pool[index];
+  if (chosen === undefined) {
+    throw new Error(`Missing placeholder image for category ${category}`);
+  }
 
   return {
     image: chosen.url,

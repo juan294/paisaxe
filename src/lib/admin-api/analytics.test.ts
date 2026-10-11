@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   fetchAnalytics,
@@ -46,7 +47,7 @@ describe("admin-api/analytics", () => {
 
       await fetchAnalytics("2026-01-01", "2026-01-31");
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:49 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.get("from")).toBe("2026-01-01");
       expect(url.searchParams.get("to")).toBe("2026-01-31");
@@ -60,7 +61,7 @@ describe("admin-api/analytics", () => {
 
       await fetchAnalytics();
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:63 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.has("from")).toBe(false);
       expect(url.searchParams.has("to")).toBe(false);
@@ -75,7 +76,7 @@ describe("admin-api/analytics", () => {
 
       await fetchAnalytics(undefined, undefined, true);
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:78 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.get("includeLocalhost")).toBe("true");
     });
@@ -88,7 +89,7 @@ describe("admin-api/analytics", () => {
 
       await fetchAnalytics(undefined, undefined, false);
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:91 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.has("includeLocalhost")).toBe(false);
     });
@@ -159,7 +160,7 @@ describe("admin-api/analytics", () => {
 
       await fetchElevenLabsAnalytics("2026-02-01", "2026-02-28");
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:162 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.get("from")).toBe("2026-02-01");
       expect(url.searchParams.get("to")).toBe("2026-02-28");
@@ -173,7 +174,7 @@ describe("admin-api/analytics", () => {
 
       await fetchElevenLabsAnalytics();
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:176 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.has("from")).toBe(false);
       expect(url.searchParams.has("to")).toBe(false);
@@ -264,7 +265,7 @@ describe("admin-api/analytics", () => {
 
       await fetchStripeAnalytics("2026-01-01", "2026-01-31");
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:267 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.get("from")).toBe("2026-01-01");
       expect(url.searchParams.get("to")).toBe("2026-01-31");
@@ -278,7 +279,7 @@ describe("admin-api/analytics", () => {
 
       await fetchStripeAnalytics();
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:281 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.has("from")).toBe(false);
       expect(url.searchParams.has("to")).toBe(false);
@@ -350,7 +351,7 @@ describe("admin-api/analytics", () => {
 
       await fetchGithubAnalytics("2026-01-15", "2026-02-15");
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:353 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.get("from")).toBe("2026-01-15");
       expect(url.searchParams.get("to")).toBe("2026-02-15");
@@ -364,7 +365,7 @@ describe("admin-api/analytics", () => {
 
       await fetchGithubAnalytics();
 
-      const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      const calledUrl = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:367 (fetch as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
       const url = new URL(calledUrl);
       expect(url.searchParams.has("from")).toBe(false);
       expect(url.searchParams.has("to")).toBe(false);
@@ -440,7 +441,7 @@ describe("admin-api/analytics", () => {
 
       await syncGithubTraffic();
 
-      const [, options] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [, options] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/analytics.test.ts:444 mock call tuple");
       expect(options.method).toBe("POST");
       expect(options.headers).toEqual({ "Content-Type": "application/json" });
     });

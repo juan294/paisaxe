@@ -38,7 +38,7 @@ export function parseBlocks(content: string): Block[] {
     }
 
     const heading = line.match(/^(#{1,4})\s+(.+)$/);
-    if (heading) {
+    if (heading?.[1] && heading[2] !== undefined) {
       flushParagraph();
       flushList();
       blocks.push({ type: "heading", level: heading[1].length as 1 | 2 | 3 | 4, text: heading[2] });
@@ -46,7 +46,7 @@ export function parseBlocks(content: string): Block[] {
     }
 
     const blockquote = line.match(/^>\s+(.+)$/);
-    if (blockquote) {
+    if (blockquote?.[1] !== undefined) {
       flushParagraph();
       flushList();
       blocks.push({ type: "blockquote", text: blockquote[1] });
@@ -54,7 +54,7 @@ export function parseBlocks(content: string): Block[] {
     }
 
     const unordered = line.match(/^[-*]\s+(.+)$/);
-    if (unordered) {
+    if (unordered?.[1] !== undefined) {
       flushParagraph();
       if (list?.type !== "unordered-list") {
         flushList();
@@ -65,7 +65,7 @@ export function parseBlocks(content: string): Block[] {
     }
 
     const ordered = line.match(/^\d+\.\s+(.+)$/);
-    if (ordered) {
+    if (ordered?.[1] !== undefined) {
       flushParagraph();
       if (list?.type !== "ordered-list") {
         flushList();

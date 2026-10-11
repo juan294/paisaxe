@@ -35,5 +35,7 @@ export function presentationAuthClientSource(url: string, anonKey: string): stri
     format: 'iife',
     logLevel: 'silent',
   });
-  return result.outputFiles[0].text;
+  const output = result.outputFiles[0];
+  if (!output) throw new Error("Local presentation auth bundle produced no output file");
+  return output.text;
 }

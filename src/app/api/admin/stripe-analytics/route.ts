@@ -148,14 +148,14 @@ export async function GET(request: NextRequest) {
       const startDate = new Date(fromParam);
       const endDate = new Date(toParam);
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        const dateKey = d.toISOString().split("T")[0];
+        const dateKey = d.toISOString().replace(/T.*$/, "");
         revenueByDayMap.set(dateKey, { revenue: 0, orders: 0 });
       }
 
       // Sum up payments by day
       for (const pi of paymentIntents.data) {
         if (pi.status === "succeeded") {
-          const dateKey = new Date(pi.created * 1000).toISOString().split("T")[0];
+          const dateKey = new Date(pi.created * 1000).toISOString().replace(/T.*$/, "");
           const existing = revenueByDayMap.get(dateKey) || { revenue: 0, orders: 0 };
           revenueByDayMap.set(dateKey, {
             revenue: existing.revenue + pi.amount,

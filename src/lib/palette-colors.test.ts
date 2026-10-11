@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -118,7 +119,7 @@ function rawColors(source: string): string[] {
 function semanticVariables(selector: ":root" | ".dark") {
   const block = read("src/app/base.css").match(new RegExp(`${selector.replace(".", "\\.")}\\s*\\{([^}]+)\\}`))?.[1];
   expect(block, selector).toBeDefined();
-  return Object.fromEntries([...block!.matchAll(/--([\w-]+):\s*([^;]+);/g)].map(([, key, value]) => [key, value.trim()]));
+  return Object.fromEntries([...block!.matchAll(/--([\w-]+):\s*([^;]+);/g)].map(([, key, value]) => [key, requiredValue(value, "src/lib/palette-colors.test.ts:122 value").trim()]));
 }
 
 describe("Phase 8 palette equivalence", () => {
@@ -130,7 +131,7 @@ describe("Phase 8 palette equivalence", () => {
     expect(colors.scene).toEqual(SCENE);
     const theme = read("node_modules/tailwindcss/theme.css");
     for (const [token, primitive] of [["black", "black"], ["white", "white"], ["canvas", "neutral-950"]] as const) {
-      expect(theme.match(new RegExp(`--color-${primitive}:\\s*([^;]+);`))?.[1].trim()).toBe(SCENE[token]);
+      expect(requiredValue(theme.match(new RegExp(`--color-${primitive}:\\s*([^;]+);`))?.[1], "src/lib/palette-colors.test.ts:133 theme.match(new RegExp(`--color-${primitive}:\\\\s*([^;]+);`))?.[1]").trim()).toBe(SCENE[token]);
     }
   });
 

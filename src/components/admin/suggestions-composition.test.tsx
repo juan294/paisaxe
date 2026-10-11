@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -69,11 +70,11 @@ beforeEach(() => {
       listReads += 1;
       return Response.json({ data: suggestions.map(suggestion => ({ ...suggestion })) });
     }
-    if (url.pathname === `/api/admin/suggestions/${suggestions[0].id}` && method === "PUT") {
+    if (url.pathname === `/api/admin/suggestions/${requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]").id}` && method === "PUT") {
       const body: { adminNotes: string } = JSON.parse(String(init?.body));
       noteBodies.push(body);
       if (noteBodies.length === 1 && heldNotes) return heldNotes;
-      return Response.json({ data: { ...suggestions[0], ...body } });
+      return Response.json({ data: { ...requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]"), ...body } });
     }
     if (url.pathname === "/api/admin/stories" && method === "POST") {
       const body: CreateStoryRequest = JSON.parse(String(init?.body));
@@ -110,8 +111,8 @@ describe("real suggestions and create-dialog composition", () => {
     heldNotes = new Promise(resolve => { finishNotes = resolve; });
     const view = render(<SuggestionsPanel />);
     try {
-      await screen.findByRole("heading", { name: suggestions[0].placeName });
-      await user.click(screen.getAllByRole("button", { name: "Expand" })[0]);
+      await screen.findByRole("heading", { name: requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]").placeName });
+      await user.click(requiredValue(screen.getAllByRole("button", { name: "Expand" })[0], "src/components/admin/suggestions-composition.test.tsx: screen.getAllByRole(\"button\", { name: \"Expand\" })[0]"));
       const notes = screen.getByRole("textbox", { name: "Admin Notes" });
       await user.type(notes, "Retained review draft");
       await user.click(screen.getByRole("button", { name: "Save Notes" }));
@@ -140,7 +141,7 @@ describe("real suggestions and create-dialog composition", () => {
       ]);
       expect(screen.getByRole("textbox", { name: "Admin Notes" })).toBe(notes);
       expect(notes).toHaveValue("Retained review draft corrected");
-      expect(screen.getByRole("heading", { name: suggestions[1].placeName })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: requiredValue(suggestions[1], "src/components/admin/suggestions-composition.test.tsx: suggestions[1]").placeName })).toBeInTheDocument();
       expect(listReads).toBe(1);
       expect(storyBodies).toEqual([]);
       expect(unexpectedRequests).toEqual([]);
@@ -153,13 +154,13 @@ describe("real suggestions and create-dialog composition", () => {
   it("cancels and resets the real conversion dialog, preserves a failed creation and publishes only the converted row", async () => {
     const user = userEvent.setup();
     render(<SuggestionsPanel />);
-    await screen.findByRole("heading", { name: suggestions[0].placeName });
-    await user.click(screen.getAllByRole("button", { name: "Expand" })[0]);
+    await screen.findByRole("heading", { name: requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]").placeName });
+    await user.click(requiredValue(screen.getAllByRole("button", { name: "Expand" })[0], "src/components/admin/suggestions-composition.test.tsx: screen.getAllByRole(\"button\", { name: \"Expand\" })[0]"));
     await user.click(screen.getByRole("button", { name: "Convert to Story" }));
     let dialog = await screen.findByRole("dialog", { name: "Convert Suggestion to Story" });
     const discardedTitle = within(dialog).getByRole("textbox", { name: /Title/ });
-    expect(discardedTitle).toHaveValue(suggestions[0].placeName);
-    expect(within(dialog).getByRole("textbox", { name: "Description" })).toHaveValue(suggestions[0].comment);
+    expect(discardedTitle).toHaveValue(requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]").placeName);
+    expect(within(dialog).getByRole("textbox", { name: "Description" })).toHaveValue(requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]").comment);
     expect(within(dialog).getByText("@phase10-visitor")).toBeInTheDocument();
     await user.clear(discardedTitle);
     await user.type(discardedTitle, "Discarded conversion draft");
@@ -171,7 +172,7 @@ describe("real suggestions and create-dialog composition", () => {
     await user.click(screen.getByRole("button", { name: "Convert to Story" }));
     dialog = await screen.findByRole("dialog", { name: "Convert Suggestion to Story" });
     const title = within(dialog).getByRole("textbox", { name: /Title/ });
-    expect(title).toHaveValue(suggestions[0].placeName);
+    expect(title).toHaveValue(requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]").placeName);
     await user.clear(title);
     await user.type(title, "Verified conversion draft");
     const category = within(dialog).getByRole("combobox", { name: /Category/ });
@@ -198,16 +199,16 @@ describe("real suggestions and create-dialog composition", () => {
         title: "Verified conversion draft",
         slug: "verified-conversion-draft",
         category: "nature",
-        description: suggestions[0].comment,
+        description: requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]").comment,
         sourceType: "user_submitted",
-        suggestionId: suggestions[0].id,
+        suggestionId: requiredValue(suggestions[0], "src/components/admin/suggestions-composition.test.tsx: suggestions[0]").id,
       });
     }
     expect(await screen.findByText("Converted", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Converted (1)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pending (1)" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Convert to Story" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: suggestions[1].placeName })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: requiredValue(suggestions[1], "src/components/admin/suggestions-composition.test.tsx: suggestions[1]").placeName })).toBeInTheDocument();
     expect(listReads).toBe(1);
     expect(noteBodies).toEqual([]);
     expect(unexpectedRequests).toEqual([]);

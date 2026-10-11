@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -182,7 +183,7 @@ describe("AccountConfigDialog", () => {
     const toggleButtons = screen.getAllByRole("button").filter(
       (btn) => !btn.textContent?.includes("Cancel") && !btn.textContent?.includes("Connect")
     );
-    await user.click(toggleButtons[0]);
+    await user.click(requiredValue(toggleButtons[0], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: toggleButtons[0]"));
 
     expect(consumerKeyInput).toHaveAttribute("type", "text");
   });
@@ -196,10 +197,10 @@ describe("AccountConfigDialog", () => {
       (btn) => !btn.textContent?.includes("Cancel") && !btn.textContent?.includes("Connect")
     );
 
-    await user.click(toggleButtons[0]);
+    await user.click(requiredValue(toggleButtons[0], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: toggleButtons[0]"));
     expect(consumerKeyInput).toHaveAttribute("type", "text");
 
-    await user.click(toggleButtons[0]);
+    await user.click(requiredValue(toggleButtons[0], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: toggleButtons[0]"));
     expect(consumerKeyInput).toHaveAttribute("type", "password");
   });
 
@@ -324,8 +325,8 @@ describe("AccountConfigDialog", () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
+    const callArgs = requiredValue((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]");
+    const body = JSON.parse(requiredValue(callArgs[1], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: callArgs[1]").body);
     expect(body.platform).toBe("x");
     expect(body.accountName).toBe("My Account");
     expect(body.accountHandle).toBe("@myhandle");
@@ -359,8 +360,8 @@ describe("AccountConfigDialog", () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
+    const callArgs = requiredValue((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]");
+    const body = JSON.parse(requiredValue(callArgs[1], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: callArgs[1]").body);
     expect(body.accountName).toBe("Paisaxe");
   });
 
@@ -393,8 +394,8 @@ describe("AccountConfigDialog", () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
+    const callArgs = requiredValue((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]");
+    const body = JSON.parse(requiredValue(callArgs[1], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: callArgs[1]").body);
     // accountName.trim() returns "" which is falsy, so || "Paisaxe" kicks in
     expect(body.accountName).toBe("Paisaxe");
   });
@@ -421,8 +422,8 @@ describe("AccountConfigDialog", () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
+    const callArgs = requiredValue((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]");
+    const body = JSON.parse(requiredValue(callArgs[1], "src/components/admin/marketing-dashboard/account-config-dialog.test.tsx: callArgs[1]").body);
     expect(body.accountHandle).toBeUndefined();
   });
 

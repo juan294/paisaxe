@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 /**
  * Regression test for AR-H2: Logger migration.
  *
@@ -45,9 +46,9 @@ describe("AR-H2 Logger migration regression", () => {
       const content = fs.readFileSync(file, "utf-8");
       const lines = content.split("\n");
       for (let i = 0; i < lines.length; i++) {
-        if (consoleCalls.test(lines[i])) {
+        if (consoleCalls.test(requiredValue(lines[i], "src/lib/logger-migration.test.ts:48 lines[i]"))) {
           const rel = path.relative(path.join(__dirname, "../.."), file);
-          violations.push(`${rel}:${i + 1} — ${lines[i].trim()}`);
+          violations.push(`${rel}:${i + 1} — ${requiredValue(lines[i], "src/lib/logger-migration.test.ts:50 lines[i]").trim()}`);
         }
       }
     }

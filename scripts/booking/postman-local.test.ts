@@ -107,7 +107,11 @@ describe("environment files", () => {
 
   it("every {{variable}} the collection uses is in the environment", () => {
     const collection = readFileSync(resolve(POSTMAN_DIR, "paisaxe-booking.postman_collection.json"), "utf8");
-    const used = new Set([...collection.matchAll(/\{\{([A-Za-z]+)\}\}/g)].map((match) => match[1]));
+    const used = new Set([...collection.matchAll(/\{\{([A-Za-z]+)\}\}/g)].map((match) => {
+      const key = match[1];
+      if (key === undefined) throw new Error("Collection variable capture is missing");
+      return key;
+    }));
     expect([...used].filter((key) => !(ENV_KEYS as readonly string[]).includes(key))).toEqual([]);
   });
 

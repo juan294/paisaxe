@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const logger = vi.hoisted(() => ({
@@ -344,7 +345,7 @@ describe("POST /api/cron/github-traffic-sync", () => {
     expect(response.body.daily).toBe(1);
 
     // Verify the upserted row has both views and clones data
-    const upsertedRows = mockUpsert.mock.calls[0][0];
+    const upsertedRows = requiredValue(mockUpsert.mock.calls[0], "src/app/api/cron/github-traffic-sync/route.test.ts:347 mockUpsert.mock.calls[0]")[0];
     expect(upsertedRows).toHaveLength(1);
     expect(upsertedRows[0]).toEqual(expect.objectContaining({
       date: "2026-03-05",
@@ -385,7 +386,7 @@ describe("POST /api/cron/github-traffic-sync", () => {
     // Two daily rows: one from views (Mar 1), one from clones (Mar 2)
     expect(response.body.daily).toBe(2);
 
-    const upsertedRows = mockUpsert.mock.calls[0][0];
+    const upsertedRows = requiredValue(mockUpsert.mock.calls[0], "src/app/api/cron/github-traffic-sync/route.test.ts:388 mockUpsert.mock.calls[0]")[0];
     expect(upsertedRows).toHaveLength(2);
     // The clone-only row should have zero views
     const cloneOnlyRow = upsertedRows.find((r: { date: string }) => r.date === "2026-03-02");

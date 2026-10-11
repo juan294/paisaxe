@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * The capture path's phone-confirmation branch (PayPal hackathon plan, Phase
@@ -99,7 +100,7 @@ describe("ensurePaymentOrder for a phone-confirmed merchant", () => {
 
     await ensurePaymentOrder(fake.client, ID);
 
-    expect(paypal.createOrder.mock.calls[0][0]).not.toHaveProperty("intent");
+    expect(requiredValue(paypal.createOrder.mock.calls[0], "src/lib/booking/capture.phone.test.ts:102 paypal.createOrder.mock.calls[0]")[0]).not.toHaveProperty("intent");
     expect(config.phoneConfirmationReadiness).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import EventEmitter from "events";
@@ -434,7 +435,7 @@ describe("POST /api/admin/agents/run", () => {
     await POST(makeRequest({ agentKey: "qa_agent_enabled" }));
 
     expect(mockSpawn).toHaveBeenCalled();
-    const spawnOptions = mockSpawn.mock.calls[0][2] as { env: NodeJS.ProcessEnv };
+    const spawnOptions = requiredValue(mockSpawn.mock.calls[0], "src/app/api/admin/agents/run/route.test.ts:437 mockSpawn.mock.calls[0]")[2] as { env: NodeJS.ProcessEnv };
     expect(spawnOptions.env).toBeDefined();
     // Allowlisted vars pass through…
     expect(spawnOptions.env.PATH).toBeDefined();

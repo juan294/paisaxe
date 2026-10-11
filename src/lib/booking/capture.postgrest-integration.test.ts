@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * The deposit flow against the live local stack (PayPal hackathon plan,
@@ -139,7 +140,7 @@ describe.skipIf(!dbReachable)("deposit flow against live local Supabase", () => 
       const { id } = newBooking();
       await withOrder(id);
 
-      const input = paypal.createOrder.mock.calls[0][0];
+      const input = requiredValue(paypal.createOrder.mock.calls[0], "src/lib/booking/capture.postgrest-integration.test.ts:142 paypal.createOrder.mock.calls[0]")[0];
       const key = row(`SELECT operation_key FROM public.payments WHERE booking_id = '${id}';`);
       expect(input).toMatchObject({ bookingId: id, amountCents: 3000, currency: "EUR", operationKey: key });
       expect(input.returnUrl).toMatch(new RegExp(`^https://paisaxe\\.es/booking/${id}\\.[A-Za-z0-9_-]{43}/return$`));

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
@@ -42,7 +43,7 @@ describe.skipIf(!reachable)("Declared database authorization matrix (real PostgR
         expect(chunk.status).toBe(201);
         dailyCounter = psql("SELECT row_to_json(c)::text FROM public.booking_daily_call_counters c WHERE counter_date=CURRENT_DATE;");
         psql(`INSERT INTO public.story_suggestions(id,user_id,place_name) VALUES('${SUGGESTION}','${ids[0]}','${PREFIX}suggestion');`);
-        for (const fixture of databaseBoundaryFixtures(ids[0], STORY, PREFIX)) {
+        for (const fixture of databaseBoundaryFixtures(requiredValue(ids[0], "src/lib/database-boundaries.postgrest-rls.test.ts:45 ids[0]"), STORY, PREFIX)) {
             const res = await request(fixture.table, "service_role", "POST", fixture.payload);
             expect(res.status, `${fixture.table}: ${await res.clone().text()}`).toBe(201);
             expect(await res.json()).toHaveLength(1);
@@ -205,7 +206,7 @@ describe.skipIf(!reachable)("Declared database authorization matrix (real PostgR
       const profile=await request(`user_profiles?user_id=eq.${ids[0]}`,"service_role");expect((await profile.json())[0].role).toBe("user");
       const update=await request(`user_profiles?user_id=eq.${ids[0]}`,"service_role","PATCH",{email:"synthetic-profile-positive@example.test"});expect(update.status).toBe(200);expect((await update.json())[0]).toMatchObject({email:"synthetic-profile-positive@example.test",role:"user"});
     });
-    const rpcs = databaseRpcFixtures(fixtures, () => ids[0], STORY, PREFIX, SUGGESTION);
+    const rpcs = databaseRpcFixtures(fixtures, () => requiredValue(ids[0], "src/lib/database-boundaries.postgrest-rls.test.ts:208 ids[0]"), STORY, PREFIX, SUGGESTION);
     it("every installed non-trigger SECURITY DEFINER RPC has reviewed arguments and all four HTTP role controls", () => {
         const installed = psql("SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.prosecdef AND p.prorettype<>'trigger'::regtype ORDER BY 1;").split("\n");
         expect(installed.sort()).toEqual(rpcs.map(r => r.signature).sort());

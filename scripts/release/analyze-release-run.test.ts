@@ -46,7 +46,7 @@ const REQUIRED: RequiredProbeManifest = {
   ],
 };
 
-const PASSING_PROBES: ProbeEvidence[] = [
+const PASSING_PROBES: [ProbeEvidence, ProbeEvidence] = [
   { id: "health-status", status: "passed", oracles: ["http"] },
   {
     id: "favorite-roundtrip",

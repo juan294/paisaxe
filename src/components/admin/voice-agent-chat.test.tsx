@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -118,7 +119,7 @@ describe("VoiceAgentChat", () => {
     render(<VoiceAgentChat />);
 
     // When disconnected, agent buttons should not be disabled
-    const xanderButton = screen.getAllByText("Xander")[0].closest("button");
+    const xanderButton = requiredValue(screen.getAllByText("Xander")[0], "src/components/admin/voice-agent-chat.test.tsx: screen.getAllByText(\"Xander\")[0]").closest("button");
     expect(xanderButton).not.toBeDisabled();
   });
 
@@ -172,6 +173,6 @@ describe("VoiceAgentChat", () => {
         connectionType: "websocket",
       });
     });
-    expect(mockStartSession.mock.calls[0][0]).not.toHaveProperty("agentId");
+    expect(requiredValue(requiredValue(mockStartSession.mock.calls[0], "src/components/admin/voice-agent-chat.test.tsx: mockStartSession.mock.calls[0]")[0], "src/components/admin/voice-agent-chat.test.tsx: mockStartSession.mock.calls[0][0]")).not.toHaveProperty("agentId");
   });
 });

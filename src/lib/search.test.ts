@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock supabase before importing search module
@@ -69,13 +70,13 @@ describe("search", () => {
       await searchChunks(embedding, 5);
 
       const rpcCall = vi.mocked(supabase.rpc).mock.calls[0];
-      expect(rpcCall[0]).toBe("match_chunks");
+      expect(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:73 rpcCall")[0], "src/lib/search.test.ts:72 rpcCall[0]")).toBe("match_chunks");
       // Only these three parameters should be passed — no ef_search, no probes
-      expect(Object.keys(rpcCall[1] as object)).toEqual(
+      expect(Object.keys(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:75 rpcCall")[1], "src/lib/search.test.ts:74 rpcCall[1]") as object)).toEqual(
         expect.arrayContaining(["query_embedding", "match_threshold", "match_count"])
       );
-      expect(rpcCall[1]).not.toHaveProperty("ef_search");
-      expect(rpcCall[1]).not.toHaveProperty("probes");
+      expect(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:78 rpcCall")[1], "src/lib/search.test.ts:77 rpcCall[1]")).not.toHaveProperty("ef_search");
+      expect(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:79 rpcCall")[1], "src/lib/search.test.ts:78 rpcCall[1]")).not.toHaveProperty("probes");
     });
 
     it("should search chunks with vector embedding", async () => {
@@ -271,7 +272,7 @@ describe("search", () => {
 
       // Result should contain the 3 reranked chunks
       expect(result.chunks).toHaveLength(3);
-      expect(result.chunks[0].id).toBe("chunk-5");
+      expect(requiredValue(result.chunks[0], "src/lib/search.test.ts:274 result.chunks[0]").id).toBe("chunk-5");
       expect(result.images).toHaveLength(3);
     });
 
@@ -435,7 +436,7 @@ describe("search", () => {
 
       // Result chunks come from reranker
       expect(result.chunks).toHaveLength(3);
-      expect(result.chunks[0].id).toBe("chunk-1");
+      expect(requiredValue(result.chunks[0], "src/lib/search.test.ts:438 result.chunks[0]").id).toBe("chunk-1");
 
       // Result images are filtered to only the refs present in the reranked top-k
       const returnedPaths = result.images.map((img) => img.path);

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -344,7 +345,7 @@ describe("StoryViewer", () => {
       await waitFor(() => expect(screen.getByTestId("bookmark-auth-state")).toHaveTextContent("verified"));
       expect(button).toBeEnabled();
       await userEvent.click(button);
-      expect(mockToggleFavorite).toHaveBeenCalledExactlyOnceWith(mockStories[0].id);
+      expect(mockToggleFavorite).toHaveBeenCalledExactlyOnceWith(requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]").id);
       expect(within(button.parentElement!).getByRole("status")).toHaveTextContent("Guardado en favoritos");
       expect(mockAuthOAuth).not.toHaveBeenCalled();
     } finally {
@@ -475,7 +476,7 @@ describe("StoryViewer", () => {
     it("UX-M5: hero image has non-empty alt text derived from localized story title", async () => {
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      const img = container.querySelector(`img[src="${requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]").image}"]`);
       expect(img).not.toBeNull();
       // Must have a non-empty alt tied to the story title
       expect(img).toHaveAttribute("alt", "Lagos de Covadonga");
@@ -486,7 +487,7 @@ describe("StoryViewer", () => {
         <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
       );
 
-      const img = container.querySelector(`img[src="${mockStories[1].image}"]`);
+      const img = container.querySelector(`img[src="${requiredValue(mockStories[1], "src/components/immersive/story-viewer.test.tsx: mockStories[1]").image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("alt", "Oviedo Cathedral");
     });
@@ -494,7 +495,7 @@ describe("StoryViewer", () => {
     it("should render story image with blur placeholder", async () => {
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      const img = container.querySelector(`img[src="${requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]").image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-placeholder", "blur");
     });
@@ -502,7 +503,7 @@ describe("StoryViewer", () => {
     it("PE-M2: should set priority=true only on the first story (index 0)", async () => {
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 0 })} />);
 
-      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      const img = container.querySelector(`img[src="${requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]").image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-priority", "true");
       expect(img).toHaveAttribute("fetchpriority", "high");
@@ -511,7 +512,7 @@ describe("StoryViewer", () => {
     it("PE-M2: should set priority=false for stories after index 0", async () => {
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
-      const img = container.querySelector(`img[src="${mockStories[1].image}"]`);
+      const img = container.querySelector(`img[src="${requiredValue(mockStories[1], "src/components/immersive/story-viewer.test.tsx: mockStories[1]").image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-priority", "false");
       expect(img).toHaveAttribute("fetchpriority", "high");
@@ -520,7 +521,7 @@ describe("StoryViewer", () => {
     it("should use darkPlaceholder fallback when story has no blurDataUrl", async () => {
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      const img = container.querySelector(`img[src="${requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]").image}"]`);
       expect(img).not.toBeNull();
       // Should use the dark SVG placeholder as fallback
       expect(img!.getAttribute("data-blur-data-url")).toMatch(/^data:image\/svg\+xml/);
@@ -534,7 +535,7 @@ describe("StoryViewer", () => {
         <StoryViewer {...getDefaultProps({ stories: storiesWithBlur })} />
       );
 
-      const img = container.querySelector(`img[src="${storiesWithBlur[0].image}"]`);
+      const img = container.querySelector(`img[src="${requiredValue(storiesWithBlur[0], "src/components/immersive/story-viewer.test.tsx: storiesWithBlur[0]").image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-blur-data-url", "data:image/webp;base64,mockblur");
     });
@@ -1286,7 +1287,7 @@ describe("StoryViewer", () => {
       fireEvent.click(surpriseItem);
 
       expect(onIndexChange).toHaveBeenCalled();
-      const calledIndex = onIndexChange.mock.calls[0][0];
+      const calledIndex = requiredValue(requiredValue(onIndexChange.mock.calls[0], "src/components/immersive/story-viewer.test.tsx: onIndexChange.mock.calls[0]")[0], "src/components/immersive/story-viewer.test.tsx: onIndexChange.mock.calls[0][0]");
       expect(calledIndex).not.toBe(0);
       expect([1, 2]).toContain(calledIndex);
     });
@@ -1398,7 +1399,7 @@ describe("StoryViewer", () => {
       });
 
       const storiesWithSlugs: Story[] = [
-        { ...mockStories[0], slug: "lagos-de-covadonga" },
+        { ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"), slug: "lagos-de-covadonga" },
         ...mockStories.slice(1),
       ];
 
@@ -1779,7 +1780,7 @@ describe("StoryViewer", () => {
       );
 
       if (relatedCards.length > 0) {
-        fireEvent.click(relatedCards[0]);
+        fireEvent.click(requiredValue(relatedCards[0], "src/components/immersive/story-viewer.test.tsx: relatedCards[0]"));
         // The callback finds the story index in the stories array and calls onIndexChange
         expect(onIndexChange).toHaveBeenCalled();
       }
@@ -1797,7 +1798,7 @@ describe("StoryViewer", () => {
 
       const storiesWithPrompts = [
         {
-          ...mockStories[0],
+          ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"),
           metadata: { question_prompts: ["What is the best time to visit?", "How to get there?"] },
         },
         ...mockStories.slice(1),
@@ -1828,7 +1829,7 @@ describe("StoryViewer", () => {
   describe("UX-H6 (#892): locale-aware text", () => {
     const storiesWithTranslations: Story[] = [
       {
-        ...mockStories[0],
+        ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"),
         metadata: {
           question_prompts: ["¿Cuándo ir?", "¿Cómo llegar?"],
           translations: {
@@ -1841,8 +1842,8 @@ describe("StoryViewer", () => {
           },
         },
       },
-      mockStories[1],
-      mockStories[2],
+      requiredValue(mockStories[1], "src/components/immersive/story-viewer.test.tsx: mockStories[1]"),
+      requiredValue(mockStories[2], "src/components/immersive/story-viewer.test.tsx: mockStories[2]"),
     ];
 
     afterEach(() => {
@@ -1979,7 +1980,7 @@ describe("StoryViewer", () => {
 
       const storiesWithAst = [
         {
-          ...mockStories[0],
+          ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"),
           metadata: { asturianu_title: "Llagos de Cuaduonga", asturianu_subtitle: "Picos d'Europa" },
         },
         ...mockStories.slice(1),
@@ -2037,7 +2038,7 @@ describe("StoryViewer", () => {
     it("should show image source when story has imageSource", async () => {
       const storiesWithSource = [
         {
-          ...mockStories[0],
+          ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"),
           imageSource: "Photo by Juan on Unsplash",
         },
         ...mockStories.slice(1),
@@ -2218,7 +2219,7 @@ describe("StoryViewer", () => {
 
       const storiesWithDates = [
         {
-          ...mockStories[0],
+          ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"),
           createdAt: new Date().toISOString(),
         },
         ...mockStories.slice(1),
@@ -2241,7 +2242,7 @@ describe("StoryViewer", () => {
     it("should render UserSubmittedBadge when story has sourceType user_submitted", async () => {
       const storiesWithUserSubmitted = [
         {
-          ...mockStories[0],
+          ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"),
           sourceType: "user_submitted" as const,
         },
         ...mockStories.slice(1),
@@ -2276,7 +2277,7 @@ describe("StoryViewer", () => {
     it("should handle stories with empty image URL gracefully", async () => {
       const storiesWithEmptyImage = [
         {
-          ...mockStories[0],
+          ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"),
           image: "",
         },
         ...mockStories.slice(1),
@@ -2393,7 +2394,7 @@ describe("StoryViewer", () => {
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // UX-L2: Hero image is decorative (alt=""), query by src
-      const heroSrc = mockStories[0].image;
+      const heroSrc = requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]").image;
       const img = container.querySelector(`img[src="${heroSrc}"]`);
       expect(img).not.toBeNull();
 
@@ -2481,9 +2482,9 @@ describe("StoryViewer", () => {
 
       // story-1 (nature) and story-2 (nature) share a category so getRelatedStories returns story-2
       const storiesWithSharedCategory: Story[] = [
-        { ...mockStories[0], category: "nature" },
-        { ...mockStories[1], category: "nature" },
-        { ...mockStories[2], category: "food" },
+        { ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"), category: "nature" },
+        { ...requiredValue(mockStories[1], "src/components/immersive/story-viewer.test.tsx: mockStories[1]"), category: "nature" },
+        { ...requiredValue(mockStories[2], "src/components/immersive/story-viewer.test.tsx: mockStories[2]"), category: "food" },
       ];
 
       await renderWithAuth(
@@ -2517,9 +2518,9 @@ describe("StoryViewer", () => {
 
       // Use stories that share a category so getRelatedStories returns results
       const storiesWithSharedCategory: Story[] = [
-        { ...mockStories[0], category: "nature" },
-        { ...mockStories[1], category: "nature" },
-        { ...mockStories[2], category: "food" },
+        { ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"), category: "nature" },
+        { ...requiredValue(mockStories[1], "src/components/immersive/story-viewer.test.tsx: mockStories[1]"), category: "nature" },
+        { ...requiredValue(mockStories[2], "src/components/immersive/story-viewer.test.tsx: mockStories[2]"), category: "food" },
       ];
 
       await renderWithAuth(
@@ -2560,14 +2561,14 @@ describe("StoryViewer", () => {
       // getRelatedStories uses allStories to find related, and the callback checks stories (filtered).
       // So clicking story-2 should find targetIndex = -1 in the filtered stories, hitting the false branch.
       const filteredStories: Story[] = [
-        { ...mockStories[0], category: "nature" },  // story-1
-        { ...mockStories[2], category: "food" },     // story-3
+        { ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"), category: "nature" },  // story-1
+        { ...requiredValue(mockStories[2], "src/components/immersive/story-viewer.test.tsx: mockStories[2]"), category: "food" },     // story-3
       ];
 
       const allStoriesWithSharedCategory: Story[] = [
-        { ...mockStories[0], category: "nature" },  // story-1
-        { ...mockStories[1], category: "nature" },  // story-2 (related but NOT in filtered)
-        { ...mockStories[2], category: "food" },     // story-3
+        { ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"), category: "nature" },  // story-1
+        { ...requiredValue(mockStories[1], "src/components/immersive/story-viewer.test.tsx: mockStories[1]"), category: "nature" },  // story-2 (related but NOT in filtered)
+        { ...requiredValue(mockStories[2], "src/components/immersive/story-viewer.test.tsx: mockStories[2]"), category: "food" },     // story-3
       ];
 
       await renderWithAuth(
@@ -2785,9 +2786,9 @@ describe("StoryViewer", () => {
   describe("coverage gaps: adjacentImages, bookmark, overlay", () => {
     it("adjacentImages skips stories with no image (line 223: img falsy branch)", async () => {
       const storiesNoImage: Story[] = [
-        { ...mockStories[0], image: undefined as unknown as string },
-        { ...mockStories[1], image: "" },
-        { ...mockStories[2] },
+        { ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"), image: undefined as unknown as string },
+        { ...requiredValue(mockStories[1], "src/components/immersive/story-viewer.test.tsx: mockStories[1]"), image: "" },
+        { ...requiredValue(mockStories[2], "src/components/immersive/story-viewer.test.tsx: mockStories[2]") },
       ];
 
       await renderWithAuth(
@@ -2866,13 +2867,13 @@ describe('Phase 7 story fallback disclosure', () => {
   afterEach(() => { mockLocale = 'es'; mockIsEnabled.mockReturnValue(false); });
   it('discloses missing story translation in the selected UI language', () => {
     mockLocale = "fr";
-    render(<TestWrapper><StoryViewer stories={[mockStories[0]]} allStories={mockStories} currentIndex={0} onIndexChange={vi.fn()} onAskAbout={vi.fn()} selectedCategory={null} selectedLocation={null} selectedDuration={null} onCategoryChange={vi.fn()} onLocationChange={vi.fn()} onDurationChange={vi.fn()} onClearFilters={vi.fn()} /></TestWrapper>);
+    render(<TestWrapper><StoryViewer stories={[requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]")]} allStories={mockStories} currentIndex={0} onIndexChange={vi.fn()} onAskAbout={vi.fn()} selectedCategory={null} selectedLocation={null} selectedDuration={null} onCategoryChange={vi.fn()} onLocationChange={vi.fn()} onDurationChange={vi.fn()} onClearFilters={vi.fn()} /></TestWrapper>);
     expect(screen.getByText(mockT("locale.storyFallback"))).toBeInTheDocument();
   });
   it('retains translated text and discloses missing translated questions', () => {
     mockLocale = "fr";
     mockIsEnabled.mockImplementation(flag => flag === 'contextual_prompts');
-    const story = {...mockStories[0], metadata:{question_prompts:["¿Qué ver?"], translations:{fr:{title:"Un lieu traduit",subtitle:"Sous-titre",description:"Description traduite"}}}};
+    const story = {...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"), metadata:{question_prompts:["¿Qué ver?"], translations:{fr:{title:"Un lieu traduit",subtitle:"Sous-titre",description:"Description traduite"}}}};
     render(<TestWrapper><StoryViewer stories={[story]} allStories={[story]} currentIndex={0} onIndexChange={vi.fn()} onAskAbout={vi.fn()} selectedCategory={null} selectedLocation={null} selectedDuration={null} onCategoryChange={vi.fn()} onLocationChange={vi.fn()} onDurationChange={vi.fn()} onClearFilters={vi.fn()} /></TestWrapper>);
     expect(screen.getByTestId("story-title")).toHaveTextContent("Un lieu traduit");
     expect(screen.getByRole("button", {name:"¿Qué ver?"})).toBeInTheDocument();

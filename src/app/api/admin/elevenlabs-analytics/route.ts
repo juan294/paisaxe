@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
         if (agent.name) {
           // Simplify name: "Paisaxe - Pelayo (Visitor Guide)" -> "Pelayo"
           const match = agent.name.match(/Paisaxe\s*-\s*([^(]+)/);
-          const displayName = match ? match[1].trim() : agent.name;
+          const displayName = match?.[1]?.trim() ?? agent.name;
           agentNameMap.set(agent.agent_id, displayName);
         }
       }

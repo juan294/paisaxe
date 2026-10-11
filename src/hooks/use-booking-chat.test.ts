@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useBookingChat } from "./use-booking-chat";
@@ -80,7 +81,7 @@ describe("useBookingChat", () => {
 
     await act(() => result.current.sendMessage("Somos cuatro", { locale: "es" }));
 
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = requiredValue(mockFetch.mock.calls[0], "booking stream request call");
     expect(url).toBe("/api/booking/chat/stream");
     expect(init.headers).toMatchObject({ Authorization: "Bearer token-1", "x-csrf-token": "csrf-1" });
     expect(JSON.parse(init.body)).toEqual({ message: "Somos cuatro", history: [], locale: "es" });
@@ -132,7 +133,7 @@ describe("useBookingChat", () => {
       await act(() => result.current.sendMessage(`m${i}`));
     }
 
-    const history = JSON.parse(mockFetch.mock.calls[6][1].body).history as { role: string; content: string }[];
+    const history = JSON.parse(requiredValue(requiredValue(mockFetch.mock.calls[6], "src/hooks/use-booking-chat.test.ts: mockFetch.mock.calls[6]")[1], "src/hooks/use-booking-chat.test.ts: mockFetch.mock.calls[6][1]").body).history as { role: string; content: string }[];
     expect(history).toHaveLength(10);
     expect(history[0]).toEqual({ role: "user", content: "m1" });
     expect(Math.max(...history.map((h) => h.content.length))).toBe(2000);
@@ -170,17 +171,17 @@ describe("useBookingChat", () => {
     await act(() => result.current.sendMessage("Quiero el paseo"));
     await act(() => result.current.acceptQuote(QUOTE_ID));
 
-    const [acceptUrl, acceptInit] = mockFetch.mock.calls[1];
+    const [acceptUrl, acceptInit] = requiredValue(mockFetch.mock.calls[1], "src/hooks/use-booking-chat.test.ts:174 mock call tuple");
     expect(acceptUrl).toBe(`/api/booking/quotes/${QUOTE_ID}/accept`);
     expect(acceptInit).toMatchObject({ method: "POST", headers: { Authorization: "Bearer token-1", "x-csrf-token": "csrf-1" } });
-    expect(result.current.messages[1].cards).toEqual([bookingCard]);
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-booking-chat.test.ts: result.current.messages[1]").cards).toEqual([bookingCard]);
 
-    const turn = JSON.parse(mockFetch.mock.calls[2][1].body);
+    const turn = JSON.parse(requiredValue(requiredValue(mockFetch.mock.calls[2], "src/hooks/use-booking-chat.test.ts: mockFetch.mock.calls[2]")[1], "src/hooks/use-booking-chat.test.ts: mockFetch.mock.calls[2][1]").body);
     expect(turn).toMatchObject({ message: "", event: { type: "quote_accepted", bookingId: BOOKING_ID } });
     // No visible user bubble for the event turn; the assistant answers.
     expect(result.current.messages.map((m) => m.role)).toEqual(["user", "assistant", "assistant"]);
-    expect(result.current.messages[2].content).toBe("Reserva retenida.");
-    expect(result.current.messages[2].cards).toEqual([paymentCard]);
+    expect(requiredValue(result.current.messages[2], "src/hooks/use-booking-chat.test.ts: result.current.messages[2]").content).toBe("Reserva retenida.");
+    expect(requiredValue(result.current.messages[2], "src/hooks/use-booking-chat.test.ts: result.current.messages[2]").cards).toEqual([paymentCard]);
   });
 
   it.each([
@@ -261,7 +262,7 @@ describe("useBookingChat", () => {
 
     // Three tokens, one scheduled frame; the end of the turn flushes the rest.
     expect(frames).toHaveLength(1);
-    expect(result.current.messages[1].content).toBe("Uno dos tres");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-booking-chat.test.ts: result.current.messages[1]").content).toBe("Uno dos tres");
     raf.mockRestore();
   });
 });

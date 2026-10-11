@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
@@ -71,7 +72,7 @@ describe("Auth Callback Route", () => {
       const request = createRequest({ code: "some-code" });
       await GET(request);
 
-      const [url] = mockCreate.mock.calls[0];
+      const [url] = requiredValue(mockCreate.mock.calls[0], "src/app/auth/callback/route.test.ts: mockCreate.mock.calls[0]");
       expect(url).toBe("https://test.supabase.co");
       expect(url).not.toMatch(/\n/);
 
@@ -89,7 +90,7 @@ describe("Auth Callback Route", () => {
       const request = createRequest({ code: "some-code" });
       await GET(request);
 
-      const [, anonKey] = mockCreate.mock.calls[0];
+      const [, anonKey] = requiredValue(mockCreate.mock.calls[0], "Supabase constructor call for anon-key trim");
       expect(anonKey).toBe("test-anon-key");
 
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
@@ -231,7 +232,7 @@ describe("Auth Callback Route", () => {
       const request = createRequest({ code: "some-code" });
       await GET(request);
 
-      const [url, anonKey] = mockCreate.mock.calls[0];
+      const [url, anonKey] = requiredValue(mockCreate.mock.calls[0], "Supabase constructor call for URL and anon-key validation");
       expect(url).toBe("");
       expect(anonKey).toBe("");
 

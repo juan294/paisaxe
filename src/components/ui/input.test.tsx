@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -108,7 +109,7 @@ describe("Input", () => {
       const ref = vi.fn();
       render(<Input ref={ref} />);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLInputElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/input.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/input.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLInputElement);
     });
   });
 

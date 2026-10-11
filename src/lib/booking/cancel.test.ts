@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Unit tests for visitor cancellation. cancel.postgrest-integration.test.ts
@@ -263,7 +264,7 @@ describe("confirmCancellation: the balance invoice (Phase 8a)", () => {
 
     expect(await confirmCancellation(fake.client, confirmed(), 3000)).toMatchObject({ status: "refund_pending" });
     expect(invoice.closeInvoiceAfterCancellationSafely).toHaveBeenCalledTimes(1);
-    expect(invoice.closeInvoiceAfterCancellationSafely.mock.invocationCallOrder[0]).toBeGreaterThan(paypal.refundCapture.mock.invocationCallOrder[0]);
+    expect(invoice.closeInvoiceAfterCancellationSafely.mock.invocationCallOrder[0]).toBeGreaterThan(requiredValue(paypal.refundCapture.mock.invocationCallOrder[0], "src/lib/booking/cancel.test.ts:266 paypal.refundCapture.mock.invocationCallOrder[0]"));
   });
 
   it("still closes the invoice when the deposit refund must be retried (the cancellation is recorded)", async () => {

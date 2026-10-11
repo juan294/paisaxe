@@ -142,6 +142,19 @@ describe("replayResponse with the committed e2e fixture", () => {
 });
 
 describe("parseReplayFixture", () => {
+  it("rejects a null scenario and parses a corrected fixture for a real replay response", () => {
+    expect(() => parseReplayFixture({ scenarios: [null] })).toThrow(
+      "booking replay: every scenario needs name, when and steps",
+    );
+
+    const corrected = parseReplayFixture({
+      scenarios: [{ name: "recovered", when: "^recovered$", steps: [{ text: "Recovered replay" }] }],
+    });
+    expect(replayResponse(corrected, params([{ role: "user", content: "recovered" }]), 1).content).toMatchObject([
+      { type: "text", text: "Recovered replay" },
+    ]);
+  });
+
   it.each([
     [{}],
     [{ scenarios: [] }],
@@ -150,6 +163,41 @@ describe("parseReplayFixture", () => {
     [{ scenarios: [{ name: "x", when: "a", steps: [{ text: "t", tools: [] }] }] }],
   ])("rejects %j", (raw) => {
     expect(() => parseReplayFixture(raw)).toThrow();
+  });
+});
+
+describe("numeric replay result indexed boundary", () => {
+  it.each([
+    { label: "empty items", items: [] },
+    { label: "nonarray items", items: { id: "42" } },
+    { label: "null item", items: [null] },
+  ])("rejects $label and accepts a corrected numeric id in the same replay", ({ items }) => {
+    const numericFixture = parseReplayFixture({
+      scenarios: [{
+        name: "numeric result",
+        when: "^numeric result$",
+        steps: [
+          { tools: [{ name: "search", input: {} }] },
+          { tools: [{ name: "numeric_probe", input: { id: "{{result.items[0].id:number}}" } }] },
+        ],
+      }],
+    });
+    const visitor: Anthropic.MessageParam = { role: "user", content: "numeric result" };
+    expect(() => replayResponse(
+      numericFixture,
+      params([visitor, assistantToolUse(), toolResult({ items })]),
+      2,
+    )).toThrow("booking replay: nothing at {{result.items[0].id}}");
+
+    const recovered = replayResponse(
+      numericFixture,
+      params([visitor, assistantToolUse(), toolResult({ items: [{ id: "42" }] })]),
+      3,
+    );
+    expect(recovered.stop_reason).toBe("tool_use");
+    expect(recovered.content).toMatchObject([
+      { type: "tool_use", name: "numeric_probe", input: { id: 42 } },
+    ]);
   });
 });
 

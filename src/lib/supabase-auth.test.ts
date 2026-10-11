@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -41,7 +42,7 @@ describe("DO-M1: getSupabaseClient trims env vars (no bare process.env reads)", 
 
     await getSupabaseClient(new NextRequest("http://localhost/api/test"));
 
-    const [url, anonKey] = mockCreateServerClient.mock.calls[0];
+    const [url, anonKey] = requiredValue(mockCreateServerClient.mock.calls[0], "Supabase client construction call");
     expect(url).toBe("");
     expect(anonKey).toBe("");
 
@@ -56,7 +57,7 @@ describe("DO-M1: getSupabaseClient trims env vars (no bare process.env reads)", 
 
     await getSupabaseClient(new NextRequest("http://localhost/api/test"));
 
-    const [url] = mockCreateServerClient.mock.calls[0];
+    const [url] = requiredValue(mockCreateServerClient.mock.calls[0], "src/lib/supabase-auth.test.ts:60 mock call tuple");
     expect(url).toBe("https://test.supabase.co");
     expect(url).not.toMatch(/\n/);
 
@@ -69,7 +70,7 @@ describe("DO-M1: getSupabaseClient trims env vars (no bare process.env reads)", 
 
     await getSupabaseClient(new NextRequest("http://localhost/api/test"));
 
-    const [, anonKey] = mockCreateServerClient.mock.calls[0];
+    const [, anonKey] = requiredValue(mockCreateServerClient.mock.calls[0], "src/lib/supabase-auth.test.ts:73 mock call tuple");
     expect(anonKey).toBe("test-anon-key");
 
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = saved;
@@ -114,7 +115,7 @@ describe("getSupabaseClient", () => {
 
     await getSupabaseClient(request);
 
-    const options = mockCreateServerClient.mock.calls[0][2];
+    const options = requiredValue(mockCreateServerClient.mock.calls[0], "src/lib/supabase-auth.test.ts:117 mockCreateServerClient.mock.calls[0]")[2];
     expect(options).toEqual(expect.objectContaining({
       global: {
         headers: { Authorization: "Bearer request-access-token" },
@@ -129,7 +130,7 @@ describe("getSupabaseClient", () => {
 
     await getSupabaseClient(request);
 
-    const options = mockCreateServerClient.mock.calls[0][2];
+    const options = requiredValue(mockCreateServerClient.mock.calls[0], "src/lib/supabase-auth.test.ts:132 mockCreateServerClient.mock.calls[0]")[2];
     expect(options).not.toHaveProperty("global");
   });
 
@@ -137,7 +138,7 @@ describe("getSupabaseClient", () => {
     async function getCookiesConfig() {
       await getSupabaseClient(new NextRequest("http://localhost/api/test"));
       const callArgs = mockCreateServerClient.mock.calls[0];
-      const options = callArgs[2] as { cookies: { getAll: () => unknown; setAll: (cookies: Array<{ name: string; value: string; options?: object }>) => void } };
+      const options = requiredValue(requiredValue(callArgs, "src/lib/supabase-auth.test.ts:141 callArgs")[2], "src/lib/supabase-auth.test.ts:140 callArgs[2]") as { cookies: { getAll: () => unknown; setAll: (cookies: Array<{ name: string; value: string; options?: object }>) => void } };
       return options.cookies;
     }
 
@@ -252,7 +253,7 @@ describe("getUserFromRequest", () => {
     expect(user).toEqual(mockUser);
     // Bearer token path: getUser called WITH the token
     expect(mockGetUser).toHaveBeenCalledWith("my-api-token");
-    expect(mockCreateServerClient.mock.calls[0][2]).toMatchObject({ global: { headers: { Authorization: "Bearer my-api-token" } } });
+    expect(requiredValue(mockCreateServerClient.mock.calls[0], "src/lib/supabase-auth.test.ts:255 mockCreateServerClient.mock.calls[0]")[2]).toMatchObject({ global: { headers: { Authorization: "Bearer my-api-token" } } });
   });
 
   // SE-L2 (#511): Explicit precedence test — bearer token wins when BOTH

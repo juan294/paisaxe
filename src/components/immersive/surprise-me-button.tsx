@@ -39,7 +39,7 @@ export function SurpriseMeButton({
 
     const targetIndex = candidates[Math.floor(Math.random() * candidates.length)];
 
-    onJumpTo(targetIndex);
+    if (targetIndex !== undefined) onJumpTo(targetIndex);
   };
 
   return (

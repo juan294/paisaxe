@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Unit tests for the phone-confirmation flow (PayPal hackathon plan, Phase 8b,
@@ -849,7 +850,7 @@ describe("reconcilePhoneAuthorizations: stale and unsettled authorizations", () 
     expect(select.in).toHaveBeenCalledWith("status", ["authorized", "void_pending"]);
     expect(select.in).toHaveBeenCalledWith("booking_id", ["b1"]);
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError.mock.calls[0][1]).toMatchObject({ id: "pay-c" });
+    expect(requiredValue(onError.mock.calls[0], "src/lib/booking/phone-confirmation.test.ts:852 onError.mock.calls[0]")[1]).toMatchObject({ id: "pay-c" });
   });
 
   it("an error the caller rethrows aborts the run", async () => {

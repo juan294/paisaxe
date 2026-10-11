@@ -163,7 +163,8 @@ export function selectImages(
     const sorted = group
       .map((img) => ({ img, score: scoreImage(img) }))
       .sort((a, b) => b.score - a.score);
-    selected.push({ image: sorted[0].img });
+    const best = sorted[0];
+    if (best) selected.push({ image: best.img });
   }
 
   return selected;

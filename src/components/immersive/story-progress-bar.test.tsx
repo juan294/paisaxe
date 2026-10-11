@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { useState } from "react";
@@ -70,7 +71,7 @@ describe("StoryProgressBar", () => {
     );
     const segments = getSegments();
     // base = 2 - (2 % 5) = 0, targetIndex = 0 + 0 = 0
-    fireEvent.click(segments[0]);
+    fireEvent.click(requiredValue(segments[0], "src/components/immersive/story-progress-bar.test.tsx: segments[0]"));
     expect(onIndexChange).toHaveBeenCalledWith(0);
   });
 
@@ -80,7 +81,7 @@ describe("StoryProgressBar", () => {
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
     const segments = getSegments();
-    fireEvent.click(segments[3]);
+    fireEvent.click(requiredValue(segments[3], "src/components/immersive/story-progress-bar.test.tsx: segments[3]"));
     expect(onIndexChange).toHaveBeenCalledWith(3);
   });
 
@@ -93,7 +94,7 @@ describe("StoryProgressBar", () => {
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
     const segments = getSegments();
-    fireEvent.keyDown(segments[0], { key: "Enter" });
+    fireEvent.keyDown(requiredValue(segments[0], "src/components/immersive/story-progress-bar.test.tsx: segments[0]"), { key: "Enter" });
     expect(onIndexChange).toHaveBeenCalledWith(0);
   });
 
@@ -103,7 +104,7 @@ describe("StoryProgressBar", () => {
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
     const segments = getSegments();
-    fireEvent.keyDown(segments[1], { key: " " });
+    fireEvent.keyDown(requiredValue(segments[1], "src/components/immersive/story-progress-bar.test.tsx: segments[1]"), { key: " " });
     expect(onIndexChange).toHaveBeenCalledWith(1);
   });
 
@@ -113,7 +114,7 @@ describe("StoryProgressBar", () => {
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
     const segments = getSegments();
-    fireEvent.keyDown(segments[0], { key: "Tab" });
+    fireEvent.keyDown(requiredValue(segments[0], "src/components/immersive/story-progress-bar.test.tsx: segments[0]"), { key: "Tab" });
     expect(onIndexChange).not.toHaveBeenCalled();
   });
 
@@ -147,7 +148,7 @@ describe("StoryProgressBar", () => {
       <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
     );
     const segments = getSegments();
-    const innerDiv = segments[0].querySelector("span[aria-hidden='true']");
+    const innerDiv = requiredValue(segments[0], "src/components/immersive/story-progress-bar.test.tsx: segments[0]").querySelector("span[aria-hidden='true']");
     expect(innerDiv).toBeTruthy();
     fireEvent.click(innerDiv!);
     expect(onIndexChange).toHaveBeenCalledWith(0);
@@ -205,7 +206,7 @@ describe("StoryProgressBar", () => {
     render(<StoryProgressBar {...defaultProps} />);
     const segments = getSegments();
     for (let i = 0; i < 5; i++) {
-      const fillDiv = segments[i].querySelector("span[aria-hidden='true']");
+      const fillDiv = requiredValue(segments[i], "src/components/immersive/story-progress-bar.test.tsx: segments[i]").querySelector("span[aria-hidden='true']");
       expect(fillDiv).toBeTruthy();
       if (i <= 2) {
         expect(fillDiv!.className).toContain("w-full");
@@ -222,7 +223,7 @@ describe("StoryProgressBar", () => {
     render(<StoryProgressBar {...defaultProps} />);
     const segments = getSegments();
     // Without storyTitles, label should NOT contain a story title, just the base label
-    const label = segments[0].getAttribute("aria-label");
+    const label = requiredValue(segments[0], "src/components/immersive/story-progress-bar.test.tsx: segments[0]").getAttribute("aria-label");
     expect(label).toBeTruthy();
     // Should just be the base label (the t() key with replacements)
     expect(label).toBe("accessibility.go_to_story");
@@ -378,7 +379,7 @@ describe("StoryProgressBar", () => {
       );
     const segments = getSegments();
       // Focus current segment (index 2), press ArrowRight -> should go to index 3
-      fireEvent.keyDown(segments[2], { key: "ArrowRight" });
+      fireEvent.keyDown(requiredValue(segments[2], "src/components/immersive/story-progress-bar.test.tsx: segments[2]"), { key: "ArrowRight" });
       expect(onIndexChange).toHaveBeenCalledWith(3);
     });
 
@@ -389,7 +390,7 @@ describe("StoryProgressBar", () => {
       );
     const segments = getSegments();
       // Focus current segment (index 2), press ArrowLeft -> should go to index 1
-      fireEvent.keyDown(segments[2], { key: "ArrowLeft" });
+      fireEvent.keyDown(requiredValue(segments[2], "src/components/immersive/story-progress-bar.test.tsx: segments[2]"), { key: "ArrowLeft" });
       expect(onIndexChange).toHaveBeenCalledWith(1);
     });
 
@@ -399,7 +400,7 @@ describe("StoryProgressBar", () => {
         <StoryProgressBar {...arrowNavProps} currentIndex={4} onIndexChange={onIndexChange} />
       );
     const segments = getSegments();
-      fireEvent.keyDown(segments[4], { key: "ArrowRight" });
+      fireEvent.keyDown(requiredValue(segments[4], "src/components/immersive/story-progress-bar.test.tsx: segments[4]"), { key: "ArrowRight" });
       expect(onIndexChange).toHaveBeenCalledWith(0);
     });
 
@@ -409,7 +410,7 @@ describe("StoryProgressBar", () => {
         <StoryProgressBar {...arrowNavProps} currentIndex={0} onIndexChange={onIndexChange} />
       );
     const segments = getSegments();
-      fireEvent.keyDown(segments[0], { key: "ArrowLeft" });
+      fireEvent.keyDown(requiredValue(segments[0], "src/components/immersive/story-progress-bar.test.tsx: segments[0]"), { key: "ArrowLeft" });
       expect(onIndexChange).toHaveBeenCalledWith(4);
     });
 
@@ -430,9 +431,9 @@ describe("StoryProgressBar", () => {
       render(<StoryProgressBar {...arrowNavProps} />);
     const segments = getSegments();
       // Each segment label should include the story title
-      expect(segments[0].getAttribute("aria-label")).toContain("Lagos de Covadonga");
-      expect(segments[1].getAttribute("aria-label")).toContain("Oviedo Cathedral");
-      expect(segments[2].getAttribute("aria-label")).toContain("Sidra House");
+      expect(requiredValue(segments[0], "src/components/immersive/story-progress-bar.test.tsx: segments[0]").getAttribute("aria-label")).toContain("Lagos de Covadonga");
+      expect(requiredValue(segments[1], "src/components/immersive/story-progress-bar.test.tsx: segments[1]").getAttribute("aria-label")).toContain("Oviedo Cathedral");
+      expect(requiredValue(segments[2], "src/components/immersive/story-progress-bar.test.tsx: segments[2]").getAttribute("aria-label")).toContain("Sidra House");
     });
 
     // UX-M10 (#520): Touch affordance — segments must be at least h-1.5, contrast bg-white/40
@@ -467,7 +468,7 @@ describe("StoryProgressBar", () => {
         <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
       );
     const segments = getSegments();
-      fireEvent.keyDown(segments[2], { key: "Home" });
+      fireEvent.keyDown(requiredValue(segments[2], "src/components/immersive/story-progress-bar.test.tsx: segments[2]"), { key: "Home" });
       expect(onIndexChange).toHaveBeenCalledWith(0);
     });
 
@@ -477,7 +478,7 @@ describe("StoryProgressBar", () => {
         <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
       );
     const segments = getSegments();
-      fireEvent.keyDown(segments[2], { key: "End" });
+      fireEvent.keyDown(requiredValue(segments[2], "src/components/immersive/story-progress-bar.test.tsx: segments[2]"), { key: "End" });
       expect(onIndexChange).toHaveBeenCalledWith(4);
     });
   });

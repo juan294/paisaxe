@@ -181,8 +181,8 @@ export function useImageEditor(
         setContentImageIndex(0);
         setContentSearched(true);
 
-        if (result.data.images.length > 0) {
-          const firstImage = result.data.images[0];
+        const firstImage = result.data.images[0];
+        if (firstImage) {
           setPreviewUrl(firstImage.url);
           setImageUrl(firstImage.url);
           setImageSource("Turismo de Asturias");
@@ -205,8 +205,9 @@ export function useImageEditor(
       newIndex = contentImageIndex === contentImages.length - 1 ? 0 : contentImageIndex + 1;
     }
 
-    setContentImageIndex(newIndex);
     const image = contentImages[newIndex];
+    if (!image) return;
+    setContentImageIndex(newIndex);
     setPreviewUrl(image.url);
     setImageUrl(image.url);
     setImageSource("Turismo de Asturias");

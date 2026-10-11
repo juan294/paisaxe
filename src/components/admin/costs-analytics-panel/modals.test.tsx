@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -83,7 +84,7 @@ describe("AddCostModal", () => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
 
-    const submittedData = onSubmit.mock.calls[0][0];
+    const submittedData = requiredValue(requiredValue(onSubmit.mock.calls[0], "src/components/admin/costs-analytics-panel/modals.test.tsx: onSubmit.mock.calls[0]")[0], "src/components/admin/costs-analytics-panel/modals.test.tsx: onSubmit.mock.calls[0][0]");
     expect(submittedData.serviceId).toBe("anthropic");
     expect(submittedData.serviceName).toBe("Anthropic Claude");
     expect(submittedData.category).toBe("ai");
@@ -163,7 +164,7 @@ describe("AddCostModal", () => {
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
-    expect(onSubmit.mock.calls[0][0].category).toBe("development");
+    expect(requiredValue(requiredValue(onSubmit.mock.calls[0], "src/components/admin/costs-analytics-panel/modals.test.tsx: onSubmit.mock.calls[0]")[0], "src/components/admin/costs-analytics-panel/modals.test.tsx: onSubmit.mock.calls[0][0]").category).toBe("development");
   });
 
   it("allows changing date range and notes", async () => {
@@ -192,7 +193,7 @@ describe("AddCostModal", () => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
 
-    const submittedData = onSubmit.mock.calls[0][0];
+    const submittedData = requiredValue(requiredValue(onSubmit.mock.calls[0], "src/components/admin/costs-analytics-panel/modals.test.tsx: onSubmit.mock.calls[0]")[0], "src/components/admin/costs-analytics-panel/modals.test.tsx: onSubmit.mock.calls[0][0]");
     expect(submittedData.billingPeriodStart).toBe("2026-03-01");
     expect(submittedData.billingPeriodEnd).toBe("2026-03-31");
     expect(submittedData.notes).toBe("March billing");

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -371,7 +372,7 @@ describe("DetailsTab", () => {
       const removeButtons = screen.getAllByLabelText("Remove question prompt");
       expect(removeButtons).toHaveLength(3);
 
-      await user.click(removeButtons[1]); // Remove Q2
+      await user.click(requiredValue(removeButtons[1], "src/components/admin/story-editor-dialog/details-tab.test.tsx: removeButtons[1]")); // Remove Q2
 
       expect(props.onQuestionPromptsChange).toHaveBeenCalledWith(["Q1", "Q3"]);
     });
@@ -385,7 +386,7 @@ describe("DetailsTab", () => {
       render(<DetailsTab {...props} />);
 
       const removeButtons = screen.getAllByLabelText("Remove question prompt");
-      await user.click(removeButtons[0]);
+      await user.click(requiredValue(removeButtons[0], "src/components/admin/story-editor-dialog/details-tab.test.tsx: removeButtons[0]"));
 
       expect(props.onQuestionPromptsChange).toHaveBeenCalledWith(["Q2"]);
     });
@@ -399,7 +400,7 @@ describe("DetailsTab", () => {
       render(<DetailsTab {...props} />);
 
       const removeButtons = screen.getAllByLabelText("Remove question prompt");
-      await user.click(removeButtons[1]);
+      await user.click(requiredValue(removeButtons[1], "src/components/admin/story-editor-dialog/details-tab.test.tsx: removeButtons[1]"));
 
       expect(props.onQuestionPromptsChange).toHaveBeenCalledWith(["Q1"]);
     });

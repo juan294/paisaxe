@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { escapeHtml, renderMarkdown, deduplicateByAgent } from "./markdown";
 import type { SharedContextEntry } from "@/types/agents-dashboard";
@@ -200,7 +201,7 @@ describe("agents-dashboard/markdown", () => {
       ];
       const result = deduplicateByAgent(entries);
       expect(result).toHaveLength(1);
-      expect(result[0].agentName).toBe("Coverage Agent");
+      expect(requiredValue(result[0], "src/components/admin/agents-dashboard/markdown.test.ts: result[0]").agentName).toBe("Coverage Agent");
     });
 
     it("keeps only the most recent entry per agent", () => {
@@ -220,7 +221,7 @@ describe("agents-dashboard/markdown", () => {
       ];
       const result = deduplicateByAgent(entries);
       expect(result).toHaveLength(1);
-      expect(result[0].content).toBe("New report");
+      expect(requiredValue(result[0], "src/components/admin/agents-dashboard/markdown.test.ts: result[0]").content).toBe("New report");
     });
 
     it("keeps entries from different agents", () => {
@@ -258,8 +259,8 @@ describe("agents-dashboard/markdown", () => {
         },
       ];
       const result = deduplicateByAgent(entries);
-      expect(result[0].agentName).toBe("Coverage Agent");
-      expect(result[1].agentName).toBe("Security Agent");
+      expect(requiredValue(result[0], "src/components/admin/agents-dashboard/markdown.test.ts: result[0]").agentName).toBe("Coverage Agent");
+      expect(requiredValue(result[1], "src/components/admin/agents-dashboard/markdown.test.ts: result[1]").agentName).toBe("Security Agent");
     });
 
     it("handles multiple duplicates across multiple agents", () => {
@@ -297,8 +298,8 @@ describe("agents-dashboard/markdown", () => {
       ];
       const result = deduplicateByAgent(entries);
       expect(result).toHaveLength(2);
-      expect(result[0].content).toBe("v3"); // Coverage latest
-      expect(result[1].content).toBe("v2"); // Security latest
+      expect(requiredValue(result[0], "src/components/admin/agents-dashboard/markdown.test.ts: result[0]").content).toBe("v3"); // Coverage latest
+      expect(requiredValue(result[1], "src/components/admin/agents-dashboard/markdown.test.ts: result[1]").content).toBe("v2"); // Security latest
     });
 
     it("deduplicates by agentName, not agentFlag", () => {
@@ -318,7 +319,7 @@ describe("agents-dashboard/markdown", () => {
       ];
       const result = deduplicateByAgent(entries);
       expect(result).toHaveLength(1);
-      expect(result[0].content).toBe("new");
+      expect(requiredValue(result[0], "src/components/admin/agents-dashboard/markdown.test.ts: result[0]").content).toBe("new");
     });
 
     it("skips older duplicate when a newer entry was already seen (line 51 false branch)", () => {
@@ -339,7 +340,7 @@ describe("agents-dashboard/markdown", () => {
       const result = deduplicateByAgent(entries);
       expect(result).toHaveLength(1);
       // Should keep the newer entry, not replace with the older one
-      expect(result[0].content).toBe("newer report");
+      expect(requiredValue(result[0], "src/components/admin/agents-dashboard/markdown.test.ts: result[0]").content).toBe("newer report");
     });
   });
 });

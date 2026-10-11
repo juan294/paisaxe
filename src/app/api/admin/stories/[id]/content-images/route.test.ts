@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
@@ -176,7 +177,7 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
           { page_number: 1 },
           { page_number: null as unknown as number },
         ],
-        images: [mockImages[0]],
+        images: [requiredValue(mockImages[0], "src/app/api/admin/stories/[id]/content-images/route.test.ts:179 mockImages[0]")],
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -243,7 +244,7 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       const mockClient = createMockSupabase({
         story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
         chunks: [{ page_number: 1 }],
-        images: [mockImages[0]],
+        images: [requiredValue(mockImages[0], "src/app/api/admin/stories/[id]/content-images/route.test.ts:246 mockImages[0]")],
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -259,7 +260,7 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       const mockClient = createMockSupabase({
         story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
         chunks: [{ page_number: 1 }],
-        images: [mockImages[0]],
+        images: [requiredValue(mockImages[0], "src/app/api/admin/stories/[id]/content-images/route.test.ts:262 mockImages[0]")],
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 

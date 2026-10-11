@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -223,7 +224,7 @@ describe("StoryCard", () => {
       expect(checkboxes.length).toBeGreaterThan(0);
 
       // Click on the checkbox in no-image state
-      fireEvent.click(checkboxes[0]);
+      fireEvent.click(requiredValue(checkboxes[0], "src/components/admin/story-card.test.tsx: checkboxes[0]"));
       expect(onToggleSelect).toHaveBeenCalledWith("story-1");
     });
 

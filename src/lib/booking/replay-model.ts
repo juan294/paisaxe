@@ -100,6 +100,8 @@ function resolvePath(root: Json, path: string): Json {
     if (value === null || value === undefined) return undefined;
     if (key !== undefined) {
       value = (value as Record<string, Json>)[key];
+    } else if (bracket === undefined) {
+      return undefined;
     } else if (/^\d+$/.test(bracket)) {
       value = Array.isArray(value) ? value[Number(bracket)] : undefined;
     } else {
@@ -136,9 +138,11 @@ function renderString(template: string, scope: TemplateScope, strict: boolean): 
     return "none";
   };
   const whole = template.match(WHOLE_PLACEHOLDER);
-  if (whole) {
-    const value = resolve(whole[1], whole[2]);
-    return whole[3] && value !== "none" ? Number(value) : value;
+  const source = whole?.[1];
+  const path = whole?.[2];
+  if (source !== undefined && path !== undefined) {
+    const value = resolve(source, path);
+    return whole?.[3] && value !== "none" ? Number(value) : value;
   }
   return template.replace(PLACEHOLDER, (_all, source: string, path: string) => {
     const value = resolve(source, path);
@@ -162,9 +166,9 @@ function systemText(system: Anthropic.MessageStreamParams["system"]): string {
 
 /** What the replay may read from agent.ts's state block. */
 function readState(system: string): TemplateScope["state"] {
-  const bookingsLine = system.match(/^Reservas del visitante: (\[.*\])$/m);
+  const bookingsLine = system.match(/^Reservas del visitante: (\[.*\])$/m)?.[1];
   return {
-    bookings: bookingsLine ? (JSON.parse(bookingsLine[1]) as Json[]) : [],
+    bookings: bookingsLine !== undefined ? (JSON.parse(bookingsLine) as Json[]) : [],
   };
 }
 
@@ -189,14 +193,9 @@ function latestToolResult(messages: Anthropic.MessageParam[]): Json {
 /** The next model response for this conversation, per the fixture. */
 export function replayResponse(fixture: ReplayFixture, params: Anthropic.MessageStreamParams, callId: number): Anthropic.Message {
   const { messages } = params;
-  let visitorIndex = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (isVisitorText(messages[i])) {
-      visitorIndex = i;
-      break;
-    }
-  }
-  const visitorText = visitorIndex >= 0 ? textOf(messages[visitorIndex]).trim() : "";
+  const visitorIndex = messages.findLastIndex(isVisitorText);
+  const visitor = messages[visitorIndex];
+  const visitorText = visitor ? textOf(visitor).trim() : "";
   // The visitor's words may be merged with earlier history: match the last paragraph.
   const latest = visitorText.split("\n\n").at(-1) ?? "";
   const scenario = fixture.scenarios.find((candidate) => candidate.pattern.test(latest));

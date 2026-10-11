@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PAYER_EMAIL, startPaypalMock, type PaypalMock } from "@/test/paypal-mock-server";
@@ -57,10 +58,10 @@ describe("createOrder", () => {
     await createOrder(input);
 
     const [request] = mock.requestsTo("POST", "/v2/checkout/orders");
-    expect(request.headers["paypal-request-id"]).toBe(OPERATION_KEY);
-    expect(request.headers.prefer).toBe("return=representation");
-    expect(request.headers["content-type"]).toBe("application/json");
-    expect(request.body).toEqual({
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/orders.test.ts:61 request").headers["paypal-request-id"], "src/lib/paypal/orders.test.ts:60 request.headers[\"paypal-request-id\"]")).toBe(OPERATION_KEY);
+    expect(requiredValue(request, "src/lib/paypal/orders.test.ts:62 request").headers.prefer).toBe("return=representation");
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/orders.test.ts:63 request").headers["content-type"], "src/lib/paypal/orders.test.ts:62 request.headers[\"content-type\"]")).toBe("application/json");
+    expect(requiredValue(request, "src/lib/paypal/orders.test.ts:64 request").body).toEqual({
       intent: "CAPTURE",
       purchase_units: [
         {
@@ -227,9 +228,9 @@ describe("captureOrder", () => {
     const order = await captureOrder(orderId, OPERATION_KEY);
 
     const [request] = mock.requestsTo("POST", `/v2/checkout/orders/${orderId}/capture`);
-    expect(request.headers["paypal-request-id"]).toBe(`capture:${OPERATION_KEY}`);
-    expect(request.headers.prefer).toBe("return=representation");
-    expect(request.body).toEqual({});
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/orders.test.ts:231 request").headers["paypal-request-id"], "src/lib/paypal/orders.test.ts:230 request.headers[\"paypal-request-id\"]")).toBe(`capture:${OPERATION_KEY}`);
+    expect(requiredValue(request, "src/lib/paypal/orders.test.ts:232 request").headers.prefer).toBe("return=representation");
+    expect(requiredValue(request, "src/lib/paypal/orders.test.ts:233 request").body).toEqual({});
     expect(order.status).toBe("COMPLETED");
     expect(order.capture).toEqual({
       id: mock.orders.get(orderId)?.captureId,

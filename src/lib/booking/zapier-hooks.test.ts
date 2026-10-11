@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Where the Zapier sync fires (PayPal hackathon plan, Phase 8c): once per
@@ -204,7 +205,7 @@ describe("booking.confirmed: consume_hold_and_confirm's 'confirmed' reply is the
 
     // loadState (2), approved/capture_pending/captured (3), then only the sync's read: no write, no flag, no refund.
     expect(touched()).toEqual(["bookings", "payments", "payments", "payments", "payments", "bookings"]);
-    expect(writes.map((query) => query.update.mock.calls[0][0].status)).toEqual(["approved", "capture_pending", "captured"]);
+    expect(writes.map((query) => requiredValue(query.update.mock.calls[0], "src/lib/booking/zapier-hooks.test.ts:207 query.update.mock.calls[0]")[0].status)).toEqual(["approved", "capture_pending", "captured"]);
     expect(paypal.refundCapture).not.toHaveBeenCalled();
     expect(failures()).toHaveLength(1);
   });
@@ -304,7 +305,7 @@ describe("booking.refunded: markBookingRefunded's guarded UPDATE changing the ro
     await settle();
 
     expect(touched()).toEqual(["payments", "bookings", "payments", "bookings", "bookings"]);
-    expect(writes.map((query) => query.update.mock.calls[0][0].status)).toEqual(["refund_pending", "refund_pending", "refunded", "refunded"]);
+    expect(writes.map((query) => requiredValue(query.update.mock.calls[0], "src/lib/booking/zapier-hooks.test.ts:307 query.update.mock.calls[0]")[0].status)).toEqual(["refund_pending", "refund_pending", "refunded", "refunded"]);
     expect(failures()).toHaveLength(1);
     expect(received.length).toBe(mode === "the hook answers 500" ? 1 : 0);
   });

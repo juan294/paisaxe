@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   fetchFeatureFlags,
@@ -30,7 +31,7 @@ describe("admin-api/feature-flags", () => {
       const result = await fetchFeatureFlags();
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/feature-flags.test.ts:33 mock call tuple");
       expect(String(url)).toBe("/api/feature-flags");
       expect(init?.cache).toBe("no-store");
       expect(result).toEqual({ data: mockData });
@@ -82,7 +83,7 @@ describe("admin-api/feature-flags", () => {
       await updateFeatureFlag("visitor_voice_agent", true);
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/feature-flags.test.ts:85 mock call tuple");
       expect(String(url)).toBe("/api/admin/feature-flags/visitor_voice_agent");
       expect(init.method).toBe("PUT");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -96,7 +97,7 @@ describe("admin-api/feature-flags", () => {
 
       await updateFeatureFlag("visitor_voice_agent", false);
 
-      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/feature-flags.test.ts:99 mock call tuple");
       expect(JSON.parse(init.body)).toEqual({ enabled: false });
     });
 
@@ -160,7 +161,7 @@ describe("admin-api/feature-flags", () => {
       await updateFeatureFlagConfig("visitor_voice_agent", mockConfig);
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/feature-flags.test.ts:163 mock call tuple");
       expect(String(url)).toBe("/api/admin/feature-flags/visitor_voice_agent");
       expect(init.method).toBe("PUT");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });

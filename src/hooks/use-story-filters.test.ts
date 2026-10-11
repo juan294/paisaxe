@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useStoryFilters } from "./use-story-filters";
@@ -124,7 +125,7 @@ describe("useStoryFilters", () => {
       });
 
       expect(result.current.filteredStories).toHaveLength(1);
-      expect(result.current.filteredStories[0].id).toBe("1");
+      expect(requiredValue(result.current.filteredStories[0], "src/hooks/use-story-filters.test.ts: result.current.filteredStories[0]").id).toBe("1");
     });
 
     it("should return empty array when no stories match combined filters", () => {

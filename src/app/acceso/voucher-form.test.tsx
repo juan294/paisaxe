@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { VoucherForm } from "./voucher-form";
@@ -78,7 +79,7 @@ describe("VoucherForm", () => {
 
     await waitFor(() => expect(mockPush).toHaveBeenCalled());
     expect(mockSignInAnonymously).not.toHaveBeenCalled();
-    expect(mockFetch.mock.calls[0][1].headers.Authorization).toBe("Bearer google-token");
+    expect(requiredValue(requiredValue(mockFetch.mock.calls[0], "src/app/acceso/voucher-form.test.tsx: mockFetch.mock.calls[0]")[1], "src/app/acceso/voucher-form.test.tsx: mockFetch.mock.calls[0][1]").headers.Authorization).toBe("Bearer google-token");
   });
 
   it("shows anonFailed and logs [VOUCHER_ANON_SIGNIN_FAILED] when the guest sign-in fails", async () => {

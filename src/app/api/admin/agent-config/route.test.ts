@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -215,7 +216,7 @@ describe("PUT /api/admin/agent-config", () => {
     expect(mockWriteFile).toHaveBeenCalledOnce();
     // Verify the written config has master_enabled=true
     const writtenConfig = JSON.parse(
-      mockWriteFile.mock.calls[0][1] as string,
+      requiredValue(mockWriteFile.mock.calls[0], "src/app/api/admin/agent-config/route.test.ts:218 mockWriteFile.mock.calls[0]")[1] as string,
     );
     expect(writtenConfig.master_enabled).toBe(true);
   });

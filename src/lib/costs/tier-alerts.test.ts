@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { computeTierAlerts } from "./tier-alerts";
 import { SERVICE_TIERS } from "@/config/service-tiers";
@@ -5,6 +6,22 @@ import type { ServiceTierConfig } from "@/config/service-tiers";
 
 describe("computeTierAlerts", () => {
   const refDate = new Date("2026-02-06");
+
+  it.each([
+    ["2026-01-01T00:00:00.000Z", "2026-01-01", "2026-01-03"],
+    ["+010000-01-01T00:00:00.000Z", "+010000-01-01", "+010000-01-03"],
+  ])("preserves the complete ISO date for %s", (reference, currentDate, projectedDate) => {
+    const tiers: ServiceTierConfig[] = [{
+      serviceId: "test", serviceName: "Test", currentTierName: "Free",
+      currentMonthlyCostUsd: 0,
+      limits: [{ metricKey: "usage", label: "Usage", monthlyLimit: 100, unit: "calls" }],
+    }];
+    const date = new Date(reference);
+    const current = requiredValue(computeTierAlerts(tiers, { usage: 200 }, 30, date)[0], "current alert");
+    expect(current.projectedDate).toBe(currentDate);
+    const projected = requiredValue(computeTierAlerts(tiers, { usage: 95 }, 30, date)[0], "projected alert");
+    expect(projected.projectedDate).toBe(projectedDate);
+  });
 
   it("should return alerts for all configured tier limits", () => {
     const totalLimits = SERVICE_TIERS.reduce(
@@ -45,8 +62,8 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].alertLevel).toBe("critical");
-    expect(alerts[0].projectedDaysToLimit).toBe(0);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:48 alerts[0]").alertLevel).toBe("critical");
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:49 alerts[0]").projectedDaysToLimit).toBe(0);
   });
 
   it("should return critical via projection when limit hit in less than 7 days", () => {
@@ -72,10 +89,10 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].alertLevel).toBe("critical");
-    expect(alerts[0].projectedDaysToLimit).toBeGreaterThan(0);
-    expect(alerts[0].projectedDaysToLimit).toBeLessThan(7);
-    expect(alerts[0].recommendation).toBeDefined();
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:75 alerts[0]").alertLevel).toBe("critical");
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:76 alerts[0]").projectedDaysToLimit).toBeGreaterThan(0);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:77 alerts[0]").projectedDaysToLimit).toBeLessThan(7);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:78 alerts[0]").recommendation).toBeDefined();
   });
 
   it("should return warning when limit hit in 7-30 days", () => {
@@ -101,9 +118,9 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].alertLevel).toBe("warning");
-    expect(alerts[0].projectedDaysToLimit).toBeGreaterThanOrEqual(7);
-    expect(alerts[0].projectedDaysToLimit).toBeLessThan(30);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:104 alerts[0]").alertLevel).toBe("warning");
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:105 alerts[0]").projectedDaysToLimit).toBeGreaterThanOrEqual(7);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:106 alerts[0]").projectedDaysToLimit).toBeLessThan(30);
   });
 
   it("should return watch when limit hit in 30-90 days", () => {
@@ -134,9 +151,9 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].alertLevel).toBe("watch");
-    expect(alerts[0].projectedDaysToLimit).toBeGreaterThanOrEqual(30);
-    expect(alerts[0].projectedDaysToLimit).toBeLessThan(90);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:137 alerts[0]").alertLevel).toBe("watch");
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:138 alerts[0]").projectedDaysToLimit).toBeGreaterThanOrEqual(30);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:139 alerts[0]").projectedDaysToLimit).toBeLessThan(90);
   });
 
   it("should return safe when limit is far away", () => {
@@ -162,8 +179,8 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].alertLevel).toBe("safe");
-    expect(alerts[0].projectedDaysToLimit).toBeGreaterThanOrEqual(90);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:165 alerts[0]").alertLevel).toBe("safe");
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:166 alerts[0]").projectedDaysToLimit).toBeGreaterThanOrEqual(90);
   });
 
   it("should handle zero periodDays without crashing", () => {
@@ -198,10 +215,10 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].recommendation).toBeDefined();
-    expect(alerts[0].recommendation!.tierName).toBe("Pro");
-    expect(alerts[0].recommendation!.monthlyCostUsd).toBe(10);
-    expect(alerts[0].recommendation!.costDelta).toBe(10);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:201 alerts[0]").recommendation).toBeDefined();
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:202 alerts[0]").recommendation!.tierName).toBe("Pro");
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:203 alerts[0]").recommendation!.monthlyCostUsd).toBe(10);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:204 alerts[0]").recommendation!.costDelta).toBe(10);
   });
 
   it("should NOT include recommendation for safe/watch alerts", () => {
@@ -225,7 +242,7 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].recommendation).toBeUndefined();
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:228 alerts[0]").recommendation).toBeUndefined();
   });
 
   it("should sort by severity (critical first)", () => {
@@ -257,8 +274,8 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].alertLevel).toBe("critical");
-    expect(alerts[1].alertLevel).toBe("safe");
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:260 alerts[0]").alertLevel).toBe("critical");
+    expect(requiredValue(alerts[1], "src/lib/costs/tier-alerts.test.ts:261 alerts[1]").alertLevel).toBe("safe");
   });
 
   it("should default to current date when referenceDate is omitted", () => {
@@ -277,7 +294,7 @@ describe("computeTierAlerts", () => {
     // Should not throw and should return valid alerts
     const alerts = computeTierAlerts(tiers, { testMetric: 50 }, 30);
     expect(alerts).toHaveLength(1);
-    expect(alerts[0].alertLevel).toBeDefined();
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:280 alerts[0]").alertLevel).toBeDefined();
   });
 
   it("should return 0 usagePercent when monthlyLimit is 0", () => {
@@ -295,7 +312,7 @@ describe("computeTierAlerts", () => {
 
     const alerts = computeTierAlerts(tiers, { testMetric: 50 }, 30, refDate);
     expect(alerts).toHaveLength(1);
-    expect(alerts[0].usagePercent).toBe(0);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:298 alerts[0]").usagePercent).toBe(0);
   });
 
   it("should compute correct projected date", () => {
@@ -320,8 +337,8 @@ describe("computeTierAlerts", () => {
       refDate
     );
 
-    expect(alerts[0].projectedDate).toBeTruthy();
-    const projected = new Date(alerts[0].projectedDate!);
+    expect(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:323 alerts[0]").projectedDate).toBeTruthy();
+    const projected = new Date(requiredValue(alerts[0], "src/lib/costs/tier-alerts.test.ts:324 alerts[0]").projectedDate!);
     expect(projected.getTime()).toBeGreaterThan(refDate.getTime());
   });
 });

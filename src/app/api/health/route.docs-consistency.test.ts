@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,7 +87,7 @@ function findHealthJqReferences(): HealthJqReference[] {
       if (!line.includes("/api/health")) return;
       const match = line.match(/jq\s+'\.([a-zA-Z0-9_.]*)'/);
       if (!match) return;
-      refs.push({ file, line: idx + 1, path: match[1], raw: line.trim() });
+      refs.push({ file, line: idx + 1, path: requiredValue(match[1], "src/app/api/health/route.docs-consistency.test.ts:89 match[1]"), raw: line.trim() });
     });
   }
 

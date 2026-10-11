@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
@@ -66,11 +67,11 @@ beforeEach(() => {
 
 for (const route of routes) {
   describe(route, async () => {
-    const load = modules[`./${route}/route.ts`];
+    const load = requiredValue(modules[`./${route}/route.ts`], "src/app/api/admin/authorization-matrix.test.ts:70 modules[`./${route}/route.ts`]");
     const handlers = await load();
     for (const method of methods.filter(method => typeof handlers[method] === "function")) {
       function invoke() {
-        return handlers[method](new NextRequest(`http://localhost/api/admin/${route}`, {
+        return requiredValue(handlers[method], "src/app/api/admin/authorization-matrix.test.ts:73 handlers[method]")(new NextRequest(`http://localhost/api/admin/${route}`, {
           method, headers: {"x-request-id": "phase10-matrix"},
           ...(!["GET", "HEAD"].includes(method) ? {body: "{}"} : {}),
         }), {params: Promise.resolve({id: "550e8400-e29b-41d4-a716-446655440000", key: "voice_enabled"})});

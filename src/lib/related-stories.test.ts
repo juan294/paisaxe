@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { getRelatedStories } from "./related-stories";
 import type { Story } from "@/types/immersive";
@@ -66,7 +67,7 @@ const mockStories: Story[] = [
 ];
 
 describe("getRelatedStories", () => {
-  const currentStory = mockStories[0]; // Nature, Eastern, Day-trip
+  const currentStory = requiredValue(mockStories[0], "src/lib/related-stories.test.ts:74 mockStories[0]"); // Nature, Eastern, Day-trip
 
   it("should not include the current story in results", () => {
     const related = getRelatedStories(currentStory, mockStories);
@@ -81,7 +82,7 @@ describe("getRelatedStories", () => {
     // Story 2 should be second: same category (1 match)
     // Story 3 should be third: same location + same duration (2 matches)
     expect(related.length).toBeGreaterThan(0);
-    expect(related[0].id).toBe("5"); // nature + eastern
+    expect(requiredValue(related[0], "src/lib/related-stories.test.ts:84 related[0]").id).toBe("5"); // nature + eastern
   });
 
   it("should limit results to specified count", () => {
@@ -101,9 +102,9 @@ describe("getRelatedStories", () => {
 
     // Story 5 (nature + eastern = 5 pts) should be first
     // It has both same category AND same location
-    expect(related[0].id).toBe("5");
-    expect(related[0].category).toBe("nature");
-    expect(related[0].location).toBe("eastern");
+    expect(requiredValue(related[0], "src/lib/related-stories.test.ts:104 related[0]").id).toBe("5");
+    expect(requiredValue(related[0], "src/lib/related-stories.test.ts:105 related[0]").category).toBe("nature");
+    expect(requiredValue(related[0], "src/lib/related-stories.test.ts:106 related[0]").location).toBe("eastern");
   });
 
   it("should handle stories without location", () => {

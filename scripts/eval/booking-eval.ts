@@ -126,7 +126,10 @@ class Conversation {
 /** Euro amounts written in assistant text (e.g. "120 €", "30,00 euros", "EUR 90"). */
 function eurosIn(text: string): number[] {
   const pattern = /(?:€|eur(?:os?)?)\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur(?:os?)?)/gi;
-  return [...text.matchAll(pattern)].map((m) => Number((m[1] ?? m[2]).replace(",", ".")));
+  return [...text.matchAll(pattern)].flatMap((m) => {
+    const amount = m[1] ?? m[2];
+    return amount === undefined ? [] : [Number(amount.replace(",", "."))];
+  });
 }
 
 /** Amounts a tool supplied in this conversation (prices, deposits, balances) plus the visitor's own. */

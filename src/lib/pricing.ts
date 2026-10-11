@@ -23,7 +23,7 @@ export interface PricingTier {
 }
 
 /** All three voice-pass tiers, in cheapest-first order. */
-export const PRICING_TIERS: PricingTier[] = [
+export const PRICING_TIERS: [PricingTier, PricingTier, PricingTier] = [
   {
     id: "day_pass",
     price: "€1.99",

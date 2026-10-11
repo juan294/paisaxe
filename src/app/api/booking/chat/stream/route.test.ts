@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -92,7 +93,7 @@ describe("POST /api/booking/chat/stream", () => {
   it("rate-limits per user id", async () => {
     deps.rateAllowed = false;
     expect((await post({ message: "hola", history: [] })).status).toBe(429);
-    expect(vi.mocked(checkRateLimit).mock.calls[0][0]).toBe("booking-chat:user-1");
+    expect(requiredValue(vi.mocked(checkRateLimit).mock.calls[0], "src/app/api/booking/chat/stream/route.test.ts:95 vi.mocked(checkRateLimit).mock.calls[0]")[0]).toBe("booking-chat:user-1");
   });
 
   it.each([
@@ -125,7 +126,7 @@ describe("POST /api/booking/chat/stream", () => {
     expect(consume).toHaveBeenCalledWith({ admin: true }, "r1", "chat_turns");
     expect((await events(response)).map((e) => e.type)).toEqual(["text", "tool", "tool", "card", "text", "done"]);
 
-    const input = vi.mocked(streamBookingTurn).mock.calls[0][0] as unknown as Record<string, unknown>;
+    const input = requiredValue(vi.mocked(streamBookingTurn).mock.calls[0], "src/app/api/booking/chat/stream/route.test.ts:128 vi.mocked(streamBookingTurn).mock.calls[0]")[0] as unknown as Record<string, unknown>;
     expect(input).toMatchObject({
       message: "Somos cuatro",
       history: [{ role: "assistant", content: "¡Hola!" }],
@@ -139,7 +140,7 @@ describe("POST /api/booking/chat/stream", () => {
     deps.searchFails = true;
     const response = await post({ message: "Somos cuatro", history: [] });
     expect((await events(response)).at(-1)?.type).toBe("done");
-    expect((vi.mocked(streamBookingTurn).mock.calls[0][0] as unknown as { contextText: unknown }).contextText).toBeNull();
+    expect((requiredValue(vi.mocked(streamBookingTurn).mock.calls[0], "src/app/api/booking/chat/stream/route.test.ts:142 vi.mocked(streamBookingTurn).mock.calls[0]")[0] as unknown as { contextText: unknown }).contextText).toBeNull();
   });
 
   it("passes a verified quote_accepted event (own booking, pending payment) with an empty message", async () => {
@@ -147,7 +148,7 @@ describe("POST /api/booking/chat/stream", () => {
     const response = await post({ message: "", history: [], event: { type: "quote_accepted", bookingId: BOOKING_ID } });
     await events(response);
 
-    expect((vi.mocked(streamBookingTurn).mock.calls[0][0] as unknown as { acceptedBooking: unknown }).acceptedBooking).toEqual({
+    expect((requiredValue(vi.mocked(streamBookingTurn).mock.calls[0], "src/app/api/booking/chat/stream/route.test.ts:150 vi.mocked(streamBookingTurn).mock.calls[0]")[0] as unknown as { acceptedBooking: unknown }).acceptedBooking).toEqual({
       id: BOOKING_ID,
       reference: "RS-ABC123",
     });
@@ -161,7 +162,7 @@ describe("POST /api/booking/chat/stream", () => {
     const response = await post({ message: "¿Y ahora?", history: [], event: { type: "quote_accepted", bookingId: BOOKING_ID } });
     await events(response);
 
-    expect((vi.mocked(streamBookingTurn).mock.calls[0][0] as unknown as { acceptedBooking: unknown }).acceptedBooking).toBeNull();
+    expect((requiredValue(vi.mocked(streamBookingTurn).mock.calls[0], "src/app/api/booking/chat/stream/route.test.ts:164 vi.mocked(streamBookingTurn).mock.calls[0]")[0] as unknown as { acceptedBooking: unknown }).acceptedBooking).toBeNull();
     expect(logger.warn).toHaveBeenCalledWith("[BOOKING_CHAT_EVENT_IGNORED]", expect.objectContaining({ bookingId: BOOKING_ID }));
   });
 
@@ -291,7 +292,7 @@ it("disposes booking idle/cap timers and the request listener at timeout, ignore
     await vi.advanceTimersByTimeAsync(30_000);
     const sent = await body;
     expect(sent).toEqual([{ type: "text", content: "Primero" }, { type: "error", message: "response_timeout" }]);
-    expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
+    expect(remove).toHaveBeenCalledWith("abort", requiredValue(add.mock.calls[0], "src/app/api/booking/chat/stream/route.test.ts:294 add.mock.calls[0]")[1]);
     resume();
     await vi.advanceTimersByTimeAsync(85_000);
     expect(sent).toHaveLength(2);

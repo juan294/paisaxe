@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from 'vitest';
 import { es } from './es';
 import { en } from './en';
@@ -58,14 +59,14 @@ describe('locale files', () => {
 
   for (const [code, { name }] of Object.entries(allLocales)) {
     it(`${name} locale has translation keys`, () => {
-      expect(allLocaleKeys[code].length).toBeGreaterThan(0);
+      expect(requiredValue(allLocaleKeys[code], "src/lib/i18n/translations.test.ts:61 allLocaleKeys[code]").length).toBeGreaterThan(0);
     });
   }
 
   for (const [code, { name }] of Object.entries(allLocales)) {
     if (code === 'es') continue;
     it(`${name} locale has the same number of keys as Spanish`, () => {
-      expect(allLocaleKeys[code].length).toBe(esKeys.length);
+      expect(requiredValue(allLocaleKeys[code], "src/lib/i18n/translations.test.ts:68 allLocaleKeys[code]").length).toBe(requiredValue(esKeys, "src/lib/i18n/translations.test.ts:69 esKeys").length);
     });
   }
 
@@ -73,13 +74,13 @@ describe('locale files', () => {
     if (code === 'es') continue;
     it(`every key in Spanish locale exists in ${name} locale`, () => {
       const targetKeySet = new Set(allLocaleKeys[code]);
-      const missing = esKeys.filter((key) => !targetKeySet.has(key));
+      const missing = requiredValue(esKeys, "src/lib/i18n/translations.test.ts:77 esKeys").filter((key) => !targetKeySet.has(key));
       expect(missing).toEqual([]);
     });
 
     it(`every key in ${name} locale exists in Spanish locale`, () => {
       const esKeySet = new Set(esKeys);
-      const missing = allLocaleKeys[code].filter((key) => !esKeySet.has(key));
+      const missing = requiredValue(allLocaleKeys[code], "src/lib/i18n/translations.test.ts:82 allLocaleKeys[code]").filter((key) => !esKeySet.has(key));
       expect(missing).toEqual([]);
     });
   }

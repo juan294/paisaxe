@@ -7,7 +7,7 @@ export function isLocale(value: unknown): value is Locale {
 }
 
 export function mapLanguageTag(tag: string): Locale | null {
-  const primary = tag.split('-')[0].toLowerCase();
+  const [primary = ''] = tag.toLowerCase().split('-');
   return isLocale(primary) ? primary : null;
 }
 
@@ -20,7 +20,7 @@ export function getLocaleCookie(): Locale | null {
 export function resolveRequestLocale(cookie: string | null | undefined, acceptLanguage: string | null) {
   if (isLocale(cookie)) return { locale: cookie, source: 'cookie' as const };
   const candidates = (acceptLanguage ?? '').split(',').map((entry, order) => {
-    const [tag, ...parameters] = entry.trim().split(';');
+    const [tag = '', ...parameters] = entry.trim().split(';');
     const quality = parameters.find(p => p.trim().startsWith('q='));
     const weight = quality === undefined ? 1 : Number(quality.trim().slice(2));
     return { locale: mapLanguageTag(tag), weight, order };

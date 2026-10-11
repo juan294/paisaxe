@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getInitialPresentation } from './request-presentation';
@@ -61,6 +62,6 @@ describe('request-scoped initial presentation', () => {
     const seed = await pending;
     expect(seed.user).toBeNull();
     expect(seed.authError).toBe(true);
-    expect(mocks.createClient.mock.calls[0][2].global.fetch).toBeTypeOf('function');
+    expect(requiredValue(mocks.createClient.mock.calls[0], "src/lib/request-presentation.test.ts:64 mocks.createClient.mock.calls[0]")[2].global.fetch).toBeTypeOf('function');
   });
 });

@@ -68,8 +68,10 @@ function PricingPageContent() {
     (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
       const next = focusForKey(event.key, index);
       if (next === null) return;
+      const tier = PRICING_TIERS[next];
+      if (!tier) return;
       event.preventDefault();
-      setSelectedTier(PRICING_TIERS[next].id);
+      setSelectedTier(tier.id);
     },
     [focusForKey]
   );

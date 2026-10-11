@@ -47,7 +47,7 @@ interface VoiceAgentChatProps {
 }
 
 export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
-  const [agents] = useState<Agent[]>([
+  const [agents] = useState<[Agent, Agent, Agent]>([
     {
       id: "xander",
       name: "Xander",

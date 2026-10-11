@@ -26,8 +26,8 @@ export function CostsAnalyticsPanel() {
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     return {
-      from: firstOfMonth.toISOString().split("T")[0],
-      to: now.toISOString().split("T")[0],
+      from: firstOfMonth.toISOString().replace(/T.*$/, ""),
+      to: now.toISOString().replace(/T.*$/, ""),
     };
   });
   const [showAddModal, setShowAddModal] = useState(false);

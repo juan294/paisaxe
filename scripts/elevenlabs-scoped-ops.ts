@@ -383,8 +383,9 @@ async function runDirectAgentOperation(
     throw new Error("ElevenLabs agent update returned the wrong branch.");
   }
   branch.version_id = updated.version_id;
-  if (entry.branches?.[branch.branch_id]) {
-    entry.branches[branch.branch_id].version_id = updated.version_id;
+  const manifestBranch = entry.branches?.[branch.branch_id];
+  if (manifestBranch) {
+    manifestBranch.version_id = updated.version_id;
   } else {
     entry.version_id = updated.version_id;
   }

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * The balance invoice against the live local stack (PayPal hackathon plan,
@@ -103,7 +104,7 @@ const cancelPath = (invoiceId: string) => `${INVOICES}/${invoiceId}/cancel`;
 async function invoicedBooking(): Promise<{ id: string; invoiceId: string }> {
   const { id } = await confirmedBooking();
   await sendInvoice(id);
-  return { id, invoiceId: invoiceRow(id)[0] };
+  return { id, invoiceId: requiredValue(invoiceRow(id)[0], "src/lib/booking/invoice.postgrest-integration.test.ts:106 invoiceRow(id)[0]") };
 }
 
 const ctx = (userId = USER) => ({ userId, redemptionId: "r-b008", client: localServiceClient() });
@@ -180,8 +181,8 @@ describe.skipIf(!dbReachable)("balance invoice against live local Supabase and t
     expect(status).toBe("sent");
     expect(paid).toBe("false");
     expect(url).toBe(`https://www.sandbox.paypal.com/invoice/p/#${invoiceId}`);
-    expect(mock.invoices.get(invoiceId)).toMatchObject({ recipientEmail: PAYER, amountCents: 9000, currency: "EUR", dueDate: date, status: "SENT" });
-    expect(mock.requestsTo("POST", INVOICES)[0].headers["paypal-request-id"]).toBe(`invoice:${id}`);
+    expect(mock.invoices.get(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:184 invoiceId"))).toMatchObject({ recipientEmail: PAYER, amountCents: 9000, currency: "EUR", dueDate: date, status: "SENT" });
+    expect(requiredValue(mock.requestsTo("POST", INVOICES)[0], "src/lib/booking/invoice.postgrest-integration.test.ts:184 mock.requestsTo(\"POST\", INVOICES)[0]").headers["paypal-request-id"]).toBe(`invoice:${id}`);
     expect(first.result).toMatchObject({ invoice: "sent", alreadySent: false, balanceEuros: "90.00", dueDate: date });
     expect(JSON.stringify(first.result)).not.toMatch(/https?:\/\/|INV2-|@/);
     expect(first.card).toMatchObject({ kind: "invoice", bookingId: id, amountCents: 9000, status: "sent", invoiceUrl: url });
@@ -215,13 +216,13 @@ describe.skipIf(!dbReachable)("balance invoice against live local Supabase and t
     const { id } = await confirmedBooking();
     await sendInvoice(id);
     const [invoiceId] = invoiceRow(id);
-    mock.payInvoice(invoiceId);
+    mock.payInvoice(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:219 invoiceId"));
 
-    expect(await deliverInvoicePaid(invoiceId)).toEqual({ outcome: "recorded", processed: "true" });
+    expect(await deliverInvoicePaid(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:221 invoiceId"))).toEqual({ outcome: "recorded", processed: "true" });
     expect(invoiceRow(id)).toEqual([invoiceId, "paid", `https://www.sandbox.paypal.com/invoice/p/#${invoiceId}`, "true"]);
 
     const reads = mock.requestsTo("GET", `${INVOICES}/${invoiceId}`).length;
-    expect(await deliverInvoicePaid(invoiceId)).toEqual({ outcome: "recorded", processed: "true" });
+    expect(await deliverInvoicePaid(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:225 invoiceId"))).toEqual({ outcome: "recorded", processed: "true" });
     expect(mock.requestsTo("GET", `${INVOICES}/${invoiceId}`)).toHaveLength(reads);
     expect((await sendInvoice(id)).result).toMatchObject({ invoice: "paid", alreadySent: true });
   });
@@ -231,12 +232,12 @@ describe.skipIf(!dbReachable)("balance invoice against live local Supabase and t
     await sendInvoice(id);
     const [invoiceId] = invoiceRow(id);
 
-    mock.payInvoice(invoiceId, { amountCents: 4000 });
-    expect(await deliverInvoicePaid(invoiceId)).toEqual({ outcome: "unsettled", processed: "true" });
+    mock.payInvoice(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:235 invoiceId"), { amountCents: 4000 });
+    expect(await deliverInvoicePaid(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:236 invoiceId"))).toEqual({ outcome: "unsettled", processed: "true" });
     expect(invoiceRow(id)).toEqual([invoiceId, "partially_paid", expect.any(String), "false"]);
 
-    mock.payInvoice(invoiceId);
-    expect(await deliverInvoicePaid(invoiceId)).toEqual({ outcome: "recorded", processed: "true" });
+    mock.payInvoice(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:239 invoiceId"));
+    expect(await deliverInvoicePaid(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:240 invoiceId"))).toEqual({ outcome: "recorded", processed: "true" });
     expect(invoiceRow(id).slice(1)).toEqual(["paid", expect.any(String), "true"]);
   });
 
@@ -244,9 +245,9 @@ describe.skipIf(!dbReachable)("balance invoice against live local Supabase and t
     const { id } = await confirmedBooking();
     await sendInvoice(id);
     const [invoiceId] = invoiceRow(id);
-    mock.payInvoice(invoiceId, { pending: true });
+    mock.payInvoice(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:248 invoiceId"), { pending: true });
 
-    expect(await deliverInvoicePaid(invoiceId)).toEqual({ outcome: "unsettled", processed: "true" });
+    expect(await deliverInvoicePaid(requiredValue(invoiceId, "src/lib/booking/invoice.postgrest-integration.test.ts:250 invoiceId"))).toEqual({ outcome: "unsettled", processed: "true" });
     expect(invoiceRow(id)).toEqual([invoiceId, "payment_pending", expect.any(String), "false"]);
   });
 

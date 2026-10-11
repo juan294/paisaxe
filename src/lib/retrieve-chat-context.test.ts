@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
@@ -174,7 +175,7 @@ describe("real retrieval cancellation and cache orchestration", () => {
    expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
    rerankData = [{ index: 4 }, { index: 2 }, { index: 0 }];
    const corrected = await search(vector, 3, "provider recovery");
-   expect(corrected.chunks[0].id).toBe("chunk-4");
+   expect(requiredValue(corrected.chunks[0], "src/lib/retrieve-chat-context.test.ts:177 corrected.chunks[0]").id).toBe("chunk-4");
  });
 
 it("a miss runs exactly one real pipeline, hits skip every retrieval request, and expired/corrupt results recover", async () => {
@@ -196,7 +197,7 @@ it("a miss runs exactly one real pipeline, hits skip every retrieval request, an
   await vi.waitFor(() => expect(store.get(resultKey)!.expiresAt).toBeGreaterThan(Date.now()));
   store.set(resultKey, { value: JSON.stringify({ chunks: "corrupt", images: [] }), expiresAt: Infinity });
   calls = [];
-  expect((await retrieveChatContext("Oviedo", 3)).chunks[0].id).toBe("chunk-4");
+  expect(requiredValue((await retrieveChatContext("Oviedo", 3)).chunks[0], "src/lib/retrieve-chat-context.test.ts:199 (await retrieveChatContext(\"Oviedo\", 3)).chunks[0]").id).toBe("chunk-4");
   expect(calls).toHaveLength(3);
   expect(calls).toEqual(expect.arrayContaining(["vector", "rerank", "images"]));
 });
@@ -218,7 +219,7 @@ it.each(["embedding", "vector", "rerank", "images"])("parent cancellation at %s 
   await new Promise(resolve => setTimeout(resolve, 0));
   expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
   expect(add).toHaveBeenCalledTimes(1);
-  expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
+  expect(remove).toHaveBeenCalledWith("abort", requiredValue(add.mock.calls[0], "src/lib/retrieve-chat-context.test.ts:221 add.mock.calls[0]")[1]);
 });
 
 it("the real general route emits no late SSE after cancellation during embedding, then a fresh request succeeds", async () => {
@@ -258,7 +259,7 @@ it.each([
   const { generateEmbedding } = await import("./embeddings");
   expect(await generateEmbedding("cached corrupt vector")).toEqual(vector);
   expect(calls).toEqual(["embedding"]);
-  await vi.waitFor(() => expect(JSON.parse([...store.values()][0].value)).toEqual(vector));
+  await vi.waitFor(() => expect(JSON.parse(requiredValue([...store.values()][0], "src/lib/retrieve-chat-context.test.ts:261 [...store.values()][0]").value)).toEqual(vector));
   calls = [];
   expect(await generateEmbedding("cached corrupt vector")).toEqual(vector);
   expect(calls).toEqual([]);
@@ -285,7 +286,7 @@ it("the real booking route uses a full-result hit without Voyage or search and r
   expect(text).toContain('"type":"done"');
   expect(text).toContain("guia.pdf");
   expect(calls).toEqual(["generation"]);
-  expect(JSON.stringify(generationBodies[0].system)).toContain("Pasaje cacheado del Sella");
+  expect(JSON.stringify(requiredValue(generationBodies[0], "src/lib/retrieve-chat-context.test.ts:288 generationBodies[0]").system)).toContain("Pasaje cacheado del Sella");
 });
 
 it("the real booking route discloses optional context loss in its server observer and a fresh turn recovers", async () => {
@@ -294,13 +295,13 @@ it("the real booking route discloses optional context loss in its server observe
   const { POST } = await import("@/app/api/booking/chat/stream/route");
   const response = await POST(bookingRequest("rutas sin contexto"));
   expect(await response.text()).toContain('"type":"done"');
-  expect(JSON.stringify(generationBodies[0].system)).not.toContain("# CONTEXTO DE LA GUÍA");
+  expect(JSON.stringify(requiredValue(generationBodies[0], "src/lib/retrieve-chat-context.test.ts:297 generationBodies[0]").system)).not.toContain("# CONTEXTO DE LA GUÍA");
   expect(warn).toHaveBeenCalledWith(expect.stringContaining("[BOOKING_CHAT_RETRIEVAL_SKIPPED]"));
   expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
   failVector = false;
   const next = await POST(bookingRequest("rutas corregidas"));
   expect(await next.text()).toContain('"type":"done"');
-  expect(JSON.stringify(generationBodies[1].system)).toContain("Paisaje de Asturias");
+  expect(JSON.stringify(requiredValue(generationBodies[1], "src/lib/retrieve-chat-context.test.ts:303 generationBodies[1]").system)).toContain("Paisaje de Asturias");
   warn.mockRestore();
 });
 

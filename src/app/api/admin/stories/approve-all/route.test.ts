@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POST } from "./route";
 import { NextRequest } from "next/server";
@@ -401,7 +402,7 @@ describe("POST /api/admin/stories/approve-all", () => {
         ([msg]) => msg === "[APPROVE_ALL_WEBHOOK_BASE_URL_MISSING]"
       );
       expect(skipLogCalls).toHaveLength(1);
-      expect(skipLogCalls[0][1]).toEqual({ approved_count: 3 });
+      expect(requiredValue(skipLogCalls[0], "src/app/api/admin/stories/approve-all/route.test.ts:404 skipLogCalls[0]")[1]).toEqual({ approved_count: 3 });
     });
   });
 
@@ -433,7 +434,7 @@ describe("POST /api/admin/stories/approve-all", () => {
       await POST(request);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [, init] = mockFetch.mock.calls[0];
+      const [, init] = requiredValue(mockFetch.mock.calls[0], "src/app/api/admin/stories/approve-all/route.test.ts:436 mockFetch.mock.calls[0]");
       expect(init.signal).toBeInstanceOf(AbortSignal);
     });
   });

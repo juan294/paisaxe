@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useBookingAccess } from "./use-booking-access";
@@ -84,6 +85,6 @@ describe("useBookingAccess", () => {
     rerender();
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
-    expect(mockFetch.mock.calls[1][1].headers.Authorization).toBe("Bearer g");
+    expect(requiredValue(requiredValue(mockFetch.mock.calls[1], "src/hooks/use-booking-access.test.ts: mockFetch.mock.calls[1]")[1], "src/hooks/use-booking-access.test.ts: mockFetch.mock.calls[1][1]").headers.Authorization).toBe("Bearer g");
   });
 });

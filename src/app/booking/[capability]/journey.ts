@@ -31,7 +31,9 @@ function balanceState(view: BookingView, phase: Phase): StepState {
  * balance paid through a PayPal invoice. A booking exists only after acceptance,
  * so the first step is always done.
  */
-export function journeySteps(view: BookingView, phase: Phase): { key: StepKey; state: StepState }[] {
+type JourneyStep = { key: StepKey; state: StepState };
+
+export function journeySteps(view: BookingView, phase: Phase): [JourneyStep, JourneyStep, JourneyStep] {
   return [
     { key: "offer", state: "done" },
     { key: "deposit", state: depositState(view, phase) },

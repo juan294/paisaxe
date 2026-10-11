@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST, maxDuration } from "./route";
 import {
@@ -813,8 +814,8 @@ describe("POST /api/chat/stream", () => {
     expect(response.status).toBe(200);
     // Verify the asturianu flag (3rd arg) is true
     const callArgs = vi.mocked(streamChatResponse).mock.calls[0];
-    expect(callArgs[2]).toBe(enabled);
-    expect(callArgs[5]).toEqual(expect.objectContaining({
+    expect(requiredValue(requiredValue(callArgs, "src/app/api/chat/stream/route.test.ts:817 callArgs")[2], "src/app/api/chat/stream/route.test.ts:816 callArgs[2]")).toBe(enabled);
+    expect(requiredValue(requiredValue(callArgs, "src/app/api/chat/stream/route.test.ts:818 callArgs")[5], "src/app/api/chat/stream/route.test.ts:817 callArgs[5]")).toEqual(expect.objectContaining({
       signal: expect.any(AbortSignal),
       locale,
     }));

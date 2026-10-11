@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';
@@ -31,7 +32,7 @@ const requiredRecoveryKeys = [
 ];
 
 function placeholders(template: string): string[] {
-  return [...new Set(Array.from(template.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g), (match) => match[1]))].sort();
+  return [...new Set(Array.from(template.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g), (match) => requiredValue(match[1], "src/lib/i18n/dictionary-completeness.test.ts:34 match[1]")))].sort();
 }
 
 // Dictionary completeness is not native-language review. In particular, shared

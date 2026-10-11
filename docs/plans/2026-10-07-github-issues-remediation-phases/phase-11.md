@@ -1,6 +1,6 @@
 # Phase 11: Checked indexed access
 
-Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #867. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: planned, not implemented. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
+Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #867. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: source implementation and complete local runtime qualification finished; owner acceptance is pending. The [implementation record](phase-11-implementation.md) preserves the exact candidate, reviews, results and accepted provider gap. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
 
 ## Scope and source evidence
 

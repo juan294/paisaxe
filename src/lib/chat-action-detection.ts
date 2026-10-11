@@ -49,8 +49,8 @@ export function detectPhoneNumbers(text: string): PhoneMatch[] {
   let match;
 
   while ((match = internationalRegex.exec(text)) !== null) {
-    // Combine all digit groups
-    const digits = match[1] + match[2] + match[3] + (match[4] || "");
+    // The matched lexeme contains only the country prefix, digits and spaces.
+    const digits = match[0].slice(3).replace(/\s/g, "");
     if (digits.length === 9) {
       const normalized = `+34${digits}`;
       if (!seen.has(normalized)) {
@@ -334,7 +334,7 @@ export function detectAddresses(text: string): AddressMatch[] {
   let match;
 
   while ((match = postalCodePattern.exec(text)) !== null) {
-    const postalCode = match[1];
+    const postalCode = match[0].slice(0, 5);
     // Only match Asturian postal codes (33XXX)
     if (postalCode.startsWith("33")) {
       const addressText = match[0].trim();
@@ -359,8 +359,7 @@ export function detectAddresses(text: string): AddressMatch[] {
   // Merge adjacent candidates that are close to each other (within 5 chars)
   const ADJACENCY_THRESHOLD = 5;
 
-  for (let i = 0; i < candidates.length; i++) {
-    const candidate = candidates[i];
+  for (const candidate of candidates) {
 
     // Skip if we've already seen this normalized address
     if (seen.has(candidate.normalized)) continue;

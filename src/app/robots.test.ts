@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import robots from "./robots";
 
@@ -14,7 +15,7 @@ describe("robots", () => {
 
   it("disallows api, admin, and auth paths", () => {
     const result = robots();
-    const rule = Array.isArray(result.rules) ? result.rules[0] : result.rules;
+    const rule = Array.isArray(result.rules) ? requiredValue(result.rules[0], "src/app/robots.test.ts: result.rules[0]") : result.rules;
     expect(rule.disallow).toContain("/api/");
     expect(rule.disallow).toContain("/admin/");
     expect(rule.disallow).toContain("/auth/");

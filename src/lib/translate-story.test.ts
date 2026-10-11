@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { translateStory, parseTranslationResponse, buildTranslationPrompt, updateStoryTranslation, getStoryTranslations } from "./translate-story";
 import type { StoryTranslation } from "@/types/immersive";
@@ -321,9 +322,9 @@ describe("translate-story", () => {
       const result = await translateStory("test-story-id");
 
       expect(callAnthropicAPI).toHaveBeenCalled();
-      expect(vi.mocked(callAnthropicAPI).mock.calls[0][2]).toBe(CHAT_MODEL);
+      expect(requiredValue(vi.mocked(callAnthropicAPI).mock.calls[0], "src/lib/translate-story.test.ts:324 vi.mocked(callAnthropicAPI).mock.calls[0]")[2]).toBe(CHAT_MODEL);
       // Usage lands in anthropic_usage under its own label, not "chat".
-      expect(vi.mocked(callAnthropicAPI).mock.calls[0][4]).toEqual({ source: "translate" });
+      expect(requiredValue(vi.mocked(callAnthropicAPI).mock.calls[0], "src/lib/translate-story.test.ts:326 vi.mocked(callAnthropicAPI).mock.calls[0]")[4]).toEqual({ source: "translate" });
       expect(result.success).toBe(true);
       expect(result.results?.en?.success).toBe(true);
     });
@@ -470,7 +471,7 @@ describe("translate-story", () => {
       expect(result.success).toBe(true);
       // Should only have requested EN translation
       const callArgs = vi.mocked(callAnthropicAPI).mock.calls[0];
-      expect(callArgs[1][0].content).toContain('"en"');
+      expect(requiredValue(requiredValue(requiredValue(callArgs, "translation generation call")[1], "translation messages")[0], "first translation message").content).toContain('"en"');
     });
 
     it("should skip existing translations unless forceRetranslate is true", async () => {
@@ -1443,13 +1444,13 @@ describe('Phase 7 translation questions and completion', () => {
     const result = await translateStory(source.id);
     expect(result).toMatchObject({ success: true, successCount: 5, failedCount: 0 });
     expect(callAnthropicAPI).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(callAnthropicAPI).mock.calls[0][1][0].content).toContain(source.metadata.question_prompts[0]);
+    expect(requiredValue(requiredValue(vi.mocked(callAnthropicAPI).mock.calls[0], "translation generation call")[1][0], "first translation message").content).toContain(source.metadata.question_prompts[0]);
     expect(rpc).toHaveBeenNthCalledWith(2, 'patch_story_translation_metadata', expect.objectContaining({ p_translations: translations }));
     for (const locale of Object.keys(questions) as StoryLocale[]) {
-      expect(rpc.mock.calls[1][1].p_translation_status[locale].status).toBe('complete');
+      expect(requiredValue(rpc.mock.calls[1], "src/lib/translate-story.test.ts:1449 rpc.mock.calls[1]")[1].p_translation_status[locale].status).toBe('complete');
     }
     expect(update).not.toHaveBeenCalled();
-    expect(rpc.mock.calls[1][1]).not.toHaveProperty('metadata');
+    expect(requiredValue(rpc.mock.calls[1], "src/lib/translate-story.test.ts:1452 rpc.mock.calls[1]")[1]).not.toHaveProperty('metadata');
   });
 
   it.each([
@@ -1466,7 +1467,7 @@ describe('Phase 7 translation questions and completion', () => {
     expect(result).toMatchObject({ success: false, successCount: 1, failedCount: 1 });
     expect(result.results?.en.success).toBe(false);
     expect(result.results?.fr.success).toBe(true);
-    const finalPatch = rpc.mock.calls[1][1];
+    const finalPatch = requiredValue(rpc.mock.calls[1], "src/lib/translate-story.test.ts:1469 rpc.mock.calls[1]")[1];
     expect(finalPatch.p_translations).not.toHaveProperty('en');
     expect(finalPatch.p_translations.fr.question_prompts).toEqual([questions.fr]);
     expect(finalPatch.p_translation_status.en.status).toBe('failed');

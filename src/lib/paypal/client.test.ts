@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { CheckoutPaymentIntent, OrdersController } from "@paypal/paypal-server-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -76,9 +77,9 @@ describe("getAccessToken", () => {
 
     expect(token).toMatch(/^A21AA\.mock-token-/);
     const [request] = mock.requestsTo("POST", TOKEN_PATH);
-    expect(request.headers.authorization).toBe(`Basic ${Buffer.from("client-id:client-secret").toString("base64")}`);
-    expect(request.headers["content-type"]).toBe("application/x-www-form-urlencoded");
-    expect(request.rawBody).toBe("grant_type=client_credentials");
+    expect(requiredValue(request, "src/lib/paypal/client.test.ts:80 request").headers.authorization).toBe(`Basic ${Buffer.from("client-id:client-secret").toString("base64")}`);
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/client.test.ts:81 request").headers["content-type"], "src/lib/paypal/client.test.ts:80 request.headers[\"content-type\"]")).toBe("application/x-www-form-urlencoded");
+    expect(requiredValue(request, "src/lib/paypal/client.test.ts:82 request").rawBody).toBe("grant_type=client_credentials");
   });
 
   it("shares one in-flight token request between concurrent callers", async () => {
@@ -131,7 +132,7 @@ describe("SDK client", () => {
     expect((error as PaypalError).status).toBe(404);
     expect(mock.requestsTo("POST", TOKEN_PATH)).toHaveLength(1);
     const [request] = mock.requestsTo("GET", "/v2/checkout/orders/MISSING");
-    expect(request.headers.authorization).toBe(`Bearer ${token}`);
+    expect(requiredValue(request, "src/lib/paypal/client.test.ts:135 request").headers.authorization).toBe(`Bearer ${token}`);
   });
 
   it("reuses one client per configuration and rebuilds it when the configuration changes", async () => {
@@ -167,7 +168,7 @@ describe("SDK client", () => {
     expect(mock.requestsTo("POST", TOKEN_PATH)).toHaveLength(2);
     const [first] = mock.requestsTo("GET", "/v2/checkout/orders/A");
     const [second] = mock.requestsTo("GET", "/v2/checkout/orders/B");
-    expect(second.headers.authorization).not.toBe(first.headers.authorization);
+    expect(requiredValue(second, "src/lib/paypal/client.test.ts:171 second").headers.authorization).not.toBe(requiredValue(first, "src/lib/paypal/client.test.ts:171 first").headers.authorization);
   });
 
   it("recovers from a failed token request on the next call", async () => {
@@ -410,7 +411,7 @@ describe("the SDK's fetch", () => {
     await caught(sdkGetOrder("ROUTED"));
 
     const [request] = mock.requestsTo("GET", "/v2/checkout/orders/ROUTED");
-    expect(request.headers["user-agent"]).toMatch(/PayPal REST API TypeScript SDK, Version: 2\.5\.0/);
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/client.test.ts:414 request").headers["user-agent"], "src/lib/paypal/client.test.ts:413 request.headers[\"user-agent\"]")).toMatch(/PayPal REST API TypeScript SDK, Version: 2\.5\.0/);
   });
 });
 

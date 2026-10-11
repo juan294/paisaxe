@@ -85,7 +85,7 @@ export default function FavoritesPage() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore) {
+        if (entries[0]?.isIntersecting && hasMore) {
           loadMore();
         }
       },
@@ -282,7 +282,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0]?.isIntersecting) {
           setIsVisible(true);
           observer.disconnect();
         }

@@ -19,11 +19,13 @@ async function fetchUserEmails(
   userIds: string[]
 ): Promise<Record<string, string>> {
   const userEmails: Record<string, string> = {};
-  let nextIndex = 0;
+  const ids = userIds.values();
 
   async function worker() {
-    while (nextIndex < userIds.length) {
-      const userId = userIds[nextIndex++];
+    for (;;) {
+      const next = ids.next();
+      if (next.done) return;
+      const userId = next.value;
       const { data: userData } = await supabase.auth.admin.getUserById(userId);
       if (userData?.user?.email) {
         userEmails[userId] = userData.user.email;

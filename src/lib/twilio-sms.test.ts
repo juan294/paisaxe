@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   sendSMS,
@@ -73,7 +74,7 @@ describe("twilio-sms", () => {
       expect(result.sid).toBe("SM123456789");
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      const [url, options] = mockFetch.mock.calls[0];
+      const [url, options] = requiredValue(mockFetch.mock.calls[0], "src/lib/twilio-sms.test.ts:76 mock call tuple");
       expect(url).toContain("api.twilio.com");
       expect(url).toContain("ACtest123");
       expect(options.method).toBe("POST");

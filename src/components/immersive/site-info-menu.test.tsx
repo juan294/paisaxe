@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -397,7 +398,7 @@ describe("SiteInfoMenu", () => {
 
       const items = screen.getAllByRole("menuitem");
       const menu = screen.getByRole("menu");
-      items[items.length - 1].focus();
+      requiredValue(items[items.length - 1], "src/components/immersive/site-info-menu.test.tsx: items[items.length - 1]").focus();
 
       fireEvent.keyDown(menu, { key: "ArrowDown" });
       expect(document.activeElement).toBe(items[0]);
@@ -409,7 +410,7 @@ describe("SiteInfoMenu", () => {
 
       const items = screen.getAllByRole("menuitem");
       const menu = screen.getByRole("menu");
-      items[1].focus();
+      requiredValue(items[1], "src/components/immersive/site-info-menu.test.tsx: items[1]").focus();
 
       fireEvent.keyDown(menu, { key: "ArrowUp" });
       expect(document.activeElement).toBe(items[0]);
@@ -428,7 +429,7 @@ describe("SiteInfoMenu", () => {
       const menu = screen.getByRole("menu");
       const resolveIndex = (index: number) =>
         index < 0 ? items.length + index : index;
-      items[resolveIndex(startIndex)].focus();
+      requiredValue(items[resolveIndex(startIndex)], "src/components/immersive/site-info-menu.test.tsx: items[resolveIndex(startIndex)]").focus();
 
       fireEvent.keyDown(menu, { key: "Tab", shiftKey });
       expect(document.activeElement).toBe(items[resolveIndex(expectedIndex)]);

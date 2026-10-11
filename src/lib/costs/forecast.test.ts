@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { computeForecasts } from "./forecast";
 import type { ServiceCost, UsageMetrics } from "@/types/costs-analytics";
@@ -57,52 +58,52 @@ describe("computeForecasts", () => {
   it("should return three scenarios by default", () => {
     const forecasts = computeForecasts(mockServices, mockUsage);
     expect(forecasts).toHaveLength(3);
-    expect(forecasts[0].label).toBe("Current");
-    expect(forecasts[1].label).toBe("3x Growth");
-    expect(forecasts[2].label).toBe("10x Growth");
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:60 forecasts[0]").label).toBe("Current");
+    expect(requiredValue(forecasts[1], "src/lib/costs/forecast.test.ts:61 forecasts[1]").label).toBe("3x Growth");
+    expect(requiredValue(forecasts[2], "src/lib/costs/forecast.test.ts:62 forecasts[2]").label).toBe("10x Growth");
   });
 
   it("should keep infrastructure costs constant across multipliers", () => {
     const forecasts = computeForecasts(mockServices, mockUsage);
     const fixedCost = 30; // $25 + $5 recurring
 
-    expect(forecasts[0].breakdown.infrastructure).toBe(fixedCost);
-    expect(forecasts[1].breakdown.infrastructure).toBe(fixedCost);
-    expect(forecasts[2].breakdown.infrastructure).toBe(fixedCost);
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:69 forecasts[0]").breakdown.infrastructure).toBe(fixedCost);
+    expect(requiredValue(forecasts[1], "src/lib/costs/forecast.test.ts:70 forecasts[1]").breakdown.infrastructure).toBe(fixedCost);
+    expect(requiredValue(forecasts[2], "src/lib/costs/forecast.test.ts:71 forecasts[2]").breakdown.infrastructure).toBe(fixedCost);
   });
 
   it("should scale AI costs linearly", () => {
     const forecasts = computeForecasts(mockServices, mockUsage);
 
-    const currentAi = forecasts[0].breakdown.ai;
-    expect(forecasts[1].breakdown.ai).toBeCloseTo(currentAi * 3, 1);
-    expect(forecasts[2].breakdown.ai).toBeCloseTo(currentAi * 10, 1);
+    const currentAi = requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:77 forecasts[0]").breakdown.ai;
+    expect(requiredValue(forecasts[1], "src/lib/costs/forecast.test.ts:78 forecasts[1]").breakdown.ai).toBeCloseTo(currentAi * 3, 1);
+    expect(requiredValue(forecasts[2], "src/lib/costs/forecast.test.ts:79 forecasts[2]").breakdown.ai).toBeCloseTo(currentAi * 10, 1);
   });
 
   it("should scale voice costs linearly", () => {
     const forecasts = computeForecasts(mockServices, mockUsage);
 
-    const currentVoice = forecasts[0].breakdown.voice;
-    expect(forecasts[1].breakdown.voice).toBeCloseTo(currentVoice * 3, 1);
-    expect(forecasts[2].breakdown.voice).toBeCloseTo(currentVoice * 10, 1);
+    const currentVoice = requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:85 forecasts[0]").breakdown.voice;
+    expect(requiredValue(forecasts[1], "src/lib/costs/forecast.test.ts:86 forecasts[1]").breakdown.voice).toBeCloseTo(currentVoice * 3, 1);
+    expect(requiredValue(forecasts[2], "src/lib/costs/forecast.test.ts:87 forecasts[2]").breakdown.voice).toBeCloseTo(currentVoice * 10, 1);
   });
 
   it("should normalize partial-period data to 30 days", () => {
     const forecasts = computeForecasts(mockServices, mockUsage);
 
     // 300 visitors in 15 days → 600/month
-    expect(forecasts[0].visitors).toBe(600);
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:94 forecasts[0]").visitors).toBe(600);
     // 50 chats in 15 days → 100/month
-    expect(forecasts[0].chats).toBe(100);
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:96 forecasts[0]").chats).toBe(100);
     // 25 voice minutes in 15 days → 50/month
-    expect(forecasts[0].voiceMinutes).toBe(50);
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:98 forecasts[0]").voiceMinutes).toBe(50);
   });
 
   it("should scale visitors with multiplier", () => {
     const forecasts = computeForecasts(mockServices, mockUsage);
 
-    expect(forecasts[1].visitors).toBe(forecasts[0].visitors * 3);
-    expect(forecasts[2].visitors).toBe(forecasts[0].visitors * 10);
+    expect(requiredValue(forecasts[1], "src/lib/costs/forecast.test.ts:104 forecasts[1]").visitors).toBe(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:104 forecasts[0]").visitors * 3);
+    expect(requiredValue(forecasts[2], "src/lib/costs/forecast.test.ts:105 forecasts[2]").visitors).toBe(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:105 forecasts[0]").visitors * 10);
   });
 
   it("should use fallback rates when usage is zero", () => {
@@ -117,19 +118,19 @@ describe("computeForecasts", () => {
     const forecasts = computeForecasts(mockServices, zeroUsage);
 
     // With zero usage, all variable costs should be 0 (even with fallback rates, 0 * rate = 0)
-    expect(forecasts[0].breakdown.ai).toBe(0);
-    expect(forecasts[0].breakdown.voice).toBe(0);
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:120 forecasts[0]").breakdown.ai).toBe(0);
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:121 forecasts[0]").breakdown.voice).toBe(0);
     // But infrastructure should still be there
-    expect(forecasts[0].breakdown.infrastructure).toBe(30);
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:123 forecasts[0]").breakdown.infrastructure).toBe(30);
   });
 
   it("should accept custom multipliers", () => {
     const forecasts = computeForecasts(mockServices, mockUsage, [1, 5, 20]);
 
     expect(forecasts).toHaveLength(3);
-    expect(forecasts[0].multiplier).toBe(1);
-    expect(forecasts[1].multiplier).toBe(5);
-    expect(forecasts[2].multiplier).toBe(20);
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:130 forecasts[0]").multiplier).toBe(1);
+    expect(requiredValue(forecasts[1], "src/lib/costs/forecast.test.ts:131 forecasts[1]").multiplier).toBe(5);
+    expect(requiredValue(forecasts[2], "src/lib/costs/forecast.test.ts:132 forecasts[2]").multiplier).toBe(20);
   });
 
   it("should compute total cost as sum of breakdown", () => {
@@ -158,9 +159,9 @@ describe("computeForecasts", () => {
   it("should use fallback labels for multipliers beyond the 3 named ones", () => {
     const forecasts = computeForecasts(mockServices, mockUsage, [1, 3, 10, 50]);
     expect(forecasts).toHaveLength(4);
-    expect(forecasts[0].label).toBe("Current");
-    expect(forecasts[1].label).toBe("3x Growth");
-    expect(forecasts[2].label).toBe("10x Growth");
-    expect(forecasts[3].label).toBe("50x");
+    expect(requiredValue(forecasts[0], "src/lib/costs/forecast.test.ts:161 forecasts[0]").label).toBe("Current");
+    expect(requiredValue(forecasts[1], "src/lib/costs/forecast.test.ts:162 forecasts[1]").label).toBe("3x Growth");
+    expect(requiredValue(forecasts[2], "src/lib/costs/forecast.test.ts:163 forecasts[2]").label).toBe("10x Growth");
+    expect(requiredValue(forecasts[3], "src/lib/costs/forecast.test.ts:164 forecasts[3]").label).toBe("50x");
   });
 });

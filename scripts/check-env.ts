@@ -52,9 +52,11 @@ function getUsedEnvKeys(files: string[], root: string): Map<string, string[]> {
       let match;
       while ((match = pattern.exec(content)) !== null) {
         const key = match[1];
+        if (key === undefined) continue;
         const relative = file.replace(root + "/", "");
-        if (!usage.has(key)) usage.set(key, []);
-        usage.get(key)!.push(relative);
+        const files = usage.get(key) ?? [];
+        files.push(relative);
+        usage.set(key, files);
       }
     }
   }

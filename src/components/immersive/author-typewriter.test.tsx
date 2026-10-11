@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
 import { createMatchMedia } from "@/test/match-media";
@@ -171,7 +172,7 @@ describe("AuthorTypewriter", () => {
     const { AuthorTypewriter } = await import("./author-typewriter");
     const { unmount } = render(<AuthorTypewriter />);
     expect(add).toHaveBeenCalledWith("change", expect.any(Function));
-    const handler = add.mock.calls[0][1];
+    const handler = requiredValue(requiredValue(add.mock.calls[0], "src/components/immersive/author-typewriter.test.tsx: add.mock.calls[0]")[1], "src/components/immersive/author-typewriter.test.tsx: add.mock.calls[0][1]");
     unmount();
     expect(remove).toHaveBeenCalledWith("change", handler);
     expect(vi.getTimerCount()).toBe(0);

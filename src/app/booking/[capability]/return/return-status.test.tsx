@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { StrictMode } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -40,7 +41,7 @@ describe("ReturnStatus (PayPal return page)", () => {
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith(`/booking/${CAPABILITY}?paid=1`));
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = requiredValue(mockFetch.mock.calls[0], "src/app/booking/[capability]/return/return-status.test.tsx:43 mock call tuple");
     expect(url).toBe("/api/booking/payments/capture");
     expect(init).toMatchObject({ method: "POST", headers: { "Content-Type": "application/json", "x-csrf-token": "csrf-1" } });
     expect(JSON.parse(init.body)).toEqual({ capability: CAPABILITY, orderId: "5O190127TN364715T" });

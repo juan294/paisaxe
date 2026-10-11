@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 /**
  * Meta-tests for QA-M4: admin-guard and RPC-name invariants.
  *
@@ -82,11 +83,11 @@ function splitExportedMethods(
   const segments: Array<{ method: string; line: number; body: string }> = [];
 
   for (let i = 0; i < matches.length; i++) {
-    const match = matches[i];
+    const match = requiredValue(matches[i], "src/lib/meta-invariants.test.ts:86 matches[i]");
     const start = match.index ?? 0;
     const end = matches[i + 1]?.index ?? content.length;
     segments.push({
-      method: match[1],
+      method: requiredValue(match[1], "src/lib/meta-invariants.test.ts:89 match[1]"),
       line: lineAt(content, start),
       body: content.slice(start, end),
     });
@@ -218,10 +219,10 @@ describe("QA-M4 RPC-name invariant", () => {
       const events: Array<{ index: number; name: string; drop: boolean }> = [];
 
       for (const match of content.matchAll(createPattern)) {
-        events.push({ index: match.index ?? 0, name: match[1], drop: false });
+        events.push({ index: match.index ?? 0, name: requiredValue(match[1], "src/lib/meta-invariants.test.ts:221 match[1]"), drop: false });
       }
       for (const match of content.matchAll(dropPattern)) {
-        events.push({ index: match.index ?? 0, name: match[1], drop: true });
+        events.push({ index: match.index ?? 0, name: requiredValue(match[1], "src/lib/meta-invariants.test.ts:224 match[1]"), drop: true });
       }
       events.sort((a, b) => a.index - b.index);
 
@@ -272,7 +273,7 @@ describe("QA-M4 RPC-name invariant", () => {
 
       for (const match of literalCalls) {
         const name = match[1];
-        if (!liveFunctions.has(name)) {
+        if (!liveFunctions.has(requiredValue(name, "src/lib/meta-invariants.test.ts:276 name"))) {
           const rel = path.relative(REPO_ROOT, file);
           violations.push(
             `${rel}:${lineAt(content, match.index ?? 0)} — .rpc("${name}") has no live migration definition`

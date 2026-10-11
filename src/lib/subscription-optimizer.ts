@@ -149,8 +149,7 @@ function analyzeService(
   } else if (usagePercentages.length > 0) {
     // Has metrics and within safe range
     const highestUsage = usagePercentages.reduce(
-      (max, u) => (u.percentage > max.percentage ? u : max),
-      usagePercentages[0]
+      (max, u) => (u.percentage > max.percentage ? u : max)
     );
     reason = `${highestUsage.label} usage at ${highestUsage.percentage}% of limit. Well within current plan.`;
   } else {
@@ -297,9 +296,10 @@ export function generateReport(report: SubscriptionReport): string {
   lines.push("|---------|------|---------|--------|------------|");
 
   for (const rec of sorted) {
+    const firstUsage = rec.usagePercentages[0];
     const keyMetric =
-      rec.usagePercentages.length > 0
-        ? `${rec.usagePercentages[0].percentage}% of ${rec.usagePercentages[0].label}`
+      firstUsage !== undefined
+        ? `${firstUsage.percentage}% of ${firstUsage.label}`
         : "N/A";
     lines.push(
       `| ${rec.serviceName} | ${rec.currentPlan} | $${rec.monthlyCostUsd.toFixed(2)} | ${formatAction(rec.action)} | ${keyMetric} |`

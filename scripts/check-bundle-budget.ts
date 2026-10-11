@@ -119,7 +119,7 @@ function parseHtmlFile(appDir: string, htmlPath: string): ParsedHtmlRoute | null
   if (statSync(htmlPath).size === 0) return null;
 
   const html = readFileSync(htmlPath, "utf8");
-  const chunkFiles = [...new Set([...html.matchAll(CHUNK_REF_PATTERN)].map((m) => m[1]))];
+  const chunkFiles = [...new Set([...html.matchAll(CHUNK_REF_PATTERN)].flatMap((m) => m[1] === undefined ? [] : [m[1]]))];
   return { route: htmlPathToRoute(appDir, htmlPath), chunkFiles };
 }
 

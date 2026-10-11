@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { AGENT_PROMPT_DEFAULTS } from "./agent-prompts";
 
@@ -10,28 +11,28 @@ describe("AGENT_PROMPT_DEFAULTS", () => {
 
   it("all agents have non-empty prompt", () => {
     for (const key of agentKeys) {
-      const config = AGENT_PROMPT_DEFAULTS[key];
+      const config = requiredValue(AGENT_PROMPT_DEFAULTS[key], "src/config/agent-prompts.test.ts:14 AGENT_PROMPT_DEFAULTS[key]");
       expect(config.prompt.trim().length, `${key} has empty prompt`).toBeGreaterThan(0);
     }
   });
 
   it("all agents have non-empty schedule", () => {
     for (const key of agentKeys) {
-      const config = AGENT_PROMPT_DEFAULTS[key];
+      const config = requiredValue(AGENT_PROMPT_DEFAULTS[key], "src/config/agent-prompts.test.ts:21 AGENT_PROMPT_DEFAULTS[key]");
       expect(config.schedule.trim().length, `${key} has empty schedule`).toBeGreaterThan(0);
     }
   });
 
   it("all agents have non-empty outputFile", () => {
     for (const key of agentKeys) {
-      const config = AGENT_PROMPT_DEFAULTS[key];
+      const config = requiredValue(AGENT_PROMPT_DEFAULTS[key], "src/config/agent-prompts.test.ts:28 AGENT_PROMPT_DEFAULTS[key]");
       expect(config.outputFile.trim().length, `${key} has empty outputFile`).toBeGreaterThan(0);
     }
   });
 
   it("no whitespace-only system prompts", () => {
     for (const key of agentKeys) {
-      const config = AGENT_PROMPT_DEFAULTS[key];
+      const config = requiredValue(AGENT_PROMPT_DEFAULTS[key], "src/config/agent-prompts.test.ts:36 AGENT_PROMPT_DEFAULTS[key]");
       // A prompt that is only whitespace (spaces, newlines, tabs)
       expect(config.prompt.trim(), `${key} prompt is whitespace-only`).not.toBe("");
     }
@@ -40,14 +41,14 @@ describe("AGENT_PROMPT_DEFAULTS", () => {
   it("agent keys are unique (implicit in Record, but verify shape)", () => {
     // Since AGENT_PROMPT_DEFAULTS is a Record, keys are unique by definition.
     // But verify that no two agents share the same outputFile (which would overwrite reports).
-    const outputFiles = agentKeys.map((k) => AGENT_PROMPT_DEFAULTS[k].outputFile);
+    const outputFiles = agentKeys.map((k) => requiredValue(AGENT_PROMPT_DEFAULTS[k], "src/config/agent-prompts.test.ts:43 AGENT_PROMPT_DEFAULTS[k]").outputFile);
     const uniqueOutputFiles = new Set(outputFiles);
     expect(uniqueOutputFiles.size).toBe(outputFiles.length);
   });
 
   it("all output files end with .md", () => {
     for (const key of agentKeys) {
-      const config = AGENT_PROMPT_DEFAULTS[key];
+      const config = requiredValue(AGENT_PROMPT_DEFAULTS[key], "src/config/agent-prompts.test.ts:51 AGENT_PROMPT_DEFAULTS[key]");
       expect(config.outputFile, `${key} outputFile should end with .md`).toMatch(/\.md$/);
     }
   });
@@ -74,9 +75,9 @@ describe("AGENT_PROMPT_DEFAULTS", () => {
       agentKeys.map((key) => [
         key,
         {
-          schedule: AGENT_PROMPT_DEFAULTS[key].schedule,
-          outputFile: AGENT_PROMPT_DEFAULTS[key].outputFile,
-          promptLength: AGENT_PROMPT_DEFAULTS[key].prompt.length,
+          schedule: requiredValue(AGENT_PROMPT_DEFAULTS[key], "src/config/agent-prompts.test.ts:77 AGENT_PROMPT_DEFAULTS[key]").schedule,
+          outputFile: requiredValue(AGENT_PROMPT_DEFAULTS[key], "src/config/agent-prompts.test.ts:78 AGENT_PROMPT_DEFAULTS[key]").outputFile,
+          promptLength: requiredValue(AGENT_PROMPT_DEFAULTS[key], "src/config/agent-prompts.test.ts:79 AGENT_PROMPT_DEFAULTS[key]").prompt.length,
         },
       ])
     );

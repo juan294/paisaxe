@@ -8,7 +8,7 @@ interface StatCardProps {
   color?: "blue" | "emerald" | "amber" | "violet" | "stone";
 }
 
-const statColorClasses: Record<string, { value: string; icon: string }> = {
+const statColorClasses: Record<NonNullable<StatCardProps["color"]>, { value: string; icon: string }> = {
   blue: {
     value: "text-blue-600 dark:text-blue-400",
     icon: "text-blue-500 dark:text-blue-400",

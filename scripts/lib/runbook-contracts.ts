@@ -56,7 +56,8 @@ function parseCommand(command: string, file: string, line: number): CronCurlExam
   let url: string | undefined;
   const headers: Record<string, string> = {};
   while (tokens.length) {
-    const token = tokens.shift()!;
+    const token = tokens.shift();
+    if (token === undefined) break;
     if (token === "-s" || token === "-sS") continue;
     if (token === "-o" || token === "-w") {
       const value = tokens.shift();
@@ -71,10 +72,12 @@ function parseCommand(command: string, file: string, line: number): CronCurlExam
     } else if (token === "-H" || token === "--header") {
       const value = tokens.shift();
       const match = value?.match(/^([a-zA-Z0-9-]+):\s*(.+)$/);
-      if (!match) throw new Error("header must be a quoted name: value pair");
-      const name = match[1].toLowerCase();
+      const headerName = match?.[1];
+      const headerValue = match?.[2];
+      if (headerName === undefined || headerValue === undefined) throw new Error("header must be a quoted name: value pair");
+      const name = headerName.toLowerCase();
       if (Object.hasOwn(headers, name)) throw new Error("duplicate headers are unsupported");
-      headers[name] = match[2];
+      headers[name] = headerValue;
     } else if (!token.startsWith("-") && !url) url = token;
     else throw new Error("unsupported option or extra argument");
   }
@@ -91,17 +94,22 @@ export function parseCronCurlExamples(content: string, file: string): CronCurlEx
   const examples: CronCurlExample[] = [];
   let fence: string | undefined;
   for (let index = 0; index < lines.length; index++) {
-    const marker = lines[index].match(/^\s*(`{3,}|~{3,})/);
-    if (marker) {
-      if (!fence) fence = marker[1];
-      else if (marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = undefined;
+    const text = lines[index];
+    if (text === undefined) break;
+    const marker = text.match(/^\s*(`{3,}|~{3,})/)?.[1];
+    if (marker !== undefined) {
+      if (!fence) fence = marker;
+      else if (marker.charAt(0) === fence.charAt(0) && marker.length >= fence.length) fence = undefined;
       continue;
     }
-    if (!fence || !lines[index].includes("curl")) continue;
+    if (!fence || !text.includes("curl")) continue;
     const line = index + 1;
-    let command = lines[index].trim();
+    let command = text.trim();
     while (command.endsWith("\\") && index + 1 < lines.length) {
-      command = command.slice(0, -1) + " " + lines[++index].trim();
+      const continuation = lines[index + 1];
+      if (continuation === undefined) break;
+      index++;
+      command = command.slice(0, -1) + " " + continuation.trim();
     }
     if (!command.includes("/api/cron/")) continue;
     try {
@@ -119,10 +127,10 @@ export function parseCronCurlExamples(content: string, file: string): CronCurlEx
 
 /** Substitute only named synthetic values, never process.env or a shell expansion. */
 export function cronFixtureRequest(example: CronCurlExample): Request {
-  const values: Record<string, string> = { CRON_SECRET: "docs-cron-fixture", WEBHOOK_SECRET: "docs-webhook-fixture" };
   const headers = Object.fromEntries(Object.entries(example.headers).map(([name, value]) => [
     name,
-    value.replace(/\$\{(CRON_SECRET|WEBHOOK_SECRET)\}|\$(CRON_SECRET|WEBHOOK_SECRET)\b/g, (_match, braced: string, plain: string) => values[braced ?? plain]),
+    value.replace(/\$\{(CRON_SECRET|WEBHOOK_SECRET)\}|\$(CRON_SECRET|WEBHOOK_SECRET)\b/g, (_match, braced: string | undefined, plain: string | undefined) =>
+      (braced ?? plain) === "CRON_SECRET" ? "docs-cron-fixture" : "docs-webhook-fixture"),
   ]));
   return new Request(`http://localhost${example.path}`, { method: example.method, headers });
 }

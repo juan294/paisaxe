@@ -143,6 +143,9 @@ export async function generateContextualizedEmbeddings(
 
   for (let i = 0; i < chunkGroups.length; i++) {
     const group = chunkGroups[i];
+    if (group === undefined) {
+      throw new Error(`Missing contextualized embedding input group ${i}`);
+    }
     if (group.length === 0) continue;
 
     const result = await voyageClient.contextualizedEmbed({
@@ -153,12 +156,12 @@ export async function generateContextualizedEmbeddings(
     });
 
     // voyageai 0.4.x ExtendedClient returns { results: [{ embeddings: number[][] }], totalTokens }
-    if (!result.results || result.results.length === 0) {
+    const documentResult = result.results?.[0];
+    if (!documentResult) {
       throw new Error(`No contextualized embeddings returned for group ${i}`);
     }
 
     // results[0] is the document; results[0].embeddings[] are per-chunk vectors
-    const documentResult = result.results[0];
     if (!documentResult.embeddings) {
       throw new Error(`No chunk embeddings in contextualized response for group ${i}`);
     }

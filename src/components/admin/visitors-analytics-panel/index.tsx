@@ -25,8 +25,8 @@ import { SkeletonDashboard } from "./skeletons";
 export function VisitorsAnalyticsPanel() {
   const { includeLocalhost, setIncludeLocalhost, isInitialized } = useDevToggle();
   const [dateRange, setDateRange] = useState({
-    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-    to: new Date().toISOString().split("T")[0],
+    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().replace(/T.*$/, ""),
+    to: new Date().toISOString().replace(/T.*$/, ""),
   });
 
   const fromISO = new Date(dateRange.from).toISOString();

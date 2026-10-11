@@ -58,7 +58,16 @@ export async function rerankChunks(
       logger.error("[Voyage AI] Rerank returned invalid indices, falling back to original order");
       return chunks.slice(0, topK);
     }
-    const reranked = indices.map(index => chunks[index!]);
+    const reranked: Chunk[] = [];
+    for (const index of indices) {
+      const chunk = index === undefined ? undefined : chunks[index];
+      if (chunk === undefined) {
+        options.onDegraded?.();
+        logger.error("[Voyage AI] Rerank returned invalid indices, falling back to original order");
+        return chunks.slice(0, topK);
+      }
+      reranked.push(chunk);
+    }
 
     return reranked;
   } catch (error) {

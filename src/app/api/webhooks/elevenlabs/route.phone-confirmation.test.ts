@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 /**
  * The ElevenLabs post-call webhook's phone-confirmation hook (PayPal hackathon
  * plan, Phase 8b). After the existing idempotent RPC records a call's outcome,
@@ -112,7 +113,7 @@ describe("ElevenLabs webhook: phone-confirmation calls", () => {
     expect(await response.json()).toEqual({ success: true, status: "processed", bookingId: CALL_ID, outcome: "confirmed", smsSent: false });
     expect(rpc).toHaveBeenCalledWith("process_elevenlabs_event_idempotent", expect.objectContaining({ p_booking_id: CALL_ID, p_outcome: "confirmed" }));
     expect(phone.settlePhoneConfirmationCall).toHaveBeenCalledWith(client, CALL_ID);
-    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(phone.settlePhoneConfirmationCall.mock.invocationCallOrder[0]);
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(requiredValue(phone.settlePhoneConfirmationCall.mock.invocationCallOrder[0], "src/app/api/webhooks/elevenlabs/route.phone-confirmation.test.ts:115 phone.settlePhoneConfirmationCall.mock.invocationCallOrder[0]"));
   });
 
   it.each([false, true])("acknowledges a retained replay without settlement or SMS (enabled=%s)", async smsEnabled => {

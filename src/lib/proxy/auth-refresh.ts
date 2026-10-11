@@ -17,7 +17,9 @@ export const AUTH_REFRESH_TIMEOUT_MS = 1_500;
 export function isTokenNearExpiry(token: string | undefined, thresholdSeconds = 300): boolean {
   if (!token) return true;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    const encodedPayload = token.split(".")[1];
+    if (encodedPayload === undefined) return true;
+    const payload = JSON.parse(atob(encodedPayload));
     return (payload.exp - Date.now() / 1000) < thresholdSeconds;
   } catch {
     return true;

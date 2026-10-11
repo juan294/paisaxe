@@ -39,7 +39,8 @@ export function extractDocumentedSecrets(content: string): Set<string> {
     let match;
     varPattern.lastIndex = 0;
     while ((match = varPattern.exec(rawLine)) !== null) {
-      keys.add(match[1]);
+      const key = match[1];
+      if (key !== undefined) keys.add(key);
     }
   }
   return keys;

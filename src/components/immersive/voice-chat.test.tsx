@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
@@ -584,7 +585,7 @@ describe("VoiceChat", () => {
       fireEvent.submit(form!);
 
       await waitFor(() => {
-        const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+        const callBody = JSON.parse(requiredValue(requiredValue(mockFetch.mock.calls[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0]")[1], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0][1]").body);
         expect(callBody.context).toContain("Lagos de Covadonga");
         expect(callBody.context).toContain("Picos de Europa");
         expect(callBody.context).toContain("nature-guide.pdf");
@@ -1379,7 +1380,7 @@ describe("VoiceChat initialMessage", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const requestBody = JSON.parse(
-      (mockFetch.mock.calls[0][1] as RequestInit).body as string
+      (requiredValue(requiredValue(mockFetch.mock.calls[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0]")[1], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0][1]") as RequestInit).body as string
     );
     expect(requestBody.message).toBe("What are the best hiking trails?");
 
@@ -1919,7 +1920,7 @@ describe("VoiceChat error UI for API failures", () => {
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      const retryCall = mockFetch.mock.calls[1][1].body;
+      const retryCall = requiredValue(requiredValue(mockFetch.mock.calls[1], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[1]")[1], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[1][1]").body;
       expect(retryCall).toContain("Retry question");
     });
   });
@@ -2046,7 +2047,7 @@ describe("VoiceChat booking mode (PayPal hackathon Phase 3, F06)", () => {
     await userEvent.keyboard("{Enter}");
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
-    expect(mockFetch.mock.calls[0][0]).toBe("/api/booking/chat/stream");
+    expect(requiredValue(requiredValue(mockFetch.mock.calls[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0]")[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0][0]")).toBe("/api/booking/chat/stream");
   });
 
   it("without booking access, uses the discovery chat route (unchanged)", async () => {
@@ -2067,6 +2068,6 @@ describe("VoiceChat booking mode (PayPal hackathon Phase 3, F06)", () => {
     await userEvent.keyboard("{Enter}");
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
-    expect(mockFetch.mock.calls[0][0]).toBe("/api/chat/stream");
+    expect(requiredValue(requiredValue(mockFetch.mock.calls[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0]")[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0][0]")).toBe("/api/chat/stream");
   });
 });

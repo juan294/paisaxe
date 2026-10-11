@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAgentRunner } from "./use-agent-runner";
@@ -29,7 +30,7 @@ describe("local capability with real API consumers", () => {
     const { result } = renderHook(() => useAgentTerminal({ onFinished }));
     await act(async () => { result.current.openTerminal("qa_agent_enabled", "now"); });
     expect(result.current.unavailable).toBe(true);
-    expect(result.current.terminalLogs[0].text).toMatch(/desarrollo local/);
+    expect(requiredValue(result.current.terminalLogs[0], "src/components/admin/agents-dashboard/local-capability.test.tsx: result.current.terminalLogs[0]").text).toMatch(/desarrollo local/);
     await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(onFinished).not.toHaveBeenCalled();

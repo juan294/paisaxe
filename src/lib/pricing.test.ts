@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import {
   PRICING_TIERS,
@@ -21,9 +22,9 @@ describe("PRICING_TIERS", () => {
   });
 
   it("has the correct prices for each tier", () => {
-    expect(PRICING_TIERS[0].price).toBe("€1.99");
-    expect(PRICING_TIERS[1].price).toBe("€4.99");
-    expect(PRICING_TIERS[2].price).toBe("€9.99");
+    expect(requiredValue(PRICING_TIERS[0], "src/lib/pricing.test.ts:24 PRICING_TIERS[0]").price).toBe("€1.99");
+    expect(requiredValue(PRICING_TIERS[1], "src/lib/pricing.test.ts:25 PRICING_TIERS[1]").price).toBe("€4.99");
+    expect(requiredValue(PRICING_TIERS[2], "src/lib/pricing.test.ts:26 PRICING_TIERS[2]").price).toBe("€9.99");
   });
 
   it("has i18n keys for every tier", () => {
@@ -34,9 +35,9 @@ describe("PRICING_TIERS", () => {
   });
 
   it("has Spanish fallback labels", () => {
-    expect(PRICING_TIERS[0].fallbackLabel).toBe("24 horas");
-    expect(PRICING_TIERS[1].fallbackLabel).toBe("7 días");
-    expect(PRICING_TIERS[2].fallbackLabel).toBe("30 días");
+    expect(requiredValue(PRICING_TIERS[0], "src/lib/pricing.test.ts:37 PRICING_TIERS[0]").fallbackLabel).toBe("24 horas");
+    expect(requiredValue(PRICING_TIERS[1], "src/lib/pricing.test.ts:38 PRICING_TIERS[1]").fallbackLabel).toBe("7 días");
+    expect(requiredValue(PRICING_TIERS[2], "src/lib/pricing.test.ts:39 PRICING_TIERS[2]").fallbackLabel).toBe("30 días");
   });
 });
 

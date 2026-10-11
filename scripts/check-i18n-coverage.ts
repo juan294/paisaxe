@@ -20,7 +20,7 @@ function extractKeys(obj: Record<string, unknown>, prefix = ''): string[] {
 }
 
 // UI Translation Analysis
-const locales = { es, en, fr, de, pt, ast } as Record<string, Record<string, unknown>>;
+const locales = { es, en, fr, de, pt, ast };
 const esKeys = new Set(extractKeys(es));
 const targetLocales = ['en', 'fr', 'de', 'pt', 'ast'] as const;
 
@@ -43,13 +43,9 @@ const storyLocales = ['en', 'fr', 'de', 'pt', 'ast'] as const;
 const slugs = Object.keys(STORY_TRANSLATIONS);
 console.log(`Total story slugs: ${slugs.length}`);
 
-const missingByLocale: Record<string, string[]> = {};
-for (const loc of storyLocales) {
-  missingByLocale[loc] = [];
-}
+const missingByLocale: Record<(typeof storyLocales)[number], string[]> = { en: [], fr: [], de: [], pt: [], ast: [] };
 
-for (const slug of slugs) {
-  const translations = STORY_TRANSLATIONS[slug];
+for (const [slug, translations] of Object.entries(STORY_TRANSLATIONS)) {
   for (const loc of storyLocales) {
     if (!translations[loc]) {
       missingByLocale[loc].push(slug);

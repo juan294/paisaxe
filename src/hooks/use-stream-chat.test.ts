@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useStreamChat } from "./use-stream-chat";
@@ -130,6 +131,87 @@ describe("useStreamChat", () => {
     });
   });
 
+  it.each(["json", "stream"])("ignores %s completion after its assistant slot is reset and accepts the next turn", async (kind) => {
+    let resolveResponse: (response: ReturnType<typeof createJsonResponse> | ReturnType<typeof createStreamingResponse>) => void = () => {
+      throw new Error("Response resolver not initialized");
+    };
+    mockFetch.mockImplementationOnce(() => new Promise((resolve) => { resolveResponse = resolve; }));
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+    let pending: Promise<void> = Promise.resolve();
+    act(() => { pending = result.current.sendMessage("Old turn", { context: "ctx", locale: "es", messageIndex: 0 }); });
+    expect(result.current.messages).toHaveLength(2);
+    act(() => { result.current.resetMessages(); });
+    await act(async () => {
+      resolveResponse(kind === "json" ? createJsonResponse("Old answer") : createStreamingResponse("Old answer"));
+      await pending;
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.isStreaming).toBe(false);
+    mockFetch.mockResolvedValueOnce(createJsonResponse("Fresh answer"));
+    await act(async () => { await result.current.sendMessage("Fresh turn", { context: "ctx", locale: "es", messageIndex: 0 }); });
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "Fresh turn" }),
+      expect.objectContaining({ role: "assistant", content: "Fresh answer" }),
+    ]);
+  });
+
+  it("ignores an SSE timeout event after reset and accepts a fresh successful turn", async () => {
+    let deliverTimeout: () => void = () => {
+      throw new Error("Held SSE stream not initialized");
+    };
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        deliverTimeout = () => {
+          controller.enqueue(new TextEncoder().encode(
+            `data: ${JSON.stringify({ type: "error", message: "response_timeout" })}\n\n`
+          ));
+          controller.close();
+        };
+      },
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+    let pending: Promise<void> = Promise.resolve();
+    await act(async () => {
+      pending = result.current.sendMessage("Old turn", {
+        context: "ctx", locale: "es", messageIndex: 0,
+      });
+    });
+    expect(stream.locked).toBe(true);
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.isStreaming).toBe(true);
+
+    act(() => { result.current.resetMessages(); });
+    expect(result.current.messages).toEqual([]);
+    await act(async () => {
+      deliverTimeout();
+      await pending;
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.isStreaming).toBe(false);
+    expect(mockRecordUpsellShown).not.toHaveBeenCalled();
+
+    mockFetch.mockResolvedValueOnce(createStreamingResponse("Fresh answer"));
+    await act(async () => {
+      await result.current.sendMessage("Fresh turn", {
+        context: "ctx", locale: "es", messageIndex: 0,
+      });
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "Fresh turn" }),
+      expect.objectContaining({ role: "assistant", content: "Fresh answer" }),
+    ]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.isStreaming).toBe(false);
+  });
+
   it("should initialize with empty messages and not streaming", () => {
     const { result } = renderHook(() =>
       useStreamChat({ canUseVoice: false })
@@ -162,8 +244,8 @@ describe("useStreamChat", () => {
         content: "Hello",
       })
     );
-    expect(result.current.messages[1].role).toBe("assistant");
-    expect(result.current.messages[1].content).toBe("Hello from AI");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").role).toBe("assistant");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Hello from AI");
   });
 
   it("should set isStreaming to true while fetching", async () => {
@@ -215,7 +297,7 @@ describe("useStreamChat", () => {
     });
 
     expect(result.current.messages).toHaveLength(2);
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "Lo siento, hubo un error. Intenta de nuevo."
     );
     expect(result.current.isStreaming).toBe(false);
@@ -237,7 +319,7 @@ describe("useStreamChat", () => {
     });
 
     expect(result.current.messages).toHaveLength(2);
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "Lo siento, hubo un error. Intenta de nuevo."
     );
   });
@@ -270,7 +352,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "Lo siento, hubo un error. Intenta de nuevo."
     );
   });
@@ -312,7 +394,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "Lo siento, hubo un error. Intenta de nuevo."
     );
   });
@@ -334,7 +416,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].content).toBe("Flagged content response");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Flagged content response");
   });
 
   it("should include images from done event", async () => {
@@ -355,7 +437,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].images).toEqual(images);
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").images).toEqual(images);
   });
 
   it("should detect upsell markers and strip them from content", async () => {
@@ -396,8 +478,8 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].content).toBe("Try voice mode");
-    expect(result.current.messages[1].upsellReason).toBe("booking");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Try voice mode");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").upsellReason).toBe("booking");
   });
 
   it("should NOT show upsell when user has voice access", async () => {
@@ -438,8 +520,8 @@ describe("useStreamChat", () => {
     });
 
     // Content should still be cleaned but upsellReason should be undefined
-    expect(result.current.messages[1].content).toBe("Info");
-    expect(result.current.messages[1].upsellReason).toBeUndefined();
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Info");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").upsellReason).toBeUndefined();
   });
 
   it("should NOT show upsell when throttle blocks it", async () => {
@@ -481,7 +563,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].upsellReason).toBeUndefined();
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").upsellReason).toBeUndefined();
     expect(mockRecordUpsellShown).not.toHaveBeenCalled();
   });
 
@@ -569,7 +651,7 @@ describe("useStreamChat", () => {
     });
 
     // The done event should have been processed from the remaining buffer
-    expect(result.current.messages[1].content).toBe("Hello");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Hello");
     expect(result.current.isStreaming).toBe(false);
   });
 
@@ -634,14 +716,14 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].upsellReason).toBe("booking");
-    expect(result.current.messages[1].upsellDismissed).toBeFalsy();
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").upsellReason).toBe("booking");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").upsellDismissed).toBeFalsy();
 
     act(() => {
       result.current.dismissUpsell(1);
     });
 
-    expect(result.current.messages[1].upsellDismissed).toBe(true);
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").upsellDismissed).toBe(true);
   });
 
   it("should not send empty messages", async () => {
@@ -737,7 +819,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "Lo siento, hubo un error. Intenta de nuevo."
     );
   });
@@ -760,7 +842,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].images).toEqual(images);
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").images).toEqual(images);
   });
 
   it("should send correct request body to API", async () => {
@@ -950,7 +1032,7 @@ describe("useStreamChat", () => {
     });
 
     // Only the valid data events should have been processed
-    expect(result.current.messages[1].content).toBe("Hello");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Hello");
   });
 
   it("should dismiss upsell at an invalid index without crashing (line 49 branch)", async () => {
@@ -990,7 +1072,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "Lo siento, no pude procesar tu pregunta."
     );
   });
@@ -1045,8 +1127,8 @@ describe("useStreamChat", () => {
     // reason was null, so `reason ?? undefined` should produce undefined
     // shouldShowUpsell is true (hasUpsell=true, canUseVoice=false, canShowUpsell=true)
     // so the ternary takes the truthy path, but reason ?? undefined = undefined
-    expect(result.current.messages[1].upsellReason).toBeUndefined();
-    expect(result.current.messages[1].content).toBe("Cleaned content");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").upsellReason).toBeUndefined();
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Cleaned content");
   });
 
   it("should ignore unrecognized SSE event types (implicit else after line 151)", async () => {
@@ -1088,7 +1170,7 @@ describe("useStreamChat", () => {
     });
 
     // The "heartbeat" event should be silently ignored; only "text" content appears
-    expect(result.current.messages[1].content).toBe("Hello");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Hello");
   });
 
   it("ignores booking-chat tool and card events, which the parser now accepts", async () => {
@@ -1119,7 +1201,7 @@ describe("useStreamChat", () => {
       await result.current.sendMessage("Test", { context: "ctx", locale: "es", messageIndex: 0 });
     });
 
-    expect(result.current.messages[1].content).toBe("Hello");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Hello");
   });
 
   it("should handle malformed SSE data gracefully", async () => {
@@ -1158,7 +1240,7 @@ describe("useStreamChat", () => {
     });
 
     // Should have the valid content, skipping the malformed event
-    expect(result.current.messages[1].content).toBe("Good content");
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Good content");
   });
 
   it("onError: sets error state and replaces assistant message when the stream reader throws", async () => {
@@ -1187,7 +1269,7 @@ describe("useStreamChat", () => {
 
     // onError non-AbortError path: sets error and updates assistant message
     expect(result.current.error).toBe("No se pudo conectar. Por favor, inténtalo de nuevo.");
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "Lo siento, hubo un error. Intenta de nuevo."
     );
   });
@@ -1332,7 +1414,7 @@ describe("useStreamChat", () => {
     // FE-H2: timeout should now surface an error and timeout message, not silently resolve
     expect(result.current.isStreaming).toBe(false);
     expect(result.current.error).toBe("Se perdió la conexión. Reintentar");
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "La respuesta tardó demasiado. Por favor, inténtalo de nuevo."
     );
   });
@@ -1399,7 +1481,7 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(result.current.messages[1].content).toBe(
+    expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
       "La respuesta tardó demasiado. Por favor, inténtalo de nuevo."
     );
   });
@@ -1442,7 +1524,7 @@ describe("useStreamChat", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     // A new_chat_prompt assistant message should have been appended
     expect(result.current.messages).toHaveLength(41);
-    const lastMsg = result.current.messages[40];
+    const lastMsg = requiredValue(result.current.messages[40], "src/hooks/use-stream-chat.test.ts: result.current.messages[40]");
     expect(lastMsg.role).toBe("assistant");
     expect(lastMsg.content).toBe(
       "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar."
@@ -1547,7 +1629,7 @@ describe("useStreamChat", () => {
 
       expect(mockFetch).toHaveBeenCalled();
       expect(result.current.messages).toHaveLength(2);
-      expect(result.current.messages[1].content).toBe("Fresh start");
+      expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe("Fresh start");
     });
   });
 
@@ -1642,7 +1724,7 @@ describe("useStreamChat", () => {
       // the content is still fully correct — proving "done" flushes the
       // buffered chunk synchronously rather than relying on a paint frame.
       expect(rafCallbacks.length).toBeGreaterThan(0);
-      expect(result.current.messages[1].content).toBe(
+      expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
         "one two three four five"
       );
 
@@ -1694,7 +1776,7 @@ describe("useStreamChat", () => {
         });
       });
 
-      expect(result.current.messages[1].content).toBe(
+      expect(requiredValue(result.current.messages[1], "src/hooks/use-stream-chat.test.ts: result.current.messages[1]").content).toBe(
         "Lo siento, hubo un error. Intenta de nuevo."
       );
     });

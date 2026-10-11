@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 
@@ -411,7 +412,7 @@ describe("useFavorites", () => {
       );
       const togglePostCall = postCalls.find((call: unknown[]) => {
         try {
-          const body = JSON.parse((call[1] as Record<string, string>)?.body);
+          const body = JSON.parse(requiredValue((requiredValue(call[1], "src/hooks/use-favorites.test.ts: call[1]") as Record<string, string>).body, "Favorite POST JSON body"));
           return (
             body.storyIds &&
             body.storyIds.length === 1 &&
@@ -466,9 +467,9 @@ describe("useFavorites", () => {
       );
       expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
 
-      const deleteCall = deleteCalls[0];
-      expect(deleteCall[0]).toBe("/api/favorites?storyId=story-1");
-      expect(deleteCall[1]).toEqual(
+      const deleteCall = requiredValue(deleteCalls[0], "src/hooks/use-favorites.test.ts: deleteCalls[0]");
+      expect(requiredValue(deleteCall[0], "src/hooks/use-favorites.test.ts: deleteCall[0]")).toBe("/api/favorites?storyId=story-1");
+      expect(requiredValue(deleteCall[1], "src/hooks/use-favorites.test.ts: deleteCall[1]")).toEqual(
         expect.objectContaining({
           method: "DELETE",
           headers: expect.objectContaining({
@@ -784,8 +785,8 @@ describe("useFavorites", () => {
       const setItemCalls = localStorageMock.setItem.mock.calls.filter(
         (call: unknown[]) => call[0] === favoritesStorageKey("user-1")
       );
-      const lastCall = setItemCalls[setItemCalls.length - 1];
-      const savedFavorites = JSON.parse(lastCall[1]).data;
+      const lastCall = requiredValue(setItemCalls[setItemCalls.length - 1], "src/hooks/use-favorites.test.ts: setItemCalls[setItemCalls.length - 1]");
+      const savedFavorites = JSON.parse(requiredValue(lastCall[1], "src/hooks/use-favorites.test.ts: lastCall[1]")).data;
       expect(savedFavorites).toEqual(["story-2"]);
     });
 

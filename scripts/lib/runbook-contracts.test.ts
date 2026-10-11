@@ -1,3 +1,4 @@
+import { requiredValue } from "../../src/test/required-value";
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
@@ -10,7 +11,7 @@ const post = 'curl -X POST https://paisaxe.es/api/cron/fail-stale-bookings -H "x
 const get = 'curl https://paisaxe.es/api/cron/fail-stale-bookings -H "Authorization: Bearer ${CRON_SECRET}"';
 const accepted = (command: string) => {
   const [example] = parseCronCurlExamples(fenced(command), file);
-  const request = cronFixtureRequest(example);
+  const request = cronFixtureRequest(requiredValue(example, "cron example"));
   return request.method === "GET" ? verifyVercelCron(new NextRequest(request)) : verifyWebhookSecret(new NextRequest(request));
 };
 
@@ -47,7 +48,7 @@ describe("fenced cron curl contracts exercise the real auth verifiers", () => {
     vi.stubEnv("WEBHOOK_SECRET", "never-expand-real-environment");
     const [example] = parseCronCurlExamples(fenced(post.replace(" -H", " \\\n  -H")), file);
     expect(example).toMatchObject({ file, line: 4, method: "POST", path: "/api/cron/fail-stale-bookings", headers: { "x-webhook-secret": "$WEBHOOK_SECRET" } });
-    expect(cronFixtureRequest(example).headers.get("x-webhook-secret")).toBe("docs-webhook-fixture");
+    expect(cronFixtureRequest(requiredValue(example, "cron example")).headers.get("x-webhook-secret")).toBe("docs-webhook-fixture");
   });
   it.each(["$(touch /tmp/not-executed)", "`id`", "; echo unsafe", " | jq", " --data '{}'"])("rejects unsupported syntax safely and suggests a supported form: %s", suffix => {
     expect(() => parseCronCurlExamples(fenced(post + suffix), file)).toThrow(new RegExp(`${file}:4:.*Supported form:`));
@@ -59,9 +60,9 @@ describe("fenced cron curl contracts exercise the real auth verifiers", () => {
     const command = 'curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/cron/fail-stale-bookings"';
     const [example] = parseCronCurlExamples(fenced(command + "\n# Expected: 401"), file);
     expect(example).toMatchObject({ expectedAuth: false, method: "GET", path: "/api/cron/fail-stale-bookings" });
-    expect(verifyVercelCron(new NextRequest(cronFixtureRequest(example)))).toBe(false);
+    expect(verifyVercelCron(new NextRequest(cronFixtureRequest(requiredValue(example, "cron example"))))).toBe(false);
     // Removing a credential from a success example cannot turn it into a passing rejection probe.
-    expect(parseCronCurlExamples(fenced(command), file)[0].expectedAuth).toBe(true);
+    expect(requiredValue(parseCronCurlExamples(fenced(command), file)[0], "success cron example").expectedAuth).toBe(true);
   });
   it("ignores non-cron examples and unfenced prose", () => {
     expect(parseCronCurlExamples(post + "\n" + fenced("curl https://paisaxe.es/api/health | jq"), file)).toEqual([]);

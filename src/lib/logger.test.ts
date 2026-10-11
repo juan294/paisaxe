@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 describe("logger", () => {
@@ -26,7 +27,7 @@ describe("logger", () => {
       logger.debug("[VOYAGE_TOKENS]", { total_tokens: 42 });
 
       expect(spy).toHaveBeenCalledTimes(1);
-      const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+      const parsed = JSON.parse(requiredValue(spy.mock.calls[0], "src/lib/logger.test.ts:29 spy.mock.calls[0]")[0] as string);
       expect(parsed).toMatchObject({
         level: "debug",
         msg: "[VOYAGE_TOKENS]",

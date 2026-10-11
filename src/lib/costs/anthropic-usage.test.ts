@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -42,7 +43,7 @@ describe("recordAnthropicUsage", () => {
 
     expect(mockFrom).toHaveBeenCalledWith("anthropic_usage");
     expect(mockInsert).toHaveBeenCalledTimes(1);
-    const row = mockInsert.mock.calls[0][0];
+    const row = requiredValue(mockInsert.mock.calls[0], "src/lib/costs/anthropic-usage.test.ts:45 mockInsert.mock.calls[0]")[0];
     expect(row.model).toBe("claude-sonnet-5");
     expect(row.input_tokens).toBe(1_000_000);
     expect(row.output_tokens).toBe(1_000_000);
@@ -63,7 +64,7 @@ describe("recordAnthropicUsage", () => {
       },
     });
 
-    const row = mockInsert.mock.calls[0][0];
+    const row = requiredValue(mockInsert.mock.calls[0], "src/lib/costs/anthropic-usage.test.ts:66 mockInsert.mock.calls[0]")[0];
     expect(row).toMatchObject({
       input_tokens: 12,
       output_tokens: 34,
@@ -80,7 +81,7 @@ describe("recordAnthropicUsage", () => {
         source,
         usage: { input_tokens: 1, output_tokens: 1 },
       });
-      expect(mockInsert.mock.calls[0][0].source).toBe(source);
+      expect(requiredValue(mockInsert.mock.calls[0], "src/lib/costs/anthropic-usage.test.ts:83 mockInsert.mock.calls[0]")[0].source).toBe(source);
     }
   );
 
@@ -136,7 +137,7 @@ describe("recordAnthropicUsage", () => {
       usage: { cache_creation_input_tokens: 1000 },
     });
     expect(mockInsert).toHaveBeenCalledTimes(1);
-    const row = mockInsert.mock.calls[0][0];
+    const row = requiredValue(mockInsert.mock.calls[0], "src/lib/costs/anthropic-usage.test.ts:139 mockInsert.mock.calls[0]")[0];
     expect(row.input_tokens).toBe(0);
     expect(row.output_tokens).toBe(0);
     expect(row.cache_creation_input_tokens).toBe(1000);
@@ -185,9 +186,9 @@ describe("recordAnthropicUsageInBackground", () => {
     });
 
     expect(mockAfter).toHaveBeenCalledTimes(1);
-    await mockAfter.mock.calls[0][0];
+    await requiredValue(mockAfter.mock.calls[0], "src/lib/costs/anthropic-usage.test.ts:188 mockAfter.mock.calls[0]")[0];
     expect(mockInsert).toHaveBeenCalledTimes(1);
-    expect(mockInsert.mock.calls[0][0].source).toBe("chat_stream");
+    expect(requiredValue(mockInsert.mock.calls[0], "src/lib/costs/anthropic-usage.test.ts:190 mockInsert.mock.calls[0]")[0].source).toBe("chat_stream");
   });
 
   it("still records and never throws outside a request scope (after() throws)", async () => {

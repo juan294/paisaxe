@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fetchTwilioCosts, fetchTwilioCostsByDay } from "./twilio-costs";
 
@@ -204,8 +205,8 @@ describe("twilio-costs", () => {
       const result = await fetchTwilioCostsByDay("2024-01-15", "2024-01-15");
 
       expect(result).toHaveLength(1);
-      expect(result[0].costUsd).toBe(5.5); // 2.50 + 3.00
-      expect(result[0].date).toBe("2024-01-15");
+      expect(requiredValue(result[0], "src/lib/costs/twilio-costs.test.ts:207 result[0]").costUsd).toBe(5.5); // 2.50 + 3.00
+      expect(requiredValue(result[0], "src/lib/costs/twilio-costs.test.ts:208 result[0]").date).toBe("2024-01-15");
     });
 
     it("returns empty array when API returns error", async () => {
@@ -257,7 +258,7 @@ describe("twilio-costs", () => {
       const result = await fetchTwilioCostsByDay("2024-01-15", "2024-01-15");
 
       expect(result).toHaveLength(1);
-      expect(result[0].costUsd).toBe(0);
+      expect(requiredValue(result[0], "src/lib/costs/twilio-costs.test.ts:260 result[0]").costUsd).toBe(0);
     });
 
     it("handles empty usage records", async () => {

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import fs from "fs";
@@ -161,10 +162,10 @@ describe("RootLayout", () => {
         alt: string;
       }>;
       expect(images.length).toBeGreaterThan(0);
-      expect(images[0].url).toContain("/images/");
-      expect(images[0].width).toBe(1200);
-      expect(images[0].height).toBe(630);
-      expect(images[0].alt).toBeTruthy();
+      expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").url).toContain("/images/");
+      expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").width).toBe(1200);
+      expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").height).toBe(630);
+      expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").alt).toBeTruthy();
     });
   });
 

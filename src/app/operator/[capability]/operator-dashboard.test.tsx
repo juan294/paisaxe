@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -299,7 +300,7 @@ describe("OperatorDashboard", () => {
     mockFetch.mockResolvedValueOnce(json(200, view()));
     render(<OperatorDashboard />);
 
-    const table = within((await screen.findAllByRole("table"))[0]);
+    const table = within(requiredValue((await screen.findAllByRole("table"))[0], "src/app/operator/[capability]/operator-dashboard.test.tsx: (await screen.findAllByRole(\"table\"))[0]"));
     expect(table.getAllByRole("columnheader")).toHaveLength(9);
     const rows = within(screen.getByRole("region", { name: "Próximas reservas" })).getAllByRole("row").slice(1);
     expect(rows).toHaveLength(2);
@@ -308,7 +309,7 @@ describe("OperatorDashboard", () => {
       expect(cells).toHaveLength(9);
       for (const cell of cells) expect(cell.getAttribute("data-label")).toMatch(/\S/);
     }
-    expect(within(rows[0]).getByRole("cell", { name: /Confirmada/ })).toHaveAttribute("data-label", "Estado");
+    expect(within(requiredValue(rows[0], "src/app/operator/[capability]/operator-dashboard.test.tsx: rows[0]")).getByRole("cell", { name: /Confirmada/ })).toHaveAttribute("data-label", "Estado");
   });
 
   it("shows an icon on the money tiles and sets no dead dark: classes", async () => {

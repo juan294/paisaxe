@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { handleSave, handleApprove, handleMarkNeedsCuration } from "./use-story-editor-save";
 import {
@@ -185,7 +186,7 @@ describe("handleSave", () => {
       });
       await handleSave(params);
 
-      const callArgs = (updateStory as Mock).mock.calls[0][1];
+      const callArgs = requiredValue(requiredValue((updateStory as Mock).mock.calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0]")[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0][1]");
       expect(callArgs.metadata.question_prompts).toEqual(["Valid prompt"]);
     });
 
@@ -211,7 +212,7 @@ describe("handleSave", () => {
       });
       await handleSave(params);
 
-      const callArgs = (updateStory as Mock).mock.calls[0][1];
+      const callArgs = requiredValue(requiredValue((updateStory as Mock).mock.calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0]")[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0][1]");
       expect(callArgs.metadata.question_prompts).toBeUndefined();
     });
 
@@ -651,9 +652,9 @@ describe("handleSave", () => {
       await handleSave(params);
 
       expect(updateStoryTranslation).toHaveBeenCalledTimes(3);
-      expect((updateStoryTranslation as Mock).mock.calls[0][1]).toBe("en");
-      expect((updateStoryTranslation as Mock).mock.calls[1][1]).toBe("fr");
-      expect((updateStoryTranslation as Mock).mock.calls[2][1]).toBe("de");
+      expect(requiredValue(requiredValue((updateStoryTranslation as Mock).mock.calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStoryTranslation as Mock).mock.calls[0]")[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStoryTranslation as Mock).mock.calls[0][1]")).toBe("en");
+      expect(requiredValue(requiredValue((updateStoryTranslation as Mock).mock.calls[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStoryTranslation as Mock).mock.calls[1]")[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStoryTranslation as Mock).mock.calls[1][1]")).toBe("fr");
+      expect(requiredValue(requiredValue((updateStoryTranslation as Mock).mock.calls[2], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStoryTranslation as Mock).mock.calls[2]")[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStoryTranslation as Mock).mock.calls[2][1]")).toBe("de");
     });
 
     it("shows error when translation save fails and stops further translations", async () => {
@@ -733,8 +734,8 @@ describe("handleSave", () => {
 
       // setIsLoading(true) at start, setIsLoading(false) in finally
       const calls = (params.setIsLoading as unknown as Mock).mock.calls;
-      expect(calls[0][0]).toBe(true);
-      expect(calls[calls.length - 1][0]).toBe(false);
+      expect(requiredValue(requiredValue(calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[0]")[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[0][0]")).toBe(true);
+      expect(requiredValue(requiredValue(calls[calls.length - 1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[calls.length - 1]")[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[calls.length - 1][0]")).toBe(false);
     });
 
     it("clears error at the start", async () => {
@@ -788,7 +789,7 @@ describe("handleSave", () => {
       });
       await handleSave(params);
 
-      const callArgs = (updateStory as Mock).mock.calls[0][1];
+      const callArgs = requiredValue(requiredValue((updateStory as Mock).mock.calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0]")[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0][1]");
       expect(callArgs.metadata).toEqual({
         mood_tags: ["relaxing"],
         asturianu_title: "Hola",
@@ -819,7 +820,7 @@ describe("handleSave", () => {
       });
       await handleSave(params);
 
-      const callArgs = (updateStory as Mock).mock.calls[0][1];
+      const callArgs = requiredValue(requiredValue((updateStory as Mock).mock.calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0]")[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0][1]");
       expect(callArgs.subtitle).toBeUndefined();
       expect(callArgs.description).toBeUndefined();
     });
@@ -847,7 +848,7 @@ describe("handleSave", () => {
       });
       await handleSave(params);
 
-      const callArgs = (updateStory as Mock).mock.calls[0][1];
+      const callArgs = requiredValue(requiredValue((updateStory as Mock).mock.calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0]")[1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: (updateStory as Mock).mock.calls[0][1]");
       expect(callArgs.location).toBeNull();
       expect(callArgs.duration).toBeNull();
     });
@@ -928,8 +929,8 @@ describe("handleApprove", () => {
     await handleApprove(mockStory, onUpdate, setIsLoading, setError);
 
     const calls = setIsLoading.mock.calls;
-    expect(calls[0][0]).toBe(true);
-    expect(calls[calls.length - 1][0]).toBe(false);
+    expect(requiredValue(requiredValue(calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[0]")[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[0][0]")).toBe(true);
+    expect(requiredValue(requiredValue(calls[calls.length - 1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[calls.length - 1]")[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[calls.length - 1][0]")).toBe(false);
   });
 
   it("clears error at the start", async () => {
@@ -1021,7 +1022,7 @@ describe("handleMarkNeedsCuration", () => {
     await handleMarkNeedsCuration(mockStory, onUpdate, setIsLoading, setError);
 
     const calls = setIsLoading.mock.calls;
-    expect(calls[0][0]).toBe(true);
-    expect(calls[calls.length - 1][0]).toBe(false);
+    expect(requiredValue(requiredValue(calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[0]")[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[0][0]")).toBe(true);
+    expect(requiredValue(requiredValue(calls[calls.length - 1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[calls.length - 1]")[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[calls.length - 1][0]")).toBe(false);
   });
 });

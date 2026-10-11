@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   fetchStories,
@@ -59,7 +60,7 @@ describe("admin-api", () => {
       await fetchStories();
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "src/lib/admin-api.test.ts:62 vi.mocked(fetch).mock.calls[0]");
       expect(String(url)).toContain("/api/admin/stories");
       // No Authorization header - cookies handle auth
       expect(init?.headers).toBeUndefined();
@@ -78,7 +79,7 @@ describe("admin-api", () => {
 
       await fetchStories("approved");
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "src/lib/admin-api.test.ts:82 vi.mocked(fetch).mock.calls[0]");
       expect(String(url)).toContain("filter=approved");
     });
 
@@ -87,7 +88,7 @@ describe("admin-api", () => {
 
       await fetchStories();
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).not.toContain("filter=");
     });
 
@@ -131,7 +132,7 @@ describe("admin-api", () => {
       await updateStoryImageUrl(storyId, imageUrl, "unsplash");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe(`/api/admin/stories/${storyId}/image`);
       expect(init?.method).toBe("PUT");
       expect(init?.headers).toEqual(
@@ -191,7 +192,7 @@ describe("admin-api", () => {
       await updateStoryImageSource(storyId, imageSource);
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe(`/api/admin/stories/${storyId}/image-source`);
       expect(init?.method).toBe("PUT");
       expect(init?.headers).toEqual(
@@ -248,7 +249,7 @@ describe("admin-api", () => {
       await uploadStoryImage(storyId, file, "user_upload");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe(`/api/admin/stories/${storyId}/image`);
       expect(init?.method).toBe("PUT");
 
@@ -266,7 +267,7 @@ describe("admin-api", () => {
 
       await uploadStoryImage(storyId, file);
 
-      const [, init] = vi.mocked(fetch).mock.calls[0];
+      const [, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       const body = init?.body as FormData;
       expect(body.get("imageSource")).toBeNull();
     });
@@ -322,7 +323,7 @@ describe("admin-api", () => {
       await updateStoryStatus(storyId, "approved");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe(`/api/admin/stories/${storyId}/status`);
       expect(init?.method).toBe("PUT");
       expect(init?.headers).toEqual(
@@ -390,7 +391,7 @@ describe("admin-api", () => {
       await updateFeatureFlagConfig(flagKey, mockConfig);
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe(`/api/admin/feature-flags/${flagKey}`);
       expect(init?.method).toBe("PUT");
       expect(init?.headers).toEqual(
@@ -448,7 +449,7 @@ describe("admin-api", () => {
 
       await createStory({ title: "New Story", content: "Story content" } as never);
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/stories");
       expect(init?.method).toBe("POST");
       expect(init?.headers).toEqual(expect.objectContaining({ "Content-Type": "application/json" }));
@@ -487,7 +488,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await updateStory("s1", { title: "Updated" } as never);
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/stories/s1");
       expect(init?.method).toBe("PATCH");
     });
@@ -512,7 +513,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { updatedIds: ["a"], status: "approved" } }));
       await bulkUpdateStoryStatus(["a", "b"], "approved");
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/stories/bulk-status");
       expect(init?.method).toBe("PUT");
       expect(JSON.parse(init?.body as string)).toEqual({ storyIds: ["a", "b"], status: "approved" });
@@ -538,7 +539,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { deletedIds: ["a"] } }));
       await bulkDeleteStories(["a", "b"]);
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/stories/bulk-delete");
       expect(init?.method).toBe("DELETE");
     });
@@ -563,7 +564,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: [] }));
       await fetchFeatureFlags();
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/feature-flags");
     });
 
@@ -587,7 +588,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { flagKey: "k", enabled: true } }));
       await updateFeatureFlag("visitor_voice_agent", true);
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/feature-flags/visitor_voice_agent");
       expect(init?.method).toBe("PUT");
       expect(JSON.parse(init?.body as string)).toEqual({ enabled: true });
@@ -613,7 +614,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await fetchAnalytics("2026-01-01", "2026-01-31", true);
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       const urlStr = String(url);
       expect(urlStr).toContain("from=2026-01-01");
       expect(urlStr).toContain("to=2026-01-31");
@@ -624,7 +625,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await fetchAnalytics();
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       const urlStr = String(url);
       expect(urlStr).not.toContain("from=");
       expect(urlStr).not.toContain("to=");
@@ -650,7 +651,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { images: [] } }));
       await searchContentImages("s1");
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/stories/s1/content-images");
     });
 
@@ -674,7 +675,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await fetchElevenLabsAnalytics("2026-01-01", "2026-01-31");
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       const urlStr = String(url);
       expect(urlStr).toContain("elevenlabs-analytics");
       expect(urlStr).toContain("from=2026-01-01");
@@ -700,7 +701,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: [] }));
       await fetchSuggestions("pending" as never);
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toContain("status=pending");
     });
 
@@ -708,7 +709,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: [] }));
       await fetchSuggestions();
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).not.toContain("status=");
     });
 
@@ -732,7 +733,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await updateSuggestion("sug-1", { status: "approved" as never, adminNotes: "LGTM" });
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/suggestions/sug-1");
       expect(init?.method).toBe("PUT");
       expect(JSON.parse(init?.body as string)).toEqual({ status: "approved", adminNotes: "LGTM" });
@@ -758,7 +759,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { id: "sug-1", deleted: true } }));
       await deleteSuggestion("sug-1");
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/suggestions/sug-1");
       expect(init?.method).toBe("DELETE");
     });
@@ -785,7 +786,7 @@ describe("admin-api", () => {
       );
       const result = await fetchStripeAnalytics("2026-01-01", "2026-01-31");
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toContain("stripe-analytics");
       expect(result).toEqual({ data: { revenue: 100 }, warning: "Test mode" });
     });
@@ -810,7 +811,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await fetchStoryTranslations("s1");
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/stories/s1/translations");
     });
 
@@ -834,7 +835,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { success: true } }));
       await updateStoryTranslation("s1", "es" as never, { title: "Hola" } as never);
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/stories/s1/translations");
       expect(init?.method).toBe("PATCH");
       expect(JSON.parse(init?.body as string)).toEqual({ locale: "es", translation: { title: "Hola" } });
@@ -860,7 +861,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { translated: true } }));
       await generateStoryTranslations("s1", { locales: ["es" as never], forceRetranslate: true });
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/stories/s1/translations");
       expect(init?.method).toBe("POST");
       expect(JSON.parse(init?.body as string)).toEqual({ locales: ["es"], forceRetranslate: true });
@@ -870,7 +871,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await generateStoryTranslations("s1");
 
-      const [, init] = vi.mocked(fetch).mock.calls[0];
+      const [, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(JSON.parse(init?.body as string)).toEqual({});
     });
 
@@ -894,7 +895,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await fetchCostsAnalytics("2026-01-01", "2026-01-31", { includeUsage: true });
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       const urlStr = String(url);
       expect(urlStr).toContain("costs-analytics");
       expect(urlStr).toContain("from=2026-01-01");
@@ -921,7 +922,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { id: "c1" } }));
       await createManualCostEntry({ platform: "vercel", amount: 20, date: "2026-01-15" } as never);
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/costs-analytics");
       expect(init?.method).toBe("POST");
     });
@@ -946,7 +947,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { id: "c1" } }));
       await updateManualCostEntry("c1", { amount: 30 } as never);
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/costs-analytics/c1");
       expect(init?.method).toBe("PUT");
     });
@@ -971,7 +972,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: { id: "c1", deleted: true } }));
       await deleteManualCostEntry("c1");
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/costs-analytics/c1");
       expect(init?.method).toBe("DELETE");
     });
@@ -996,7 +997,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ data: {} }));
       await fetchAgentsSummary();
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/agents-summary");
     });
 
@@ -1021,7 +1022,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse(responseData));
       const result = await triggerAgentRun("xander");
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/agents/run");
       expect(init?.method).toBe("POST");
       expect(JSON.parse(init?.body as string)).toEqual({ agentKey: "xander" });
@@ -1049,7 +1050,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse(responseData));
       const result = await fetchRunningAgents();
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/agents/run");
       expect(result).toEqual({ data: responseData });
     });
@@ -1075,7 +1076,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse(responseData));
       const result = await stopAgent("xander");
 
-      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      const [url, init] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).toBe("/api/admin/agents/run");
       expect(init?.method).toBe("DELETE");
       expect(JSON.parse(init?.body as string)).toEqual({ agentKey: "xander" });
@@ -1103,7 +1104,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse(responseData));
       const result = await fetchAgentLogs("xander", 12345);
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       const urlStr = String(url);
       expect(urlStr).toContain("agentKey=xander");
       expect(urlStr).toContain("since=12345");
@@ -1114,7 +1115,7 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({}));
       await fetchAgentLogs("xander");
 
-      const [url] = vi.mocked(fetch).mock.calls[0];
+      const [url] = requiredValue(vi.mocked(fetch).mock.calls[0], "first fetch fixture call");
       expect(String(url)).not.toContain("since=");
     });
 

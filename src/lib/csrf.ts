@@ -81,7 +81,7 @@ function parseCookieValue(
   if (!cookieHeader) return null;
   const cookies = cookieHeader.split(";");
   for (const cookie of cookies) {
-    const [cookieName, ...rest] = cookie.split("=");
+    const [cookieName = "", ...rest] = cookie.split("=");
     if (cookieName.trim() === name) {
       return rest.join("=").trim();
     }

@@ -197,7 +197,9 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
     markViewed(currentIndex);
   }, [currentIndex, markViewed]);
 
-  const currentStory = filteredStories[currentIndex];
+  // Filters can shrink before the index-reset effect runs. Keep the open
+  // chat bound to the first remaining story during that render.
+  const currentStory = filteredStories[currentIndex] ?? filteredStories[0];
 
   // FE-H3: stable identities across re-renders. handleCloseChat is passed as
   // VoiceChat's onClose, which feeds useFocusTrap's onEscape — a plain
@@ -235,7 +237,7 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
   }
 
   // Show message when no stories match filters
-  if (filteredStories.length === 0) {
+  if (!currentStory) {
     return (
       <div role="alert" aria-live="assertive" className="fixed inset-0 flex flex-col items-center justify-center bg-black">
         <CacheRetryNotice error={storiesError} onRetry={() => void refreshStories()} />

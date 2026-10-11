@@ -134,7 +134,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { agentKey } = body;
-    if (!agentKey || !Object.prototype.hasOwnProperty.call(AGENT_SCRIPTS, agentKey)) {
+    const scriptName = agentKey && Object.prototype.hasOwnProperty.call(AGENT_SCRIPTS, agentKey)
+      ? AGENT_SCRIPTS[agentKey]
+      : undefined;
+    if (!agentKey || !scriptName) {
       return NextResponse.json(
         { error: `Unknown agent key: ${agentKey}` },
         { status: 400 },
@@ -160,7 +163,7 @@ export async function POST(request: NextRequest) {
 
     // Use specific subdirectory to avoid Turbopack tracing the entire project root.
     const projectRoot = process.cwd();
-    const scriptPath = path.join(projectRoot, "scripts", AGENT_SCRIPTS[agentKey]);
+    const scriptPath = path.join(projectRoot, "scripts", scriptName);
     const startedAt = new Date().toISOString();
 
     const child = spawn("bash", [scriptPath], {

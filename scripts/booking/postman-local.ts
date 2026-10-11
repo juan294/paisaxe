@@ -292,6 +292,7 @@ export async function seedQuotes(client: SupabaseClient, experience: FixtureExpe
     .select("id, expires_at");
   if (error || !data || data.length !== 2) throw new Error(`Failed to seed quotes: ${error?.message ?? "unexpected rows"}`);
   const [fresh, stale] = [...data].sort((a, b) => Date.parse(b.expires_at as string) - Date.parse(a.expires_at as string));
+  if (!fresh || !stale) throw new Error("Failed to seed quotes: unexpected rows");
   return { quoteId: fresh.id as string, staleQuoteId: stale.id as string };
 }
 
@@ -327,13 +328,14 @@ export async function handleControl(deps: ControlDeps, request: IncomingMessage,
     if (!userId) return reply(response, 401, { error: "unknown session" });
     return reply(response, 200, await deps.seed(userId));
   }
-  if (request.method === "POST" && approval) {
+  const orderId = approval?.[1];
+  if (request.method === "POST" && orderId !== undefined) {
     try {
-      deps.approve(approval[1]);
+      deps.approve(orderId);
     } catch (error) {
       return reply(response, 409, { error: error instanceof Error ? error.message : String(error) });
     }
-    return reply(response, 200, { orderId: approval[1], status: "APPROVED" });
+    return reply(response, 200, { orderId, status: "APPROVED" });
   }
   reply(response, 404, { error: "not found" });
 }

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { initiateCall } from "./elevenlabs-call-service";
 import { logger } from "@/lib/logger";
@@ -116,7 +117,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
       conversationId: "conv_123",
     });
 
-    const [url, options] = mockFetch.mock.calls[0];
+    const [url, options] = requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:120 mock call tuple");
     expect(url).toBe(
       "https://api.us.elevenlabs.io/v1/convai/twilio/outbound-call"
     );
@@ -154,7 +155,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
       booking_id: "pending-row-abc-123",
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const body = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:157 mockFetch.mock.calls[0]")[1].body);
     expect(body.conversation_initiation_client_data.dynamic_variables.booking_id).toBe(
       "pending-row-abc-123"
     );
@@ -168,7 +169,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
 
     await initiateCall("+34985887797", baseRequest);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const body = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:171 mockFetch.mock.calls[0]")[1].body);
     expect(
       "booking_id" in body.conversation_initiation_client_data.dynamic_variables
     ).toBe(false);
@@ -185,7 +186,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
       special_requests: undefined,
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const body = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:188 mockFetch.mock.calls[0]")[1].body);
     expect(
       body.conversation_initiation_client_data.dynamic_variables.special_requests
     ).toBe("ninguna");
@@ -281,7 +282,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
         timedOut: true,
       });
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:284 mockFetch.mock.calls[0]")[1].body);
       expect(body.conversation_initiation_client_data.dynamic_variables.booking_id).toBe(
         request.booking_id
       );

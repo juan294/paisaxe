@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   analyzeSubscriptions,
@@ -118,7 +119,7 @@ describe("analyzeSubscriptions", () => {
     expect(elevenlabs).toBeDefined();
     expect(elevenlabs!.usagePercentages).toBeDefined();
     expect(elevenlabs!.usagePercentages!.length).toBeGreaterThan(0);
-    expect(elevenlabs!.usagePercentages![0].percentage).toBeCloseTo(12, 0);
+    expect(requiredValue(elevenlabs!.usagePercentages![0], "src/lib/subscription-optimizer.test.ts:121 elevenlabs!.usagePercentages![0]").percentage).toBeCloseTo(12, 0);
   });
 
   it("should calculate total monthly spend", () => {
@@ -156,7 +157,7 @@ describe("analyzeSubscriptions", () => {
       ],
     };
     const result = analyzeSubscriptions(input);
-    const rec = result.recommendations[0];
+    const rec = requiredValue(result.recommendations[0], "src/lib/subscription-optimizer.test.ts:450 result.recommendations[0]");
     expect(rec.action).toBe("keep");
     expect(rec.reason).toContain("All plan features are in use");
   });
@@ -178,7 +179,7 @@ describe("analyzeSubscriptions", () => {
       ],
     };
     const result = analyzeSubscriptions(input);
-    const rec = result.recommendations[0];
+    const rec = requiredValue(result.recommendations[0], "src/lib/subscription-optimizer.test.ts:183 result.recommendations[0]");
     expect(rec.action).toBe("keep");
     expect(rec.reason).toContain("Using 3 of 4 plan features");
   });
@@ -255,13 +256,13 @@ describe("analyzeSubscriptions", () => {
       },
     };
     const result = analyzeSubscriptions(input);
-    const rec = result.recommendations[0];
+    const rec = requiredValue(result.recommendations[0], "src/lib/subscription-optimizer.test.ts:265 result.recommendations[0]");
     // supabase has only 1 tier limit (supabaseStorageGb), so the reduce processes
     // the single-element array. The false branch would need multiple elements.
     // With real SERVICE_TIERS, each service has only one limit.
     // Let's verify the "keep" action and usage percentage are correct.
     expect(rec.action).toBe("keep");
-    expect(rec.usagePercentages[0].percentage).toBe(25);
+    expect(requiredValue(rec.usagePercentages[0], "src/lib/subscription-optimizer.test.ts:264 rec.usagePercentages[0]").percentage).toBe(25);
     expect(rec.reason).toContain("25%");
   });
 
@@ -302,7 +303,7 @@ describe("analyzeSubscriptions", () => {
       ],
     };
     const result = analyzeSubscriptions(input);
-    const rec = result.recommendations[0];
+    const rec = requiredValue(result.recommendations[0], "src/lib/subscription-optimizer.test.ts:308 result.recommendations[0]");
     // All features are unused → review since > half unused
     expect(rec.action).toBe("review");
     expect(rec.unusedFeatures).toHaveLength(5);
@@ -378,7 +379,7 @@ describe("analyzeSubscriptions", () => {
         },
       };
       const result = analyzeSubscriptions(input);
-      const rec = result.recommendations[0];
+      const rec = requiredValue(result.recommendations[0], "src/lib/subscription-optimizer.test.ts:449 result.recommendations[0]");
       // Only 2 usage percentages should be reported (visitors + voiceMinutes)
       // The "unknownMetric" is skipped because getMetricValue returns undefined.
       expect(rec.usagePercentages).toHaveLength(2);
@@ -412,7 +413,7 @@ describe("analyzeSubscriptions", () => {
         },
       };
       const result = analyzeSubscriptions(input);
-      const rec = result.recommendations[0];
+      const rec = requiredValue(result.recommendations[0], "src/lib/subscription-optimizer.test.ts:453 result.recommendations[0]");
       // The highest usage should be visitors at 50%
       expect(rec.usagePercentages).toHaveLength(2);
       expect(rec.action).toBe("keep");
@@ -445,7 +446,7 @@ describe("analyzeSubscriptions", () => {
         },
       };
       const result = analyzeSubscriptions(input);
-      const rec = result.recommendations[0];
+      const rec = requiredValue(result.recommendations[0], "src/lib/subscription-optimizer.test.ts:452 result.recommendations[0]");
       expect(rec.usagePercentages).toHaveLength(2);
       expect(rec.action).toBe("keep");
       // The reason should reference Voice Minutes (50%) as the highest, not Visitors (10%)

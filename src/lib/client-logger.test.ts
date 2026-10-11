@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("clientLogger", () => {
@@ -20,8 +21,8 @@ describe("clientLogger", () => {
     clientLogger.error("[BOOM]", { code: 42 });
 
     expect(console.error).toHaveBeenCalledTimes(1);
-    const arg = (console.error as unknown as ReturnType<typeof vi.fn>).mock
-      .calls[0][0] as string;
+    const arg = requiredValue((console.error as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0], "src/lib/client-logger.test.ts:23 (console.error as unknown as ReturnType<typeof vi.fn>).mock\n      .calls[0]")[0] as string;
     const parsed = JSON.parse(arg);
     expect(parsed.level).toBe("error");
     expect(parsed.msg).toBe("[BOOM]");
@@ -61,7 +62,7 @@ describe("clientLogger", () => {
     clientLogger.debug("[DEBUG_EVENT]", { detail: "test" });
 
     expect(spy).toHaveBeenCalledTimes(1);
-    const arg = (spy as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const arg = requiredValue((spy as unknown as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/client-logger.test.ts:64 (spy as unknown as ReturnType<typeof vi.fn>).mock.calls[0]")[0] as string;
     const parsed = JSON.parse(arg);
     expect(parsed.level).toBe("debug");
     expect(parsed.msg).toBe("[DEBUG_EVENT]");
@@ -75,8 +76,8 @@ describe("clientLogger", () => {
     const child = clientLogger.child({ scope: "auth" });
     child.error("[CHILD]", { extra: true });
 
-    const arg = (console.error as unknown as ReturnType<typeof vi.fn>).mock
-      .calls[0][0] as string;
+    const arg = requiredValue((console.error as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0], "src/lib/client-logger.test.ts:78 (console.error as unknown as ReturnType<typeof vi.fn>).mock\n      .calls[0]")[0] as string;
     const parsed = JSON.parse(arg);
     expect(parsed.scope).toBe("auth");
     expect(parsed.extra).toBe(true);

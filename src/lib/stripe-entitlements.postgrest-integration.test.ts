@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -162,7 +163,7 @@ describe.skipIf(!reachable)("Stripe entitlement lifecycle against real local dat
     expect(await (await deliver("charge.refunded", payload)).json()).toMatchObject({ status: "reconciliation_required" });
     expect(await access()).toBe(false);
     expect(psql(`SELECT reconciliation_reasons::text FROM public.stripe_entitlement_payments WHERE payment_intent='${payment}';`)).toContain("incomplete_refund_pagination");
-    payload.refunds.has_more = false; payload.refunds.data[0].amount = 20;
+    payload.refunds.has_more = false; requiredValue(payload.refunds.data[0], "src/lib/stripe-entitlements.postgrest-integration.test.ts:165 payload.refunds.data[0]").amount = 20;
     await deliver("charge.refunded", payload);
     expect(psql(`SELECT reconciliation_reasons::text FROM public.stripe_entitlement_payments WHERE payment_intent='${payment}';`)).toContain("conflicting_refund:");
     const reasons = JSON.parse(psql(`SELECT to_json(reconciliation_reasons) FROM public.stripe_entitlement_payments WHERE payment_intent='${payment}';`));

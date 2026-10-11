@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock rate-limit module
@@ -85,7 +86,7 @@ describe("/api/mcp/places", () => {
     process.env.GOOGLE_PLACES_API_KEY = " corrected-key ";
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ places: [] }) });
     expect((await handler(request())).status).toBe(200);
-    expect(new Headers(mockFetch.mock.calls[0][1].headers).get("X-Goog-Api-Key")).toBe("corrected-key");
+    expect(new Headers(requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/places/route.test.ts:88 mockFetch.mock.calls[0]")[1].headers).get("X-Goog-Api-Key")).toBe("corrected-key");
   });
 
   describe("GET", () => {
@@ -267,7 +268,7 @@ describe("/api/mcp/places", () => {
 
       // Should include Asturias center coordinates in locationBias
       const call = mockFetch.mock.calls[0];
-      const body = JSON.parse(call[1].body);
+      const body = JSON.parse(requiredValue(requiredValue(call, "src/app/api/mcp/places/route.test.ts:271 call")[1], "src/app/api/mcp/places/route.test.ts:270 call[1]").body);
       expect(body.locationBias.circle.center.latitude).toBeCloseTo(43.3619, 2);
     });
 
@@ -303,7 +304,7 @@ describe("/api/mcp/places", () => {
 
       // Should use Gijón coordinates
       const call = mockFetch.mock.calls[0];
-      const body = JSON.parse(call[1].body);
+      const body = JSON.parse(requiredValue(requiredValue(call, "src/app/api/mcp/places/route.test.ts:307 call")[1], "src/app/api/mcp/places/route.test.ts:306 call[1]").body);
       expect(body.locationBias.circle.center.latitude).toBeCloseTo(43.5453, 2);
     });
   });
@@ -1011,7 +1012,7 @@ describe("/api/mcp/places", () => {
 
       // Unknown city should use Asturias center (default) with 50km radius
       const call = mockFetch.mock.calls[0];
-      const body = JSON.parse(call[1].body);
+      const body = JSON.parse(requiredValue(requiredValue(call, "src/app/api/mcp/places/route.test.ts:1015 call")[1], "src/app/api/mcp/places/route.test.ts:1014 call[1]").body);
       expect(body.locationBias.circle.center.latitude).toBeCloseTo(43.3619, 2);
       expect(body.locationBias.circle.radius).toBe(50000);
     });
@@ -1072,7 +1073,7 @@ describe("/api/mcp/places", () => {
       await GET(request);
 
       const call = mockFetch.mock.calls[0];
-      const body = JSON.parse(call[1].body);
+      const body = JSON.parse(requiredValue(requiredValue(call, "src/app/api/mcp/places/route.test.ts:1076 call")[1], "src/app/api/mcp/places/route.test.ts:1075 call[1]").body);
       expect(body.includedType).toBeUndefined();
     });
   });

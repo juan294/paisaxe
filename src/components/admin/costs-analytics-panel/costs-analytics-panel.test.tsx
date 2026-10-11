@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -474,8 +475,8 @@ describe("CostsAnalyticsPanel", () => {
     });
 
     const dateInputs = screen.getAllByDisplayValue(/^\d{4}-\d{2}-\d{2}$/);
-    const fromInput = dateInputs[0];
-    const toInput = dateInputs[1];
+    const fromInput = requiredValue(dateInputs[0], "src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx: dateInputs[0]");
+    const toInput = requiredValue(dateInputs[1], "src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx: dateInputs[1]");
 
     // Change the "from" date (wrapped in act to avoid React state-update warnings)
     await act(async () => {
@@ -613,7 +614,7 @@ describe("CostsAnalyticsPanel", () => {
 
     // Click the edit button on the manual cost row (Supabase has source: "manual")
     const supabaseRow = screen.getByText("Supabase").closest("tr")! as HTMLElement;
-    const editButton = within(supabaseRow).getAllByRole("button")[0];
+    const editButton = requiredValue(within(supabaseRow).getAllByRole("button")[0], "src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx: within(supabaseRow).getAllByRole(\"button\")[0]");
     await user.click(editButton);
 
     // Edit modal should open
@@ -653,7 +654,7 @@ describe("CostsAnalyticsPanel", () => {
     });
 
     const supabaseRow = screen.getByText("Supabase").closest("tr")! as HTMLElement;
-    const editButton = within(supabaseRow).getAllByRole("button")[0];
+    const editButton = requiredValue(within(supabaseRow).getAllByRole("button")[0], "src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx: within(supabaseRow).getAllByRole(\"button\")[0]");
     await user.click(editButton);
 
     await waitFor(() => {
@@ -720,7 +721,7 @@ describe("CostsAnalyticsPanel", () => {
 
     // Click edit button on the manual cost row
     const supabaseRow = screen.getByText("Supabase").closest("tr")! as HTMLElement;
-    const editButton = within(supabaseRow).getAllByRole("button")[0];
+    const editButton = requiredValue(within(supabaseRow).getAllByRole("button")[0], "src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx: within(supabaseRow).getAllByRole(\"button\")[0]");
     await user.click(editButton);
 
     // Edit modal should open

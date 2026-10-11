@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 
 /**
@@ -82,6 +83,6 @@ describe("stories-data SSR (node environment)", () => {
     // SSR `supabase` instance rather than the browser client.
     expect(mockSupabaseFrom).toHaveBeenCalledWith("stories");
     expect(result.length).toBe(1);
-    expect(result[0].slug).toBe("ssr-story");
+    expect(requiredValue(result[0], "src/lib/stories-data.ssr.test.ts:85 result[0]").slug).toBe("ssr-story");
   });
 });

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ImageEditorDialog } from "./image-editor-dialog";
@@ -716,7 +717,7 @@ describe("ImageEditorDialog", () => {
 
       // Find the maximize button (the one containing the maximize icon)
       const maximizeIcons = screen.getAllByTestId("icon-maximize");
-      const maximizeButton = maximizeIcons[0].closest("button")!;
+      const maximizeButton = requiredValue(maximizeIcons[0], "src/components/admin/image-editor-dialog.test.tsx: maximizeIcons[0]").closest("button")!;
       fireEvent.click(maximizeButton);
 
       // Should show the story title in the fullscreen overlay at the bottom
@@ -730,7 +731,7 @@ describe("ImageEditorDialog", () => {
 
       // Open fullscreen
       const maximizeIcons = screen.getAllByTestId("icon-maximize");
-      const maximizeButton = maximizeIcons[0].closest("button")!;
+      const maximizeButton = requiredValue(maximizeIcons[0], "src/components/admin/image-editor-dialog.test.tsx: maximizeIcons[0]").closest("button")!;
       fireEvent.click(maximizeButton);
 
       // Fullscreen overlay should contain a next-image with the story image
@@ -756,7 +757,7 @@ describe("ImageEditorDialog", () => {
 
       // Open fullscreen
       const maximizeIcons = screen.getAllByTestId("icon-maximize");
-      const maximizeButton = maximizeIcons[0].closest("button")!;
+      const maximizeButton = requiredValue(maximizeIcons[0], "src/components/admin/image-editor-dialog.test.tsx: maximizeIcons[0]").closest("button")!;
       fireEvent.click(maximizeButton);
 
       // Verify overlay is visible (title appears twice)
@@ -778,7 +779,7 @@ describe("ImageEditorDialog", () => {
 
       // Open fullscreen
       const maximizeIcons = screen.getAllByTestId("icon-maximize");
-      const maximizeButton = maximizeIcons[0].closest("button")!;
+      const maximizeButton = requiredValue(maximizeIcons[0], "src/components/admin/image-editor-dialog.test.tsx: maximizeIcons[0]").closest("button")!;
       fireEvent.click(maximizeButton);
 
       // Verify overlay is visible
@@ -1245,7 +1246,7 @@ describe("ImageEditorDialog", () => {
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Turismo de Asturias" },
+        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: "Turismo de Asturias" },
       });
 
       render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
@@ -1260,7 +1261,7 @@ describe("ImageEditorDialog", () => {
 
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
-        mockContentImages[0].url,
+        requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url,
         "Turismo de Asturias"
       );
     });
@@ -1270,7 +1271,7 @@ describe("ImageEditorDialog", () => {
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Turismo de Asturias" },
+        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: "Turismo de Asturias" },
       });
 
       const onClose = vi.fn();
@@ -1289,7 +1290,7 @@ describe("ImageEditorDialog", () => {
       });
 
       expect(onUpdate).toHaveBeenCalledWith("story-1", {
-        image: mockContentImages[0].url,
+        image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url,
         imageSource: "Turismo de Asturias",
       });
       expect(onClose).toHaveBeenCalled();
@@ -1300,7 +1301,7 @@ describe("ImageEditorDialog", () => {
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[1].url, imageSource: "Turismo de Asturias" },
+        data: { id: "story-1", image: requiredValue(mockContentImages[1], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[1]").url, imageSource: "Turismo de Asturias" },
       });
 
       const onUpdate = vi.fn();
@@ -1326,11 +1327,11 @@ describe("ImageEditorDialog", () => {
 
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
-        mockContentImages[1].url,
+        requiredValue(mockContentImages[1], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[1]").url,
         "Turismo de Asturias"
       );
       expect(onUpdate).toHaveBeenCalledWith("story-1", {
-        image: mockContentImages[1].url,
+        image: requiredValue(mockContentImages[1], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[1]").url,
         imageSource: "Turismo de Asturias",
       });
     });
@@ -1386,7 +1387,7 @@ describe("ImageEditorDialog", () => {
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[0].url, imageSource: undefined },
+        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: undefined },
       });
 
       render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
@@ -1407,7 +1408,7 @@ describe("ImageEditorDialog", () => {
 
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
-        mockContentImages[0].url,
+        requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url,
         undefined
       );
     });
@@ -1417,7 +1418,7 @@ describe("ImageEditorDialog", () => {
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Custom Attribution" },
+        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: "Custom Attribution" },
       });
 
       render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
@@ -1438,7 +1439,7 @@ describe("ImageEditorDialog", () => {
 
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
-        mockContentImages[0].url,
+        requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url,
         "Custom Attribution"
       );
     });

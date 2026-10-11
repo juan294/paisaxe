@@ -126,3 +126,8 @@ well-scoped modules rather than one flat directory. Track as future work under
 - `noUncheckedIndexedAccess` remains explicitly deferred with a rationale, so
   it is a conscious backlog item rather than an oversight.
 - Revisit the move and the remaining flag together in a dedicated cleanup cycle.
+
+
+## Dedicated indexed-access follow-up, 2026-10-11
+
+Authorized backlog Phase 11 implements the deferred flag on the integrated codebase without requiring the separate folder move. Root and independent E2E options now enable `noUncheckedIndexedAccess`; scripts and edge inherit it (`tsconfig.json:12`, `e2e/tsconfig.json:7`). All four canonical targets report zero diagnostics with the effective flag after the initial 1,303 reported diagnostics were inventoried and repaired. Independent review, simplification and complete local runtime qualification are complete; owner acceptance remains pending. The accepted ElevenLabs provider evidence gap remains RED. The [Phase 11 implementation record](../plans/2026-10-07-github-issues-remediation-phases/phase-11-implementation.md) preserves the boundary behavior and evidence. This dated follow-up supersedes the flag deferral above for the local candidate; the sub-domain folder move remains deferred.

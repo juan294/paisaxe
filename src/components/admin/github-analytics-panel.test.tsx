@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -209,8 +210,8 @@ describe("GitHubAnalyticsPanel", () => {
 
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/);
     // First input is "from", second is "to"
-    const fromInput = dateInputs[0];
-    const toInput = dateInputs[1];
+    const fromInput = requiredValue(dateInputs[0], "src/components/admin/github-analytics-panel.test.tsx: dateInputs[0]");
+    const toInput = requiredValue(dateInputs[1], "src/components/admin/github-analytics-panel.test.tsx: dateInputs[1]");
 
     // Change "from" date
     await user.clear(fromInput);

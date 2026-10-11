@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
@@ -350,7 +351,7 @@ describe("POST /api/admin/stories", () => {
 
     expect(response.status).toBe(201);
     // Verify insert was called with normalized slug
-    const insertCall = mockInsert.mock.calls[0][0];
+    const insertCall = requiredValue(mockInsert.mock.calls[0], "src/app/api/admin/stories/route.test.ts:353 mockInsert.mock.calls[0]")[0];
     expect(insertCall.slug).toBe("covadonga-n-asturias");
   });
 
@@ -408,7 +409,7 @@ describe("POST /api/admin/stories", () => {
     });
     await POST(request);
 
-    const insertCall = mockInsert.mock.calls[0][0];
+    const insertCall = requiredValue(mockInsert.mock.calls[0], "src/app/api/admin/stories/route.test.ts:411 mockInsert.mock.calls[0]")[0];
     // Should use the provided displayOrder, not auto-calculate
     expect(insertCall.display_order).toBe(42);
   });
@@ -457,7 +458,7 @@ describe("POST /api/admin/stories", () => {
     });
     await POST(request);
 
-    const insertCall = mockInsert.mock.calls[0][0];
+    const insertCall = requiredValue(mockInsert.mock.calls[0], "src/app/api/admin/stories/route.test.ts:460 mockInsert.mock.calls[0]")[0];
     expect(insertCall.display_order).toBe(6);
   });
 
@@ -668,7 +669,7 @@ describe("POST /api/admin/stories", () => {
     });
     await POST(request);
 
-    const insertCall = mockInsert.mock.calls[0][0];
+    const insertCall = requiredValue(mockInsert.mock.calls[0], "src/app/api/admin/stories/route.test.ts:671 mockInsert.mock.calls[0]")[0];
     expect(insertCall.subtitle).toBe("A complete story");
     expect(insertCall.description).toBe("Full description");
     expect(insertCall.location).toBe("central");

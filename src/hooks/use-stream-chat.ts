@@ -171,6 +171,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         updateMessages((prev) => {
           const updated = [...prev];
           const current = updated[assistantIndex];
+          if (!current) return prev;
           updated[assistantIndex] = {
             ...current,
             content: current.content + toAppend,
@@ -221,8 +222,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           const data = await response.json();
           updateMessages((prev) => {
             const updated = [...prev];
+            const current = updated[assistantIndex];
+            if (!current) return prev;
             updated[assistantIndex] = {
-              ...updated[assistantIndex],
+              ...current,
               role: "assistant",
               content: data.message || t("chat.error_processing"),
               images: data.images,
@@ -255,6 +258,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             updateMessages((prev) => {
               const updated = [...prev];
               const currentMsg = updated[assistantIndex];
+              if (!currentMsg) return prev;
               const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
                 currentMsg.content
               );
@@ -290,6 +294,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             updateMessages((prev) => {
               const updated = [...prev];
               const current = updated[assistantIndex];
+              if (!current) return prev;
 
               updated[assistantIndex] = {
                 ...current,
@@ -297,7 +302,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
                 content: isTimeout
                   ? t("chat.error_timeout")
                   : t("chat.error_generic"),
-                images: current?.images,
+                images: current.images,
               };
               return updated;
             });
@@ -329,9 +334,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             setError(t("chat.error"));
             updateMessages((prev) => {
               const updated = [...prev];
-              if (updated[assistantIndex]) {
+              const current = updated[assistantIndex];
+              if (current) {
                 updated[assistantIndex] = {
-                  ...updated[assistantIndex],
+                  ...current,
                   role: "assistant",
                   content: t("chat.error_generic"),
                 };
@@ -351,9 +357,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         if (err instanceof HandledError) {
           updateMessages((prev) => {
             const updated = [...prev];
-            if (updated[assistantIndex]) {
+            const current = updated[assistantIndex];
+            if (current) {
               updated[assistantIndex] = {
-                ...updated[assistantIndex],
+                ...current,
                 role: "assistant",
                 content: t("chat.error_generic"),
               };
@@ -373,9 +380,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             setError(t("chat.connection_lost"));
             updateMessages((prev) => {
               const updated = [...prev];
-              if (updated[assistantIndex]) {
+              const current = updated[assistantIndex];
+              if (current) {
                 updated[assistantIndex] = {
-                  ...updated[assistantIndex],
+                  ...current,
                   role: "assistant",
                   content: t("chat.error_timeout"),
                 };
@@ -394,9 +402,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         setError(t("chat.error"));
         updateMessages((prev) => {
           const updated = [...prev];
-          if (updated[assistantIndex]) {
+          const current = updated[assistantIndex];
+          if (current) {
             updated[assistantIndex] = {
-              ...updated[assistantIndex],
+              ...current,
               role: "assistant",
               content: t("chat.error_generic"),
             };

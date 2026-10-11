@@ -12,7 +12,7 @@ export class RemoteImageError extends Error {}
 function isPublicAddress(address: string): boolean {
   const family = isIP(address);
   if (family === 4) {
-    const [a, b, c] = address.split(".").map(Number);
+    const [a = 0, b = 0, c = 0] = address.split(".").map(Number);
     return !(
       a === 0 || a === 10 || a === 127 || a >= 224 ||
       (a === 100 && b >= 64 && b <= 127) ||
@@ -28,7 +28,7 @@ function isPublicAddress(address: string): boolean {
   // URL canonicalisation collapses zero runs and normalises embedded IPv4.
   // Only global unicast is accepted, excluding transition/special-use ranges.
   const canonical = new URL(`https://[${address}]/`).hostname.slice(1, -1);
-  const [first, second = "0"] = canonical.split(":").map((part) => part || "0");
+  const [first = "0", second = "0"] = canonical.split(":").map((part) => part || "0");
   const prefix = parseInt(first, 16);
   const subnet = parseInt(second, 16);
   return prefix >= 0x2000 && prefix <= 0x3fff &&
@@ -45,13 +45,14 @@ const publicLookup: LookupFunction = (hostname, options, callback) => {
       return;
     }
     const matching = addresses.filter(({ family }) => !options.family || options.family === family);
-    if (!matching.length) {
+    const first = matching[0];
+    if (first === undefined) {
       callback(new RemoteImageError("Remote image host could not be validated"), "", 4);
       return;
     }
     // autoSelectFamily is disabled below; honour all for callers on supported Node versions.
     if (options.all) callback(null, matching);
-    else callback(null, matching[0].address, matching[0].family);
+    else callback(null, first.address, first.family);
   }, () => callback(new RemoteImageError("Remote image host could not be validated"), "", 4));
 };
 

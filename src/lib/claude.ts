@@ -593,8 +593,8 @@ function buildChatSystem(messageIndex: number, asturianEnabled: boolean, locale?
  */
 export function buildContextText(context: Chunk[]): string {
   let contextText = "";
-  for (let i = 0; i < context.length && contextText.length < MAX_CONTEXT_LENGTH; i++) {
-    const chunk = context[i];
+  for (const [i, chunk] of context.entries()) {
+    if (contextText.length >= MAX_CONTEXT_LENGTH) break;
     const chunkText = `[Fuente ${i + 1}: ${chunk.sourcePdf}${chunk.pageNumber ? `, pag. ${chunk.pageNumber}` : ""}]\n${chunk.content}`;
     if (contextText.length + chunkText.length < MAX_CONTEXT_LENGTH) {
       contextText += (contextText ? "\n\n---\n\n" : "") + chunkText;

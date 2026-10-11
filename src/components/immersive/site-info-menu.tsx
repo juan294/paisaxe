@@ -53,19 +53,19 @@ export function SiteInfoMenu() {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-      items[next].focus();
+      items[next]?.focus();
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-      items[prev].focus();
+      items[prev]?.focus();
     } else if (event.key === "Tab") {
       event.preventDefault();
       if (event.shiftKey) {
         const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-        items[prev].focus();
+        items[prev]?.focus();
       } else {
         const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-        items[next].focus();
+        items[next]?.focus();
       }
     }
   }, []);
@@ -102,7 +102,7 @@ export function SiteInfoMenu() {
             />
           ) : (
             <span className="text-white text-sm font-medium">
-              {(user.name || user.email || "U")[0].toUpperCase()}
+              {(user.name || user.email || "U").charAt(0).toUpperCase()}
             </span>
           )
         ) : (
@@ -146,7 +146,7 @@ export function SiteInfoMenu() {
                   />
                 ) : (
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
-                    {(user.name || user.email || "?")[0].toUpperCase()}
+                    {(user.name || user.email || "?").charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">

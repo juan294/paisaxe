@@ -136,25 +136,31 @@ export function modernizeConfig(
       throw new Error("Language-specific voices only apply to Pelayo Visitor.");
     }
     const presets = next.conversation_config.language_presets;
+    const en = presets.en;
+    const fr = presets.fr;
+    const ptBr = presets["pt-br"];
+    if (!en) throw new Error("Missing native voice preset: en");
+    if (!fr) throw new Error("Missing native voice preset: fr");
+    if (!ptBr) throw new Error("Missing native voice preset: pt-br");
     next.conversation_config.language_presets = {
       en: {
-        ...presets.en,
+        ...en,
         overrides: {
-          ...presets.en.overrides,
+          ...en.overrides,
           tts: { voice_id: "7EzWGsX10sAS4c9m9cPf" },
         },
       },
       fr: {
-        ...presets.fr,
+        ...fr,
         overrides: {
-          ...presets.fr.overrides,
+          ...fr.overrides,
           tts: { voice_id: "YxrwjAKoUKULGd0g8K9Y" },
         },
       },
       "pt-br": {
-        ...presets["pt-br"],
+        ...ptBr,
         overrides: {
-          ...presets["pt-br"].overrides,
+          ...ptBr.overrides,
           tts: { voice_id: "oJebhZNaPllxk6W0LSBA" },
         },
       },
@@ -171,7 +177,7 @@ export function modernizeConfig(
 
 function main(): void {
   const [agentArg, stageArg] = process.argv.slice(2);
-  if (!(agentArg in BRANCH_CONFIGS)) {
+  if (!agentArg || !(agentArg in BRANCH_CONFIGS)) {
     throw new Error(`Unknown Paisaxe agent: ${agentArg ?? "(missing)"}`);
   }
   const allowedStages: ModernizationStage[] = [

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -373,7 +374,7 @@ describe("StripeAnalyticsPanel", () => {
         ...mockData,
         summary: { ...mockData.summary, totalOrders: 1 },
         productBreakdown: [],
-        recentOrders: [mockData.recentOrders[0]],
+        recentOrders: [requiredValue(mockData.recentOrders[0], "src/components/admin/stripe-analytics-panel/stripe-analytics-panel.test.tsx: mockData.recentOrders[0]")],
       },
     });
 
@@ -392,7 +393,7 @@ describe("StripeAnalyticsPanel", () => {
         ...mockData,
         summary: { ...mockData.summary, totalOrders: 1 },
         recentOrders: [],
-        productBreakdown: [mockData.productBreakdown[0]],
+        productBreakdown: [requiredValue(mockData.productBreakdown[0], "src/components/admin/stripe-analytics-panel/stripe-analytics-panel.test.tsx: mockData.productBreakdown[0]")],
       },
     });
 
@@ -435,7 +436,7 @@ describe("StripeAnalyticsPanel", () => {
         ...mockData,
         recentOrders: [
           {
-            ...mockData.recentOrders[0],
+            ...requiredValue(mockData.recentOrders[0], "src/components/admin/stripe-analytics-panel/stripe-analytics-panel.test.tsx: mockData.recentOrders[0]"),
             status: "pending" as const,
           },
         ],
@@ -461,7 +462,7 @@ describe("StripeAnalyticsPanel", () => {
     });
 
     const dateInputs = screen.getAllByDisplayValue(/^\d{4}-\d{2}-\d{2}$/);
-    const fromInput = dateInputs[0];
+    const fromInput = requiredValue(dateInputs[0], "src/components/admin/stripe-analytics-panel/stripe-analytics-panel.test.tsx: dateInputs[0]");
 
     // Use fireEvent.change to atomically set the value (avoids intermediate invalid date states)
     vi.mocked(adminApi.fetchStripeAnalytics).mockClear();
@@ -492,7 +493,7 @@ describe("StripeAnalyticsPanel", () => {
     });
 
     const dateInputs = screen.getAllByDisplayValue(/^\d{4}-\d{2}-\d{2}$/);
-    const toInput = dateInputs[1];
+    const toInput = requiredValue(dateInputs[1], "src/components/admin/stripe-analytics-panel/stripe-analytics-panel.test.tsx: dateInputs[1]");
 
     // Use fireEvent.change to atomically set the value (avoids intermediate invalid date states)
     vi.mocked(adminApi.fetchStripeAnalytics).mockClear();
@@ -609,7 +610,7 @@ describe("StripeAnalyticsPanel", () => {
         ...mockData,
         recentOrders: [
           {
-            ...mockData.recentOrders[0],
+            ...requiredValue(mockData.recentOrders[0], "src/components/admin/stripe-analytics-panel/stripe-analytics-panel.test.tsx: mockData.recentOrders[0]"),
             status: "failed" as const,
           },
         ],
@@ -629,7 +630,7 @@ describe("StripeAnalyticsPanel", () => {
         ...mockData,
         recentOrders: [
           {
-            ...mockData.recentOrders[0],
+            ...requiredValue(mockData.recentOrders[0], "src/components/admin/stripe-analytics-panel/stripe-analytics-panel.test.tsx: mockData.recentOrders[0]"),
             status: "partially_refunded" as const,
             refundedAmount: 100,
             refundedAmountFormatted: "€1.00",

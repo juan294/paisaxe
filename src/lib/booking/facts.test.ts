@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, expect, it } from "vitest";
 import { evaluateConstraints, visitorConstraintsSchema } from "./facts";
 import type { ExperienceFact } from "./types";
@@ -45,7 +46,7 @@ describe("evaluateConstraints (F07)", () => {
 
   it("treats a yes or no the provider has not confirmed as unknown", () => {
     const unconfirmed = { facts: [fact({ key: "step_free", value: "yes", confirmedByProvider: false })] };
-    expect(evaluateConstraints(unconfirmed, { step_free: true })[0].verdict).toBe("unknown");
+    expect(requiredValue(evaluateConstraints(unconfirmed, { step_free: true })[0], "src/lib/booking/facts.test.ts:48 evaluateConstraints(unconfirmed, { step_free: true })[0]").verdict).toBe("unknown");
   });
 
   it("treats a missing fact as unknown", () => {
@@ -57,20 +58,20 @@ describe("evaluateConstraints (F07)", () => {
   it("maps pets onto pets_allowed", () => {
     expect(evaluateConstraints(jeep, { pets: true })[0]).toMatchObject({ key: "pets", verdict: "unknown" });
     const petFriendly = { facts: [fact({ key: "pets_allowed", value: "yes" })] };
-    expect(evaluateConstraints(petFriendly, { pets: true })[0].verdict).toBe("supported");
+    expect(requiredValue(evaluateConstraints(petFriendly, { pets: true })[0], "src/lib/booking/facts.test.ts:60 evaluateConstraints(petFriendly, { pets: true })[0]").verdict).toBe("supported");
   });
 
   it("compares the youngest participant's age with the provider's minimum age", () => {
-    expect(evaluateConstraints(canoe, { min_age: 6 })[0].verdict).toBe("unsupported");
-    expect(evaluateConstraints(canoe, { min_age: 8 })[0].verdict).toBe("supported");
-    expect(evaluateConstraints(coastalWalk, { min_age: 2 })[0].verdict).toBe("supported");
-    expect(evaluateConstraints(jeep, { min_age: 10 })[0].verdict).toBe("unknown");
+    expect(requiredValue(evaluateConstraints(canoe, { min_age: 6 })[0], "src/lib/booking/facts.test.ts:64 evaluateConstraints(canoe, { min_age: 6 })[0]").verdict).toBe("unsupported");
+    expect(requiredValue(evaluateConstraints(canoe, { min_age: 8 })[0], "src/lib/booking/facts.test.ts:65 evaluateConstraints(canoe, { min_age: 8 })[0]").verdict).toBe("supported");
+    expect(requiredValue(evaluateConstraints(coastalWalk, { min_age: 2 })[0], "src/lib/booking/facts.test.ts:66 evaluateConstraints(coastalWalk, { min_age: 2 })[0]").verdict).toBe("supported");
+    expect(requiredValue(evaluateConstraints(jeep, { min_age: 10 })[0], "src/lib/booking/facts.test.ts:67 evaluateConstraints(jeep, { min_age: 10 })[0]").verdict).toBe("unknown");
   });
 
   it("checks a requested language against the provider's stated languages", () => {
-    expect(evaluateConstraints(coastalWalk, { language: "en" })[0].verdict).toBe("supported");
-    expect(evaluateConstraints(coastalWalk, { language: "de" })[0].verdict).toBe("unsupported");
-    expect(evaluateConstraints(canoe, { language: "en" })[0].verdict).toBe("unknown");
+    expect(requiredValue(evaluateConstraints(coastalWalk, { language: "en" })[0], "src/lib/booking/facts.test.ts:71 evaluateConstraints(coastalWalk, { language: \"en\" })[0]").verdict).toBe("supported");
+    expect(requiredValue(evaluateConstraints(coastalWalk, { language: "de" })[0], "src/lib/booking/facts.test.ts:72 evaluateConstraints(coastalWalk, { language: \"de\" })[0]").verdict).toBe("unsupported");
+    expect(requiredValue(evaluateConstraints(canoe, { language: "en" })[0], "src/lib/booking/facts.test.ts:73 evaluateConstraints(canoe, { language: \"en\" })[0]").verdict).toBe("unknown");
   });
 
   it("evaluates only the constraints the visitor asked for, in a stable order", () => {

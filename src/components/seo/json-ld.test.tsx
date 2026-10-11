@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/react";
 import { JsonLd, StoryJsonLd, BreadcrumbJsonLd, FAQJsonLd } from "./json-ld";
@@ -548,7 +549,7 @@ describe("FAQJsonLd", () => {
     const data = JSON.parse(script!.textContent!);
 
     expect(data.mainEntity[0]["@type"]).toBe("Question");
-    expect(data.mainEntity[0].name).toBe(questions[0].question);
+    expect(requiredValue(data.mainEntity[0], "src/components/seo/json-ld.test.tsx: data.mainEntity[0]").name).toBe(requiredValue(questions[0], "src/components/seo/json-ld.test.tsx: questions[0]").question);
   });
 
   it("includes Answer type for each answer", () => {
@@ -559,7 +560,7 @@ describe("FAQJsonLd", () => {
     const data = JSON.parse(script!.textContent!);
 
     expect(data.mainEntity[0].acceptedAnswer["@type"]).toBe("Answer");
-    expect(data.mainEntity[0].acceptedAnswer.text).toBe(questions[0].answer);
+    expect(requiredValue(data.mainEntity[0], "src/components/seo/json-ld.test.tsx: data.mainEntity[0]").acceptedAnswer.text).toBe(requiredValue(questions[0], "src/components/seo/json-ld.test.tsx: questions[0]").answer);
   });
 
   it("returns null for empty questions array", () => {

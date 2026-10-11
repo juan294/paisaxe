@@ -108,7 +108,7 @@ function parseInline(
     if (text[next] === "*") {
       const end = text.indexOf("*", next + 1);
       if (end === -1) {
-        pushText(text[next]);
+        pushText(text.charAt(next));
         cursor = next + 1;
         continue;
       }
@@ -123,7 +123,7 @@ function parseInline(
 
     const labelEnd = text.indexOf("](", next);
     if (labelEnd === -1) {
-      pushText(text[next]);
+      pushText(text.charAt(next));
       cursor = next + 1;
       continue;
     }
@@ -234,7 +234,7 @@ export function BasicMarkdown({
   return (
     <>
       {blocks.map((block, index) => {
-        const key = blockKeys[index];
+        const key = blockKeys[index] ?? `block-${index}`;
 
         if (block.type !== "paragraph" && block.type !== "heading" && block.type !== "blockquote") {
           return renderList(block, key, index, options);

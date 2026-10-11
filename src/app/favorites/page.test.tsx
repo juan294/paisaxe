@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
@@ -92,6 +93,54 @@ const mockUseStories = vi.fn();
 vi.mock("@/hooks/use-stories", () => ({
   useStories: () => mockUseStories(),
 }));
+
+describe("FavoritesPage indexed observer boundary", () => {
+  it("ignores empty observer batches and accepts later real intersections", () => {
+    const original = global.IntersectionObserver;
+    const observations: { callback: IntersectionObserverCallback; target: Element; observer: IntersectionObserver }[] = [];
+    class ControlledObserver implements IntersectionObserver {
+      readonly root = null;
+      readonly rootMargin = "";
+      readonly scrollMargin = "";
+      readonly thresholds = [];
+      constructor(private callback: IntersectionObserverCallback) {}
+      observe(target: Element) { observations.push({ callback: this.callback, target, observer: this }); }
+      unobserve() {}
+      disconnect() {}
+      takeRecords(): IntersectionObserverEntry[] { return []; }
+    }
+    global.IntersectionObserver = ControlledObserver;
+    const stories = Array.from({ length: 21 }, (_, index) => ({
+      ...requiredValue(mockStories[0], "Favorite observer story fixture"),
+      id: `observer-${index}`, slug: `observer-${index}`, title: `Observer place ${index}`,
+    }));
+    mockUseAuth.mockReturnValue({ signInWithGoogle: mockSignInWithGoogle });
+    mockUseFavorites.mockReturnValue({ favorites: stories.map((story) => story.id), toggleFavorite: mockToggleFavorite, isLoading: false, requiresAuth: false });
+    mockUseStories.mockReturnValue({ stories, isLoading: false });
+    const view = render(<FavoritesPage />);
+    try {
+      expect(() => act(() => {
+        for (const { callback, observer } of observations) callback([], observer);
+      })).not.toThrow();
+      act(() => {
+        for (const { callback, target, observer } of [...observations]) {
+          const rect = target.getBoundingClientRect();
+          callback([{ target, isIntersecting: true, intersectionRatio: 1, boundingClientRect: rect, intersectionRect: rect, rootBounds: null, time: 0 }], observer);
+        }
+      });
+      act(() => {
+        for (const { callback, target, observer } of [...observations]) {
+          const rect = target.getBoundingClientRect();
+          callback([{ target, isIntersecting: true, intersectionRatio: 1, boundingClientRect: rect, intersectionRect: rect, rootBounds: null, time: 0 }], observer);
+        }
+      });
+      expect(screen.getByText("Observer place 20")).toBeInTheDocument();
+    } finally {
+      view.unmount();
+      global.IntersectionObserver = original;
+    }
+  });
+});
 
 describe("FavoritesPage", () => {
   beforeEach(() => {

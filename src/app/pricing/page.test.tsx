@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import PricingPage from "./page";
@@ -598,8 +599,8 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[0].focus();
-      fireEvent.keyDown(radios[0], { key: "ArrowRight" });
+      requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]").focus();
+      fireEvent.keyDown(requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]"), { key: "ArrowRight" });
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[1]).toHaveAttribute("aria-checked", "true");
@@ -612,8 +613,8 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[0].focus();
-      fireEvent.keyDown(radios[0], { key: "ArrowLeft" });
+      requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]").focus();
+      fireEvent.keyDown(requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]"), { key: "ArrowLeft" });
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[2]).toHaveAttribute("aria-checked", "true");
@@ -624,10 +625,10 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[0].focus();
-      fireEvent.keyDown(radios[0], { key: "ArrowRight" }); // -> weekly
-      fireEvent.keyDown(screen.getAllByRole("radio")[1], { key: "ArrowRight" }); // -> monthly
-      fireEvent.keyDown(screen.getAllByRole("radio")[2], { key: "ArrowRight" }); // wraps -> day
+      requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]").focus();
+      fireEvent.keyDown(requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]"), { key: "ArrowRight" }); // -> weekly
+      fireEvent.keyDown(requiredValue(screen.getAllByRole("radio")[1], "src/app/pricing/page.test.tsx: screen.getAllByRole(\"radio\")[1]"), { key: "ArrowRight" }); // -> monthly
+      fireEvent.keyDown(requiredValue(screen.getAllByRole("radio")[2], "src/app/pricing/page.test.tsx: screen.getAllByRole(\"radio\")[2]"), { key: "ArrowRight" }); // wraps -> day
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[0]).toHaveAttribute("aria-checked", "true");
@@ -638,8 +639,8 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[2].focus();
-      fireEvent.keyDown(radios[2], { key: "Home" });
+      requiredValue(radios[2], "src/app/pricing/page.test.tsx: radios[2]").focus();
+      fireEvent.keyDown(requiredValue(radios[2], "src/app/pricing/page.test.tsx: radios[2]"), { key: "Home" });
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[0]).toHaveAttribute("aria-checked", "true");
@@ -650,8 +651,8 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[0].focus();
-      fireEvent.keyDown(radios[0], { key: "End" });
+      requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]").focus();
+      fireEvent.keyDown(requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]"), { key: "End" });
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[2]).toHaveAttribute("aria-checked", "true");

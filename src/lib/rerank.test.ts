@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -23,6 +24,18 @@ describe("rerank", () => {
   });
 
   describe("rerankChunks", () => {
+    it("falls back when a provider index points to a missing chunk and recovers on valid output", async () => {
+      const chunks = makeChunks(5);
+      delete chunks[4];
+      const onDegraded = vi.fn();
+      mockRerank.mockResolvedValueOnce({ data: [{ index: 4 }] });
+      const { rerankChunks } = await import("./rerank");
+      await expect(rerankChunks("query", chunks, 3, { onDegraded })).resolves.toEqual(chunks.slice(0, 3));
+      expect(onDegraded).toHaveBeenCalledOnce();
+      mockRerank.mockResolvedValueOnce({ data: [{ index: 2 }] });
+      await expect(rerankChunks("query", chunks, 3)).resolves.toEqual([chunks[2]]);
+    });
+
     const makeChunks = (count: number): Chunk[] =>
       Array.from({ length: count }, (_, i) => ({
         id: `chunk-${i}`,
@@ -70,9 +83,9 @@ describe("rerank", () => {
       const result = await rerankChunks("query", chunks, 3);
 
       expect(result).toHaveLength(3);
-      expect(result[0].id).toBe("chunk-2");
-      expect(result[1].id).toBe("chunk-0");
-      expect(result[2].id).toBe("chunk-4");
+      expect(requiredValue(result[0], "src/lib/rerank.test.ts:85 result").id).toBe("chunk-2");
+      expect(requiredValue(result[1], "src/lib/rerank.test.ts:86 result").id).toBe("chunk-0");
+      expect(requiredValue(result[2], "src/lib/rerank.test.ts:87 result").id).toBe("chunk-4");
     });
 
     it("should fall back to original order on API error", async () => {
@@ -86,9 +99,9 @@ describe("rerank", () => {
 
       // Falls back to first `topK` chunks in original order
       expect(result).toHaveLength(3);
-      expect(result[0].id).toBe("chunk-0");
-      expect(result[1].id).toBe("chunk-1");
-      expect(result[2].id).toBe("chunk-2");
+      expect(requiredValue(result[0], "src/lib/rerank.test.ts:101 result").id).toBe("chunk-0");
+      expect(requiredValue(result[1], "src/lib/rerank.test.ts:102 result").id).toBe("chunk-1");
+      expect(requiredValue(result[2], "src/lib/rerank.test.ts:103 result").id).toBe("chunk-2");
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("[Voyage AI] Rerank failed")
@@ -155,9 +168,9 @@ describe("rerank", () => {
       const result = await rerankChunks("query", chunks, 3);
 
       expect(result).toHaveLength(3);
-      expect(result[0].id).toBe("chunk-0");
-      expect(result[1].id).toBe("chunk-1");
-      expect(result[2].id).toBe("chunk-2");
+      expect(requiredValue(result[0], "src/lib/rerank.test.ts:170 result").id).toBe("chunk-0");
+      expect(requiredValue(result[1], "src/lib/rerank.test.ts:171 result").id).toBe("chunk-1");
+      expect(requiredValue(result[2], "src/lib/rerank.test.ts:172 result").id).toBe("chunk-2");
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Rerank returned no data")

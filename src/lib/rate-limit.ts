@@ -79,7 +79,7 @@ function checkInMemory(
   const currentCount = entry.timestamps.length;
 
   if (currentCount >= maxRequests) {
-    const oldestInWindow = entry.timestamps[0];
+    const oldestInWindow = entry.timestamps[0] ?? now;
     const resetAt = oldestInWindow + windowMs;
     const retryAfter = Math.ceil((resetAt - now) / 1000);
 

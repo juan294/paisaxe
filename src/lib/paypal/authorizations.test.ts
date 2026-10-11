@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Authorize / capture / void against the local PayPal stand-in (PayPal
@@ -69,8 +70,8 @@ describe("createOrder with intent AUTHORIZE", () => {
     await createOrder({ ...input, intent: undefined, operationKey: "another-key" });
 
     const [authorizeIntent, captureIntent] = mock.requestsTo("POST", "/v2/checkout/orders");
-    expect((authorizeIntent.body as { intent: string }).intent).toBe("AUTHORIZE");
-    expect((captureIntent.body as { intent: string }).intent).toBe("CAPTURE");
+    expect((requiredValue(authorizeIntent, "src/lib/paypal/authorizations.test.ts:73 authorizeIntent").body as { intent: string }).intent).toBe("AUTHORIZE");
+    expect((requiredValue(captureIntent, "src/lib/paypal/authorizations.test.ts:74 captureIntent").body as { intent: string }).intent).toBe("CAPTURE");
   });
 
   it("an AUTHORIZE order can never be captured as an order", async () => {
@@ -88,8 +89,8 @@ describe("authorizeOrder", () => {
     const order = await authorizeOrder(orderId, OPERATION_KEY);
 
     const [request] = mock.requestsTo("POST", `/v2/checkout/orders/${orderId}/authorize`);
-    expect(request.headers["paypal-request-id"]).toBe(`authorize:${OPERATION_KEY}`);
-    expect(request.headers.prefer).toBe("return=representation");
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/authorizations.test.ts:92 request").headers["paypal-request-id"], "src/lib/paypal/authorizations.test.ts:91 request.headers[\"paypal-request-id\"]")).toBe(`authorize:${OPERATION_KEY}`);
+    expect(requiredValue(request, "src/lib/paypal/authorizations.test.ts:93 request").headers.prefer).toBe("return=representation");
     expect(order.status).toBe("COMPLETED");
     expect(order.capture).toBeNull();
     expect(order.authorization).toEqual({
@@ -155,8 +156,8 @@ describe("captureAuthorization", () => {
     const capture = await captureAuthorization(authorizationId, 4000, OPERATION_KEY);
 
     const [request] = mock.requestsTo("POST", `/v2/payments/authorizations/${authorizationId}/capture`);
-    expect(request.headers["paypal-request-id"]).toBe(`capture-authorization:${OPERATION_KEY}`);
-    expect(request.body).toEqual({ amount: { currency_code: "EUR", value: "40.00" }, final_capture: true });
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/authorizations.test.ts:159 request").headers["paypal-request-id"], "src/lib/paypal/authorizations.test.ts:158 request.headers[\"paypal-request-id\"]")).toBe(`capture-authorization:${OPERATION_KEY}`);
+    expect(requiredValue(request, "src/lib/paypal/authorizations.test.ts:160 request").body).toEqual({ amount: { currency_code: "EUR", value: "40.00" }, final_capture: true });
     expect(capture).toEqual({
       id: expect.stringMatching(/^CAP/),
       status: "COMPLETED",
@@ -199,8 +200,8 @@ describe("voidAuthorization", () => {
     const result = await voidAuthorization(authorizationId, OPERATION_KEY);
 
     const [request] = mock.requestsTo("POST", `/v2/payments/authorizations/${authorizationId}/void`);
-    expect(request.headers["paypal-request-id"]).toBe(`void:${OPERATION_KEY}`);
-    expect(request.headers.prefer).toBe("return=representation");
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/authorizations.test.ts:203 request").headers["paypal-request-id"], "src/lib/paypal/authorizations.test.ts:202 request.headers[\"paypal-request-id\"]")).toBe(`void:${OPERATION_KEY}`);
+    expect(requiredValue(request, "src/lib/paypal/authorizations.test.ts:204 request").headers.prefer).toBe("return=representation");
     expect(result).toMatchObject({ id: authorizationId, status: "VOIDED", orderId });
   });
 

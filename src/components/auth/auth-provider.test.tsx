@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, act, renderHook } from "@testing-library/react";
 import { AuthProvider, useAuthContext } from "./auth-provider";
@@ -524,7 +525,7 @@ describe("AuthProvider", () => {
     vi.stubGlobal("window", realWindow);
     await signInPromise!;
 
-    const callArgs = mockSignInWithOAuth.mock.calls[0][0];
+    const callArgs = requiredValue(requiredValue(mockSignInWithOAuth.mock.calls[0], "src/components/auth/auth-provider.test.tsx: mockSignInWithOAuth.mock.calls[0]")[0], "src/components/auth/auth-provider.test.tsx: mockSignInWithOAuth.mock.calls[0][0]");
     expect(callArgs.options.redirectTo).toBe("https://paisaxe.es/auth/callback");
 
     delete process.env.NEXT_PUBLIC_SITE_URL;
@@ -551,7 +552,7 @@ describe("AuthProvider", () => {
     vi.stubGlobal("window", realWindow);
     await signInPromise!;
 
-    const callArgs = mockSignInWithOAuth.mock.calls[0][0];
+    const callArgs = requiredValue(requiredValue(mockSignInWithOAuth.mock.calls[0], "src/components/auth/auth-provider.test.tsx: mockSignInWithOAuth.mock.calls[0]")[0], "src/components/auth/auth-provider.test.tsx: mockSignInWithOAuth.mock.calls[0][0]");
     expect(callArgs.options.redirectTo).toBe("http://localhost:3000/auth/callback");
   });
 
@@ -570,7 +571,7 @@ describe("AuthProvider", () => {
     await signInPromise!;
 
     // Verify it uses window.location.origin (the "typeof window !== undefined" branch)
-    const callArgs = mockSignInWithOAuth.mock.calls[0][0];
+    const callArgs = requiredValue(requiredValue(mockSignInWithOAuth.mock.calls[0], "src/components/auth/auth-provider.test.tsx: mockSignInWithOAuth.mock.calls[0]")[0], "src/components/auth/auth-provider.test.tsx: mockSignInWithOAuth.mock.calls[0][0]");
     expect(callArgs.options.redirectTo).toBe(
       `${window.location.origin}/auth/callback`
     );

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { randomInt, randomUUID } from "node:crypto";
@@ -137,7 +138,7 @@ describe.skipIf(!reachable)("Installed pg_net JSONB transport and transaction bo
         configure(base);
         clear();
         psql("SELECT public.fail_stale_story_translations(now()-interval '5 minutes',5);");
-        expect((await received("/api/webhooks/translate"))[0].body.eventKey).toBe(`${STORY}:default:all`);
+        expect(requiredValue((await received("/api/webhooks/translate"))[0], "src/lib/pg-net.postgrest-integration.test.ts:140 (await received(\"/api/webhooks/translate\"))[0]").body.eventKey).toBe(`${STORY}:default:all`);
     });
     it("missing configuration preserves the original update and durable queue; corrected retry delivers", async () => {
         configure("");
@@ -147,6 +148,6 @@ describe.skipIf(!reachable)("Installed pg_net JSONB transport and transaction bo
         configure(base);
         clear();
         psql("SELECT public.fail_stale_story_translations(now()-interval '5 minutes',5);");
-        expect((await received("/api/webhooks/translate"))[0].body.eventKey).toBe(`${STORY}:default:all`);
+        expect(requiredValue((await received("/api/webhooks/translate"))[0], "src/lib/pg-net.postgrest-integration.test.ts:150 (await received(\"/api/webhooks/translate\"))[0]").body.eventKey).toBe(`${STORY}:default:all`);
     });
 });

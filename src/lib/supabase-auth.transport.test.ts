@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -51,7 +52,7 @@ describe("real Supabase SSR request identity", () => {
     const request = new NextRequest("http://localhost/api/favorites", { headers: { Authorization: "Bearer invalid" } });
     expect(await getUserFromRequest(request)).toBeNull();
     expect(transport).toHaveBeenCalledTimes(1);
-    expect(String(transport.mock.calls[0][0])).toContain("/auth/v1/user");
+    expect(String(requiredValue(transport.mock.calls[0], "src/lib/supabase-auth.transport.test.ts:54 transport.mock.calls[0]")[0])).toContain("/auth/v1/user");
   });
   it("rejected auth spends no route budget and a later valid request succeeds", async () => {
     const denied = await getFavorites(new NextRequest("http://localhost/api/favorites", { headers: { Authorization: "Bearer invalid" } }));

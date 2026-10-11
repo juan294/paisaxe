@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, expect, it } from "vitest";
 import { normalizeStripeAdjustment, stripeObjectId } from "./stripe-entitlements";
 describe("Stripe adjustment normalization", () => {
@@ -11,11 +12,11 @@ describe("Stripe adjustment normalization", () => {
   });
   it.each(["unknown", null, undefined])("classifies unsupported refund status %s", status => {
     const value = structuredClone(charge) as typeof charge;
-    value.refunds.data[0].status = status as string;
+    requiredValue(value.refunds.data[0], "src/lib/stripe-entitlements.test.ts:14 value.refunds.data[0]").status = status as string;
     expect(normalizeStripeAdjustment("charge.refunded", value).facts).toContainEqual({ kind: "reconciliation", reason: "unsupported_refund:re_local" });
   });
   it("quarantines nested refund charge mismatch", () => {
-    const value = structuredClone(charge); value.refunds.data[0].charge = "ch_other";
+    const value = structuredClone(charge); requiredValue(value.refunds.data[0], "src/lib/stripe-entitlements.test.ts:18 value.refunds.data[0]").charge = "ch_other";
     expect(normalizeStripeAdjustment("charge.refunded", value).facts).toContainEqual({ kind: "reconciliation", reason: "conflicting_refund_charge:re_local" });
     expect(normalizeStripeAdjustment("charge.refunded", value).facts.some(f => f.kind === "refund")).toBe(false);
   });
@@ -29,7 +30,7 @@ describe("Stripe adjustment normalization", () => {
     expect(normalizeStripeAdjustment("charge.refunded", { ...charge, amount_refunded: 300, refunds: { has_more: false, data: [] } }).facts).toContainEqual({kind:"reconciliation",reason:"missing_physical_refunds:ch_local"});
   });
   it("classifies refund currency conflicting with its known captured charge", () => {
-    const value=structuredClone(charge); value.refunds.data[0].currency="usd";
+    const value=structuredClone(charge); requiredValue(value.refunds.data[0], "src/lib/stripe-entitlements.test.ts:32 value.refunds.data[0]").currency="usd";
     expect(normalizeStripeAdjustment("charge.refunded", value).facts).toContainEqual({kind:"reconciliation",reason:"currency_mismatch:re_local"});
   });
   it("retains incomplete pagination rather than adding cumulative amount_refunded", () => {
