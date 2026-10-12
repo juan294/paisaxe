@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
+import type { ReactEventHandler } from "react";
 import { ChatMessageList } from "./chat-message-list";
 import type { StreamChatMessage } from "@/hooks/use-stream-chat";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
+
+const requestedImageSources = vi.hoisted((): string[] => []);
 
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
@@ -15,10 +20,13 @@ vi.mock("@/hooks/use-reduced-motion", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ src, alt }: { src: string; alt: string }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} />
-  ),
+  default: ({ src, alt, onError }: { src: string; alt: string; onError?: ReactEventHandler<HTMLImageElement> }) => {
+    requestedImageSources.push(src);
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={alt} onError={onError} />
+    );
+  },
 }));
 
 vi.mock("@/components/immersive/skeleton-chat-message", () => ({
@@ -49,6 +57,7 @@ describe("ChatMessageList", () => {
   const noop = () => {};
 
   beforeEach(() => {
+    requestedImageSources.length = 0;
     // scrollIntoView is not implemented in jsdom
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
   });
@@ -79,6 +88,17 @@ describe("ChatMessageList", () => {
     expect(screen.getByText("Bienvenido")).toBeInTheDocument();
   });
 
+  it("links official CC-BY attribution to both the dataset and license, retaining the unknown update/year and change notice", () => {
+    const citation = { title: "Synthetic official fact", url: "https://www.turismoasturiasprofesional.es/open-data/turismoasturias", license: "CC-BY-4.0", revision: `sha256:${"a".repeat(64)}`,
+      attribution: "Administración del Principado de Asturias · actualización no facilitada · año del producto no facilitado · campos sin modificar; selección y redacción propia" };
+    const msg = makeMessage({ sources: [{ id: "official-fixture", title: citation.title, snippet: "Synthetic", citation }] });
+    render(<ChatMessageList messages={[msg]} isLoading={false} onUpsellDismiss={noop} />);
+    expect(screen.getByRole("link", { name: /Synthetic official fact/ })).toHaveAttribute("href", citation.url);
+    expect(screen.getByRole("link", { name: "CC-BY-4.0" })).toHaveAttribute("href", "https://creativecommons.org/licenses/by/4.0/");
+    expect(screen.getByText(/actualización no facilitada/)).toHaveTextContent(citation.attribution);
+    expect(screen.queryByText(/\.pdf|pág\./)).not.toBeInTheDocument();
+  });
+
   it("shows loading skeleton when isLoading and last message content is empty", () => {
     const msg = makeMessage({ role: "assistant", content: "" });
     render(<ChatMessageList messages={[msg]} isLoading={true} onUpsellDismiss={noop} />);
@@ -97,7 +117,7 @@ describe("ChatMessageList", () => {
     expect(screen.queryByTestId("chat-skeleton")).not.toBeInTheDocument();
   });
 
-  it("renders inline images with caption and source", () => {
+  it("renders a reviewed inline image with its approved alt, credit, source URL and license instead of a PDF label", () => {
     const msg = makeMessage({
       role: "assistant",
       content: "See this",
@@ -107,16 +127,21 @@ describe("ChatMessageList", () => {
           path: "/images/test.jpg",
           caption: "A lake",
           sourcePdf: "guide.pdf",
+          provenance: imageProvenanceFixture("/images/test.jpg", undefined, undefined, { alt: "A lake", credit: "Reviewed synthetic lake credit" }),
         },
       ],
     });
     render(<ChatMessageList messages={[msg]} isLoading={false} onUpsellDismiss={noop} />);
-    expect(screen.getByAltText("A lake")).toBeInTheDocument();
+    expect(screen.getByAltText("A lake")).toHaveAttribute("src", "/images/test.jpg");
     expect(screen.getByText("A lake")).toBeInTheDocument();
-    expect(screen.getByText(/guide\.pdf/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Reviewed synthetic lake credit" })).toHaveAttribute("href", "https://example.com/synthetic-photo-review");
+    expect(screen.getByText(/owner-permission/)).toBeInTheDocument();
+    expect(screen.getByText(/Imagen temática, no representa el lugar/)).toBeInTheDocument();
+    expect(screen.queryByText(/guide\.pdf/)).not.toBeInTheDocument();
+    expect(requestedImageSources).toEqual(["/images/test.jpg"]);
   });
 
-  it("renders image without caption using i18n fallback alt", () => {
+  it("renders the reviewed alt even when the cached caption is absent", () => {
     const msg = makeMessage({
       role: "assistant",
       content: "Photo",
@@ -126,11 +151,53 @@ describe("ChatMessageList", () => {
           path: "/images/other.jpg",
           caption: undefined,
           sourcePdf: "guide.pdf",
+          provenance: imageProvenanceFixture("/images/other.jpg", undefined, undefined, { alt: "Reviewed caption-free image" }),
         },
       ],
     });
     render(<ChatMessageList messages={[msg]} isLoading={false} onUpsellDismiss={noop} />);
-    expect(screen.getByAltText("chat.image_alt")).toBeInTheDocument();
+    expect(screen.getByAltText("Reviewed caption-free image")).toHaveAttribute("src", "/images/other.jpg");
+    expect(screen.queryByText(/guide\.pdf/)).not.toBeInTheDocument();
+  });
+
+  it.each(["legacy", "mismatched"] as const)("never requests a raw %s cached photo or displays its unsupported caption/credit", kind => {
+    const rawPath = "https://example.com/unreviewed-chat-photo.jpg";
+    const msg = makeMessage({ images: [{
+      id: "unreviewed-photo", path: rawPath, caption: "Unsupported cached place caption", sourcePdf: "unreviewed-guide.pdf",
+      ...(kind === "mismatched" ? { provenance: imageProvenanceFixture("https://example.com/different-reviewed-photo.jpg", undefined, undefined, { credit: "Mismatched synthetic credit", alt: "Mismatched synthetic alt" }) } : {}),
+    }] });
+    render(<ChatMessageList messages={[msg]} isLoading={false} onUpsellDismiss={noop} />);
+    expect(screen.getByRole("img")).toHaveAttribute("src", NEUTRAL_IMAGE);
+    expect(screen.getByRole("img")).toHaveAttribute("alt", NEUTRAL_CREDIT);
+    expect(requestedImageSources).toEqual([NEUTRAL_IMAGE]);
+    expect(requestedImageSources).not.toContain(rawPath);
+    expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+    expect(screen.queryByText("Unsupported cached place caption")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mismatched synthetic credit")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mismatched synthetic alt")).not.toBeInTheDocument();
+    expect(screen.queryByText(/unreviewed-guide\.pdf/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("replaces a failed reviewed photo with the neutral illustration and its credit", () => {
+    const path = "/images/reviewed-chat-failure.jpg";
+    const msg = makeMessage({ images: [{
+      id: "reviewed-failure", path, caption: "Cached caption must not outlive the failed photo", sourcePdf: "old-guide.pdf",
+      provenance: imageProvenanceFixture(path, undefined, undefined, { alt: "Reviewed failure-test landscape", credit: "Reviewed failure-test credit" }),
+    }] });
+    render(<ChatMessageList messages={[msg]} isLoading={false} onUpsellDismiss={noop} />);
+    expect(screen.getByAltText("Reviewed failure-test landscape")).toHaveAttribute("src", path);
+    expect(screen.getByRole("link", { name: "Reviewed failure-test credit" })).toBeInTheDocument();
+    expect(screen.queryByText("Cached caption must not outlive the failed photo")).not.toBeInTheDocument();
+    fireEvent.error(screen.getByAltText("Reviewed failure-test landscape"));
+    expect(screen.getByRole("img")).toHaveAttribute("src", NEUTRAL_IMAGE);
+    expect(screen.getByRole("img")).toHaveAttribute("alt", NEUTRAL_CREDIT);
+    expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+    expect(screen.queryByText("Reviewed failure-test credit")).not.toBeInTheDocument();
+    expect(screen.queryByText("Cached caption must not outlive the failed photo")).not.toBeInTheDocument();
+    expect(screen.queryByText(/old-guide\.pdf/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(requestedImageSources).toContain(NEUTRAL_IMAGE);
   });
 
   it("renders upsell CTA when upsellReason is set and not dismissed", () => {

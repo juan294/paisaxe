@@ -1,7 +1,16 @@
+export interface AuthoredCitation {
+  title: string;
+  url: string;
+  license: string;
+  revision: string;
+  attribution: string;
+}
+
 export interface Source {
   id: string;
   title: string;
-  sourcePdf: string;
+  sourcePdf?: string;
+  citation?: AuthoredCitation;
   pageNumber?: number;
   snippet: string;
 }
@@ -11,12 +20,14 @@ export interface ImageResult {
   path: string;
   caption?: string;
   sourcePdf: string;
+  provenance?: string;
 }
 
 export interface Chunk {
   id: string;
   content: string;
-  sourcePdf: string;
+  sourcePdf?: string;
+  citation?: AuthoredCitation;
   pageNumber?: number;
   sectionTitle?: string;
   imageRefs?: string[];

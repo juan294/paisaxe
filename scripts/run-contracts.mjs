@@ -8,6 +8,7 @@ import { verifyTransport } from './contract-transport.mjs';
 
 export const REQUIRED_SUITES = [
   'src/lib/database-boundaries.postgrest-rls.test.ts',
+  'src/lib/corpus.postgrest-integration.test.ts',
   'src/lib/booking/retention.postgrest-integration.test.ts',
   'src/lib/pg-net.postgrest-integration.test.ts',
   'src/lib/feature-flag-consumers.postgrest-integration.test.ts',

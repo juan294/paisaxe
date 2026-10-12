@@ -503,7 +503,7 @@ describe("useImageEditor", () => {
       expect(result.current.contentSearched).toBe(true);
       expect(result.current.previewUrl).toBe("/content/images/img1.jpg");
       expect(result.current.imageUrl).toBe("/content/images/img1.jpg");
-      expect(result.current.imageSource).toBe("Turismo de Asturias");
+      expect(result.current.imageSource).toBe("");
     });
 
     it("handles empty results", async () => {
@@ -689,7 +689,7 @@ describe("useImageEditor", () => {
       expect(result.current.contentImageIndex).toBe(1);
       expect(result.current.previewUrl).toBe("/content/images/img2.jpg");
       expect(result.current.imageUrl).toBe("/content/images/img2.jpg");
-      expect(result.current.imageSource).toBe("Turismo de Asturias");
+      expect(result.current.imageSource).toBe("");
     });
 
     it("navigates to previous image", async () => {

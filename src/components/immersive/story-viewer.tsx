@@ -7,6 +7,8 @@ import { RateLimitNotice } from "@/components/rate-limit-notice";
 import { useState, useEffect, useCallback, useRef, useMemo, RefObject } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { PermittedStoryImage } from "@/components/permitted-story-image";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE, resolvePermittedImage } from "@/lib/image-provenance";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
@@ -106,6 +108,7 @@ export function StoryViewer({
 }: StoryViewerProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
+  const [failedHero, setFailedHero] = useState<string>();
   const [autoPlay, setAutoPlay] = useState(false);
   const [ambientMode, setAmbientMode] = useState(false);
   // #328: lifted suggest-dialog state — avoids DOM coupling in overflow menu
@@ -120,6 +123,8 @@ export function StoryViewer({
   const router = useRouter();
 
   const story = stories[currentIndex];
+  const heroIdentity = story ? `${story.image}\0${story.imageSource ?? ""}` : "";
+  const effectiveStory = useMemo(() => story ? { ...story, ...(failedHero === heroIdentity ? { image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT, blurDataUrl: undefined } : resolvePermittedImage(story.image, story.imageSource, story.blurDataUrl)) } : undefined, [story, heroIdentity, failedHero]);
   const ambientStartRef = useRef<number | null>(null);
   // FE-M1: Single ref to track the pending transition timer so rapid navigation
   // cancels any in-flight timer before setting a new one, preventing stacking.
@@ -232,11 +237,13 @@ export function StoryViewer({
     const prevIndex = currentIndex > 0 ? currentIndex - 1 : len - 1;
     const urls = new Set<string>();
     for (const idx of [nextIndex, prevIndex]) {
-      const img = stories[idx]?.image;
-      if (img && idx !== currentIndex) urls.add(img);
+      const adjacent = stories[idx];
+      if (!adjacent?.image || idx === currentIndex) continue;
+      const img = resolvePermittedImage(adjacent.image, adjacent.imageSource).image;
+      if (img !== effectiveStory?.image) urls.add(img);
     }
     return Array.from(urls);
-  }, [stories, currentIndex]);
+  }, [stories, currentIndex, effectiveStory?.image]);
 
   // Asturianu labels
   const ast = isEnabled("asturianu_touches") && locale === 'ast';
@@ -256,7 +263,7 @@ export function StoryViewer({
   // the same order (React rules-of-hooks).
   const handleFavoritesNav = useCallback(() => router.push("/favorites"), [router]);
 
-  if (!story || !localizedStory) return null;
+  if (!story || !localizedStory || !effectiveStory) return null;
 
   // Question prompts from metadata.
   // UX-H6 (#892): resolve the translated prompts for the active locale,
@@ -323,9 +330,12 @@ export function StoryViewer({
         )}
       >
         {story.image ? (
-          <Image
-            src={story.image}
-            alt={localizedStory.title}
+          <PermittedStoryImage
+            image={effectiveStory.image}
+            imageSource={effectiveStory.imageSource}
+            blurDataUrl={effectiveStory.blurDataUrl || darkPlaceholder}
+            onError={() => setFailedHero(heroIdentity)}
+            showCredit={false}
             fill
             sizes="100vw"
             // FE-M6 (#768): motion-reduce:animate-none is a CSS-layer backstop —
@@ -337,7 +347,6 @@ export function StoryViewer({
             priority={currentIndex === 0}
             fetchPriority="high"
             placeholder="blur"
-            blurDataURL={story.blurDataUrl || darkPlaceholder}
             key={story.id}
           />
         ) : null}
@@ -384,7 +393,7 @@ export function StoryViewer({
 
       {/* Main content — extracted to StoryInfoPanel (FE-H2) */}
       <StoryInfoPanel
-        story={story}
+        story={effectiveStory}
         localizedStory={localizedStory}
         showInfo={showInfo}
         t={t}

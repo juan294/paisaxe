@@ -1,3 +1,4 @@
+import { resolvePermittedImage } from "./image-provenance";
 import type { Story } from "@/types/immersive";
 
 // LOCATION-SPECIFIC: Import fallback stories from content directory
@@ -35,5 +36,5 @@ export const FALLBACK_STORIES: Story[] = (fallbackStoriesData.stories as Story[]
       ...(sourcePrompts.length === 0 ? { question_prompts: [] } : {}),
     }]];
   }));
-  return { ...story, metadata: { ...story.metadata, translations: { ...story.metadata?.translations, ...translations } } };
+  return { ...story, ...resolvePermittedImage(story.image, story.imageSource, story.blurDataUrl), metadata: { ...story.metadata, translations: { ...story.metadata?.translations, ...translations } } };
 });

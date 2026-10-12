@@ -6,6 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { VoiceChat } from "./voice-chat";
 import { Story } from "@/types/immersive";
 import { createMockT } from "@/test/i18n-mock";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 // Mock i18n
 const mockT = createMockT();
@@ -75,26 +77,33 @@ vi.mock("@/components/posthog-provider", () => ({
   usePaisaxePostHog: () => mockAppPostHog.current,
 }));
 
-// Mock next/image — renders a plain <img> with all props forwarded for test assertions
+const imageRequests = vi.hoisted((): string[] => []);
+
+// Mock only next/image; the real provenance guard still chooses every URL.
 vi.mock("next/image", () => ({
-  default: ({ src, alt, className, width, height, sizes }: {
+  default: ({ src, alt, className, width, height, sizes, onError }: {
     src: string;
     alt: string;
     className?: string;
     width?: number;
     height?: number;
     sizes?: string;
-  }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      className={className}
-      data-width={width}
-      data-height={height}
-      data-sizes={sizes}
-    />
-  ),
+    onError?: React.ReactEventHandler<HTMLImageElement>;
+  }) => {
+    imageRequests.push(src);
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        data-width={width}
+        data-height={height}
+        data-sizes={sizes}
+        onError={onError}
+      />
+    );
+  },
 }));
 
 // Mock Supabase browser client
@@ -279,6 +288,7 @@ const resetMockVoiceAccess = () => {
 describe("VoiceChat", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    imageRequests.length = 0;
     mockCapture.mockReset();
     mockReactPostHog.current = { capture: mockCapture };
     mockAppPostHog.current = { capture: mockCapture };
@@ -911,6 +921,7 @@ describe("VoiceChat", () => {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
             caption: "Lagos de Covadonga at sunset",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/lagos.jpg", undefined, undefined, { alt: "Lagos de Covadonga at sunset" }),
             sourcePdf: "nature-guide.pdf",
           },
         ])
@@ -932,13 +943,14 @@ describe("VoiceChat", () => {
       });
     });
 
-    it("should display image caption when available", async () => {
+    it("should display the reviewed image caption", async () => {
       mockFetch.mockResolvedValueOnce(
         createStreamingResponse("Beautiful place.", [
           {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
             caption: "Picos de Europa mountain view",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/lagos.jpg", undefined, undefined, { alt: "Picos de Europa mountain view" }),
             sourcePdf: "nature-guide.pdf",
           },
         ])
@@ -965,6 +977,7 @@ describe("VoiceChat", () => {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/test.jpg",
             caption: "Test image",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/test.jpg", undefined, undefined, { alt: "Test image" }),
             sourcePdf: "hiking-guide.pdf",
           },
         ])
@@ -980,7 +993,9 @@ describe("VoiceChat", () => {
       fireEvent.submit(form!);
 
       await waitFor(() => {
-        expect(screen.getByText(/hiking-guide\.pdf/)).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Synthetic fixture credit" })).toHaveAttribute("href", "https://example.com/synthetic-photo-review");
+        expect(screen.getByText(/owner-permission/)).toBeInTheDocument();
+        expect(screen.queryByText(/hiking-guide\.pdf/)).not.toBeInTheDocument();
       });
     });
 
@@ -991,12 +1006,14 @@ describe("VoiceChat", () => {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/img1.jpg",
             caption: "First image",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/img1.jpg", undefined, undefined, { alt: "First image" }),
             sourcePdf: "guide-1.pdf",
           },
           {
             id: "img-2",
             path: "https://example.supabase.co/storage/v1/images/img2.jpg",
             caption: "Second image",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/img2.jpg", undefined, undefined, { alt: "Second image" }),
             sourcePdf: "guide-2.pdf",
           },
         ])
@@ -1062,6 +1079,7 @@ describe("VoiceChat", () => {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/optimized.jpg",
             caption: "Optimized photo",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/optimized.jpg", undefined, undefined, { alt: "Optimized photo" }),
             sourcePdf: "guide.pdf",
           },
         ])
@@ -1086,12 +1104,13 @@ describe("VoiceChat", () => {
       });
     });
 
-    it("should use fallback alt text when image has no caption", async () => {
+    it("should use reviewed alt text when the response image has no caption", async () => {
       mockFetch.mockResolvedValueOnce(
         createStreamingResponse("Image without caption.", [
           {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/no-caption.jpg",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/no-caption.jpg"),
             sourcePdf: "guide.pdf",
           },
         ])
@@ -1112,7 +1131,58 @@ describe("VoiceChat", () => {
         // Should have a meaningful alt text even without caption
         expect(img.getAttribute("alt")).toBeTruthy();
         expect(img.getAttribute("alt")).not.toBe("");
+        expect(img).toHaveAttribute("alt", "Synthetic geometric fixture");
+        expect(img).toHaveAttribute("src", "https://example.supabase.co/storage/v1/images/no-caption.jpg");
       });
+    });
+
+    it.each([
+      ["legacy image", undefined],
+      ["mismatched image proof", imageProvenanceFixture("https://example.supabase.co/storage/v1/images/other.jpg")],
+    ])("renders a %s neutrally without fabricated caption or PDF attribution", async (_label, provenance) => {
+      const path = "https://example.supabase.co/storage/v1/images/unreviewed.jpg";
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Image review pending.", [{
+        id: "pending-image", path, provenance, caption: "Unreviewed place claim", sourcePdf: "unreviewed-guide.pdf",
+      }]));
+      const { container } = render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Show an image");
+      const form = input.closest("form");
+      if (!form) throw new Error("Voice image form is missing");
+      fireEvent.submit(form);
+
+      await waitFor(() => expect(screen.getByRole("img", { name: NEUTRAL_CREDIT })).toHaveAttribute("src", NEUTRAL_IMAGE));
+      expect(container.querySelector(`img[src="${path}"]`)).toBeNull();
+      expect(imageRequests).not.toContain(path);
+      expect(imageRequests.length).toBeGreaterThan(0);
+      expect(imageRequests.every(src => src === NEUTRAL_IMAGE)).toBe(true);
+      expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+      expect(screen.queryByText("Unreviewed place claim")).not.toBeInTheDocument();
+      expect(screen.queryByText(/unreviewed-guide\.pdf/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Synthetic fixture credit" })).not.toBeInTheDocument();
+    });
+
+    it("replaces a failed approved chat image and its attribution with neutral imagery", async () => {
+      const path = "https://example.supabase.co/storage/v1/images/reviewed.jpg";
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Reviewed image.", [{
+        id: "reviewed-image", path,
+        provenance: imageProvenanceFixture(path), caption: "Unreviewed cached caption", sourcePdf: "legacy-guide.pdf",
+      }]));
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Show an image");
+      const form = input.closest("form");
+      if (!form) throw new Error("Voice image form is missing");
+      fireEvent.submit(form);
+      const image = await screen.findByRole("img", { name: "Synthetic geometric fixture" });
+      expect(image).toHaveAttribute("src", path);
+      expect(screen.getByRole("link", { name: "Synthetic fixture credit" })).toBeInTheDocument();
+      fireEvent.error(image);
+      expect(screen.getByRole("img", { name: NEUTRAL_CREDIT })).toHaveAttribute("src", NEUTRAL_IMAGE);
+      expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Synthetic fixture credit" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Unreviewed cached caption")).not.toBeInTheDocument();
+      expect(screen.queryByText(/legacy-guide\.pdf/)).not.toBeInTheDocument();
     });
   });
 });

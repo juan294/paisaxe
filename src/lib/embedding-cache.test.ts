@@ -39,7 +39,7 @@ function redisKey(
 }
 
 function searchResultKey(text: string, limit: number): string {
-  return `search:${limit}:${sha256(normalizedText(text))}`;
+  return `search:v2:legacy:${limit}:${sha256(normalizedText(text))}`;
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -377,7 +377,7 @@ describe("SearchResultCache (Redis-backed)", () => {
         similarity: 0.9,
       },
     ],
-    images: [{ id: "img-1", path: "img1.jpg", caption: "Oviedo", sourcePdf: "guide.pdf" }],
+    images: [],
   };
 
   beforeEach(() => {
@@ -393,7 +393,7 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    const result = await cache.get("Oviedo", 3);
+    const result = await cache.get("Oviedo", 3, "legacy");
 
     expect(result).toBeNull();
   });
@@ -404,7 +404,7 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    const result = await cache.get("Oviedo", 3);
+    const result = await cache.get("Oviedo", 3, "legacy");
 
     expect(result).toEqual(sampleResult);
   });
@@ -415,7 +415,7 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    const result = await cache.get("Oviedo", 3);
+    const result = await cache.get("Oviedo", 3, "legacy");
 
     expect(result).toEqual(sampleResult);
   });
@@ -424,7 +424,7 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    await cache.set("Oviedo", 3, sampleResult);
+    await cache.set("Oviedo", 3, sampleResult, "legacy");
 
     expect(mockRedisSet).toHaveBeenCalledWith(
       searchResultKey("Oviedo", 3),
@@ -437,8 +437,8 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    await cache.get("Oviedo", 3);
-    await cache.get("Oviedo", 5);
+    await cache.get("Oviedo", 3, "legacy");
+    await cache.get("Oviedo", 5, "legacy");
 
     const calls = mockRedisGet.mock.calls;
     expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:443 calls[0]")[0]).not.toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:443 calls[1]")[0]);
@@ -448,8 +448,8 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    await cache.get("  Oviedo  ", 3);
-    await cache.get("Oviedo", 3);
+    await cache.get("  Oviedo  ", 3, "legacy");
+    await cache.get("Oviedo", 3, "legacy");
 
     const calls = mockRedisGet.mock.calls;
     expect(requiredValue(calls[0], "src/lib/embedding-cache.test.ts:454 calls[0]")[0]).toBe(requiredValue(calls[1], "src/lib/embedding-cache.test.ts:454 calls[1]")[0]);
@@ -462,8 +462,8 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    await expect(cache.get("Oviedo", 3)).resolves.toBeNull();
-    await expect(cache.set("Oviedo", 3, sampleResult)).resolves.toBeUndefined();
+    await expect(cache.get("Oviedo", 3, "legacy")).resolves.toBeNull();
+    await expect(cache.set("Oviedo", 3, sampleResult, "legacy")).resolves.toBeUndefined();
     expect(mockRedisGet).not.toHaveBeenCalled();
     expect(mockRedisSet).not.toHaveBeenCalled();
   });
@@ -474,7 +474,7 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    const result = await cache.get("Oviedo", 3);
+    const result = await cache.get("Oviedo", 3, "legacy");
 
     expect(result).toBeNull();
     expect(mockLoggerWarn).toHaveBeenCalledWith(
@@ -489,7 +489,7 @@ describe("SearchResultCache (Redis-backed)", () => {
     const { SearchResultCache } = await import("./embedding-cache");
     const cache = new SearchResultCache();
 
-    await expect(cache.set("Oviedo", 3, sampleResult)).resolves.toBeUndefined();
+    await expect(cache.set("Oviedo", 3, sampleResult, "legacy")).resolves.toBeUndefined();
   });
 });
 
@@ -507,6 +507,66 @@ describe("full-result cache corruption", () => {
   ])("treats a parsed but invalid cache record as a miss: %j", async (record) => {
     mockRedisGet.mockResolvedValue(record);
     const { SearchResultCache } = await import("./embedding-cache");
-    expect(await new SearchResultCache().get("Oviedo", 3)).toBeNull();
+    expect(await new SearchResultCache().get("Oviedo", 3, "legacy")).toBeNull();
+  });
+});
+
+describe("corpus-versioned result evidence", () => {
+  const citation = { title: "Synthetic source", url: "https://source.example.test/facts", license: "CC0-1.0", revision: "2026-10-11", attribution: "Example owner" };
+  const authored = { chunks: [{ id: "authored", content: "Independently authored synthetic fact", citation }], images: [] };
+
+  beforeEach(() => {
+    vi.resetModules(); vi.resetAllMocks();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.com");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "synthetic-test-token");
+    mockRedisSet.mockResolvedValue("OK");
+  });
+
+  it("keeps version A and B results separate even for identical normalized query and limit", async () => {
+    const stored = new Map<string, string>();
+    mockRedisGet.mockImplementation((key: string) => Promise.resolve(stored.get(key) ?? null));
+    mockRedisSet.mockImplementation((key: string, value: string) => { stored.set(key, value); return Promise.resolve("OK"); });
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+    const next = { chunks: [{ ...authored.chunks[0], id: "new-version", content: "A corrected synthetic fact", citation }], images: [] };
+    await cache.set("  same query ", 3, authored, "version-a");
+    expect(await cache.get("same query", 3, "version-b")).toBeNull();
+    await cache.set("same query", 3, next, "version-b");
+    expect(await cache.get("same query", 3, "version-a")).toEqual(authored);
+    expect(await cache.get("same query", 3, "version-b")).toEqual(next);
+    expect([...stored.keys()]).toEqual([
+      `search:v2:version-a:3:${sha256("same query")}`,
+      `search:v2:version-b:3:${sha256("same query")}`,
+    ]);
+  });
+
+  it("does not accept authored citations with missing evidence or a PDF/page camouflage", async () => {
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+    const base = { id: "authored", content: "Synthetic fact", citation };
+    for (const chunk of [
+      { ...base, citation: { ...citation, attribution: "" } },
+      { ...base, citation: { ...citation, url: "javascript:alert(1)" } },
+      { ...base, citation: undefined, sourcePdf: "" },
+      { ...base, citation: { ...citation, revision: "" }, sourcePdf: "guide.pdf" },
+      { ...base, sourcePdf: "invented.pdf" },
+      { ...base, pageNumber: 17 },
+    ]) {
+      mockRedisGet.mockResolvedValue({ chunks: [chunk], images: [] });
+      expect(await cache.get("same query", 3, "version-a")).toBeNull();
+    }
+    mockRedisGet.mockResolvedValue(authored);
+    expect(await cache.get("same query", 3, "version-a")).toEqual(authored);
+  });
+
+  it("cannot resurrect unreviewed legacy images or accept a fake authored source in legacy", async () => {
+    const { SearchResultCache } = await import("./embedding-cache");
+    const cache = new SearchResultCache();
+    mockRedisGet.mockResolvedValue({ chunks: [{ id: "legacy", content: "Synthetic legacy fixture", sourcePdf: "legacy.pdf" }], images: [{ id: "old-photo", path: "/old-photo.jpg", sourcePdf: "legacy.pdf" }] });
+    expect(await cache.get("same query", 3, "legacy")).toBeNull();
+    mockRedisGet.mockResolvedValue({ chunks: [{ id: "legacy", content: "Synthetic fixture", sourcePdf: "" }], images: [] });
+    expect(await cache.get("same query", 3, "legacy")).toBeNull();
+    mockRedisGet.mockResolvedValue({ chunks: [{ ...authored.chunks[0], sourcePdf: "legacy.pdf", citation }], images: [] });
+    expect(await cache.get("same query", 3, "legacy")).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ import { FALLBACK_STORY_TRANSLATIONS } from '../../content/translations/fallback
 import { FALLBACK_STORIES } from './stories-fallback';
 import { getLocalizedStory, hasTranslation } from './localize-story';
 import { TRANSLATION_LOCALES } from './translation-locales';
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from './image-provenance';
 
 describe('Phase 7 actually served local fallback content', () => {
   it('ships exactly the fallback translations with every approved field intact', () => {
@@ -18,8 +19,18 @@ describe('Phase 7 actually served local fallback content', () => {
 
   it('preserves the original 25 story identities and Spanish source fields', () => {
     expect(FALLBACK_STORIES).toHaveLength(25);
-    expect(FALLBACK_STORIES.map(({ metadata: _metadata, ...story }) => story)).toEqual(fallback.stories);
+    expect(FALLBACK_STORIES.map(({ metadata: _metadata, ...story }) => story)).toEqual(
+      fallback.stories.map(story => ({ ...story, image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT })),
+    );
     expect(fallback.stories.every(story => !('metadata' in story))).toBe(true);
+  });
+
+  it('serves authored neutral illustrations rather than unreviewed fallback photographs or blur bytes', () => {
+    for (const story of FALLBACK_STORIES) {
+      expect(story.image, story.id).toBe(NEUTRAL_IMAGE);
+      expect(story.imageSource, story.id).toBe(NEUTRAL_CREDIT);
+      expect(story.blurDataUrl, story.id).toBeUndefined();
+    }
   });
 
   it.each(TRANSLATION_LOCALES)('serves approved %s text for every fallback story with explicit empty questions', (locale) => {

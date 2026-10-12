@@ -4,6 +4,7 @@ import React from "react";
 import { useStories, clearStoriesCache, prefetchStories, StoriesProvider } from "./use-stories";
 import type { Story } from "@/types/immersive";
 import { stubStoriesApiFetch } from "@/test/mock-stories-api-fetch";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 const mockStories: Story[] = [
   {
@@ -741,7 +742,9 @@ describe("useStories localStorage persistence", () => {
     // Parse the stored data and verify structure
     const stored = JSON.parse(storiesCall![1]);
     expect(stored.version).toBe(1);
-    expect(stored.data).toEqual(mockStories.map(({ sourcePdf: _sourcePdf, ...story }) => story));
+    expect(stored.data).toEqual(mockStories.map(({ sourcePdf: _sourcePdf, ...story }) => ({
+      ...story, image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT,
+    })));
     expect(stored.timestamp).toBeDefined();
   });
 
@@ -814,7 +817,9 @@ describe("useStories localStorage persistence", () => {
 
     // Should immediately have stories from localStorage, mapped back to Story compatibility
     expect(result.current.stories).toEqual(
-      mockStories.map((story) => ({ ...story, sourcePdf: "" }))
+      mockStories.map((story) => ({
+        ...story, sourcePdf: "", image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT,
+      }))
     );
     expect(result.current.isLoading).toBe(false);
   });

@@ -1,8 +1,11 @@
 "use client";
 
-import { useRef, useEffect, memo, type ReactNode } from "react";
+import { useRef, useEffect, useState, memo, type ReactNode } from "react";
+import { isAuthoredCitation } from "@/lib/corpus-citation";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+import { ImageAttribution, PermittedStoryImage } from "@/components/permitted-story-image";
+import { parseImageProvenance, resolvePermittedImage } from "@/lib/image-provenance";
+import type { ImageResult } from "@/types";
 import { ChatMessageSkeleton } from "@/components/immersive/skeleton-chat-message";
 import { ChatUpsellCTA } from "@/components/immersive/chat-upsell-cta";
 import { useTranslation } from "@/lib/i18n";
@@ -23,6 +26,23 @@ interface MessageRowProps {
   idx: number;
   onUpsellDismiss: (index: number) => void;
   renderCards?: (msg: StreamChatMessage) => ReactNode;
+}
+
+function ChatImage({ image }: { image: ImageResult }) {
+  const permitted = resolvePermittedImage(image.path, image.provenance);
+  const identity = `${permitted.image}\0${permitted.imageSource}`;
+  const [failed, setFailed] = useState<string>();
+  const current = failed === identity ? resolvePermittedImage(undefined, undefined) : permitted;
+  const provenance = parseImageProvenance(current.imageSource);
+  return <figure className="overflow-hidden rounded-xl">
+    <div className="relative">
+      <PermittedStoryImage image={current.image} imageSource={current.imageSource}
+        width={400} height={300} sizes="(max-width: 640px) 100vw, 400px"
+        showCredit={false} className="w-full rounded-xl object-cover" onError={() => setFailed(identity)} />
+    </div>
+    {provenance && <figcaption className="mt-1.5 text-xs text-white/70">{provenance.alt}</figcaption>}
+    <ImageAttribution source={current.imageSource} className="mt-0.5 block text-xs text-white/60" />
+  </figure>;
 }
 
 // FE-M3: memoize individual rows so only the actively-streaming row re-renders
@@ -50,28 +70,19 @@ const MessageRow = memo(function MessageRow({
         ) : (
           <ChatMarkdown content={msg.content} />
         )}
+        {msg.sources && msg.sources.length > 0 && (
+          <ul className="mt-3 space-y-1 text-xs text-white/80" aria-label={t("chat.source")}>
+            {msg.sources.map(source => <li key={source.id}>{isAuthoredCitation(source.citation) ? (
+              <>
+                <a className="underline" href={source.citation.url} target="_blank" rel="noopener noreferrer">{source.citation.title} · {source.citation.attribution}{source.citation.license === "CC-BY-4.0" ? "" : ` · ${source.citation.license}`}</a>
+                {source.citation.license === "CC-BY-4.0" && <> · <a className="underline" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC-BY-4.0</a></>}
+              </>
+            ) : <span>{source.title}{source.pageNumber ? `, ${source.pageNumber}` : ""}</span>}</li>)}
+          </ul>
+        )}
         {msg.images && msg.images.length > 0 && (
           <div className="mt-3 space-y-3">
-            {msg.images.map((image) => (
-              <figure key={image.id} className="overflow-hidden rounded-xl">
-                <Image
-                  src={image.path}
-                  alt={image.caption || t("chat.image_alt")}
-                  width={400}
-                  height={300}
-                  sizes="(max-width: 640px) 100vw, 400px"
-                  className="w-full rounded-xl object-cover"
-                />
-                {image.caption && (
-                  <figcaption className="mt-1.5 text-xs text-white/70">
-                    {image.caption}
-                  </figcaption>
-                )}
-                <p className="mt-0.5 text-xs text-white/60">
-                  {t("chat.source")}: {image.sourcePdf}
-                </p>
-              </figure>
-            ))}
+            {msg.images.map(image => <ChatImage key={image.id} image={image} />)}
           </div>
         )}
       </div>}

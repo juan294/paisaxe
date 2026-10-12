@@ -21,6 +21,12 @@ vi.mock("@/lib/search", () => ({
   search: vi.fn(),
 }));
 
+// Keep the real retrieval/timing orchestration while controlling its new
+// mandatory database selector alongside the existing embedding/search seams.
+vi.mock("@/lib/active-corpus", () => ({
+  activeCorpusVersion: vi.fn(),
+}));
+
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>(
     "@/lib/rate-limit"
@@ -61,6 +67,7 @@ vi.mock("@/lib/chat-config", async () => ({
 import { streamChatResponse, extractSourcesFromChunks } from "@/lib/claude";
 import { generateEmbedding } from "@/lib/embeddings";
 import { search } from "@/lib/search";
+import { activeCorpusVersion } from "@/lib/active-corpus";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { detectInjectionAttempt, sanitizeInput, detectPromptLeakage } from "@/lib/chat-safety";
 import { logger } from "@/lib/logger";
@@ -92,6 +99,10 @@ async function collectStreamEvents(response: Response): Promise<unknown[]> {
 
   return events;
 }
+
+beforeEach(() => {
+  vi.mocked(activeCorpusVersion).mockReset().mockResolvedValue("legacy");
+});
 
 describe("POST /api/chat/stream", () => {
   beforeEach(() => {
@@ -649,6 +660,54 @@ describe("POST /api/chat/stream", () => {
     expect(errorEvent).toBeDefined();
   });
 
+  it("fails closed when the corpus selector rejects, without embedding, search, or generation", async () => {
+    const selectionError = new Error("Corpus selection unavailable");
+    vi.mocked(activeCorpusVersion).mockRejectedValueOnce(selectionError);
+    const response = await POST(new NextRequest("http://localhost/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Tell me about Asturias" }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("text/event-stream");
+    expect(await collectStreamEvents(response)).toEqual([{ type: "error", message: "search_unavailable" }]);
+    expect(activeCorpusVersion).toHaveBeenCalledTimes(1);
+    expect(activeCorpusVersion).toHaveBeenCalledWith(expect.any(AbortSignal));
+    expect(generateEmbedding).not.toHaveBeenCalled();
+    expect(search).not.toHaveBeenCalled();
+    expect(streamChatResponse).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith("[CHAT_STREAM_SEARCH_UNAVAILABLE]", { error: selectionError, stage: undefined });
+  });
+
+  it("bounds a stalled corpus selector within the embedding stage and aborts its signal", async () => {
+    vi.useFakeTimers();
+    try {
+      let selectorSignal: AbortSignal | undefined;
+      vi.mocked(activeCorpusVersion).mockImplementationOnce((signal) => {
+        selectorSignal = signal;
+        return new Promise<string>(() => {});
+      });
+      const pending = POST(new NextRequest("http://localhost/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Asturias" }),
+      }));
+      await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.embedding + 1);
+      const response = await pending;
+
+      expect(await collectStreamEvents(response)).toEqual([{ type: "error", message: "search_unavailable" }]);
+      expect(requiredValue(selectorSignal, "stalled corpus selector signal").aborted).toBe(true);
+      expect(activeCorpusVersion).toHaveBeenCalledTimes(1);
+      expect(generateEmbedding).not.toHaveBeenCalled();
+      expect(search).not.toHaveBeenCalled();
+      expect(streamChatResponse).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith("[CHAT_STREAM_STAGE_TIMEOUT]", expect.objectContaining({ stage: "embedding" }));
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it("PE-H2: returns an SSE error event when retrieval exceeds the stage timeout", async () => {
     vi.useFakeTimers();
     try {
@@ -701,7 +760,7 @@ describe("POST /api/chat/stream", () => {
 
     await POST(request);
 
-    expect(search).toHaveBeenCalledWith(mockEmbedding, 3, "Best hiking routes", expect.objectContaining({ signal: expect.any(AbortSignal), skipCacheRead: true }));
+    expect(search).toHaveBeenCalledWith(mockEmbedding, 3, "Best hiking routes", expect.objectContaining({ signal: expect.any(AbortSignal), skipCacheRead: true, corpusVersion: "legacy" }));
   });
 
   it("should default asturianu flag to false when feature flag returns false", async () => {

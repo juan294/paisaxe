@@ -7,11 +7,16 @@ import { NextRequest } from "next/server";
 vi.mock("next/headers", () => ({ cookies: async () => ({ getAll: () => [], set: () => {} }) }));
 
 // Real cache, retrieval, provider SDKs and route; only HTTP responses are replaced.
+const citation = { title: "Synthetic factual source", url: "https://source.example.test/facts", license: "CC0-1.0", revision: "2026-10-11", attribution: "Example source owner" };
 const rows = Array.from({ length: 5 }, (_, i) => ({
-  id: `chunk-${i}`, content: `Paisaje de Asturias ${i}`, source_pdf: "guia.pdf",
-  page_number: i + 1, section_title: "Paisajes", image_refs: [`image-${i}.jpg`], similarity: 0.9 - i / 10,
+  id: `chunk-${i}`, content: `Paisaje de Asturias ${i}`, source_pdf: null, citation,
+  page_number: null, section_title: "Paisajes", image_refs: [`/images/reviewed/image-${i}.jpg`], similarity: 0.9 - i / 10,
 }));
-const images = rows.map((row, i) => ({ id: `image-${i}`, path: row.image_refs[0], caption: "Asturias", source_pdf: "guia.pdf" }));
+const images = rows.map((row, i) => {
+  const path = requiredValue(row.image_refs[0], "Synthetic reviewed photo path");
+  const provenance = JSON.stringify({ assetUrl: path, originalSha256: "a".repeat(64), replacementSha256: "b".repeat(64), sourcePage: "https://owner.example.test/photo", photographer: "Example owner", license: "owner-permission", permission: "Synthetic owner receipt", date: "2026-10-11", credit: "Example owner · Thematic landscape", context: "thematic", alt: "Reviewed thematic landscape", crop: { mobile: "center", desktop: "center" }, reviewer: "Example reviewer", reviewReceipt: "c".repeat(64), status: "approved", flow: "manual" });
+  return { id: `image-${i}`, path, provenance };
+});
 const vector = Array(512).fill(0.1);
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
 const embeddingResponse = () => json({ data: [{ index: 0, data: [{ index: 0, embedding: vector }] }], usage: { total_tokens: 7 } });
@@ -25,11 +30,20 @@ let hold: string | undefined;
 let release: ((response: Response) => void) | undefined;
 let ignoreAbort: boolean;
 let failVector: boolean;
+let failSelector: boolean;
+let activeVersion: string;
+let vectorVersions: string[];
+let transportOrder: string[];
+let imageRequests: { corpus_version: string; image_paths: string[] }[];
+let databasePaths: string[];
+let imageData: unknown;
+let emptyImageRefs: boolean;
 let generationBodies: Record<string, unknown>[];
 const visitorId = "00000000-0000-4000-8000-000000000005";
 
 function upstream(path: string, signal: AbortSignal | null | undefined, response: () => Response) {
   calls.push(path);
+  transportOrder.push(path);
   requests.push({ path, signal });
   if (hold !== path) return Promise.resolve(response());
   return new Promise<Response>((resolve, reject) => {
@@ -47,19 +61,23 @@ beforeEach(async () => {
   vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://cache.invalid");
   vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "synthetic-test-token");
   vi.stubEnv("ANTHROPIC_TRANSPORT", "sdk");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://test.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJ-synthetic-anon-key");
   vi.stubEnv("SUPABASE_SERVICE_KEY", "synthetic-service-key");
   vi.stubEnv("BOOKING_AGENT_REPLAY", "");
   vi.stubEnv("VERCEL_ENV", "development");
   store = new Map(); calls = []; requests = []; hold = undefined; release = undefined; ignoreAbort = false;
   rerankData = [{ index: 4 }, { index: 2 }, { index: 0 }];
-  failVector = false; generationBodies = [];
+  failVector = false; failSelector = false; activeVersion = "authored-v1"; vectorVersions = []; transportOrder = []; imageRequests = []; databasePaths = []; imageData = images; generationBodies = [];
+  emptyImageRefs = false;
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    if (url.hostname === "test.supabase.co") databasePaths.push(url.pathname);
     if (url.hostname === "cache.invalid") {
       const body = JSON.parse(String(init?.body));
       const run = ([command, key, value, , ttl]: [string, string, string?, string?, number?]) => {
+        transportOrder.push(`cache:${command.toLowerCase()}`);
         if (command.toLowerCase() === "get") {
           const entry = store.get(key);
           const valid = entry && entry.expiresAt > Date.now();
@@ -79,9 +97,26 @@ beforeEach(async () => {
       return upstream("embedding", signal, embeddingResponse);
     }
     if (url.hostname === "api.voyageai.com" && url.pathname.endsWith("/rerank")) return upstream("rerank", signal, rerankResponse);
-    if (url.hostname === "test.supabase.co" && url.pathname.endsWith("/rpc/match_chunks")) return upstream("vector", signal, () => failVector
-      ? new Response(JSON.stringify({ message: "synthetic retrieval outage" }), { status: 503, headers: { "Content-Type": "application/json" } }) : json(rows));
-    if (url.hostname === "test.supabase.co" && url.pathname.endsWith("/images")) return upstream("images", signal, () => json(images));
+    if (url.hostname === "test.supabase.co" && url.pathname.endsWith("/rpc/active_corpus_version")) return upstream("selector", signal, () => failSelector
+      ? new Response(JSON.stringify({ message: "Synthetic selector outage" }), { status: 503, headers: { "Content-Type": "application/json" } }) : json(activeVersion));
+    if (url.hostname === "test.supabase.co" && url.pathname.endsWith("/rpc/match_corpus_chunks")) {
+      const body = JSON.parse(String(init?.body));
+      vectorVersions.push(body.corpus_version);
+      return upstream("vector", signal, () => failVector || body.corpus_version !== activeVersion
+        ? new Response(JSON.stringify({ message: body.corpus_version !== activeVersion ? "Corpus version changed" : "synthetic retrieval outage" }), { status: 409, headers: { "Content-Type": "application/json" } })
+        : json(rows.map(row => ({ ...row, image_refs: emptyImageRefs ? [] : row.image_refs, content: `${activeVersion}: ${row.content}` }))));
+    }
+    if (url.hostname === "test.supabase.co" && url.pathname.endsWith("/rpc/corpus_related_images")) {
+      const body = JSON.parse(String(init?.body));
+      expect(init?.method).toBe("POST");
+      expect(body).toEqual({ corpus_version: requiredValue(vectorVersions.at(-1), "Captured vector version for image boundary"), image_paths: emptyImageRefs ? [] : rows.flatMap(row => row.image_refs) });
+      imageRequests.push(body);
+      return upstream("images", signal, () => failSelector
+        ? new Response(JSON.stringify({ code: "P0001", message: "corpus_selection_unavailable" }), { status: 400, headers: { "Content-Type": "application/json" } })
+        : body.corpus_version !== activeVersion
+          ? new Response(JSON.stringify({ code: "PT409", message: "corpus_version_not_selected" }), { status: 409, headers: { "Content-Type": "application/json" } })
+          : json(imageData));
+    }
     if (url.hostname === "test.supabase.co") {
       if (url.pathname.endsWith("/feature_flags")) return json([{ enabled: url.searchParams.get("flag_key") === "eq.experience_booking" }]);
       if (url.pathname.endsWith("/auth/v1/user")) return json({ id: visitorId, aud: "authenticated", email: "visitor@example.invalid", app_metadata: {}, user_metadata: {}, created_at: "2026-10-09T00:00:00Z" });
@@ -115,14 +150,14 @@ async function untilCalled(path: string) {
 describe("real retrieval cancellation and cache orchestration", () => {
   it("a full result-cache hit skips embedding as well as vector, rerank and images in the real general route", async () => {
     const { SearchResultCache } = await import("./embedding-cache");
-    await new SearchResultCache().set("¿Qué visitar?", 3, { chunks: [], images: [] });
+    await new SearchResultCache().set("¿Qué visitar?", 3, { chunks: [], images: [] }, activeVersion);
     await vi.waitFor(() => expect(store.size).toBe(1));
     const { POST } = await import("@/app/api/chat/stream/route");
     const response = await POST(new NextRequest("http://localhost/api/chat/stream", {
       method: "POST", body: JSON.stringify({ message: "¿Qué visitar?" }),
     }));
     expect(await response.text()).toContain('"type":"done"');
-    expect(calls).toEqual(["generation"]);
+    expect(calls).toEqual(["selector", "generation"]);
   });
 
   it("the 2.5s fallback cancels the actual Voyage rerank request and never caches vector ordering", async () => {
@@ -160,7 +195,7 @@ describe("real retrieval cancellation and cache orchestration", () => {
     release!(json(rows));
     expect(vectorSignal?.aborted).toBe(true);
     expect(await outcome).toBe("aborted");
-    expect(calls).toEqual(["vector"]);
+    expect(calls).toEqual(["selector", "vector"]);
     expect(store.size).toBe(0);
   });
 });
@@ -182,27 +217,28 @@ it("a miss runs exactly one real pipeline, hits skip every retrieval request, an
   const { retrieveChatContext } = await import("./retrieve-chat-context");
   const first = await retrieveChatContext("Oviedo", 3);
   expect(first.chunks.map(chunk => chunk.id)).toEqual(["chunk-4", "chunk-2", "chunk-0"]);
-  expect(first.images.map(image => image.path)).toEqual(["image-0.jpg", "image-2.jpg", "image-4.jpg"]);
-  expect(calls).toHaveLength(4);
-  expect(calls).toEqual(expect.arrayContaining(["embedding", "vector", "rerank", "images"]));
+  expect(first.images.map(image => image.path)).toEqual(["/images/reviewed/image-0.jpg", "/images/reviewed/image-2.jpg", "/images/reviewed/image-4.jpg"]);
+  expect(calls).toHaveLength(5);
+  expect(calls).toEqual(expect.arrayContaining(["selector", "embedding", "vector", "rerank", "images"]));
   await vi.waitFor(() => expect([...store.keys()].some(key => key.startsWith("search:"))).toBe(true));
   calls = [];
   expect(await retrieveChatContext("  Oviedo  ", 3)).toEqual(first);
-  expect(calls).toEqual([]);
+  expect(calls).toEqual(["selector"]);
+  calls = [];
   const resultKey = [...store.keys()].find(key => key.startsWith("search:"))!;
   store.get(resultKey)!.expiresAt = 0;
   await retrieveChatContext("Oviedo", 3);
-  expect(calls).toHaveLength(3);
-  expect(calls).toEqual(expect.arrayContaining(["vector", "rerank", "images"]));
+  expect(calls).toHaveLength(4);
+  expect(calls).toEqual(expect.arrayContaining(["selector", "vector", "rerank", "images"]));
   await vi.waitFor(() => expect(store.get(resultKey)!.expiresAt).toBeGreaterThan(Date.now()));
   store.set(resultKey, { value: JSON.stringify({ chunks: "corrupt", images: [] }), expiresAt: Infinity });
   calls = [];
   expect(requiredValue((await retrieveChatContext("Oviedo", 3)).chunks[0], "src/lib/retrieve-chat-context.test.ts:199 (await retrieveChatContext(\"Oviedo\", 3)).chunks[0]").id).toBe("chunk-4");
-  expect(calls).toHaveLength(3);
-  expect(calls).toEqual(expect.arrayContaining(["vector", "rerank", "images"]));
+  expect(calls).toHaveLength(4);
+  expect(calls).toEqual(expect.arrayContaining(["selector", "vector", "rerank", "images"]));
 });
 
-it.each(["embedding", "vector", "rerank", "images"])("parent cancellation at %s aborts the actual child request and forbids late full-result writes", async (stage) => {
+it.each(["selector", "embedding", "vector", "rerank", "images"])("parent cancellation at %s aborts the actual child request and forbids late full-result writes", async (stage) => {
   hold = stage; ignoreAbort = true;
   const { retrieveChatContext } = await import("./retrieve-chat-context");
   const parent = new AbortController();
@@ -214,7 +250,7 @@ it.each(["embedding", "vector", "rerank", "images"])("parent cancellation at %s 
   parent.abort();
   expect(await outcome).toBe("aborted");
   expect(requests.find(request => request.path === stage)?.signal?.aborted).toBe(true);
-  const response = stage === "embedding" ? embeddingResponse() : stage === "rerank" ? rerankResponse() : json(stage === "vector" ? rows : images);
+  const response = stage === "selector" ? json(activeVersion) : stage === "embedding" ? embeddingResponse() : stage === "rerank" ? rerankResponse() : json(stage === "vector" ? rows : images);
   release!(response);
   await new Promise(resolve => setTimeout(resolve, 0));
   expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
@@ -234,7 +270,7 @@ it("the real general route emits no late SSE after cancellation during embedding
   expect(await response.text()).toBe("");
   release!(embeddingResponse());
   await new Promise(resolve => setTimeout(resolve, 0));
-  expect(calls).toEqual(["embedding"]);
+  expect(calls).toEqual(["selector", "embedding"]);
   expect(store.size).toBe(0);
   hold = undefined;
   const next = await POST(new NextRequest("http://localhost/api/chat/stream", {
@@ -274,10 +310,11 @@ function bookingRequest(message: string, signal?: AbortSignal) {
 }
 
 it("the real booking route uses a full-result hit without Voyage or search and retains authenticated generation", async () => {
+  activeVersion = "legacy";
   const { SearchResultCache } = await import("./embedding-cache");
   await new SearchResultCache().set("rutas de Asturias", 3, {
     chunks: [{ id: "cached", content: "Pasaje cacheado del Sella", sourcePdf: "guia.pdf", sectionTitle: "Ríos" }], images: [],
-  });
+  }, activeVersion);
   await vi.waitFor(() => expect(store.size).toBe(1));
   const { POST } = await import("@/app/api/booking/chat/stream/route");
   const response = await POST(bookingRequest("rutas de Asturias"));
@@ -285,7 +322,7 @@ it("the real booking route uses a full-result hit without Voyage or search and r
   expect(text).toContain('"type":"text"');
   expect(text).toContain('"type":"done"');
   expect(text).toContain("guia.pdf");
-  expect(calls).toEqual(["generation"]);
+  expect(calls).toEqual(["selector", "generation"]);
   expect(JSON.stringify(requiredValue(generationBodies[0], "src/lib/retrieve-chat-context.test.ts:288 generationBodies[0]").system)).toContain("Pasaje cacheado del Sella");
 });
 
@@ -315,10 +352,206 @@ it("the real booking route cancels a pending retrieval, emits no late SSE/cache 
   expect(requests.find(request => request.path === "embedding")?.signal?.aborted).toBe(true);
   release!(embeddingResponse());
   await new Promise(resolve => setTimeout(resolve, 0));
-  expect(calls).toEqual(["embedding"]);
+  expect(calls).toEqual(["selector", "embedding"]);
   expect(store.size).toBe(0);
   hold = undefined;
   const next = await POST(bookingRequest("reserva corregida"));
   expect(await next.text()).toContain('"type":"done"');
   expect(calls.filter(call => call === "generation")).toHaveLength(1);
+});
+
+it("resolves the active version before a full-result hit and never reads cache when selection fails", async () => {
+  const { SearchResultCache } = await import("./embedding-cache");
+  await new SearchResultCache().set("selector boundary", 3, { chunks: [], images: [] }, activeVersion);
+  await vi.waitFor(() => expect(store.size).toBe(1));
+  transportOrder = []; calls = [];
+  const { retrieveChatContext } = await import("./retrieve-chat-context");
+  expect(await retrieveChatContext("selector boundary", 3)).toEqual({ chunks: [], images: [] });
+  expect(transportOrder).toEqual(["selector", "cache:get"]);
+  failSelector = true; transportOrder = []; calls = [];
+  await expect(retrieveChatContext("selector boundary", 3)).rejects.toThrow("Corpus selection unavailable");
+  expect(transportOrder).toEqual(["selector"]);
+  expect(calls).toEqual(["selector"]);
+});
+
+it("isolates two active corpus versions and captures each selection only once for its pipeline", async () => {
+  const { retrieveChatContext } = await import("./retrieve-chat-context");
+  const first = await retrieveChatContext("same query", 3);
+  await vi.waitFor(() => expect([...store.keys()].some(key => key.startsWith("search:v2:authored-v1:"))).toBe(true));
+  activeVersion = "authored-v2"; calls = [];
+  const second = await retrieveChatContext("same query", 3);
+  expect(second.chunks[0]?.content).toContain("authored-v2:");
+  expect(second.chunks[0]?.content).not.toBe(first.chunks[0]?.content);
+  expect(calls.filter(call => call === "selector")).toHaveLength(1);
+  expect(calls.filter(call => call === "vector")).toHaveLength(1);
+  expect(vectorVersions).toEqual(["authored-v1", "authored-v2"]);
+  expect(imageRequests.map(request => request.corpus_version)).toEqual(["authored-v1", "authored-v2"]);
+  expect(imageRequests.map(request => request.image_paths)).toEqual([rows.flatMap(row => row.image_refs), rows.flatMap(row => row.image_refs)]);
+  await vi.waitFor(() => expect([...store.keys()].some(key => key.startsWith("search:v2:authored-v2:"))).toBe(true));
+  activeVersion = "authored-v1"; calls = [];
+  expect(await retrieveChatContext("same query", 3)).toEqual(first);
+  expect(calls).toEqual(["selector"]);
+});
+
+it("rejects a version switch during embedding rather than falling back or caching mixed content", async () => {
+  hold = "embedding";
+  const { retrieveChatContext } = await import("./retrieve-chat-context");
+  const pending = retrieveChatContext("version switch", 3);
+  const outcome = pending.then(() => "unexpected success", error => error);
+  await untilCalled("embedding");
+  activeVersion = "authored-v2";
+  requiredValue(release, "Held embedding response")(embeddingResponse());
+  expect(await outcome).toBeInstanceOf(Error);
+  expect(String(await outcome)).toContain("Corpus version changed");
+  expect(vectorVersions).toEqual(["authored-v1"]);
+  expect(calls).toEqual(["selector", "embedding", "vector"]);
+  expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
+});
+
+it.each([
+  { name: "promotion conflict", status: 409, code: "PT409", message: "corpus_version_not_selected" },
+  { name: "revoked selector", status: 400, code: "P0001", message: "corpus_selection_unavailable" },
+])("a held image RPC $name after captured-A text retrieval rejects without result caching or legacy fallback, and a corrected retry succeeds", async ({ status, code, message }) => {
+  hold = "images";
+  const capturedVersion = activeVersion;
+  const { retrieveChatContext } = await import("./retrieve-chat-context");
+  const pending = retrieveChatContext("image selector recovery", 3);
+  const rejection = expect(pending).rejects.toThrow("Corpus selection changed or unavailable during image retrieval");
+  await untilCalled("images");
+  expect(vectorVersions).toEqual([capturedVersion]);
+  expect(imageRequests).toEqual([{ corpus_version: capturedVersion, image_paths: rows.flatMap(row => row.image_refs) }]);
+  expect(calls.filter(call => call === "selector")).toHaveLength(1);
+  expect(calls.slice(0, 3)).toEqual(["selector", "embedding", "vector"]);
+  expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
+  if (code === "PT409") activeVersion = "authored-v2";
+  else failSelector = true;
+  requiredValue(release, "Held version-bound image response")(new Response(JSON.stringify({ code, message }), {
+    status, headers: { "Content-Type": "application/json" },
+  }));
+  await rejection;
+  // Flush the real Redis automatic pipeline before checking for forbidden result writes.
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
+  expect(calls).toHaveLength(5);
+  expect(calls).toEqual(expect.arrayContaining(["selector", "embedding", "vector", "rerank", "images"]));
+  expect(databasePaths).toEqual([
+    "/rest/v1/rpc/active_corpus_version", "/rest/v1/rpc/match_corpus_chunks", "/rest/v1/rpc/corpus_related_images",
+  ]);
+  expect(vectorVersions).not.toContain("legacy");
+
+  // Restore the same approved selection and reviewed image bytes, then retry the same query.
+  activeVersion = capturedVersion; failSelector = false; hold = undefined; calls = []; databasePaths = [];
+  const corrected = await retrieveChatContext("image selector recovery", 3);
+  expect(corrected.chunks.map(chunk => chunk.id)).toEqual(["chunk-4", "chunk-2", "chunk-0"]);
+  expect(corrected.chunks.every(chunk => chunk.content.startsWith(`${capturedVersion}:`))).toBe(true);
+  expect(corrected.images.map(image => image.path)).toEqual([
+    "/images/reviewed/image-0.jpg", "/images/reviewed/image-2.jpg", "/images/reviewed/image-4.jpg",
+  ]);
+  expect(corrected.images.every(image => typeof image.provenance === "string")).toBe(true);
+  expect(calls).toHaveLength(4);
+  expect(calls).toEqual(expect.arrayContaining(["selector", "vector", "rerank", "images"]));
+  expect(vectorVersions).toEqual([capturedVersion, capturedVersion]);
+  expect(imageRequests.map(request => request.corpus_version)).toEqual([capturedVersion, capturedVersion]);
+  expect(databasePaths).toEqual([
+    "/rest/v1/rpc/active_corpus_version", "/rest/v1/rpc/match_corpus_chunks", "/rest/v1/rpc/corpus_related_images",
+  ]);
+  await vi.waitFor(() => expect([...store.keys()].some(key => key.startsWith(`search:v2:${capturedVersion}:`))).toBe(true));
+});
+
+it.each(["promotion", "revocation"] as const)("empty authored image references still reject %s before the image boundary, without caching text, and recover on corrected retry", async change => {
+  emptyImageRefs = true; imageData = []; hold = "vector";
+  const capturedVersion = activeVersion;
+  const { retrieveChatContext } = await import("./retrieve-chat-context");
+  const pending = retrieveChatContext("empty-reference selector recovery", 3);
+  const rejection = expect(pending).rejects.toThrow("Corpus selection changed or unavailable during image retrieval");
+  await untilCalled("vector");
+  expect(vectorVersions).toEqual([capturedVersion]);
+  expect(calls).toEqual(["selector", "embedding", "vector"]);
+  if (change === "promotion") activeVersion = "authored-v2";
+  else failSelector = true;
+  requiredValue(release, "Held captured-version text response")(json(rows.map(row => ({
+    ...row, content: `${capturedVersion}: ${row.content}`, image_refs: [],
+  }))));
+  await rejection;
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(imageRequests).toEqual([{ corpus_version: capturedVersion, image_paths: [] }]);
+  expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
+  expect(calls).toHaveLength(5);
+  expect(calls).toEqual(expect.arrayContaining(["selector", "embedding", "vector", "rerank", "images"]));
+  expect(databasePaths).toEqual([
+    "/rest/v1/rpc/active_corpus_version", "/rest/v1/rpc/match_corpus_chunks", "/rest/v1/rpc/corpus_related_images",
+  ]);
+  expect(vectorVersions).not.toContain("legacy");
+
+  activeVersion = capturedVersion; failSelector = false; hold = undefined; calls = []; databasePaths = [];
+  const corrected = await retrieveChatContext("empty-reference selector recovery", 3);
+  expect(corrected.chunks.map(chunk => chunk.id)).toEqual(["chunk-4", "chunk-2", "chunk-0"]);
+  expect(corrected.chunks.every(chunk => chunk.content.startsWith(`${capturedVersion}:`) && chunk.imageRefs?.length === 0)).toBe(true);
+  expect(corrected.images).toEqual([]);
+  expect(calls).toHaveLength(4);
+  expect(calls).toEqual(expect.arrayContaining(["selector", "vector", "rerank", "images"]));
+  expect(vectorVersions).toEqual([capturedVersion, capturedVersion]);
+  expect(imageRequests).toEqual([
+    { corpus_version: capturedVersion, image_paths: [] }, { corpus_version: capturedVersion, image_paths: [] },
+  ]);
+  expect(databasePaths).toEqual([
+    "/rest/v1/rpc/active_corpus_version", "/rest/v1/rpc/match_corpus_chunks", "/rest/v1/rpc/corpus_related_images",
+  ]);
+  await vi.waitFor(() => expect([...store.keys()].some(key => key.startsWith(`search:v2:${capturedVersion}:`))).toBe(true));
+});
+
+it("publishes authored source evidence through the real route without inventing a PDF or page", async () => {
+  const { POST } = await import("@/app/api/chat/stream/route");
+  const response = await POST(new NextRequest("http://localhost/api/chat/stream", {
+    method: "POST", body: JSON.stringify({ message: "authored source" }),
+  }));
+  const text = await response.text();
+  expect(text).toContain('"type":"done"');
+  expect(text).toContain(citation.url);
+  expect(text).toContain(citation.license);
+  expect(text).not.toContain('"sourcePdf":"guia.pdf"');
+  expect(text).not.toContain('"pageNumber":');
+  const system = JSON.stringify(requiredValue(generationBodies[0], "Authored context generation").messages);
+  expect(system).toContain(citation.title);
+  expect(system).toContain(citation.url);
+  expect(system).not.toContain("guia.pdf");
+  expect(system).not.toContain("pag.");
+});
+
+it("never queries legacy photos and does not cache an authored image with reused permission evidence", async () => {
+  const { getRelatedImages, search } = await import("./search");
+  activeVersion = "legacy";
+  expect(await getRelatedImages(["/images/unreviewed.jpg"])).toEqual([]);
+  expect(calls).toEqual(["selector"]);
+  expect(imageRequests).toEqual([]);
+  activeVersion = "authored-v1"; calls = [];
+  const original = requiredValue(images[0], "Reviewed image fixture");
+  imageData = [{ ...original, path: "/images/reviewed/another-photo.jpg" }];
+  const degraded = await search(vector, 3, "image permission recovery");
+  expect(degraded.images).toEqual([]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect([...store.keys()].filter(key => key.startsWith("search:"))).toEqual([]);
+  imageData = images;
+  const recovered = await search(vector, 3, "image permission recovery");
+  expect(recovered.images).toHaveLength(3);
+  expect(recovered.images.every(image => typeof image.provenance === "string")).toBe(true);
+  await vi.waitFor(() => expect([...store.keys()].some(key => key.startsWith("search:v2:authored-v1:"))).toBe(true));
+});
+
+it("treats cached malformed authored citations and photo permission records as misses and replaces them", async () => {
+  const { retrieveChatContext } = await import("./retrieve-chat-context");
+  const good = await retrieveChatContext("evidence recovery", 3);
+  await vi.waitFor(() => expect([...store.keys()].some(key => key.startsWith("search:v2:"))).toBe(true));
+  const key = requiredValue([...store.keys()].find(item => item.startsWith("search:v2:")), "Authored cache key");
+  for (const corrupt of [
+    { ...good, chunks: good.chunks.map(chunk => ({ ...chunk, citation: { ...citation, attribution: "" }, sourcePdf: "legacy.pdf" })) },
+    { ...good, images: good.images.map(image => ({ ...image, provenance: undefined })) },
+    { ...good, images: good.images.map(image => ({ ...image, path: "/images/reviewed/unapproved-photo.jpg" })) },
+  ]) {
+    store.set(key, { value: JSON.stringify(corrupt), expiresAt: Infinity });
+    calls = [];
+    expect(await retrieveChatContext("evidence recovery", 3)).toEqual(good);
+    expect(calls).toEqual(expect.arrayContaining(["selector", "vector", "rerank", "images"]));
+    await vi.waitFor(() => expect(JSON.parse(requiredValue(store.get(key), "Recovered cache entry").value)).toEqual(good));
+  }
 });

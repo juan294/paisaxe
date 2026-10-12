@@ -12,6 +12,11 @@ if (!reachable)
     warnLocalSupabaseUnreachable("database-boundaries.postgrest-rls.test.ts");
 const PRIVATE_TABLES = ["admin_audit_log", "anthropic_usage", "booking_daily_call_counters", "booking_drafts", "booking_sms_jobs", "bookings", "cron_job_locks", "elevenlabs_webhook_events", "experience_facts", "experiences", "github_traffic_daily", "github_traffic_paths", "github_traffic_referrers", "holds", "marketing_accounts", "marketing_agent_logs", "marketing_content_bank", "marketing_posts", "marketing_schedule", "merchants", "operator_access", "payments", "paypal_webhook_events", "pending_bookings", "platform_costs", "quotes", "stripe_webhook_events", "stripe_entitlement_payments", "stripe_entitlement_facts", "translate_webhook_events", "voice_saved_places", "vouchers", "voucher_redemptions", "webhook_config", "feature_flag_public_config_keys"];
 const RLS_TABLES = new Set(["github_traffic_daily", "github_traffic_paths", "github_traffic_referrers", "marketing_accounts", "marketing_agent_logs", "marketing_content_bank", "marketing_posts", "marketing_schedule", "platform_costs", "webhook_config"]);
+// Exact dedicated coverage: corpus.postgrest-integration.test.ts. New unknown
+// tables/functions still fail these complete installed-catalog equalities.
+const CORPUS_TABLES = ["corpus_versions", "corpus_selection", "corpus_chunks", "corpus_images", "story_image_drafts"];
+const CORPUS_DEFINER_RPCS = ["active_corpus_version()", "stage_corpus(text,text,jsonb,jsonb)", "approve_corpus(text,text,jsonb)", "select_corpus(text,text,text,jsonb)", "match_corpus_chunks(vector,text,double precision,integer)", "preview_corpus_chunks(vector,text,integer)", "corpus_related_images(text,text[])"];
+const CORPUS_INVOKER_RPCS = ["image_provenance_valid(jsonb,text)", "official_corpus_source_valid(jsonb)"];
 const PUBLIC_TABLES = ["chunks", "feature_flags", "images", "stories", "story_suggestions", "user_favorites", "user_profiles", "voice_purchases"];
 const fixtures: BoundaryFixture[] = [];
 const ids: string[] = [];
@@ -66,7 +71,7 @@ describe.skipIf(!reachable)("Declared database authorization matrix (real PostgR
     });
     it("every installed public table has an explicitly reviewed role contract", () => {
         const tables = psql("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') ORDER BY c.relname;").split("\n");
-        expect(tables).toEqual([...PRIVATE_TABLES, ...PUBLIC_TABLES].sort());
+        expect(tables).toEqual([...PRIVATE_TABLES, ...PUBLIC_TABLES, ...CORPUS_TABLES].sort());
     });
     const fixtureFor = (table: string) => { const fixture = fixtures.find(f => f.table === table); expect(fixture, table).toBeDefined(); return fixture!; };
     for (const table of PRIVATE_TABLES) {
@@ -209,7 +214,7 @@ describe.skipIf(!reachable)("Declared database authorization matrix (real PostgR
     const rpcs = databaseRpcFixtures(fixtures, () => requiredValue(ids[0], "src/lib/database-boundaries.postgrest-rls.test.ts:208 ids[0]"), STORY, PREFIX, SUGGESTION);
     it("every installed non-trigger SECURITY DEFINER RPC has reviewed arguments and all four HTTP role controls", () => {
         const installed = psql("SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.prosecdef AND p.prorettype<>'trigger'::regtype ORDER BY 1;").split("\n");
-        expect(installed.sort()).toEqual(rpcs.map(r => r.signature).sort());
+        expect(installed.sort()).toEqual([...rpcs.map(r => r.signature), ...CORPUS_DEFINER_RPCS].sort());
         for (const fixture of rpcs) {
             const keys = Object.keys(fixture.args()).sort();
             const actual = JSON.parse(psql(`SELECT COALESCE(to_json(proargnames[1:pronargs]),'[]'::json)::text FROM pg_proc WHERE oid='public.${fixture.signature}'::regprocedure;`));
@@ -248,7 +253,7 @@ describe.skipIf(!reachable)("Declared database authorization matrix (real PostgR
     ];
     it("all non-trigger application RPCs are classified, including invoker ownership filters", () => {
         const installed = psql("SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.prorettype<>'trigger'::regtype AND NOT EXISTS(SELECT 1 FROM pg_depend d WHERE d.classid='pg_proc'::regclass AND d.objid=p.oid AND d.deptype='e');").split("\n").sort();
-        expect(installed).toEqual([...rpcs, ...publicRpcs].map(r => r.signature).sort());
+        expect(installed).toEqual([...rpcs.map(r => r.signature), ...publicRpcs.map(r => r.signature), ...CORPUS_DEFINER_RPCS, ...CORPUS_INVOKER_RPCS].sort());
     });
     for (const fixture of publicRpcs) {
         for (const role of ["anon", "owner", "nonowner", "service_role"]) {

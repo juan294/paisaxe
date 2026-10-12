@@ -32,6 +32,9 @@ vi.mock("@/lib/booking/agent", () => ({
   streamBookingTurn: vi.fn((input: Record<string, unknown>) => deps.turn!(input)),
 }));
 vi.mock("@/lib/embeddings", () => ({ generateEmbedding: vi.fn(async () => [0.1]) }));
+// Exercise real optional retrieval orchestration with an explicit selected
+// corpus instead of depending on a database reachable by the unit process.
+vi.mock("@/lib/active-corpus", () => ({ activeCorpusVersion: vi.fn() }));
 vi.mock("@/lib/search", () => ({
   search: vi.fn(async () => {
     if (deps.searchFails) throw new Error("search down");
@@ -43,6 +46,9 @@ const { POST } = await import("./route");
 const { consume } = await import("@/lib/booking/metering");
 const { streamBookingTurn } = await import("@/lib/booking/agent");
 const { checkRateLimit } = await import("@/lib/rate-limit");
+const { activeCorpusVersion } = await import("@/lib/active-corpus");
+const { generateEmbedding } = await import("@/lib/embeddings");
+const { search } = await import("@/lib/search");
 
 const BOOKING_ID = "11111111-2222-4333-8444-555555555555";
 
@@ -66,6 +72,7 @@ async function events(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(activeCorpusVersion).mockReset().mockResolvedValue("legacy");
   deps.access = {
     userId: "user-1",
     redemption: { id: "r1", voucherId: "v1", limits: { chatTurns: { used: 1, limit: 60 }, bookingAttempts: { used: 0, limit: 10 } } },
@@ -134,6 +141,21 @@ describe("POST /api/booking/chat/stream", () => {
       acceptedBooking: null,
     });
     expect(input.contextText).toContain("El Sella");
+    expect(activeCorpusVersion).toHaveBeenCalledWith(expect.any(AbortSignal));
+    expect(search).toHaveBeenCalledWith([0.1], 3, "Somos cuatro", expect.objectContaining({ corpusVersion: "legacy", skipCacheRead: true, signal: expect.any(AbortSignal) }));
+  });
+
+  it("omits optional context when corpus selection fails without querying legacy or generating an embedding", async () => {
+    vi.mocked(activeCorpusVersion).mockRejectedValueOnce(new Error("Corpus selection unavailable"));
+    const response = await post({ message: "Somos cuatro", history: [] });
+
+    expect((await events(response)).map((event) => event.type)).toEqual(["text", "tool", "tool", "card", "text", "done"]);
+    expect(activeCorpusVersion).toHaveBeenCalledTimes(1);
+    expect(generateEmbedding).not.toHaveBeenCalled();
+    expect(search).not.toHaveBeenCalled();
+    expect(streamBookingTurn).toHaveBeenCalledTimes(1);
+    expect(requiredValue(vi.mocked(streamBookingTurn).mock.calls[0], "booking turn after selector failure")[0]).toMatchObject({ contextText: null });
+    expect(logger.warn).toHaveBeenCalledWith("[BOOKING_CHAT_RETRIEVAL_SKIPPED]", { error: "Corpus selection unavailable" });
   });
 
   it("still answers when retrieval fails, without guide context", async () => {

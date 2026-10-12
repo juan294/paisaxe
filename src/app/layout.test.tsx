@@ -162,10 +162,10 @@ describe("RootLayout", () => {
         alt: string;
       }>;
       expect(images.length).toBeGreaterThan(0);
-      expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").url).toContain("/images/");
+      expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").url).toBe(`${SITE_URL}/opengraph-image`);
       expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").width).toBe(1200);
       expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").height).toBe(630);
-      expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").alt).toBeTruthy();
+      expect(requiredValue(images[0], "src/app/layout.test.tsx: images[0]").alt).toBe("Paisaxe · Diseño tipográfico original");
     });
   });
 
@@ -186,7 +186,7 @@ describe("RootLayout", () => {
     it("should include twitter:images", () => {
       const twitter = metadata.twitter;
       expect(twitter).toBeDefined();
-      expect(twitter!.images).toBeDefined();
+      expect(twitter!.images).toEqual([{ url: `${SITE_URL}/opengraph-image`, alt: "Paisaxe · Diseño tipográfico original" }]);
     });
   });
 

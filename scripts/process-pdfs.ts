@@ -1,3 +1,4 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
 import fs from "fs";
 import path from "path";
 import { PDFParse } from "pdf-parse";
@@ -155,5 +156,5 @@ const isDirectExecution =
   process.argv[1]?.endsWith("process-pdfs.js");
 
 if (isDirectExecution) {
-  processAllPdfs().catch(console.error);
+  rejectLegacyContentOperation("process-pdfs.ts", processAllPdfs);
 }

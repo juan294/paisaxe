@@ -19,7 +19,7 @@
     ".github/workflows/ci.yml": {
       "path": ".github/workflows/ci.yml",
       "prefix": "ci",
-      "blobSha": "3a0adf76a4492f39f90e1652e05600e9f0e231d3"
+      "blobSha": "f57f1b6472636e8b698007537ce283b429bdd618"
     },
     ".github/workflows/e2e.yml": {
       "path": ".github/workflows/ci-cadence-e2e-full.yml",
@@ -60,7 +60,7 @@
   },
   "coverageOnly": {
     "path": ".github/workflows/coverage.yml",
-    "blobSha": "7d23583a78b2214f3548d2bcf640fcba674e946a",
+    "blobSha": "85d897bd0a9e82bdbbeaadbeaebf465158e58f50",
     "steps": [
       {
         "name": "Decide weekly native coverage eligibility",
@@ -145,7 +145,7 @@
   "workflowPins": {
     ".github/workflows/ci-nightly.yml": "cfd4937f85bd4a48c4ea6f5221ca1976796c5dd1",
     ".github/workflows/ci-cadence.yml": "b2b51feccc7174ac44d6bca85d07a91a229427f7",
-    ".github/workflows/ci.yml": "3a0adf76a4492f39f90e1652e05600e9f0e231d3",
+    ".github/workflows/ci.yml": "f57f1b6472636e8b698007537ce283b429bdd618",
     ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "ff6cf4bc6078aff7c1962b261bccc70415d547b1",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",

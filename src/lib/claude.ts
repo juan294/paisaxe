@@ -595,7 +595,8 @@ export function buildContextText(context: Chunk[]): string {
   let contextText = "";
   for (const [i, chunk] of context.entries()) {
     if (contextText.length >= MAX_CONTEXT_LENGTH) break;
-    const chunkText = `[Fuente ${i + 1}: ${chunk.sourcePdf}${chunk.pageNumber ? `, pag. ${chunk.pageNumber}` : ""}]\n${chunk.content}`;
+    const label = chunk.citation ? `${chunk.citation.title} · ${chunk.citation.url} · ${chunk.citation.license}` : `${chunk.sourcePdf}${chunk.pageNumber ? `, pag. ${chunk.pageNumber}` : ""}`;
+    const chunkText = `[Fuente ${i + 1}: ${label}]\n${chunk.content}`;
     if (contextText.length + chunkText.length < MAX_CONTEXT_LENGTH) {
       contextText += (contextText ? "\n\n---\n\n" : "") + chunkText;
     } else {
@@ -696,9 +697,10 @@ export function sanitizeOutput(text: string | null | undefined): string {
 export function extractSourcesFromChunks(chunks: Chunk[]): Source[] {
   return chunks.map((chunk) => ({
     id: chunk.id,
-    title: chunk.sectionTitle || chunk.sourcePdf,
+    title: chunk.sectionTitle || chunk.citation?.title || chunk.sourcePdf || "Fuente",
+    citation: chunk.citation,
     sourcePdf: chunk.sourcePdf,
-    pageNumber: chunk.pageNumber,
+    pageNumber: chunk.citation ? undefined : chunk.pageNumber,
     snippet: chunk.content.slice(0, 200) + "...",
   }));
 }

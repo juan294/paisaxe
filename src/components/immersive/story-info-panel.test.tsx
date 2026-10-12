@@ -4,6 +4,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { StoryInfoPanel } from "./story-info-panel";
 import { Story } from "@/types/immersive";
 import { createMockT } from "@/test/i18n-mock";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 const mockT = createMockT();
 
@@ -13,6 +15,7 @@ const mockStory: Story = {
   subtitle: "Picos de Europa",
   description: "Beautiful glacial lakes in the mountains",
   image: "/images/lagos.jpg",
+  imageSource: imageProvenanceFixture("/images/lagos.jpg", "image fixture", "image fixture", { alt: "Lagos de Covadonga" }),
   category: "nature",
   sourcePdf: "nature-guide.pdf",
 };
@@ -59,11 +62,26 @@ describe("StoryInfoPanel", () => {
     expect(screen.getByText("Beautiful glacial lakes in the mountains")).toBeInTheDocument();
   });
 
-  it("should render image source attribution when provided", () => {
+  it("does not present free-text credit as permission-reviewed image attribution", () => {
     const storyWithSource = { ...mockStory, imageSource: "Photo by Juan" };
     renderPanel({ story: storyWithSource });
 
-    expect(screen.getByText("Photo by Juan")).toBeInTheDocument();
+    expect(screen.queryByText("Photo by Juan")).not.toBeInTheDocument();
+  });
+
+  it("renders the reviewed readable credit without exposing the raw permission record", () => {
+    const imageSource = imageProvenanceFixture(mockStory.image);
+    const { container } = renderPanel({ story: { ...mockStory, imageSource } });
+    expect(screen.getByText("Synthetic fixture credit")).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(imageSource);
+    expect(container).not.toHaveTextContent("Synthetic test bytes only; no real photo permission");
+    expect(screen.getByText(localizedStory.description)).toBeInTheDocument();
+  });
+
+  it("discloses that the authored neutral illustration does not represent a named place", () => {
+    renderPanel({ story: { ...mockStory, image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT } });
+    expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+    expect(screen.getByText(localizedStory.title)).toBeInTheDocument();
   });
 
   it("should apply opacity-0 class when showInfo is false", () => {

@@ -19,6 +19,9 @@ import {
 import { supabase } from "./supabase";
 import { createSupabaseBrowserClient } from "./supabase-browser";
 import { logger } from "@/lib/logger";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "./image-provenance";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { rowToStory, type Story } from "@/types/immersive";
 
 // Mock supabase (server path)
 vi.mock("./supabase", () => ({
@@ -65,6 +68,13 @@ const mockStoryRow = {
   metadata: {},
   created_at: "2024-01-01",
   updated_at: "2024-01-01",
+};
+
+const syntheticImageStory: Story = {
+  id: "synthetic-image-story", slug: "synthetic-image-story",
+  title: "Invented image review fixture", subtitle: "Synthetic subtitle",
+  description: "This invented sentence is used only for an image-boundary test.",
+  image: "/images/synthetic.svg", category: "culture", sourcePdf: "",
 };
 
 describe("stories-data", () => {
@@ -290,11 +300,34 @@ describe("stories-data", () => {
       expect(row.slug).toBe("test");
       expect(row.subtitle).toBeNull();
       expect(row.description).toBeNull();
-      expect(row.image_path).toBeNull();
+      expect(row.image_path).toBe(NEUTRAL_IMAGE);
+      expect(row.image_source).toBe(NEUTRAL_CREDIT);
       expect(row.source_pdf).toBeNull();
       expect(row.location).toBeNull();
       expect(row.duration).toBeNull();
       expect(row.display_order).toBe(0);
+    });
+
+    it("retains reviewed image provenance and blur through the real seed-row roundtrip", () => {
+      const image = "/images/synthetic-reviewed.svg";
+      const imageSource = imageProvenanceFixture(image);
+      const story = { ...syntheticImageStory, image, imageSource, blurDataUrl: "data:image/svg+xml;base64,c3ludGhldGlj" };
+      const row = storyToRow(story);
+      expect(row.image_path).toBe(image);
+      expect(row.image_source).toBe(imageSource);
+      expect(row.blur_data_url).toBe(story.blurDataUrl);
+      const restored = rowToStory({ ...row, id: story.id, created_at: "2026-10-10T00:00:00Z", updated_at: "2026-10-11T00:00:00Z" });
+      expect(restored).toMatchObject({ image, imageSource, blurDataUrl: story.blurDataUrl, title: story.title, description: story.description });
+    });
+
+    it.each([undefined, "Photo credit", imageProvenanceFixture("/images/different-synthetic.svg")])("does not seed an unreviewed image or its legacy blur", imageSource => {
+      const story = { ...syntheticImageStory, image: "/images/unknown-synthetic.svg", imageSource, blurDataUrl: "data:image/png;base64,bGVnYWN5" };
+      const row = storyToRow(story);
+      expect(row.image_path).toBe(NEUTRAL_IMAGE);
+      expect(row.image_source).toBe(NEUTRAL_CREDIT);
+      expect(row.blur_data_url).toBeNull();
+      expect(row.title).toBe(story.title);
+      expect(row.description).toBe(story.description);
     });
   });
 

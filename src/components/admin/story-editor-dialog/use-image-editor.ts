@@ -185,7 +185,7 @@ export function useImageEditor(
         if (firstImage) {
           setPreviewUrl(firstImage.url);
           setImageUrl(firstImage.url);
-          setImageSource("Turismo de Asturias");
+          setImageSource("");
         }
       }
     } catch {
@@ -210,7 +210,7 @@ export function useImageEditor(
     setContentImageIndex(newIndex);
     setPreviewUrl(image.url);
     setImageUrl(image.url);
-    setImageSource("Turismo de Asturias");
+    setImageSource("");
   }, [contentImages, contentImageIndex]);
 
   const currentContentImage = contentImages[contentImageIndex] || null;

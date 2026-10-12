@@ -1,5 +1,6 @@
 import { test, expect } from "./fixtures/auth";
 import { assertLocalDatastore } from "../scripts/release/probe-guards";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "../src/lib/image-provenance";
 
 /**
  * FE-B2: a real, UI-driven authenticated favorite round-trip.
@@ -46,8 +47,9 @@ test.beforeAll(() => {
 });
 
 test("sign in, bookmark a story via the UI, reload, favorite persists from Postgres", async ({
-  authenticatedPage,
+  authenticatedPage, baseURL,
 }) => {
+  if (!baseURL) throw new Error("The favorites browser probe requires its application URL");
   const page = authenticatedPage;
 
   // Deterministic local fixture story (supabase/seed.sql) — guaranteed to
@@ -89,7 +91,25 @@ test("sign in, bookmark a story via the UI, reload, favorite persists from Postg
       removeButton,
       "favorite must persist across reload by being read back from Postgres",
     ).toBeVisible({ timeout: 10000 });
+
+    // Exercise the real saved-card surface, including its fresh datastore read.
+    await page.goto("/favorites");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const savedLink = page.locator('a[href="/immersive?story=release-probe-local-story"]');
+    await expect(savedLink).toHaveCount(1);
+    await savedLink.scrollIntoViewIfNeeded();
+    const card = savedLink.locator("xpath=..");
+    const image = card.locator("img");
+    await expect(image).toHaveJSProperty("src", new URL(NEUTRAL_IMAGE, baseURL).href);
+    await expect(image).toHaveAttribute("alt", NEUTRAL_CREDIT);
+    await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
+    await expect(card.getByText(NEUTRAL_CREDIT, { exact: true })).toBeVisible();
+    expect(await image.getAttribute("style")).not.toContain("data:image");
   } finally {
+    // The saved-card check navigates away; restore the original bookmark surface
+    // before using its existing real API DELETE cleanup.
+    await page.goto("/immersive?story=release-probe-local-story");
+    await expect(removeButton).toBeVisible({ timeout: 10000 });
     // Clean up regardless of the assertions above, so a failed run doesn't
     // leave the QA test user's favorite behind for the next run.
     const favoriteDelete = page.waitForResponse(
@@ -100,5 +120,73 @@ test("sign in, bookmark a story via the UI, reload, favorite persists from Postg
     const deleteResponse = await favoriteDelete;
     expect(deleteResponse.status()).toBeLessThan(300);
     await expect(addButton).toBeVisible();
+  }
+});
+
+
+test("local story server landing page discloses neutral imagery and serves its own OG image", async ({
+  browser, baseURL, request,
+}, testInfo) => {
+  if (!baseURL) throw new Error("The story browser probe requires a loopback application URL");
+  const origin = new URL(baseURL);
+  expect(origin.protocol).toBe("http:");
+  expect(["localhost", "127.0.0.1"]).toContain(origin.hostname);
+  // Let React's inline streaming reveal run while holding application hydration
+  // and StoryRedirectClient, as in the presentation first-paint probes.
+  const context = await browser.newContext({ baseURL });
+  let releaseScripts!: () => void;
+  let heldScripts = 0;
+  const scriptGate = new Promise<void>(resolve => { releaseScripts = resolve; });
+  try {
+    await context.route(/\/_next\/static\/.*\.js(?:\?.*)?$/, async route => {
+      if (new URL(route.request().url()).origin !== origin.origin) return route.fallback();
+      heldScripts += 1;
+      await scriptGate;
+      await route.continue();
+    });
+    const page = await context.newPage();
+    const response = await page.goto("/story/release-probe-local-story", { waitUntil: "commit" });
+    expect(response?.status()).toBe(200);
+    await expect.poll(() => heldScripts, "Actual application hydration scripts must be held").toBeGreaterThan(0);
+    await expect(page).toHaveURL(/\/story\/release-probe-local-story$/);
+    const main = page.locator("main");
+    await expect(main.locator("h1")).toBeVisible();
+    await expect(main.getByRole("link", { name: "Ver experiencia interactiva" })).toHaveAttribute("href", "/immersive?story=release-probe-local-story");
+    const image = main.locator("img");
+    await expect(image).toHaveJSProperty("src", new URL(NEUTRAL_IMAGE, baseURL).href);
+    await expect(image).toHaveAttribute("alt", NEUTRAL_CREDIT);
+    await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
+    await expect(main.getByText(NEUTRAL_CREDIT, { exact: true })).toBeVisible();
+    expect(await image.getAttribute("style")).not.toContain("data:image");
+    await expect(page.locator('link[rel="preload"][as="image"][href*=".webp"]')).toHaveCount(0);
+
+    const metadata = page.locator('meta[property="og:image"]');
+    await expect(metadata).toHaveCount(1);
+    const value = await metadata.getAttribute("content");
+    if (!value) throw new Error("The story is missing its generated OG metadata");
+    const og = new URL(value, baseURL);
+    expect(og.pathname).toContain("/story/release-probe-local-story/opengraph-image");
+    await expect(page.locator('meta[name="twitter:image"]')).toHaveCount(1);
+    const twitterImages = await page.locator('meta[name="twitter:image"]').evaluateAll(elements => elements.map(element => element.getAttribute("content")));
+    for (const twitter of twitterImages) {
+      if (!twitter) throw new Error("Empty Twitter image metadata");
+      expect(new URL(twitter, baseURL).pathname).toContain("/story/release-probe-local-story/opengraph-image");
+    }
+    // Metadata can advertise SITE_URL. Fetch the same path from this owned
+    // application only, never from the published host.
+    const actual = await request.get(`${og.pathname}${og.search}`);
+    expect(actual.status()).toBe(200);
+    expect(actual.headers()["content-type"]).toContain("image/png");
+    const bytes = await actual.body();
+    expect(bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))).toBe(true);
+    expect(bytes.readUInt32BE(16)).toBe(1200);
+    expect(bytes.readUInt32BE(20)).toBe(630);
+    await testInfo.attach("Actual local story OG response", { body: bytes, contentType: "image/png" });
+    await testInfo.attach("Actual local story neutral landing page before hydration", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+    releaseScripts();
+    await expect(page).toHaveURL(/\/immersive\?story=release-probe-local-story$/, { timeout: 15000 });
+  } finally {
+    releaseScripts();
+    await context.close();
   }
 });

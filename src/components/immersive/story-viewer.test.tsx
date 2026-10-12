@@ -10,7 +10,9 @@ import type { Session, User } from "@supabase/supabase-js";
 import { ReactNode } from "react";
 import { createMockT } from "@/test/i18n-mock";
 import { useState, useEffect } from "react";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactEventHandler } from "react";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 // #569: StoryViewer now loads its flag-gated tools via next/dynamic. The real
 // next/dynamic loader does not resolve under vitest, so mock it to eagerly load
@@ -152,9 +154,11 @@ const renderWithAuth = async (ui: ReactNode) => {
   return result!;
 };
 
+const requestedImageSources = vi.hoisted((): string[] => []);
+
 // Mock next/image — captures blur placeholder props for verification
 vi.mock("next/image", () => ({
-  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL, sizes, loading, fetchPriority }: {
+  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL, sizes, loading, fetchPriority, onError }: {
     src: string;
     alt: string;
     className?: string;
@@ -165,21 +169,26 @@ vi.mock("next/image", () => ({
     sizes?: string;
     loading?: "eager" | "lazy";
     fetchPriority?: "high" | "low" | "auto";
-  }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      className={className}
-      data-fill={fill}
-      data-priority={priority}
-      data-placeholder={placeholder}
-      data-blur-data-url={blurDataURL}
-      data-sizes={sizes}
-      loading={loading}
-      fetchPriority={fetchPriority}
-    />
-  ),
+    onError?: ReactEventHandler<HTMLImageElement>;
+  }) => {
+    requestedImageSources.push(src);
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        data-fill={fill}
+        data-priority={priority}
+        data-placeholder={placeholder}
+        data-blur-data-url={blurDataURL}
+        data-sizes={sizes}
+        loading={loading}
+        fetchPriority={fetchPriority}
+        onError={onError}
+      />
+    );
+  },
 }));
 
 // FE-M2 (#764): capture the exact `localizedStory`/`questionPrompts` prop
@@ -227,6 +236,7 @@ const mockStories: Story[] = [
     subtitle: "Picos de Europa",
     description: "Beautiful glacial lakes in the mountains",
     image: "/images/lagos.jpg",
+    imageSource: imageProvenanceFixture("/images/lagos.jpg", "image fixture", "image fixture", { alt: "Lagos de Covadonga" }),
     category: "nature",
     sourcePdf: "nature-guide.pdf",
   },
@@ -236,6 +246,7 @@ const mockStories: Story[] = [
     subtitle: "Historic City",
     description: "Gothic cathedral in the heart of Oviedo",
     image: "/images/cathedral.jpg",
+    imageSource: imageProvenanceFixture("/images/cathedral.jpg", "image fixture", "image fixture", { alt: "Oviedo Cathedral" }),
     category: "culture",
     sourcePdf: "culture-guide.pdf",
   },
@@ -245,6 +256,7 @@ const mockStories: Story[] = [
     subtitle: "Gastronomia",
     description: "Traditional cider house experience",
     image: "/images/sidra.jpg",
+    imageSource: imageProvenanceFixture("/images/sidra.jpg", "image fixture", "image fixture", { alt: "Sidra House" }),
     category: "food",
     sourcePdf: "food-guide.pdf",
   },
@@ -275,6 +287,7 @@ describe("StoryViewer", () => {
   });
 
   beforeEach(() => {
+    requestedImageSources.length = 0;
     onIndexChange = vi.fn<(index: number) => void>();
     onAskAbout = vi.fn<(initialMessage?: string) => void>();
     onCategoryChange = vi.fn<(category: StoryCategory | null) => void>();
@@ -2035,11 +2048,36 @@ describe("StoryViewer", () => {
   });
 
   describe("image source attribution", () => {
-    it("should show image source when story has imageSource", async () => {
+    it("never displays another asset's reviewed credit for a neutralized hero", async () => {
+      const mismatchedCredit = "Credit belonging to another asset";
+      const first = requiredValue(mockStories[0], "Mismatched photo story");
+      const stories = [{ ...first, imageSource: imageProvenanceFixture("/images/another-asset.jpg", "image fixture", "image fixture", { credit: mismatchedCredit }) }, ...mockStories.slice(1)];
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ stories, allStories: stories })} />);
+      const panel = screen.getByTestId("story-info-panel");
+      expect(container.querySelector(`img[src="${first.image}"]`)).toBeNull();
+      expect(container.querySelector(`img[src="${NEUTRAL_IMAGE}"]`)).not.toBeNull();
+      expect(screen.queryByText(mismatchedCredit)).not.toBeInTheDocument();
+      expect(within(panel).getByText(NEUTRAL_CREDIT)).toBeVisible();
+    });
+
+    it("neutralizes the info-panel credit when the reviewed hero fails to load", async () => {
+      const first = requiredValue(mockStories[0], "Failed hero story");
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+      const panel = screen.getByTestId("story-info-panel");
+      expect(within(panel).getByText("Synthetic fixture credit")).toBeVisible();
+      const hero = requiredValue(container.querySelector(`img[src="${first.image}"]`), "Reviewed main hero element");
+      if (!hero) throw new Error("Reviewed main hero element missing");
+      fireEvent.error(hero);
+      expect(container.querySelector(`img[src="${NEUTRAL_IMAGE}"]`)).not.toBeNull();
+      expect(within(panel).queryByText("Synthetic fixture credit")).not.toBeInTheDocument();
+      expect(within(panel).getByText(NEUTRAL_CREDIT)).toBeVisible();
+    });
+
+    it("shows reviewed image credit when its asset matches the story photo", async () => {
       const storiesWithSource = [
         {
           ...requiredValue(mockStories[0], "src/components/immersive/story-viewer.test.tsx: mockStories[0]"),
-          imageSource: "Photo by Juan on Unsplash",
+          imageSource: imageProvenanceFixture(requiredValue(mockStories[0], "Reviewed credit story").image, "image fixture", "image fixture", { credit: "Reviewed synthetic photo credit" }),
         },
         ...mockStories.slice(1),
       ];
@@ -2054,7 +2092,7 @@ describe("StoryViewer", () => {
       );
 
       expect(
-        screen.getByText("Photo by Juan on Unsplash")
+        screen.getByText("Reviewed synthetic photo credit")
       ).toBeInTheDocument();
     });
   });
@@ -2609,6 +2647,30 @@ describe("StoryViewer", () => {
     // rendered as hidden next/image elements so the optimizer URL matches.
     // Phase 8 keeps eager warming at low priority, leaving the initial preload
     // and high fetch priority to the visible image.
+    it("never requests an unreviewed adjacent URL while retaining valid low-priority warming", async () => {
+      const unreviewedUrl = "https://example.com/unreviewed-adjacent.jpg";
+      const stories = mockStories.map((story, index) => index === 1 ? { ...story, image: unreviewedUrl, imageSource: "Legacy photographer credit" } : story);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ stories, allStories: stories })} />);
+      expect(requestedImageSources).not.toContain(unreviewedUrl);
+      expect(container.querySelector(`img[src="${unreviewedUrl}"]`)).toBeNull();
+      expect(container.querySelector('img[src="/images/sidra.jpg"][loading="eager"][fetchpriority="low"]')).not.toBeNull();
+      expect(container.querySelector('img[src="/images/lagos.jpg"][fetchpriority="high"]')).not.toBeNull();
+    });
+
+    it.each(["reviewed", "neutral"])("never prefetches a duplicate of the current effective %s URL", async (mode) => {
+      const first = requiredValue(mockStories[0], "Current effective image story");
+      const second = requiredValue(mockStories[1], "Adjacent effective image story");
+      const current = mode === "reviewed" ? first : { ...first, image: "https://example.com/unreviewed-current.jpg", imageSource: "Legacy current credit" };
+      const adjacent = mode === "reviewed"
+        ? { ...second, image: first.image, imageSource: first.imageSource }
+        : { ...second, image: "https://example.com/unreviewed-next.jpg", imageSource: "Legacy next credit" };
+      const stories = [current, adjacent, ...mockStories.slice(2)];
+      const effectiveUrl = mode === "reviewed" ? first.image : NEUTRAL_IMAGE;
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ stories, allStories: stories })} />);
+      expect(container.querySelectorAll(`img[src="${effectiveUrl}"]`)).toHaveLength(1);
+      expect(container.querySelector(`img[src="${effectiveUrl}"][loading="eager"][fetchpriority="low"]`)).toBeNull();
+    });
+
     it("does not render a hand-built preload link for adjacent images", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />

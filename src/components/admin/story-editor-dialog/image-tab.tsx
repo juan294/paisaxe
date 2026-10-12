@@ -289,13 +289,13 @@ export function ImageTab({ story }: ImageTabProps) {
           <Input
             id="imageSource"
             type="text"
-            placeholder="e.g., Photo by Juan on Unsplash"
+            placeholder="Reviewed photo record"
             value={imageSource}
             onChange={(e) => setImageSource(e.target.value)}
             className="bg-admin-paper dark:bg-admin-ink"
           />
           <p className="text-[10px] text-admin-subtle">
-            Will be displayed below the image in stories
+            Permission and mobile/desktop crop review are required. A credit alone cannot approve a photo.
           </p>
         </div>
       </div>

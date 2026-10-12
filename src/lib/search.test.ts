@@ -7,6 +7,7 @@ vi.mock("./supabase", () => ({
     rpc: vi.fn(),
     from: vi.fn(() => ({
       select: vi.fn(() => ({
+        eq: vi.fn().mockReturnThis(),
         in: vi.fn(() => Promise.resolve({ data: [], error: null })),
         textSearch: vi.fn(() => ({
           limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
@@ -47,9 +48,31 @@ import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
 import { logger } from "@/lib/logger";
 
+const citation = { title: "Synthetic source", url: "https://source.example.test/facts", license: "CC0-1.0", revision: "2026-10-11", attribution: "Example source" };
+
+function photoProof(assetUrl: string): string {
+  return JSON.stringify({ assetUrl, originalSha256: "a".repeat(64), replacementSha256: "b".repeat(64), sourcePage: "https://owner.example.test/photo", photographer: "Example owner", license: "owner-permission", permission: "Synthetic approval receipt", date: "2026-10-11", credit: "Example owner", context: "thematic", alt: "Reviewed synthetic landscape", crop: { mobile: "center", desktop: "center" }, reviewer: "Example reviewer", reviewReceipt: "c".repeat(64), status: "approved", flow: "manual" });
+}
+
+function queueRpc(response: { data: Record<string, unknown>[] | null; error: unknown }) {
+  vi.mocked(supabase.rpc).mockImplementationOnce((_name, params) => Promise.resolve({
+    ...response,
+    data: params?.corpus_version === "legacy" ? response.data : response.data?.map(row => ({ ...row, source_pdf: null, page_number: null, citation })),
+  }) as never);
+}
+
+function queueImageRpc(response: { data: Record<string, unknown>[] | null; error: unknown }) {
+  vi.mocked(supabase.rpc).mockImplementationOnce((name, params) => {
+    expect(name).toBe("corpus_related_images");
+    expect(params).toEqual(expect.objectContaining({ corpus_version: "authored-v1" }));
+    return Promise.resolve(response) as never;
+  });
+}
+
 describe("search", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(supabase.rpc).mockReset().mockResolvedValue({ data: [], error: null } as never);
     // Default: cache miss, cache write succeeds — most tests exercise the
     // uncached retrieval path and don't care about caching.
     mockSearchResultCacheGet.mockResolvedValue(null);
@@ -57,23 +80,40 @@ describe("search", () => {
   });
 
   describe("searchChunks", () => {
+    it("rejects malformed authored citations instead of disguising them as legacy PDF results", async () => {
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: [{ id: "invalid-authored", content: "Synthetic fact", source_pdf: "legacy.pdf", page_number: 12, citation: { ...citation, url: "javascript:alert(1)" } }],
+        error: null,
+      } as never);
+      await expect(searchChunks([0.1], 3, { corpusVersion: "authored-v1" })).rejects.toThrow("Invalid authored citation");
+    });
+
+    it("returns authored citation evidence without requiring a fabricated PDF or page", async () => {
+      queueRpc({ data: [{ id: "authored", content: "Synthetic fact", section_title: null, image_refs: [], similarity: 0.9 }], error: null });
+      const chunks = await searchChunks([0.1], 3, { corpusVersion: "authored-v1" });
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0]?.citation).toEqual(citation);
+      expect(chunks[0]?.sourcePdf ?? undefined).toBeUndefined();
+      expect(chunks[0]?.pageNumber ?? undefined).toBeUndefined();
+    });
+
     it("should not pass ef_search as a client-side parameter (HNSW sets it via SET LOCAL inside match_chunks SQL function)", async () => {
       // Regression test for PE-H1: hnsw.ef_search = 40 is set via SET LOCAL
       // inside the match_chunks plpgsql function (migration 084), NOT as a
       // client-supplied RPC argument. This verifies the RPC call shape is clean.
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: [],
         error: null,
-      } as never);
+      });
 
       const embedding = new Array(512).fill(0.1);
-      await searchChunks(embedding, 5);
+      await searchChunks(embedding, 5, { corpusVersion: "legacy" });
 
       const rpcCall = vi.mocked(supabase.rpc).mock.calls[0];
-      expect(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:73 rpcCall")[0], "src/lib/search.test.ts:72 rpcCall[0]")).toBe("match_chunks");
-      // Only these three parameters should be passed — no ef_search, no probes
+      expect(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:73 rpcCall")[0], "src/lib/search.test.ts:72 rpcCall[0]")).toBe("match_corpus_chunks");
+      // The version is explicit; no ef_search or probes are client parameters.
       expect(Object.keys(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:75 rpcCall")[1], "src/lib/search.test.ts:74 rpcCall[1]") as object)).toEqual(
-        expect.arrayContaining(["query_embedding", "match_threshold", "match_count"])
+        expect.arrayContaining(["query_embedding", "match_threshold", "match_count", "corpus_version"])
       );
       expect(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:78 rpcCall")[1], "src/lib/search.test.ts:77 rpcCall[1]")).not.toHaveProperty("ef_search");
       expect(requiredValue(requiredValue(rpcCall, "src/lib/search.test.ts:79 rpcCall")[1], "src/lib/search.test.ts:78 rpcCall[1]")).not.toHaveProperty("probes");
@@ -87,23 +127,24 @@ describe("search", () => {
           source_pdf: "guide.pdf",
           page_number: 1,
           section_title: "Introduction",
-          image_refs: ["img1.jpg"],
+          image_refs: ["/images/img1.jpg"],
           similarity: 0.9,
         },
       ];
 
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: mockData,
         error: null,
-      } as never);
+      });
 
       const embedding = new Array(512).fill(0.1);
-      const results = await searchChunks(embedding, 5);
+      const results = await searchChunks(embedding, 5, { corpusVersion: "legacy" });
 
-      expect(supabase.rpc).toHaveBeenCalledWith("match_chunks", {
+      expect(supabase.rpc).toHaveBeenCalledWith("match_corpus_chunks", {
         query_embedding: embedding,
         match_threshold: 0.5,
         match_count: 5,
+        corpus_version: "legacy",
       });
 
       expect(results).toHaveLength(1);
@@ -113,30 +154,30 @@ describe("search", () => {
         sourcePdf: "guide.pdf",
         pageNumber: 1,
         sectionTitle: "Introduction",
-        imageRefs: ["img1.jpg"],
+        imageRefs: ["/images/img1.jpg"],
         similarity: 0.9,
       });
     });
 
     it("should throw on RPC error instead of returning empty array", async () => {
       const dbError = { message: "Database connection failed", code: "500" };
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: null,
         error: dbError,
-      } as never);
+      });
 
       const embedding = new Array(512).fill(0.1);
-      await expect(searchChunks(embedding)).rejects.toThrow();
+      await expect(searchChunks(embedding, 5, { corpusVersion: "legacy" })).rejects.toThrow();
     });
 
     it("should return empty array for legitimate no-results (no error, empty data)", async () => {
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: [],
         error: null,
-      } as never);
+      });
 
       const embedding = new Array(512).fill(0.1);
-      const results = await searchChunks(embedding);
+      const results = await searchChunks(embedding, 5, { corpusVersion: "legacy" });
 
       expect(results).toEqual([]);
     });
@@ -144,68 +185,89 @@ describe("search", () => {
 
   describe("getRelatedImages", () => {
     it("should return empty array for empty imageRefs", async () => {
-      const results = await getRelatedImages([]);
+      const results = await getRelatedImages([], { corpusVersion: "authored-v1" });
       expect(results).toEqual([]);
+      expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith("corpus_related_images", { corpus_version: "authored-v1", image_paths: [] });
+      expect(supabase.from).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { code: "PT409", message: "corpus_version_not_selected" },
+      { code: "P0001", message: "corpus_selection_unavailable" },
+    ])("checks an empty authored image list against the captured selection ($code) and accepts a corrected retry", async error => {
+      const onDegraded = vi.fn();
+      queueImageRpc({ data: null, error });
+      await expect(getRelatedImages([], { corpusVersion: "authored-v1", onDegraded })).rejects.toThrow("Corpus selection changed or unavailable during image retrieval");
+      expect(supabase.rpc).toHaveBeenCalledExactlyOnceWith("corpus_related_images", { corpus_version: "authored-v1", image_paths: [] });
+      expect(onDegraded).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(supabase.from).not.toHaveBeenCalled();
+      queueImageRpc({ data: [], error: null });
+      expect(await getRelatedImages([], { corpusVersion: "authored-v1", onDegraded })).toEqual([]);
+      expect(supabase.rpc).toHaveBeenCalledTimes(2);
+      expect(supabase.rpc).toHaveBeenLastCalledWith("corpus_related_images", { corpus_version: "authored-v1", image_paths: [] });
+      expect(onDegraded).not.toHaveBeenCalled();
+    });
+
+    it("does not request unreviewed legacy images even when references exist", async () => {
+      expect(await getRelatedImages(["/legacy-extracted.jpg"], { corpusVersion: "legacy" })).toEqual([]);
+      expect(supabase.rpc).not.toHaveBeenCalled();
+      expect(supabase.from).not.toHaveBeenCalled();
+    });
+
+    it("throws selector mismatch instead of invoking degraded image fallback", async () => {
+      const onDegraded = vi.fn();
+      queueImageRpc({ data: null, error: { code: "PT409", message: "Corpus selection changed" } });
+      await expect(getRelatedImages(["/images/test.jpg"], { corpusVersion: "authored-v1", onDegraded })).rejects.toThrow("Corpus selection changed");
+      expect(onDegraded).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(supabase.from).not.toHaveBeenCalled();
     });
 
     it("should fetch images by refs", async () => {
       const mockImages = [
         {
           id: "img-1",
-          path: "/images/test.jpg",
+          path: "/images/test.jpg", provenance: photoProof("/images/test.jpg"),
           caption: "Test image",
           source_pdf: "guide.pdf",
         },
       ];
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({ data: mockImages, error: null }),
-      });
+      queueImageRpc({ data: mockImages, error: null });
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
+      const results = await getRelatedImages(["/images/test.jpg"], { corpusVersion: "authored-v1" });
 
-      const results = await getRelatedImages(["/images/test.jpg"]);
-
-      expect(supabase.from).toHaveBeenCalledWith("images");
+      expect(supabase.rpc).toHaveBeenCalledWith("corpus_related_images", { corpus_version: "authored-v1", image_paths: ["/images/test.jpg"] });
+      expect(supabase.from).not.toHaveBeenCalled();
       expect(results).toHaveLength(1);
       expect(results[0]).toEqual({
         id: "img-1",
-        path: "/images/test.jpg",
-        caption: "Test image",
-        sourcePdf: "guide.pdf",
+        path: "/images/test.jpg", provenance: photoProof("/images/test.jpg"),
+        caption: "Reviewed synthetic landscape",
+        sourcePdf: "Example owner",
       });
     });
 
     it("should return empty array on error", async () => {
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({
+      queueImageRpc({
           data: null,
           error: { message: "Error" },
-        }),
-      });
+        });
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
-
-      const results = await getRelatedImages(["test.jpg"]);
+      const results = await getRelatedImages(["test.jpg"], { corpusVersion: "authored-v1" });
       expect(results).toEqual([]);
     });
 
     it("logs [TABLE_FALLBACK] with logger.error on images fetch error (#249)", async () => {
       vi.mocked(logger.error).mockClear();
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({
+      queueImageRpc({
           data: null,
           error: { message: "DB connection failed" },
-        }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+        });
 
-      await getRelatedImages(["test.jpg"]);
+      await getRelatedImages(["test.jpg"], { corpusVersion: "authored-v1" });
 
       expect(logger.error).toHaveBeenCalledWith(
         "[TABLE_FALLBACK]",
@@ -223,42 +285,37 @@ describe("search", () => {
         source_pdf: `guide-${i}.pdf`,
         page_number: i + 1,
         section_title: null,
-        image_refs: [`img${i}.jpg`],
+        image_refs: [`/images/img${i}.jpg`],
         similarity: 0.9 - i * 0.02,
       }));
 
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: mockDbChunks,
         error: null,
       } as never);
 
       // Reranker returns the best 3 (chunks 5, 2, 8 in reranked order)
       const rerankedChunks = [
-        { id: "chunk-5", content: "Content 5", sourcePdf: "guide-5.pdf", pageNumber: 6, sectionTitle: undefined, imageRefs: ["img5.jpg"], similarity: 0.8 },
-        { id: "chunk-2", content: "Content 2", sourcePdf: "guide-2.pdf", pageNumber: 3, sectionTitle: undefined, imageRefs: ["img2.jpg"], similarity: 0.86 },
-        { id: "chunk-8", content: "Content 8", sourcePdf: "guide-8.pdf", pageNumber: 9, sectionTitle: undefined, imageRefs: ["img8.jpg"], similarity: 0.74 },
+        { id: "chunk-5", content: "Content 5", sourcePdf: "guide-5.pdf", pageNumber: 6, sectionTitle: undefined, imageRefs: ["/images/img5.jpg"], similarity: 0.8 },
+        { id: "chunk-2", content: "Content 2", sourcePdf: "guide-2.pdf", pageNumber: 3, sectionTitle: undefined, imageRefs: ["/images/img2.jpg"], similarity: 0.86 },
+        { id: "chunk-8", content: "Content 8", sourcePdf: "guide-8.pdf", pageNumber: 9, sectionTitle: undefined, imageRefs: ["/images/img8.jpg"], similarity: 0.74 },
       ];
       vi.mocked(rerankChunks).mockResolvedValueOnce(rerankedChunks);
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({
+      queueImageRpc({
           data: [
-            { id: "img-5", path: "img5.jpg", caption: null, source_pdf: "guide-5.pdf" },
-            { id: "img-2", path: "img2.jpg", caption: null, source_pdf: "guide-2.pdf" },
-            { id: "img-8", path: "img8.jpg", caption: null, source_pdf: "guide-8.pdf" },
+            { id: "img-5", path: "/images/img5.jpg", provenance: photoProof("/images/img5.jpg"), caption: null, source_pdf: "guide-5.pdf" },
+            { id: "img-2", path: "/images/img2.jpg", provenance: photoProof("/images/img2.jpg"), caption: null, source_pdf: "guide-2.pdf" },
+            { id: "img-8", path: "/images/img8.jpg", provenance: photoProof("/images/img8.jpg"), caption: null, source_pdf: "guide-8.pdf" },
           ],
           error: null,
-        }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
+        });
 
       const embedding = new Array(1024).fill(0.1);
-      const result = await search(embedding, 3, "best restaurants in Asturias");
+      const result = await search(embedding, 3, "best restaurants in Asturias", { corpusVersion: "authored-v1" });
 
       // Vector search should request 10 candidates
-      expect(supabase.rpc).toHaveBeenCalledWith("match_chunks", expect.objectContaining({
+      expect(supabase.rpc).toHaveBeenCalledWith("match_corpus_chunks", expect.objectContaining({
         match_count: 10,
       }));
 
@@ -277,7 +334,7 @@ describe("search", () => {
     });
 
     it("should pass query text to rerankChunks for reranking", async () => {
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: [
           { id: "chunk-1", content: "Content", source_pdf: "guide.pdf", page_number: 1, section_title: null, image_refs: [], similarity: 0.8 },
         ],
@@ -288,15 +345,10 @@ describe("search", () => {
         { id: "chunk-1", content: "Content", sourcePdf: "guide.pdf", pageNumber: 1, sectionTitle: undefined, imageRefs: [], similarity: 0.8 },
       ]);
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
+      queueImageRpc({ data: [], error: null });
 
       const embedding = new Array(1024).fill(0.1);
-      await search(embedding, 3, "best hiking in Asturias");
+      await search(embedding, 3, "best hiking in Asturias", { corpusVersion: "authored-v1" });
 
       expect(rerankChunks).toHaveBeenCalledWith(
         "best hiking in Asturias",
@@ -314,28 +366,23 @@ describe("search", () => {
           source_pdf: "guide.pdf",
           page_number: 1,
           section_title: null,
-          image_refs: ["img1.jpg"],
+          image_refs: ["/images/img1.jpg"],
           similarity: 0.8,
         },
       ];
 
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: mockChunks,
         error: null,
       } as never);
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({
-          data: [{ id: "img-1", path: "img1.jpg", caption: null, source_pdf: "guide.pdf" }],
+      queueImageRpc({
+          data: [{ id: "img-1", path: "/images/img1.jpg", provenance: photoProof("/images/img1.jpg"), caption: null, source_pdf: "guide.pdf" }],
           error: null,
-        }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
+        });
 
       const embedding = new Array(512).fill(0.1);
-      const result = await search(embedding, 5);
+      const result = await search(embedding, 5, undefined, { corpusVersion: "authored-v1" });
 
       // Without query text, reranking should not be called
       expect(rerankChunks).not.toHaveBeenCalled();
@@ -359,20 +406,15 @@ describe("search", () => {
         },
       ];
 
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: mockChunks,
         error: null,
       } as never);
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
+      queueImageRpc({ data: [], error: null });
 
       const embedding = new Array(512).fill(0.1);
-      const result = await search(embedding, 5);
+      const result = await search(embedding, 5, undefined, { corpusVersion: "authored-v1" });
 
       expect(result.chunks).toHaveLength(1);
       // With null imageRefs, no images should be fetched (empty refs list)
@@ -390,49 +432,50 @@ describe("search", () => {
         source_pdf: `guide-${i}.pdf`,
         page_number: i + 1,
         section_title: null,
-        image_refs: [`img${i}.jpg`],
+        image_refs: [`/images/img${i}.jpg`],
         similarity: 0.9 - i * 0.02,
       }));
 
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: mockDbChunks,
         error: null,
       } as never);
 
       // Reranker returns top 3
       const rerankedChunks = [
-        { id: "chunk-1", content: "Content 1", sourcePdf: "guide-1.pdf", pageNumber: 2, sectionTitle: undefined, imageRefs: ["img1.jpg"], similarity: 0.88 },
-        { id: "chunk-3", content: "Content 3", sourcePdf: "guide-3.pdf", pageNumber: 4, sectionTitle: undefined, imageRefs: ["img3.jpg"], similarity: 0.85 },
-        { id: "chunk-7", content: "Content 7", sourcePdf: "guide-7.pdf", pageNumber: 8, sectionTitle: undefined, imageRefs: ["img7.jpg"], similarity: 0.80 },
+        { id: "chunk-1", content: "Content 1", sourcePdf: "guide-1.pdf", pageNumber: 2, sectionTitle: undefined, imageRefs: ["/images/img1.jpg"], similarity: 0.88 },
+        { id: "chunk-3", content: "Content 3", sourcePdf: "guide-3.pdf", pageNumber: 4, sectionTitle: undefined, imageRefs: ["/images/img3.jpg"], similarity: 0.85 },
+        { id: "chunk-7", content: "Content 7", sourcePdf: "guide-7.pdf", pageNumber: 8, sectionTitle: undefined, imageRefs: ["/images/img7.jpg"], similarity: 0.80 },
       ];
       vi.mocked(rerankChunks).mockResolvedValueOnce(rerankedChunks);
 
       // Track what refs getRelatedImages was called with
-      let capturedImageRefs: string[] = [];
-      const mockSelect = vi.fn().mockImplementation(() => ({
-        in: vi.fn().mockImplementation((_, refs: string[]) => {
-          capturedImageRefs = [...refs];
-          return Promise.resolve({
-            data: [
-              { id: "img-1", path: "img1.jpg", caption: null, source_pdf: "guide-1.pdf" },
-              { id: "img-3", path: "img3.jpg", caption: null, source_pdf: "guide-3.pdf" },
-              { id: "img-7", path: "img7.jpg", caption: null, source_pdf: "guide-7.pdf" },
-              // img0.jpg through img9.jpg may be included — we just filter the output
-            ],
-            error: null,
-          });
-        }),
-      }));
-      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+      vi.mocked(supabase.rpc).mockImplementationOnce((name, params) => {
+        expect(name).toBe("corpus_related_images");
+        expect(params).toEqual({
+          corpus_version: "authored-v1",
+          image_paths: mockDbChunks.flatMap(chunk => chunk.image_refs),
+        });
+        return Promise.resolve({
+          data: [
+            { id: "img-1", path: "/images/img1.jpg", provenance: photoProof("/images/img1.jpg") },
+            { id: "img-3", path: "/images/img3.jpg", provenance: photoProof("/images/img3.jpg") },
+            { id: "img-7", path: "/images/img7.jpg", provenance: photoProof("/images/img7.jpg") },
+            { id: "img-0", path: "/images/img0.jpg", provenance: photoProof("/images/img0.jpg") },
+            { id: "img-9", path: "/images/img9.jpg", provenance: photoProof("/images/img9.jpg") },
+          ], error: null,
+        }) as never;
+      });
 
       const embedding = new Array(512).fill(0.1);
-      const result = await search(embedding, 3, "hiking in Asturias");
+      const result = await search(embedding, 3, "hiking in Asturias", { corpusVersion: "authored-v1" });
 
       // getRelatedImages must be called with ALL candidate imageRefs (all 10),
       // because it's fired in parallel before rerank resolves
-      expect(capturedImageRefs.length).toBe(10);
-      expect(capturedImageRefs).toContain("img0.jpg");
-      expect(capturedImageRefs).toContain("img9.jpg");
+      expect(supabase.rpc).toHaveBeenCalledWith("corpus_related_images", {
+        corpus_version: "authored-v1",
+        image_paths: mockDbChunks.flatMap(chunk => chunk.image_refs),
+      });
 
       // Result chunks come from reranker
       expect(result.chunks).toHaveLength(3);
@@ -440,12 +483,12 @@ describe("search", () => {
 
       // Result images are filtered to only the refs present in the reranked top-k
       const returnedPaths = result.images.map((img) => img.path);
-      expect(returnedPaths).toContain("img1.jpg");
-      expect(returnedPaths).toContain("img3.jpg");
-      expect(returnedPaths).toContain("img7.jpg");
+      expect(returnedPaths).toContain("/images/img1.jpg");
+      expect(returnedPaths).toContain("/images/img3.jpg");
+      expect(returnedPaths).toContain("/images/img7.jpg");
       // Images not in reranked chunks should not appear
-      expect(returnedPaths).not.toContain("img0.jpg");
-      expect(returnedPaths).not.toContain("img9.jpg");
+      expect(returnedPaths).not.toContain("/images/img0.jpg");
+      expect(returnedPaths).not.toContain("/images/img9.jpg");
     });
 
     it("PE-H2: falls back to vector order when rerank exceeds its timeout", async () => {
@@ -457,30 +500,27 @@ describe("search", () => {
           source_pdf: `guide-${i}.pdf`,
           page_number: i + 1,
           section_title: null,
-          image_refs: [`img${i}.jpg`],
+          image_refs: [`/images/img${i}.jpg`],
           similarity: 0.9 - i * 0.02,
         }));
 
-        vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        queueRpc({
           data: mockDbChunks,
           error: null,
         } as never);
         vi.mocked(rerankChunks).mockReturnValue(new Promise(() => {}));
 
-        const mockSelect = vi.fn().mockReturnValue({
-          in: vi.fn().mockResolvedValueOnce({
+        queueImageRpc({
             data: [
-              { id: "img-0", path: "img0.jpg", caption: null, source_pdf: "guide-0.pdf" },
-              { id: "img-1", path: "img1.jpg", caption: null, source_pdf: "guide-1.pdf" },
-              { id: "img-2", path: "img2.jpg", caption: null, source_pdf: "guide-2.pdf" },
-              { id: "img-9", path: "img9.jpg", caption: null, source_pdf: "guide-9.pdf" },
+              { id: "img-0", path: "/images/img0.jpg", provenance: photoProof("/images/img0.jpg"), caption: null, source_pdf: "guide-0.pdf" },
+              { id: "img-1", path: "/images/img1.jpg", provenance: photoProof("/images/img1.jpg"), caption: null, source_pdf: "guide-1.pdf" },
+              { id: "img-2", path: "/images/img2.jpg", provenance: photoProof("/images/img2.jpg"), caption: null, source_pdf: "guide-2.pdf" },
+              { id: "img-9", path: "/images/img9.jpg", provenance: photoProof("/images/img9.jpg"), caption: null, source_pdf: "guide-9.pdf" },
             ],
             error: null,
-          }),
-        });
-        vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+          });
 
-        const pendingSearch = search(new Array(512).fill(0.1), 3, "slow rerank");
+        const pendingSearch = search(new Array(512).fill(0.1), 3, "slow rerank", { corpusVersion: "authored-v1" });
         await vi.advanceTimersByTimeAsync(RERANK_TIMEOUT_MS + 1);
         const result = await pendingSearch;
 
@@ -490,9 +530,9 @@ describe("search", () => {
           "chunk-2",
         ]);
         expect(result.images.map((image) => image.path)).toEqual([
-          "img0.jpg",
-          "img1.jpg",
-          "img2.jpg",
+          "/images/img0.jpg",
+          "/images/img1.jpg",
+          "/images/img2.jpg",
         ]);
         expect(logger.warn).toHaveBeenCalledWith(
           "[SEARCH_RERANK_TIMEOUT]",
@@ -504,25 +544,80 @@ describe("search", () => {
     });
 
     it("should use limit directly when no query text is provided", async () => {
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: [],
         error: null,
       } as never);
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({
-        select: mockSelect,
-      } as never);
+      queueImageRpc({ data: [], error: null });
 
       const embedding = new Array(1024).fill(0.1);
-      await search(embedding, 5);
+      await search(embedding, 5, undefined, { corpusVersion: "authored-v1" });
 
       // Without query text, vector search should use the exact limit
-      expect(supabase.rpc).toHaveBeenCalledWith("match_chunks", expect.objectContaining({
+      expect(supabase.rpc).toHaveBeenCalledWith("match_corpus_chunks", expect.objectContaining({
         match_count: 5,
       }));
+    });
+  });
+
+  describe("version-bound image promotion race", () => {
+    it("rejects a held image RPC mismatch after vector search and accepts a reviewed same-version retry without caching the failure", async () => {
+      const version = "authored-a";
+      const imagePath = "/images/reviewed-a.jpg";
+      const chunk = { id: "authored-a-chunk", content: "Synthetic independently authored fact", citation, imageRefs: [imagePath], similarity: 0.9 };
+      const row = { id: chunk.id, content: chunk.content, citation, image_refs: chunk.imageRefs, similarity: chunk.similarity, section_title: null, source_pdf: null, page_number: null };
+      const image = { id: "reviewed-a-image", path: imagePath, provenance: photoProof(imagePath) };
+      type ImageReply = { data: typeof image[] | null; error: { code: string; message: string } | null };
+      let releaseImages: (reply: ImageReply) => void = () => { throw new Error("Held image RPC has not started"); };
+      const heldImages = new Promise<ImageReply>(resolve => { releaseImages = resolve; });
+      let markImagesStarted: () => void = () => { throw new Error("Image-start observer missing"); };
+      const imagesStarted = new Promise<void>(resolve => { markImagesStarted = resolve; });
+      let imageCalls = 0;
+      vi.mocked(supabase.rpc).mockImplementation((name, params) => {
+        if (name === "active_corpus_version") return Promise.resolve({ data: version, error: null }) as never;
+        if (name === "match_corpus_chunks") {
+          expect(params).toEqual(expect.objectContaining({ corpus_version: version }));
+          return Promise.resolve({ data: [row], error: null }) as never;
+        }
+        if (name === "corpus_related_images") {
+          expect(params).toEqual({ corpus_version: version, image_paths: [imagePath] });
+          imageCalls += 1;
+          if (imageCalls === 1) {
+            markImagesStarted();
+            return heldImages as never;
+          }
+          return Promise.resolve({ data: [image], error: null }) as never;
+        }
+        throw new Error(`Unexpected fallback RPC: ${name}`);
+      });
+      vi.mocked(rerankChunks).mockResolvedValueOnce([chunk]).mockResolvedValueOnce([chunk]);
+
+      const pending = search(new Array(512).fill(0.1), 1, "synthetic query");
+      const rejection = expect(pending).rejects.toThrow("Corpus selection changed");
+      await imagesStarted;
+      expect(mockSearchResultCacheGet).toHaveBeenCalledWith("synthetic query", 1, version);
+      expect(supabase.rpc).toHaveBeenCalledWith("match_corpus_chunks", expect.objectContaining({ corpus_version: version }));
+      expect(mockSearchResultCacheSet).not.toHaveBeenCalled();
+      releaseImages({ data: null, error: { code: "PT409", message: "Corpus selection changed" } });
+      await rejection;
+      expect(mockSearchResultCacheSet).not.toHaveBeenCalled();
+      expect(supabase.from).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalledWith("[TABLE_FALLBACK]", expect.anything());
+      expect(vi.mocked(supabase.rpc).mock.calls.map(([name]) => name)).toEqual([
+        "active_corpus_version", "match_corpus_chunks", "corpus_related_images",
+      ]);
+
+      const retry = await search(new Array(512).fill(0.1), 1, "synthetic query");
+      expect(retry.chunks).toEqual([chunk]);
+      expect(retry.images).toEqual([{ ...image, caption: "Reviewed synthetic landscape", sourcePdf: "Example owner" }]);
+      expect(mockSearchResultCacheSet).toHaveBeenCalledOnce();
+      expect(mockSearchResultCacheSet).toHaveBeenCalledWith("synthetic query", 1, retry, version);
+      expect(supabase.from).not.toHaveBeenCalled();
+      expect(vi.mocked(supabase.rpc).mock.calls.map(([name]) => name)).toEqual([
+        "active_corpus_version", "match_corpus_chunks", "corpus_related_images",
+        "active_corpus_version", "match_corpus_chunks", "corpus_related_images",
+      ]);
     });
   });
 
@@ -545,16 +640,16 @@ describe("search", () => {
       mockSearchResultCacheGet.mockResolvedValueOnce(cachedResult);
 
       const embedding = new Array(512).fill(0.1);
-      const result = await search(embedding, 3, "Oviedo");
+      const result = await search(embedding, 3, "Oviedo", { corpusVersion: "authored-v1" });
 
       expect(result).toEqual(cachedResult);
       expect(supabase.rpc).not.toHaveBeenCalled();
       expect(rerankChunks).not.toHaveBeenCalled();
-      expect(mockSearchResultCacheGet).toHaveBeenCalledWith("Oviedo", 3);
+      expect(mockSearchResultCacheGet).toHaveBeenCalledWith("Oviedo", 3, "authored-v1");
     });
 
     it("stores the result in the cache after a successful reranked search", async () => {
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: [
           { id: "chunk-1", content: "Content", source_pdf: "guide.pdf", page_number: 1, section_title: null, image_refs: [], similarity: 0.8 },
         ],
@@ -566,30 +661,25 @@ describe("search", () => {
       ];
       vi.mocked(rerankChunks).mockResolvedValueOnce(rerankedChunks);
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+      queueImageRpc({ data: [], error: null });
 
       const embedding = new Array(512).fill(0.1);
-      const result = await search(embedding, 3, "best hiking in Asturias");
+      const result = await search(embedding, 3, "best hiking in Asturias", { corpusVersion: "authored-v1" });
 
       expect(mockSearchResultCacheSet).toHaveBeenCalledWith(
         "best hiking in Asturias",
         3,
-        result
+        result,
+        "authored-v1"
       );
     });
 
     it("does not query or write the cache when no queryText is provided (vector-only fallback path)", async () => {
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: [], error: null } as never);
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+      queueRpc({ data: [], error: null } as never);
+      queueImageRpc({ data: [], error: null });
 
       const embedding = new Array(512).fill(0.1);
-      await search(embedding, 5);
+      await search(embedding, 5, undefined, { corpusVersion: "authored-v1" });
 
       expect(mockSearchResultCacheGet).not.toHaveBeenCalled();
       expect(mockSearchResultCacheSet).not.toHaveBeenCalled();
@@ -604,22 +694,19 @@ describe("search", () => {
           source_pdf: `guide-${i}.pdf`,
           page_number: i + 1,
           section_title: null,
-          image_refs: [`img${i}.jpg`],
+          image_refs: [`/images/img${i}.jpg`],
           similarity: 0.9 - i * 0.02,
         }));
 
-        vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        queueRpc({
           data: mockDbChunks,
           error: null,
         } as never);
         vi.mocked(rerankChunks).mockReturnValue(new Promise(() => {}));
 
-        const mockSelect = vi.fn().mockReturnValue({
-          in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
-        });
-        vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+        queueImageRpc({ data: [], error: null });
 
-        const pendingSearch = search(new Array(512).fill(0.1), 3, "slow rerank");
+        const pendingSearch = search(new Array(512).fill(0.1), 3, "slow rerank", { corpusVersion: "authored-v1" });
         await vi.advanceTimersByTimeAsync(RERANK_TIMEOUT_MS + 1);
         await pendingSearch;
 
@@ -632,27 +719,24 @@ describe("search", () => {
 
   describe("error message fallbacks (branch coverage)", () => {
     it("searchChunks uses String(error) when RPC error has no message field", async () => {
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: null,
         error: "rpc-failed-no-message",
-      } as never);
+      });
 
       const embedding = new Array(512).fill(0.1);
-      await expect(searchChunks(embedding)).rejects.toThrow(/rpc-failed-no-message/);
+      await expect(searchChunks(embedding, 5, { corpusVersion: "legacy" })).rejects.toThrow(/rpc-failed-no-message/);
     });
 
     it("getRelatedImages logs String(error) when error has no message field", async () => {
       vi.mocked(logger.error).mockClear();
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({
+      queueImageRpc({
           data: null,
           error: "no-message-string-error",
-        }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+        });
 
-      const results = await getRelatedImages(["x.jpg"]);
+      const results = await getRelatedImages(["x.jpg"], { corpusVersion: "authored-v1" });
       expect(results).toEqual([]);
       expect(logger.error).toHaveBeenCalledWith(
         "[TABLE_FALLBACK]",
@@ -664,7 +748,7 @@ describe("search", () => {
   describe("imageRefs null fallback (branch coverage)", () => {
     it("search() handles chunks with null imageRefs in no-query path", async () => {
       // Vector-only path (queryText undefined) - candidates have null imageRefs
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: [
           {
             id: "c1",
@@ -679,12 +763,9 @@ describe("search", () => {
         error: null,
       } as never);
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+      queueImageRpc({ data: [], error: null });
 
-      const result = await search(new Array(512).fill(0.1), 3);
+      const result = await search(new Array(512).fill(0.1), 3, undefined, { corpusVersion: "authored-v1" });
       expect(result.chunks).toHaveLength(1);
       expect(result.images).toEqual([]);
     });
@@ -700,7 +781,7 @@ describe("search", () => {
         similarity: 0.9 - i * 0.01,
       }));
 
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      queueRpc({
         data: candidatesWithNullRefs,
         error: null,
       } as never);
@@ -718,12 +799,9 @@ describe("search", () => {
         })),
       );
 
-      const mockSelect = vi.fn().mockReturnValue({
-        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
-      });
-      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+      queueImageRpc({ data: [], error: null });
 
-      const result = await search(new Array(512).fill(0.1), 3, "query text");
+      const result = await search(new Array(512).fill(0.1), 3, "query text", { corpusVersion: "authored-v1" });
       expect(result.chunks).toHaveLength(3);
       expect(result.images).toEqual([]);
     });

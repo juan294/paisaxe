@@ -1,4 +1,5 @@
 import { requiredValue } from "@/test/required-value";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ImageEditorDialog } from "./image-editor-dialog";
@@ -197,12 +198,12 @@ describe("ImageEditorDialog", () => {
     it("renders image source / attribution input", () => {
       render(<ImageEditorDialog {...defaultProps} />);
       expect(screen.getByText("Image Source / Attribution")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Reviewed photo record")).toBeInTheDocument();
     });
 
     it("image source input works", () => {
       render(<ImageEditorDialog {...defaultProps} />);
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
       fireEvent.change(sourceInput, { target: { value: "Photo by Test" } });
       expect(sourceInput).toHaveValue("Photo by Test");
     });
@@ -210,7 +211,7 @@ describe("ImageEditorDialog", () => {
     it("initializes imageSource from story", () => {
       const storyWithSource = { ...mockStory, imageSource: "Original source" };
       render(<ImageEditorDialog {...defaultProps} story={storyWithSource} />);
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
       expect(sourceInput).toHaveValue("Original source");
     });
   });
@@ -254,7 +255,7 @@ describe("ImageEditorDialog", () => {
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
 
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
       fireEvent.change(sourceInput, { target: { value: "Test source" } });
 
       const saveButton = screen.getByRole("button", { name: "Save" });
@@ -879,15 +880,16 @@ describe("ImageEditorDialog", () => {
     });
 
     it("allows saving just imageSource when story already has a non-placeholder image", async () => {
+      const proof = imageProvenanceFixture(storyWithRealImage.image);
       mockUpdateStoryImageSource.mockResolvedValue({
-        data: { id: "story-1", imageSource: "Turismo Asturias" },
+        data: { id: "story-1", imageSource: proof },
       });
 
       render(<ImageEditorDialog {...defaultProps} story={storyWithRealImage} />);
 
       // Enter just the source without selecting a new image
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
+      fireEvent.change(sourceInput, { target: { value: proof } });
 
       // Save should not require selecting a new image
       await act(async () => {
@@ -897,12 +899,13 @@ describe("ImageEditorDialog", () => {
       // Should NOT show the "please provide an image" error
       expect(screen.queryByText(/Please provide an image/)).not.toBeInTheDocument();
       // Should have called updateStoryImageSource
-      expect(mockUpdateStoryImageSource).toHaveBeenCalledWith("story-1", "Turismo Asturias");
+      expect(mockUpdateStoryImageSource).toHaveBeenCalledWith("story-1", proof);
     });
 
     it("calls onUpdate and onClose on successful source-only save", async () => {
+      const proof = imageProvenanceFixture(storyWithRealImage.image);
       mockUpdateStoryImageSource.mockResolvedValue({
-        data: { id: "story-1", imageSource: "Turismo Asturias" },
+        data: { id: "story-1", imageSource: proof },
       });
 
       const onClose = vi.fn();
@@ -910,14 +913,14 @@ describe("ImageEditorDialog", () => {
 
       render(<ImageEditorDialog story={storyWithRealImage} onClose={onClose} onUpdate={onUpdate} />);
 
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
+      fireEvent.change(sourceInput, { target: { value: proof } });
 
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
       });
 
-      expect(onUpdate).toHaveBeenCalledWith("story-1", { imageSource: "Turismo Asturias" });
+      expect(onUpdate).toHaveBeenCalledWith("story-1", { imageSource: proof });
       expect(onClose).toHaveBeenCalled();
     });
 
@@ -931,7 +934,7 @@ describe("ImageEditorDialog", () => {
       render(<ImageEditorDialog {...defaultProps} story={placeholderStory} />);
 
       // Enter source but don't select new image
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
       fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
 
       await act(async () => {
@@ -968,7 +971,7 @@ describe("ImageEditorDialog", () => {
 
       render(<ImageEditorDialog {...defaultProps} story={storyWithRealImage} />);
 
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
       fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
 
       await act(async () => {
@@ -986,7 +989,7 @@ describe("ImageEditorDialog", () => {
 
       render(<ImageEditorDialog story={storyWithRealImage} onClose={onClose} onUpdate={onUpdate} />);
 
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
       fireEvent.change(sourceInput, { target: { value: "New Source" } });
 
       await act(async () => {
@@ -1173,7 +1176,7 @@ describe("ImageEditorDialog", () => {
       expect(resolutionElements.length).toBeGreaterThan(0);
     });
 
-    it("auto-populates imageSource when searching content images", async () => {
+    it("keeps imageSource pending when searching content images", async () => {
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
       });
@@ -1186,12 +1189,15 @@ describe("ImageEditorDialog", () => {
         fireEvent.click(screen.getByText(/Search PDF/i));
       });
 
-      // Should auto-populate the imageSource field
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      expect(sourceInput).toHaveValue("Turismo de Asturias");
+      // Selecting a legacy result does not supply permission or credit.
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
+      expect(sourceInput).toHaveValue("");
+      expect(screen.getByText(/1 of 2/i)).toBeInTheDocument();
+      expect(screen.getByTestId("next-image")).toHaveAttribute("data-src", requiredValue(mockContentImages[0], "First content image").url);
+      expect(screen.getByText("Permission and mobile/desktop crop review are required. A credit alone cannot approve a photo.")).toBeInTheDocument();
     });
 
-    it("updates imageSource when navigating between content images", async () => {
+    it("clears the previous asset's proof when navigating between content images", async () => {
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
       });
@@ -1204,17 +1210,19 @@ describe("ImageEditorDialog", () => {
         fireEvent.click(screen.getByText(/Search PDF/i));
       });
 
-      // Clear the imageSource to verify it gets set again on navigation
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "" } });
-      expect(sourceInput).toHaveValue("");
+      // Proof for the first asset must not follow navigation to another asset.
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
+      const firstProof = imageProvenanceFixture(requiredValue(mockContentImages[0], "First content image").url);
+      fireEvent.change(sourceInput, { target: { value: firstProof } });
+      expect(sourceInput).toHaveValue(firstProof);
 
       // Navigate to next image
       const nextButton = screen.getByTestId("icon-chevron-right").closest("button")!;
       fireEvent.click(nextButton);
 
-      // Should have set imageSource again
-      expect(sourceInput).toHaveValue("Turismo de Asturias");
+      expect(sourceInput).toHaveValue("");
+      expect(screen.getByText(/2 of 2/i)).toBeInTheDocument();
+      expect(screen.getByTestId("next-image")).toHaveAttribute("data-src", requiredValue(mockContentImages[1], "Second content image").url);
     });
 
     it("calls onUpdate with curationStatus on successful mark as pending", async () => {
@@ -1241,12 +1249,13 @@ describe("ImageEditorDialog", () => {
       expect(onClose).not.toHaveBeenCalled();
     });
 
-    it("saves content image with auto-populated imageSource", async () => {
+    it("saves the selected content image with explicitly entered synthetic proof", async () => {
+      const proof = imageProvenanceFixture(requiredValue(mockContentImages[0], "First content image").url);
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: "Turismo de Asturias" },
+        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: proof },
       });
 
       render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
@@ -1255,6 +1264,10 @@ describe("ImageEditorDialog", () => {
         fireEvent.click(screen.getByText(/Search PDF/i));
       });
 
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
+      expect(sourceInput).toHaveValue("");
+      fireEvent.change(sourceInput, { target: { value: proof } });
+
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
       });
@@ -1262,16 +1275,17 @@ describe("ImageEditorDialog", () => {
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
         requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url,
-        "Turismo de Asturias"
+        proof
       );
     });
 
     it("calls onUpdate and onClose on successful content image save", async () => {
+      const proof = imageProvenanceFixture(requiredValue(mockContentImages[0], "First content image").url);
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: "Turismo de Asturias" },
+        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: proof },
       });
 
       const onClose = vi.fn();
@@ -1285,23 +1299,27 @@ describe("ImageEditorDialog", () => {
       });
 
       // Save the selected content image
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
+      expect(sourceInput).toHaveValue("");
+      fireEvent.change(sourceInput, { target: { value: proof } });
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
       });
 
       expect(onUpdate).toHaveBeenCalledWith("story-1", {
         image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url,
-        imageSource: "Turismo de Asturias",
+        imageSource: proof,
       });
       expect(onClose).toHaveBeenCalled();
     });
 
     it("saves navigated content image (not just the first one)", async () => {
+      const proof = imageProvenanceFixture(requiredValue(mockContentImages[1], "Second content image").url);
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: requiredValue(mockContentImages[1], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[1]").url, imageSource: "Turismo de Asturias" },
+        data: { id: "story-1", image: requiredValue(mockContentImages[1], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[1]").url, imageSource: proof },
       });
 
       const onUpdate = vi.fn();
@@ -1321,6 +1339,9 @@ describe("ImageEditorDialog", () => {
       expect(screen.getByText(/2 of 2/i)).toBeInTheDocument();
 
       // Save the second content image
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
+      expect(sourceInput).toHaveValue("");
+      fireEvent.change(sourceInput, { target: { value: proof } });
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
       });
@@ -1328,11 +1349,11 @@ describe("ImageEditorDialog", () => {
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
         requiredValue(mockContentImages[1], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[1]").url,
-        "Turismo de Asturias"
+        proof
       );
       expect(onUpdate).toHaveBeenCalledWith("story-1", {
         image: requiredValue(mockContentImages[1], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[1]").url,
-        imageSource: "Turismo de Asturias",
+        imageSource: proof,
       });
     });
 
@@ -1382,12 +1403,12 @@ describe("ImageEditorDialog", () => {
       expect(screen.getByText("Failed to update image")).toBeInTheDocument();
     });
 
-    it("saves content image with empty imageSource as undefined", async () => {
+    it("forwards missing proof as undefined and preserves the draft after server rejection", async () => {
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: undefined },
+        error: "Reviewed photo record required",
       });
 
       render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
@@ -1397,8 +1418,8 @@ describe("ImageEditorDialog", () => {
         fireEvent.click(screen.getByText(/Search PDF/i));
       });
 
-      // Clear the auto-populated imageSource
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      // The selected result has no reviewed proof.
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
       fireEvent.change(sourceInput, { target: { value: "" } });
 
       // Save the selected content image with no source
@@ -1411,14 +1432,19 @@ describe("ImageEditorDialog", () => {
         requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url,
         undefined
       );
+      expect(screen.getByText("Reviewed photo record required")).toBeInTheDocument();
+      expect(screen.getByText(/1 of 2/i)).toBeInTheDocument();
+      expect(defaultProps.onUpdate).not.toHaveBeenCalled();
+      expect(defaultProps.onClose).not.toHaveBeenCalled();
     });
 
-    it("passes custom imageSource (not auto-populated) on content image save", async () => {
+    it("passes explicitly reviewed proof on content image save", async () => {
+      const proof = imageProvenanceFixture(requiredValue(mockContentImages[0], "First content image").url);
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
       });
       mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: "Custom Attribution" },
+        data: { id: "story-1", image: requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url, imageSource: proof },
       });
 
       render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
@@ -1428,9 +1454,9 @@ describe("ImageEditorDialog", () => {
         fireEvent.click(screen.getByText(/Search PDF/i));
       });
 
-      // Override the auto-populated imageSource with a custom value
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Custom Attribution" } });
+      // Supply reviewed proof for the selected asset.
+      const sourceInput = screen.getByPlaceholderText("Reviewed photo record");
+      fireEvent.change(sourceInput, { target: { value: proof } });
 
       // Save the selected content image
       await act(async () => {
@@ -1440,7 +1466,7 @@ describe("ImageEditorDialog", () => {
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
         requiredValue(mockContentImages[0], "src/components/admin/image-editor-dialog.test.tsx: mockContentImages[0]").url,
-        "Custom Attribution"
+        proof
       );
     });
   });

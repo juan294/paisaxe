@@ -1,3 +1,4 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
 import fs from "fs";
 import path from "path";
 import { config } from "dotenv";
@@ -455,5 +456,5 @@ const isDirectExecution = process.argv[1]?.endsWith("generate-stories.ts") ||
   process.argv[1]?.endsWith("generate-stories");
 
 if (isDirectExecution) {
-  main().catch(console.error);
+  rejectLegacyContentOperation("generate-stories.ts", main);
 }

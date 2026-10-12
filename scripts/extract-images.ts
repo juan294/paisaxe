@@ -1,3 +1,4 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
 import fs from "fs";
 import path from "path";
 import { createCanvas } from "canvas";
@@ -355,4 +356,4 @@ const mode = args.includes("--render")
     ? "extract"
     : "both";
 
-processAllPdfs(mode).catch(console.error);
+rejectLegacyContentOperation(`extract-images ${mode}`, processAllPdfs);

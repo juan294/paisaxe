@@ -1,3 +1,5 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
+import { resolvePermittedImage } from "../src/lib/image-provenance";
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
@@ -419,13 +421,14 @@ async function seedStories(): Promise<void> {
       console.log(`  → Assigned placeholder image for "${story.title}"`);
     }
 
+    const permittedImage = resolvePermittedImage(imagePath, imageSource);
     return {
       slug,
       title: story.title,
       subtitle: story.subtitle || null,
       description: story.description || null,
-      image_path: imagePath,
-      image_source: imageSource,
+      image_path: permittedImage.image,
+      image_source: permittedImage.imageSource,
       category: story.category,
       source_pdf: story.sourcePdf || null,
       location: story.location || null,
@@ -641,5 +644,6 @@ async function main(): Promise<void> {
 }
 
 if (isDirectExecution) {
-  main().catch(console.error);
+  if (!process.argv.includes("--stories") || process.argv.includes("--clear")) rejectLegacyContentOperation("seed-database chunks/clear");
+  main().catch(error => { console.error(error); process.exitCode = 1; });
 }

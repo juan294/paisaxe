@@ -76,11 +76,11 @@ export const metadata: Metadata = {
     locale: LOCATION_CONFIG.seo.locale,
     images: [
       {
-        // LOCATION-SPECIFIC: Default OG image
-        url: `${SITE_URL}/images/stories/lagos-covadonga.webp`,
+        // Existing original text/gradient generator; no photograph or place claim.
+        url: `${SITE_URL}/opengraph-image`,
         width: 1200,
         height: 630,
-        alt: `Lagos de Covadonga, ${LOCATION_CONFIG.name} - ${LOCATION_CONFIG.siteName}`,
+        alt: `${LOCATION_CONFIG.siteName} · Diseño tipográfico original`,
       },
     ],
   },
@@ -89,7 +89,7 @@ export const metadata: Metadata = {
     title,
     // LOCATION-SPECIFIC: Twitter description
     description: LOCATION_CONFIG.seo.description,
-    images: [`${SITE_URL}/images/stories/lagos-covadonga.webp`],
+    images: [{ url: `${SITE_URL}/opengraph-image`, alt: `${LOCATION_CONFIG.siteName} · Diseño tipográfico original` }],
   },
   alternates: {
     canonical: SITE_URL,

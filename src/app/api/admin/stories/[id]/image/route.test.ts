@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { PUT } from "./route";
@@ -75,7 +77,7 @@ vi.mock("@/lib/image-optimization", () => ({
 
 import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { validateImageBuffer } from "@/lib/image-optimization";
+import { validateImageBuffer, optimizeSingleImage } from "@/lib/image-optimization";
 
 /**
  * Create a mock File object with arrayBuffer() method for Node.js test environment.
@@ -115,11 +117,11 @@ function setupStoryUpdateMock(imagePath = "https://example.com/image.jpg") {
   return { mockUpdate };
 }
 
-function createJsonImageRequest(imageUrl: string) {
+function createJsonImageRequest(imageUrl: string, imageSource: unknown = imageProvenanceFixture(imageUrl)) {
   return new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ imageUrl }),
+    body: JSON.stringify({ imageUrl, imageSource }),
   });
 }
 
@@ -140,7 +142,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
-        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg", imageSource: imageProvenanceFixture("https://example.com/image.jpg") }),
       });
 
       const response = await PUT(request, mockParams);
@@ -155,7 +157,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const request = new NextRequest("http://localhost:3000/api/admin/stories//image", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg", imageSource: imageProvenanceFixture("https://example.com/image.jpg") }),
       });
 
       const response = await PUT(request, { params: Promise.resolve({ id: "" }) });
@@ -184,7 +186,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/new-image.jpg" }),
+        body: JSON.stringify({ imageUrl: "https://example.com/new-image.jpg", imageSource: imageProvenanceFixture("https://example.com/new-image.jpg") }),
       });
 
       const response = await PUT(request, mockParams);
@@ -192,7 +194,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
       expect(response.status).toBe(200);
       expect(data.data.image).toBe("https://example.com/new-image.jpg");
-      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://example.com/new-image.jpg", blur_data_url: "data:image/webp;base64,mockblur" });
+      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://example.com/new-image.jpg", image_source: imageProvenanceFixture("https://example.com/new-image.jpg"), blur_data_url: "data:image/webp;base64,mockblur" });
     });
 
     it("should return 400 when imageUrl is missing", async () => {
@@ -233,7 +235,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "not-a-valid-url" }),
+        body: JSON.stringify({ imageUrl: "not-a-valid-url", imageSource: imageProvenanceFixture("not-a-valid-url") }),
       });
 
       const response = await PUT(request, mockParams);
@@ -249,7 +251,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: "story-123", image_path: "https://example.com/img.jpg", image_source: "unsplash" },
+        data: { id: "story-123", image_path: "https://example.com/img.jpg", image_source: imageProvenanceFixture("https://example.com/img.jpg") },
         error: null,
       });
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
@@ -262,89 +264,48 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/img.jpg", imageSource: "unsplash" }),
+        body: JSON.stringify({ imageUrl: "https://example.com/img.jpg", imageSource: imageProvenanceFixture("https://example.com/img.jpg") }),
       });
 
       const response = await PUT(request, mockParams);
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.data.imageSource).toBe("unsplash");
+      expect(data.data.imageSource).toBe(imageProvenanceFixture("https://example.com/img.jpg"));
       expect(mockUpdate).toHaveBeenCalledWith({
         image_path: "https://example.com/img.jpg",
         blur_data_url: "data:image/webp;base64,mockblur",
-        image_source: "unsplash",
+        image_source: imageProvenanceFixture("https://example.com/img.jpg"),
       });
     });
 
-    it("should not include imageSource when not provided", async () => {
+    it.each([undefined, 123, "unreviewed photographer credit", "{}"])("rejects missing or unreviewed provenance %s before DNS or writes", async (source) => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: "story-123", image_path: "https://example.com/img.jpg" },
-        error: null,
-      });
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
-      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
-
-      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
-
+      const { mockUpdate } = setupStoryUpdateMock();
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/img.jpg" }),
+        method: "PUT", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://example.com/img.jpg", imageSource: source }),
       });
-
       const response = await PUT(request, mockParams);
-
-      expect(response.status).toBe(200);
-      expect(mockUpdate).toHaveBeenCalledWith({
-        image_path: "https://example.com/img.jpg",
-        blur_data_url: "data:image/webp;base64,mockblur",
-      });
-    });
-
-    it("should not include imageSource when it is not a string", async () => {
-      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: "story-123", image_path: "https://example.com/img.jpg" },
-        error: null,
-      });
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
-      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
-
-      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
-
-      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/img.jpg", imageSource: 123 }),
-      });
-
-      const response = await PUT(request, mockParams);
-
-      expect(response.status).toBe(200);
-      expect(mockUpdate).toHaveBeenCalledWith({
-        image_path: "https://example.com/img.jpg",
-        blur_data_url: "data:image/webp;base64,mockblur",
-      });
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("Photo permission and crop review is required for this image");
+      expect(dns.lookup).not.toHaveBeenCalled();
+      expect(validateImageBuffer).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe("FormData file upload", () => {
+    const optimizedBytes = Buffer.from("optimized image");
+    const uploadUrl = `https://storage.example.com/story-123-${createHash("sha256").update(optimizedBytes).digest("hex")}.avif`;
     const setupStorageMocks = (uploadError: { message: string } | null = null) => {
       const mockUpload = vi.fn().mockResolvedValue({ error: uploadError });
       const mockGetPublicUrl = vi.fn().mockReturnValue({
-        data: { publicUrl: "https://storage.example.com/story-123-12345.avif" },
+        data: { publicUrl: uploadUrl },
       });
 
       const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: "story-123", image_path: "https://storage.example.com/story-123-12345.avif", image_source: null },
+        data: { id: "story-123", image_path: uploadUrl, image_source: null },
         error: null,
       });
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
@@ -366,7 +327,11 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     };
 
     // Helper: create a NextRequest with multipart content-type and a mocked formData() method
-    const createFormDataRequest = (formData: FormData) => {
+    const createFormDataRequest = async (formData: FormData, addProof = true) => {
+      const file = formData.get("file");
+      if (addProof && file instanceof File && !formData.has("imageSource")) {
+        formData.set("imageSource", imageProvenanceFixture(uploadUrl, Buffer.from(await file.arrayBuffer()), optimizedBytes));
+      }
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
         headers: { "content-type": "multipart/form-data; boundary=----formdata" },
@@ -388,17 +353,69 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const mockFile = createMockFile("image content", "test.jpg", "image/jpeg");
       formData.append("file", mockFile);
 
-      const request = createFormDataRequest(formData);
+      const request = await createFormDataRequest(formData);
       const response = await PUT(request, mockParams);
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(mockUpload).toHaveBeenCalled();
+      expect(mockUpload).toHaveBeenCalledWith(`story-123-${createHash("sha256").update(optimizedBytes).digest("hex")}.avif`, optimizedBytes, { contentType: "image/avif", cacheControl: "31536000", upsert: true });
       expect(mockGetPublicUrl).toHaveBeenCalled();
       // Now outputs AVIF instead of original format
-      expect(data.data.image).toBe("https://storage.example.com/story-123-12345.avif");
+      expect(data.data.image).toBe(uploadUrl);
+      expect(mockUpdate).toHaveBeenCalledWith({
+        image_path: uploadUrl,
+        image_source: imageProvenanceFixture(uploadUrl, "image content", optimizedBytes),
+        blur_data_url: "data:image/webp;base64,mockblur",
+      });
       // Should also have blur placeholder
       expect(data.data.blurDataUrl).toBe("data:image/webp;base64,mockblur");
+    });
+
+    it.each([undefined, "free credit", "{}", JSON.stringify({ ...JSON.parse(imageProvenanceFixture(uploadUrl)), status: "rejected" })])("rejects missing or rejected upload proof %s before processing or writes", async (proof) => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      const { mockUpload, mockUpdate } = setupStorageMocks();
+      const formData = new FormData();
+      formData.append("file", createMockFile("image content", "test.jpg", "image/jpeg"));
+      if (proof !== undefined) formData.set("imageSource", proof);
+      const response = await PUT(await createFormDataRequest(formData, false), mockParams);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("Photo permission and crop review is required before upload");
+      expect(validateImageBuffer).not.toHaveBeenCalled();
+      expect(optimizeSingleImage).not.toHaveBeenCalled();
+      expect(mockUpload).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { name: "original bytes", source: imageProvenanceFixture(uploadUrl, "different original", optimizedBytes), error: "The reviewed original photo differs from this file", optimized: false },
+      { name: "replacement bytes", source: imageProvenanceFixture(uploadUrl, "image content", "different replacement"), error: "Review the optimized photo before upload", optimized: true },
+      { name: "planned asset", source: imageProvenanceFixture("https://example.com/other.avif", "image content", optimizedBytes), error: "The photo review is for another asset", optimized: true },
+    ])("rejects mismatched $name before storage or database writes", async ({ source, error, optimized }) => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      const { mockUpload, mockUpdate } = setupStorageMocks();
+      const formData = new FormData();
+      formData.append("file", createMockFile("image content", "test.jpg", "image/jpeg"));
+      formData.set("imageSource", source);
+      const response = await PUT(await createFormDataRequest(formData), mockParams);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe(error);
+      expect(optimizeSingleImage).toHaveBeenCalledTimes(optimized ? 1 : 0);
+      expect(validateImageBuffer).toHaveBeenCalledTimes(optimized ? 1 : 0);
+      expect(mockUpload).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("preserves optimization failures without upload or database writes", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      const { mockUpload, mockUpdate } = setupStorageMocks();
+      vi.mocked(optimizeSingleImage).mockRejectedValueOnce(new Error("Optimization failed"));
+      const formData = new FormData();
+      formData.append("file", createMockFile("image content", "test.jpg", "image/jpeg"));
+      const response = await PUT(await createFormDataRequest(formData), mockParams);
+      expect(response.status).toBe(500);
+      expect((await response.json()).error).toBe("Internal server error");
+      expect(mockUpload).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
     it("should return 400 when no file in FormData", async () => {
@@ -408,7 +425,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const formData = new FormData();
       // No file appended
 
-      const request = createFormDataRequest(formData);
+      const request = await createFormDataRequest(formData);
       const response = await PUT(request, mockParams);
       const data = await response.json();
 
@@ -424,7 +441,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const mockFile = createMockFile("content", "test.txt", "text/plain");
       formData.append("file", mockFile);
 
-      const request = createFormDataRequest(formData);
+      const request = await createFormDataRequest(formData);
       const response = await PUT(request, mockParams);
       const data = await response.json();
 
@@ -443,7 +460,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const mockFile = createMockFile(largeContent, "large.jpg", "image/jpeg");
       formData.append("file", mockFile);
 
-      const request = createFormDataRequest(formData);
+      const request = await createFormDataRequest(formData);
       const response = await PUT(request, mockParams);
       const data = await response.json();
 
@@ -466,7 +483,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const mockFile = createMockFile("corrupt data", "test.jpg", "image/jpeg");
       formData.append("file", mockFile);
 
-      const request = createFormDataRequest(formData);
+      const request = await createFormDataRequest(formData);
       const response = await PUT(request, mockParams);
       const data = await response.json();
 
@@ -487,7 +504,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const mockFile = createMockFile("corrupt data", "test.jpg", "image/jpeg");
       formData.append("file", mockFile);
 
-      const request = createFormDataRequest(formData);
+      const request = await createFormDataRequest(formData);
       const response = await PUT(request, mockParams);
       const data = await response.json();
 
@@ -497,18 +514,19 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
     it("should return 500 on storage upload error", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-      setupStorageMocks({ message: "Storage error" });
+      const { mockUpdate } = setupStorageMocks({ message: "Storage error" });
 
       const formData = new FormData();
       const mockFile = createMockFile("image content", "test.jpg", "image/jpeg");
       formData.append("file", mockFile);
 
-      const request = createFormDataRequest(formData);
+      const request = await createFormDataRequest(formData);
       const response = await PUT(request, mockParams);
       const data = await response.json();
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to upload image");
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
     it("should include imageSource from FormData when provided", async () => {
@@ -518,18 +536,42 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const formData = new FormData();
       const mockFile = createMockFile("image content", "test.png", "image/png");
       formData.append("file", mockFile);
-      formData.append("imageSource", "photographer-credit");
+      formData.append("imageSource", imageProvenanceFixture(uploadUrl, "image content", optimizedBytes));
 
-      const request = createFormDataRequest(formData);
+      const request = await createFormDataRequest(formData);
       const response = await PUT(request, mockParams);
 
       expect(response.status).toBe(200);
       expect(mockUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ image_source: "photographer-credit" })
+        expect.objectContaining({ image_source: imageProvenanceFixture(uploadUrl, "image content", optimizedBytes) })
       );
     });
   });
 
+  describe("reviewed remote bytes", () => {
+    it("rejects a review for another URL before DNS or writes", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      const { mockUpdate } = setupStoryUpdateMock();
+      const response = await PUT(createJsonImageRequest("https://example.com/a.jpg", imageProvenanceFixture("https://example.com/b.jpg")), mockParams);
+      expect(response.status).toBe(400);
+      expect(dns.lookup).not.toHaveBeenCalled();
+      expect(validateImageBuffer).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+    it("rejects changed remote bytes before validation or writes and allows a reviewed retry", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      const { mockUpdate } = setupStoryUpdateMock();
+      const url = "https://example.com/a.jpg";
+      const response = await PUT(createJsonImageRequest(url, imageProvenanceFixture(url, "changed bytes")), mockParams);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("The reviewed photo differs from this URL");
+      expect(dns.lookup).toHaveBeenCalledOnce();
+      expect(validateImageBuffer).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect((await PUT(createJsonImageRequest(url), mockParams)).status).toBe(200);
+      expect(mockUpdate).toHaveBeenCalledOnce();
+    });
+  });
   describe("remote import denial and recovery", () => {
     it.each(["::ffff:7f00:1", "::ffff:93.184.216.34", "10.0.0.5", "fe80::1"])("rejects unsafe DNS answer %s without a write, then accepts a valid retry", async (address) => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
@@ -598,7 +640,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const request = new NextRequest("http://localhost:3000/api/admin/stories/nonexistent/image", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg", imageSource: imageProvenanceFixture("https://example.com/image.jpg") }),
       });
 
       const response = await PUT(request, { params: Promise.resolve({ id: "nonexistent" }) });
@@ -625,7 +667,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg", imageSource: imageProvenanceFixture("https://example.com/image.jpg") }),
       });
 
       const response = await PUT(request, mockParams);
@@ -644,7 +686,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg", imageSource: imageProvenanceFixture("https://example.com/image.jpg") }),
       });
 
       const response = await PUT(request, mockParams);
@@ -665,7 +707,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+      body: JSON.stringify({ imageUrl: "https://example.com/image.jpg", imageSource: imageProvenanceFixture("https://example.com/image.jpg") }),
     });
     const response = await PUT(request, { params: Promise.resolve({ id: "story-123" }) });
     consoleSpy.mockRestore();

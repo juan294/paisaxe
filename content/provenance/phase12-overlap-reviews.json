@@ -1,0 +1,10 @@
+{
+  "reviews": [
+    {
+      "fingerprint": "b008ae85e9f4a6128b653d9b31ee5215e2f94d9f0019e6cb29944b5ce6086b3a",
+      "reviewer": "independent-agent:/root/phase11_review",
+      "reason": "Approved only for sample SHA256 7626b8b0a9cc66bef2d43093556dc5b9b672474202d7811aa05fc9d774c66bb0: candidate-derived two-token phrase de Asturias is a geographic proper-name connective within the licensed structured Province of Asturias label (Wikidata Q24004403 revision2453209754, CC0 structured-facts). The three uses in aviles-es, cangas-onis-es and taramundi-es are independently supported by their P131 facts. This narrowly permits that common-name fingerprint only; it does not approve any descriptive/safety sentence, eight-token overlap, other sample/version, owner sample acceptance or production rights."
+    }
+  ],
+  "sampleSha256": "7626b8b0a9cc66bef2d43093556dc5b9b672474202d7811aa05fc9d774c66bb0"
+}

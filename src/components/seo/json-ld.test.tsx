@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/react";
 import { JsonLd, StoryJsonLd, BreadcrumbJsonLd, FAQJsonLd } from "./json-ld";
 import type { Story } from "@/types/immersive";
+import { NEUTRAL_IMAGE } from "@/lib/image-provenance";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
 
 describe("JsonLd", () => {
   // Ensure env var is cleared for default tests
@@ -233,14 +235,38 @@ describe("StoryJsonLd", () => {
     expect(data.geo.longitude).toBeDefined();
   });
 
-  it("includes image URL in schema", () => {
-    const { container } = render(<StoryJsonLd story={mockNatureStory} />);
+  it("includes an exactly approved synthetic relative image URL in schema", () => {
+    const image = "/images/phase12-synthetic-json-ld.png";
+    const story: Story = { ...mockNatureStory, image, imageSource: imageProvenanceFixture(image, "synthetic original bytes", "synthetic replacement bytes") };
+    const { container } = render(<StoryJsonLd story={story} />);
     const script = container.querySelector(
       'script[type="application/ld+json"]'
     );
     const data = JSON.parse(script!.textContent!);
 
-    expect(data.image).toContain("lagos-covadonga.webp");
+    expect(data.image).toBe("https://paisaxe.es/images/phase12-synthetic-json-ld.png");
+  });
+
+  describe.each(["nature", "food"] as const)("%s image permission boundary", category => {
+    it.each([
+      ["missing proof", undefined],
+      ["legacy credit", "Unreviewed synthetic credit"],
+      ["proof for another asset", imageProvenanceFixture("/images/another-synthetic-asset.png")],
+    ])("uses the neutral asset for %s", (_label, imageSource) => {
+      const story: Story = {
+        ...mockNatureStory, category,
+        image: "/images/phase12-unreviewed-json-ld.png", imageSource,
+      };
+      const { container } = render(<StoryJsonLd story={story} />);
+      const script = container.querySelector('script[type="application/ld+json"]');
+      if (!script?.textContent) throw new Error("Story JSON-LD script is missing");
+      const data = JSON.parse(script.textContent);
+      expect(data.image).toBe(`https://paisaxe.es${NEUTRAL_IMAGE}`);
+      expect(data.name).toBe(story.title);
+      expect(data.description).toBe(story.description);
+      expect(data["@type"]).toBe(category === "food" ? "Restaurant" : "TouristAttraction");
+      expect(script.textContent).not.toContain(story.image);
+    });
   });
 
   it("includes isPartOf reference to Paisaxe", () => {
@@ -322,10 +348,11 @@ describe("StoryJsonLd", () => {
     expect(data.geo.longitude).toBe(-5.85);
   });
 
-  it("uses absolute image URL as-is when it starts with http", () => {
+  it("preserves an exactly approved synthetic HTTPS image URL", () => {
+    const image = "https://cdn.example.com/phase12-synthetic-json-ld.png";
     const storyWithAbsoluteImage: Story = {
-      ...mockNatureStory,
-      image: "https://cdn.example.com/photos/lagos.webp",
+      ...mockNatureStory, image,
+      imageSource: imageProvenanceFixture(image, "synthetic original bytes", "synthetic replacement bytes"),
     };
     const { container } = render(<StoryJsonLd story={storyWithAbsoluteImage} />);
     const script = container.querySelector(
@@ -333,7 +360,7 @@ describe("StoryJsonLd", () => {
     );
     const data = JSON.parse(script!.textContent!);
 
-    expect(data.image).toBe("https://cdn.example.com/photos/lagos.webp");
+    expect(data.image).toBe("https://cdn.example.com/phase12-synthetic-json-ld.png");
   });
 
   it("falls back to story.id in URL when slug is undefined", () => {

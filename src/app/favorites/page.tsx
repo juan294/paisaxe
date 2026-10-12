@@ -4,7 +4,7 @@ import { CacheRetryNotice } from "@/components/cache-retry-notice";
 import { RateLimitNotice } from "@/components/rate-limit-notice";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import Image from "next/image";
+import { PermittedStoryImage } from "@/components/permitted-story-image";
 import Link from "next/link";
 import { useTimedValue } from "@/hooks/use-timed-value";
 import { useFavorites } from "@/hooks/use-favorites";
@@ -320,9 +320,9 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
       )}>
         {isVisible && story.image ? (
           <>
-            <Image
-              src={story.image}
-              alt={localizedStory.title}
+            <PermittedStoryImage
+              image={story.image}
+              imageSource={story.imageSource}
               fill
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               sizes={isFeature

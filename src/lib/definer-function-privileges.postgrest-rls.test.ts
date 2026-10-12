@@ -32,7 +32,7 @@ const PROBE_FN = "zz_definer_privilege_probe";
 describe.skipIf(!dbReachable)(
   "SECURITY DEFINER function privileges (live local Supabase)",
   () => {
-    it("no SECURITY DEFINER function in public is executable by anon or authenticated", () => {
+    it("only the exact read-only corpus selectors are public SECURITY DEFINER exceptions", () => {
       const exposed = psql(
         `select p.oid::regprocedure::text from pg_proc p ` +
           `join pg_namespace n on n.oid = p.pronamespace ` +
@@ -41,7 +41,14 @@ describe.skipIf(!dbReachable)(
           `or has_function_privilege('authenticated', p.oid, 'EXECUTE')) order by 1;`
       );
 
-      expect(exposed).toBe("");
+      expect(exposed.split("\n")).toEqual(["active_corpus_version()", "corpus_related_images(text,text[])", "match_corpus_chunks(vector,text,double precision,integer)"]);
+      for (const signature of exposed.split("\n")) {
+        expect(psql(`SELECT provolatile FROM pg_proc WHERE oid='public.${signature}'::regprocedure;`)).toBe("s");
+        const config: string[] = JSON.parse(psql(`SELECT to_json(proconfig)::text FROM pg_proc WHERE oid='public.${signature}'::regprocedure;`));
+        expect(config.filter(value => value.startsWith("search_path="))).toEqual(['search_path=""']);
+        const definition = psql(`SELECT pg_get_functiondef('public.${signature}'::regprocedure);`);
+        expect(definition).not.toMatch(/\b(?:insert|update|delete|truncate|execute)\b/i);
+      }
     });
 
     it("a new function that follows the repo's REVOKE-FROM-PUBLIC pattern is not left callable by anon or authenticated", () => {

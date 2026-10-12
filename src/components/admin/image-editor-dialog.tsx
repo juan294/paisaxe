@@ -306,13 +306,13 @@ export function ImageEditorDialog({
                 <Input
                   id="image-source"
                   type="text"
-                  placeholder="e.g., Photo by Juan on Unsplash"
+                  placeholder="Reviewed photo record"
                   value={img.imageSource}
                   onChange={(e) => img.setImageSource(e.target.value)}
                   className="h-11 rounded-xl border-none bg-admin-paper text-sm text-admin-ink placeholder:text-admin-subtle focus-visible:ring-1 focus-visible:ring-admin-warning dark:bg-admin-ink dark:text-admin-paper"
                 />
                 <p className="mt-1.5 text-[10px] text-admin-subtle">
-                  Will be displayed below the image in stories
+                  Permission and mobile/desktop crop review are required. A credit alone cannot approve a photo.
                 </p>
               </div>
 

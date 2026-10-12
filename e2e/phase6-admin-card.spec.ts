@@ -1,11 +1,12 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { injectSessionCookies, isValidTestEmail } from "./fixtures/auth";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "../src/lib/image-provenance";
 
 const localRun = process.env.PHASE6_ADMIN_CARD_LOCAL === "1";
 const stories = [
-  { kind: "image", title: process.env.PHASE6_ADMIN_CARD_IMAGE_TITLE ?? "", overlays: 4 },
-  { kind: "no image", title: process.env.PHASE6_ADMIN_CARD_NO_IMAGE_TITLE ?? "", overlays: 1 },
+  { kind: "unknown image request becomes neutral", title: process.env.PHASE6_ADMIN_CARD_IMAGE_TITLE ?? "", overlays: 4 },
+  { kind: "missing image request becomes neutral", title: process.env.PHASE6_ADMIN_CARD_NO_IMAGE_TITLE ?? "", overlays: 4 },
 ];
 
 // The dedicated local run uses real Auth/admin APIs. Ordinary mock-oriented
@@ -39,18 +40,41 @@ test.beforeEach(async ({ page, baseURL }) => {
   expect(error).toBeNull();
   if (!data.session) throw new Error("Owned local admin fixture did not return a session");
 
+  // The migration intentionally replaces both unreviewed and missing images.
+  // Observe the real persisted row, independently of the admin API/UI mapper.
+  for (const story of stories) {
+    const persisted = await supabase.from("stories")
+      .select("id,title,image_path,image_source,metadata").eq("title", story.title).single();
+    expect(persisted.error).toBeNull();
+    expect(persisted.data).toMatchObject({
+      title: story.title, image_path: NEUTRAL_IMAGE, image_source: NEUTRAL_CREDIT,
+      metadata: { issues_phase12_fixture: marker.split(":")[1] },
+    });
+  }
+
   await page.goto("/admin");
   const storageKey = `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token`;
   await injectSessionCookies(page, storageKey, data.session);
   await page.goto("/admin?tab=stories");
   await expect(page.getByPlaceholder("Search stories...")).toBeVisible();
   await page.getByRole("button", { name: "Filter: show all stories", exact: true }).click();
+  const response = await page.request.get("/api/admin/stories?pageSize=100");
+  expect(response.status()).toBe(200);
+  const payload: { data: { stories: { title: string; image: string; imageSource?: string }[] } } = await response.json();
+  for (const story of stories) {
+    expect(payload.data.stories.filter(row => row.title === story.title)).toEqual([
+      expect.objectContaining({ title: story.title, image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT }),
+    ]);
+  }
 });
 
 async function findCard(page: Page, title: string): Promise<Locator> {
   await page.getByPlaceholder("Search stories...").fill(title);
   const card = page.getByRole("button").filter({ has: page.getByText(title, { exact: true }) });
   await expect(card).toHaveCount(1);
+  const image = card.getByRole("img", { name: title, exact: true });
+  await expect(image).toHaveAttribute("src", NEUTRAL_IMAGE);
+  await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
   return card;
 }
 

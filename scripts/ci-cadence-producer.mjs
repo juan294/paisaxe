@@ -34,6 +34,7 @@ export const ENVIRONMENT_GATED = Object.freeze([
   { file: 'src/lib/feature-flag-consumers.postgrest-integration.test.ts', describe: 'Public feature-flag consumers with real local database', cases: 4 },
   { file: 'src/lib/feature-flag-realtime.postgrest-integration.test.ts', describe: 'Public realtime column privileges (actual local websocket)', cases: 1 },
   { file: 'src/lib/pg-net.postgrest-integration.test.ts', describe: 'Installed pg_net JSONB transport and transaction boundary', cases: 10 },
+  { file: 'src/lib/corpus.postgrest-integration.test.ts', describe: 'Authored corpus version and permission boundaries (real PostgREST)', cases: 29 },
 ].map(Object.freeze));
 
 /** The runner supplies paths to its actual exit receipt and fresh native JSON.

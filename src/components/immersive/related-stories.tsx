@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, memo } from "react";
-import Image from "next/image";
+import { PermittedStoryImage } from "@/components/permitted-story-image";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import type { Story } from "@/types/immersive";
 
-// Dark placeholder for images (prevents flash of white and CLS)
-const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
 
 interface RelatedStoriesProps {
   stories: Story[];
@@ -71,14 +69,15 @@ export const RelatedStories = memo(function RelatedStories({
             {/* Background Image */}
             <div className="absolute inset-0">
               {story.image ? (
-                <Image
-                  src={story.image}
-                  alt={story.title}
+                <PermittedStoryImage
+                  image={story.image}
+                  imageSource={story.imageSource}
+                  linkCredit={false}
+                  blurDataUrl={story.blurDataUrl}
                   fill
                   className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
                   sizes="(max-width: 768px) 50vw, 33vw"
                   placeholder="blur"
-                  blurDataURL={story.blurDataUrl || darkPlaceholder}
                 />
               ) : null}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />

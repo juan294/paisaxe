@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { parseImageProvenance } from "@/lib/image-provenance";
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { fetchRemoteImage, RemoteImageError } from "@/lib/remote-image";
@@ -50,6 +52,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           );
         }
 
+        const provenance = parseImageProvenance(imageSource);
+        if (!provenance) return NextResponse.json({ error: "Photo permission and crop review is required before upload" }, { status: 400 });
+
         // Validate file type
         const allowedTypes = [
           "image/jpeg",
@@ -77,6 +82,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         const arrayBuffer = await file.arrayBuffer();
         const inputBuffer = Buffer.from(arrayBuffer);
 
+        if (createHash("sha256").update(inputBuffer).digest("hex") !== provenance.originalSha256) return NextResponse.json({ error: "The reviewed original photo differs from this file" }, { status: 400 });
+
         // Validate image data
         const validation = await validateImageBuffer(inputBuffer);
         if (!validation.valid) {
@@ -93,7 +100,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         blurDataUrl = generatedBlur;
 
         // Generate unique filename with .avif extension
-        const filename = `${id}-${Date.now()}.avif`;
+        const replacementHash = createHash("sha256").update(optimizedBuffer).digest("hex");
+        if (replacementHash !== provenance.replacementSha256) return NextResponse.json({ error: "Review the optimized photo before upload" }, { status: 400 });
+        const filename = `${id}-${replacementHash}.avif`;
+        const plannedUrl = supabase.storage.from("story-images").getPublicUrl(filename).data.publicUrl;
+        if (provenance.assetUrl !== plannedUrl) return NextResponse.json({ error: "The photo review is for another asset" }, { status: 400 });
 
         // Upload optimized image to Supabase Storage
         const { error: uploadError } = await supabase.storage
@@ -142,8 +153,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           );
         }
 
+        const provenance = parseImageProvenance(bodyImageSource);
+        if (!provenance || provenance.assetUrl !== imageUrl) return NextResponse.json({ error: "Photo permission and crop review is required for this image" }, { status: 400 });
         try {
           const imageBuffer = await fetchRemoteImage(parsedUrl);
+          if (createHash("sha256").update(imageBuffer).digest("hex") !== provenance.replacementSha256) return NextResponse.json({ error: "The reviewed photo differs from this URL" }, { status: 400 });
           const validation = await validateImageBuffer(imageBuffer);
           if (!validation.valid) {
             return NextResponse.json(
@@ -168,19 +182,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       // Update story in database
       const updateData: {
         image_path: string;
-        image_source?: string;
-        blur_data_url?: string;
+        image_source: string;
+        blur_data_url: string | null;
       } = {
         image_path: imagePath,
+        image_source: imageSource ?? "",
+        blur_data_url: blurDataUrl,
       };
-
-      if (imageSource !== null) {
-        updateData.image_source = imageSource;
-      }
-
-      if (blurDataUrl !== null) {
-        updateData.blur_data_url = blurDataUrl;
-      }
 
       const { data, error } = await supabase
         .from("stories")
@@ -207,7 +215,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({
         data: {
           id: data.id,
-          image: imagePath,
+          image: data.image_path,
           imageSource: data.image_source || undefined,
           blurDataUrl: blurDataUrl || undefined,
         },

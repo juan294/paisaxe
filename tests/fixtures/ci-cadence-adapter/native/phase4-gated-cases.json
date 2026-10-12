@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "source": "Phase 4 declared source census. Phase 3 unchanged groups retain their prior provenance. New lifecycle group and expanded service-only matrix require exact-candidate full contract qualification; this inventory is not a hosted recording or a full-run receipt.",
-  "declaredContractCases": 1002,
-  "ordinaryEnvironmentGatedCases": 1003,
+  "source": "Phase 12 declared source census extends the prior Phase 4 census with 29 authored-corpus permission/version cases. Historical recordings remain unchanged. Exact-candidate full contract qualification is required; this inventory is not a hosted recording or full-run receipt.",
+  "declaredContractCases": 1031,
+  "ordinaryEnvironmentGatedCases": 1032,
   "groups": [
     {
       "file": "scripts/booking/create-operator-link.test.ts",
@@ -113,6 +113,11 @@
       "file": "src/lib/pg-net.postgrest-integration.test.ts",
       "describe": "Installed pg_net JSONB transport and transaction boundary",
       "cases": 10
+    },
+    {
+      "file": "src/lib/corpus.postgrest-integration.test.ts",
+      "describe": "Authored corpus version and permission boundaries (real PostgREST)",
+      "cases": 29
     }
   ]
 }

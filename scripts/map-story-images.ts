@@ -1,3 +1,4 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
 /**
  * Script to map stories to extracted PDF images
  *
@@ -218,4 +219,4 @@ async function main() {
   console.log(`No suitable images found: ${noImagesFound}`);
 }
 
-main().catch(console.error);
+rejectLegacyContentOperation("map-story-images.ts", main);

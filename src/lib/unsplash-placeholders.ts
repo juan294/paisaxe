@@ -1,3 +1,4 @@
+import { NEUTRAL_IMAGE, NEUTRAL_CREDIT } from "./image-provenance";
 import type { StoryCategory } from "@/types/immersive";
 
 export const PLACEHOLDER_PREFIX = "unsplash-placeholder:";
@@ -71,15 +72,6 @@ export const UNSPLASH_POOLS: Record<StoryCategory, UnsplashImage[]> = {
  * Simple string hash for deterministic assignment.
  * Produces a non-negative integer from a string.
  */
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0; // Convert to 32-bit integer
-  }
-  return Math.abs(hash);
-}
 
 /**
  * Check whether a story's image is a placeholder.
@@ -126,18 +118,8 @@ export function needsPlaceholderImage(story: { image?: string; imageSource?: str
  * same image so cards look stable across reloads.
  */
 export function getPlaceholderForStory(
-  slug: string,
-  category: StoryCategory
+  _slug: string,
+  _category: StoryCategory
 ): { image: string; imageSource: string } {
-  const pool = UNSPLASH_POOLS[category];
-  const index = hashString(slug) % pool.length;
-  const chosen = pool[index];
-  if (chosen === undefined) {
-    throw new Error(`Missing placeholder image for category ${category}`);
-  }
-
-  return {
-    image: chosen.url,
-    imageSource: `${PLACEHOLDER_PREFIX}Photo by ${chosen.author} on Unsplash`,
-  };
+  return { image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT };
 }

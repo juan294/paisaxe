@@ -1,6 +1,6 @@
 # Phase 12: Content and image provenance
 
-Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #986, #987. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: planned, not implemented. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
+Parent: [backlog plan](../2026-10-07-github-issues-remediation.md). Owned issues: #986, #987. Baseline: develop `fe1843713a49277bc66460e4ae7470025d01e1c6`; revalidate at entry. Status: local implementation in progress from accepted Phase 11 `24a9dc7b47b99724f265d9a87e42526102d165c7`; 20-chunk owner sample and 40-question evaluation set with rubric accepted on 2026-10-11; 77 of 195 subjects have some reviewed factual basis after the 2026-10-12 official-source continuation, with 118 still uncovered; full writing, quality/photo and external serving gates remain pending. Apply the parent's local-only authority, TDD/review/simplify loop, sequential verification, coverage ratchets and acceptance boundary in full.
 
 ## Scope and source evidence
 

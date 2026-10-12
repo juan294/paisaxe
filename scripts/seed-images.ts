@@ -1,3 +1,4 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
 /**
  * Seed images from extracted PDFs into Supabase Storage and the images table.
  *
@@ -437,5 +438,5 @@ const isDirectExecution = process.argv[1]?.endsWith("seed-images.ts") ||
   process.argv[1]?.includes("seed-images");
 
 if (isDirectExecution && !process.env.VITEST) {
-  main().catch(console.error);
+  rejectLegacyContentOperation("seed-images.ts", main);
 }

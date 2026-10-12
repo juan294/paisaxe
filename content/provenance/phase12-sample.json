@@ -1,0 +1,1134 @@
+{
+  "schemaVersion": 1,
+  "status": "OWNER_REVIEW_PENDING",
+  "scope": "20 review-only chunks: 10 existing subjects, each in Spanish and English; not a full corpus",
+  "sources": [
+    {
+      "id": "wikidata:Q12273",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q12273",
+      "revision": "2553527527",
+      "retrievedAt": "2026-10-11T13:43:44.077206+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q12273",
+      "refreshAfter": "2027-04-09T13:43:44.077206+00:00",
+      "namespace": "main",
+      "evidenceSha256": "df81b0a908f1417314bd97191bd525da800c8a76d274b763b3fc8895c7a78b86"
+    },
+    {
+      "id": "wikidata:Q14317",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q14317",
+      "revision": "2555283246",
+      "retrievedAt": "2026-10-11T13:46:32.163252+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q14317",
+      "refreshAfter": "2027-04-09T13:46:32.163252+00:00",
+      "namespace": "main",
+      "evidenceSha256": "e234c5be3f24541b162c3343d441980d2edbbb93017e3cf78a1a9b8ba6a308ef"
+    },
+    {
+      "id": "wikidata:Q14649",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q14649",
+      "revision": "2555887890",
+      "retrievedAt": "2026-10-11T13:43:45.360457+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q14649",
+      "refreshAfter": "2027-04-09T13:43:45.360457+00:00",
+      "namespace": "main",
+      "evidenceSha256": "dc20e438a4e7ae0448c139fac5095029a4e25c431ddc60ce54932bd8c3e09672"
+    },
+    {
+      "id": "wikidata:Q1534288",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q1534288",
+      "revision": "2509576267",
+      "retrievedAt": "2026-10-11T13:43:41.906357+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q1534288",
+      "refreshAfter": "2027-04-09T13:43:41.906357+00:00",
+      "namespace": "main",
+      "evidenceSha256": "6b6961ee013a5a2be6d287a4f80014ca053c7887ef31a5c67481ab40c4b93d64"
+    },
+    {
+      "id": "wikidata:Q16565898",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q16565898",
+      "revision": "2553713666",
+      "retrievedAt": "2026-10-11T13:44:49.491144+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q16565898",
+      "refreshAfter": "2027-04-09T13:44:49.491144+00:00",
+      "namespace": "main",
+      "evidenceSha256": "7e285477f0f94514882d8536c8c47b2d069b9625220d766e95e1a89a9ecbcc2d"
+    },
+    {
+      "id": "wikidata:Q2090594",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q2090594",
+      "revision": "2552899608",
+      "retrievedAt": "2026-10-11T13:44:38.839456+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q2090594",
+      "refreshAfter": "2027-04-09T13:44:38.839456+00:00",
+      "namespace": "main",
+      "evidenceSha256": "74f8c895aa5c28d18afcd78256bdffb593a18812eb79370947b91dcd4ad64beb"
+    },
+    {
+      "id": "wikidata:Q225515",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q225515",
+      "revision": "2545340898",
+      "retrievedAt": "2026-10-11T13:43:47.730300+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q225515",
+      "refreshAfter": "2027-04-09T13:43:47.730300+00:00",
+      "namespace": "main",
+      "evidenceSha256": "6fdf6178c91e4a0ad0f31e2c6ccd955336bd40ee86e54125e2e725b5869d7895"
+    },
+    {
+      "id": "wikidata:Q23712",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q23712",
+      "revision": "2551825290",
+      "retrievedAt": "2026-10-11T13:44:45.864635+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q23712",
+      "refreshAfter": "2027-04-09T13:44:45.864635+00:00",
+      "namespace": "main",
+      "evidenceSha256": "d9404b13d02f370dcf1dbe8f7b8861849f80ff082a2a574e572b4b719ebf3292"
+    },
+    {
+      "id": "wikidata:Q24004403",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q24004403",
+      "revision": "2453209754",
+      "retrievedAt": "2026-10-11T13:44:37.597292+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q24004403",
+      "refreshAfter": "2027-04-09T13:44:37.597292+00:00",
+      "namespace": "main",
+      "evidenceSha256": "7c5bf2c073c49c0cfa1891c46d21022b1b58b0b0683a4c059f0c283cf305acbc"
+    },
+    {
+      "id": "wikidata:Q2477016",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q2477016",
+      "revision": "2535277975",
+      "retrievedAt": "2026-10-11T13:43:40.643770+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q2477016",
+      "refreshAfter": "2027-04-09T13:43:40.643770+00:00",
+      "namespace": "main",
+      "evidenceSha256": "cd1f4678ccf17fdafd9eb007f4f1c11aa62ffbabeb9c3163d409568c81d14aa3"
+    },
+    {
+      "id": "wikidata:Q29",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q29",
+      "revision": "2555283528",
+      "retrievedAt": "2026-10-11T13:44:35.633937+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q29",
+      "refreshAfter": "2027-04-09T13:44:35.633937+00:00",
+      "namespace": "main",
+      "evidenceSha256": "64492cefdf42da3e54c87bcd8e61129155894e9827d8a9c588d51c4b9b8c40e7"
+    },
+    {
+      "id": "wikidata:Q40080",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q40080",
+      "revision": "2547766806",
+      "retrievedAt": "2026-10-11T13:44:42.633127+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q40080",
+      "refreshAfter": "2027-04-09T13:44:42.633127+00:00",
+      "namespace": "main",
+      "evidenceSha256": "b608fe1951d1b684328c822ae59d50e381e0fe7feec79ea51d81bfe5b107002b"
+    },
+    {
+      "id": "wikidata:Q503094",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q503094",
+      "revision": "2555286508",
+      "retrievedAt": "2026-10-11T13:43:46.649720+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q503094",
+      "refreshAfter": "2027-04-09T13:43:46.649720+00:00",
+      "namespace": "main",
+      "evidenceSha256": "568d33ab927f4f7ce6f7bfcf679ff9d41e868397b3be30069bd6305b064c1826"
+    },
+    {
+      "id": "wikidata:Q5055981",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q5055981",
+      "revision": "2529962005",
+      "retrievedAt": "2026-10-11T13:44:36.668583+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q5055981",
+      "refreshAfter": "2027-04-09T13:44:36.668583+00:00",
+      "namespace": "main",
+      "evidenceSha256": "c31fdb875c1b5d9a183c98816a18066156c2f93a90902a840b3d9636da70ca63"
+    },
+    {
+      "id": "wikidata:Q56242215",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q56242215",
+      "revision": "2548329152",
+      "retrievedAt": "2026-10-11T13:44:43.511655+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q56242215",
+      "refreshAfter": "2027-04-09T13:44:43.511655+00:00",
+      "namespace": "main",
+      "evidenceSha256": "9b52e7d8891265ce6eaf6b59a67ee2c1557c268e51899c7e342722aa8054046c"
+    },
+    {
+      "id": "wikidata:Q5926864",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q5926864",
+      "revision": "2553371374",
+      "retrievedAt": "2026-10-11T13:44:41.182351+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q5926864",
+      "refreshAfter": "2027-04-09T13:44:41.182351+00:00",
+      "namespace": "main",
+      "evidenceSha256": "d4e7b394facea43b1cd6c9aeb1a9e66d1fd44ebd00afa6a47306788d74daba56"
+    },
+    {
+      "id": "wikidata:Q6078521",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q6078521",
+      "revision": "2159370916",
+      "retrievedAt": "2026-10-11T13:43:42.732121+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q6078521",
+      "refreshAfter": "2027-04-09T13:43:42.732121+00:00",
+      "namespace": "main",
+      "evidenceSha256": "dc705e5a2d4360175bfe6e19ccee177e250c1d42a9bce3288092fb94ffefaafa"
+    },
+    {
+      "id": "wikidata:Q746549",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q746549",
+      "revision": "2532267038",
+      "retrievedAt": "2026-10-11T13:44:46.892890+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q746549",
+      "refreshAfter": "2027-04-09T13:44:46.892890+00:00",
+      "namespace": "main",
+      "evidenceSha256": "f459ca803e965a95cae73077af2c4a0e052255f77be2b8edfa3f774d512f3702"
+    },
+    {
+      "id": "wikidata:Q818372",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q818372",
+      "revision": "2550275293",
+      "retrievedAt": "2026-10-11T13:43:49.035111+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q818372",
+      "refreshAfter": "2027-04-09T13:43:49.035111+00:00",
+      "namespace": "main",
+      "evidenceSha256": "b4308d5966ab45b8a1c079ab063359b7a31557bebf56a09fb62d8ba27207fc88"
+    },
+    {
+      "id": "wikidata:Q842685",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q842685",
+      "revision": "2553603004",
+      "retrievedAt": "2026-10-11T13:43:50.261695+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q842685",
+      "refreshAfter": "2027-04-09T13:43:50.261695+00:00",
+      "namespace": "main",
+      "evidenceSha256": "ccdd3a38ace349f2da48830f7907f79f3bc830e11e6369b42b79d4cb35e87ea6"
+    },
+    {
+      "id": "wikidata:Q995376",
+      "canonicalUrl": "https://www.wikidata.org/wiki/Q995376",
+      "revision": "2518234871",
+      "retrievedAt": "2026-10-11T13:43:18.743466+00:00",
+      "license": "CC0-1.0",
+      "allowedUse": "structured-facts",
+      "attribution": "Wikidata contributors, Q995376",
+      "refreshAfter": "2027-04-09T13:43:18.743466+00:00",
+      "namespace": "main",
+      "evidenceSha256": "17c3e49ffddc6755083c7079c5aba2b87e80954db468d69c1b280e57722922f8"
+    }
+  ],
+  "facts": [
+    {
+      "id": "Q2477016-P31-Q5926864",
+      "sourceId": "wikidata:Q2477016",
+      "property": "P31",
+      "value": {
+        "entityId": "Q5926864",
+        "labels": {
+          "en": "group of lakes",
+          "es": "grupo de lagos"
+        },
+        "labelSourceId": "wikidata:Q5926864"
+      },
+      "statementId": "Q2477016$76d7f4f7-4c2e-5acd-c34c-c1487b92fbb7"
+    },
+    {
+      "id": "Q2477016-P131-Q225515",
+      "sourceId": "wikidata:Q2477016",
+      "property": "P131",
+      "value": {
+        "entityId": "Q225515",
+        "labels": {
+          "en": "Cangues d'Onís",
+          "es": "Cangas de Onís"
+        },
+        "labelSourceId": "wikidata:Q225515"
+      },
+      "statementId": "Q2477016$0d0956d4-4006-e162-1194-4750f7b6ca30"
+    },
+    {
+      "id": "Q2477016-P17-Q29",
+      "sourceId": "wikidata:Q2477016",
+      "property": "P17",
+      "value": {
+        "entityId": "Q29",
+        "labels": {
+          "es": "España",
+          "en": "Spain"
+        },
+        "labelSourceId": "wikidata:Q29"
+      },
+      "statementId": "q2477016$7C5DAC26-ABD0-461A-B711-DCAB6B58651E"
+    },
+    {
+      "id": "Q1534288-P31-Q56242215",
+      "sourceId": "wikidata:Q1534288",
+      "property": "P31",
+      "value": {
+        "entityId": "Q56242215",
+        "labels": {
+          "es": "catedral católica",
+          "en": "Catholic cathedral"
+        },
+        "labelSourceId": "wikidata:Q56242215"
+      },
+      "statementId": "Q1534288$6bc18a2c-41ae-e6a7-4b54-24b4dd8a1676"
+    },
+    {
+      "id": "Q1534288-P131-Q14317",
+      "sourceId": "wikidata:Q1534288",
+      "property": "P131",
+      "value": {
+        "entityId": "Q14317",
+        "labels": {
+          "es": "Oviedo",
+          "en": "Oviedo"
+        },
+        "labelSourceId": "wikidata:Q14317"
+      },
+      "statementId": "Q1534288$FA184AB4-7C9D-4FB2-B79C-B9C5B29CE887"
+    },
+    {
+      "id": "Q1534288-P1435-Q23712",
+      "sourceId": "wikidata:Q1534288",
+      "property": "P1435",
+      "value": {
+        "entityId": "Q23712",
+        "labels": {
+          "es": "bien de interés cultural",
+          "en": "bien de interés cultural"
+        },
+        "labelSourceId": "wikidata:Q23712",
+        "qualifiers": {
+          "P580": [
+            {
+              "snaktype": "value",
+              "property": "P580",
+              "hash": "c7b7c9fdb309ed3b710cae93bbdc82721d76a487",
+              "datavalue": {
+                "value": {
+                  "time": "+1931-06-03T00:00:00Z",
+                  "timezone": 0,
+                  "before": 0,
+                  "after": 0,
+                  "precision": 11,
+                  "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+                },
+                "type": "time"
+              },
+              "datatype": "time"
+            }
+          ]
+        }
+      },
+      "statementId": "Q1534288$0825A73C-813F-45EE-BB96-97D2BF64787E"
+    },
+    {
+      "id": "Q995376-P31-Q746549",
+      "sourceId": "wikidata:Q995376",
+      "property": "P31",
+      "value": {
+        "entityId": "Q746549",
+        "labels": {
+          "en": "dish",
+          "es": "plato"
+        },
+        "labelSourceId": "wikidata:Q746549"
+      },
+      "statementId": "Q995376$8F085CFD-8CF8-4C01-881B-43E7492F72CD"
+    },
+    {
+      "id": "Q995376-P495-Q29",
+      "sourceId": "wikidata:Q995376",
+      "property": "P495",
+      "value": {
+        "entityId": "Q29",
+        "labels": {
+          "es": "España",
+          "en": "Spain"
+        },
+        "labelSourceId": "wikidata:Q29"
+      },
+      "statementId": "Q995376$6B4A8217-3ECA-44C0-989B-72879A73ECE5"
+    },
+    {
+      "id": "Q995376-P527-Q16565898",
+      "sourceId": "wikidata:Q995376",
+      "property": "P527",
+      "value": {
+        "entityId": "Q16565898",
+        "labels": {
+          "es": "Faba asturiana",
+          "en": "Faba asturiana"
+        },
+        "labelSourceId": "wikidata:Q16565898"
+      },
+      "statementId": "Q995376$EA92159E-B7AA-44E9-9900-48C21883E763"
+    },
+    {
+      "id": "Q6078521-P31-Q40080",
+      "sourceId": "wikidata:Q6078521",
+      "property": "P31",
+      "value": {
+        "entityId": "Q40080",
+        "labels": {
+          "es": "playa",
+          "en": "beach"
+        },
+        "labelSourceId": "wikidata:Q40080"
+      },
+      "statementId": "Q6078521$D67DF273-5BA3-41D9-A84B-1936807D3D32"
+    },
+    {
+      "id": "Q6078521-P131-Q818372",
+      "sourceId": "wikidata:Q6078521",
+      "property": "P131",
+      "value": {
+        "entityId": "Q818372",
+        "labels": {
+          "es": "Cudillero",
+          "en": "Cudillero"
+        },
+        "labelSourceId": "wikidata:Q818372"
+      },
+      "statementId": "Q6078521$1e5df0ad-4aac-5063-7098-0bac685b2e9e"
+    },
+    {
+      "id": "Q6078521-P17-Q29",
+      "sourceId": "wikidata:Q6078521",
+      "property": "P17",
+      "value": {
+        "entityId": "Q29",
+        "labels": {
+          "es": "España",
+          "en": "Spain"
+        },
+        "labelSourceId": "wikidata:Q29"
+      },
+      "statementId": "Q6078521$33098423-79D1-4A69-9B69-6A0E48A66637"
+    },
+    {
+      "id": "Q12273-P31-Q5055981",
+      "sourceId": "wikidata:Q12273",
+      "property": "P31",
+      "value": {
+        "entityId": "Q5055981",
+        "labels": {
+          "es": "Concejo (Asturias)",
+          "en": "council of Asturies"
+        },
+        "labelSourceId": "wikidata:Q5055981"
+      },
+      "statementId": "q12273$d79d7c52-4ed3-d30f-033b-d7608e20b1e4"
+    },
+    {
+      "id": "Q12273-P17-Q29",
+      "sourceId": "wikidata:Q12273",
+      "property": "P17",
+      "value": {
+        "entityId": "Q29",
+        "labels": {
+          "es": "España",
+          "en": "Spain"
+        },
+        "labelSourceId": "wikidata:Q29"
+      },
+      "statementId": "q12273$861E9671-1BC6-45C5-B7D5-32B8C3FE2E1F"
+    },
+    {
+      "id": "Q12273-P206-Q2090594",
+      "sourceId": "wikidata:Q12273",
+      "property": "P206",
+      "value": {
+        "entityId": "Q2090594",
+        "labels": {
+          "es": "mar Cantábrico",
+          "en": "Cantabrian Sea"
+        },
+        "labelSourceId": "wikidata:Q2090594"
+      },
+      "statementId": "Q12273$ea37139c-4846-670e-da95-8aabe8ac4357"
+    },
+    {
+      "id": "Q14649-P31-Q5055981",
+      "sourceId": "wikidata:Q14649",
+      "property": "P31",
+      "value": {
+        "entityId": "Q5055981",
+        "labels": {
+          "es": "Concejo (Asturias)",
+          "en": "council of Asturies"
+        },
+        "labelSourceId": "wikidata:Q5055981"
+      },
+      "statementId": "q14649$3BC075B2-2C43-443D-8F9B-F282F1C9971E"
+    },
+    {
+      "id": "Q14649-P131-Q24004403",
+      "sourceId": "wikidata:Q14649",
+      "property": "P131",
+      "value": {
+        "entityId": "Q24004403",
+        "labels": {
+          "en": "Province of Asturias",
+          "es": "provincia de Asturias"
+        },
+        "labelSourceId": "wikidata:Q24004403"
+      },
+      "statementId": "q14649$C5F9F45C-76E7-4851-BEF1-D8B9E8E69A74"
+    },
+    {
+      "id": "Q14649-P206-Q2090594",
+      "sourceId": "wikidata:Q14649",
+      "property": "P206",
+      "value": {
+        "entityId": "Q2090594",
+        "labels": {
+          "es": "mar Cantábrico",
+          "en": "Cantabrian Sea"
+        },
+        "labelSourceId": "wikidata:Q2090594"
+      },
+      "statementId": "Q14649$75f76fcb-46e7-9d60-603c-7a63ce25ee73"
+    },
+    {
+      "id": "Q503094-P31-Q5055981",
+      "sourceId": "wikidata:Q503094",
+      "property": "P31",
+      "value": {
+        "entityId": "Q5055981",
+        "labels": {
+          "es": "Concejo (Asturias)",
+          "en": "council of Asturies"
+        },
+        "labelSourceId": "wikidata:Q5055981"
+      },
+      "statementId": "Q503094$8327D41F-1B3F-4B06-ABD2-354C543FBD60"
+    },
+    {
+      "id": "Q503094-P17-Q29",
+      "sourceId": "wikidata:Q503094",
+      "property": "P17",
+      "value": {
+        "entityId": "Q29",
+        "labels": {
+          "es": "España",
+          "en": "Spain"
+        },
+        "labelSourceId": "wikidata:Q29"
+      },
+      "statementId": "q503094$F10E8403-A6ED-4AF8-9D50-CE35C04DFA68"
+    },
+    {
+      "id": "Q503094-P206-Q2090594",
+      "sourceId": "wikidata:Q503094",
+      "property": "P206",
+      "value": {
+        "entityId": "Q2090594",
+        "labels": {
+          "es": "mar Cantábrico",
+          "en": "Cantabrian Sea"
+        },
+        "labelSourceId": "wikidata:Q2090594"
+      },
+      "statementId": "Q503094$297406eb-446a-d86c-016d-f38572329d60"
+    },
+    {
+      "id": "Q225515-P31-Q5055981",
+      "sourceId": "wikidata:Q225515",
+      "property": "P31",
+      "value": {
+        "entityId": "Q5055981",
+        "labels": {
+          "es": "Concejo (Asturias)",
+          "en": "council of Asturies"
+        },
+        "labelSourceId": "wikidata:Q5055981"
+      },
+      "statementId": "Q225515$14605C42-EFBC-4D84-9D30-43F62D93230F"
+    },
+    {
+      "id": "Q225515-P131-Q24004403",
+      "sourceId": "wikidata:Q225515",
+      "property": "P131",
+      "value": {
+        "entityId": "Q24004403",
+        "labels": {
+          "en": "Province of Asturias",
+          "es": "provincia de Asturias"
+        },
+        "labelSourceId": "wikidata:Q24004403"
+      },
+      "statementId": "Q225515$0A3D081F-5FE5-440B-BEC9-18E7E4A30943"
+    },
+    {
+      "id": "Q225515-P17-Q29",
+      "sourceId": "wikidata:Q225515",
+      "property": "P17",
+      "value": {
+        "entityId": "Q29",
+        "labels": {
+          "es": "España",
+          "en": "Spain"
+        },
+        "labelSourceId": "wikidata:Q29"
+      },
+      "statementId": "q225515$44C2B3F0-42CB-402C-A23B-C26EE6F363F0"
+    },
+    {
+      "id": "Q818372-P31-Q5055981",
+      "sourceId": "wikidata:Q818372",
+      "property": "P31",
+      "value": {
+        "entityId": "Q5055981",
+        "labels": {
+          "es": "Concejo (Asturias)",
+          "en": "council of Asturies"
+        },
+        "labelSourceId": "wikidata:Q5055981"
+      },
+      "statementId": "Q818372$86B25BE1-B0BE-4E20-BE10-98C6E7660810"
+    },
+    {
+      "id": "Q818372-P17-Q29",
+      "sourceId": "wikidata:Q818372",
+      "property": "P17",
+      "value": {
+        "entityId": "Q29",
+        "labels": {
+          "es": "España",
+          "en": "Spain"
+        },
+        "labelSourceId": "wikidata:Q29"
+      },
+      "statementId": "q818372$0B9B35EE-BCB4-4F87-B5E4-909BBEBFA094"
+    },
+    {
+      "id": "Q818372-P206-Q2090594",
+      "sourceId": "wikidata:Q818372",
+      "property": "P206",
+      "value": {
+        "entityId": "Q2090594",
+        "labels": {
+          "es": "mar Cantábrico",
+          "en": "Cantabrian Sea"
+        },
+        "labelSourceId": "wikidata:Q2090594"
+      },
+      "statementId": "Q818372$0754639d-488c-86ef-9e96-2c859587876e"
+    },
+    {
+      "id": "Q842685-P31-Q5055981",
+      "sourceId": "wikidata:Q842685",
+      "property": "P31",
+      "value": {
+        "entityId": "Q5055981",
+        "labels": {
+          "es": "Concejo (Asturias)",
+          "en": "council of Asturies"
+        },
+        "labelSourceId": "wikidata:Q5055981"
+      },
+      "statementId": "Q842685$9ACE0516-9A99-4B95-AF39-37362EFC8F39"
+    },
+    {
+      "id": "Q842685-P131-Q24004403",
+      "sourceId": "wikidata:Q842685",
+      "property": "P131",
+      "value": {
+        "entityId": "Q24004403",
+        "labels": {
+          "en": "Province of Asturias",
+          "es": "provincia de Asturias"
+        },
+        "labelSourceId": "wikidata:Q24004403"
+      },
+      "statementId": "Q842685$CFFEE681-F3B3-4E0D-91F4-B7AC9E3F784C"
+    },
+    {
+      "id": "Q842685-P17-Q29",
+      "sourceId": "wikidata:Q842685",
+      "property": "P17",
+      "value": {
+        "entityId": "Q29",
+        "labels": {
+          "es": "España",
+          "en": "Spain"
+        },
+        "labelSourceId": "wikidata:Q29"
+      },
+      "statementId": "q842685$B5BDE073-8C9A-4D6E-8968-D427BB4F21C4"
+    }
+  ],
+  "chunks": [
+    {
+      "id": "phase12-sample-lagos-covadonga-es",
+      "documentId": "phase12-sample-lagos-covadonga",
+      "language": "es",
+      "region": "eastern",
+      "topic": "interior",
+      "season": "all",
+      "content": "Los Lagos de Covadonga forman un grupo de lagos. Se encuentran en Cangas de Onís, en España.",
+      "factIds": [
+        "Q2477016-P31-Q5926864",
+        "Q2477016-P131-Q225515",
+        "Q2477016-P17-Q29"
+      ],
+      "sourceIds": [
+        "wikidata:Q225515",
+        "wikidata:Q2477016",
+        "wikidata:Q29",
+        "wikidata:Q5926864"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-lagos-covadonga-en",
+      "documentId": "phase12-sample-lagos-covadonga",
+      "language": "en",
+      "region": "eastern",
+      "topic": "interior",
+      "season": "all",
+      "content": "Lagos de Covadonga form a group of lakes. They are in Cangas de Onís, in Spain.",
+      "factIds": [
+        "Q2477016-P31-Q5926864",
+        "Q2477016-P131-Q225515",
+        "Q2477016-P17-Q29"
+      ],
+      "sourceIds": [
+        "wikidata:Q225515",
+        "wikidata:Q2477016",
+        "wikidata:Q29",
+        "wikidata:Q5926864"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-oviedo-catedral-es",
+      "documentId": "phase12-sample-oviedo-catedral",
+      "language": "es",
+      "region": "central",
+      "topic": "heritage",
+      "season": "all",
+      "content": "La Catedral de San Salvador está en Oviedo. Es una catedral católica y su categoría patrimonial registrada es bien de interés cultural.",
+      "factIds": [
+        "Q1534288-P31-Q56242215",
+        "Q1534288-P131-Q14317",
+        "Q1534288-P1435-Q23712"
+      ],
+      "sourceIds": [
+        "wikidata:Q14317",
+        "wikidata:Q1534288",
+        "wikidata:Q23712",
+        "wikidata:Q56242215"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-oviedo-catedral-en",
+      "documentId": "phase12-sample-oviedo-catedral",
+      "language": "en",
+      "region": "central",
+      "topic": "heritage",
+      "season": "all",
+      "content": "The Cathedral of San Salvador is in Oviedo. It is a Catholic cathedral and its recorded heritage status is bien de interés cultural.",
+      "factIds": [
+        "Q1534288-P31-Q56242215",
+        "Q1534288-P131-Q14317",
+        "Q1534288-P1435-Q23712"
+      ],
+      "sourceIds": [
+        "wikidata:Q14317",
+        "wikidata:Q1534288",
+        "wikidata:Q23712",
+        "wikidata:Q56242215"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-fabada-es",
+      "documentId": "phase12-sample-fabada",
+      "language": "es",
+      "region": "central",
+      "topic": "food",
+      "season": "all",
+      "content": "La fabada asturiana es un plato originario de España. La faba asturiana figura entre sus componentes.",
+      "factIds": [
+        "Q995376-P31-Q746549",
+        "Q995376-P495-Q29",
+        "Q995376-P527-Q16565898"
+      ],
+      "sourceIds": [
+        "wikidata:Q16565898",
+        "wikidata:Q29",
+        "wikidata:Q746549",
+        "wikidata:Q995376"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-fabada-en",
+      "documentId": "phase12-sample-fabada",
+      "language": "en",
+      "region": "central",
+      "topic": "food",
+      "season": "all",
+      "content": "Fabada asturiana is a dish originating in Spain. Faba asturiana is listed among its components.",
+      "factIds": [
+        "Q995376-P31-Q746549",
+        "Q995376-P495-Q29",
+        "Q995376-P527-Q16565898"
+      ],
+      "sourceIds": [
+        "wikidata:Q16565898",
+        "wikidata:Q29",
+        "wikidata:Q746549",
+        "wikidata:Q995376"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-playa-silencio-es",
+      "documentId": "phase12-sample-playa-silencio",
+      "language": "es",
+      "region": "western",
+      "topic": "coast",
+      "season": "all",
+      "content": "La Playa del Silencio es una playa situada en Cudillero. Está en España.",
+      "factIds": [
+        "Q6078521-P31-Q40080",
+        "Q6078521-P131-Q818372",
+        "Q6078521-P17-Q29"
+      ],
+      "sourceIds": [
+        "wikidata:Q29",
+        "wikidata:Q40080",
+        "wikidata:Q6078521",
+        "wikidata:Q818372"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-playa-silencio-en",
+      "documentId": "phase12-sample-playa-silencio",
+      "language": "en",
+      "region": "western",
+      "topic": "coast",
+      "season": "all",
+      "content": "Playa del Silencio is a beach in Cudillero. It is in Spain.",
+      "factIds": [
+        "Q6078521-P31-Q40080",
+        "Q6078521-P131-Q818372",
+        "Q6078521-P17-Q29"
+      ],
+      "sourceIds": [
+        "wikidata:Q29",
+        "wikidata:Q40080",
+        "wikidata:Q6078521",
+        "wikidata:Q818372"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-gijon-es",
+      "documentId": "phase12-sample-gijon",
+      "language": "es",
+      "region": "central",
+      "topic": "geography",
+      "season": "all",
+      "content": "Gijón es un concejo asturiano situado en España. Se encuentra junto al mar Cantábrico.",
+      "factIds": [
+        "Q12273-P31-Q5055981",
+        "Q12273-P17-Q29",
+        "Q12273-P206-Q2090594"
+      ],
+      "sourceIds": [
+        "wikidata:Q12273",
+        "wikidata:Q2090594",
+        "wikidata:Q29",
+        "wikidata:Q5055981"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-gijon-en",
+      "documentId": "phase12-sample-gijon",
+      "language": "en",
+      "region": "central",
+      "topic": "geography",
+      "season": "all",
+      "content": "Gijón is an Asturian council in Spain. It lies beside the Cantabrian Sea.",
+      "factIds": [
+        "Q12273-P31-Q5055981",
+        "Q12273-P17-Q29",
+        "Q12273-P206-Q2090594"
+      ],
+      "sourceIds": [
+        "wikidata:Q12273",
+        "wikidata:Q2090594",
+        "wikidata:Q29",
+        "wikidata:Q5055981"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-aviles-es",
+      "documentId": "phase12-sample-aviles",
+      "language": "es",
+      "region": "central",
+      "topic": "geography",
+      "season": "all",
+      "content": "Avilés es un concejo de la provincia de Asturias. Se encuentra junto al mar Cantábrico.",
+      "factIds": [
+        "Q14649-P31-Q5055981",
+        "Q14649-P131-Q24004403",
+        "Q14649-P206-Q2090594"
+      ],
+      "sourceIds": [
+        "wikidata:Q14649",
+        "wikidata:Q2090594",
+        "wikidata:Q24004403",
+        "wikidata:Q5055981"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-aviles-en",
+      "documentId": "phase12-sample-aviles",
+      "language": "en",
+      "region": "central",
+      "topic": "geography",
+      "season": "all",
+      "content": "Avilés is a council in the Province of Asturias. It lies beside the Cantabrian Sea.",
+      "factIds": [
+        "Q14649-P31-Q5055981",
+        "Q14649-P131-Q24004403",
+        "Q14649-P206-Q2090594"
+      ],
+      "sourceIds": [
+        "wikidata:Q14649",
+        "wikidata:Q2090594",
+        "wikidata:Q24004403",
+        "wikidata:Q5055981"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-llanes-es",
+      "documentId": "phase12-sample-llanes",
+      "language": "es",
+      "region": "eastern",
+      "topic": "coast",
+      "season": "all",
+      "content": "Llanes es un concejo asturiano situado en España. Se encuentra junto al mar Cantábrico.",
+      "factIds": [
+        "Q503094-P31-Q5055981",
+        "Q503094-P17-Q29",
+        "Q503094-P206-Q2090594"
+      ],
+      "sourceIds": [
+        "wikidata:Q2090594",
+        "wikidata:Q29",
+        "wikidata:Q503094",
+        "wikidata:Q5055981"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-llanes-en",
+      "documentId": "phase12-sample-llanes",
+      "language": "en",
+      "region": "eastern",
+      "topic": "coast",
+      "season": "all",
+      "content": "Llanes is an Asturian council in Spain. It lies beside the Cantabrian Sea.",
+      "factIds": [
+        "Q503094-P31-Q5055981",
+        "Q503094-P17-Q29",
+        "Q503094-P206-Q2090594"
+      ],
+      "sourceIds": [
+        "wikidata:Q2090594",
+        "wikidata:Q29",
+        "wikidata:Q503094",
+        "wikidata:Q5055981"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-cangas-onis-es",
+      "documentId": "phase12-sample-cangas-onis",
+      "language": "es",
+      "region": "eastern",
+      "topic": "interior",
+      "season": "all",
+      "content": "Cangas de Onís es un concejo de la provincia de Asturias. Está en España.",
+      "factIds": [
+        "Q225515-P31-Q5055981",
+        "Q225515-P131-Q24004403",
+        "Q225515-P17-Q29"
+      ],
+      "sourceIds": [
+        "wikidata:Q225515",
+        "wikidata:Q24004403",
+        "wikidata:Q29",
+        "wikidata:Q5055981"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-cangas-onis-en",
+      "documentId": "phase12-sample-cangas-onis",
+      "language": "en",
+      "region": "eastern",
+      "topic": "interior",
+      "season": "all",
+      "content": "Cangas de Onís is a council in the Province of Asturias. It is in Spain.",
+      "factIds": [
+        "Q225515-P31-Q5055981",
+        "Q225515-P131-Q24004403",
+        "Q225515-P17-Q29"
+      ],
+      "sourceIds": [
+        "wikidata:Q225515",
+        "wikidata:Q24004403",
+        "wikidata:Q29",
+        "wikidata:Q5055981"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-cudillero-es",
+      "documentId": "phase12-sample-cudillero",
+      "language": "es",
+      "region": "western",
+      "topic": "coast",
+      "season": "all",
+      "content": "Cudillero es un concejo asturiano situado en España. Se encuentra junto al mar Cantábrico.",
+      "factIds": [
+        "Q818372-P31-Q5055981",
+        "Q818372-P17-Q29",
+        "Q818372-P206-Q2090594"
+      ],
+      "sourceIds": [
+        "wikidata:Q2090594",
+        "wikidata:Q29",
+        "wikidata:Q5055981",
+        "wikidata:Q818372"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-cudillero-en",
+      "documentId": "phase12-sample-cudillero",
+      "language": "en",
+      "region": "western",
+      "topic": "coast",
+      "season": "all",
+      "content": "Cudillero is an Asturian council in Spain. It lies beside the Cantabrian Sea.",
+      "factIds": [
+        "Q818372-P31-Q5055981",
+        "Q818372-P17-Q29",
+        "Q818372-P206-Q2090594"
+      ],
+      "sourceIds": [
+        "wikidata:Q2090594",
+        "wikidata:Q29",
+        "wikidata:Q5055981",
+        "wikidata:Q818372"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-taramundi-es",
+      "documentId": "phase12-sample-taramundi",
+      "language": "es",
+      "region": "western",
+      "topic": "interior",
+      "season": "all",
+      "content": "Taramundi es un concejo de la provincia de Asturias. Está en España.",
+      "factIds": [
+        "Q842685-P31-Q5055981",
+        "Q842685-P131-Q24004403",
+        "Q842685-P17-Q29"
+      ],
+      "sourceIds": [
+        "wikidata:Q24004403",
+        "wikidata:Q29",
+        "wikidata:Q5055981",
+        "wikidata:Q842685"
+      ],
+      "imageRefs": []
+    },
+    {
+      "id": "phase12-sample-taramundi-en",
+      "documentId": "phase12-sample-taramundi",
+      "language": "en",
+      "region": "western",
+      "topic": "interior",
+      "season": "all",
+      "content": "Taramundi is a council in the Province of Asturias. It is in Spain.",
+      "factIds": [
+        "Q842685-P31-Q5055981",
+        "Q842685-P131-Q24004403",
+        "Q842685-P17-Q29"
+      ],
+      "sourceIds": [
+        "wikidata:Q24004403",
+        "wikidata:Q29",
+        "wikidata:Q5055981",
+        "wikidata:Q842685"
+      ],
+      "imageRefs": []
+    }
+  ],
+  "limitations": [
+    "No production import, embedding, provider call, quality baseline or owner/native-language acceptance.",
+    "Region copies fallback location metadata as an editorial routing tag, including central for fabada; it does not assert exclusive culinary origin.",
+    "Season all means the facts make no seasonal availability claim. No current opening, price, access or safety advice is supported.",
+    "Verification is against Wikidata revisions, not independent corroboration against cited publications.",
+    "No guide/chunk text, Wikipedia article prose, Commons image content or restricted reference was read for authoring. imageRefs are empty.",
+    "Overlap clearance against restricted references remains pending.",
+    "Q2477016 also has a mountain-pass classification; that conflicting classification is excluded pending review.",
+    "The cathedral heritage statement has a preserved start-date qualifier of 1931-06-03 and no end-date qualifier; all other selected statements are unqualified."
+  ]
+}

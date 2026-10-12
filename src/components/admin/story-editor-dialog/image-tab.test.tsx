@@ -566,7 +566,7 @@ describe("ImageTab", () => {
       const input = screen.getByLabelText("Image Attribution");
       expect(input).toHaveAttribute(
         "placeholder",
-        "e.g., Photo by Juan on Unsplash"
+        "Reviewed photo record"
       );
     });
 
@@ -580,11 +580,11 @@ describe("ImageTab", () => {
       expect(state.setImageSource).toHaveBeenCalled();
     });
 
-    it("shows helper text about attribution display", () => {
+    it("explains the permission and crop review required to approve a photo", () => {
       renderImageTab(mockStory);
 
       expect(
-        screen.getByText("Will be displayed below the image in stories")
+        screen.getByText("Permission and mobile/desktop crop review are required. A credit alone cannot approve a photo.")
       ).toBeInTheDocument();
     });
   });

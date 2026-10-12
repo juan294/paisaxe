@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { ImageResult } from "@/types";
+import { ImageResult, type Source } from "@/types";
 import type { BookingCard } from "@/types/booking-cards";
 import { useTranslation } from "@/lib/i18n";
 import {
@@ -32,6 +32,7 @@ export interface StreamChatMessage {
   role: "user" | "assistant";
   content: string;
   images?: ImageResult[];
+  sources?: Source[];
   upsellReason?: UpsellReason;
   upsellDismissed?: boolean;
   /** Booking chat only: structured cards shown under the bubble. */
@@ -274,6 +275,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
                 ...currentMsg,
                 content: cleanContent,
                 images: event.images,
+                sources: event.sources,
                 upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
               };
               return updated;
