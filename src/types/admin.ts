@@ -50,6 +50,26 @@ export function rowToAdminStory(row: AdminStoryRow): AdminStory {
   };
 }
 
+export type StoryCatalogFilter = "all" | CurationStatus | "missing_translations";
+
+export interface StoryCatalogStats {
+  total: number;
+  approved: number;
+  pending: number;
+  missingTranslations: number;
+}
+
+export interface AdminStoriesPage {
+  stories: AdminStory[];
+  /** Number matching the current filter/search, used for pagination. */
+  total: number;
+  page: number;
+  pageSize: number;
+  stats: StoryCatalogStats;
+  /** Global pending snapshot; approval never includes IDs added later. */
+  pendingApprovalIds: string[];
+}
+
 export interface AdminApiResponse<T> {
   data?: T;
   error?: string;

@@ -24,6 +24,10 @@ vi.mock("@/lib/supabase-admin", () => ({
 
 // Mock fetch for webhook fan-out
 const mockFetch = vi.fn();
+const storyId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const approvalRequest = (storyIds = [storyId(1), storyId(2), storyId(3)]) => new NextRequest("http://localhost/api/admin/stories/approve-all", {
+  method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storyIds }),
+});
 vi.stubGlobal("fetch", mockFetch);
 
 import { validateAdminAuth } from "@/lib/admin-auth";
@@ -44,37 +48,58 @@ describe("POST /api/admin/stories/approve-all", () => {
       error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }),
     });
 
-    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-      method: "POST",
-    });
+    const request = approvalRequest();
 
     const response = await POST(request);
     expect(response.status).toBe(401);
   });
 
-  it("should approve all pending stories", async () => {
+  it("approves only the explicit snapshot while rows remain pending", async () => {
     const mockSelect = vi.fn().mockResolvedValue({
-      data: [{ id: "1" }, { id: "2" }, { id: "3" }],
+      data: [{ id: storyId(1) }, { id: storyId(2) }, { id: storyId(3) }],
       error: null,
     });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
     const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
     mockCreateAdminClient.mockReturnValue({ from: mockFrom });
 
-    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-      method: "POST",
-    });
+    const request = approvalRequest();
 
     const response = await POST(request);
     expect(response.status).toBe(200);
 
     const data = await response.json();
     expect(data.data.approvedCount).toBe(3);
-    expect(data.data.approvedIds).toEqual(["1", "2", "3"]);
+    expect(data.data.approvedIds).toEqual([storyId(1), storyId(2), storyId(3)]);
 
     expect(mockUpdate).toHaveBeenCalledWith({ curation_status: "approved" });
     expect(mockEq).toHaveBeenCalledWith("curation_status", "needs_curation");
+    expect(mockIn).toHaveBeenCalledWith("id", [storyId(1), storyId(2), storyId(3)]);
+  });
+
+  it.each([{}, { storyIds: [] }, { storyIds: ["not-a-uuid"] }, { storyIds: [storyId(1), storyId(1)] }])("rejects a missing or ambiguous approval snapshot: %j", async (body) => {
+    const response = await POST(new NextRequest("http://localhost/api/admin/stories/approve-all", {
+      method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" },
+    }));
+    expect(response.status).toBe(400);
+    expect(mockCreateAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("reports the exact completed batch if a later batch fails, without retrying or approving later arrivals", async () => {
+    const ids = Array.from({ length: 129 }, (_, i) => storyId(i + 1));
+    const select = vi.fn().mockResolvedValueOnce({ data: ids.slice(0, 100).map(id => ({ id })), error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: "Batch failed" } });
+    const inIds = vi.fn().mockReturnValue({ select });
+    const eq = vi.fn().mockReturnValue({ in: inIds });
+    mockCreateAdminClient.mockReturnValue({ from: vi.fn().mockReturnValue({ update: vi.fn().mockReturnValue({ eq }) }) });
+    const response = await POST(approvalRequest(ids));
+    expect(response.status).toBe(500);
+    expect((await response.json()).data).toEqual({ approvedCount: 100, approvedIds: ids.slice(0, 100) });
+    expect(inIds.mock.calls).toEqual([["id", ids.slice(0, 100)], ["id", ids.slice(100)]]);
+    expect(eq).toHaveBeenCalledWith("curation_status", "needs_curation");
+    expect(select).toHaveBeenCalledTimes(2);
   });
 
   it("should handle null data response gracefully", async () => {
@@ -82,14 +107,13 @@ describe("POST /api/admin/stories/approve-all", () => {
       data: null,
       error: null,
     });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
     const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
     mockCreateAdminClient.mockReturnValue({ from: mockFrom });
 
-    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-      method: "POST",
-    });
+    const request = approvalRequest();
 
     const response = await POST(request);
     expect(response.status).toBe(200);
@@ -104,14 +128,13 @@ describe("POST /api/admin/stories/approve-all", () => {
       data: [],
       error: null,
     });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
     const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
     mockCreateAdminClient.mockReturnValue({ from: mockFrom });
 
-    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-      method: "POST",
-    });
+    const request = approvalRequest();
 
     const response = await POST(request);
     expect(response.status).toBe(200);
@@ -126,9 +149,7 @@ describe("POST /api/admin/stories/approve-all", () => {
       throw new Error("Unexpected error");
     });
 
-    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-      method: "POST",
-    });
+    const request = approvalRequest();
 
     const response = await POST(request);
     expect(response.status).toBe(500);
@@ -142,9 +163,7 @@ describe("POST /api/admin/stories/approve-all", () => {
       throw "raw string failure";
     });
 
-    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-      method: "POST",
-    });
+    const request = approvalRequest();
 
     const response = await POST(request);
     expect(response.status).toBe(500);
@@ -159,7 +178,7 @@ describe("POST /api/admin/stories/approve-all", () => {
   describe("BE-H3: bulk approval concurrency cap", () => {
     it("fires at most 5 concurrent webhook notifications when approving stories", async () => {
       // Arrange: 10 stories approved — fan-out must be capped at 5 concurrent
-      const storyIds = Array.from({ length: 10 }, (_, i) => `story-id-${i}`);
+      const storyIds = Array.from({ length: 10 }, (_, i) => storyId(i + 1));
       const inflightCounts: number[] = [];
       let inflight = 0;
 
@@ -167,7 +186,8 @@ describe("POST /api/admin/stories/approve-all", () => {
         data: storyIds.map((id) => ({ id })),
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
@@ -184,9 +204,7 @@ describe("POST /api/admin/stories/approve-all", () => {
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
       vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest(storyIds);
 
       await POST(request);
 
@@ -205,17 +223,16 @@ describe("POST /api/admin/stories/approve-all", () => {
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
 
       const mockSelect = vi.fn().mockResolvedValue({
-        data: [{ id: "story-only" }],
+        data: [{ id: storyId(1) }],
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest();
 
       const response = await POST(request);
       const data = await response.json();
@@ -232,7 +249,8 @@ describe("POST /api/admin/stories/approve-all", () => {
         data: [],
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
@@ -243,9 +261,7 @@ describe("POST /api/admin/stories/approve-all", () => {
 
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest();
 
       await POST(request);
 
@@ -254,12 +270,13 @@ describe("POST /api/admin/stories/approve-all", () => {
 
     it("still returns success even when some webhook pings fail", async () => {
       // Webhook failures should not block the approve-all response
-      const storyIds = ["story-a", "story-b"];
+      const storyIds = [storyId(1), storyId(2)];
       const mockSelect = vi.fn().mockResolvedValue({
         data: storyIds.map((id) => ({ id })),
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
@@ -269,9 +286,7 @@ describe("POST /api/admin/stories/approve-all", () => {
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
       vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest();
 
       const response = await POST(request);
       const data = await response.json();
@@ -285,10 +300,11 @@ describe("POST /api/admin/stories/approve-all", () => {
       // Exercises the `err instanceof Error ? err.message : String(err)` false
       // branch when fetch rejects with a non-Error value (e.g. a plain string).
       const mockSelect = vi.fn().mockResolvedValue({
-        data: [{ id: "story-x" }],
+        data: [{ id: storyId(1) }],
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
@@ -299,9 +315,7 @@ describe("POST /api/admin/stories/approve-all", () => {
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
       vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest();
 
       const response = await POST(request);
       const data = await response.json();
@@ -310,7 +324,7 @@ describe("POST /api/admin/stories/approve-all", () => {
       expect(data.data.approvedCount).toBe(1);
       expect(logger.error).toHaveBeenCalledWith(
         "[APPROVE_ALL_WEBHOOK_PING_FAILED]",
-        { story_id: "story-x", error: "raw string rejection" }
+        { story_id: storyId(1), error: "raw string rejection" }
       );
     });
   });
@@ -327,10 +341,11 @@ describe("POST /api/admin/stories/approve-all", () => {
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
 
       const mockSelect = vi.fn().mockResolvedValue({
-        data: [{ id: "story-1" }],
+        data: [{ id: storyId(1) }],
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
@@ -339,9 +354,7 @@ describe("POST /api/admin/stories/approve-all", () => {
         new Response(JSON.stringify({ success: true }), { status: 200 })
       );
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest();
       await POST(request);
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -357,17 +370,16 @@ describe("POST /api/admin/stories/approve-all", () => {
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
 
       const mockSelect = vi.fn().mockResolvedValue({
-        data: [{ id: "story-1" }],
+        data: [{ id: storyId(1) }],
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest();
       const response = await POST(request);
       const data = await response.json();
 
@@ -382,19 +394,18 @@ describe("POST /api/admin/stories/approve-all", () => {
       vi.stubEnv("VERCEL_ENV", "");
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
 
-      const storyIds = ["story-1", "story-2", "story-3"];
+      const storyIds = [storyId(1), storyId(2), storyId(3)];
       const mockSelect = vi.fn().mockResolvedValue({
         data: storyIds.map((id) => ({ id })),
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest();
       await POST(request);
 
       expect(mockFetch).not.toHaveBeenCalled();
@@ -416,10 +427,11 @@ describe("POST /api/admin/stories/approve-all", () => {
       vi.stubEnv("WEBHOOK_SECRET", "test-secret");
 
       const mockSelect = vi.fn().mockResolvedValue({
-        data: [{ id: "story-1" }],
+        data: [{ id: storyId(1) }],
         error: null,
       });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
       mockCreateAdminClient.mockReturnValue({ from: mockFrom });
@@ -428,9 +440,7 @@ describe("POST /api/admin/stories/approve-all", () => {
         new Response(JSON.stringify({ success: true }), { status: 200 })
       );
 
-      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-        method: "POST",
-      });
+      const request = approvalRequest();
       await POST(request);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -444,19 +454,19 @@ describe("POST /api/admin/stories/approve-all", () => {
       data: null,
       error: { message: "Database error" },
     });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
     const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
     mockCreateAdminClient.mockReturnValue({ from: mockFrom });
 
-    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-      method: "POST",
-    });
+    const request = approvalRequest();
 
     const response = await POST(request);
     expect(response.status).toBe(500);
     const data = await response.json();
-    expect(data.error).toBe("Failed to approve stories");
+    expect(data.error).toContain("Approval stopped after 0 stories");
+    expect(data.data).toEqual({ approvedCount: 0, approvedIds: [] });
   });
 
   it("should use logger.error (not console.error) on database error", async () => {
@@ -464,15 +474,14 @@ describe("POST /api/admin/stories/approve-all", () => {
       data: null,
       error: { message: "Database error" },
     });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEq = vi.fn().mockReturnValue({ in: mockIn });
     const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
     mockCreateAdminClient.mockReturnValue({ from: mockFrom });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
-      method: "POST",
-    });
+    const request = approvalRequest();
 
     await POST(request);
     consoleSpy.mockRestore();

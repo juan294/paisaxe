@@ -1,3 +1,5 @@
+import { parseImageProvenance } from "@/lib/image-provenance";
+import { photoReviewError } from "../photo-review";
 import {
   updateStory,
   updateStoryImageUrl,
@@ -73,6 +75,49 @@ export async function handleSave(params: SaveParams): Promise<void> {
   setError("");
 
   try {
+    if (hasImageChanges && (imageUrl || selectedFile || currentContentImage || imageSource !== (story.imageSource || ""))) {
+      const target = imageSourceTab === "upload" && selectedFile ? undefined
+        : imageSourceTab === "url" && imageUrl ? imageUrl : currentContentImage?.url ?? story.image;
+      const reviewError = photoReviewError(imageSource, target);
+      if (reviewError) { setError(reviewError); return; }
+    }
+    // Save image if changed
+    if (hasImageChanges) {
+      let imageResult;
+
+      if (imageSourceTab === "url" && imageUrl) {
+        imageResult = await updateStoryImageUrl(story.id, imageUrl, imageSource || undefined);
+      } else if (imageSourceTab === "upload" && selectedFile) {
+        imageResult = await uploadStoryImage(story.id, selectedFile, imageSource || undefined);
+      } else if (imageSourceTab === "content" && currentContentImage) {
+        imageResult = await updateStoryImageUrl(story.id, currentContentImage.url, imageSource || undefined);
+      } else if (imageSource !== (story.imageSource || "") && !parseImageProvenance(story.imageSource)) {
+        imageResult = await updateStoryImageUrl(story.id, story.image, imageSource);
+      } else if (imageSource !== (story.imageSource || "")) {
+        // Only source changed
+        const sourceResult = await updateStoryImageSource(story.id, imageSource);
+        if (sourceResult.error) {
+          setError(sourceResult.error);
+          setIsLoading(false);
+          return;
+        }
+        if (sourceResult.data) {
+          onUpdate(story.id, { imageSource: sourceResult.data.imageSource });
+        }
+      }
+
+      if (imageResult) {
+        if (imageResult.error) {
+          setError(imageResult.error);
+          setIsLoading(false);
+          return;
+        }
+        if (imageResult.data) {
+          onUpdate(story.id, { image: imageResult.data.image, imageSource: imageResult.data.imageSource });
+        }
+      }
+    }
+
     // Save details if changed
     if (hasDetailsChanges) {
       const filteredPrompts = questionPrompts.filter(p => p.trim());
@@ -111,41 +156,6 @@ export async function handleSave(params: SaveParams): Promise<void> {
           sourcePdf: detailsResult.data.sourcePdf || undefined,
           metadata: detailsResult.data.metadata || undefined,
         });
-      }
-    }
-
-    // Save image if changed
-    if (hasImageChanges) {
-      let imageResult;
-
-      if (imageSourceTab === "url" && imageUrl) {
-        imageResult = await updateStoryImageUrl(story.id, imageUrl, imageSource || undefined);
-      } else if (imageSourceTab === "upload" && selectedFile) {
-        imageResult = await uploadStoryImage(story.id, selectedFile, imageSource || undefined);
-      } else if (imageSourceTab === "content" && currentContentImage) {
-        imageResult = await updateStoryImageUrl(story.id, currentContentImage.url, imageSource || undefined);
-      } else if (imageSource !== (story.imageSource || "")) {
-        // Only source changed
-        const sourceResult = await updateStoryImageSource(story.id, imageSource);
-        if (sourceResult.error) {
-          setError(sourceResult.error);
-          setIsLoading(false);
-          return;
-        }
-        if (sourceResult.data) {
-          onUpdate(story.id, { imageSource: sourceResult.data.imageSource });
-        }
-      }
-
-      if (imageResult) {
-        if (imageResult.error) {
-          setError(imageResult.error);
-          setIsLoading(false);
-          return;
-        }
-        if (imageResult.data) {
-          onUpdate(story.id, { image: imageResult.data.image, imageSource: imageResult.data.imageSource });
-        }
       }
     }
 

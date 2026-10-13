@@ -58,7 +58,7 @@ const SelectionToolbar = dynamic(
 );
 
 export function StoriesTabPanel() {
-  const { currentPage, stories, total, filter, setFilter, searchQuery, setSearchQuery, isLoading, error, editingStory, setEditingStory, selectedIds, isBulkUpdating, isCreateDialogOpen, setIsCreateDialogOpen, isApproveAllConfirmOpen, setIsApproveAllConfirmOpen, isApprovingAll, totalPages, goToPage, filteredStories, needsCurationCount, approvedCount, missingTranslationsCount, handleStoryUpdate, handleToggleSelect, handleClearSelection, handleBulkMarkApproved, handleBulkMarkPending, handleStoryCreated, handleApproveAll, handleBulkDelete } = useStoriesTab();
+  const { approvalCount, successMessage, currentPage, stories, total, filter, setFilter, searchQuery, setSearchQuery, isLoading, error, editingStory, setEditingStory, selectedIds, isBulkUpdating, isCreateDialogOpen, setIsCreateDialogOpen, isApproveAllConfirmOpen, setIsApproveAllConfirmOpen, isApprovingAll, totalPages, goToPage, filteredStories, needsCurationCount, approvedCount, missingTranslationsCount, handleStoryUpdate, handleToggleSelect, handleClearSelection, handleBulkMarkApproved, handleBulkMarkPending, handleStoryCreated, handleApproveAll, handleBulkDelete } = useStoriesTab();
 
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -115,6 +115,8 @@ export function StoriesTabPanel() {
         />
       </div>
 
+      <p className="mb-4 text-sm text-admin-muted dark:text-admin-subtle">Los contadores abarcan todo el catálogo. La búsqueda y los filtros se aplican antes de paginar.</p>
+
       {/* Search + actions toolbar */}
       <div className="mb-6 flex items-center gap-4">
         <div className="relative max-w-md flex-1">
@@ -130,7 +132,7 @@ export function StoriesTabPanel() {
         {needsCurationCount > 0 && (
           <Button
             onClick={() => setIsApproveAllConfirmOpen(true)}
-            disabled={isApprovingAll}
+            disabled={isApprovingAll || isLoading || isBulkUpdating || !!error}
             className="h-11 rounded-xl bg-admin-approve text-sm font-medium text-white hover:bg-admin-approve-hover disabled:opacity-50"
           >
             {isApprovingAll ? (
@@ -149,6 +151,8 @@ export function StoriesTabPanel() {
           Create Story
         </Button>
       </div>
+
+      {successMessage && <p role="status" className="mb-4 text-sm text-admin-muted dark:text-admin-subtle">{successMessage}</p>}
 
       {/* Error */}
       {error && (
@@ -242,9 +246,7 @@ export function StoriesTabPanel() {
               Approve All Stories
             </h2>
             <p className="mt-2 text-sm text-admin-muted dark:text-admin-subtle">
-              This will approve {needsCurationCount} pending{" "}
-              {needsCurationCount === 1 ? "story" : "stories"}. This action can be
-              reversed by marking stories as pending individually.
+              Se aprobarán {approvalCount} historias pendientes de todo el catálogo, incluidas las que no aparecen en esta página o búsqueda. Las historias añadidas después de abrir esta confirmación quedan fuera.
             </p>
             <div className="mt-6 flex gap-3">
               <Button

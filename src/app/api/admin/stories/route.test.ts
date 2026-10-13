@@ -33,170 +33,42 @@ function mockWithAdminUnauthorized(status = 401) {
 }
 
 describe("GET /api/admin/stories", () => {
-  const mockStories = [
-    {
-      id: "story-1",
-      title: "Test Story 1",
-      subtitle: "Subtitle 1",
-      category: "nature",
-      image_path: "/images/test1.jpg",
-      display_order: 1,
-      curation_status: "needs_curation",
-    },
-    {
-      id: "story-2",
-      title: "Test Story 2",
-      subtitle: "Subtitle 2",
-      category: "culture",
-      image_path: "/images/test2.jpg",
-      display_order: 2,
-      curation_status: "approved",
-    },
-  ];
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should return 401 when auth fails", async () => {
-    mockWithAdminUnauthorized();
-
-    const request = new NextRequest("http://localhost:3000/api/admin/stories");
-    const response = await GET(request);
-
-    expect(response.status).toBe(401);
-  });
-
-  /**
-   * Build a mock Supabase chain for GET: select → order → [eq →] range
-   */
-  function buildGetMock(stories: unknown[], count = stories.length, error: unknown = null) {
-    const mockRange = vi.fn().mockResolvedValue({ data: stories, error, count });
-    const mockOrder = vi.fn().mockReturnValue({ range: mockRange });
-    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
-    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-    return { mockFrom, mockRange, mockOrder, mockSelect };
+  const rows = Array.from({ length: 45 }, (_, i) => ({ id: `story-${i}`, slug: `story-${i}`, title: i === 35 ? "Oviedo Cathedral" : `Story ${i}`, subtitle: "", description: "", category: "nature", display_order: i, curation_status: i < 30 ? "approved" : "needs_curation" }));
+  function authorize(data = rows, options: { error?: boolean; missingCount?: boolean; cap?: number; throws?: boolean } = {}) {
+    const range = vi.fn().mockImplementation(async (offset: number) => ({ data: data.slice(offset, offset + (options.cap ?? 1000)), error: options.error ? { message: "DB unavailable" } : null, count: options.missingCount ? null : data.length }));
+    const query = { order: vi.fn().mockImplementation(() => query), range };
+    const from = vi.fn().mockImplementation(() => { if (options.throws) throw new Error("Unexpected"); return { select: vi.fn().mockReturnValue(query) }; });
+    mockWithAdminAuthorized({ from });
+    return range;
   }
-
-  /**
-   * Build a mock that supports an optional .eq() after .range():
-   * select → order → range → eq (resolved)
-   * The eq() result is the final resolved promise.
-   */
-  function buildFilteredGetMock(stories: unknown[], count = stories.length) {
-    const mockEq = vi.fn().mockResolvedValue({ data: stories, error: null, count });
-    const mockRange = vi.fn().mockReturnValue({ eq: mockEq });
-    const mockOrder = vi.fn().mockReturnValue({ range: mockRange });
-    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
-    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-    return { mockFrom, mockRange, mockOrder, mockEq };
-  }
-
-  it("should return stories when auth is valid", async () => {
-    const { mockFrom } = buildGetMock(mockStories, 2);
-    mockWithAdminAuthorized({ from: mockFrom });
-
-    const request = new NextRequest("http://localhost:3000/api/admin/stories");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.data.stories).toHaveLength(2);
-    expect(data.data.total).toBe(2);
-    expect(data.data.page).toBe(1);
-    expect(data.data.pageSize).toBe(20);
-    expect(data.data.stories[0].id).toBe("story-1");
-    expect(data.data.stories[0].curationStatus).toBe("needs_curation");
+  beforeEach(() => vi.clearAllMocks());
+  it("requires admin authorization before loading any catalog rows", async () => {
+    mockWithAdminUnauthorized(); expect((await GET(new NextRequest("http://localhost/api/admin/stories"))).status).toBe(401);
   });
-
-  it("should apply .range() for pagination", async () => {
-    const { mockFrom, mockRange } = buildGetMock(mockStories, 2);
-    mockWithAdminAuthorized({ from: mockFrom });
-
-    const request = new NextRequest("http://localhost:3000/api/admin/stories?page=2&pageSize=10");
-    await GET(request);
-
-    // page=2, pageSize=10 → offset=10, end=19
-    expect(mockRange).toHaveBeenCalledWith(10, 19);
+  it("returns global counts with a pending-only page", async () => {
+    authorize(); const r = await GET(new NextRequest("http://localhost/api/admin/stories?filter=needs_curation&pageSize=10")); const { data } = await r.json();
+    expect(r.status).toBe(200); expect(data.total).toBe(15); expect(data.stats).toEqual({ total: 45, approved: 30, pending: 15, missingTranslations: 45 }); expect(data.stories.map((s: { id: string }) => s.id)).toEqual(rows.slice(30, 40).map(s => s.id)); expect(data.pendingApprovalIds).toHaveLength(15);
   });
-
-  it("should filter by needs_curation status", async () => {
-    const filteredStories = mockStories.filter(s => s.curation_status === "needs_curation");
-    const { mockFrom, mockEq } = buildFilteredGetMock(filteredStories);
-    mockWithAdminAuthorized({ from: mockFrom });
-
-    const request = new NextRequest("http://localhost:3000/api/admin/stories?filter=needs_curation");
-    await GET(request);
-
-    expect(mockEq).toHaveBeenCalledWith("curation_status", "needs_curation");
+  it("filters and searches the whole catalog before paginating", async () => {
+    authorize(); const r = await GET(new NextRequest("http://localhost/api/admin/stories?filter=needs_curation&search=OVIEDO")); const { data } = await r.json(); expect(data.stories.map((s: { id: string }) => s.id)).toEqual(["story-35"]); expect(data.total).toBe(1); expect(data.stats.total).toBe(45);
   });
-
-  it("should filter by approved status", async () => {
-    const { mockFrom, mockEq } = buildFilteredGetMock([]);
-    mockWithAdminAuthorized({ from: mockFrom });
-
-    const request = new NextRequest("http://localhost:3000/api/admin/stories?filter=approved");
-    await GET(request);
-
-    expect(mockEq).toHaveBeenCalledWith("curation_status", "approved");
+  it("scans every response batch even when the provider cap is lower", async () => {
+    const range = authorize(rows, { cap: 20 }); const r = await GET(new NextRequest("http://localhost/api/admin/stories?page=2&pageSize=10")); const { data } = await r.json(); expect(range.mock.calls.map(c => c[0])).toEqual([0, 20, 40]); expect(data.stories.map((s: { id: string }) => s.id)).toEqual(rows.slice(10, 20).map(s => s.id));
   });
-
-  it("should return 500 when database query fails", async () => {
-    const { mockFrom } = buildGetMock([], 0, { message: "DB Error" });
-    mockWithAdminAuthorized({ from: mockFrom });
-
-    const request = new NextRequest("http://localhost:3000/api/admin/stories");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(data.error).toBe("Failed to fetch stories");
+  it("filters missing translations and defaults nonnumeric pagination", async () => {
+    authorize(); const r = await GET(new NextRequest("http://localhost/api/admin/stories?filter=missing_translations&page=abc&pageSize=xyz")); expect((await r.json()).data).toMatchObject({ page: 1, pageSize: 20, total: 45 });
   });
-
-  it("should fall back to page=1 and pageSize=20 when query params are non-numeric", async () => {
-    const { mockFrom, mockRange } = buildGetMock(mockStories, 2);
-    mockWithAdminAuthorized({ from: mockFrom });
-
-    // parseInt("abc", 10) is NaN → the `|| 1` / `|| 20` fallback branch kicks in
-    const request = new NextRequest("http://localhost:3000/api/admin/stories?page=abc&pageSize=xyz");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.data.page).toBe(1);
-    expect(data.data.pageSize).toBe(20);
-    // offset=0, end=19
-    expect(mockRange).toHaveBeenCalledWith(0, 19);
+  it("returns the last valid page after records disappear", async () => {
+    authorize(); const { data } = await (await GET(new NextRequest("http://localhost/api/admin/stories?filter=approved&page=99"))).json(); expect(data.page).toBe(2); expect(data.stories).toHaveLength(10);
   });
-
-  it("should default total to 0 when count is null", async () => {
-    // Supabase can resolve count: null (e.g. exact count unavailable) — the `count ?? 0` fallback
-    const mockRange = vi.fn().mockResolvedValue({ data: mockStories, error: null, count: null });
-    const mockOrder = vi.fn().mockReturnValue({ range: mockRange });
-    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
-    const nullCountFrom = vi.fn().mockReturnValue({ select: mockSelect });
-    mockWithAdminAuthorized({ from: nullCountFrom });
-
-    const request = new NextRequest("http://localhost:3000/api/admin/stories");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.data.total).toBe(0);
+  it.each(["filter=unknown", "search=" + "x".repeat(201), "page=999999999999999999999"])('rejects invalid query %s', async query => {
+    const range = authorize(); const r = await GET(new NextRequest("http://localhost/api/admin/stories?" + query)); expect(r.status).toBe(400); expect(range).not.toHaveBeenCalled();
   });
-
-  it("should return 500 on unexpected error", async () => {
-    // withAdmin calls through but the handler throws due to bad mock
-    mockWithAdminAuthorized({
-      from: vi.fn().mockImplementation(() => { throw new Error("Unexpected error"); }),
-    });
-
-    const request = new NextRequest("http://localhost:3000/api/admin/stories");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(data.error).toBe("Internal server error");
+  it.each([{ error: true }, { missingCount: true }, { throws: true }])("fails closed when the complete catalog cannot be measured: %j", async options => {
+    authorize(rows, options); expect((await GET(new NextRequest("http://localhost/api/admin/stories"))).status).toBe(500);
+  });
+  it("returns an empty measured catalog", async () => {
+    authorize([]); const { data } = await (await GET(new NextRequest("http://localhost/api/admin/stories"))).json(); expect(data.stats.total).toBe(0); expect(data.stories).toEqual([]);
   });
 });
 

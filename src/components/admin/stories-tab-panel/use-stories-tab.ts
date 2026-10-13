@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchStories, bulkUpdateStoryStatus, bulkDeleteStories, approveAllPendingStories } from "@/lib/admin-api";
-import { hasMissingTranslations } from "@/lib/admin-formatters";
-import type { AdminStory, CurationStatus, CreateStoryResponse } from "@/types/admin";
+import type { AdminStory, CreateStoryResponse, StoryCatalogFilter, StoryCatalogStats } from "@/types/admin";
 
-type FilterType = "all" | CurationStatus | "missing_translations";
+type FilterType = StoryCatalogFilter;
 
 const PAGE_SIZE = 20;
 
@@ -22,83 +21,91 @@ export function useStoriesTab() {
 
   // ── Stories state ────────────────────────────────────────────────────────
   const [stories, setStories] = useState<AdminStory[]>([]);
-  const [total, setTotal] = useState(0);
-  const [filter, setFilter] = useState<FilterType>("needs_curation");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [matchingTotal, setMatchingTotal] = useState(0);
+  const [stats, setStats] = useState<StoryCatalogStats>({ total: 0, approved: 0, pending: 0, missingTranslations: 0 });
+  const [pendingApprovalIds, setPendingApprovalIds] = useState<string[]>([]);
+  const [approvalIds, setApprovalIds] = useState<string[]>([]);
+  const [successMessage, setSuccessMessage] = useState("");
+  const requestSequence = useRef(0);
+  const [filter, updateFilter] = useState<FilterType>("needs_curation");
+  const [searchQuery, updateSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => { const timer = setTimeout(() => setDebouncedSearch(searchQuery), 250); return () => clearTimeout(timer); }, [searchQuery]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isApproveAllConfirmOpen, setIsApproveAllConfirmOpen] = useState(false);
+  const [isApproveAllConfirmOpen, updateApproveAllConfirmOpen] = useState(false);
   const [isApprovingAll, setIsApprovingAll] = useState(false);
 
-  const loadStories = useCallback(
-    async (page: number = currentPage) => {
-      setIsLoading(true);
-      setError("");
-
-      const result = await fetchStories({ page, pageSize: PAGE_SIZE });
-
-      if (result.error) {
-        setError(result.error);
-      } else if (result.data) {
-        setStories(result.data.stories);
-        setTotal(result.data.total);
+  const loadStories = useCallback(async (page: number = currentPage) => {
+    const sequence = ++requestSequence.current;
+    setIsLoading(true);
+    setError("");
+    const result = await fetchStories({ page, pageSize: PAGE_SIZE, filter, search: debouncedSearch });
+    if (sequence !== requestSequence.current) return;
+    if (result.error) setError(result.error);
+    else if (result.data) {
+      setStories(result.data.stories);
+      setMatchingTotal(result.data.total);
+      setStats(result.data.stats);
+      setPendingApprovalIds(result.data.pendingApprovalIds);
+      if (result.data.page !== undefined && result.data.page !== page) {
+        setCurrentPage(result.data.page);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tab", "stories"); params.set("storiesPage", String(result.data.page));
+        router.push(`?${params.toString()}`, { scroll: false });
       }
+    }
+    setIsLoading(false);
+  }, [currentPage, filter, debouncedSearch, router, searchParams]);
 
-      setIsLoading(false);
-    },
-    [currentPage]
-  );
-
+  // Router objects may be recreated by test/navigation adapters. The query
+  // identity is the page/filter/search tuple, not the wrapper object's identity.
+  const loadRef = useRef(loadStories);
+  loadRef.current = loadStories;
   useEffect(() => {
-    loadStories(currentPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+    if (searchQuery === debouncedSearch) void loadRef.current(currentPage);
+    return () => { requestSequence.current += 1; };
+  }, [currentPage, filter, searchQuery, debouncedSearch]);
 
-  // ── Pagination helpers ───────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(matchingTotal / PAGE_SIZE));
+  const goToPage = useCallback((page: number) => {
+    const clamped = Math.max(1, Math.min(totalPages, page));
+    if (clamped === currentPage) return;
+    setSelectedIds(new Set());
+    setStories([]);
+    setSuccessMessage("");
+    setCurrentPage(clamped);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "stories"); params.set("storiesPage", String(clamped));
+    router.push(`?${params.toString()}`, { scroll: false });
+  }, [router, searchParams, totalPages, currentPage]);
 
-  const goToPage = useCallback(
-    (page: number) => {
-      const clamped = Math.max(1, Math.min(totalPages, page));
-      const nextParams = new URLSearchParams(searchParams.toString());
-      nextParams.set("tab", "stories");
-      nextParams.set("storiesPage", String(clamped));
-      router.push(`?${nextParams.toString()}`, { scroll: false });
-    },
-    [router, searchParams, totalPages]
-  );
-
-  // ── Client-side filter (applied on top of the page) ──────────────────────
-  const filteredStories = stories.filter((story) => {
-    if (filter === "missing_translations") {
-      if (!hasMissingTranslations(story)) return false;
-    } else if (filter !== "all" && story.curationStatus !== filter) {
-      return false;
-    }
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        story.title.toLowerCase().includes(query) ||
-        story.subtitle.toLowerCase().includes(query) ||
-        story.description.toLowerCase().includes(query) ||
-        story.category.toLowerCase().includes(query)
-      );
-    }
-
-    return true;
-  });
-
-  // ── Stat card counts (from current page; page-local) ─────────────────────
-  const needsCurationCount = stories.filter(
-    (s) => s.curationStatus === "needs_curation"
-  ).length;
-  const approvedCount = stories.filter((s) => s.curationStatus === "approved").length;
-  const missingTranslationsCount = stories.filter(hasMissingTranslations).length;
+  const resetPage = () => {
+    requestSequence.current += 1;
+    setStories([]);
+    setIsLoading(true);
+    setSuccessMessage("");
+    setSelectedIds(new Set());
+    setCurrentPage(1);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "stories"); params.set("storiesPage", "1");
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
+  const setFilter = (value: FilterType) => { if (value === filter) return; resetPage(); updateFilter(value); };
+  const setSearchQuery = (value: string) => { if (value === searchQuery) return; resetPage(); updateSearchQuery(value); };
+  const setIsApproveAllConfirmOpen = (open: boolean) => {
+    if (open) setApprovalIds([...pendingApprovalIds]);
+    updateApproveAllConfirmOpen(open);
+  };
+  const filteredStories = stories;
+  const total = stats.total;
+  const needsCurationCount = stats.pending;
+  const approvedCount = stats.approved;
+  const missingTranslationsCount = stats.missingTranslations;
 
   // ── CRUD handlers ────────────────────────────────────────────────────────
 
@@ -109,6 +116,7 @@ export function useStoriesTab() {
     setEditingStory((prev) =>
       prev && prev.id === storyId ? { ...prev, ...updates } : prev
     );
+    void loadRef.current();
   };
 
   const handleToggleSelect = (storyId: string) => {
@@ -134,12 +142,8 @@ export function useStoriesTab() {
     if (result.error) {
       setError(result.error);
     } else if (result.data) {
-      setStories((prev) =>
-        prev.map((story) =>
-          selectedIds.has(story.id) ? { ...story, curationStatus: "approved" } : story
-        )
-      );
       setSelectedIds(new Set());
+      await loadRef.current();
     }
 
     setIsBulkUpdating(false);
@@ -157,21 +161,15 @@ export function useStoriesTab() {
     if (result.error) {
       setError(result.error);
     } else if (result.data) {
-      setStories((prev) =>
-        prev.map((story) =>
-          selectedIds.has(story.id)
-            ? { ...story, curationStatus: "needs_curation" }
-            : story
-        )
-      );
       setSelectedIds(new Set());
+      await loadRef.current();
     }
 
     setIsBulkUpdating(false);
   };
 
   const handleStoryCreated = (_story: CreateStoryResponse) => {
-    loadStories(1);
+    void loadRef.current(1);
     goToPage(1);
   };
 
@@ -179,19 +177,12 @@ export function useStoriesTab() {
     setIsApprovingAll(true);
     setError("");
 
-    const result = await approveAllPendingStories();
+    const result = await approveAllPendingStories(approvalIds);
 
-    if (result.error) {
-      setError(result.error);
-    } else if (result.data) {
-      setStories((prev) =>
-        prev.map((story) =>
-          story.curationStatus === "needs_curation"
-            ? { ...story, curationStatus: "approved" }
-            : story
-        )
-      );
-    }
+    if (result.data) setSuccessMessage(`Se han aprobado ${result.data.approvedCount} historias.`);
+    setSelectedIds(new Set());
+    await loadRef.current();
+    if (result.error) setError(result.error);
 
     setIsApprovingAll(false);
     setIsApproveAllConfirmOpen(false);
@@ -214,11 +205,11 @@ export function useStoriesTab() {
     if (result.error) {
       setError(result.error);
     } else if (result.data) {
-      setStories((prev) => prev.filter((story) => !selectedIds.has(story.id)));
       setSelectedIds(new Set());
+      await loadRef.current();
     }
 
     setIsBulkUpdating(false);
   };
-  return { currentPage, stories, total, filter, setFilter, searchQuery, setSearchQuery, isLoading, error, editingStory, setEditingStory, selectedIds, isBulkUpdating, isCreateDialogOpen, setIsCreateDialogOpen, isApproveAllConfirmOpen, setIsApproveAllConfirmOpen, isApprovingAll, totalPages, goToPage, filteredStories, needsCurationCount, approvedCount, missingTranslationsCount, handleStoryUpdate, handleToggleSelect, handleClearSelection, handleBulkMarkApproved, handleBulkMarkPending, handleStoryCreated, handleApproveAll, handleBulkDelete };
+  return { approvalCount: approvalIds.length, successMessage, currentPage, stories, total, filter, setFilter, searchQuery, setSearchQuery, isLoading, error, editingStory, setEditingStory, selectedIds, isBulkUpdating, isCreateDialogOpen, setIsCreateDialogOpen, isApproveAllConfirmOpen, setIsApproveAllConfirmOpen, isApprovingAll, totalPages, goToPage, filteredStories, needsCurationCount, approvedCount, missingTranslationsCount, handleStoryUpdate, handleToggleSelect, handleClearSelection, handleBulkMarkApproved, handleBulkMarkPending, handleStoryCreated, handleApproveAll, handleBulkDelete };
 }

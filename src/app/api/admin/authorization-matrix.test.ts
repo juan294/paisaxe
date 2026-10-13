@@ -39,6 +39,7 @@ const routes = [
   "stories/[id]/content-images",
   "stories/[id]/image",
   "stories/[id]/image-source",
+  "stories/[id]/image-review",
   "stories/[id]",
   "stories/[id]/status",
   "stories/[id]/translations",

@@ -3,6 +3,7 @@ import { render, screen, within, fireEvent, waitFor } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { StoriesTabPanel } from "./stories-tab-panel";
 import type { AdminStory } from "@/types/admin";
+import { selectStoryCatalog } from "@/lib/admin-story-catalog";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -28,7 +29,9 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input), window.location.origin);
     if (url.pathname === "/api/admin/stories" && !init?.method) {
-      return Response.json({data: {stories: [story], total: 1, page: 1, pageSize: 20}});
+      return Response.json({data: selectStoryCatalog([story], {
+        filter: "all", page: 1, pageSize: 20,
+      })});
     }
     if (url.pathname === `/api/admin/stories/${story.id}` && init?.method === "PATCH") {
       const body = JSON.parse(String(init.body));

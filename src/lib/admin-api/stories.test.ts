@@ -573,7 +573,7 @@ describe("admin-api/stories", () => {
         mockResponse({ data: { approvedCount: 5, approvedIds: ["a", "b", "c", "d", "e"] } })
       );
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(fetch).toHaveBeenCalledOnce();
       const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:578 mock call tuple");
@@ -582,16 +582,16 @@ describe("admin-api/stories", () => {
       expect(result).toEqual({ data: { approvedCount: 5, approvedIds: ["a", "b", "c", "d", "e"] } });
     });
 
-    it("does not send request body or Content-Type header", async () => {
+    it("sends the explicit confirmation snapshot as JSON", async () => {
       global.fetch = vi.fn().mockResolvedValue(
         mockResponse({ data: { approvedCount: 0, approvedIds: [] } })
       );
 
-      await approveAllPendingStories();
+      await approveAllPendingStories(["a", "b"]);
 
       const [, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:591 mock call tuple");
-      expect(init.body).toBeUndefined();
-      expect(init.headers).toEqual({});
+      expect(JSON.parse(init.body)).toEqual({ storyIds: ["a", "b"] });
+      expect(init.headers).toEqual(expect.objectContaining({ "Content-Type": "application/json" }));
     });
 
     it("returns error from response body on non-ok response", async () => {
@@ -599,15 +599,20 @@ describe("admin-api/stories", () => {
         mockResponse({ error: "Forbidden" }, false)
       );
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(result).toEqual({ error: "Forbidden" });
+    });
+
+    it("preserves the actual receipt when a later approval batch fails", async () => {
+      global.fetch = vi.fn().mockResolvedValue(mockResponse({ error: "Stopped", data: { approvedCount: 1, approvedIds: ["a"] } }, false));
+      expect(await approveAllPendingStories(["a", "b"])).toEqual({ error: "Stopped", data: { approvedCount: 1, approvedIds: ["a"] } });
     });
 
     it("returns fallback error when response body has no error field", async () => {
       global.fetch = vi.fn().mockResolvedValue(mockResponse({}, false));
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(result).toEqual({ error: "Failed to approve all stories" });
     });
@@ -615,7 +620,7 @@ describe("admin-api/stories", () => {
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(result).toEqual({ error: "Network error" });
     });
@@ -623,7 +628,7 @@ describe("admin-api/stories", () => {
     it("returns network error when fetch throws a non-Error value", async () => {
       global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(result).toEqual({ error: "Network error" });
     });

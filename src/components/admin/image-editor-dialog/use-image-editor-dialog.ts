@@ -1,5 +1,8 @@
 "use client";
 
+import { parseImageProvenance } from "@/lib/image-provenance";
+import { photoReviewError } from "../photo-review";
+
 import { useState, useCallback } from "react";
 import { updateStoryImageUrl, uploadStoryImage, updateStoryStatus, updateStoryImageSource } from "@/lib/admin-api";
 import type { AdminStory, CurationStatus } from "@/types/admin";
@@ -25,6 +28,12 @@ export function useImageEditorDialog({ story, onClose, onUpdate }: ImageEditorDi
     setError("");
 
     try {
+      const changing = !!img.imageUrl || !!img.selectedFile || !!img.currentContentImage || img.imageSource !== (story.imageSource || "");
+      if (changing) {
+        const target = img.imageSourceTab === "upload" && img.selectedFile ? undefined : img.imageSourceTab === "url" && img.imageUrl ? img.imageUrl : img.currentContentImage?.url ?? story.image;
+        const reviewError = photoReviewError(img.imageSource, target);
+        if (reviewError) { setError(reviewError); return; }
+      }
       let result;
 
       if (img.imageSourceTab === "url" && img.imageUrl) {
@@ -34,11 +43,17 @@ export function useImageEditorDialog({ story, onClose, onUpdate }: ImageEditorDi
       } else if (img.imageSourceTab === "content" && img.currentContentImage) {
         result = await updateStoryImageUrl(story.id, img.currentContentImage.url, img.imageSource || undefined);
       } else {
-        const hasRealImage = story.image && !isPlaceholderImage(story);
+        const hasRealImage = story.image && (!isPlaceholderImage(story) || parseImageProvenance(img.imageSource)?.assetUrl === story.image);
         const sourceChanged = img.imageSource !== (story.imageSource || "");
 
         if (hasRealImage) {
           if (sourceChanged && img.imageSource) {
+            if (!parseImageProvenance(story.imageSource)) {
+              const reviewed = await updateStoryImageUrl(story.id, story.image, img.imageSource);
+              if (reviewed.error) setError(reviewed.error);
+              else if (reviewed.data) { onUpdate(story.id, { image: reviewed.data.image, imageSource: reviewed.data.imageSource }); resetAndClose(); }
+              return;
+            }
             const sourceResult = await updateStoryImageSource(story.id, img.imageSource);
             if (sourceResult.error) {
               setError(sourceResult.error);

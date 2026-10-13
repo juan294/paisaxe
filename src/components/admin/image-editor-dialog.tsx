@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhotoReviewForm } from "./photo-review-form";
 import { CurationBadge } from "./curation-badge";
 import {
   Link,
@@ -20,8 +21,6 @@ import {
   Loader2,
   AlertCircle,
   FolderSearch,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
@@ -47,7 +46,7 @@ export function ImageEditorDialog({
   return (
     <>
       <Dialog open={!!story} onOpenChange={resetAndClose}>
-        <DialogContent hideCloseButton className="max-w-xl gap-0 overflow-hidden rounded-2xl border-admin-line bg-white p-0 shadow-xl dark:border-admin-depth dark:bg-admin-panel">
+        <DialogContent hideCloseButton className="max-h-[90vh] max-w-xl gap-0 overflow-y-auto rounded-2xl border-admin-line bg-white p-0 shadow-xl dark:border-admin-depth dark:bg-admin-panel">
           {/* Header */}
           <DialogHeader className="border-b border-admin-line px-5 py-4 dark:border-admin-depth">
             <div className="flex items-center justify-between">
@@ -120,10 +119,11 @@ export function ImageEditorDialog({
                   img.setImageSourceTab("content");
                   img.clearUpload();
                   img.handleUrlChange("");
+                  img.setImageSource(story.imageSource || "");
                 }}
               >
                 <FolderSearch className="h-3.5 w-3.5" />
-                Content
+                Actual
               </button>
               <button
                 className={cn(
@@ -168,82 +168,13 @@ export function ImageEditorDialog({
                   className="h-11 rounded-xl border-none bg-admin-paper text-sm text-admin-ink placeholder:text-admin-subtle focus-visible:ring-1 focus-visible:ring-admin-warning dark:bg-admin-ink dark:text-admin-paper"
                 />
               ) : img.imageSourceTab === "content" ? (
-                <div className="space-y-3">
-                  {/* Search button */}
-                  <button
-                    onClick={img.handleSearchContent}
-                    disabled={img.isSearchingContent || !story?.sourcePdf}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-admin-line/80 bg-white/80 px-4 py-3 text-sm font-medium text-admin-secondary shadow-sm backdrop-blur-sm transition-all hover:bg-admin-paper disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {img.isSearchingContent ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <FolderSearch className="h-4 w-4" />
-                        Search PDF Images
-                      </>
-                    )}
-                  </button>
-
-                  {/* No source PDF warning */}
-                  {!story?.sourcePdf && (
-                    <p className="text-center text-xs text-admin-muted">
-                      This story has no source PDF linked.
-                    </p>
-                  )}
-
-                  {/* Content search results */}
-                  {img.contentSearched && (
-                    <div className="rounded-xl border border-admin-line/80 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
-                      {img.contentImages.length === 0 ? (
-                        <p className="text-center text-xs text-admin-muted">
-                          No images found in the PDF content.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-admin-muted">
-                              {img.contentImageIndex + 1} of {img.contentImages.length} images
-                            </span>
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => img.handleContentImageNav("prev")}
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted"
-                              >
-                                <ChevronLeft className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => img.handleContentImageNav("next")}
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted"
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                          {img.currentContentImage && (
-                            <div className="flex items-center justify-between text-[10px] text-admin-muted">
-                              <span>
-                                {img.currentContentImage.width} × {img.currentContentImage.height}px
-                              </span>
-                              <span>
-                                Page {img.currentContentImage.pageNumber} · {img.currentContentImage.type}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <p className="text-xs text-admin-muted">Revisa abajo la foto subida actualmente. Las fotos extraídas de guías no están disponibles sin una revisión individual de permisos.</p>
               ) : (
                 <div>
                   <input
                     ref={img.fileInputRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                     onChange={img.handleFileChange}
                     className="hidden"
                   />
@@ -290,7 +221,7 @@ export function ImageEditorDialog({
                           {img.isDragging ? "Drop here" : "Click or drag"}
                         </p>
                         <p className="mt-0.5 text-[10px] text-admin-subtle">
-                          JPEG, PNG, WebP, GIF · Max 5MB
+                          JPEG, PNG, WebP, GIF, AVIF · Max 10MB
                         </p>
                       </div>
                     </div>
@@ -298,23 +229,7 @@ export function ImageEditorDialog({
                 </div>
               )}
 
-              {/* Image Source / Attribution */}
-              <div className="pt-2">
-                <label htmlFor="image-source" className="mb-1.5 block text-xs font-medium text-admin-muted">
-                  Image Source / Attribution
-                </label>
-                <Input
-                  id="image-source"
-                  type="text"
-                  placeholder="Reviewed photo record"
-                  value={img.imageSource}
-                  onChange={(e) => img.setImageSource(e.target.value)}
-                  className="h-11 rounded-xl border-none bg-admin-paper text-sm text-admin-ink placeholder:text-admin-subtle focus-visible:ring-1 focus-visible:ring-admin-warning dark:bg-admin-ink dark:text-admin-paper"
-                />
-                <p className="mt-1.5 text-[10px] text-admin-subtle">
-                  Permission and mobile/desktop crop review are required. A credit alone cannot approve a photo.
-                </p>
-              </div>
+              <PhotoReviewForm title={story.title} description={story.description} storyId={story.id} asset={img.imageSourceTab === "upload" ? img.selectedFile : img.imageSourceTab === "url" ? img.imageUrl || null : story.image || null} source={img.imageSource} onChange={img.setImageSource} />
 
               {error && (
                 <div className="flex items-center gap-2 rounded-xl bg-red-50/80 px-3 py-2 text-xs text-red-600">

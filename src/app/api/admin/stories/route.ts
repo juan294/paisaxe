@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAdmin, withAdminRead } from "@/lib/admin-auth";
 import {
-  rowToAdminStory,
-  type AdminStoryRow,
   type CurationStatus,
 } from "@/types/admin";
 import type { StoryCategory } from "@/types/immersive";
 import { logger } from "@/lib/logger";
+import { loadStoryCatalog, selectStoryCatalog } from "@/lib/admin-story-catalog";
+import type { StoryCatalogFilter } from "@/types/admin";
 import { createStorySchema } from "@/lib/schemas";
 
 /**
@@ -35,40 +35,22 @@ function generateSlug(title: string): string {
 export async function GET(request: NextRequest) {
   return withAdminRead(async (supabase) => {
     try {
-      // Get optional filter and pagination params from query params
       const { searchParams } = new URL(request.url);
-      const filter = searchParams.get("filter") as CurationStatus | null;
+      const filter = searchParams.get("filter") ?? "all";
+      const search = searchParams.get("search") ?? "";
+      if (!["all", "needs_curation", "approved", "missing_translations"].includes(filter) || search.length > 200) {
+        return NextResponse.json({ error: "Invalid story filter or search" }, { status: 400 });
+      }
       const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
       const pageSize = Math.max(1, Math.min(100, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20));
-      const offset = (page - 1) * pageSize;
-
-      // Build query with exact count for pagination metadata
-      let query = supabase
-        .from("stories")
-        .select("*", { count: "exact" })
-        .order("display_order", { ascending: true })
-        .range(offset, offset + pageSize - 1);
-
-      // Apply filter if provided
-      if (filter === "needs_curation" || filter === "approved") {
-        query = query.eq("curation_status", filter);
-      }
-
-      const { data, error, count } = await query;
-
-      if (error) {
+      if (!Number.isSafeInteger(page)) return NextResponse.json({ error: "Invalid page" }, { status: 400 });
+      try {
+        const catalog = await loadStoryCatalog(supabase);
+        return NextResponse.json({ data: selectStoryCatalog(catalog, { filter: filter as StoryCatalogFilter, search, page, pageSize }) });
+      } catch (error) {
         logger.error("[ADMIN_STORIES_FETCH_FAILED]", { error });
-        return NextResponse.json(
-          { error: "Failed to fetch stories" },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: "Failed to fetch complete story catalog" }, { status: 500 });
       }
-
-      // Convert to admin stories
-      const stories = (data as AdminStoryRow[]).map(rowToAdminStory);
-      const total = count ?? 0;
-
-      return NextResponse.json({ data: { stories, total, page, pageSize } });
     } catch (error) {
       logger.error("[ADMIN_STORIES_GET_UNHANDLED_ERROR]", { error });
       return NextResponse.json(

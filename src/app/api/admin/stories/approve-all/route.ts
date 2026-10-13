@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAdminDeferred } from "@/lib/admin-auth";
+import { bulkDeleteStoriesSchema } from "@/lib/schemas";
+import { readJsonBody } from "@/lib/request-validation";
 import { logger } from "@/lib/logger";
 
 // BE-H3: cap bulk fan-out so a large approval batch does not create unbounded
@@ -83,28 +85,32 @@ async function runWithConcurrencyLimit(
   await Promise.all(workers);
 }
 
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   return withAdminDeferred(async (getClient) => {
 
     try {
-      const supabase = getClient();
-
-      // Update all stories with needs_curation status to approved
-      const { data, error } = await supabase
-        .from("stories")
-        .update({ curation_status: "approved" })
-        .eq("curation_status", "needs_curation")
-        .select("id");
-
-      if (error) {
-        logger.error("Approve all error:", { error: error.message });
-        return NextResponse.json(
-          { error: "Failed to approve stories" },
-          { status: 500 }
-        );
+      const body = await readJsonBody(request);
+      if (!body.ok) return body.error;
+      const parsed = bulkDeleteStoriesSchema.safeParse(body.data);
+      if (!parsed.success || new Set(parsed.data.storyIds).size !== parsed.data.storyIds.length) {
+        return NextResponse.json({ error: "An explicit list of unique story IDs is required" }, { status: 400 });
       }
-
-      const approvedIds = data?.map((s) => s.id) || [];
+      const supabase = getClient();
+      const approvedIds: string[] = [];
+      // Bound URL length and response size. Every batch is restricted to the
+      // frozen confirmation snapshot and rows that are still pending.
+      for (let offset = 0; offset < parsed.data.storyIds.length; offset += 100) {
+        const { data, error } = await supabase.from("stories")
+          .update({ curation_status: "approved" })
+          .eq("curation_status", "needs_curation")
+          .in("id", parsed.data.storyIds.slice(offset, offset + 100))
+          .select("id");
+        if (error) {
+          logger.error("Approve all error:", { error: error.message, approved_count: approvedIds.length });
+          return NextResponse.json({ error: `Approval stopped after ${approvedIds.length} stories; refresh and review the remaining stories`, data: { approvedCount: approvedIds.length, approvedIds } }, { status: 500 });
+        }
+        approvedIds.push(...(data?.map(s => s.id) ?? []));
+      }
 
       // BE-H3: fan out webhook pings with a concurrency cap to avoid unbounded
       // concurrent HTTP calls when a large batch is approved.  The DB trigger has
@@ -139,5 +145,5 @@ export async function POST(_request: NextRequest) {
       );
     }
 
-  }, _request);
+  }, request);
 }

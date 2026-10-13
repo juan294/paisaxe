@@ -2,15 +2,12 @@
 
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PhotoReviewForm } from "../photo-review-form";
 import {
   Link,
   Upload,
-  Loader2,
   AlertCircle,
   FolderSearch,
-  ChevronLeft,
-  ChevronRight,
   ImagePlus,
   Maximize2,
   X,
@@ -35,10 +32,6 @@ export function ImageTab({ story }: ImageTabProps) {
     selectedFile,
     isDragging,
     fileInputRef,
-    contentImages,
-    contentImageIndex,
-    isSearchingContent,
-    contentSearched,
     currentContentImage,
     setIsFullscreen,
     handleUrlChange,
@@ -48,8 +41,6 @@ export function ImageTab({ story }: ImageTabProps) {
     handleDragLeave,
     handleDrop,
     clearUpload,
-    handleSearchContent,
-    handleContentImageNav,
   } = useImageEditorContext();
 
   return (
@@ -101,6 +92,7 @@ export function ImageTab({ story }: ImageTabProps) {
             setImageSourceTab("content");
             clearUpload();
             handleUrlChange("");
+            setImageSource(story.imageSource || "");
           }}
           className={cn(
             "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
@@ -110,7 +102,7 @@ export function ImageTab({ story }: ImageTabProps) {
           )}
         >
           <FolderSearch className="h-3.5 w-3.5" />
-          Content
+          Actual
         </button>
         <button
           onClick={() => {
@@ -147,71 +139,7 @@ export function ImageTab({ story }: ImageTabProps) {
       {/* Image Source Content */}
       <div className="space-y-3">
         {imageSourceTab === "content" ? (
-          <>
-            <button
-              onClick={handleSearchContent}
-              disabled={isSearchingContent || !story.sourcePdf}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-admin-line bg-white px-4 py-3 text-sm font-medium text-admin-muted transition-all hover:bg-admin-paper disabled:cursor-not-allowed disabled:opacity-50 dark:border-admin-depth dark:bg-admin-ink dark:text-admin-subtle dark:hover:bg-admin-depth"
-            >
-              {isSearchingContent ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                <>
-                  <FolderSearch className="h-4 w-4" />
-                  Search PDF Images
-                </>
-              )}
-            </button>
-
-            {!story.sourcePdf && (
-              <p className="text-center text-xs text-admin-subtle">
-                This story has no source PDF linked.
-              </p>
-            )}
-
-            {contentSearched && (
-              <div className="rounded-xl border border-admin-line bg-white p-3 dark:border-admin-depth dark:bg-admin-ink">
-                {contentImages.length === 0 ? (
-                  <p className="text-center text-xs text-admin-subtle">
-                    No images found in the PDF content.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-admin-muted dark:text-admin-subtle">
-                        {contentImageIndex + 1} of {contentImages.length} images
-                      </span>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => handleContentImageNav("prev")}
-                          aria-label="Previous image"
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted dark:hover:bg-admin-depth"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleContentImageNav("next")}
-                          aria-label="Next image"
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted dark:hover:bg-admin-depth"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                    {currentContentImage && (
-                      <div className="flex items-center justify-between text-[10px] text-admin-subtle">
-                        <span>{currentContentImage.width} × {currentContentImage.height}px</span>
-                        <span>Page {currentContentImage.pageNumber} · {currentContentImage.type}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+          <p className="text-xs text-admin-subtle">Revisa abajo la foto subida actualmente. Las fotos extraídas de guías no están disponibles sin una revisión individual de permisos.</p>
         ) : imageSourceTab === "url" ? (
           <Input
             type="url"
@@ -225,7 +153,7 @@ export function ImageTab({ story }: ImageTabProps) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
               onChange={handleFileChange}
               className="hidden"
             />
@@ -273,7 +201,7 @@ export function ImageTab({ story }: ImageTabProps) {
                     {isDragging ? "Drop here" : "Click or drag"}
                   </p>
                   <p className="mt-0.5 text-[10px] text-admin-subtle">
-                    JPEG, PNG, WebP, GIF · Max 5MB
+                    JPEG, PNG, WebP, GIF, AVIF · Max 10MB
                   </p>
                 </div>
               </div>
@@ -281,23 +209,7 @@ export function ImageTab({ story }: ImageTabProps) {
           </div>
         )}
 
-        {/* Image Attribution */}
-        <div className="space-y-2 pt-2">
-          <Label htmlFor="imageSource" className="text-sm font-medium text-admin-ink dark:text-admin-paper">
-            Image Attribution
-          </Label>
-          <Input
-            id="imageSource"
-            type="text"
-            placeholder="Reviewed photo record"
-            value={imageSource}
-            onChange={(e) => setImageSource(e.target.value)}
-            className="bg-admin-paper dark:bg-admin-ink"
-          />
-          <p className="text-[10px] text-admin-subtle">
-            Permission and mobile/desktop crop review are required. A credit alone cannot approve a photo.
-          </p>
-        </div>
+        <PhotoReviewForm title={story.title} description={story.description} storyId={story.id} asset={imageSourceTab === "upload" ? selectedFile : imageSourceTab === "url" ? imageUrl || null : story.image || null} source={imageSource} onChange={setImageSource} />
       </div>
     </>
   );

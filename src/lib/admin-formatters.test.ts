@@ -42,6 +42,14 @@ describe("hasMissingTranslations", () => {
     expect(hasMissingTranslations(baseStory)).toBe(true);
   });
 
+  it("treats malformed legacy translation fields as missing instead of throwing", () => {
+    const story = { ...baseStory, metadata: {
+      translations: { en: { title: 123, subtitle: null, description: false } },
+      translation_status: { en: { status: "complete" } },
+    } } as unknown as AdminStory;
+    expect(hasMissingTranslations(story)).toBe(true);
+  });
+
   it("returns true when metadata exists but translations are empty", () => {
     const story: AdminStory = {
       ...baseStory,

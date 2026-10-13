@@ -1,3 +1,4 @@
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
 import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { handleSave, handleApprove, handleMarkNeedsCuration } from "./use-story-editor-save";
@@ -31,7 +32,7 @@ const mockStory = {
   subtitle: "A subtitle",
   description: "A description",
   image: "/images/test.jpg",
-  imageSource: "Photo by Test",
+  imageSource: imageProvenanceFixture("/images/test.jpg"),
   category: "nature",
   displayOrder: 1,
   curationStatus: "needs_curation",
@@ -251,25 +252,25 @@ describe("handleSave", () => {
   describe("image saving", () => {
     it("saves image via URL when imageSourceTab is 'url'", async () => {
       (updateStoryImageUrl as Mock).mockResolvedValue({
-        data: { id: "story-1", image: "/images/new.jpg", imageSource: "Photo by URL" },
+        data: { id: "story-1", image: "/images/new.jpg", imageSource: imageProvenanceFixture("https://example.com/photo.jpg") },
       });
 
       const params = makeParams({
         hasImageChanges: true,
         imageSourceTab: "url",
         imageUrl: "https://example.com/photo.jpg",
-        imageSource: "Photo by URL",
+        imageSource: imageProvenanceFixture("https://example.com/photo.jpg"),
       });
       await handleSave(params);
 
       expect(updateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
         "https://example.com/photo.jpg",
-        "Photo by URL"
+        imageProvenanceFixture("https://example.com/photo.jpg")
       );
       expect(params.onUpdate).toHaveBeenCalledWith("story-1", {
         image: "/images/new.jpg",
-        imageSource: "Photo by URL",
+        imageSource: imageProvenanceFixture("https://example.com/photo.jpg"),
       });
       expect(params.resetAndClose).toHaveBeenCalled();
     });
@@ -277,25 +278,25 @@ describe("handleSave", () => {
     it("saves image via upload when imageSourceTab is 'upload'", async () => {
       const mockFile = new File(["data"], "photo.jpg", { type: "image/jpeg" });
       (uploadStoryImage as Mock).mockResolvedValue({
-        data: { id: "story-1", image: "/images/uploaded.jpg", imageSource: "My photo" },
+        data: { id: "story-1", image: "/images/uploaded.jpg", imageSource: imageProvenanceFixture("https://example.com/uploaded.avif") },
       });
 
       const params = makeParams({
         hasImageChanges: true,
         imageSourceTab: "upload",
         selectedFile: mockFile,
-        imageSource: "My photo",
+        imageSource: imageProvenanceFixture("https://example.com/uploaded.avif"),
       });
       await handleSave(params);
 
-      expect(uploadStoryImage).toHaveBeenCalledWith("story-1", mockFile, "My photo");
+      expect(uploadStoryImage).toHaveBeenCalledWith("story-1", mockFile, imageProvenanceFixture("https://example.com/uploaded.avif"));
       expect(params.onUpdate).toHaveBeenCalledWith("story-1", {
         image: "/images/uploaded.jpg",
-        imageSource: "My photo",
+        imageSource: imageProvenanceFixture("https://example.com/uploaded.avif"),
       });
     });
 
-    it("passes undefined for imageSource when empty on upload (line 124 falsy branch)", async () => {
+    it("rejects upload without a complete photo review", async () => {
       const mockFile = new File(["data"], "photo.jpg", { type: "image/jpeg" });
       (uploadStoryImage as Mock).mockResolvedValue({
         data: { id: "story-1", image: "/images/uploaded.jpg", imageSource: null },
@@ -309,7 +310,8 @@ describe("handleSave", () => {
       });
       await handleSave(params);
 
-      expect(uploadStoryImage).toHaveBeenCalledWith("story-1", mockFile, undefined);
+      expect(uploadStoryImage).not.toHaveBeenCalled();
+      expect(params.setError).toHaveBeenCalledWith(expect.stringMatching(/revis/i));
     });
 
     it("saves image from content when imageSourceTab is 'content'", async () => {
@@ -325,25 +327,25 @@ describe("handleSave", () => {
         score: 0.95,
       };
       (updateStoryImageUrl as Mock).mockResolvedValue({
-        data: { id: "story-1", image: "/content/images/img.jpg", imageSource: "Content" },
+        data: { id: "story-1", image: "/content/images/img.jpg", imageSource: imageProvenanceFixture("/content/images/img.jpg") },
       });
 
       const params = makeParams({
         hasImageChanges: true,
         imageSourceTab: "content",
         currentContentImage: contentImage,
-        imageSource: "Content",
+        imageSource: imageProvenanceFixture("/content/images/img.jpg"),
       });
       await handleSave(params);
 
       expect(updateStoryImageUrl).toHaveBeenCalledWith(
         "story-1",
         "/content/images/img.jpg",
-        "Content"
+        imageProvenanceFixture("/content/images/img.jpg")
       );
     });
 
-    it("passes undefined for imageSource when empty on content image (line 126 falsy branch)", async () => {
+    it("rejects content image without a complete photo review", async () => {
       const contentImage: ContentImage = {
         filename: "img.jpg",
         sourcePdf: "guide.pdf",
@@ -367,21 +369,18 @@ describe("handleSave", () => {
       });
       await handleSave(params);
 
-      expect(updateStoryImageUrl).toHaveBeenCalledWith(
-        "story-1",
-        "/content/images/img.jpg",
-        undefined
-      );
+      expect(updateStoryImageUrl).not.toHaveBeenCalled();
+      expect(params.setError).toHaveBeenCalledWith(expect.stringMatching(/revis/i));
     });
 
     it("updates only image source when only imageSource changed", async () => {
       const storyWithSource = {
         ...mockStory,
-        imageSource: "Old Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Old Source" }),
       } as AdminStory;
 
       (updateStoryImageSource as Mock).mockResolvedValue({
-        data: { id: "story-1", imageSource: "New Source" },
+        data: { id: "story-1", imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }) },
       });
 
       const params = makeParams({
@@ -389,13 +388,13 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "url",
         imageUrl: "", // no URL provided, so url branch doesn't fire
-        imageSource: "New Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }),
       });
       await handleSave(params);
 
-      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "New Source");
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }));
       expect(params.onUpdate).toHaveBeenCalledWith("story-1", {
-        imageSource: "New Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }),
       });
       expect(params.resetAndClose).toHaveBeenCalled();
     });
@@ -403,8 +402,8 @@ describe("handleSave", () => {
     it("uses empty string fallback when story.imageSource is undefined (line 127 falsy branch)", async () => {
       // story.imageSource is undefined → `story.imageSource || ""` evaluates the falsy branch
       const storyNoSource = { ...mockStory, imageSource: undefined } as AdminStory;
-      (updateStoryImageSource as Mock).mockResolvedValue({
-        data: { id: "story-1", imageSource: "Added Source" },
+      (updateStoryImageUrl as Mock).mockResolvedValue({
+        data: { id: "story-1", image: "/images/test.jpg", imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Added Source" }) },
       });
 
       const params = makeParams({
@@ -412,13 +411,14 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "url",
         imageUrl: "", // no URL — skip url branch
-        imageSource: "Added Source", // differs from fallback "" → enters source-only branch
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Added Source" }), // differs from fallback "" → enters source-only branch
       });
       await handleSave(params);
 
-      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "Added Source");
+      expect(updateStoryImageUrl).toHaveBeenCalledWith("story-1", "/images/test.jpg", imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Added Source" }));
       expect(params.onUpdate).toHaveBeenCalledWith("story-1", {
-        imageSource: "Added Source",
+        image: "/images/test.jpg",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Added Source" }),
       });
     });
 
@@ -431,6 +431,7 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "url",
         imageUrl: "https://example.com/big.jpg",
+        imageSource: imageProvenanceFixture("https://example.com/big.jpg"),
       });
       await handleSave(params);
 
@@ -447,7 +448,7 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "url",
         imageUrl: "https://example.com/photo.jpg",
-        imageSource: "Photo credit",
+        imageSource: imageProvenanceFixture("https://example.com/photo.jpg"),
       });
       await handleSave(params);
 
@@ -461,7 +462,7 @@ describe("handleSave", () => {
     it("does not call onUpdate when sourceResult.data is null (line 135 false branch)", async () => {
       const storyWithSource = {
         ...mockStory,
-        imageSource: "Old Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Old Source" }),
       } as AdminStory;
 
       // updateStoryImageSource returns success but no data
@@ -472,11 +473,11 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "url",
         imageUrl: "",
-        imageSource: "New Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }),
       });
       await handleSave(params);
 
-      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "New Source");
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }));
       // onUpdate should NOT have been called (no data returned)
       expect(params.onUpdate).not.toHaveBeenCalled();
       // Should still call resetAndClose (no error)
@@ -503,7 +504,7 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "upload",
         selectedFile: null,
-        imageSource: "Photo by Test", // same as story.imageSource
+        imageSource: imageProvenanceFixture("/images/test.jpg"), // same as story.imageSource
       });
       await handleSave(params);
 
@@ -520,7 +521,7 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "content",
         currentContentImage: null,
-        imageSource: "Photo by Test", // same as story.imageSource
+        imageSource: imageProvenanceFixture("/images/test.jpg"), // same as story.imageSource
       });
       await handleSave(params);
 
@@ -533,9 +534,9 @@ describe("handleSave", () => {
     it("falls through to imageSource check when upload tab has no file and source differs (line 127)", async () => {
       // imageSourceTab is "upload" but selectedFile is null, AND imageSource differs
       // This should fall through to the `else if (imageSource !== ...)` branch
-      const storyWithSource = { ...mockStory, imageSource: "Old Source" } as AdminStory;
+      const storyWithSource = { ...mockStory, imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Old Source" }) } as AdminStory;
       (updateStoryImageSource as Mock).mockResolvedValue({
-        data: { id: "story-1", imageSource: "New Source" },
+        data: { id: "story-1", imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }) },
       });
 
       const params = makeParams({
@@ -543,19 +544,19 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "upload",
         selectedFile: null,
-        imageSource: "New Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }),
       });
       await handleSave(params);
 
       expect(uploadStoryImage).not.toHaveBeenCalled();
-      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "New Source");
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }));
     });
 
     it("falls through to imageSource check when content tab has no image and source differs (line 127)", async () => {
       // imageSourceTab is "content" but currentContentImage is null, AND imageSource differs
-      const storyWithSource = { ...mockStory, imageSource: "Old Source" } as AdminStory;
+      const storyWithSource = { ...mockStory, imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Old Source" }) } as AdminStory;
       (updateStoryImageSource as Mock).mockResolvedValue({
-        data: { id: "story-1", imageSource: "New Source" },
+        data: { id: "story-1", imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }) },
       });
 
       const params = makeParams({
@@ -563,18 +564,18 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "content",
         currentContentImage: null,
-        imageSource: "New Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }),
       });
       await handleSave(params);
 
       expect(updateStoryImageUrl).not.toHaveBeenCalled();
-      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "New Source");
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }));
     });
 
     it("shows error when updateStoryImageSource fails", async () => {
       const storyWithSource = {
         ...mockStory,
-        imageSource: "Old Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "Old Source" }),
       } as AdminStory;
 
       (updateStoryImageSource as Mock).mockResolvedValue({
@@ -586,7 +587,7 @@ describe("handleSave", () => {
         hasImageChanges: true,
         imageSourceTab: "url",
         imageUrl: "",
-        imageSource: "New Source",
+        imageSource: imageProvenanceFixture("/images/test.jpg", "image fixture", "image fixture", { credit: "New Source" }),
       });
       await handleSave(params);
 
@@ -1025,4 +1026,22 @@ describe("handleMarkNeedsCuration", () => {
     expect(requiredValue(requiredValue(calls[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[0]")[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[0][0]")).toBe(true);
     expect(requiredValue(requiredValue(calls[calls.length - 1], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[calls.length - 1]")[0], "src/components/admin/story-editor-dialog/use-story-editor-save.test.ts: calls[calls.length - 1][0]")).toBe(false);
   });
+});
+
+// A failed image review must not partially save other story edits.
+it("preflights image review before any details mutation", async () => {
+  const params = makeParams({ hasDetailsChanges: true, hasImageChanges: true, imageSourceTab: "url", imageUrl: "https://example.com/new.jpg", imageSource: "free credit" });
+  await handleSave(params);
+  expect(params.setError).toHaveBeenCalledWith(expect.stringMatching(/revis/i));
+  expect(updateStory).not.toHaveBeenCalled();
+  expect(updateStoryImageUrl).not.toHaveBeenCalled();
+});
+
+it("does not save details when byte verification rejects the reviewed image", async () => {
+  (updateStoryImageUrl as Mock).mockResolvedValue({ error: "La foto cambió desde su revisión" });
+  const params = makeParams({ hasDetailsChanges: true, hasImageChanges: true, imageSourceTab: "url", imageUrl: "https://example.com/current.jpg", imageSource: imageProvenanceFixture("https://example.com/current.jpg") });
+  await handleSave(params);
+  expect(params.setError).toHaveBeenCalledWith("La foto cambió desde su revisión");
+  expect(updateStory).not.toHaveBeenCalled();
+  expect(params.resetAndClose).not.toHaveBeenCalled();
 });
