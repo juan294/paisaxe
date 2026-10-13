@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-13
+
+### Added
+- Structured image provenance and owner review, a disclosed illustration fallback, and authored-content source and overlap validation tools.
+- PayPal Transaction Search in the operator panel, using the official PayPal Server SDK.
+- Isolated database contract verification and recorded provider adapter replay fixtures.
+
+### Changed
+- Consolidated client caches with identity-scoped invalidation, checked indexed access, and stricter admin and tooling contracts.
+- Refined booking cards, voucher and payment-return pages, operator presentation, locale handling, keyboard navigation and legal-footer access.
+- Bound retrieval and reranking work; require supplied evidence in guide responses and more conservative driving, snow and allergy advice.
+- Retired the release-PR Vercel Preview exception; release artifact verification runs in GitHub Actions.
+
+### Fixed
+- Admin catalog totals, approval filtering and photo curation behavior.
+- Real Stripe checkout verification now uses an owned local database and rejects live-mode keys and unsafe direct test invocations.
+- Stripe entitlement lifecycle and paid voice access boundaries.
+- Request authentication, local-operation isolation, database privileges and booking retention boundaries.
+- Frontend performance, shared palette consistency and CI coverage evidence handling.
+
+### Release scope and migration notes
+- Release scope is the 71 owner-approved stories. The owner closed further answer-quality rechecking and full replacement-knowledge completion for this release; historical failed diagnostics remain recorded and no full replacement corpus is promoted by this release.
+- Includes migrations 127–130 for database boundaries, booking retention, Stripe entitlements and authored content. Deployment must verify remote migration posture before affected features are used.
+- Existing photo credits require the separately authorized structured owner-review batch after provenance-aware code is deployed; unchanged uploaded images and original credits are preserved.
+
 ## [1.8.0] - 2026-10-07
 
 ### Added

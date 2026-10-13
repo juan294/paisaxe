@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_MCP_SECRET } from "./e2e/fixtures/mcp-secret";
+import { assertStripeLocalInputs } from "./scripts/run-stripe-e2e";
 import { assertLocalDatastore } from "./scripts/release/probe-guards";
 import {
   BOOKING_PREVIEW_ORIGIN,
@@ -8,6 +9,9 @@ import {
   isReleaseLocalRun,
   localBookingServerEnv,
 } from "./e2e/fixtures/booking-env";
+
+const stripeLocalRun = process.argv.some((arg, index) => arg === "--project=stripe-integration" || (arg === "--project" && process.argv[index + 1] === "stripe-integration"));
+if (stripeLocalRun) assertStripeLocalInputs();
 
 const presentationLocalRun = process.argv.some((arg, index) => arg === "--project=presentation-local" || (arg === "--project" && process.argv[index + 1] === "presentation-local"));
 if (presentationLocalRun) {
@@ -212,7 +216,9 @@ export default defineConfig({
     },
     {
       name: "stripe-integration",
-      use: { ...desktopChrome, locale: "en-US" },
+      // Owned local test transport only: production CSP excludes loopback
+      // Supabase. This project does not qualify production CSP behavior.
+      use: { ...desktopChrome, locale: "en-US", bypassCSP: true },
       testMatch: "stripe-real-checkout.spec.ts",
       timeout: 120_000,
       // This is a release gate: a Playwright retry would turn a flaky payment
@@ -250,6 +256,8 @@ export default defineConfig({
       // Deployed, read-only required probes. Anonymous by design: the
       // admin-denial probe is only meaningful without a stored session.
       name: "release-required",
+      // Stripe is a separate mandatory gate with provider/owned-fixture prerequisites.
+      testIgnore: ["**/stripe-real-checkout.spec.ts"],
       use: {
         ...desktopChrome,
         baseURL: releaseTargetUrl || baseURL,
@@ -275,7 +283,7 @@ export default defineConfig({
       // deviation 9). Test-only, and only on this localhost project.
       use: { ...desktopChrome, bypassCSP: true },
       grep: /@local-docker/,
-      testIgnore: ["**/presentation-local.spec.ts", ...(releaseArtifactRun ? ["**/booking-*.spec.ts"] : [])],
+      testIgnore: ["**/presentation-local.spec.ts", "**/stripe-real-checkout.spec.ts", ...(releaseArtifactRun ? ["**/booking-*.spec.ts"] : [])],
       timeout: 60_000,
       retries: 0,
     },

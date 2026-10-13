@@ -214,7 +214,7 @@
     },
     {
       "path": ".github/workflows/e2e-stripe-integration.yml",
-      "definitionSha": "7a803bd2c0b4df6309c12bd1a0e8f611867ea112",
+      "definitionSha": "cb686455a7854112a3d216e0bd814f62657ffc76",
       "jobs": [
         {
           "id": "e2e-stripe-integration-e2e-stripe",
