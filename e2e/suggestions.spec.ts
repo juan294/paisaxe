@@ -1,3 +1,4 @@
+import { mockFeatureFlagsAfterSsr } from "./fixtures/mock-feature-flags";
 import { test, expect } from "./fixtures/base-test";
 import {
   MOCK_FEATURE_FLAGS,
@@ -28,17 +29,10 @@ test.describe("Suggestion feature", () => {
   test("button visible when user_story_suggestions flag is enabled", async ({
     page,
   }) => {
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          withFeatureFlags({ user_story_suggestions: true })
-        ),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ user_story_suggestions: true }));
 
     await page.goto("/immersive");
+    await settleFlags();
     await expect(page.locator("h1").first()).toBeVisible();
 
     await expect(
@@ -49,16 +43,13 @@ test.describe("Suggestion feature", () => {
   test("button hidden when user_story_suggestions flag is disabled", async ({
     page,
   }) => {
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_FEATURE_FLAGS),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ user_story_suggestions: true }));
 
     await page.goto("/immersive");
+    await settleFlags();
     await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.locator("[data-suggest-place-trigger]")).toBeVisible();
+    await settleFlags(MOCK_FEATURE_FLAGS);
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
@@ -67,17 +58,10 @@ test.describe("Suggestion feature", () => {
 
   test.describe("with flag enabled", () => {
     test.beforeEach(async ({ page }) => {
-      await page.route("**/api/feature-flags", (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify(
-            withFeatureFlags({ user_story_suggestions: true })
-          ),
-        })
-      );
+      const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ user_story_suggestions: true }));
 
       await page.goto("/immersive");
+      await settleFlags();
       await expect(page.locator("h1").first()).toBeVisible();
     });
 
