@@ -10,7 +10,7 @@ const PINS = {
   "scripts/ci-cadence-projection.mjs": "9eb795c6059c57eab3509ed8004e7514b85466aeca0d2843eebecf94a677c0fe",
   "scripts/ci-cadence-run.mjs": "ef1b11904bba6fb5cd210a1ec060ac5314fe262f644535deb63a88860f847b84",
   "scripts/ci-cadence-github.mjs": "8fd9db069e1cef6b2ed191acac2e4877d27ba781a5bac1de118d3e99566e63d8",
-  "scripts/ci-cadence-producer.mjs": "c70bfee233a2b8d743a4bd925e53ca6af7de442359ff6bd92db39ae1e7e12be2",
+  "scripts/ci-cadence-producer.mjs": "a6e0c7998c3961980de8dd755386631a6b22a44555eb6c35683535672b87562c",
   "scripts/ci-cadence-coverage.mjs": "a32f5a65db83b73ad517131520c1be4ac011921e7b2c98131e7d5fc34b125f58",
   "scripts/ci-cadence-native.mjs": "a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d",
   "scripts/ci-cadence.mjs": "9f2da9ab55525a3ca4acc311feaf5426fc86d83258c5dda7754dc05405c9a7ab"

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "source": "Phase 12 declared source census extends the prior Phase 4 census with 29 authored-corpus permission/version cases. Historical recordings remain unchanged. Exact-candidate full contract qualification is required; this inventory is not a hosted recording or full-run receipt.",
-  "declaredContractCases": 1031,
-  "ordinaryEnvironmentGatedCases": 1032,
+  "source": "Release 1.9.0 source census: 1,036 cases qualified by the local full contract run on 2026-10-14, plus the one ordinary operator-link case outside that runner. Source hashes bind all 23 current gated test files. Historical hosted recordings remain unchanged; this inventory is not a hosted recording.",
+  "declaredContractCases": 1036,
+  "ordinaryEnvironmentGatedCases": 1037,
   "groups": [
     {
       "file": "scripts/booking/create-operator-link.test.ts",
@@ -52,7 +52,7 @@
     {
       "file": "src/lib/booking/phone-confirmation.postgrest-integration.test.ts",
       "describe": "phone confirmation against live local Supabase",
-      "cases": 14
+      "cases": 15
     },
     {
       "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
@@ -117,7 +117,49 @@
     {
       "file": "src/lib/corpus.postgrest-integration.test.ts",
       "describe": "Authored corpus version and permission boundaries (real PostgREST)",
-      "cases": 29
+      "cases": 33
     }
-  ]
+  ],
+  "sourceSha256": {
+    "scripts/booking/create-operator-link.test.ts": "ee2e57c9dbff70ab88b71776bdbec50e608681eeb1c3c7a02199b55688ce7ce4",
+    "src/app/api/feature-flags/route.postgrest-rls.test.ts": "d20e499d2f47b25a4a2759cb447175cca76df1faded26a73bb1a54ffb28f26eb",
+    "src/app/api/webhooks/stripe/route.postgrest-integration.test.ts": "6b1055a9d1bb93a80d7af37ea5c58aa2be22955b55aa70070b9e587a825aeb5e",
+    "src/lib/booking/booking.postgrest-integration.test.ts": "521fc01848c4bcf20c335665da95d56e7273b5721491986b034e51069a4655b5",
+    "src/lib/booking/cancel.postgrest-integration.test.ts": "f910fe11c782379284bb909ede63ed8d11015fa3336063491d37e610b2fa64e0",
+    "src/lib/booking/capture.postgrest-integration.test.ts": "70e4a4276bd1442bd8fd3a7ca3f79cceae71bbb6c1fe6bb55594c238d02ade84",
+    "src/lib/booking/invoice.postgrest-integration.test.ts": "55f6900043b8d3988175e901af24e823bc5928c52f559e4356db1e82ce825348",
+    "src/lib/booking/operator.postgrest-integration.test.ts": "49deeafd15ca851fdb2f18f6f4d5c6e2664a5b0ac00420103d618eb3e7f07882",
+    "src/lib/booking/phone-confirmation.postgrest-integration.test.ts": "dcd8ebd3170ab49bcd91d80e36b194c46b9cdc4f76371287368f59d7b91dd4a9",
+    "src/lib/booking/reconcile.postgrest-integration.test.ts": "2b0c9dfb250c8d5c36679fc2d246629ed861a3f7a93917f81cc22e534bd8f963",
+    "src/lib/booking/retention.postgrest-integration.test.ts": "e08c291409cd073a339a5599058eac10f6ecc83b6805b1a2d692edb38da834b7",
+    "src/lib/booking/tools.postgrest-integration.test.ts": "75f80d4839a3577879491b649a8dc25d41eda314f7e0b15040d59a6f28754df3",
+    "src/lib/booking/vouchers.postgrest-integration.test.ts": "a2ef2fbffa3cd291edb98d4cbf4d0cb7c34c8dded370ddba4f3fa96af4f58f6f",
+    "src/lib/corpus.postgrest-integration.test.ts": "ad66d2e81115bbf256d54d17ddd5d3c0b13ccf6f1d1c0b2e8a1396848869c35a",
+    "src/lib/database-boundaries.postgrest-rls.test.ts": "9a66abc34b6fac44b9f065d7272107c6a48a62cee82335ad56596428c51adcd3",
+    "src/lib/definer-function-privileges.postgrest-rls.test.ts": "41dcaa01c9acb18727f322b8e14ab0b6d49aeb9c37a05d1684db06617f219785",
+    "src/lib/feature-flag-consumers.postgrest-integration.test.ts": "f2b21c6bed817fb6e2dca6035694e5816fd06b4fc56a1d6bbd62fcd0d2c7dae7",
+    "src/lib/feature-flag-realtime.postgrest-integration.test.ts": "ff1deb38075b9d8a9fe93249c398e81a32c4fdae74ba1a1db85f67e0b700e2bb",
+    "src/lib/match-chunks.postgrest-rls.test.ts": "c65f7e859dcf8040a6ac098fcbe8998193c42850ad3240ba029ef0b65ac5de50",
+    "src/lib/pg-net.postgrest-integration.test.ts": "a219b0ca81ff3f47e7cdfe891fd71c1662498042dea078bfedab04ad5a8dd62c",
+    "src/lib/proxy/maintenance.postgrest-integration.test.ts": "e51d5e4bfa4cd35c79b0c5f85c542f6ac5c18a2c1672c6a9f2224303dc8db1ce",
+    "src/lib/stories-rls.postgrest-rls.test.ts": "3a9f1365a692ee8443d42f2f1db308e288b0f72c44c78b9620149006ac2da552",
+    "src/lib/stripe-entitlements.postgrest-integration.test.ts": "a886a3e546d719992a447cebee7e125811b9cb66a380bb28e952adc7a35544fc"
+  },
+  "qualification": {
+    "receipt": "logs/approved-corpus-release-2026-10-13/release190-final-contracts02/run-aYNjAK/receipt.json",
+    "receiptSha256": "5ba51e7e54b016ea04fd08cc3666a1dbb02063660dd781957dfaef4c5b2a2e20",
+    "candidateDigest": "30799055bd2d10cc927871525c6f652091ae356b21be66a7d708f06f9dfe24f0",
+    "finishedAt": "2026-10-14T06:00:32.873Z",
+    "contractCases": 1036,
+    "observedChangedGroups": [
+      {
+        "file": "src/lib/booking/phone-confirmation.postgrest-integration.test.ts",
+        "cases": 15
+      },
+      {
+        "file": "src/lib/corpus.postgrest-integration.test.ts",
+        "cases": 33
+      }
+    ]
+  }
 }

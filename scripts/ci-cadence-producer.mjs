@@ -21,7 +21,7 @@ export const ENVIRONMENT_GATED = Object.freeze([
   { file: 'src/lib/booking/capture.postgrest-integration.test.ts', describe: 'deposit flow against live local Supabase', cases: 28 },
   { file: 'src/lib/booking/invoice.postgrest-integration.test.ts', describe: 'balance invoice against live local Supabase and the PayPal mock', cases: 14 },
   { file: 'src/lib/booking/operator.postgrest-integration.test.ts', describe: 'operator view against live local Supabase', cases: 20 },
-  { file: 'src/lib/booking/phone-confirmation.postgrest-integration.test.ts', describe: 'phone confirmation against live local Supabase', cases: 14 },
+  { file: 'src/lib/booking/phone-confirmation.postgrest-integration.test.ts', describe: 'phone confirmation against live local Supabase', cases: 15 },
   { file: 'src/lib/booking/reconcile.postgrest-integration.test.ts', describe: 'PayPal webhook inbox and reconciliation against live local Supabase', cases: 32 },
   { file: 'src/lib/booking/tools.postgrest-integration.test.ts', describe: 'booking tools against the fixture merchant', cases: 2 },
   { file: 'src/lib/booking/vouchers.postgrest-integration.test.ts', describe: 'vouchers against live local Supabase', cases: 9 },
@@ -34,7 +34,7 @@ export const ENVIRONMENT_GATED = Object.freeze([
   { file: 'src/lib/feature-flag-consumers.postgrest-integration.test.ts', describe: 'Public feature-flag consumers with real local database', cases: 4 },
   { file: 'src/lib/feature-flag-realtime.postgrest-integration.test.ts', describe: 'Public realtime column privileges (actual local websocket)', cases: 1 },
   { file: 'src/lib/pg-net.postgrest-integration.test.ts', describe: 'Installed pg_net JSONB transport and transaction boundary', cases: 10 },
-  { file: 'src/lib/corpus.postgrest-integration.test.ts', describe: 'Authored corpus version and permission boundaries (real PostgREST)', cases: 29 },
+  { file: 'src/lib/corpus.postgrest-integration.test.ts', describe: 'Authored corpus version and permission boundaries (real PostgREST)', cases: 33 },
 ].map(Object.freeze));
 
 /** The runner supplies paths to its actual exit receipt and fresh native JSON.

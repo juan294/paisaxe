@@ -2,6 +2,7 @@
 // groups in the sources, and they admit the actual skip census of a hosted nightly.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -53,8 +54,8 @@ test('each gated group is gated only by the local Supabase reachability probe, u
 
 test('each reviewed group pins its actual qualified case count', () => {
   assert.deepEqual(ENVIRONMENT_GATED.map(entry => ({...entry})), reviewed.groups);
-  assert.equal(reviewed.declaredContractCases, 1031);
-  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), 1032);
+  assert.equal(reviewed.declaredContractCases, 1036);
+  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), 1037);
 });
 
 function skippedSuite(groups) {
@@ -81,8 +82,22 @@ test('historical hosted nightly retains its 204-case provenance and cannot quali
 test('current ordinary measurement discloses only whole reviewed groups, never counts their skipped cases', () => {
   const suite=skippedSuite(reviewed.groups);
   const result=aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[structuredClone(suite)],environmentGated:ENVIRONMENT_GATED});
-  assert.equal(result.environmentGatedSkipped,1032);assert.equal(result.testCount,1);assert.equal(result.testFiles,1);
+  assert.equal(result.environmentGatedSkipped,1037);assert.equal(result.testCount,1);assert.equal(result.testFiles,1);
   for(const omitted of ENVIRONMENT_GATED) assert.throws(() => aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[structuredClone(suite)],environmentGated:ENVIRONMENT_GATED.filter(entry=>entry!==omitted)}), /mandatory cases skipped or unfinished/, key(omitted));
   const partial=structuredClone(suite);partial.tests.testResults.at(-1).assertionResults[0].status='passed';
   assert.throws(() => aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[partial],environmentGated:ENVIRONMENT_GATED}), /mandatory cases skipped or unfinished/);
+});
+
+// Counts qualify exact source bytes, not merely two agreeing static lists.
+// Changing a suite requires a new measured census before skip admission.
+test('the reviewed census binds every gated test source to its qualified bytes', () => {
+  const files=[...new Set(ENVIRONMENT_GATED.map(entry=>entry.file))].sort();
+  assert.deepEqual(Object.keys(reviewed.sourceSha256 ?? {}).sort(),files);
+  for(const file of files)assert.equal(createHash('sha256').update(readFileSync(`${root}/${file}`)).digest('hex'),reviewed.sourceSha256[file],`${file}: source changed; qualify a fresh case census`);
+  assert.match(reviewed.qualification.receiptSha256,/^[a-f0-9]{64}$/);
+  assert.equal(reviewed.qualification.contractCases,reviewed.declaredContractCases);
+  for(const observed of reviewed.qualification.observedChangedGroups){
+    const entry=ENVIRONMENT_GATED.find(item=>item.file===observed.file);
+    assert.equal(entry?.cases,observed.cases,`${observed.file}: qualified count differs`);
+  }
 });

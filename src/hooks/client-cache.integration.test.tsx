@@ -222,12 +222,14 @@ it("shares one favorites read and optimistic changes between actual authenticate
   const read = deferred<Response>();
   favoritesRead = () => read.promise;
   await mount();
-  expect(reads("/api/favorites")).toBe(1);
+  // Authentication renders before the favorites bootstrap effect enables its query.
+  await waitFor(() => expect(reads("/api/favorites")).toBe(1));
   await act(async () => {
     read.resolve(json([]));
   });
   fireEvent.click(screen.getByText("first one"));
   await waitFor(() => bothFavorites("first"));
+  expect(reads("/api/favorites")).toBe(1);
 });
 it.each([true, false])(
   "rolls back only its failed story regardless of completion order (failure first: %s)",
