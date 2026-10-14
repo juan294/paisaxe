@@ -7,6 +7,12 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startTransport, stopTransport } from './contract-transport.mjs';
 import { dockerSql, inspectStack, localDockerEnvironment, migrationInventory, schemaDigest } from './run-contracts.mjs';
+import { POLICY, createLifecycleReceipt, lifecycleRoot, recordInventory, updateReceipt } from './contract-stack-lifecycle.mjs';
+
+function gitHead(root) {
+  try { return execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim(); }
+  catch { return null; }
+}
 
 export async function initializeRealtime(manifest, anonKey, env, clientFactory = createClient, timeoutMs = 15000) {
   const client = clientFactory(manifest.apiUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -41,7 +47,7 @@ export async function initializeRealtime(manifest, anonKey, env, clientFactory =
   }
 }
 
-export async function prepareStack(root = process.cwd(), { clientFactory = createClient, readinessTimeoutMs = 15000 } = {}) {
+export async function prepareStack(root = process.cwd(), { clientFactory = createClient, readinessTimeoutMs = 15000, lifecycle = {} } = {}) {
   // No caller-provided directory or project: this command can only create a new disposable task.
   const taskDir = realpathSync(mkdtempSync(join(tmpdir(), 'paisaxe-contracts-')));
   const projectId = 'paisaxe-contracts-' + randomBytes(6).toString('hex');
@@ -88,20 +94,33 @@ enabled = true
 enabled = true
 `;
   writeFileSync(join(taskDir, 'supabase/config.toml'), config);
-  let transportStarted = false; let env; let stage = 'network';
+  const lifecycleDir = lifecycle.root ?? lifecycleRoot();
+  const disposable = lifecycle.disposable === true;
+  let transportStarted = false; let env; let stage = 'network'; let docker; let tracked = false;
   try {
     const cliHome = join(taskDir, '.local-cli-home'); mkdirSync(cliHome);
     env = { ...localDockerEnvironment(), HOME: cliHome };
+    docker = (args) => execFileSync('docker', args, { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 }).trim();
     const cli = (args) => execFileSync('supabase', [...args, '--workdir', taskDir, '--network-id', projectId],
       { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 600000, maxBuffer: 32 * 1024 * 1024 });
+    // The private lifecycle receipt exists before any Docker allocation; each allocated identity is added to it.
+    stage = 'lifecycle';
+    createLifecycleReceipt(lifecycleDir, { projectId, nonce, taskDir, disposable, task: lifecycle.task ?? 'reusable',
+      candidate: { head: gitHead(root), migrationDigest: manifest.migrationDigest }, daemonId: docker(['info', '--format', '{{.ID}}']),
+      stack: { apiUrl: manifest.apiUrl, dbPort: manifest.dbPort, migrationDigest: manifest.migrationDigest, transport: manifest.transport } });
+    tracked = true;
     // Internal networking prevents migration 025's historical production webhook URL from sending traffic.
-    execFileSync('docker', ['network', 'create', '--internal', '--label', `com.paisaxe.contracts.nonce=${nonce}`, projectId],
-      { env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 10000 });
+    stage = 'network';
+    const networkId = docker(['network', 'create', '--internal', '--label', `com.paisaxe.contracts.nonce=${nonce}`, projectId]);
+    updateReceipt(lifecycleDir, projectId, (r) => { r.resources.network = { id: networkId, name: projectId }; });
     stage = 'transport'; await startTransport(manifest, env); transportStarted = true;
     stage = 'start'; cli(['start']);
+    recordInventory(lifecycleDir, projectId, docker);
     stage = 'inspect-start'; await inspectStack(manifest, env);
     // Reset only a newly generated project after Docker has proved its ownership and network identity.
     stage = 'reset'; cli(['db', 'reset', '--local', '--yes']);
+    // Reset recreates the database container and its labelled volume under the same names.
+    recordInventory(lifecycleDir, projectId, docker);
     stage = 'inspect-reset'; await inspectStack(manifest, env);
     stage = 'sanitize';
     dockerSql(projectId, "BEGIN; UPDATE public.webhook_config SET value='' WHERE key IN ('base_url','secret'); SELECT cron.alter_job(jobid, active:=false) FROM cron.job WHERE active; " +
@@ -113,6 +132,8 @@ enabled = true
     await initializeRealtime(manifest, status.ANON_KEY, env, clientFactory, readinessTimeoutMs);
     stage = 'schema'; manifest.schemaDigest = schemaDigest(projectId, env);
     writeFileSync(join(taskDir, 'contracts-stack.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+    recordInventory(lifecycleDir, projectId, docker);
+    updateReceipt(lifecycleDir, projectId, (r) => { r.state = 'prepared'; });
     return manifest;
   } catch (error) {
     // External command diagnostics may contain local credentials. Keep them
@@ -123,7 +144,17 @@ enabled = true
     // Preserve a failed task's identity for recovery; never reset, stop or delete an existing user stack.
     writeFileSync(join(taskDir, 'preparation-failed.json'), JSON.stringify({ projectId, nonce, taskDir, status: 'failed', stage,
       recovery: 'Restore local Docker access, then rerun preparation from the repository. Inspect this exact task before stopping its containers/network.' }, null, 2) + '\n', { mode: 0o600 });
-    throw new Error(`Task stack preparation failed; no contract acceptance. Local-only recovery receipt: ${taskDir}/preparation-failed.json`);
+    if (tracked) {
+      // Partial preparation: record whatever was allocated so the owner verifier can account for it.
+      try { recordInventory(lifecycleDir, projectId, docker); } catch { /* Recorded identities stay; inventory is retried by inspection. */ }
+      const now = new Date();
+      updateReceipt(lifecycleDir, projectId, (r) => {
+        r.state = 'preparation-failed'; r.failedStage = stage; r.failedAt = now.toISOString();
+        r.retainUntil = disposable ? new Date(now.getTime() + POLICY.failedRetentionMs).toISOString() : null;
+        r.diagnostics.push(join(taskDir, 'preparation-failed.json'));
+      }, now);
+    }
+    throw Object.assign(new Error(`Task stack preparation failed; no contract acceptance. Local-only recovery receipt: ${taskDir}/preparation-failed.json`), { projectId, taskDir });
   }
 }
 
@@ -132,5 +163,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const manifest = await prepareStack();
     console.log(`Prepared disposable stack ${manifest.projectId}. From the repository directory run:`);
     console.log(`CONTRACT_STACK_DIR='${manifest.taskDir}' npm run test:contracts`);
+    console.log(`This reusable stack stays allocated until you finish it: npm run contracts:finish -- ${manifest.projectId}`);
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

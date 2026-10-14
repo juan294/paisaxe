@@ -5,6 +5,7 @@ import { basename, join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyTransport } from './contract-transport.mjs';
+import { leaseForCaller } from './contract-stack-lifecycle.mjs';
 
 export const REQUIRED_SUITES = [
   'src/lib/database-boundaries.postgrest-rls.test.ts',
@@ -217,6 +218,7 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
   const runDir = mkdtempSync(join(receiptDir, 'run-'));
   const receipt = { version: 1, status: 'failed', startedAt: new Date().toISOString(), root: resolve(root), suites: [] };
   const failures = [];
+  let lease;
   try {
     receipt.suites = discoverSuites(root);
     receipt.candidateDigest = candidateDigest(root);
@@ -228,6 +230,8 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     } else failures.push('Required provider fixture freshness checker is missing');
     insist(taskDir, 'CONTRACT_STACK_DIR is required; run node scripts/prepare-contract-stack.mjs first');
     const manifest = validateManifest(json(join(taskDir, 'contracts-stack.json')), taskDir);
+    // A reusable stack stays allocated; the lease keeps scheduled disposal away while it is in use.
+    lease = leaseForCaller(manifest.projectId, 'contracts');
     const inventory = migrationInventory(root);
     insist(inventory.digest === manifest.migrationDigest, 'Candidate migrations changed; prepare a fresh contracts stack');
     receipt.migrationDigest = inventory.digest; receipt.projectId = manifest.projectId;
@@ -272,6 +276,8 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     // External command errors may embed credentials in stdout/stderr. Never serialize those fields.
     failures.push(error instanceof SyntaxError ? 'Malformed local contract data; inspect private diagnostics' :
       error.status !== undefined || error.code ? 'Local stack command unavailable/failed; check local Docker and prepare a fresh task stack' : error.message);
+  } finally {
+    lease?.release();
   }
   receipt.failures = failures; receipt.status = failures.length ? 'failed' : 'passed'; receipt.finishedAt = new Date().toISOString();
   writeFileSync(join(runDir, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
