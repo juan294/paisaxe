@@ -724,7 +724,7 @@ jobs:
       - name: Install database contract dependencies
         run: npm ci
       - name: Setup database contract Supabase
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: 2.120.0
       - name: Check database contract PostgreSQL client

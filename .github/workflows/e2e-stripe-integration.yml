@@ -82,7 +82,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: 2.120.0
 
