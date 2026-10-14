@@ -13,7 +13,7 @@
   "workflows": [
     {
       "path": ".github/workflows/ci.yml",
-      "definitionSha": "911440837d9f016be751b2624a0e70bb4c580841",
+      "definitionSha": "d4fe43c291f992d6bb6ea557e51a0cd27cc0e7a6",
       "jobs": [
         {
           "id": "ci-lint-and-typecheck",
@@ -214,7 +214,7 @@
     },
     {
       "path": ".github/workflows/e2e-stripe-integration.yml",
-      "definitionSha": "cb686455a7854112a3d216e0bd814f62657ffc76",
+      "definitionSha": "fed1ceae28ec90fcc179477c56f2aecffdbf9e95",
       "jobs": [
         {
           "id": "e2e-stripe-integration-e2e-stripe",
