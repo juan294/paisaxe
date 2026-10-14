@@ -1,0 +1,4 @@
+# Reviewed synthetic public anon-key literals in browser contract fixtures.
+# Exact historical findings only; future additions remain scanned.
+d1481e89d676042f01f9dc7a5ad36af27a652001:src/hooks/client-cache.integration.test.tsx:generic-api-key:150
+ecbbfa7c7ce4877865bcfd3850944b8f1c2cd423:src/components/immersive/visitor-timed-values.integration.test.tsx:generic-api-key:243
