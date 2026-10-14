@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Voucher redemption and metering against the REAL local Supabase stack
@@ -67,11 +68,11 @@ function deleteFixtureRows(): void {
 
 /** Creates a voucher whose code is `code`; returns its id. */
 function createVoucher(code: string, options: { max?: number; expires?: string; turns?: number; voice?: boolean } = {}): string {
-  return psql(
+  return requiredValue(psql(
     `INSERT INTO public.vouchers (code_hash, label, expires_at, max_redemptions, chat_turns_limit, grants_voice_pass) VALUES (` +
       `'${hashVoucherCode(code)}', '${LABEL_PREFIX}${code}', '${options.expires ?? "2026-12-16T23:59:59Z"}', ` +
       `${options.max ?? 50}, ${options.turns ?? 60}, ${options.voice ?? true}) RETURNING id;`
-  ).split("\n")[0];
+  ).split("\n")[0], "src/lib/booking/vouchers.postgrest-integration.test.ts:70 psql(\n    `INSERT INTO public.vouchers (code_hash, label, expires_at, max_redemptions, chat_turns_limit, grants_voice_pass) VALUES (` +\n      `'${hashVoucherCode(code)}', '${LABEL_PREFIX}${code}', '${options.expires ?? \"2026-12-16T23:59:59Z\"}', ` +\n      `${options.max ?? 50}, ${options.turns ?? 60}, ${options.voice ?? true}) RETURNING id;`\n  ).split(\"\\n\")[0]");
 }
 
 const VOUCHER_LOCKER = "it_voucher_locker";

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -115,7 +116,7 @@ describe("streamBookingTurn", () => {
       { date: "2026-11-21" }
     );
 
-    const second = fake.calls[1].params.messages as { role: string; content: unknown }[];
+    const second = requiredValue(fake.calls[1], "src/lib/booking/agent.test.ts:118 fake.calls[1]").params.messages as { role: string; content: unknown }[];
     expect(second.at(-2)).toEqual({ role: "assistant", content: [{ type: "text", text: "Miro " }, toolUse("tu_1")] });
     expect(second.at(-1)).toEqual({
       role: "user",
@@ -136,7 +137,7 @@ describe("streamBookingTurn", () => {
 
     expect(events).toContainEqual({ type: "tool", name: "search_experiences", status: "error" });
     expect(events.at(-1)).toEqual({ type: "text", content: "No he podido mirarlo ahora." });
-    const toolResult = (fake.calls[1].params.messages as { content: { is_error: boolean }[] }[]).at(-1)?.content[0];
+    const toolResult = (requiredValue(fake.calls[1], "src/lib/booking/agent.test.ts:139 fake.calls[1]").params.messages as { content: { is_error: boolean }[] }[]).at(-1)?.content[0];
     expect(toolResult?.is_error).toBe(true);
   });
 
@@ -207,15 +208,15 @@ describe("streamBookingTurn", () => {
       )
     );
 
-    const systemA = first.calls[0].params.system as { text: string; cache_control?: unknown }[];
-    const systemB = second.calls[0].params.system as { text: string; cache_control?: unknown }[];
-    expect(systemA[0].cache_control).toEqual({ type: "ephemeral" });
+    const systemA = requiredValue(first.calls[0], "src/lib/booking/agent.test.ts:210 first.calls[0]").params.system as { text: string; cache_control?: unknown }[];
+    const systemB = requiredValue(second.calls[0], "src/lib/booking/agent.test.ts:211 second.calls[0]").params.system as { text: string; cache_control?: unknown }[];
+    expect(requiredValue(systemA[0], "src/lib/booking/agent.test.ts:212 systemA[0]").cache_control).toEqual({ type: "ephemeral" });
     expect(JSON.stringify(systemA[0])).toBe(JSON.stringify(systemB[0]));
-    expect(systemA[0].text).toContain("RESERVAS DE EXPERIENCIAS");
-    expect(systemB[1].cache_control).toBeUndefined();
-    expect(systemB[1].text).toContain('"partySize":6');
-    expect(systemB[1].text).toContain("2026-11-20");
-    expect(systemB[1].text).toContain("El Sella nace en los Picos de Europa.");
+    expect(requiredValue(systemA[0], "src/lib/booking/agent.test.ts:214 systemA[0]").text).toContain("RESERVAS DE EXPERIENCIAS");
+    expect(requiredValue(systemB[1], "src/lib/booking/agent.test.ts:215 systemB[1]").cache_control).toBeUndefined();
+    expect(requiredValue(systemB[1], "src/lib/booking/agent.test.ts:216 systemB[1]").text).toContain('"partySize":6');
+    expect(requiredValue(systemB[1], "src/lib/booking/agent.test.ts:217 systemB[1]").text).toContain("2026-11-20");
+    expect(requiredValue(systemB[1], "src/lib/booking/agent.test.ts:218 systemB[1]").text).toContain("El Sella nace en los Picos de Europa.");
     expect(countCacheBreakpoints({ system: systemB })).toBeLessThanOrEqual(MAX_CACHE_BREAKPOINTS);
   });
 
@@ -237,7 +238,7 @@ describe("streamBookingTurn", () => {
       )
     );
 
-    const { params, options } = fake.calls[0];
+    const { params, options } = requiredValue(fake.calls[0], "src/lib/booking/agent.test.ts:240 fake.calls[0]");
     expect(params.messages).toEqual([
       { role: "user", content: "Somos cuatro" },
       { role: "assistant", content: "¿Qué día?" },
@@ -265,7 +266,7 @@ describe("streamBookingTurn", () => {
   it("tells the model the visitor's interface language", async () => {
     const fake = fakeAnthropic([{ content: [], stopReason: "end_turn" }]);
     await collect(streamBookingTurn(input(fake.client, { locale: "en" })));
-    expect((fake.calls[0].params.system as { text: string }[])[1].text).toContain("Idioma de la interfaz del visitante: en");
+    expect(requiredValue((requiredValue(fake.calls[0], "src/lib/booking/agent.test.ts:268 fake.calls[0]").params.system as { text: string }[])[1], "src/lib/booking/agent.test.ts:268 (fake.calls[0].params.system as { text: string }[])[1]").text).toContain("Idioma de la interfaz del visitante: en");
   });
 
   describe("a verified accept (#1003)", () => {

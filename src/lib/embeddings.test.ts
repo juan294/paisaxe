@@ -67,7 +67,7 @@ describe("embeddings", () => {
           inputType: "query",
           outputDimension: 512,
         },
-        { abortSignal: undefined }
+        { abortSignal: undefined, timeoutInSeconds: 12 }
       );
       expect(mockEmbed).not.toHaveBeenCalled();
     });
@@ -89,7 +89,7 @@ describe("embeddings", () => {
 
       expect(mockContextualizedEmbed).toHaveBeenCalledWith(
         expect.objectContaining({ inputs: [["test text"]] }),
-        { abortSignal: controller.signal }
+        { abortSignal: controller.signal, timeoutInSeconds: 12 }
       );
     });
 
@@ -278,6 +278,33 @@ describe("embeddings", () => {
   });
 
   describe("generateContextualizedEmbeddings", () => {
+    it("rejects a missing contextualized document with a useful error then accepts corrected output", async () => {
+      mockContextualizedEmbed.mockResolvedValueOnce({ results: [undefined] });
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      await expect(generateContextualizedEmbeddings([["chunk"]])).rejects.toThrow(
+        "No contextualized embeddings returned for group 0",
+      );
+      mockContextualizedEmbed.mockResolvedValueOnce({ results: [{ embeddings: [[0.5]] }] });
+      await expect(generateContextualizedEmbeddings([["chunk"]])).resolves.toEqual({
+        embeddings: [[0.5]], totalTokens: 0,
+      });
+    });
+
+    it("rejects a sparse input group before provider work and accepts corrected groups", async () => {
+      const groups: string[][] = [];
+      groups.length = 1;
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      await expect(generateContextualizedEmbeddings(groups)).rejects.toThrow(
+        "Missing contextualized embedding input group 0",
+      );
+      expect(mockContextualizedEmbed).not.toHaveBeenCalled();
+      groups[0] = ["chunk"];
+      mockContextualizedEmbed.mockResolvedValueOnce({ results: [{ embeddings: [[0.5]] }] });
+      await expect(generateContextualizedEmbeddings(groups)).resolves.toEqual({
+        embeddings: [[0.5]], totalTokens: 0,
+      });
+    });
+
     it("should generate contextualized embeddings for chunk groups", async () => {
       const mockEmbedding1 = Array(1024).fill(0.1);
       const mockEmbedding2 = Array(1024).fill(0.2);

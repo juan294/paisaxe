@@ -25,13 +25,15 @@ describe("release merge topology", () => {
   });
 });
 
-describe("standing release rulings (ADR-0024 decisions 11 and 12)", () => {
+describe("standing release rulings (no Vercel Previews; ADR-0024 decision 12)", () => {
   const checklist = read("docs/runbooks/release-checklist.md");
   const claude = read("CLAUDE.md");
 
-  it("documents the release PR Preview as the only permitted Preview", () => {
-    expect(checklist).toMatch(/Release PR Preview exception/);
-    expect(checklist).toMatch(/No other\s+Preview is created/);
+  it("documents that no Vercel Preview is built and the release-PR exception is retired (2026-10-07)", () => {
+    expect(checklist).toMatch(/No Vercel Previews/);
+    expect(checklist).toMatch(/builds production only/);
+    expect(checklist).toMatch(/exception of 2026-10-02 \(ADR-0024 decision 11\) is retired/);
+    expect(checklist).toMatch(/Required contexts: `Lint & Typecheck`, `Test`, `Build`, `Playwright E2E`,\s+`Release artifact smoke`/);
   });
 
   it("keeps the required probes read-only and separates the production acceptance step", () => {
@@ -40,13 +42,13 @@ describe("standing release rulings (ADR-0024 decisions 11 and 12)", () => {
     expect(checklist).toMatch(/required probes[^.]*strictly read-only/);
   });
 
-  it("forbids other Previews in CLAUDE.md", () => {
-    expect(claude).toMatch(/Do not create Preview deployments either/);
+  it("forbids every Preview in CLAUDE.md", () => {
+    expect(claude).toMatch(/Never create Preview deployments/);
     expect(claude).not.toMatch(/Preview deploy\w*[^.\n]{0,40}develop[^.\n]{0,20}\b(fine|ok|allowed|permitted)\b/i);
   });
 
   it("points CLAUDE.md at both rulings", () => {
-    expect(claude).toMatch(/only permitted\s+Preview \(section 3\)/);
-    expect(claude).toMatch(/acceptance step \(section 5b\)/);
+    expect(claude).toMatch(/no Vercel Preview is ever built \(section 3;/);
+    expect(claude).toMatch(/acceptance step\s+\(section 5b\)/);
   });
 });

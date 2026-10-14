@@ -65,6 +65,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
           MAINTENANCE_MODE: "false"
       - name: Run Lighthouse CI (mobile)
+        id: mobile_lighthouse
         uses: treosh/lighthouse-ci-action@v12
         with:
           configPath: ./lighthouserc.mobile.json
@@ -76,5 +77,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
           MAINTENANCE_MODE: "false"
+      - name: Require strict mobile Lighthouse medians
+        run: node scripts/check-mobile-lighthouse.mjs "$LIGHTHOUSE_RESULTS_PATH"
+        env:
+          LIGHTHOUSE_RESULTS_PATH: ${{ steps.mobile_lighthouse.outputs.resultsPath }}
     permissions:
       contents: read

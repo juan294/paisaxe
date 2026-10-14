@@ -596,3 +596,10 @@ Phases 4 (steps 1 to 3), 5 and 8 (8a, 8c) were run on the local stack against th
 3. **Stop reasons are no longer silent.** `max_tokens` logs `[BOOKING_CHAT_MAX_TOKENS]`; `refusal` logs `[BOOKING_CHAT_REFUSAL]` and, before any text, fails the turn so the route answers `ai_unavailable`.
 4. **Booking rules (#1002):** search the catalog as soon as party and date are known, before asking for an activity type; propose only experiences `search_experiences` returned; never call a booking awaiting payment confirmed; answer in the language of the visitor's latest message.
 5. **Evaluation:** 8 scenarios (7: English general request; 8: the turn after "Accept offer"), PayPal mock started in-process for scenario 8, cleanup deletes payments before bookings. Scenario 6's claim detector now ignores negated or conditional sentences: on 2026-10-07 the model answered "solo diré que la reserva está confirmada cuando el sistema lo indique", a correct refusal the old pattern counted as a claim. Result on `claude-sonnet-5-5`: **8/8** (`docs/hackathon/evaluation/2026-10-07.json`). The first run of the day crashed in cleanup and the second failed scenario 7 (Spanish reply to English), which the language rule fixed.
+
+### Follow-up: the official SDK, 2026-10-08
+
+The PayPal adapter moved from the earlier plugin's `pay-pal-server-sdk` to the official
+`@paypal/paypal-server-sdk` 2.5.0, with retries, and the operator view gained a Transaction
+Search check: [`docs/plans/2026-10-08-apimatic-official-sdk.md`](2026-10-08-apimatic-official-sdk.md)
+and its notes (issue #1013). The SDK it replaced was chosen in Phase 4 ("First decision of this unit", `2026-10-03-paypal-hackathon-booking-phases/phase-4.md`).

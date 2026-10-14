@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { LanguageProvider } from "@/lib/i18n";
 import RootError from "./error";
 
@@ -36,7 +36,12 @@ describe("RootError", () => {
     .spyOn(console, "error")
     .mockImplementation(() => {});
 
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     consoleSpy.mockClear();
     mockCaptureException.mockClear();
   });
@@ -106,10 +111,11 @@ describe("RootError", () => {
   });
 
   // DO-M3: Sentry.captureException must be called on mount with the error
-  it("DO-M3: calls Sentry.captureException on mount with the error", () => {
+  it("DO-M3: calls Sentry.captureException on mount with the error", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://example@sentry.io/1");
     const error = new Error("Test error for Sentry");
     renderWithI18n(<RootError error={error} reset={vi.fn()} />);
-    expect(mockCaptureException).toHaveBeenCalledOnce();
+    await waitFor(() => expect(mockCaptureException).toHaveBeenCalledOnce());
     expect(mockCaptureException).toHaveBeenCalledWith(error);
   });
 
@@ -119,17 +125,18 @@ describe("RootError", () => {
     expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 
-  it("DO-M3: calls Sentry.captureException again when error prop changes", () => {
+  it("DO-M3: calls Sentry.captureException again when error prop changes", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://example@sentry.io/1");
     const error1 = new Error("First error");
     const error2 = new Error("Second error");
     const { rerender } = renderWithI18n(<RootError error={error1} reset={vi.fn()} />);
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockCaptureException).toHaveBeenCalledTimes(1));
     rerender(
       <LanguageProvider initialLocale="es">
         <RootError error={error2} reset={vi.fn()} />
       </LanguageProvider>
     );
-    expect(mockCaptureException).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(mockCaptureException).toHaveBeenCalledTimes(2));
     expect(mockCaptureException).toHaveBeenLastCalledWith(error2);
   });
 });

@@ -77,19 +77,19 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-      items[next].focus();
+      items[next]?.focus();
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-      items[prev].focus();
+      items[prev]?.focus();
     } else if (event.key === "Tab") {
       event.preventDefault();
       if (event.shiftKey) {
         const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-        items[prev].focus();
+        items[prev]?.focus();
       } else {
         const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-        items[next].focus();
+        items[next]?.focus();
       }
     }
   }, []);

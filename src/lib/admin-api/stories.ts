@@ -1,5 +1,6 @@
 import type {
-  AdminStory,
+  AdminStoriesPage,
+  StoryCatalogFilter,
   CurationStatus,
   AdminApiResponse,
   ContentImagesResponse,
@@ -67,15 +68,9 @@ export async function updateStory(
   }
 }
 
-interface StoriesPage {
-  stories: AdminStory[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
 interface FetchStoriesOptions {
-  filter?: CurationStatus;
+  filter?: StoryCatalogFilter;
+  search?: string;
   page?: number;
   pageSize?: number;
 }
@@ -86,7 +81,7 @@ interface FetchStoriesOptions {
  */
 export async function fetchStories(
   filterOrOptions?: CurationStatus | FetchStoriesOptions
-): Promise<AdminApiResponse<StoriesPage>> {
+): Promise<AdminApiResponse<AdminStoriesPage>> {
   try {
     // Accept both legacy string form and new options object
     const opts: FetchStoriesOptions =
@@ -98,6 +93,7 @@ export async function fetchStories(
     if (opts.filter) {
       url.searchParams.set("filter", opts.filter);
     }
+    if (opts.search) url.searchParams.set("search", opts.search);
     if (opts.page != null) {
       url.searchParams.set("page", String(opts.page));
     }
@@ -285,18 +281,19 @@ export async function bulkDeleteStories(
 /**
  * Approve all pending (needs_curation) stories at once
  */
-export async function approveAllPendingStories(): Promise<
+export async function approveAllPendingStories(storyIds: string[]): Promise<
   AdminApiResponse<{ approvedCount: number; approvedIds: string[] }>
 > {
   try {
     const response = await fetch(`${API_BASE}/stories/approve-all`, {
       method: "POST",
-      headers: csrfHeaders(),
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      body: JSON.stringify({ storyIds }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      return { error: error.error || "Failed to approve all stories" };
+      return { error: error.error || "Failed to approve all stories", ...(error.data ? { data: error.data } : {}) };
     }
 
     return await response.json();

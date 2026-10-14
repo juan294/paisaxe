@@ -70,7 +70,7 @@ export function toPaymentView(row: Record<string, unknown>): BookingPaymentView 
 
 export async function loadBookingView(client: SupabaseClient, booking: Booking): Promise<BookingView> {
   const [experience, payment, hold] = await Promise.all([
-    client.from("experiences").select("title").eq("id", booking.experienceId).maybeSingle(),
+    client.from("experiences").select("title, slug").eq("id", booking.experienceId).maybeSingle(),
     client
       .from("payments")
       .select("status, order_id, capture_id, refund_id")
@@ -94,6 +94,7 @@ export async function loadBookingView(client: SupabaseClient, booking: Booking):
     reference: booking.reference,
     status: booking.status,
     experienceTitle: (experience.data?.title as string | undefined) ?? "",
+    experienceSlug: (experience.data?.slug as string | undefined) ?? null,
     slotDate: booking.slotDate,
     slotTime: booking.slotTime,
     partySize: booking.partySize,

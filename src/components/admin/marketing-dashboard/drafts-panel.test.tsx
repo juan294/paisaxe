@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -162,7 +163,7 @@ describe("DraftsPanel", () => {
     });
 
     const copyButtons = screen.getAllByTitle("Copy content");
-    await user.click(copyButtons[0]);
+    await user.click(requiredValue(copyButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: copyButtons[0]"));
 
     expect(writeText).toHaveBeenCalledWith("Check out the stunning Covadonga lakes!");
   });
@@ -189,7 +190,7 @@ describe("DraftsPanel", () => {
 
     // Click copy on first draft
     const copyButtons = screen.getAllByTitle("Copy content");
-    fireEvent.click(copyButtons[0]);
+    fireEvent.click(requiredValue(copyButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: copyButtons[0]"));
 
     // Check icon should be shown after clipboard write resolves
     await waitFor(() => {
@@ -220,7 +221,7 @@ describe("DraftsPanel", () => {
     });
 
     const postedButtons = screen.getAllByTitle("Mark as posted");
-    await user.click(postedButtons[0]);
+    await user.click(requiredValue(postedButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: postedButtons[0]"));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -249,7 +250,7 @@ describe("DraftsPanel", () => {
     });
 
     const deleteButtons = screen.getAllByTitle("Delete draft");
-    await user.click(deleteButtons[0]);
+    await user.click(requiredValue(deleteButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: deleteButtons[0]"));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -275,7 +276,7 @@ describe("DraftsPanel", () => {
     });
 
     const deleteButtons = screen.getAllByTitle("Delete draft");
-    await user.click(deleteButtons[0]);
+    await user.click(requiredValue(deleteButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: deleteButtons[0]"));
 
     // Only the initial load fetch should have been called
     expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -361,7 +362,7 @@ describe("DraftsPanel", () => {
     });
 
     const deleteButtons = screen.getAllByTitle("Delete draft");
-    await user.click(deleteButtons[0]);
+    await user.click(requiredValue(deleteButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: deleteButtons[0]"));
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -430,7 +431,7 @@ describe("DraftsPanel", () => {
     });
 
     const copyButtons = screen.getAllByTitle("Copy content");
-    await user.click(copyButtons[0]);
+    await user.click(requiredValue(copyButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: copyButtons[0]"));
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -465,7 +466,7 @@ describe("DraftsPanel", () => {
     });
 
     const copyButtons = screen.getAllByTitle("Copy content");
-    await user.click(copyButtons[0]);
+    await user.click(requiredValue(copyButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: copyButtons[0]"));
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -495,7 +496,7 @@ describe("DraftsPanel", () => {
     });
 
     const postedButtons = screen.getAllByTitle("Mark as posted");
-    await user.click(postedButtons[0]);
+    await user.click(requiredValue(postedButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: postedButtons[0]"));
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -526,7 +527,7 @@ describe("DraftsPanel", () => {
     });
 
     const deleteButtons = screen.getAllByTitle("Delete draft");
-    await user.click(deleteButtons[0]);
+    await user.click(requiredValue(deleteButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: deleteButtons[0]"));
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -609,7 +610,7 @@ describe("DraftsPanel", () => {
     });
 
     const postedButtons = screen.getAllByTitle("Mark as posted");
-    await user.click(postedButtons[0]);
+    await user.click(requiredValue(postedButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: postedButtons[0]"));
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -655,7 +656,7 @@ describe("DraftsPanel", () => {
     });
 
     const postedButtons = screen.getAllByTitle("Mark as posted");
-    await user.click(postedButtons[0]);
+    await user.click(requiredValue(postedButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: postedButtons[0]"));
 
     // Wait for the PATCH call to complete
     await waitFor(() => {
@@ -684,7 +685,7 @@ describe("DraftsPanel", () => {
     });
 
     const deleteButtons = screen.getAllByTitle("Delete draft");
-    await user.click(deleteButtons[0]);
+    await user.click(requiredValue(deleteButtons[0], "src/components/admin/marketing-dashboard/drafts-panel.test.tsx: deleteButtons[0]"));
 
     // Wait for the DELETE call to complete
     await waitFor(() => {

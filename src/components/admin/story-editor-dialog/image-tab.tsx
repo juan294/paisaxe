@@ -2,15 +2,12 @@
 
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PhotoReviewForm } from "../photo-review-form";
 import {
   Link,
   Upload,
-  Loader2,
   AlertCircle,
   FolderSearch,
-  ChevronLeft,
-  ChevronRight,
   ImagePlus,
   Maximize2,
   X,
@@ -35,10 +32,6 @@ export function ImageTab({ story }: ImageTabProps) {
     selectedFile,
     isDragging,
     fileInputRef,
-    contentImages,
-    contentImageIndex,
-    isSearchingContent,
-    contentSearched,
     currentContentImage,
     setIsFullscreen,
     handleUrlChange,
@@ -48,8 +41,6 @@ export function ImageTab({ story }: ImageTabProps) {
     handleDragLeave,
     handleDrop,
     clearUpload,
-    handleSearchContent,
-    handleContentImageNav,
   } = useImageEditorContext();
 
   return (
@@ -63,7 +54,7 @@ export function ImageTab({ story }: ImageTabProps) {
       )}
 
       {/* Image Preview */}
-      <div className="relative aspect-video overflow-hidden rounded-xl bg-[#f5f3ee] dark:bg-[#2d2a26]">
+      <div className="relative aspect-video overflow-hidden rounded-xl bg-admin-paper dark:bg-admin-ink">
         {currentPreview ? (
           <>
             <Image
@@ -87,7 +78,7 @@ export function ImageTab({ story }: ImageTabProps) {
             )}
           </>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-[#a39e98]">
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-admin-subtle">
             <ImagePlus className="h-8 w-8" />
             <span className="text-sm">No image</span>
           </div>
@@ -95,22 +86,23 @@ export function ImageTab({ story }: ImageTabProps) {
       </div>
 
       {/* Image Source Tabs */}
-      <div className="flex gap-1 rounded-xl bg-[#f5f3ee] p-1 dark:bg-[#2d2a26]">
+      <div className="flex gap-1 rounded-xl bg-admin-paper p-1 dark:bg-admin-ink">
         <button
           onClick={() => {
             setImageSourceTab("content");
             clearUpload();
             handleUrlChange("");
+            setImageSource(story.imageSource || "");
           }}
           className={cn(
             "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
             imageSourceTab === "content"
-              ? "bg-white text-[#2d2a26] shadow-sm dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
-              : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+              ? "bg-white text-admin-ink shadow-sm dark:bg-admin-depth dark:text-admin-paper"
+              : "text-admin-muted hover:text-admin-ink dark:text-admin-subtle dark:hover:text-admin-paper"
           )}
         >
           <FolderSearch className="h-3.5 w-3.5" />
-          Content
+          Actual
         </button>
         <button
           onClick={() => {
@@ -120,8 +112,8 @@ export function ImageTab({ story }: ImageTabProps) {
           className={cn(
             "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
             imageSourceTab === "url"
-              ? "bg-white text-[#2d2a26] shadow-sm dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
-              : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+              ? "bg-white text-admin-ink shadow-sm dark:bg-admin-depth dark:text-admin-paper"
+              : "text-admin-muted hover:text-admin-ink dark:text-admin-subtle dark:hover:text-admin-paper"
           )}
         >
           <Link className="h-3.5 w-3.5" />
@@ -135,8 +127,8 @@ export function ImageTab({ story }: ImageTabProps) {
           className={cn(
             "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
             imageSourceTab === "upload"
-              ? "bg-white text-[#2d2a26] shadow-sm dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
-              : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+              ? "bg-white text-admin-ink shadow-sm dark:bg-admin-depth dark:text-admin-paper"
+              : "text-admin-muted hover:text-admin-ink dark:text-admin-subtle dark:hover:text-admin-paper"
           )}
         >
           <Upload className="h-3.5 w-3.5" />
@@ -147,98 +139,34 @@ export function ImageTab({ story }: ImageTabProps) {
       {/* Image Source Content */}
       <div className="space-y-3">
         {imageSourceTab === "content" ? (
-          <>
-            <button
-              onClick={handleSearchContent}
-              disabled={isSearchingContent || !story.sourcePdf}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#e5e3de] bg-white px-4 py-3 text-sm font-medium text-[#6b6560] transition-all hover:bg-[#f5f3ee] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#3d3a36] dark:bg-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#3d3a36]"
-            >
-              {isSearchingContent ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                <>
-                  <FolderSearch className="h-4 w-4" />
-                  Search PDF Images
-                </>
-              )}
-            </button>
-
-            {!story.sourcePdf && (
-              <p className="text-center text-xs text-[#a39e98]">
-                This story has no source PDF linked.
-              </p>
-            )}
-
-            {contentSearched && (
-              <div className="rounded-xl border border-[#e5e3de] bg-white p-3 dark:border-[#3d3a36] dark:bg-[#2d2a26]">
-                {contentImages.length === 0 ? (
-                  <p className="text-center text-xs text-[#a39e98]">
-                    No images found in the PDF content.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-[#6b6560] dark:text-[#a39e98]">
-                        {contentImageIndex + 1} of {contentImages.length} images
-                      </span>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => handleContentImageNav("prev")}
-                          aria-label="Previous image"
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleContentImageNav("next")}
-                          aria-label="Next image"
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                    {currentContentImage && (
-                      <div className="flex items-center justify-between text-[10px] text-[#a39e98]">
-                        <span>{currentContentImage.width} × {currentContentImage.height}px</span>
-                        <span>Page {currentContentImage.pageNumber} · {currentContentImage.type}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+          <p className="text-xs text-admin-subtle">Revisa abajo la foto subida actualmente. Las fotos extraídas de guías no están disponibles sin una revisión individual de permisos.</p>
         ) : imageSourceTab === "url" ? (
           <Input
             type="url"
             placeholder="https://example.com/image.jpg"
             value={imageUrl}
             onChange={(e) => handleUrlChange(e.target.value)}
-            className="bg-[#f5f3ee] dark:bg-[#2d2a26]"
+            className="bg-admin-paper dark:bg-admin-ink"
           />
         ) : (
           <div>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
               onChange={handleFileChange}
               className="hidden"
             />
 
             {selectedFile ? (
-              <div className="flex items-center justify-between rounded-xl border border-[#e5e3de] bg-white px-4 py-3 dark:border-[#3d3a36] dark:bg-[#2d2a26]">
+              <div className="flex items-center justify-between rounded-xl border border-admin-line bg-white px-4 py-3 dark:border-admin-depth dark:bg-admin-ink">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#2d2a26] dark:bg-[#f5f3ee]">
-                    <ImagePlus className="h-4 w-4 text-[#f5f3ee] dark:text-[#2d2a26]" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-admin-ink dark:bg-admin-paper">
+                    <ImagePlus className="h-4 w-4 text-admin-paper dark:text-admin-ink" />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-[#2d2a26] dark:text-[#f5f3ee]">{selectedFile.name}</p>
-                    <p className="text-[10px] text-[#a39e98]">
+                    <p className="text-xs font-medium text-admin-ink dark:text-admin-paper">{selectedFile.name}</p>
+                    <p className="text-[10px] text-admin-subtle">
                       {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                     </p>
                   </div>
@@ -246,7 +174,7 @@ export function ImageTab({ story }: ImageTabProps) {
                 <button
                   onClick={clearUpload}
                   aria-label="Remove uploaded file"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted dark:hover:bg-admin-depth"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -261,19 +189,19 @@ export function ImageTab({ story }: ImageTabProps) {
                 className={cn(
                   "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-8 transition-all",
                   isDragging
-                    ? "border-[#c9a55c] bg-[#c9a55c]/10"
-                    : "border-[#e5e3de] hover:border-[#c9a55c] hover:bg-[#f5f3ee]/50 dark:border-[#3d3a36] dark:hover:border-[#c9a55c] dark:hover:bg-[#2d2a26]/50"
+                    ? "border-admin-warning bg-admin-warning/10"
+                    : "border-admin-line hover:border-admin-warning hover:bg-admin-paper/50 dark:border-admin-depth dark:hover:border-admin-warning dark:hover:bg-admin-ink/50"
                 )}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5f3ee] dark:bg-[#2d2a26]">
-                  <ImagePlus className="h-5 w-5 text-[#a39e98]" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-admin-paper dark:bg-admin-ink">
+                  <ImagePlus className="h-5 w-5 text-admin-subtle" />
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-medium text-[#6b6560] dark:text-[#a39e98]">
+                  <p className="text-xs font-medium text-admin-muted dark:text-admin-subtle">
                     {isDragging ? "Drop here" : "Click or drag"}
                   </p>
-                  <p className="mt-0.5 text-[10px] text-[#a39e98]">
-                    JPEG, PNG, WebP, GIF · Max 5MB
+                  <p className="mt-0.5 text-[10px] text-admin-subtle">
+                    JPEG, PNG, WebP, GIF, AVIF · Max 10MB
                   </p>
                 </div>
               </div>
@@ -281,23 +209,7 @@ export function ImageTab({ story }: ImageTabProps) {
           </div>
         )}
 
-        {/* Image Attribution */}
-        <div className="space-y-2 pt-2">
-          <Label htmlFor="imageSource" className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
-            Image Attribution
-          </Label>
-          <Input
-            id="imageSource"
-            type="text"
-            placeholder="e.g., Photo by Juan on Unsplash"
-            value={imageSource}
-            onChange={(e) => setImageSource(e.target.value)}
-            className="bg-[#f5f3ee] dark:bg-[#2d2a26]"
-          />
-          <p className="text-[10px] text-[#a39e98]">
-            Will be displayed below the image in stories
-          </p>
-        </div>
+        <PhotoReviewForm title={story.title} description={story.description} storyId={story.id} asset={imageSourceTab === "upload" ? selectedFile : imageSourceTab === "url" ? imageUrl || null : story.image || null} source={imageSource} onChange={setImageSource} />
       </div>
     </>
   );

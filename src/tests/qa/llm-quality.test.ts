@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 /**
  * LLM Quality Automated Tests
  *
@@ -62,7 +63,7 @@ async function getCsrfToken(): Promise<string> {
   if (!match) {
     throw new Error('Could not obtain CSRF token from page response');
   }
-  return match[1];
+  return requiredValue(match[1], "src/tests/qa/llm-quality.test.ts:65 match[1]");
 }
 
 // Helper to call the chat API with retry for rate limiting and transient network errors

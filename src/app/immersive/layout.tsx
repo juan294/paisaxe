@@ -9,6 +9,7 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
+import { NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 // LOCATION-SPECIFIC: Site URL from config
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
     images: [
       {
         // LOCATION-SPECIFIC: Default OG image
-        url: `${SITE_URL}/images/stories/lagos-covadonga.webp`,
+        url: `${SITE_URL}${NEUTRAL_IMAGE}`,
         width: 1200,
         height: 630,
         alt: `Explora ${LOCATION_CONFIG.name} - ${LOCATION_CONFIG.siteName}`,
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title,
     description: LOCATION_CONFIG.seo.description,
-    images: [`${SITE_URL}/images/stories/lagos-covadonga.webp`],
+    images: [`${SITE_URL}${NEUTRAL_IMAGE}`],
   },
   alternates: {
     canonical: `${SITE_URL}/immersive`,

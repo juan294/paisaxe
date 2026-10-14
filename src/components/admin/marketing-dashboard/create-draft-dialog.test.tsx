@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -204,8 +205,8 @@ describe("CreateDraftDialog", () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
+    const callArgs = requiredValue((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/components/admin/marketing-dashboard/create-draft-dialog.test.tsx: (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]");
+    const body = JSON.parse(requiredValue(callArgs[1], "src/components/admin/marketing-dashboard/create-draft-dialog.test.tsx: callArgs[1]").body);
     expect(body.platform).toBe("instagram");
     expect(body.content).toBe("Beautiful Asturias");
   });

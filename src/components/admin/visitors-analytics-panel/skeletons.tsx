@@ -9,7 +9,7 @@ function SkeletonStatCard({ color }: { color: "blue" | "emerald" | "amber" | "ro
   return (
     <div>
       <div className={`h-16 w-32 animate-pulse rounded lg:h-24 lg:w-48 ${skeletonColorClasses[color]}`} />
-      <div className="mt-4 h-3 w-20 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+      <div className="mt-4 h-3 w-20 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
     </div>
   );
 }
@@ -19,13 +19,13 @@ function SkeletonChart() {
     <div className="overflow-x-auto">
       <div className="relative h-[200px] w-full max-w-3xl">
         {/* Chart area placeholder */}
-        <div className="absolute inset-0 animate-pulse rounded bg-[#f5f3ee] dark:bg-[#2d2a26]">
+        <div className="absolute inset-0 animate-pulse rounded bg-admin-paper dark:bg-admin-ink">
           {/* Grid lines */}
-          <div className="absolute left-12 right-5 top-5 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="absolute left-12 right-5 top-1/4 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="absolute left-12 right-5 top-1/2 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="absolute left-12 right-5 top-3/4 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
-          <div className="absolute bottom-8 left-12 right-5 h-px bg-[#e5e3de] dark:bg-[#3d3a36]" />
+          <div className="absolute left-12 right-5 top-5 h-px bg-admin-line dark:bg-admin-depth" />
+          <div className="absolute left-12 right-5 top-1/4 h-px bg-admin-line dark:bg-admin-depth" />
+          <div className="absolute left-12 right-5 top-1/2 h-px bg-admin-line dark:bg-admin-depth" />
+          <div className="absolute left-12 right-5 top-3/4 h-px bg-admin-line dark:bg-admin-depth" />
+          <div className="absolute bottom-8 left-12 right-5 h-px bg-admin-line dark:bg-admin-depth" />
         </div>
       </div>
 
@@ -47,32 +47,32 @@ function SkeletonChart() {
 function SkeletonDataTable({ number, title }: { number: string; title: string }) {
   return (
     <section>
-      <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+      <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
         {number} — {title}
       </h2>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+          <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
               #
             </th>
-            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
               Name
             </th>
-            <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
               Count
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+        <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
           {[1, 2, 3, 4, 5].map((idx) => (
             <tr key={idx}>
-              <td className="py-3 font-mono text-sm tabular-nums text-[#6b6560] dark:text-[#a39e98]">
+              <td className="py-3 font-mono text-sm tabular-nums text-admin-muted dark:text-admin-subtle">
                 {String(idx).padStart(2, "0")}
               </td>
               <td className="py-3">
                 <div
-                  className="h-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]"
+                  className="h-4 animate-pulse rounded bg-admin-line dark:bg-admin-depth"
                   style={{ width: `${70 - idx * 8}%` }}
                 />
               </td>
@@ -124,7 +124,7 @@ export function SkeletonDashboard() {
 
       {/* Time Series Chart Skeleton */}
       <section>
-        <div className="mb-6 h-3 w-32 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+        <div className="mb-6 h-3 w-32 animate-pulse rounded bg-admin-line dark:bg-admin-depth" />
         <SkeletonChart />
       </section>
 
@@ -156,7 +156,7 @@ export function SkeletonDashboard() {
 
       {/* New vs Returning Skeleton */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
           12 — New vs Returning Visitors
         </h2>
         <SkeletonBar />

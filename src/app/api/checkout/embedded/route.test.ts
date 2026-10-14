@@ -1,3 +1,4 @@
+import { resetRateLimit } from "@/lib/rate-limit";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -56,6 +57,7 @@ function createRequest(
 
 describe("POST /api/checkout/embedded", () => {
   beforeEach(() => {
+    resetRateLimit();
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://paisaxe.es");
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");

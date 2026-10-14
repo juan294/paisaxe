@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -480,7 +481,7 @@ describe("VisitorsAnalyticsPanel", () => {
 
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/);
     // First date input is "from" — use fireEvent to set atomically (avoids invalid date on clear)
-    fireEvent.change(dateInputs[0], { target: { value: "2024-01-10" } });
+    fireEvent.change(requiredValue(dateInputs[0], "src/components/admin/visitors-analytics-panel/visitors-analytics-panel.test.tsx: dateInputs[0]"), { target: { value: "2024-01-10" } });
 
     expect(dateInputs[0]).toHaveValue("2024-01-10");
   });
@@ -498,7 +499,7 @@ describe("VisitorsAnalyticsPanel", () => {
 
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/);
     // Second date input is "to"
-    fireEvent.change(dateInputs[1], { target: { value: "2024-02-20" } });
+    fireEvent.change(requiredValue(dateInputs[1], "src/components/admin/visitors-analytics-panel/visitors-analytics-panel.test.tsx: dateInputs[1]"), { target: { value: "2024-02-20" } });
 
     expect(dateInputs[1]).toHaveValue("2024-02-20");
   });
@@ -806,11 +807,11 @@ describe("VisitorsAnalyticsPanel", () => {
     expect(bars.length).toBe(2);
 
     // The narrow bar (5%) should have no text content
-    const narrowBar = bars[0];
+    const narrowBar = requiredValue(bars[0], "src/components/admin/visitors-analytics-panel/visitors-analytics-panel.test.tsx: bars[0]");
     expect(narrowBar.textContent).toBe("");
 
     // The wide bar (95%) should show its percentage
-    const wideBar = bars[1];
+    const wideBar = requiredValue(bars[1], "src/components/admin/visitors-analytics-panel/visitors-analytics-panel.test.tsx: bars[1]");
     expect(wideBar.textContent).toBe("95%");
   });
 

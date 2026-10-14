@@ -104,10 +104,10 @@ non-admin QA user.
 
 ---
 
-## Gate 3 — Cron Endpoint Without VERCEL_CRON_SECRET
+## Gate 3 — Cron Endpoint Without CRON_SECRET
 
 **Why:** Cron jobs must reject unauthenticated callers. The live environment
-uses `VERCEL_CRON_SECRET`; verifying that this header is required prevents
+uses `Authorization: Bearer $CRON_SECRET`; verifying that this header is required prevents
 unintended external triggering.
 
 ```bash
@@ -127,13 +127,13 @@ curl -s -o /dev/null -w "%{http_code}" \
 # Expected: 401
 ```
 
-**Pass criteria:** All cron endpoints return 401 without the `x-vercel-cron`
+**Pass criteria:** All cron endpoints return 401 without the `Authorization: Bearer $CRON_SECRET`
 header.
 
 **Automated coverage (unit tests):**
 - `src/lib/cron-auth.test.ts` — validates the cron secret check.
 - `src/app/api/cron/fail-stale-bookings/route.test.ts:41` — returns 401 when
-  Vercel-Cron header is missing.
+  Authorization header is missing.
 - `src/app/api/cron/fail-stale-translations/route.test.ts` — same pattern.
 - `src/app/api/cron/content-discovery/route.test.ts` — same pattern.
 
@@ -242,7 +242,7 @@ Before creating a `develop → main` release PR, confirm:
 
 - [ ] Gate 1: `Gitleaks secret scan` CI check is green for the released commit/tree
 - [ ] Gate 2: Admin endpoints return 403 for non-admin QA user
-- [ ] Gate 3: Cron endpoints return 401 without `x-vercel-cron` header
+- [ ] Gate 3: Cron endpoints return 401 without `Authorization: Bearer $CRON_SECRET` header
 - [ ] Gate 4: MCP endpoints return 401 without `x-mcp-secret` header
 - [ ] Gate 5: Stripe webhook returns 401 without valid signature
 - [ ] Gate 6: `npm run prelaunch:live` passes end-to-end

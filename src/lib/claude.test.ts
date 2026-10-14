@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Chunk, ImageResult } from "@/types";
@@ -21,7 +22,7 @@ vi.mock("@/lib/costs/anthropic-usage", () => ({
   recordAnthropicUsageInBackground: vi.fn(),
 }));
 
-import { generateChatResponse, extractSourcesFromChunks, sanitizeOutput, streamChatResponse, formatImagesForContext } from "./claude";
+import { buildContextText, generateChatResponse, extractSourcesFromChunks, sanitizeOutput, streamChatResponse, formatImagesForContext } from "./claude";
 import {
   CACHE_MIN_SAFETY_MARGIN,
   MAX_CACHE_BREAKPOINTS,
@@ -66,10 +67,10 @@ function setupMockAPIResponse(body: unknown, status = 200) {
 function getCurlBody(): RequestBody {
   const lastCall = mockExecFile.mock.calls[mockExecFile.mock.calls.length - 1];
   // execFile args: ("curl", [args...], {options})
-  const curlArgs: string[] = lastCall[1];
+  const curlArgs: string[] = requiredValue(requiredValue(lastCall, "src/lib/claude.test.ts:70 lastCall")[1], "src/lib/claude.test.ts:69 lastCall[1]");
   // Find the -d argument (the one after "-d" flag)
   const dIndex = curlArgs.indexOf("-d");
-  const bodyStr = curlArgs[dIndex + 1];
+  const bodyStr = requiredValue(curlArgs[dIndex + 1], "src/lib/claude.test.ts:73 curlArgs[dIndex + 1]");
   return JSON.parse(bodyStr);
 }
 
@@ -81,6 +82,37 @@ describe("claude", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  describe("buildContextText", () => {
+    it("stops before reading another chunk after a separator crosses the context limit", () => {
+      const firstContent = "x".repeat(3966);
+      const secondContent = "y".repeat(5);
+      const firstText = `[Fuente 1: a]\n${firstContent}`;
+      const secondText = `[Fuente 2: b]\n${secondContent}`;
+      const readThirdContent = vi.fn(() => "This chunk must not be read");
+      const chunks: Chunk[] = [
+        { id: "a", sourcePdf: "a", content: firstContent },
+        { id: "b", sourcePdf: "b", content: secondContent },
+        {
+          id: "c",
+          sourcePdf: "c",
+          get content() {
+            return readThirdContent();
+          },
+        },
+      ];
+      const expected = `${firstText}\n\n---\n\n${secondText}`;
+
+      // The length check excludes the separator added between these two chunks.
+      expect(firstText).toHaveLength(3980);
+      expect(secondText).toHaveLength(19);
+      expect(expected).toHaveLength(4006);
+      expect(buildContextText(chunks)).toBe(expected);
+      expect(readThirdContent).not.toHaveBeenCalled();
+      expect(mockExecFile).not.toHaveBeenCalled();
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
   });
 
   describe("generateChatResponse", () => {
@@ -183,7 +215,7 @@ describe("claude", () => {
       await generateChatResponse("Hello", []);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:186 body.messages[0]").content;
       expect(userContent).toContain("<user_question>");
       expect(userContent).toContain("</user_question>");
       expect(userContent).toContain("Hello");
@@ -202,7 +234,7 @@ describe("claude", () => {
       await generateChatResponse("Question here", chunks);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:205 body.messages[0]").content;
       expect(userContent).toContain("<context>");
       expect(userContent).toContain("</context>");
       expect(userContent).toContain("<user_question>");
@@ -222,7 +254,7 @@ describe("claude", () => {
       expect(body.output_config).toEqual({ effort: "low" });
       expect(body.system).toBeDefined();
       expect(body.messages).toHaveLength(1);
-      expect(body.messages[0].role).toBe("user");
+      expect(requiredValue(body.messages[0], "src/lib/claude.test.ts:225 body.messages[0]").role).toBe("user");
     });
   });
 
@@ -253,7 +285,7 @@ describe("claude", () => {
         pageNumber: 5,
         snippet: expect.stringContaining("Content about Oviedo"),
       });
-      expect(sources[1].title).toBe("food-guide.pdf"); // Falls back to sourcePdf when no sectionTitle
+      expect(requiredValue(sources[1], "src/lib/claude.test.ts:256 sources[1]").title).toBe("food-guide.pdf"); // Falls back to sourcePdf when no sectionTitle
     });
 
     it("should use sourcePdf as title when sectionTitle is missing", () => {
@@ -266,7 +298,7 @@ describe("claude", () => {
       ];
 
       const sources = extractSourcesFromChunks(chunks);
-      expect(sources[0].title).toBe("test.pdf");
+      expect(requiredValue(sources[0], "src/lib/claude.test.ts:269 sources[0]").title).toBe("test.pdf");
     });
 
     it("should return empty array for empty chunks", () => {
@@ -573,7 +605,7 @@ describe("claude", () => {
       await generateChatResponse("Test", [], false, 0, undefined, { signal: controller.signal });
 
       const lastCall = mockExecFile.mock.calls[mockExecFile.mock.calls.length - 1];
-      const execOptions = lastCall[2] as { signal?: AbortSignal };
+      const execOptions = requiredValue(requiredValue(lastCall, "src/lib/claude.test.ts:577 lastCall")[2], "src/lib/claude.test.ts:576 lastCall[2]") as { signal?: AbortSignal };
       expect(execOptions.signal).toBe(controller.signal);
     });
   });
@@ -648,7 +680,7 @@ describe("claude", () => {
       await generateChatResponse("Tell me about Oviedo", chunks);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:651 body.messages[0]").content;
       expect(userContent).toContain("[Fuente 1: oviedo.pdf, pag. 3]");
       expect(userContent).toContain("Oviedo is the capital");
     });
@@ -669,7 +701,7 @@ describe("claude", () => {
       await generateChatResponse("Question", chunks);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:672 body.messages[0]").content;
       expect(userContent).toContain("[Fuente 1: guide.pdf]");
       expect(userContent).not.toContain("pag.");
     });
@@ -687,7 +719,7 @@ describe("claude", () => {
       await generateChatResponse("Question", chunks);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:690 body.messages[0]").content;
       expect(userContent).toContain("---");
       expect(userContent).toContain("[Fuente 1: a.pdf]");
       expect(userContent).toContain("[Fuente 2: b.pdf]");
@@ -807,7 +839,7 @@ describe("claude", () => {
       await generateChatResponse("Question about many topics", chunks);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:810 body.messages[0]").content;
 
       // Should have context tags
       expect(userContent).toContain("<context>");
@@ -823,7 +855,7 @@ describe("claude", () => {
       const contextMatch = userContent.match(/<context>\n([\s\S]*?)\n<\/context>/);
       expect(contextMatch).not.toBeNull();
       // Allow some slack for the dividers but context must be bounded
-      expect(contextMatch![1].length).toBeLessThanOrEqual(4200);
+      expect(requiredValue(contextMatch![1], "src/lib/claude.test.ts:826 contextMatch![1]").length).toBeLessThanOrEqual(4200);
     });
 
     it("should add '...' to a truncated chunk when partially fitting", async () => {
@@ -851,7 +883,7 @@ describe("claude", () => {
       await generateChatResponse("Question", chunks);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:854 body.messages[0]").content;
 
       // First chunk should be present in full
       expect(userContent).toContain("[Fuente 1: first.pdf, pag. 1]");
@@ -881,7 +913,7 @@ describe("claude", () => {
       await generateChatResponse("Question", chunks);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:884 body.messages[0]").content;
 
       expect(userContent).toContain("[Fuente 1: a.pdf]");
       // Second chunk is dropped — no header and no truncation marker
@@ -905,7 +937,7 @@ describe("claude", () => {
       await generateChatResponse("Question", chunks);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:908 body.messages[0]").content;
 
       // Should have dividers between chunks that fit
       expect(userContent).toContain("---");
@@ -1077,9 +1109,9 @@ describe("claude", () => {
       }
       expect(received).toEqual(["ok"]);
 
-      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const curlArgs: string[] = requiredValue(mockSpawn.mock.calls[0], "src/lib/claude.test.ts:1080 mockSpawn.mock.calls[0]")[1];
       const dIndex = curlArgs.indexOf("-d");
-      const body = JSON.parse(curlArgs[dIndex + 1]);
+      const body = JSON.parse(requiredValue(curlArgs[dIndex + 1], "src/lib/claude.test.ts:1082 curlArgs[dIndex + 1]"));
       const userContent: string = body.messages[0].content;
       expect(userContent).toContain("<context>");
       expect(userContent).toContain("Cudillero is a fishing village");
@@ -1103,9 +1135,9 @@ describe("claude", () => {
       }
       expect(received).toEqual(["ok"]);
 
-      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const curlArgs: string[] = requiredValue(mockSpawn.mock.calls[0], "src/lib/claude.test.ts:1106 mockSpawn.mock.calls[0]")[1];
       const dIndex = curlArgs.indexOf("-d");
-      const body = JSON.parse(curlArgs[dIndex + 1]);
+      const body = JSON.parse(requiredValue(curlArgs[dIndex + 1], "src/lib/claude.test.ts:1108 curlArgs[dIndex + 1]"));
       const userContent: string = body.messages[0].content;
       expect(userContent).toContain("<available_images>");
       expect(userContent).toContain("Faro de Cudillero");
@@ -1327,9 +1359,9 @@ describe("claude", () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _chunk of streamChatResponse("Test", [])) { /* noop */ }
 
-      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const curlArgs: string[] = requiredValue(mockSpawn.mock.calls[0], "src/lib/claude.test.ts:1330 mockSpawn.mock.calls[0]")[1];
       const dIndex = curlArgs.indexOf("-d");
-      const body = JSON.parse(curlArgs[dIndex + 1]);
+      const body = JSON.parse(requiredValue(curlArgs[dIndex + 1], "src/lib/claude.test.ts:1332 curlArgs[dIndex + 1]"));
       expect(body.stream).toBe(true);
       expect(body.model).toBe("claude-sonnet-5-5");
     });
@@ -1381,9 +1413,9 @@ describe("claude", () => {
       }
       expect(chunks).toEqual(["Ye prestoso"]);
 
-      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const curlArgs: string[] = requiredValue(mockSpawn.mock.calls[0], "src/lib/claude.test.ts:1384 mockSpawn.mock.calls[0]")[1];
       const dIndex = curlArgs.indexOf("-d");
-      const body = JSON.parse(curlArgs[dIndex + 1]);
+      const body = JSON.parse(requiredValue(curlArgs[dIndex + 1], "src/lib/claude.test.ts:1386 curlArgs[dIndex + 1]"));
       expect(systemText(body)).toContain("asturianu");
       // Same block shape as the SDK path: marked stable block, unmarked flow block.
       expect(body.system[0].cache_control).toEqual({ type: "ephemeral" });
@@ -1463,7 +1495,7 @@ describe("claude", () => {
       await generateChatResponse("Tell me about Oviedo", chunks, false, 0, images);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:1466 body.messages[0]").content;
       expect(userContent).toContain("<available_images>");
       expect(userContent).toContain("Oviedo Cathedral");
     });
@@ -1480,7 +1512,7 @@ describe("claude", () => {
       await generateChatResponse("Show me beaches", [], false, 0, images);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:1483 body.messages[0]").content;
       expect(userContent).toContain("<available_images>");
       expect(userContent).toContain("Playa de Gulpiyuri");
       // Should NOT have context tags since no chunks
@@ -1495,7 +1527,7 @@ describe("claude", () => {
       await generateChatResponse("Hello", []);
 
       const body = getCurlBody();
-      const userContent = body.messages[0].content;
+      const userContent = requiredValue(body.messages[0], "src/lib/claude.test.ts:1498 body.messages[0]").content;
       expect(userContent).not.toContain("<available_images>");
     });
   });
@@ -1550,12 +1582,12 @@ describe("claude", () => {
     }
 
     it("sends system as [stable marked block, unmarked flow block]", async () => {
-      const body = await curlBodyFor(variants[0]);
+      const body = await curlBodyFor(requiredValue(variants[0], "src/lib/claude.test.ts:1553 variants[0]"));
       expect(body.system).toHaveLength(2);
-      expect(body.system[0].cache_control).toEqual({ type: "ephemeral" });
-      expect(body.system[1].cache_control).toBeUndefined();
+      expect(requiredValue(body.system[0], "src/lib/claude.test.ts:1555 body.system[0]").cache_control).toEqual({ type: "ephemeral" });
+      expect(requiredValue(body.system[1], "src/lib/claude.test.ts:1556 body.system[1]").cache_control).toBeUndefined();
       // Blocks are concatenated as-is, so the flow heading needs its own line.
-      expect(body.system[1].text.startsWith("\n\n# CONVERSATION FLOW\n")).toBe(true);
+      expect(requiredValue(body.system[1], "src/lib/claude.test.ts:1558 body.system[1]").text.startsWith("\n\n# CONVERSATION FLOW\n")).toBe(true);
     });
 
     it("produces identical stable-block bytes for messageIndex 0 vs 5, asturianu on and off", async () => {
@@ -1567,11 +1599,11 @@ describe("claude", () => {
     });
 
     it("keeps message index and asturianu addition out of the stable block", async () => {
-      const body = await curlBodyFor(variants[3]);
-      expect(body.system[0].text).not.toContain("message #");
-      expect(body.system[0].text).not.toContain("asturianu");
-      expect(body.system[1].text).toContain("message #6");
-      expect(body.system[1].text).toContain("asturianu");
+      const body = await curlBodyFor(requiredValue(variants[3], "src/lib/claude.test.ts:1570 variants[3]"));
+      expect(requiredValue(body.system[0], "src/lib/claude.test.ts:1571 body.system[0]").text).not.toContain("message #");
+      expect(requiredValue(body.system[0], "src/lib/claude.test.ts:1572 body.system[0]").text).not.toContain("asturianu");
+      expect(requiredValue(body.system[1], "src/lib/claude.test.ts:1573 body.system[1]").text).toContain("message #6");
+      expect(requiredValue(body.system[1], "src/lib/claude.test.ts:1574 body.system[1]").text).toContain("asturianu");
     });
 
     it("uses at most 4 cache breakpoints", async () => {
@@ -1581,8 +1613,8 @@ describe("claude", () => {
     });
 
     it("keeps the stable block above the Sonnet 5 cache minimum with a 20% margin", async () => {
-      const body = await curlBodyFor(variants[0]);
-      expect(estimateTokens(body.system[0].text)).toBeGreaterThanOrEqual(
+      const body = await curlBodyFor(requiredValue(variants[0], "src/lib/claude.test.ts:1584 variants[0]"));
+      expect(estimateTokens(requiredValue(body.system[0], "src/lib/claude.test.ts:1585 body.system[0]").text)).toBeGreaterThanOrEqual(
         SONNET_5_MIN_CACHE_TOKENS * CACHE_MIN_SAFETY_MARGIN
       );
     });
@@ -1633,6 +1665,21 @@ describe("claude", () => {
       ]);
     });
   });
+describe("selected locale in real provider request construction", () => {
+  it.each([["es","Spanish"],["en","English"],["fr","French"],["de","German"],["pt","European Portuguese"],["ast","Asturian (Asturianu)"]] as const)("uses %s in an unmarked block and keeps the shared prefix constant", async (locale, name) => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    setupMockAPIResponse({content:[{type:"text",text:"Response"}]});
+    await generateChatResponse("A question in English", [], true, 0, undefined, {locale});
+    const selected = getCurlBody();
+    expect(requiredValue(selected.system[1], "src/lib/claude.test.ts:1642 selected.system[1]").text).toContain(`INTERFACE LANGUAGE: ${name}.`);
+    expect(requiredValue(selected.system[1], "src/lib/claude.test.ts:1643 selected.system[1]").cache_control).toBeUndefined();
+    expect(requiredValue(selected.system[1], "src/lib/claude.test.ts:1644 selected.system[1]").text.includes("asturianu")).toBe(locale === "ast");
+    await generateChatResponse("Otra pregunta", [], false, 3, undefined, {locale:"es"});
+    expect(getCurlBody().system[0]).toEqual(selected.system[0]);
+    vi.unstubAllEnvs();
+  });
+});
+
 });
 
 // ─── SDK path tests (USE_CURL = false, NODE_ENV = production) ──────────
@@ -1778,7 +1825,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(response).toBe("SDK generated response");
       expect(mockCreate).toHaveBeenCalledTimes(1);
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = requiredValue(mockCreate.mock.calls[0], "src/lib/claude.test.ts:1796 mockCreate.mock.calls[0]")[0];
       expect(callArgs.model).toBe("claude-sonnet-5-5");
       expect(callArgs.max_tokens).toBe(16000);
       expect(callArgs.output_config).toEqual({ effort: "low" });
@@ -1862,7 +1909,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       }
 
       expect(mockStream).toHaveBeenCalledTimes(1);
-      const callArgs = mockStream.mock.calls[0][0];
+      const callArgs = requiredValue(mockStream.mock.calls[0], "src/lib/claude.test.ts:1880 mockStream.mock.calls[0]")[0];
       expect(callArgs.model).toBe("claude-sonnet-5-5");
       expect(callArgs.max_tokens).toBe(16000);
       expect(callArgs.output_config).toEqual({ effort: "low" });
@@ -2212,7 +2259,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         { source: "chat" }
       );
 
-      const callArgs = mockCreate.mock.calls[0][0];
+      const callArgs = requiredValue(mockCreate.mock.calls[0], "src/lib/claude.test.ts:2230 mockCreate.mock.calls[0]")[0];
       expect(callArgs.system).toEqual([
         { type: "text", text: "my system prompt", cache_control: { type: "ephemeral" } },
       ]);
@@ -2227,7 +2274,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _chunk of streamChat("Test", [])) { /* noop */ }
 
-      const callArgs = mockStream.mock.calls[0][0];
+      const callArgs = requiredValue(mockStream.mock.calls[0], "src/lib/claude.test.ts:2245 mockStream.mock.calls[0]")[0];
       expect(Array.isArray(callArgs.system)).toBe(true);
       expect(callArgs.system[0]).toMatchObject({
         type: "text",
@@ -2348,15 +2395,15 @@ describe("ANTHROPIC_TRANSPORT override (BE-L1, #794)", () => {
     });
     const curlModule = await import("./claude");
     await curlModule.generateChatResponse("Hola", [], true, 2);
-    const curlArgs: string[] = localMockExecFile.mock.calls[0][1];
-    const curlBody = JSON.parse(curlArgs[curlArgs.indexOf("-d") + 1]);
+    const curlArgs: string[] = requiredValue(localMockExecFile.mock.calls[0], "src/lib/claude.test.ts:2366 localMockExecFile.mock.calls[0]")[1];
+    const curlBody = JSON.parse(requiredValue(curlArgs[curlArgs.indexOf("-d") + 1], "src/lib/claude.test.ts:2367 curlArgs[curlArgs.indexOf(\"-d\") + 1]"));
 
     vi.resetModules();
     vi.stubEnv("ANTHROPIC_TRANSPORT", "sdk");
     mockCreate.mockResolvedValue({ content: [{ type: "text", text: "ok" }] });
     const sdkModule = await import("./claude");
     await sdkModule.generateChatResponse("Hola", [], true, 2);
-    const sdkParams = mockCreate.mock.calls[0][0];
+    const sdkParams = requiredValue(mockCreate.mock.calls[0], "src/lib/claude.test.ts:2374 mockCreate.mock.calls[0]")[0];
 
     expect(curlBody.system).toEqual(sdkParams.system);
     expect(curlBody.system).toHaveLength(2);

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import PricingPage from "./page";
@@ -575,7 +576,7 @@ describe("PricingPage", () => {
 
       const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
       expect(button.className).toContain("focus-visible:ring-2");
-      expect(button.className).toContain("focus-visible:ring-green-300");
+      expect(button.className).toContain("focus-visible:ring-paisaxe-green-300");
     });
   });
 
@@ -598,8 +599,8 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[0].focus();
-      fireEvent.keyDown(radios[0], { key: "ArrowRight" });
+      requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]").focus();
+      fireEvent.keyDown(requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]"), { key: "ArrowRight" });
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[1]).toHaveAttribute("aria-checked", "true");
@@ -612,8 +613,8 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[0].focus();
-      fireEvent.keyDown(radios[0], { key: "ArrowLeft" });
+      requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]").focus();
+      fireEvent.keyDown(requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]"), { key: "ArrowLeft" });
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[2]).toHaveAttribute("aria-checked", "true");
@@ -624,10 +625,10 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[0].focus();
-      fireEvent.keyDown(radios[0], { key: "ArrowRight" }); // -> weekly
-      fireEvent.keyDown(screen.getAllByRole("radio")[1], { key: "ArrowRight" }); // -> monthly
-      fireEvent.keyDown(screen.getAllByRole("radio")[2], { key: "ArrowRight" }); // wraps -> day
+      requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]").focus();
+      fireEvent.keyDown(requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]"), { key: "ArrowRight" }); // -> weekly
+      fireEvent.keyDown(requiredValue(screen.getAllByRole("radio")[1], "src/app/pricing/page.test.tsx: screen.getAllByRole(\"radio\")[1]"), { key: "ArrowRight" }); // -> monthly
+      fireEvent.keyDown(requiredValue(screen.getAllByRole("radio")[2], "src/app/pricing/page.test.tsx: screen.getAllByRole(\"radio\")[2]"), { key: "ArrowRight" }); // wraps -> day
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[0]).toHaveAttribute("aria-checked", "true");
@@ -638,8 +639,8 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[2].focus();
-      fireEvent.keyDown(radios[2], { key: "Home" });
+      requiredValue(radios[2], "src/app/pricing/page.test.tsx: radios[2]").focus();
+      fireEvent.keyDown(requiredValue(radios[2], "src/app/pricing/page.test.tsx: radios[2]"), { key: "Home" });
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[0]).toHaveAttribute("aria-checked", "true");
@@ -650,8 +651,8 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const radios = screen.getAllByRole("radio");
-      radios[0].focus();
-      fireEvent.keyDown(radios[0], { key: "End" });
+      requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]").focus();
+      fireEvent.keyDown(requiredValue(radios[0], "src/app/pricing/page.test.tsx: radios[0]"), { key: "End" });
 
       const radiosAfter = screen.getAllByRole("radio");
       expect(radiosAfter[2]).toHaveAttribute("aria-checked", "true");
@@ -667,6 +668,62 @@ describe("PricingPage", () => {
       expect(radios[0]).toHaveAttribute("tabindex", "0");
       const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
       expect(button.getAttribute("tabindex")).not.toBe("-1");
+    });
+  });
+
+  describe("Phase 6 real pricing roving consumer", () => {
+    it.each([
+      { key: "ArrowDown", expected: 1 },
+      { key: "ArrowUp", expected: 2 },
+    ])("$key selects tier $expected and prevents default while retaining bubbling", ({ key, expected }) => {
+      const parentKeyDown = vi.fn();
+      render(<div onKeyDown={parentKeyDown}><PricingPage /></div>);
+      const radios = screen.getAllByRole("radio");
+      radios[0]!.focus();
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      fireEvent(radios[0]!, event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(parentKeyDown).toHaveBeenCalledTimes(1);
+      expect(screen.getAllByRole("radio")[expected]).toHaveFocus();
+      expect(screen.getAllByRole("radio")[expected]).toHaveAttribute("aria-checked", "true");
+      expect(screen.getAllByRole("radio").filter((radio) => radio.tabIndex === 0)).toEqual([screen.getAllByRole("radio")[expected]]);
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockSignInWithGoogle).not.toHaveBeenCalled();
+    });
+
+    it("rapid mixed-axis/Home/End keys keep selection/focus coherent and purchase the final tier", () => {
+      mockUseAuth.mockReturnValue({ user: { id: "user-123", email: "test@example.com" }, session: { access_token: "token" }, signInWithGoogle: mockSignInWithGoogle, isLoading: false });
+      mockUseSearchParams.mockReturnValue(new URLSearchParams([["returnTo", "oviedo-walking-tour"]]));
+      const parentKeyDown = vi.fn();
+      render(<div onKeyDown={parentKeyDown}><PricingPage /></div>);
+      screen.getAllByRole("radio")[0]!.focus();
+      for (const [key, selected] of [
+        ["ArrowDown", 1], ["End", 2], ["ArrowRight", 0],
+        ["ArrowUp", 2], ["Home", 0], ["ArrowRight", 1],
+      ] as const) {
+        fireEvent.keyDown(document.activeElement!, { key });
+        const radios = screen.getAllByRole("radio");
+        expect(radios[selected]).toHaveFocus();
+        expect(radios[selected]).toHaveAttribute("aria-checked", "true");
+        expect(radios.filter((radio) => radio.tabIndex === 0)).toEqual([radios[selected]]);
+      }
+      expect(parentKeyDown).toHaveBeenCalledTimes(6);
+      expect(mockPush).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "premium.pricing_cta" }));
+      expect(mockPush).toHaveBeenCalledExactlyOnceWith("/pricing/checkout?returnTo=oviedo-walking-tour&tier=weekly_pass");
+    });
+
+    it("leaves Tab unclaimed without changing the selected tier", () => {
+      const parentKeyDown = vi.fn();
+      render(<div onKeyDown={parentKeyDown}><PricingPage /></div>);
+      const selected = screen.getAllByRole("radio")[0]!;
+      selected.focus();
+      const event = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+      fireEvent(selected, event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(parentKeyDown).toHaveBeenCalledTimes(1);
+      expect(selected).toHaveAttribute("aria-checked", "true");
+      expect(selected).toHaveAttribute("tabindex", "0");
     });
   });
 
@@ -723,7 +780,7 @@ describe("PricingPage", () => {
       render(<PricingPage />);
 
       const button = screen.getByRole("button", { name: "premium.pricing_cta" });
-      expect(button.className).toMatch(/from-green-/);
+      expect(button.className).toMatch(/from-paisaxe-green-/);
       expect(button.className).not.toMatch(/amber-|yellow-/);
     });
   });

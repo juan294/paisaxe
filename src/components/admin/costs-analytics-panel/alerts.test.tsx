@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -118,7 +119,7 @@ describe("TierAlertsSection", () => {
     });
 
     // Verify the usageMap passed to computeTierAlerts has posthogEvents: 0
-    const usageMap = mockComputeTierAlerts.mock.calls[0][1];
+    const usageMap = requiredValue(requiredValue(mockComputeTierAlerts.mock.calls[0], "src/components/admin/costs-analytics-panel/alerts.test.tsx: mockComputeTierAlerts.mock.calls[0]")[1], "src/components/admin/costs-analytics-panel/alerts.test.tsx: mockComputeTierAlerts.mock.calls[0][1]");
     expect(usageMap.posthogEvents).toBe(0);
   });
 
@@ -143,7 +144,7 @@ describe("TierAlertsSection", () => {
       expect(mockComputeTierAlerts).toHaveBeenCalled();
     });
 
-    const usageMap = mockComputeTierAlerts.mock.calls[0][1];
+    const usageMap = requiredValue(requiredValue(mockComputeTierAlerts.mock.calls[0], "src/components/admin/costs-analytics-panel/alerts.test.tsx: mockComputeTierAlerts.mock.calls[0]")[1], "src/components/admin/costs-analytics-panel/alerts.test.tsx: mockComputeTierAlerts.mock.calls[0][1]");
     expect(usageMap.posthogEvents).toBe(0);
   });
 
@@ -168,7 +169,7 @@ describe("TierAlertsSection", () => {
       expect(mockComputeTierAlerts).toHaveBeenCalled();
     });
 
-    const usageMap = mockComputeTierAlerts.mock.calls[0][1];
+    const usageMap = requiredValue(requiredValue(mockComputeTierAlerts.mock.calls[0], "src/components/admin/costs-analytics-panel/alerts.test.tsx: mockComputeTierAlerts.mock.calls[0]")[1], "src/components/admin/costs-analytics-panel/alerts.test.tsx: mockComputeTierAlerts.mock.calls[0][1]");
     expect(usageMap.posthogEvents).toBe(1234);
   });
 

@@ -7,9 +7,10 @@ const mocks = vi.hoisted(() => ({
   getElevenLabsSignedUrl: vi.fn(),
 }));
 
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: mocks.validateAdminAuth,
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(mocks.validateAdminAuth);
+});
 
 vi.mock("@/lib/elevenlabs-signed-session", async (importOriginal) => {
   const actual =
@@ -109,3 +110,6 @@ describe("POST /api/admin/voice-session", () => {
     });
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

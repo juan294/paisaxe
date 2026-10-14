@@ -156,7 +156,7 @@ describe("AgentTerminal", () => {
         <AgentTerminal {...defaultProps} logs={stderrLogs} />
       );
       const stderrSpan = screen.getByText("[stderr] Error occurred");
-      expect(stderrSpan.className).toContain("text-[#c97a7a]");
+      expect(stderrSpan.className).toContain("text-admin-health-error");
     });
 
     it("applies normal color class to stdout lines", () => {

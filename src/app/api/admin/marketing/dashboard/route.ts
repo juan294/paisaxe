@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase-admin";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { NextRequest, NextResponse } from "next/server";
+import { withAdminDeferred } from "@/lib/admin-auth";
 import {
   rowToMarketingAccountPublic,
   rowToMarketingPost,
@@ -81,112 +80,110 @@ function normalizeMarketingStats(raw: unknown): MarketingStats {
  * GET /api/admin/marketing/dashboard
  * Returns a summary of marketing automation status for the admin dashboard
  */
-export async function GET() {
-  // Validate admin auth
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+export async function GET(request?: NextRequest) {
+  return withAdminDeferred(async (getClient) => {
 
-  try {
-    const supabase = createAdminClient();
+    try {
+      const supabase = getClient();
 
-    // Fetch all data in parallel. Stats are aggregated in SQL via the
-    // get_marketing_post_stats RPC (PE-M4) instead of folding 100 rows in JS.
-    // The 100-row post fetch is still used for the recent/upcoming lists only.
-    const [accountsResult, postsResult, schedulesResult, statsResult] =
-      await Promise.all([
-        supabase.from("marketing_accounts").select("*").order("platform"),
+      // Fetch all data in parallel. Stats are aggregated in SQL via the
+      // get_marketing_post_stats RPC (PE-M4) instead of folding 100 rows in JS.
+      // The 100-row post fetch is still used for the recent/upcoming lists only.
+      const [accountsResult, postsResult, schedulesResult, statsResult] =
+        await Promise.all([
+          supabase.from("marketing_accounts").select("*").order("platform"),
 
-        supabase
-          .from("marketing_posts")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(100), // Recent posts for the recent/upcoming lists
+          supabase
+            .from("marketing_posts")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(100), // Recent posts for the recent/upcoming lists
 
-        supabase
-          .from("marketing_schedule")
-          .select("*")
-          .order("platform")
-          .order("day_of_week"),
+          supabase
+            .from("marketing_schedule")
+            .select("*")
+            .order("platform")
+            .order("day_of_week"),
 
-        supabase.rpc("get_marketing_post_stats"),
-      ]);
+          supabase.rpc("get_marketing_post_stats"),
+        ]);
 
-    if (accountsResult.error) {
-      logger.error("Error fetching accounts:", { error: accountsResult.error.message });
+      if (accountsResult.error) {
+        logger.error("Error fetching accounts:", { error: accountsResult.error.message });
+        return NextResponse.json(
+          { error: "Failed to fetch accounts" },
+          { status: 500 }
+        );
+      }
+
+      if (postsResult.error) {
+        logger.error("Error fetching posts:", { error: postsResult.error.message });
+        return NextResponse.json(
+          { error: "Failed to fetch posts" },
+          { status: 500 }
+        );
+      }
+
+      if (schedulesResult.error) {
+        logger.error("Error fetching schedules:", { error: schedulesResult.error.message });
+        return NextResponse.json(
+          { error: "Failed to fetch schedules" },
+          { status: 500 }
+        );
+      }
+
+      if (statsResult.error) {
+        logger.error("Error fetching stats:", { error: statsResult.error.message });
+        return NextResponse.json(
+          { error: "Failed to fetch stats" },
+          { status: 500 }
+        );
+      }
+
+      // Convert to typed objects
+      const accounts = (accountsResult.data as MarketingAccountRow[]).map(
+        rowToMarketingAccountPublic
+      );
+      const allPosts = (postsResult.data as MarketingPostRow[]).map(
+        rowToMarketingPost
+      );
+      const schedules = (schedulesResult.data as MarketingScheduleRow[]).map(
+        rowToMarketingSchedule
+      );
+
+      // Filter posts for different views
+      const recentPosts = allPosts
+        .filter((p) => p.status === "posted")
+        .slice(0, 10);
+
+      const upcomingPosts = allPosts
+        .filter((p) => p.status === "scheduled" && p.scheduledFor)
+        .sort(
+          (a, b) =>
+            new Date(a.scheduledFor!).getTime() -
+            new Date(b.scheduledFor!).getTime()
+        )
+        .slice(0, 10);
+
+      // Stats are pre-aggregated in SQL (get_marketing_post_stats RPC).
+      const stats = normalizeMarketingStats(statsResult.data);
+
+      const summary: MarketingDashboardSummary = {
+        accounts,
+        recentPosts,
+        upcomingPosts,
+        schedules,
+        stats,
+      };
+
+      return NextResponse.json({ data: summary });
+    } catch (error) {
+      logger.error("Marketing dashboard API error:", { error: error instanceof Error ? error.message : String(error) });
       return NextResponse.json(
-        { error: "Failed to fetch accounts" },
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
 
-    if (postsResult.error) {
-      logger.error("Error fetching posts:", { error: postsResult.error.message });
-      return NextResponse.json(
-        { error: "Failed to fetch posts" },
-        { status: 500 }
-      );
-    }
-
-    if (schedulesResult.error) {
-      logger.error("Error fetching schedules:", { error: schedulesResult.error.message });
-      return NextResponse.json(
-        { error: "Failed to fetch schedules" },
-        { status: 500 }
-      );
-    }
-
-    if (statsResult.error) {
-      logger.error("Error fetching stats:", { error: statsResult.error.message });
-      return NextResponse.json(
-        { error: "Failed to fetch stats" },
-        { status: 500 }
-      );
-    }
-
-    // Convert to typed objects
-    const accounts = (accountsResult.data as MarketingAccountRow[]).map(
-      rowToMarketingAccountPublic
-    );
-    const allPosts = (postsResult.data as MarketingPostRow[]).map(
-      rowToMarketingPost
-    );
-    const schedules = (schedulesResult.data as MarketingScheduleRow[]).map(
-      rowToMarketingSchedule
-    );
-
-    // Filter posts for different views
-    const recentPosts = allPosts
-      .filter((p) => p.status === "posted")
-      .slice(0, 10);
-
-    const upcomingPosts = allPosts
-      .filter((p) => p.status === "scheduled" && p.scheduledFor)
-      .sort(
-        (a, b) =>
-          new Date(a.scheduledFor!).getTime() -
-          new Date(b.scheduledFor!).getTime()
-      )
-      .slice(0, 10);
-
-    // Stats are pre-aggregated in SQL (get_marketing_post_stats RPC).
-    const stats = normalizeMarketingStats(statsResult.data);
-
-    const summary: MarketingDashboardSummary = {
-      accounts,
-      recentPosts,
-      upcomingPosts,
-      schedules,
-      stats,
-    };
-
-    return NextResponse.json({ data: summary });
-  } catch (error) {
-    logger.error("Marketing dashboard API error:", { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }

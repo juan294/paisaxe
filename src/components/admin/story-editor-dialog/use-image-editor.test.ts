@@ -272,14 +272,14 @@ describe("useImageEditor", () => {
       });
 
       expect(result.current.selectedFile).toBeNull();
-      expect(mockSetError).toHaveBeenCalledWith("Invalid file type. Allowed: JPEG, PNG, WebP, GIF");
+      expect(mockSetError).toHaveBeenCalledWith("Invalid file type. Allowed: JPEG, PNG, WebP, GIF, AVIF");
     });
 
-    it("rejects files larger than 5MB", () => {
+    it("rejects files larger than 10MB", () => {
       const { result } = renderHook(() => useImageEditor(mockStory, mockSetError));
 
       // Create a file > 5MB
-      const largeData = new ArrayBuffer(6 * 1024 * 1024);
+      const largeData = new ArrayBuffer(11 * 1024 * 1024);
       const file = new File([largeData], "big.jpg", { type: "image/jpeg" });
       const event = {
         target: { files: [file] },
@@ -290,7 +290,7 @@ describe("useImageEditor", () => {
       });
 
       expect(result.current.selectedFile).toBeNull();
-      expect(mockSetError).toHaveBeenCalledWith("File too large. Maximum size is 5MB");
+      expect(mockSetError).toHaveBeenCalledWith("File too large. Maximum size is 10MB");
     });
 
     it("clears selection when no file provided", () => {
@@ -503,7 +503,7 @@ describe("useImageEditor", () => {
       expect(result.current.contentSearched).toBe(true);
       expect(result.current.previewUrl).toBe("/content/images/img1.jpg");
       expect(result.current.imageUrl).toBe("/content/images/img1.jpg");
-      expect(result.current.imageSource).toBe("Turismo de Asturias");
+      expect(result.current.imageSource).toBe("");
     });
 
     it("handles empty results", async () => {
@@ -689,7 +689,7 @@ describe("useImageEditor", () => {
       expect(result.current.contentImageIndex).toBe(1);
       expect(result.current.previewUrl).toBe("/content/images/img2.jpg");
       expect(result.current.imageUrl).toBe("/content/images/img2.jpg");
-      expect(result.current.imageSource).toBe("Turismo de Asturias");
+      expect(result.current.imageSource).toBe("");
     });
 
     it("navigates to previous image", async () => {
@@ -908,4 +908,13 @@ describe("useImageEditor", () => {
       expect(result.current.fileInputRef).toEqual({ current: null });
     });
   });
+});
+
+it("preserves the existing image review when changing tabs without selecting another asset", () => {
+  const { result } = renderHook(() => useImageEditor(mockStory, vi.fn()));
+  act(() => { result.current.setImageSourceTab("url"); result.current.handleUrlChange(""); });
+  expect(result.current.imageSource).toBe(mockStory.imageSource);
+  act(() => { result.current.setImageSourceTab("upload"); result.current.clearUpload(); });
+  expect(result.current.imageSource).toBe(mockStory.imageSource);
+  expect(result.current.selectedFile).toBeNull();
 });

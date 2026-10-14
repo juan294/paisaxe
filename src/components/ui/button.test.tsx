@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Button, buttonVariants } from "./button";
@@ -206,12 +207,61 @@ describe("Button", () => {
     });
   });
 
+  describe("dark-surface variants (booking UI polish, U01/U07/U16)", () => {
+    const DARK_FOCUS = [
+      "focus-visible:ring-2",
+      "focus-visible:ring-white/70",
+      "focus-visible:ring-offset-2",
+      "focus-visible:ring-offset-neutral-950",
+    ];
+
+    it("brand is the paisaxe-green gradient with black text", () => {
+      render(<Button variant="brand">Entrar</Button>);
+      expect(screen.getByRole("button")).toHaveClass(
+        "bg-gradient-to-r",
+        "from-paisaxe-green-500",
+        "to-paisaxe-green-400",
+        "text-black",
+        "hover:from-paisaxe-green-400",
+        "hover:to-paisaxe-green-300",
+        ...DARK_FOCUS
+      );
+    });
+
+    it("paypal is PayPal gold with dark text", () => {
+      render(<Button variant="paypal">Pagar</Button>);
+      expect(screen.getByRole("button")).toHaveClass("bg-[#FFC439]", "text-[#111111]", "hover:bg-[#F2BA36]", ...DARK_FOCUS);
+    });
+
+    it("glassDestructive is a red tint, never solid red", () => {
+      render(<Button variant="glassDestructive">Cancelar</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("bg-red-500/10", "text-red-200", "border-red-400/40", ...DARK_FOCUS);
+      expect(button).not.toHaveClass("bg-destructive");
+    });
+
+    it("glass keeps its exact class string", () => {
+      expect(buttonVariants({ variant: "glass" })).toBe(
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 h-9 px-4 py-2"
+      );
+    });
+
+    it("buttonVariants styles an anchor as a PayPal button", () => {
+      render(
+        <a href="https://example.test" className={buttonVariants({ variant: "paypal" })}>
+          Pagar con PayPal
+        </a>
+      );
+      expect(screen.getByRole("link", { name: "Pagar con PayPal" })).toHaveClass("bg-[#FFC439]");
+    });
+  });
+
   describe("ref forwarding", () => {
     it("should forward ref to button element", () => {
       const ref = vi.fn();
       render(<Button ref={ref}>Ref Button</Button>);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLButtonElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/button.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/button.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLButtonElement);
     });
   });
 

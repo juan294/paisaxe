@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, expect, it } from "vitest";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
@@ -179,7 +180,7 @@ describe("capability redaction (F05)", () => {
 
     expect(JSON.stringify(event)).not.toContain(capability);
     expect(event.request?.url).toBe("/booking/[redacted]/return");
-    expect(event.breadcrumbs?.[0].data?.from).toBe("/immersive");
+    expect(requiredValue(event.breadcrumbs?.[0], "src/lib/sentry-before-send.test.ts:182 event.breadcrumbs?.[0]").data?.from).toBe("/immersive");
   });
 
   it("redacts capabilities from transaction events", () => {
@@ -208,7 +209,7 @@ describe("capability redaction (F05)", () => {
 
     expect(transaction.sdkProcessingMetadata).toBe(sdkProcessingMetadata);
     expect(transaction.transaction).toBe("/booking/[redacted]");
-    expect(transaction.spans?.[0].description).toBe("GET /booking/[redacted]");
+    expect(requiredValue(transaction.spans?.[0], "src/lib/sentry-before-send.test.ts:211 transaction.spans?.[0]").description).toBe("GET /booking/[redacted]");
   });
 
   it("is wired as beforeSendTransaction in every Sentry init", () => {

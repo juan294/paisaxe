@@ -1,0 +1,24 @@
+{
+  "provider": "Stripe",
+  "environment": "test",
+  "retrieval": "Authenticated CLI events retrieve of an existing test event selected by the Paisaxe metadata keys and /pricing/checkout/return path",
+  "api_version": "2025-08-27.basil",
+  "retrievalStartedAt": "2026-10-08T15:19:57.716361+00:00",
+  "captured_at": "2026-10-08T15:19:59.695050Z",
+  "expires_at": "2026-11-07T15:19:59.695050Z",
+  "refresh_owner": "Juan (Paisaxe owner)",
+  "sha256": "8301ccdcc301db3230aa6537ac0c44d3b51d75beafb1e643328998066dfb8e9c",
+  "raw_sha256": "9eb6271b526771b1a9fc45fb53b1dad5113cea799b2f6cba454d67b22f1fbe5b",
+  "sanitization": [
+    "IDs consistently pseudonymized; UUID shape retained for original user_id.",
+    "Only actual envelope and checkout fields consumed by the adapter are retained; contact, product, URL and payment-method details are omitted.",
+    "Type, API version, original creation time, test mode, paid status, currency, amount, purchase type and field types are preserved."
+  ],
+  "limitations": [
+    "Provider event export, not original webhook HTTP delivery bytes; original delivery signature unavailable.",
+    "Sanitized body requires a synthetic local signature. Signature checking, route and database must run for real during replay.",
+    "This records checkout.session.completed only; no async_payment_succeeded event was available.",
+    "The exact originating local test run is unproven. This establishes exported provider shape compatibility, not a new checkout/payment or live availability."
+  ],
+  "earlier_refresh_criterion": "Review and refresh on Stripe SDK, webhook schema/API-version, or adapter contract change; no automatic provider requests."
+}

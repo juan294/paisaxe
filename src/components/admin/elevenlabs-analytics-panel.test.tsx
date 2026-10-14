@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -375,7 +376,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
     expect(dateInputs.length).toBeGreaterThanOrEqual(2);
 
     // Use fireEvent.change for date inputs to avoid invalid intermediate states
-    fireEvent.change(dateInputs[0], { target: { value: "2024-06-01" } });
+    fireEvent.change(requiredValue(dateInputs[0], "src/components/admin/elevenlabs-analytics-panel.test.tsx: dateInputs[0]"), { target: { value: "2024-06-01" } });
 
     expect(dateInputs[0]).toHaveValue("2024-06-01");
   });
@@ -393,7 +394,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
 
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/);
 
-    fireEvent.change(dateInputs[1], { target: { value: "2024-12-31" } });
+    fireEvent.change(requiredValue(dateInputs[1], "src/components/admin/elevenlabs-analytics-panel.test.tsx: dateInputs[1]"), { target: { value: "2024-12-31" } });
 
     expect(dateInputs[1]).toHaveValue("2024-12-31");
   });
@@ -463,15 +464,15 @@ describe("ElevenLabsAnalyticsPanel", () => {
       expect(screen.getByText("Active calls: 0")).toBeInTheDocument();
     });
 
-    // The indicator dot should have idle styling (bg-[#a39e98]), NOT animate-pulse
+    // The indicator dot should have idle styling (bg-admin-subtle), NOT animate-pulse
     const activeCallsText = screen.getByText("Active calls: 0");
     const widgetContainer = activeCallsText.closest("[class*='inline-flex']")!;
     const indicatorDot = widgetContainer.querySelector("span[class*='rounded-full'][class*='h-2.5']")!;
 
-    expect(indicatorDot.className).toContain("bg-[#a39e98]");
+    expect(indicatorDot.className).toContain("bg-admin-subtle");
     expect(indicatorDot.className).not.toContain("animate-pulse");
     // Container should have neutral background, not emerald
-    expect(widgetContainer.className).toContain("bg-[#f5f3ee]");
+    expect(widgetContainer.className).toContain("bg-admin-paper");
     expect(widgetContainer.className).not.toContain("bg-emerald-50");
   });
 
@@ -511,7 +512,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
     });
 
     // The em dash separator between from/to date inputs
-    const dateContainer = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/)[0].closest("div")!;
+    const dateContainer = requiredValue(screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/)[0], "src/components/admin/elevenlabs-analytics-panel.test.tsx: screen.getAllByDisplayValue(/\\d{4}-\\d{2}-\\d{2}/)[0]").closest("div")!;
     const dashSpan = dateContainer.querySelector("span");
     expect(dashSpan).toBeInTheDocument();
     expect(dashSpan!.textContent).toBe("—");
@@ -639,9 +640,9 @@ describe("ElevenLabsAnalyticsPanel", () => {
   // Line 270: `statColorClasses[color] || statColorClasses.stone` — the `||` fallback is unreachable.
   // The StatCard `color` prop is typed as a union of valid keys ("blue" | "emerald" | ... | "stone")
   // with a default of "stone". The parent component only passes valid color strings.
-  // The fallback is defensive code that cannot be triggered through the component's public API.
+  // The fallback is defensive code that cannot be triggered through the panel's public API.
   //
   // Line 471: `skeletonColorClasses[color] || skeletonColorClasses.stone` — same pattern.
-  // SkeletonStatCard is a private component called with hardcoded valid color strings.
-  // The fallback is defensive code that cannot be triggered through the component's public API.
+  // SkeletonStatCard is internal to the skeleton module and called with hardcoded valid color strings.
+  // The fallback is defensive code that cannot be triggered through the panel's public API.
 });

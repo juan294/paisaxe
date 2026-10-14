@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -20,55 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, ChevronDown, ChevronUp, AtSign, AlertCircle } from "lucide-react";
-import { createStory } from "@/lib/admin-api";
 import { cn } from "@/lib/utils";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
-import type { CreateStoryRequest, CreateStoryResponse } from "@/types/admin";
-import type { AdminStorySuggestion } from "@/types/suggestions";
 
-const CATEGORIES: { value: StoryCategory; label: string }[] = [
-  { value: "nature", label: "Nature" },
-  { value: "cities", label: "Cities" },
-  { value: "food", label: "Food" },
-  { value: "culture", label: "Culture" },
-  { value: "activities", label: "Activities" },
-];
-
-const LOCATIONS: { value: StoryLocation; label: string }[] = [
-  { value: "eastern", label: "Eastern Asturias" },
-  { value: "central", label: "Central Asturias" },
-  { value: "western", label: "Western Asturias" },
-];
-
-const DURATIONS: { value: StoryDuration; label: string }[] = [
-  { value: "day-trip", label: "Day Trip" },
-  { value: "weekend", label: "Weekend" },
-  { value: "week", label: "Week" },
-];
-
-/**
- * Generate a URL-safe slug from a title.
- * Handles Spanish diacritics and special characters.
- */
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/ñ/g, "n")
-    .replace(/[\s_]+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-interface CreateStoryDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreated: (story: CreateStoryResponse) => void;
-  /** Optional suggestion to pre-fill form data from */
-  suggestion?: AdminStorySuggestion | null;
-}
+import { CATEGORIES, LOCATIONS, DURATIONS, type CreateStoryDialogProps } from "./create-story-dialog/model";
+import { useCreateStoryForm } from "./create-story-dialog/use-create-story-form";
 
 export function CreateStoryDialog({
   open,
@@ -76,136 +31,39 @@ export function CreateStoryDialog({
   onCreated,
   suggestion,
 }: CreateStoryDialogProps) {
-  // Form state
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [category, setCategory] = useState<StoryCategory | "">("");
-  const [subtitle, setSubtitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState<StoryLocation | "">("");
-  const [duration, setDuration] = useState<StoryDuration | "">("");
-  const [sourcePdf, setSourcePdf] = useState("");
-
-  // UI state
-  const [showOptionalFields, setShowOptionalFields] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  // Reset form when dialog opens/closes or suggestion changes
-  const resetForm = useCallback(() => {
-    if (suggestion) {
-      // Pre-fill from suggestion
-      setTitle(suggestion.placeName);
-      setSlug(generateSlug(suggestion.placeName));
-      setSlugManuallyEdited(false);
-      setCategory("");
-      setSubtitle("");
-      setDescription(suggestion.comment || "");
-      setLocation(suggestion.location || "");
-      setDuration("");
-      setSourcePdf("");
-      setShowOptionalFields(!!suggestion.location);
-    } else {
-      // Clean slate
-      setTitle("");
-      setSlug("");
-      setSlugManuallyEdited(false);
-      setCategory("");
-      setSubtitle("");
-      setDescription("");
-      setLocation("");
-      setDuration("");
-      setSourcePdf("");
-      setShowOptionalFields(false);
-    }
-    setError("");
-    setFieldErrors({});
-  }, [suggestion]);
-
-  useEffect(() => {
-    if (open) {
-      resetForm();
-    }
-  }, [open, resetForm]);
-
-  // Auto-generate slug from title if not manually edited
-  useEffect(() => {
-    if (!slugManuallyEdited && title) {
-      setSlug(generateSlug(title));
-    }
-  }, [title, slugManuallyEdited]);
-
-  const handleSlugChange = (value: string) => {
-    setSlugManuallyEdited(true);
-    setSlug(value);
-  };
-
-  const validate = (): boolean => {
-    const errors: Record<string, string> = {};
-
-    if (!title.trim()) {
-      errors.title = "Title is required";
-    }
-
-    if (!category) {
-      errors.category = "Category is required";
-    }
-
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError("");
-
-    const data: CreateStoryRequest = {
-      title: title.trim(),
-      slug: slug || generateSlug(title),
-      category: category as StoryCategory,
-      subtitle: subtitle.trim() || undefined,
-      description: description.trim() || undefined,
-      location: location || undefined,
-      duration: duration || undefined,
-      sourcePdf: sourcePdf.trim() || undefined,
-    };
-
-    // If creating from a suggestion, add source tracking
-    if (suggestion) {
-      data.sourceType = "user_submitted";
-      data.suggestionId = suggestion.id;
-    }
-
-    const result = await createStory(data);
-
-    if (result.error) {
-      setError(result.error);
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (result.data) {
-      onCreated(result.data);
-      onOpenChange(false);
-    }
-
-    setIsSubmitting(false);
-  };
+  const {
+    title,
+    setTitle,
+    slug,
+    category,
+    setCategory,
+    subtitle,
+    setSubtitle,
+    description,
+    setDescription,
+    location,
+    setLocation,
+    duration,
+    setDuration,
+    sourcePdf,
+    setSourcePdf,
+    showOptionalFields,
+    setShowOptionalFields,
+    isSubmitting,
+    error,
+    fieldErrors,
+    handleSlugChange,
+    handleSubmit,
+  } = useCreateStoryForm({ open, onOpenChange, onCreated, suggestion });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto bg-white dark:bg-[#252320] sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto bg-white dark:bg-admin-panel sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-[#2d2a26] dark:text-[#f5f3ee]">
+          <DialogTitle className="text-admin-ink dark:text-admin-paper">
             {suggestion ? "Convert Suggestion to Story" : "Create New Story"}
           </DialogTitle>
-          <DialogDescription className="text-[#6b6560] dark:text-[#a39e98]">
+          <DialogDescription className="text-admin-muted dark:text-admin-subtle">
             {suggestion
               ? "Create a new story from this user suggestion."
               : "Fill in the details to create a new story."}
@@ -214,7 +72,7 @@ export function CreateStoryDialog({
 
         {/* Attribution notice when converting */}
         {suggestion?.attribution && (
-          <div className="flex items-center gap-2 rounded-lg bg-[#f5f3ee] px-3 py-2 text-sm text-[#6b6560] dark:bg-[#2d2a26] dark:text-[#a39e98]">
+          <div className="flex items-center gap-2 rounded-lg bg-admin-paper px-3 py-2 text-sm text-admin-muted dark:bg-admin-ink dark:text-admin-subtle">
             <AtSign className="h-4 w-4 flex-shrink-0" />
             <span>
               Credit: <strong>{suggestion.attribution}</strong>
@@ -235,7 +93,7 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="title"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               Title <span className="text-red-500">*</span>
             </Label>
@@ -245,7 +103,7 @@ export function CreateStoryDialog({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter story title"
               className={cn(
-                "bg-[#f5f3ee] dark:bg-[#2d2a26]",
+                "bg-admin-paper dark:bg-admin-ink",
                 fieldErrors.title && "border-red-500"
               )}
             />
@@ -258,18 +116,18 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="slug"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               URL Slug
             </Label>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[#a39e98]">/story/</span>
+              <span className="text-sm text-admin-subtle">/story/</span>
               <Input
                 id="slug"
                 value={slug}
                 onChange={(e) => handleSlugChange(e.target.value)}
                 placeholder="auto-generated-from-title"
-                className="flex-1 bg-[#f5f3ee] dark:bg-[#2d2a26]"
+                className="flex-1 bg-admin-paper dark:bg-admin-ink"
               />
             </div>
           </div>
@@ -278,7 +136,7 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="category"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               Category <span className="text-red-500">*</span>
             </Label>
@@ -289,7 +147,7 @@ export function CreateStoryDialog({
               <SelectTrigger
                 id="category"
                 className={cn(
-                  "bg-[#f5f3ee] dark:bg-[#2d2a26]",
+                  "bg-admin-paper dark:bg-admin-ink",
                   fieldErrors.category && "border-red-500"
                 )}
               >
@@ -312,7 +170,7 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="subtitle"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               Subtitle
             </Label>
@@ -321,7 +179,7 @@ export function CreateStoryDialog({
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder="Optional subtitle"
-              className="bg-[#f5f3ee] dark:bg-[#2d2a26]"
+              className="bg-admin-paper dark:bg-admin-ink"
             />
           </div>
 
@@ -329,7 +187,7 @@ export function CreateStoryDialog({
           <div className="space-y-2">
             <Label
               htmlFor="description"
-              className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+              className="text-sm font-medium text-admin-ink dark:text-admin-paper"
             >
               Description
             </Label>
@@ -339,7 +197,7 @@ export function CreateStoryDialog({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
               rows={3}
-              className="w-full rounded-md border border-input bg-[#f5f3ee] px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#2d2a26]"
+              className="w-full rounded-md border border-input bg-admin-paper px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-admin-ink"
             />
           </div>
 
@@ -347,7 +205,7 @@ export function CreateStoryDialog({
           <button
             type="button"
             onClick={() => setShowOptionalFields(!showOptionalFields)}
-            className="flex w-full items-center justify-between rounded-lg bg-[#f5f3ee] px-3 py-2 text-sm font-medium text-[#6b6560] transition-colors hover:bg-[#e5e3de] dark:bg-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#3d3a36]"
+            className="flex w-full items-center justify-between rounded-lg bg-admin-paper px-3 py-2 text-sm font-medium text-admin-muted transition-colors hover:bg-admin-line dark:bg-admin-ink dark:text-admin-subtle dark:hover:bg-admin-depth"
           >
             <span>Optional Fields</span>
             {showOptionalFields ? (
@@ -359,12 +217,12 @@ export function CreateStoryDialog({
 
           {/* Optional Fields Section */}
           {showOptionalFields && (
-            <div className="space-y-4 rounded-lg bg-[#f5f3ee]/50 p-4 dark:bg-[#2d2a26]/50">
+            <div className="space-y-4 rounded-lg bg-admin-paper/50 p-4 dark:bg-admin-ink/50">
               {/* Location */}
               <div className="space-y-2">
                 <Label
                   htmlFor="location"
-                  className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+                  className="text-sm font-medium text-admin-ink dark:text-admin-paper"
                 >
                   Location
                 </Label>
@@ -374,7 +232,7 @@ export function CreateStoryDialog({
                 >
                   <SelectTrigger
                     id="location"
-                    className="bg-white dark:bg-[#252320]"
+                    className="bg-white dark:bg-admin-panel"
                   >
                     <SelectValue placeholder="Select a region" />
                   </SelectTrigger>
@@ -392,7 +250,7 @@ export function CreateStoryDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="duration"
-                  className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+                  className="text-sm font-medium text-admin-ink dark:text-admin-paper"
                 >
                   Duration
                 </Label>
@@ -402,7 +260,7 @@ export function CreateStoryDialog({
                 >
                   <SelectTrigger
                     id="duration"
-                    className="bg-white dark:bg-[#252320]"
+                    className="bg-white dark:bg-admin-panel"
                   >
                     <SelectValue placeholder="Select visit duration" />
                   </SelectTrigger>
@@ -420,7 +278,7 @@ export function CreateStoryDialog({
               <div className="space-y-2">
                 <Label
                   htmlFor="sourcePdf"
-                  className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]"
+                  className="text-sm font-medium text-admin-ink dark:text-admin-paper"
                 >
                   Source PDF
                 </Label>
@@ -429,7 +287,7 @@ export function CreateStoryDialog({
                   value={sourcePdf}
                   onChange={(e) => setSourcePdf(e.target.value)}
                   placeholder="guide.pdf"
-                  className="bg-white dark:bg-[#252320]"
+                  className="bg-white dark:bg-admin-panel"
                 />
               </div>
             </div>
@@ -441,14 +299,14 @@ export function CreateStoryDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
-            className="border-[#e5e3de] dark:border-[#3d3a36]"
+            className="border-admin-line dark:border-admin-depth"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="bg-[#2d2a26] text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+            className="bg-admin-ink text-admin-paper hover:bg-admin-depth dark:bg-admin-paper dark:text-admin-ink dark:hover:bg-admin-line"
           >
             {isSubmitting ? (
               <>

@@ -1,3 +1,4 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
 /**
  * Script to map stories to extracted PDF images
  *
@@ -77,7 +78,7 @@ function findBestImageForPdf(images: ManifestImage[], sourcePdf: string, usedIma
       const areaB = b.width * b.height;
       if (areaA !== areaB) return areaB - areaA;
       return a.pageNumber - b.pageNumber;
-    })[0];
+    })[0] ?? null;
   }
 
   // Fallback to largest image regardless of orientation
@@ -85,7 +86,7 @@ function findBestImageForPdf(images: ManifestImage[], sourcePdf: string, usedIma
     const areaA = a.width * a.height;
     const areaB = b.width * b.height;
     return areaB - areaA;
-  })[0];
+  })[0] ?? null;
 }
 
 async function main() {
@@ -218,4 +219,4 @@ async function main() {
   console.log(`No suitable images found: ${noImagesFound}`);
 }
 
-main().catch(console.error);
+rejectLegacyContentOperation("map-story-images.ts", main);

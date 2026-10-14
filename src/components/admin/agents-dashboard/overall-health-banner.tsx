@@ -14,7 +14,7 @@ export function OverallHealthBanner({ health, agents }: { health: AgentHealthSta
         <span className={`text-sm font-medium ${HEALTH_TEXT_COLORS[health]}`}>
           {HEALTH_LABELS[health]}
         </span>
-        <span className="font-mono text-xs text-[#a39e98] dark:text-[#6b6560]">
+        <span className="font-mono text-xs text-admin-subtle dark:text-admin-muted">
           {greenCount}/{total} agents healthy
         </span>
       </div>

@@ -25,12 +25,12 @@ export function AccountCard({
   return (
     <div
       className={cn(
-        "group relative border border-[#e5e3de] p-4 transition-all dark:border-[#3d3a36]",
+        "group relative border border-admin-line p-4 transition-all dark:border-admin-depth",
         isActive
-          ? "bg-[#f5f3ee] dark:bg-[#252320]/50"
+          ? "bg-admin-paper dark:bg-admin-panel/50"
           : isPaused
             ? "bg-amber-50/50 dark:bg-amber-900/10"
-            : "cursor-pointer hover:border-[#a39e98] dark:hover:border-[#6b6560]"
+            : "cursor-pointer hover:border-admin-subtle dark:hover:border-admin-muted"
       )}
       onClick={isNotConfigured ? onConfigure : undefined}
     >
@@ -39,24 +39,24 @@ export function AccountCard({
           className={cn(
             "flex h-8 w-8 items-center justify-center border font-mono text-xs font-medium",
             isActive
-              ? "border-[#2d2a26] text-[#2d2a26] dark:border-[#f5f3ee] dark:text-[#f5f3ee]"
+              ? "border-admin-ink text-admin-ink dark:border-admin-paper dark:text-admin-paper"
               : isPaused
                 ? "border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400"
-                : "border-[#a39e98] text-[#a39e98] dark:border-[#4d4944]"
+                : "border-admin-subtle text-admin-subtle dark:border-admin-secondary"
           )}
         >
           {PLATFORM_BADGES[platform]}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+          <p className="text-sm font-medium text-admin-ink dark:text-admin-paper">
             {PLATFORM_NAMES[platform]}
           </p>
           {account?.accountHandle ? (
-            <p className="truncate font-mono text-xs text-[#6b6560]">
+            <p className="truncate font-mono text-xs text-admin-muted">
               {account.accountHandle}
             </p>
           ) : (
-            <p className="font-mono text-xs text-[#a39e98]">Click to connect</p>
+            <p className="font-mono text-xs text-admin-subtle">Click to connect</p>
           )}
         </div>
         {isActive ? (
@@ -70,7 +70,7 @@ export function AccountCard({
             Paused
           </span>
         ) : (
-          <span className="font-mono text-[10px] uppercase tracking-widest text-[#a39e98]">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-admin-subtle">
             Not Connected
           </span>
         )}
@@ -78,13 +78,13 @@ export function AccountCard({
 
       {/* Action buttons for active accounts */}
       {isActive && (
-        <div className="mt-3 flex items-center gap-2 border-t border-[#e5e3de] pt-3 dark:border-[#4d4944]">
+        <div className="mt-3 flex items-center gap-2 border-t border-admin-line pt-3 dark:border-admin-secondary">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onConfigure();
             }}
-            className="flex-1 font-mono text-[10px] uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
+            className="flex-1 font-mono text-[10px] uppercase tracking-widest text-admin-subtle transition-colors hover:text-admin-ink dark:hover:text-admin-paper"
           >
             Configure
           </button>
@@ -103,7 +103,7 @@ export function AccountCard({
 
       {/* Action buttons for paused accounts */}
       {isPaused && (
-        <div className="mt-3 flex items-center gap-2 border-t border-[#e5e3de] pt-3 dark:border-[#4d4944]">
+        <div className="mt-3 flex items-center gap-2 border-t border-admin-line pt-3 dark:border-admin-secondary">
           <button
             onClick={(e) => {
               e.stopPropagation();

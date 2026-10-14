@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 /**
  * Meta-tests for QA-M4: admin-guard and RPC-name invariants.
  *
@@ -39,7 +40,7 @@ const HTTP_METHODS = [
  * in sync with the exports of src/lib/admin-auth.ts — a new guard wrapper
  * needs to be added here too, or this check will false-positive.
  */
-const ADMIN_GUARD_PATTERN = /validateAdminAuth\(|withAdmin\(|withAdminRead\(/;
+const ADMIN_GUARD_PATTERN = /validateAdminAuth\(|withAdmin\(|withAdminRead\(|withAdminSession\(|withAdminDeferred\(/;
 
 function collectRouteFiles(dir: string): string[] {
   return collectFiles(dir, (name) => name === "route.ts");
@@ -82,17 +83,56 @@ function splitExportedMethods(
   const segments: Array<{ method: string; line: number; body: string }> = [];
 
   for (let i = 0; i < matches.length; i++) {
-    const match = matches[i];
+    const match = requiredValue(matches[i], "src/lib/meta-invariants.test.ts:86 matches[i]");
     const start = match.index ?? 0;
     const end = matches[i + 1]?.index ?? content.length;
     segments.push({
-      method: match[1],
+      method: requiredValue(match[1], "src/lib/meta-invariants.test.ts:89 match[1]"),
       line: lineAt(content, start),
       body: content.slice(start, end),
     });
   }
 
   return segments;
+}
+
+/** Only these build-resolved routes delegate to guarded development modules. */
+const LOCAL_ADMIN_ROUTES: Record<string, string> = {
+  "src/app/api/admin/agents/run/route.ts": "@/lib/local-operations/agents",
+  "src/app/api/admin/tunnel/route.ts": "@/lib/local-operations/tunnel",
+};
+const LOCAL_METHODS = ["GET", "POST", "DELETE"];
+
+function inspectAdminRoute(
+  file: string,
+  readSource: (file: string) => string = (sourceFile) => fs.readFileSync(sourceFile, "utf-8"),
+): string[] {
+  const rel = path.relative(REPO_ROOT, file);
+  const content = readSource(file);
+  const target = LOCAL_ADMIN_ROUTES[rel];
+  let implementation = content;
+  let implementationRel = rel;
+
+  if (target) {
+    // Reject aliases, wildcard exports, changed targets and extra statements.
+    const withoutComments = content.replace(/^\s*\/\/.*$/gm, "").trim();
+    const reexport = withoutComments.match(/^export\s*\{\s*GET\s*,\s*POST\s*,\s*DELETE\s*\}\s*from\s*(["'])([^"']+)\1\s*;?$/);
+    if (!reexport || reexport[2] !== target) {
+      return [`${rel} — expected only GET, POST, DELETE reexports from ${target}`];
+    }
+    const targetFile = path.join(SRC_DIR, `${target.slice(2)}.ts`);
+    implementation = readSource(targetFile);
+    implementationRel = path.relative(REPO_ROOT, targetFile);
+  }
+
+  const segments = splitExportedMethods(implementation);
+  if (segments.length === 0) return [`${rel} — no exported HTTP method handler found`];
+  if (target && (segments.length !== LOCAL_METHODS.length || LOCAL_METHODS.some((method) => segments.filter((segment) => segment.method === method).length !== 1))) {
+    return [`${rel} → ${implementationRel} — expected one development handler for each GET, POST, DELETE`];
+  }
+  return segments.filter((segment) => !ADMIN_GUARD_PATTERN.test(segment.body)).map((segment) =>
+    `${implementationRel}:${segment.line} — exported ${segment.method} has no admin-auth guard reference${target ? ` (reexported by ${rel})` : ""}`,
+  );
 }
 
 describe("QA-M4 admin-guard invariant", () => {
@@ -103,31 +143,58 @@ describe("QA-M4 admin-guard invariant", () => {
     const violations: string[] = [];
 
     for (const file of routeFiles) {
-      const content = fs.readFileSync(file, "utf-8");
-      const segments = splitExportedMethods(content);
-      const rel = path.relative(REPO_ROOT, file);
-
-      if (segments.length === 0) {
-        violations.push(`${rel} — no exported HTTP method handler found`);
-        continue;
-      }
-
-      for (const segment of segments) {
-        if (!ADMIN_GUARD_PATTERN.test(segment.body)) {
-          violations.push(
-            `${rel}:${segment.line} — exported ${segment.method} has no admin-auth guard reference`
-          );
-        }
-      }
+      violations.push(...inspectAdminRoute(file));
     }
 
     reportViolations(
       violations,
       `Found ${violations.length} admin route handler(s) without an admin-auth guard. ` +
         `Every admin route method must call validateAdminAuth(), or be wrapped in ` +
-        `withAdmin()/withAdminRead() from "@/lib/admin-auth":`
+        `withAdmin()/withAdminRead()/withAdminSession()/withAdminDeferred() from "@/lib/admin-auth":`
     );
   });
+
+  it.each(Object.entries(LOCAL_ADMIN_ROUTES).flatMap(([route, target]) =>
+    LOCAL_METHODS.map((method) => ({ route, target, method })),
+  ))("rejects omission of the $method guard in $target", ({ route, target, method }) => {
+    const routeFile = path.join(REPO_ROOT, route);
+    const targetFile = path.join(SRC_DIR, `${target.slice(2)}.ts`);
+    const source = fs.readFileSync(targetFile, "utf-8");
+    expect(inspectAdminRoute(routeFile)).toEqual([]);
+    const segment = splitExportedMethods(source).find((part) => part.method === method)!;
+    expect(segment.body.match(new RegExp(ADMIN_GUARD_PATTERN.source, "g"))).toHaveLength(1);
+    // Change the actual handler's call, keeping all other handlers unchanged.
+    const mutated = source.replace(segment.body, segment.body.replace(ADMIN_GUARD_PATTERN, "removedAdminGuard("));
+    const violations = inspectAdminRoute(routeFile, (file) => file === targetFile ? mutated : fs.readFileSync(file, "utf-8"));
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain(`exported ${method} has no admin-auth guard reference`);
+    expect(violations[0]).toContain(path.relative(REPO_ROOT, targetFile));
+  });
+
+  it.each(["withAdminSession", "withAdminDeferred"])("accepts only the named %s boundary and still rejects its omission", guard => {
+    const file = path.join(ADMIN_API_DIR, "fixture/route.ts");
+    const guarded = `export async function POST(request: Request) { return ${guard}(async () => new Response(), request); }`;
+    expect(inspectAdminRoute(file, () => guarded)).toEqual([]);
+    const violations = inspectAdminRoute(file, () => guarded.replace(`${guard}(`, "removedAdminGuard("));
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain("exported POST has no admin-auth guard reference");
+  });
+
+  it.each(Object.entries(LOCAL_ADMIN_ROUTES))("rejects redirecting %s to the inert production stub", (route, target) => {
+    const file = path.join(REPO_ROOT, route);
+    const redirected = fs.readFileSync(file, "utf-8").replace(target, "@/lib/local-operations/unavailable");
+    expect(inspectAdminRoute(file, () => redirected)).toEqual([
+      `${route} — expected only GET, POST, DELETE reexports from ${target}`,
+    ]);
+  });
+
+  it("continues to reject an unknown route that reexports a local handler", () => {
+    const file = path.join(ADMIN_API_DIR, "unknown-local/route.ts");
+    expect(inspectAdminRoute(file, () => 'export { GET } from "@/lib/local-operations/agents";')).toEqual([
+      "src/app/api/admin/unknown-local/route.ts — no exported HTTP method handler found",
+    ]);
+  });
+
 });
 
 describe("QA-M4 RPC-name invariant", () => {
@@ -152,10 +219,10 @@ describe("QA-M4 RPC-name invariant", () => {
       const events: Array<{ index: number; name: string; drop: boolean }> = [];
 
       for (const match of content.matchAll(createPattern)) {
-        events.push({ index: match.index ?? 0, name: match[1], drop: false });
+        events.push({ index: match.index ?? 0, name: requiredValue(match[1], "src/lib/meta-invariants.test.ts:221 match[1]"), drop: false });
       }
       for (const match of content.matchAll(dropPattern)) {
-        events.push({ index: match.index ?? 0, name: match[1], drop: true });
+        events.push({ index: match.index ?? 0, name: requiredValue(match[1], "src/lib/meta-invariants.test.ts:224 match[1]"), drop: true });
       }
       events.sort((a, b) => a.index - b.index);
 
@@ -206,7 +273,7 @@ describe("QA-M4 RPC-name invariant", () => {
 
       for (const match of literalCalls) {
         const name = match[1];
-        if (!liveFunctions.has(name)) {
+        if (!liveFunctions.has(requiredValue(name, "src/lib/meta-invariants.test.ts:276 name"))) {
           const rel = path.relative(REPO_ROOT, file);
           violations.push(
             `${rel}:${lineAt(content, match.index ?? 0)} — .rpc("${name}") has no live migration definition`

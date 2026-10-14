@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const es: Translations = {
   common: {
+    rateLimited: "Límite temporal. Espera {seconds} segundos y vuelve a intentarlo.",
+    retry: "Volver a intentar",
     loading: 'Cargando...',
     close: 'Cerrar',
   },
 
+  navigation: {
+    preparing: "Preparando la navegación…",
+    recovery: "Si los controles no se activan, recarga la página y comprueba que JavaScript esté habilitado.",
+    reload: "Recargar la página",
+    ready: "La navegación está lista.",
+  },
+
+  locale: {
+    loadFailed: "No se pudo cargar el idioma elegido. Se muestra español mientras lo intentas de nuevo.",
+    retry: "Reintentar la carga del idioma",
+    storyFallback: "Parte del contenido o las preguntas de esta historia aún no están disponibles en el idioma elegido y se muestran en español.",
+    legacyMigrated: "Se ha recuperado el idioma que tenías guardado en este navegador.",
+  },
+
   chat: {
+    safety_redirect: "¡Hola! Soy {name}, tu guía turístico de {region}. ¿En qué puedo ayudarte a descubrir nuestra tierra?",
     placeholder: 'Escribe tu pregunta...',
     listening: 'Escuchando...',
     thinking: 'Pensando...',
@@ -165,6 +182,8 @@ export const es: Translations = {
   },
 
   auth: {
+    verificationFailed: "No se pudo comprobar tu sesión. Vuelve a intentarlo para continuar.",
+    retryVerification: "Volver a comprobar la sesión",
     user: 'Usuario',
     user_avatar: 'Avatar del usuario',
     sign_out: 'Cerrar sesión',
@@ -187,6 +206,12 @@ export const es: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "El acceso a voz no está disponible en este momento.",
+    checkAccess: "Comprobar el acceso a voz",
+    contactSupport: "Contactar con soporte",
+    suspended: "El acceso a voz está suspendido mientras se revisa una disputa sobre el pago.",
+    revoked: "Este pase de voz se ha revocado tras la reversión de un pago.",
+    expired: "Tu pase de voz ha caducado. Puedes comprar otro para seguir usando la voz.",
     try_voice: 'Hablar',
     use_text: 'Escribir',
     upgrade_cta: 'Usa tu voz',
@@ -471,7 +496,7 @@ export const es: Translations = {
       limitReached: 'Has usado todo lo que incluye este código. Pide uno nuevo para seguir.',
       rateLimited: 'Demasiados intentos. Espera un minuto y vuelve a probar.',
       failed: 'No se pudo comprobar el código. Inténtalo de nuevo.',
-      welcome: '¡Bienvenido! Abriendo el asistente de reservas…',
+      welcome: 'Te damos la bienvenida. Abriendo el asistente de reservas…',
     },
     chat: {
       checking: 'Consultando disponibilidad…',
@@ -513,6 +538,20 @@ export const es: Translations = {
       returnProblem: 'Hay un problema con este pago y lo estamos revisando. Si se ha cobrado, te devolveremos la señal.',
       returnFailed: 'PayPal ha rechazado el pago y no se ha cobrado nada. Lo estamos revisando.',
       returnError: 'No se pudo comprobar el pago. Abre la reserva para ver su estado.',
+      statusConfirming: 'Confirmando el pago',
+      holdCountdown: 'Te guardamos la plaza: quedan {time}',
+      when: '{day} · {time} · {people} personas',
+      steps: {
+        label: 'Estado de la reserva',
+        offer: 'Oferta aceptada',
+        deposit: 'Señal pagada',
+        balance: 'Resto pagado',
+      },
+      receiptTitle: 'Comprobante PayPal',
+      copy: 'Copiar',
+      copied: 'Copiado',
+      copyFailed: 'No se pudo copiar; selecciona el código',
+      returnSlow: 'Está tardando más de lo normal. Puedes ver el estado en tu reserva.',
     },
     cancel: {
       title: 'Cancelar la reserva',
@@ -568,6 +607,10 @@ export const es: Translations = {
       sandbox: 'PayPal sandbox: pago de prueba, sin dinero real',
       pay: 'Pagar con PayPal',
       payBefore: 'Paga antes de las {time}; después se libera la plaza',
+      payWith: 'Pagar con',
+      demoSandbox: 'Demo · sandbox',
+      depositPaid: 'Señal pagada',
+      balancePaid: 'Resto pagado',
       cancellationTitle: 'Cancelación',
       suitability: {
         suitable: 'Encaja con lo que buscas',

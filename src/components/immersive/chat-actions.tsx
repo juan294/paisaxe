@@ -32,8 +32,9 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
   // Find the last assistant message
   const lastAssistantMessage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "assistant") {
-        return messages[i];
+      const message = messages[i];
+      if (message?.role === "assistant") {
+        return message;
       }
     }
     return null;
@@ -46,6 +47,8 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
     }
     return detectChatActions(lastAssistantMessage.content);
   }, [lastAssistantMessage]);
+
+  const primaryAddress = actions.addresses[0];
 
   // Don't render anything if no messages or still loading
   if (messages.length === 0 || isLoading) {
@@ -107,14 +110,14 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
         ))}
 
         {/* Directions button - only show first/primary address */}
-        {actions.addresses.length > 0 && (
+        {primaryAddress && (
           <Tooltip>
             <TooltipTrigger asChild>
               <a
-                href={actions.addresses[0].mapsUrl}
+                href={primaryAddress.mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`${t("chat.directions")} - ${actions.addresses[0].text}`}
+                aria-label={`${t("chat.directions")} - ${primaryAddress.text}`}
                 className={iconButtonClass}
                 style={{ animationDelay: `${actions.phones.length * 50}ms` }}
               >

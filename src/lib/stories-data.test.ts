@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   FALLBACK_STORIES,
@@ -18,6 +19,9 @@ import {
 import { supabase } from "./supabase";
 import { createSupabaseBrowserClient } from "./supabase-browser";
 import { logger } from "@/lib/logger";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "./image-provenance";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { rowToStory, type Story } from "@/types/immersive";
 
 // Mock supabase (server path)
 vi.mock("./supabase", () => ({
@@ -64,6 +68,13 @@ const mockStoryRow = {
   metadata: {},
   created_at: "2024-01-01",
   updated_at: "2024-01-01",
+};
+
+const syntheticImageStory: Story = {
+  id: "synthetic-image-story", slug: "synthetic-image-story",
+  title: "Invented image review fixture", subtitle: "Synthetic subtitle",
+  description: "This invented sentence is used only for an image-boundary test.",
+  image: "/images/synthetic.svg", category: "culture", sourcePdf: "",
 };
 
 describe("stories-data", () => {
@@ -252,7 +263,7 @@ describe("stories-data", () => {
 
   describe("storyToRow", () => {
     it("should convert a Story to database row format", () => {
-      const story = FALLBACK_STORIES[0];
+      const story = requiredValue(FALLBACK_STORIES[0], "src/lib/stories-data.test.ts:266 FALLBACK_STORIES[0]");
       const row = storyToRow(story, 5);
 
       expect(row.slug).toBe(story.slug || story.id);
@@ -269,8 +280,8 @@ describe("stories-data", () => {
     });
 
     it("should use story displayOrder if provided", () => {
-      const story = { ...FALLBACK_STORIES[0], displayOrder: 10 };
-      const row = storyToRow(story, 5);
+      const story = { ...requiredValue(FALLBACK_STORIES[0], "first fallback story"), displayOrder: 10 };
+      const row = storyToRow(requiredValue(story, "src/lib/stories-data.test.ts:274 story"), 5);
       expect(row.display_order).toBe(10);
     });
 
@@ -289,11 +300,34 @@ describe("stories-data", () => {
       expect(row.slug).toBe("test");
       expect(row.subtitle).toBeNull();
       expect(row.description).toBeNull();
-      expect(row.image_path).toBeNull();
+      expect(row.image_path).toBe(NEUTRAL_IMAGE);
+      expect(row.image_source).toBe(NEUTRAL_CREDIT);
       expect(row.source_pdf).toBeNull();
       expect(row.location).toBeNull();
       expect(row.duration).toBeNull();
       expect(row.display_order).toBe(0);
+    });
+
+    it("retains reviewed image provenance and blur through the real seed-row roundtrip", () => {
+      const image = "/images/synthetic-reviewed.svg";
+      const imageSource = imageProvenanceFixture(image);
+      const story = { ...syntheticImageStory, image, imageSource, blurDataUrl: "data:image/svg+xml;base64,c3ludGhldGlj" };
+      const row = storyToRow(story);
+      expect(row.image_path).toBe(image);
+      expect(row.image_source).toBe(imageSource);
+      expect(row.blur_data_url).toBe(story.blurDataUrl);
+      const restored = rowToStory({ ...row, id: story.id, created_at: "2026-10-10T00:00:00Z", updated_at: "2026-10-11T00:00:00Z" });
+      expect(restored).toMatchObject({ image, imageSource, blurDataUrl: story.blurDataUrl, title: story.title, description: story.description });
+    });
+
+    it.each([undefined, "Photo credit", imageProvenanceFixture("/images/different-synthetic.svg")])("[case %#] does not seed an unreviewed image or its legacy blur", imageSource => {
+      const story = { ...syntheticImageStory, image: "/images/unknown-synthetic.svg", imageSource, blurDataUrl: "data:image/png;base64,bGVnYWN5" };
+      const row = storyToRow(story);
+      expect(row.image_path).toBe(NEUTRAL_IMAGE);
+      expect(row.image_source).toBe(NEUTRAL_CREDIT);
+      expect(row.blur_data_url).toBeNull();
+      expect(row.title).toBe(story.title);
+      expect(row.description).toBe(story.description);
     });
   });
 
@@ -325,8 +359,8 @@ describe("stories-data", () => {
       const result = await getStoriesFromDB();
 
       expect(result.length).toBe(1);
-      expect(result[0].title).toBe("Test Story");
-      expect(result[0].slug).toBe("test-story");
+      expect(requiredValue(result[0], "src/lib/stories-data.test.ts:328 result[0]").title).toBe("Test Story");
+      expect(requiredValue(result[0], "src/lib/stories-data.test.ts:329 result[0]").slug).toBe("test-story");
     });
 
     it("selects only the public story fields for immersive/public lists", async () => {
@@ -352,7 +386,7 @@ describe("stories-data", () => {
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesFromDB();
-      const selectedFields = mockSelect.mock.calls[0][0].split(",");
+      const selectedFields = requiredValue(mockSelect.mock.calls[0], "src/lib/stories-data.test.ts:355 mockSelect.mock.calls[0]")[0].split(",");
 
       expect(mockSelect).not.toHaveBeenCalledWith("*");
       expect(selectedFields).toEqual([
@@ -385,7 +419,7 @@ describe("stories-data", () => {
       );
       expect(result[0]).not.toHaveProperty("suggestionId");
       expect(result[0]).not.toHaveProperty("sourcePdf", "private-guide.pdf");
-      expect(result[0].metadata).not.toHaveProperty("translation_status");
+      expect(requiredValue(result[0], "src/lib/stories-data.test.ts:388 result[0]").metadata).not.toHaveProperty("translation_status");
     });
 
     it("should filter by curation_status approved", async () => {
@@ -483,7 +517,7 @@ describe("stories-data", () => {
       const result = await getStoriesByCategoryFromDB("nature");
 
       expect(result.length).toBe(1);
-      expect(result[0].category).toBe("nature");
+      expect(requiredValue(result[0], "src/lib/stories-data.test.ts:486 result[0]").category).toBe("nature");
     });
 
     it("should return filtered fallback stories on error", async () => {
@@ -543,7 +577,7 @@ describe("stories-data", () => {
       const result = await getStoriesByLocationFromDB("eastern");
 
       expect(result.length).toBe(1);
-      expect(result[0].location).toBe("eastern");
+      expect(requiredValue(result[0], "src/lib/stories-data.test.ts:546 result[0]").location).toBe("eastern");
     });
 
     it("should return filtered fallback stories on error", async () => {
@@ -603,7 +637,7 @@ describe("stories-data", () => {
       const result = await getStoriesByDurationFromDB("weekend");
 
       expect(result.length).toBe(1);
-      expect(result[0].duration).toBe("weekend");
+      expect(requiredValue(result[0], "src/lib/stories-data.test.ts:606 result[0]").duration).toBe("weekend");
     });
 
     it("should return filtered fallback stories on error", async () => {

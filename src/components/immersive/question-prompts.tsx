@@ -1,5 +1,6 @@
 "use client";
 
+import { hasCompleteStoryPrompts } from "@/lib/localize-story";
 import { cn } from "@/lib/utils";
 import { useTranslation, type Locale } from "@/lib/i18n";
 import type { Story, StoryLocale } from "@/types/immersive";
@@ -29,9 +30,10 @@ export function getLocalizedQuestionPrompts(story: Story, locale: Locale): strin
 
   if (locale === "es") return spanishPrompts;
 
-  const translatedPrompts = story.metadata?.translations?.[locale as StoryLocale]?.question_prompts;
-
-  return translatedPrompts && translatedPrompts.length > 0 ? translatedPrompts : spanishPrompts;
+  const translation = story.metadata?.translations?.[locale as StoryLocale];
+  return hasCompleteStoryPrompts({ ...story, question_prompts: spanishPrompts }, translation)
+    ? translation?.question_prompts ?? spanishPrompts
+    : spanishPrompts;
 }
 
 export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: QuestionPromptsProps) {

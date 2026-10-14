@@ -48,15 +48,47 @@ test('repair defaults off and excludes nonowner source events independently', as
   assert.match(workflow, /workflow_run\.actor\.login == 'juan294'/);
   assert.match(workflow, /workflow_run\.head_repository\.full_name == github\.repository/);
 });
+test('Sutura uses a pinned repository-scoped App token with default revocation', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/sutura.yml', import.meta.url), 'utf8');
+  const mint = workflow.match(/      - name: Create repository-scoped Sutura token\n([\s\S]*?)(?=      - name:)/)?.[1];
+  assert.ok(mint);
+  assert.equal(mint, `        id: sutura-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: \${{ vars.SUTURA_APP_CLIENT_ID }}
+          private-key: \${{ secrets.SUTURA_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-checks: write
+          permission-contents: write
+          permission-pull-requests: write
+`);
+  assert.match(workflow, /github-token: \$\{\{ steps\.sutura-app-token\.outputs\.token \}\}/);
+  assert.doesNotMatch(workflow, /github-token: \$\{\{ github\.token/);
+});
 test('actual repair predicate denies default, untrusted, production, PR and nonfailed sources', async () => {
   const workflow = await readFile(new URL('../.github/workflows/sutura.yml', import.meta.url), 'utf8');
   const expression = workflow.match(/    if: >-\n\s+\$\{\{([\s\S]*?)\}\}/)?.[1];
   assert.ok(expression);
   const allowed = new Function('github', 'vars', `return Boolean(${expression});`);
-  const github = { repository, event: { workflow_run: { actor: { login: 'juan294' }, head_repository: { full_name: repository }, event: 'push', head_branch: 'develop', conclusion: 'failure' } } };
+  const github = { repository, event: { workflow_run: { name: 'CI', actor: { login: 'juan294' }, head_repository: { full_name: repository }, event: 'push', head_branch: 'develop', conclusion: 'failure' } } };
   assert.equal(allowed(github, {}), false);
   assert.equal(allowed(github, { CI_CADENCE_REPAIR_ENABLED: 'true' }), true);
   for (const delta of [{ actor: { login: 'outsider' } }, { head_repository: { full_name: 'outsider/paisaxe' } }, { event: 'pull_request' }, { head_branch: 'main' }, { conclusion: 'cancelled' }, { conclusion: 'success' }]) assert.equal(allowed({ ...github, event: { workflow_run: { ...github.event.workflow_run, ...delta } } }, { CI_CADENCE_REPAIR_ENABLED: 'true' }), false);
+  assert.match(workflow, /workflows: \["CI", "CI cadence"\]/);
+  for (const name of ['CI', 'CI cadence', 'CI nightly', 'Other']) for (const mode of [undefined, 'legacy', 'lean']) {
+    for (const enabled of [undefined, 'false', 'true']) for (const conclusion of ['failure', 'timed_out', 'success', 'cancelled', 'skipped']) {
+      const expected = enabled === 'true' && ['failure', 'timed_out'].includes(conclusion)
+        && (name === 'CI' || (mode === 'lean' && name === 'CI cadence'));
+      const source = { ...github.event.workflow_run, name, conclusion };
+      const vars = { CI_CADENCE_MODE: mode, CI_CADENCE_REPAIR_ENABLED: enabled };
+      assert.equal(allowed({ ...github, event: { workflow_run: source } }, vars), expected, `${name} ${mode} ${enabled} ${conclusion}`);
+      if (name === 'CI cadence' && expected) {
+        for (const delta of [{ actor: { login: 'outsider' } }, { head_repository: { full_name: 'outsider/paisaxe' } }, { event: 'pull_request' }, { event: 'schedule' }, { head_branch: 'main' }]) {
+          assert.equal(allowed({ ...github, event: { workflow_run: { ...source, ...delta } } }, vars), false, `cadence still excludes ${JSON.stringify(delta)}`);
+        }
+      }
+    }
+  }
 });
 test('all inventoried full application children must succeed, never skip/cancel/fail', async () => {
   const policy = JSON.parse(await readFile(new URL('../.github/ci-cadence.json', import.meta.url)));

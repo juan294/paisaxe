@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * The operator view and its two actions against the live local stack
@@ -97,7 +98,7 @@ function seedBooking(options: SeedOptions): { bookingId: string; holdId: string 
         `VALUES ('${bookingId}', 3000, '${status}', ${text(order)}, ${text(capture)}, ${text(refund)});`
     );
   }
-  return { bookingId, holdId };
+  return { bookingId: requiredValue(bookingId, "src/lib/booking/operator.postgrest-integration.test.ts:101 bookingId"), holdId: requiredValue(holdId, "src/lib/booking/operator.postgrest-integration.test.ts:101 holdId") };
 }
 
 const access = { id: ACCESS, merchantId: MERCHANT, label: "IT operator", linkVersion: 1, expiresAt: "2099-01-01T00:00:00Z" };
@@ -218,18 +219,19 @@ describe.skipIf(!dbReachable)("operator view against live local Supabase", () =>
       const view = await loadOperatorView(localServiceClient(), access);
       const byId = new Map(view.bookings.map((booking) => [booking.id, booking]));
 
-      expect(byId.get(seeded.attention)?.exception).toBe(true);
-      expect(byId.get(seeded.refunding)?.exception).toBe(true);
-      expect(byId.get(seeded.cancelling)?.exception).toBe(true);
-      expect(byId.get(seeded.confirmed)?.exception).toBe(false);
-      expect(byId.get(seeded.pending)?.exception).toBe(false);
-      expect(byId.get(seeded.attention)?.payment).toEqual({
+      expect(byId.get(requiredValue(seeded.attention, "seeded booking attention"))?.exception).toBe(true);
+      expect(byId.get(requiredValue(seeded.refunding, "seeded booking refunding"))?.exception).toBe(true);
+      expect(byId.get(requiredValue(seeded.cancelling, "seeded booking cancelling"))?.exception).toBe(true);
+      expect(byId.get(requiredValue(seeded.confirmed, "seeded booking confirmed"))?.exception).toBe(false);
+      expect(byId.get(requiredValue(seeded.pending, "seeded booking pending"))?.exception).toBe(false);
+      expect(byId.get(requiredValue(seeded.attention, "seeded booking attention"))?.payment).toEqual({
         status: "refund_failed",
         orderId: "IT6-ORDER-2",
         captureId: "IT6-CAP-2",
         refundId: "IT6-REF-2",
+        capturedAt: null,
       });
-      expect(byId.get(seeded.confirmed)).toMatchObject({
+      expect(byId.get(requiredValue(seeded.confirmed, "seeded booking confirmed"))).toMatchObject({
         experienceTitle: "IT operator walk",
         slotTime: "10:00",
         partySize: 3,
@@ -253,17 +255,17 @@ describe.skipIf(!dbReachable)("operator view against live local Supabase", () =>
       const pendingHold = psql(`SELECT hold_id FROM public.bookings WHERE id = '${seeded.pending}';`);
       expect(holds.map((hold) => hold.id)).toEqual([pendingHold]);
       expect(holds[0]).toMatchObject({ experienceTitle: "IT operator walk", slotTime: "10:00", partySize: 1 });
-      expect(holds[0].reference).toMatch(/^IT6-/);
+      expect(requiredValue(holds[0], "src/lib/booking/operator.postgrest-integration.test.ts:257 holds[0]").reference).toMatch(/^IT6-/);
     });
 
     it("shows 14 days of capacity per start time for this merchant's experiences only", async () => {
       const { capacity } = await loadOperatorView(localServiceClient(), access);
 
       expect(capacity.map((experience) => experience.id)).toEqual([EXPERIENCE]);
-      const slots = capacity[0].slots;
+      const slots = requiredValue(capacity[0], "src/lib/booking/operator.postgrest-integration.test.ts:264 capacity[0]").slots;
       expect(slots).toHaveLength(14);
-      expect(slots[0].date).toBe(today());
-      expect(capacity[0].capacity).toBe(CAPACITY);
+      expect(requiredValue(slots[0], "src/lib/booking/operator.postgrest-integration.test.ts:266 slots[0]").date).toBe(today());
+      expect(requiredValue(capacity[0], "src/lib/booking/operator.postgrest-integration.test.ts:267 capacity[0]").capacity).toBe(CAPACITY);
       // Day +2: one confirmed booking of 3. Day +6: one live hold of 1 (the expired hold counts for nothing).
       expect(slots.find((slot) => slot.date === addDays(today(), 2))).toEqual({
         date: addDays(today(), 2),

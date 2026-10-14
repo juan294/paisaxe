@@ -4,9 +4,10 @@ import { NextRequest } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn().mockResolvedValue({ valid: true }),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn().mockResolvedValue({ valid: true }));
+});
 
 // Mock translate-story module
 vi.mock("@/lib/translate-story", () => ({
@@ -510,3 +511,6 @@ describe("translations API route", () => {
     });
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
-import { generateNativeWorkflows } from './ci-cadence-native-workflows.mjs';
+import { findNestedCallees, generateNativeWorkflows } from './ci-cadence-native-workflows.mjs';
 test('concrete generated nightly calls all seven immutable same-definition app graphs, never inherits secrets',()=>{
   const files=generateNativeWorkflows(),nightly=files.find(file=>file.path.endsWith('/ci-nightly.yml'));
   assert.equal(readFileSync(nightly.path,'utf8'),nightly.source);
@@ -41,4 +41,18 @@ test('main coverage completion has a concrete coverage-only reader instead of im
  const {createGitHubCadenceReader}=await import('./ci-cadence-github.mjs');
  const reader=createGitHubCadenceReader({token:'fixture-only'});
  assert.equal(typeof reader.readStandaloneCoverage,'function');
+});
+
+// GitHub's referenced_workflows lists every reusable workflow a run reaches, at any depth.
+test('nested callee discovery follows local reusable calls to any depth and rejects foreign ones',()=>{
+  const sources={
+    '.github/workflows/ci.yml':'jobs:\n  a:\n    uses: ./.github/workflows/mid.yml\n  b:\n    uses: ./.github/workflows/e2e.yml\n',
+    '.github/workflows/e2e.yml':'jobs:\n  t:\n    runs-on: ubuntu-latest\n',
+    '.github/workflows/mid.yml':'jobs:\n  m:\n    uses: ./.github/workflows/leaf.yml\n',
+    '.github/workflows/leaf.yml':'jobs:\n  l:\n    runs-on: ubuntu-latest\n',
+  };
+  const blob=path=>'b'.repeat(39)+String(Object.keys(sources).indexOf(path));
+  const found=findNestedCallees(['.github/workflows/ci.yml','.github/workflows/e2e.yml'],path=>sources[path],blob);
+  assert.deepEqual(found,{'.github/workflows/mid.yml':{path:'.github/workflows/mid.yml',blobSha:blob('.github/workflows/mid.yml')},'.github/workflows/leaf.yml':{path:'.github/workflows/leaf.yml',blobSha:blob('.github/workflows/leaf.yml')}});
+  for(const uses of ['juan294/other/.github/workflows/x.yml@main','./.github/actions/thing']) assert.throws(()=>findNestedCallees(['.github/workflows/ci.yml'],path=>path==='.github/workflows/ci.yml'?`jobs:\n  a:\n    uses: ${uses}\n`:sources[path],blob),/Unreviewed reusable workflow reference/);
 });

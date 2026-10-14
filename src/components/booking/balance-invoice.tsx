@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonVariants } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n";
 import type { BalanceInvoiceStatus } from "@/types/booking-page";
 
@@ -17,7 +18,7 @@ export function BalanceInvoiceStatusView({ status, url }: { status: BalanceInvoi
     <>
       <p className={status === "paid" ? "font-semibold text-emerald-300" : undefined}>{t(`booking.invoice.status.${status}`)}</p>
       {url && PAYABLE.has(status) && (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block underline">
+        <a href={url} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "paypal", className: "mt-3 w-full" })}>
           {t("booking.invoice.pay")}
         </a>
       )}

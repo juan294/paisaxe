@@ -25,8 +25,8 @@ import { SkeletonDashboard } from "./skeletons";
 export function VisitorsAnalyticsPanel() {
   const { includeLocalhost, setIncludeLocalhost, isInitialized } = useDevToggle();
   const [dateRange, setDateRange] = useState({
-    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-    to: new Date().toISOString().split("T")[0],
+    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().replace(/T.*$/, ""),
+    to: new Date().toISOString().replace(/T.*$/, ""),
   });
 
   const fromISO = new Date(dateRange.from).toISOString();
@@ -44,13 +44,13 @@ export function VisitorsAnalyticsPanel() {
     <div className="space-y-12">
       {/* Controls */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+        <h2 className="text-lg font-medium text-admin-ink dark:text-admin-paper">
           Visitor Data
         </h2>
         <div className="flex items-center gap-6">
           {/* Localhost toggle */}
           <label htmlFor="dev-toggle" className="flex cursor-pointer items-center gap-2">
-            <span className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <span className="font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
               Dev
             </span>
             <button
@@ -62,7 +62,7 @@ export function VisitorsAnalyticsPanel() {
               className={`relative h-5 w-9 rounded-full transition-colors ${
                 includeLocalhost
                   ? "bg-amber-500"
-                  : "bg-[#d5d3ce] dark:bg-[#4d4944]"
+                  : "bg-admin-skeleton-dot dark:bg-admin-secondary"
               }`}
             >
               <span
@@ -72,7 +72,7 @@ export function VisitorsAnalyticsPanel() {
               />
             </button>
           </label>
-          <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+          <div className="flex items-center gap-2 font-mono text-xs text-admin-muted dark:text-admin-subtle">
             <input
               type="date"
               value={dateRange.from}
@@ -90,7 +90,7 @@ export function VisitorsAnalyticsPanel() {
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+            className="font-mono text-xs uppercase tracking-widest text-admin-muted transition-colors hover:text-admin-ink disabled:opacity-50 dark:text-admin-subtle dark:hover:text-admin-paper"
           >
             {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -112,8 +112,8 @@ export function VisitorsAnalyticsPanel() {
         <SkeletonDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-4">
-          <p className="text-2xl font-extralight text-[#a39e98]">No data yet</p>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+          <p className="text-2xl font-extralight text-admin-subtle">No data yet</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
             Visitor data will appear here once browsing begins
           </p>
         </div>
@@ -130,7 +130,7 @@ export function VisitorsAnalyticsPanel() {
           {/* Time Series Chart */}
           {data.timeSeries.length > 0 && (
             <section>
-              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
                 Traffic Over Time
               </h2>
               <TimeSeriesChart data={data.timeSeries} />
@@ -158,7 +158,7 @@ export function VisitorsAnalyticsPanel() {
           {/* UTM Campaigns */}
           {data.utmCampaigns.length > 0 && (
             <section>
-              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
                 03 — UTM Campaigns
               </h2>
               <UTMTable items={data.utmCampaigns} />
@@ -238,7 +238,7 @@ export function VisitorsAnalyticsPanel() {
 
           {/* New vs Returning */}
           <section>
-            <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
               12 — New vs Returning Visitors
             </h2>
             <NewVsReturningBar

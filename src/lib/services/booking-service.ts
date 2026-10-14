@@ -171,7 +171,7 @@ export function formatTimeNatural(time: string): string {
     return time;
   }
 
-  const [hourStr, minStr] = time.split(/[:.]/);
+  const [hourStr = "", minStr = ""] = time.split(/[:.]/);
   const hour = parseInt(hourStr, 10);
   const min = parseInt(minStr, 10);
 

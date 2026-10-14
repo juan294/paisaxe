@@ -6,6 +6,7 @@ interface UseAgentRunnerOptions {
 }
 
 export function useAgentRunner({ onAgentsFinished }: UseAgentRunnerOptions) {
+  const [unavailable, setUnavailable] = useState(false);
   const [runningAgents, setRunningAgents] = useState<Set<string>>(new Set());
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -17,7 +18,7 @@ export function useAgentRunner({ onAgentsFinished }: UseAgentRunnerOptions) {
 
   // Poll running agents when any are active
   useEffect(() => {
-    if (runningAgents.size === 0) {
+    if (unavailable || runningAgents.size === 0) {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
@@ -27,6 +28,11 @@ export function useAgentRunner({ onAgentsFinished }: UseAgentRunnerOptions) {
 
     const poll = async () => {
       const result = await fetchRunningAgents();
+      if (result.unavailable) {
+        setUnavailable(true);
+        setRunningAgents(new Set());
+        return;
+      }
       if (!result.data) return;
 
       const stillRunning = new Set(Object.keys(result.data.running));
@@ -44,10 +50,12 @@ export function useAgentRunner({ onAgentsFinished }: UseAgentRunnerOptions) {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runningAgents.size]);
+  }, [runningAgents.size, unavailable]);
 
   const handleRunAgent = async (agentKey: string) => {
+    if (unavailable) return { started: false, startedAt: null };
     const result = await triggerAgentRun(agentKey);
+    if (result.unavailable) setUnavailable(true);
     if (result.data?.started) {
       setRunningAgents((prev) => new Set([...prev, agentKey]));
       return { started: true, startedAt: result.data.startedAt };
@@ -56,7 +64,8 @@ export function useAgentRunner({ onAgentsFinished }: UseAgentRunnerOptions) {
   };
 
   const handleStopAgent = async (agentKey: string) => {
-    await stopAgent(agentKey);
+    const result = await stopAgent(agentKey);
+    if (result.unavailable) setUnavailable(true);
     setRunningAgents((prev) => {
       const next = new Set(prev);
       next.delete(agentKey);
@@ -72,6 +81,7 @@ export function useAgentRunner({ onAgentsFinished }: UseAgentRunnerOptions) {
   };
 
   return {
+    unavailable,
     runningAgents,
     lastRunResults,
     handleRunAgent,

@@ -2,6 +2,11 @@ import Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FrameLocator, Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures/auth";
+import { assertStripeLocalInputs } from "../scripts/run-stripe-e2e";
+
+// Collection precedes auth fixture cleanup/sign-in. Guard here regardless of
+// project selectors, including all projects, wildcard and direct spec paths.
+assertStripeLocalInputs();
 
 const STRIPE_TIMEOUT_MS = 30_000;
 const TALK_BUTTON_TEXT = /Talk|Hablar|Parler|Sprechen|Falar/i;

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -160,7 +161,7 @@ describe("SuggestionsPanel", () => {
 
     // Click expand button on first suggestion
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     // Should show admin notes textarea and action buttons
     await waitFor(() => {
@@ -218,7 +219,7 @@ describe("SuggestionsPanel", () => {
       data: mockSuggestions,
     });
     vi.mocked(adminApi.updateSuggestion).mockResolvedValue({
-      data: { ...mockSuggestions[0], status: "reviewed" as const },
+      data: { ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"), status: "reviewed" as const },
     });
 
     render(<SuggestionsPanel />);
@@ -229,7 +230,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand the first suggestion (status: pending)
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     // Click "Mark Reviewed"
     const markReviewedBtn = screen.getByText("Mark Reviewed");
@@ -254,7 +255,7 @@ describe("SuggestionsPanel", () => {
     });
 
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     const markReviewedBtn = screen.getByText("Mark Reviewed");
     await user.click(markReviewedBtn);
@@ -270,7 +271,7 @@ describe("SuggestionsPanel", () => {
       data: mockSuggestions,
     });
     vi.mocked(adminApi.updateSuggestion).mockResolvedValue({
-      data: { ...mockSuggestions[0], adminNotes: "Great spot to visit" },
+      data: { ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"), adminNotes: "Great spot to visit" },
     });
 
     render(<SuggestionsPanel />);
@@ -281,7 +282,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand the first suggestion
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     // Type in the admin notes textarea
     const textarea = screen.getByPlaceholderText("Add internal notes...");
@@ -312,7 +313,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand the first suggestion
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     // Click Delete
     const deleteBtn = screen.getByText("Delete");
@@ -342,7 +343,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand the first suggestion
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     // Click Delete
     const deleteBtn = screen.getByText("Delete");
@@ -372,7 +373,7 @@ describe("SuggestionsPanel", () => {
     });
 
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     const deleteBtn = screen.getByText("Delete");
     await user.click(deleteBtn);
@@ -398,7 +399,7 @@ describe("SuggestionsPanel", () => {
     });
 
     // Expand the first suggestion
-    const expandBtn = screen.getAllByLabelText("Expand")[0];
+    const expandBtn = requiredValue(screen.getAllByLabelText("Expand")[0], "src/components/admin/suggestions-panel.test.tsx: screen.getAllByLabelText(\"Expand\")[0]");
     await user.click(expandBtn);
 
     // Verify expanded content is visible
@@ -430,7 +431,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand the first suggestion (pending status, not converted)
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     // Click "Convert to Story"
     const convertBtn = screen.getByText("Convert to Story");
@@ -511,7 +512,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand the second suggestion (s2) which has adminNotes: "Nice suggestion"
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[1]);
+    await user.click(requiredValue(expandButtons[1], "src/components/admin/suggestions-panel.test.tsx: expandButtons[1]"));
 
     // The textarea should be pre-filled with the admin notes
     await waitFor(() => {
@@ -524,13 +525,13 @@ describe("SuggestionsPanel", () => {
     vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
       data: [
         {
-          ...mockSuggestions[0],
+          ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"),
           id: "s3",
           placeName: "Cudillero",
           location: "central" as const,
         },
         {
-          ...mockSuggestions[0],
+          ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"),
           id: "s4",
           placeName: "Tapia de Casariego",
           location: "western" as const,
@@ -563,7 +564,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand first suggestion
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     // Type in the admin notes
     const textarea = screen.getByPlaceholderText("Add internal notes...");
@@ -584,7 +585,7 @@ describe("SuggestionsPanel", () => {
       data: mockSuggestions,
     });
     vi.mocked(adminApi.updateSuggestion).mockResolvedValue({
-      data: { ...mockSuggestions[0], status: "rejected" as const },
+      data: { ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"), status: "rejected" as const },
     });
 
     render(<SuggestionsPanel />);
@@ -595,7 +596,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand the first suggestion (status: pending, so Reject button shows)
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     // Click "Reject"
     const rejectBtn = screen.getByText("Reject");
@@ -618,7 +619,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand first suggestion and click Convert to Story
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     const convertBtn = screen.getByText("Convert to Story");
     await user.click(convertBtn);
@@ -685,7 +686,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand and click Convert to Story to set convertingSuggestion
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
     const convertBtn = screen.getByText("Convert to Story");
     await user.click(convertBtn);
 
@@ -724,7 +725,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand and click Convert to Story
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
     const convertBtn = screen.getByText("Convert to Story");
     await user.click(convertBtn);
 
@@ -749,7 +750,7 @@ describe("SuggestionsPanel", () => {
     vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
       data: [
         {
-          ...mockSuggestions[0],
+          ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"),
           id: "s-unknown",
           placeName: "Senda del Oso",
           userId: "user-no-email",
@@ -771,7 +772,7 @@ describe("SuggestionsPanel", () => {
     vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
       data: [
         {
-          ...mockSuggestions[0],
+          ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"),
           id: "s-custom-loc",
           placeName: "Mysterious Place",
           location: "southern" as never,
@@ -794,7 +795,7 @@ describe("SuggestionsPanel", () => {
     vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
       data: [
         {
-          ...mockSuggestions[0],
+          ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"),
           id: "s-no-notes",
           placeName: "Cabo Peñas",
           adminNotes: null,
@@ -802,7 +803,7 @@ describe("SuggestionsPanel", () => {
       ],
     });
     vi.mocked(adminApi.updateSuggestion).mockResolvedValue({
-      data: { ...mockSuggestions[0], id: "s-no-notes", adminNotes: "" },
+      data: { ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"), id: "s-no-notes", adminNotes: "" },
     });
 
     render(<SuggestionsPanel />);
@@ -877,7 +878,7 @@ describe("SuggestionsPanel", () => {
 
     // Expand first suggestion and click Mark Reviewed
     const expandButtons = screen.getAllByLabelText("Expand");
-    await user.click(expandButtons[0]);
+    await user.click(requiredValue(expandButtons[0], "src/components/admin/suggestions-panel.test.tsx: expandButtons[0]"));
 
     const markReviewedBtn = screen.getByText("Mark Reviewed");
     await user.click(markReviewedBtn);
@@ -893,7 +894,7 @@ describe("SuggestionsPanel", () => {
     vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
       data: [
         {
-          ...mockSuggestions[0],
+          ...requiredValue(mockSuggestions[0], "src/components/admin/suggestions-panel.test.tsx: mockSuggestions[0]"),
           id: "s-converted",
           placeName: "Playa del Silencio",
           status: "converted" as const,

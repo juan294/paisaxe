@@ -7,19 +7,16 @@
  */
 
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import { VercelAnalytics } from "@/components/analytics";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
 import { getSiteUrl, getSupabaseUrl } from "@/lib/env";
-import { Providers } from "./providers";
+import { es } from "@/lib/i18n/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+import { Suspense } from "react";
+import { RequestPresentationProviderShell } from "./request-presentation-provider-shell";
 import { PostHogPageView } from "@/components/posthog-provider";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
 
 // LOCATION-SPECIFIC: Site URL from config
 const SITE_URL = getSiteUrl() ?? `https://${LOCATION_CONFIG.domain}`;
@@ -79,11 +76,11 @@ export const metadata: Metadata = {
     locale: LOCATION_CONFIG.seo.locale,
     images: [
       {
-        // LOCATION-SPECIFIC: Default OG image
-        url: `${SITE_URL}/images/stories/lagos-covadonga.webp`,
+        // Existing original text/gradient generator; no photograph or place claim.
+        url: `${SITE_URL}/opengraph-image`,
         width: 1200,
         height: 630,
-        alt: `Lagos de Covadonga, ${LOCATION_CONFIG.name} - ${LOCATION_CONFIG.siteName}`,
+        alt: `${LOCATION_CONFIG.siteName} · Diseño tipográfico original`,
       },
     ],
   },
@@ -92,7 +89,7 @@ export const metadata: Metadata = {
     title,
     // LOCATION-SPECIFIC: Twitter description
     description: LOCATION_CONFIG.seo.description,
-    images: [`${SITE_URL}/images/stories/lagos-covadonga.webp`],
+    images: [{ url: `${SITE_URL}/opengraph-image`, alt: `${LOCATION_CONFIG.siteName} · Diseño tipográfico original` }],
   },
   alternates: {
     canonical: SITE_URL,
@@ -119,10 +116,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // NOTE: locale is resolved client-side in LanguageProvider. Reading headers()
-  // here would make the root layout dynamic and break the PPR static shell
-  // (see CLAUDE.md "CSP and PPR Compatibility"); FE-M4 server-side locale was
-  // reverted for that reason — the i18n first-paint flash remains a known item.
+  // Request reads belong to the streamed server shell, leaving this root static.
   return (
     <html lang={LOCATION_CONFIG.primaryLanguage} suppressHydrationWarning>
       <head>
@@ -152,14 +146,21 @@ export default function RootLayout({
         layer, ad hoc Tailwind utilities, ~1,969 raw hex literals in admin) is
         tracked separately — see #938.
       */}
-      <body className={`${inter.variable} font-sans antialiased bg-neutral-950`}>
+      <body className="font-sans antialiased bg-neutral-950">
         <JsonLd type="website" />
-        <Providers>
+        <Suspense fallback={
+          <div role="status" aria-busy="true" className="p-6 text-white">
+            <p>{resolveTranslation("navigation.preparing", es)}</p>
+            <p>{resolveTranslation("navigation.recovery", es)} <a href="/immersive" className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{resolveTranslation("navigation.reload", es)}</a>.</p>
+          </div>
+        }>
+        <RequestPresentationProviderShell>
           <PostHogPageView />
           <div id="main-content">
             {children}
           </div>
-        </Providers>
+        </RequestPresentationProviderShell>
+        </Suspense>
         <VercelAnalytics />
       </body>
     </html>

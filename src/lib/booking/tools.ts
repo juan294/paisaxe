@@ -138,7 +138,7 @@ const searchExperiencesTool: BookingTool<z.infer<typeof searchInputSchema>> = {
     }));
     return {
       result: {
-        options: results.map((r, i) => ({
+        options: results.map((r) => ({
           experienceId: r.experience.id,
           title: r.experience.title,
           description: r.experience.description,
@@ -151,7 +151,7 @@ const searchExperiencesTool: BookingTool<z.infer<typeof searchInputSchema>> = {
           verdicts: r.verdicts,
           slots: r.slots.slice(0, SLOTS_PER_OPTION),
           alternatives: r.alternatives.slice(0, SLOTS_PER_OPTION),
-          slotsShown: options[i].slots.length,
+          slotsShown: Math.min((r.slots.length > 0 ? r.slots : r.alternatives).length, SLOTS_PER_OPTION),
         })),
       },
       card: { kind: "offer", options },

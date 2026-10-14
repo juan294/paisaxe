@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
 import {
   CATEGORY_LABELS,
   LOCATION_LABELS,
@@ -180,7 +182,8 @@ describe("immersive types", () => {
       expect(story.title).toBe("Test Story");
       expect(story.subtitle).toBe("Test Subtitle");
       expect(story.description).toBe("Test Description");
-      expect(story.image).toBe("https://example.com/image.jpg");
+      expect(story.image).toBe(NEUTRAL_IMAGE);
+      expect(story.imageSource).toBe(NEUTRAL_CREDIT);
       expect(story.category).toBe("nature");
       expect(story.sourcePdf).toBe("test.pdf");
       expect(story.location).toBe("eastern");
@@ -218,7 +221,8 @@ describe("immersive types", () => {
 
       expect(story.subtitle).toBe("");
       expect(story.description).toBe("");
-      expect(story.image).toBe("");
+      expect(story.image).toBe(NEUTRAL_IMAGE);
+      expect(story.imageSource).toBe(NEUTRAL_CREDIT);
       expect(story.sourcePdf).toBe("");
       expect(story.location).toBeUndefined();
       expect(story.duration).toBeUndefined();
@@ -256,8 +260,9 @@ describe("immersive types", () => {
       expect(story.bestMonths).toEqual([6, 7, 8]);
       expect(story.sourceType).toBe("user_submitted");
       expect(story.suggestionId).toBe("sug-1");
-      expect(story.blurDataUrl).toBe("data:image/png;base64,abc");
-      expect(story.imageSource).toBe("Unsplash");
+      expect(story.blurDataUrl).toBeUndefined();
+      expect(story.image).toBe(NEUTRAL_IMAGE);
+      expect(story.imageSource).toBe(NEUTRAL_CREDIT);
     });
 
     it("should return undefined for falsy metadata and null bestMonths", () => {
@@ -372,7 +377,7 @@ describe("immersive types", () => {
         title: "Public Story",
         subtitle: "",
         description: "",
-        image: "/public.jpg",
+        image: NEUTRAL_IMAGE,
         category: "culture",
         sourcePdf: "",
         location: "central",
@@ -426,6 +431,9 @@ describe("immersive types", () => {
 
       const publicStory = toPublicStory(story);
 
+      expect(publicStory.image).toBe(NEUTRAL_IMAGE);
+      expect(publicStory.imageSource).toBe(NEUTRAL_CREDIT);
+      expect(publicStory.blurDataUrl).toBeUndefined();
       expect(publicStory).not.toHaveProperty("sourcePdf");
       expect(publicStory).not.toHaveProperty("suggestionId");
       expect(publicStory.metadata).toEqual({
@@ -453,6 +461,8 @@ describe("immersive types", () => {
 
       const story = publicStoryToStory(persistedStory);
 
+      expect(story.image).toBe(NEUTRAL_IMAGE);
+      expect(story.imageSource).toBe(NEUTRAL_CREDIT);
       expect(story.sourcePdf).toBe("");
       expect(story).not.toHaveProperty("suggestionId");
       expect(story.metadata).toEqual({
@@ -483,6 +493,57 @@ describe("immersive types", () => {
         asturianu_title: "Historia asturiana",
         asturianu_subtitle: "Subtítulu asturianu",
       });
+    });
+  });
+
+  describe("permitted image projection roundtrip", () => {
+    const image = "/images/synthetic-reviewed.svg";
+    const blur = "data:image/svg+xml;base64,c3ludGhldGlj";
+    const source = imageProvenanceFixture(image);
+    function reviewedRow(): StoryRow {
+      return {
+        id: "synthetic-row", slug: "synthetic-story", title: "Synthetic title",
+        subtitle: "Synthetic subtitle", description: "Independently invented test description",
+        image_path: image, image_source: source, blur_data_url: blur,
+        category: "culture", source_pdf: "private-fixture.pdf", location: "central", duration: "day-trip",
+        display_order: 4, is_active: true, related_stories: ["related-synthetic"],
+        metadata: { question_prompts: ["Synthetic question?"], translation_status: { en: { status: "failed", error: "private-fixture-error" } }, discovery_source: "private-fixture-source" },
+        best_months: [5], created_at: "2026-10-10T00:00:00Z", updated_at: "2026-10-11T00:00:00Z",
+        source_type: "curated", suggestion_id: "private-fixture-suggestion",
+      };
+    }
+
+    it("preserves exact manually reviewed image/source/blur across real row and public converters", () => {
+      const row = reviewedRow();
+      const full = rowToStory(row);
+      const directPublic = rowToPublicStory(row);
+      const persistedPublic = toPublicStory(full);
+      const restoredPublic = publicStoryToStory(persistedPublic);
+      for (const story of [full, directPublic, persistedPublic, restoredPublic]) {
+        expect(story).toMatchObject({ image, imageSource: source, blurDataUrl: blur, id: row.id, title: row.title, description: row.description });
+      }
+      expect(full.sourcePdf).toBe("private-fixture.pdf");
+      expect(full.suggestionId).toBe("private-fixture-suggestion");
+      for (const story of [directPublic, persistedPublic, restoredPublic]) {
+        expect(story).not.toHaveProperty("suggestionId");
+        expect(story).not.toHaveProperty("sourcePdf", "private-fixture.pdf");
+        expect(story.metadata).toEqual({ question_prompts: ["Synthetic question?"] });
+        expect(JSON.stringify(story)).not.toContain("private-fixture-error");
+      }
+    });
+
+    it.each([null, "Photo by someone", imageProvenanceFixture("/images/a-different-synthetic.svg")])("[case %#] neutralizes absent/free-credit/mismatched review and removes its legacy blur", imageSource => {
+      const row = { ...reviewedRow(), image_source: imageSource };
+      const full = rowToStory(row);
+      const directPublic = rowToPublicStory(row);
+      const staleCache: Story = { ...full, image, imageSource: imageSource ?? undefined, blurDataUrl: blur };
+      for (const story of [full, directPublic, toPublicStory(staleCache), publicStoryToStory(staleCache)]) {
+        expect(story.image).toBe(NEUTRAL_IMAGE);
+        expect(story.imageSource).toBe(NEUTRAL_CREDIT);
+        expect(story.blurDataUrl).toBeUndefined();
+        expect(story.title).toBe(row.title);
+        expect(story.description).toBe(row.description);
+      }
     });
   });
 });

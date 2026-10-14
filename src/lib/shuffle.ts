@@ -16,13 +16,20 @@ function mulberry32(seed: number): () => number {
  * Returns a new array; does not mutate the original.
  */
 export function fisherYatesShuffle<T>(array: T[], seed?: number): T[] {
-  const result = [...array];
+  // Box values so presence checks never reject a legitimate undefined T.
+  // Array.from retains the original sparse-array densification contract.
+  const result = Array.from(array, value => ({ value }));
   const random = seed !== undefined ? mulberry32(seed) : Math.random;
 
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
+    const current = result[i];
+    const selected = result[j];
+    if (current === undefined || selected === undefined) {
+      throw new Error("Shuffle selected an out-of-range index");
+    }
+    [result[i], result[j]] = [selected, current];
   }
 
-  return result;
+  return result.map(entry => entry.value);
 }

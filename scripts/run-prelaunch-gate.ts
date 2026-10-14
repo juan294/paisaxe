@@ -10,7 +10,7 @@ type PackageJson = {
 
 type GateStep = {
   name: string;
-  command: readonly string[];
+  command: readonly [string, ...string[]];
 };
 
 type ProcessLike = {
@@ -94,7 +94,7 @@ export function validatePackageScripts(pkg: PackageJson): void {
   }
 }
 
-function runCommand(command: readonly string[], spawnImpl: SpawnLike): Promise<void> {
+function runCommand(command: readonly [string, ...string[]], spawnImpl: SpawnLike): Promise<void> {
   const [executable, ...args] = command;
 
   return new Promise((resolve, reject) => {

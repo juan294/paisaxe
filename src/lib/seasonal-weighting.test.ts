@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { applySeasonalWeighting } from "./seasonal-weighting";
 import type { Story } from "@/types/immersive";
@@ -25,7 +26,7 @@ describe("applySeasonalWeighting", () => {
 
   it("should place stories matching the current month first", () => {
     const result = applySeasonalWeighting(stories, 7); // July
-    expect(result.stories[0].id).toBe("s1");
+    expect(requiredValue(result.stories[0], "src/lib/seasonal-weighting.test.ts:28 result.stories[0]").id).toBe("s1");
   });
 
   it("should place non-matching stories after boosted ones", () => {
@@ -101,6 +102,6 @@ describe("applySeasonalWeighting", () => {
 
     const result = applySeasonalWeighting(testStories);
     expect(result.boostedCount).toBe(1);
-    expect(result.stories[0].id).toBe("m1");
+    expect(requiredValue(result.stories[0], "src/lib/seasonal-weighting.test.ts:104 result.stories[0]").id).toBe("m1");
   });
 });

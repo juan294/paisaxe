@@ -26,8 +26,8 @@ export function CostsAnalyticsPanel() {
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     return {
-      from: firstOfMonth.toISOString().split("T")[0],
-      to: now.toISOString().split("T")[0],
+      from: firstOfMonth.toISOString().replace(/T.*$/, ""),
+      to: now.toISOString().replace(/T.*$/, ""),
     };
   });
   const [showAddModal, setShowAddModal] = useState(false);
@@ -70,11 +70,11 @@ export function CostsAnalyticsPanel() {
     <div className="space-y-12">
       {/* Controls */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+        <h2 className="text-lg font-medium text-admin-ink dark:text-admin-paper">
           Platform Costs
         </h2>
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+          <div className="flex items-center gap-2 font-mono text-xs text-admin-muted dark:text-admin-subtle">
             <input
               type="date"
               value={dateRange.from}
@@ -96,7 +96,7 @@ export function CostsAnalyticsPanel() {
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+            className="font-mono text-xs uppercase tracking-widest text-admin-muted transition-colors hover:text-admin-ink disabled:opacity-50 dark:text-admin-subtle dark:hover:text-admin-paper"
           >
             {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -118,16 +118,16 @@ export function CostsAnalyticsPanel() {
         <SkeletonCostsDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-4">
-          <Receipt className="h-8 w-8 text-[#e5e3de]" />
-          <p className="text-2xl font-extralight text-[#a39e98]">
+          <Receipt className="h-8 w-8 text-admin-line" />
+          <p className="text-2xl font-extralight text-admin-subtle">
             No cost data yet
           </p>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+          <p className="font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
             Add manual costs or configure API keys
           </p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="mt-4 flex items-center gap-2 rounded-full bg-[#2d2a26] px-4 py-2 text-sm font-medium text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+            className="mt-4 flex items-center gap-2 rounded-full bg-admin-ink px-4 py-2 text-sm font-medium text-admin-paper hover:bg-admin-depth dark:bg-admin-paper dark:text-admin-ink dark:hover:bg-admin-line"
           >
             <Plus className="h-4 w-4" />
             Add Manual Cost
@@ -162,7 +162,7 @@ export function CostsAnalyticsPanel() {
           {/* Cost Chart */}
           {data.costsByDay.length > 0 && (
             <section>
-              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
                 Daily Costs
               </h2>
               <CostChart data={data.costsByDay} />
@@ -172,12 +172,12 @@ export function CostsAnalyticsPanel() {
           {/* Service Breakdown */}
           <section>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+              <h3 className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
                 Service Breakdown
               </h3>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-1 rounded-lg bg-[#f5f3ee] px-3 py-1.5 font-mono text-xs text-[#6b6560] transition-colors hover:bg-[#e5e3de] dark:bg-[#3d3a36] dark:text-[#a39e98] dark:hover:bg-[#4d4a44]"
+                className="flex items-center gap-1 rounded-lg bg-admin-paper px-3 py-1.5 font-mono text-xs text-admin-muted transition-colors hover:bg-admin-line dark:bg-admin-depth dark:text-admin-subtle dark:hover:bg-[#4d4a44]"
               >
                 <Plus className="h-3 w-3" />
                 Add Cost

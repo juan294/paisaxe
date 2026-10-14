@@ -1,24 +1,27 @@
 /**
  * Orders v2 through the SDK: create, read and capture the deposit order
  * (PayPal hackathon plan, Phase 4, unit [adapter]; contract sheet
- * pay-pal-server-sdk-plan.md, "Operations").
+ * paypal-server-sdk-plan.md, "Operations").
  *
- * Idempotency is PayPal-Request-Id only (the SDK never retries): the payment's
- * operation key on create, "capture:" + key on capture. A capture of an order
+ * Idempotency is PayPal-Request-Id, the same on every SDK retry (decision D3):
+ * the payment's operation key on create, "capture:" + key on capture. A capture of an order
  * that is already captured returns that order's existing capture, whether
  * PayPal answers 422 ORDER_ALREADY_CAPTURED or 201 (Phase 0 finding 6).
  */
 import "server-only";
 
 import {
-  type AuthorizationWithAdditionalData,
   CheckoutPaymentIntent,
-  PayPalExperienceUserAction,
-  PayPalWalletContextShippingPreference,
-  type LinkDescription,
-  type Order,
-  type OrdersCapture,
-} from "pay-pal-server-sdk";
+  PaypalExperienceUserAction,
+  PaypalWalletContextShippingPreference,
+} from "@paypal/paypal-server-sdk";
+import type {
+  AuthorizationWithAdditionalData,
+  LinkDescription,
+  Order,
+  OrderAuthorizeResponse,
+  OrdersCapture,
+} from "@paypal/paypal-server-sdk";
 import { callPaypal } from "./client";
 import { centsToValue, valueToCents } from "./money";
 import {
@@ -72,7 +75,7 @@ export function normalizeAuthorization(
   };
 }
 
-export function normalizeOrder(order: Order, status: number | null): PaypalOrder {
+export function normalizeOrder(order: Order | OrderAuthorizeResponse, status: number | null): PaypalOrder {
   if (!order.id || !order.status) {
     throw new PaypalError("PayPal returned an order without id or status", { status });
   }
@@ -99,9 +102,9 @@ export function normalizeOrder(order: Order, status: number | null): PaypalOrder
  */
 export async function createOrder(input: CreateOrderInput): Promise<{ orderId: string; approveUrl: string }> {
   const value = centsToValue(input.amountCents);
-  const { value: order, status } = await callPaypal("createOrder", (client) =>
-    client.orders.createOrder({
-      payPalRequestId: input.operationKey,
+  const { value: order, status } = await callPaypal("createOrder", ({ orders }) =>
+    orders.createOrder({
+      paypalRequestId: input.operationKey,
       prefer: PREFER_REPRESENTATION,
       body: {
         intent: input.intent === "AUTHORIZE" ? CheckoutPaymentIntent.Authorize : CheckoutPaymentIntent.Capture,
@@ -117,8 +120,8 @@ export async function createOrder(input: CreateOrderInput): Promise<{ orderId: s
             experienceContext: {
               returnUrl: input.returnUrl,
               cancelUrl: input.cancelUrl,
-              userAction: PayPalExperienceUserAction.PayNow,
-              shippingPreference: PayPalWalletContextShippingPreference.NoShipping,
+              userAction: PaypalExperienceUserAction.PayNow,
+              shippingPreference: PaypalWalletContextShippingPreference.NoShipping,
             },
           },
         },
@@ -132,7 +135,7 @@ export async function createOrder(input: CreateOrderInput): Promise<{ orderId: s
 }
 
 export async function getOrder(orderId: string): Promise<PaypalOrder> {
-  const { value, status } = await callPaypal("getOrder", (client) => client.orders.getOrder({ id: orderId }));
+  const { value, status } = await callPaypal("getOrder", ({ orders }) => orders.getOrder({ id: orderId }));
   return normalizeOrder(value, status);
 }
 
@@ -146,10 +149,10 @@ export async function captureOrder(orderId: string, operationKey: string): Promi
   let order: PaypalOrder;
   let status: number | null = null;
   try {
-    const response = await callPaypal("captureOrder", (client) =>
-      client.orders.captureOrder({
+    const response = await callPaypal("captureOrder", ({ orders }) =>
+      orders.captureOrder({
         id: orderId,
-        payPalRequestId: `capture:${operationKey}`,
+        paypalRequestId: `capture:${operationKey}`,
         prefer: PREFER_REPRESENTATION,
         body: {},
       }),

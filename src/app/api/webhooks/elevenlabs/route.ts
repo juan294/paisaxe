@@ -373,6 +373,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    if (rpcStatus === "retained") {
+      return NextResponse.json({ success: true, status: "retained", bookingId: booking.id, smsSent: false });
+    }
+
     // Phase 8b: settle the PayPal authorization of a phone-confirmation call
     // from the outcome recorded above (also on a redelivery, idempotent by state).
     if (isPhoneConfirmationCall(booking)) {
@@ -395,7 +399,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // processed events the row was already inserted atomically above;
       // this call is a no-op for those rows.  For duplicate events it
       // re-queues a previously failed job so the webhook can retry it.
-      const { error: enqueueError } = await supabase.rpc(
+      const { data: enqueueStatus, error: enqueueError } = await supabase.rpc(
         "enqueue_booking_sms_job",
         {
           p_event_key: eventKey,
@@ -412,6 +416,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           error: enqueueError.message,
         });
         return NextResponse.json({ error: "Database error" }, { status: 500 });
+      }
+
+      // Retention may have completed after the processing RPC committed.
+      if (enqueueStatus === "retained") {
+        return NextResponse.json({ success: true, status: "retained", bookingId: booking.id, smsSent: false });
       }
 
       const { data: claimedSMSJob, error: claimSMSError } = await supabase.rpc(
@@ -431,7 +440,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: "Database error" }, { status: 500 });
       }
 
-      const smsJob = claimedSMSJob as ClaimedSMSJob | null;
+      // RETURNS TABLE is an array through PostgREST; an empty claim sends nothing.
+      const smsJob = (claimedSMSJob as ClaimedSMSJob[] | null)?.[0];
 
       if (smsJob) {
         // Attempt SMS send outside the transaction. If it fails the durable

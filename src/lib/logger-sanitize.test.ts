@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { sanitizeValue, sanitizeLogMessage } from "./logger-sanitize";
 
@@ -16,7 +17,7 @@ describe("sanitizeValue", () => {
     it("redacts Bearer token in nested object", () => {
       // 'auth' is not a sensitive key — the pattern replaces just the token portion
       const result = sanitizeValue({ headers: { auth: "Bearer supersecret" } }) as Record<string, Record<string, string>>;
-      expect(result.headers.auth).toBe("Bearer [REDACTED]");
+      expect(requiredValue(result.headers, "sanitized headers fixture").auth).toBe("Bearer [REDACTED]");
     });
 
     it("redacts sensitive key 'authorization' regardless of value", () => {

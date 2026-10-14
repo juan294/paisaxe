@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock environment module
@@ -94,7 +95,7 @@ describe("isFeatureFlagEnabled", () => {
       const resultPromise = isFeatureFlagEnabled("randomized_order");
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      const fetchOptions = mockFetch.mock.calls[0][1];
+      const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/feature-flags-server.test.ts:97 mockFetch.mock.calls[0]")[1];
       expect(fetchOptions.signal.aborted).toBe(false);
 
       vi.advanceTimersByTime(5000);
@@ -139,7 +140,7 @@ describe("isFeatureFlagEnabled", () => {
     const { isFeatureFlagEnabled } = await import("./feature-flags-server");
     await isFeatureFlagEnabled("randomized_order");
 
-    const callUrl = mockFetch.mock.calls[0][0];
+    const callUrl = requiredValue(mockFetch.mock.calls[0], "src/lib/feature-flags-server.test.ts:142 mockFetch.mock.calls[0]")[0];
     expect(callUrl).toContain("flag_key=eq.randomized_order");
     expect(callUrl).toContain("environment=eq.production");
     expect(callUrl).toContain("select=enabled");
@@ -154,7 +155,7 @@ describe("isFeatureFlagEnabled", () => {
     const { isFeatureFlagEnabled } = await import("./feature-flags-server");
     await isFeatureFlagEnabled("randomized_order");
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/feature-flags-server.test.ts:157 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.next).toEqual({ revalidate: 60 });
   });
 
@@ -170,7 +171,7 @@ describe("isFeatureFlagEnabled", () => {
     const { isFeatureFlagEnabled } = await import("./feature-flags-server");
     await isFeatureFlagEnabled("randomized_order");
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/feature-flags-server.test.ts:173 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.cache).toBe("no-store");
   });
 
@@ -238,7 +239,7 @@ describe("isFeatureFlagEnabled", () => {
     const { isFeatureFlagEnabled } = await import("./feature-flags-server");
     await isFeatureFlagEnabled("randomized_order");
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/feature-flags-server.test.ts:241 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.signal).toBeDefined();
     expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
   });
@@ -356,7 +357,7 @@ describe("getAllFeatureFlagsServer", () => {
     const { getAllFeatureFlagsServer } = await import("./feature-flags-server");
     await getAllFeatureFlagsServer();
 
-    const callUrl = mockFetch.mock.calls[0][0];
+    const callUrl = requiredValue(mockFetch.mock.calls[0], "src/lib/feature-flags-server.test.ts:359 mockFetch.mock.calls[0]")[0];
     expect(callUrl).toContain("environment=eq.");
     expect(callUrl).toContain("select=flag_key,enabled");
   });
@@ -370,7 +371,7 @@ describe("getAllFeatureFlagsServer", () => {
     const { getAllFeatureFlagsServer } = await import("./feature-flags-server");
     await getAllFeatureFlagsServer();
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/feature-flags-server.test.ts:373 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.next).toEqual({ revalidate: 60 });
   });
 
@@ -383,7 +384,7 @@ describe("getAllFeatureFlagsServer", () => {
     const { getAllFeatureFlagsServer } = await import("./feature-flags-server");
     await getAllFeatureFlagsServer();
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/feature-flags-server.test.ts:386 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.signal).toBeDefined();
     expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
   });

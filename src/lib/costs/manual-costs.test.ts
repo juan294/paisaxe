@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createAdminClient } from "@/lib/supabase-admin";
 import {
@@ -64,10 +65,10 @@ describe("manual-costs", () => {
       const result = await fetchManualCosts("2024-01-01", "2024-01-31");
 
       expect(result).toHaveLength(1);
-      expect(result[0].serviceId).toBe("vercel");
-      expect(result[0].costUsd).toBe(20);
-      expect(result[0].source).toBe("manual");
-      expect(result[0].costFormatted).toBe("$20.00");
+      expect(requiredValue(result[0], "src/lib/costs/manual-costs.test.ts:67 result[0]").serviceId).toBe("vercel");
+      expect(requiredValue(result[0], "src/lib/costs/manual-costs.test.ts:68 result[0]").costUsd).toBe(20);
+      expect(requiredValue(result[0], "src/lib/costs/manual-costs.test.ts:69 result[0]").source).toBe("manual");
+      expect(requiredValue(result[0], "src/lib/costs/manual-costs.test.ts:70 result[0]").costFormatted).toBe("$20.00");
     });
 
     it("returns empty array on database error", async () => {
@@ -112,7 +113,7 @@ describe("manual-costs", () => {
       const result = await fetchManualCosts("2024-01-01", "2024-01-31");
 
       expect(result).toHaveLength(1);
-      expect(result[0].notes).toBeUndefined();
+      expect(requiredValue(result[0], "src/lib/costs/manual-costs.test.ts:115 result[0]").notes).toBeUndefined();
     });
 
     it("returns empty array when data is null without error", async () => {

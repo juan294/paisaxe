@@ -8,6 +8,7 @@
 
 import type { Story, StoryLocation } from "@/types/immersive";
 import { LOCATION_CONFIG, getRegionCoordinates } from "@/config/location";
+import { resolvePermittedImage } from "@/lib/image-provenance";
 
 /** Safe serialization for JSON-LD inside <script> tags — prevents </script>-injection XSS. */
 function safeJsonLd(data: unknown): string {
@@ -94,9 +95,8 @@ interface StoryJsonLdProps {
 export function StoryJsonLd({ story }: StoryJsonLdProps) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
   const storyUrl = `${siteUrl}/immersive?story=${story.slug || story.id}`;
-  const imageUrl = story.image.startsWith("http")
-    ? story.image
-    : `${siteUrl}${story.image}`;
+  const { image } = resolvePermittedImage(story.image, story.imageSource);
+  const imageUrl = image.startsWith("https://") ? image : `${siteUrl}${image}`;
 
   // LOCATION-SPECIFIC: Get geo coordinates based on region
   const coords = getRegionCoordinates(story.location as StoryLocation | undefined);

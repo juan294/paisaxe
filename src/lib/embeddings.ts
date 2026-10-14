@@ -2,6 +2,7 @@ import "server-only";
 import { VoyageAIClient } from "voyageai";
 import { EmbeddingCache } from "./embedding-cache";
 import { logger } from "./logger";
+import { CHAT_STREAM_STAGE_TIMEOUTS_MS } from "./chat-stream-timeouts";
 
 const voyageClient = new VoyageAIClient({
   apiKey: process.env.VOYAGE_API_KEY?.trim(),
@@ -42,8 +43,10 @@ export async function generateEmbedding(
   text: string,
   options: { signal?: AbortSignal } = {}
 ): Promise<number[]> {
+  options.signal?.throwIfAborted();
   // Check cache first
   const cached = await embeddingCache.get(text);
+  options.signal?.throwIfAborted();
   if (cached) {
     return cached;
   }
@@ -55,9 +58,10 @@ export async function generateEmbedding(
       inputType: "query",
       outputDimension: EMBEDDING_DIMENSIONS,
     },
-    { abortSignal: options.signal }
+    { abortSignal: options.signal, timeoutInSeconds: CHAT_STREAM_STAGE_TIMEOUTS_MS.embedding / 1000 }
   );
 
+  options.signal?.throwIfAborted();
   const embedding = result.results?.[0]?.embeddings?.[0] as number[] | undefined;
   if (!embedding) {
     throw new Error("No embedding returned from Voyage AI");
@@ -139,6 +143,9 @@ export async function generateContextualizedEmbeddings(
 
   for (let i = 0; i < chunkGroups.length; i++) {
     const group = chunkGroups[i];
+    if (group === undefined) {
+      throw new Error(`Missing contextualized embedding input group ${i}`);
+    }
     if (group.length === 0) continue;
 
     const result = await voyageClient.contextualizedEmbed({
@@ -149,12 +156,12 @@ export async function generateContextualizedEmbeddings(
     });
 
     // voyageai 0.4.x ExtendedClient returns { results: [{ embeddings: number[][] }], totalTokens }
-    if (!result.results || result.results.length === 0) {
+    const documentResult = result.results?.[0];
+    if (!documentResult) {
       throw new Error(`No contextualized embeddings returned for group ${i}`);
     }
 
     // results[0] is the document; results[0].embeddings[] are per-chunk vectors
-    const documentResult = result.results[0];
     if (!documentResult.embeddings) {
       throw new Error(`No chunk embeddings in contextualized response for group ${i}`);
     }

@@ -10,9 +10,10 @@ const logger = vi.hoisted(() => ({
 vi.mock("@/lib/logger", () => ({ logger }));
 
 // Mock dependencies
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 vi.mock("@/lib/costs", () => ({
   fetchAnthropicCosts: vi.fn(),
@@ -1379,6 +1380,64 @@ describe("GET /api/admin/costs-analytics", () => {
     vi.unstubAllEnvs();
   });
 
+  it.each([
+    [{ name: "AbortError" }, "upstream_timeout"],
+    [{ name: "TimeoutError" }, "upstream_timeout"],
+    [null, "upstream_unavailable"],
+    [{ name: "RPC_TIMEOUT" }, "upstream_unavailable"],
+  ])("preserves partial costs and recovery after unknown rejection %j", async (error, failureClass) => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    vi.mocked(fetchAnthropicCosts).mockResolvedValue(mockAnthropicCost);
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(null);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(null);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+    vi.stubEnv("POSTHOG_PROJECT_ID", "");
+    vi.stubEnv("POSTHOG_PERSONAL_API_KEY", "");
+    vi.stubEnv("ELEVENLABS_API_KEY", "xi-test");
+    const originalFetch = global.fetch;
+    const fetchMock = vi.fn().mockRejectedValueOnce(error).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        agents: [{ agent_id: "agent_recovered", name: "Paisaxe - Recovered" }],
+        conversations: [{
+          agent_id: "agent_recovered",
+          start_time_unix_secs: new Date("2026-02-03").getTime() / 1000,
+          call_duration_secs: 60,
+        }],
+      }),
+    });
+    global.fetch = fetchMock;
+    try {
+      const request = new NextRequest(
+        "http://localhost/api/admin/costs-analytics?includeUsage=true&from=2026-02-01&to=2026-02-06"
+      );
+      const response = await GET(request);
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.data.summary.totalMonthlyUsd).toBe(mockAnthropicCost.costUsd);
+      expect(body.data.usageMetrics.voiceConversations).toBe(0);
+      expect(logger.error).toHaveBeenCalledWith(
+        "[ELEVENLABS_PROVIDER_UNAVAILABLE]",
+        expect.objectContaining({ failure_class: failureClass })
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      logger.error.mockClear();
+      const recovered = await GET(request);
+      expect(recovered.status).toBe(200);
+      const recoveredBody = await recovered.json();
+      expect(recoveredBody.data.usageMetrics.voiceConversations).toBe(1);
+      expect(recoveredBody.data.usageMetrics.voiceMinutes).toBe(1);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(logger.error).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("stops usage collection after one request and one canonical event on ElevenLabs 401", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,
@@ -1581,3 +1640,6 @@ describe("POST /api/admin/costs-analytics", () => {
     consoleSpy.mockRestore();
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

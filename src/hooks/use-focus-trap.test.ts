@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useFocusTrap } from "./use-focus-trap";
@@ -94,7 +95,7 @@ describe("useFocusTrap", () => {
     renderHook(() => useFocusTrap(ref, true));
 
     const buttons = container.querySelectorAll("button");
-    const lastButton = buttons[buttons.length - 1];
+    const lastButton = requiredValue(buttons[buttons.length - 1], "src/hooks/use-focus-trap.test.ts: buttons[buttons.length - 1]");
 
     // Focus the last element
     lastButton.focus();
@@ -117,7 +118,7 @@ describe("useFocusTrap", () => {
     renderHook(() => useFocusTrap(ref, true));
 
     const buttons = container.querySelectorAll("button");
-    const firstButton = buttons[0];
+    const firstButton = requiredValue(buttons[0], "src/hooks/use-focus-trap.test.ts: buttons[0]");
     const lastButton = buttons[buttons.length - 1];
 
     // Focus the first element

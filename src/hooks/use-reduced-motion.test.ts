@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useReducedMotion } from "./use-reduced-motion";
@@ -77,7 +78,7 @@ describe("useReducedMotion", () => {
     expect(result.current).toBe(false);
 
     // Simulate the media query changing
-    const changeHandler = matchMediaMock.addEventListener.mock.calls[0][1];
+    const changeHandler = requiredValue(requiredValue(matchMediaMock.addEventListener.mock.calls[0], "src/hooks/use-reduced-motion.test.ts: matchMediaMock.addEventListener.mock.calls[0]")[1], "src/hooks/use-reduced-motion.test.ts: matchMediaMock.addEventListener.mock.calls[0][1]");
     act(() => {
       changeHandler({ matches: true });
     });

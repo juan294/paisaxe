@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { LanguageSwitcher, LOCALE_COVERAGE } from "./language-switcher";
@@ -348,7 +349,7 @@ describe("LanguageSwitcher", () => {
 
       // First option should be focused after open
       const options = screen.getAllByRole("option");
-      options[0].focus();
+      requiredValue(options[0], "src/components/immersive/language-switcher.test.tsx: options[0]").focus();
 
       // Press ArrowDown
       fireEvent.keyDown(listbox, { key: "ArrowDown" });
@@ -363,7 +364,7 @@ describe("LanguageSwitcher", () => {
 
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
-      options[1].focus();
+      requiredValue(options[1], "src/components/immersive/language-switcher.test.tsx: options[1]").focus();
 
       fireEvent.keyDown(listbox, { key: "ArrowUp" });
       expect(document.activeElement).toBe(options[0]);
@@ -377,7 +378,7 @@ describe("LanguageSwitcher", () => {
 
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
-      const lastOption = options[options.length - 1];
+      const lastOption = requiredValue(options[options.length - 1], "src/components/immersive/language-switcher.test.tsx: options[options.length - 1]");
       lastOption.focus();
 
       fireEvent.keyDown(listbox, { key: "ArrowDown" });
@@ -392,7 +393,7 @@ describe("LanguageSwitcher", () => {
 
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
-      options[0].focus();
+      requiredValue(options[0], "src/components/immersive/language-switcher.test.tsx: options[0]").focus();
 
       fireEvent.keyDown(listbox, { key: "ArrowUp" });
       expect(document.activeElement).toBe(options[options.length - 1]);
@@ -406,7 +407,7 @@ describe("LanguageSwitcher", () => {
 
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
-      options[3].focus();
+      requiredValue(options[3], "src/components/immersive/language-switcher.test.tsx: options[3]").focus();
 
       fireEvent.keyDown(listbox, { key: "Home" });
       expect(document.activeElement).toBe(options[0]);
@@ -420,7 +421,7 @@ describe("LanguageSwitcher", () => {
 
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
-      options[0].focus();
+      requiredValue(options[0], "src/components/immersive/language-switcher.test.tsx: options[0]").focus();
 
       fireEvent.keyDown(listbox, { key: "End" });
       expect(document.activeElement).toBe(options[options.length - 1]);
@@ -435,7 +436,7 @@ describe("LanguageSwitcher", () => {
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
       // UX-M10 (#903): visible list is [es, ast, en, fr, de, pt] — EN is at index 2
-      options[2].focus();
+      requiredValue(options[2], "src/components/immersive/language-switcher.test.tsx: options[2]").focus();
 
       fireEvent.keyDown(listbox, { key: "Enter" });
       expect(mockSetLocale).toHaveBeenCalledWith("en");
@@ -503,7 +504,7 @@ describe("LanguageSwitcher", () => {
 
       const listbox = screen.getByRole("listbox");
       const options = screen.getAllByRole("option");
-      options[0].focus();
+      requiredValue(options[0], "src/components/immersive/language-switcher.test.tsx: options[0]").focus();
 
       // Press an unrecognized key — nothing should change
       fireEvent.keyDown(listbox, { key: "x" });
@@ -532,7 +533,7 @@ describe("LanguageSwitcher", () => {
 
       // Arrow key navigation works, proving listboxRef.current is valid
       const listbox = screen.getByRole("listbox");
-      options[0].focus();
+      requiredValue(options[0], "src/components/immersive/language-switcher.test.tsx: options[0]").focus();
       fireEvent.keyDown(listbox, { key: "ArrowDown" });
       expect(document.activeElement).toBe(options[1]);
     });

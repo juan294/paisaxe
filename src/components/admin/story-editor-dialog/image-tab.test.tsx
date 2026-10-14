@@ -192,7 +192,7 @@ describe("ImageTab", () => {
     it("renders all three source tab buttons", () => {
       renderImageTab();
 
-      expect(screen.getByText("Content")).toBeInTheDocument();
+      expect(screen.getByText("Actual")).toBeInTheDocument();
       expect(screen.getByText("URL")).toBeInTheDocument();
       expect(screen.getByText("Upload")).toBeInTheDocument();
     });
@@ -201,7 +201,7 @@ describe("ImageTab", () => {
       const user = userEvent.setup();
       const { state } = renderImageTab(mockStory, { imageSourceTab: "url" });
 
-      await user.click(screen.getByText("Content"));
+      await user.click(screen.getByText("Actual"));
 
       expect(state.setImageSourceTab).toHaveBeenCalledWith("content");
       expect(state.clearUpload).toHaveBeenCalled();
@@ -233,190 +233,14 @@ describe("ImageTab", () => {
   // Content tab
   // ---------------------------------------------------------------------------
 
-  describe("content tab", () => {
-    it("renders search button", () => {
-      renderImageTab(mockStory, { imageSourceTab: "content" });
-
-      expect(screen.getByText("Search PDF Images")).toBeInTheDocument();
-    });
-
-    it("disables search button when no sourcePdf", () => {
-      const noSourceStory = { ...mockStory, sourcePdf: undefined };
-      renderImageTab(noSourceStory, { imageSourceTab: "content" });
-
-      const button = screen.getByText("Search PDF Images").closest("button");
-      expect(button).toBeDisabled();
-    });
-
-    it("shows message when no sourcePdf", () => {
-      const noSourceStory = { ...mockStory, sourcePdf: undefined };
-      renderImageTab(noSourceStory, { imageSourceTab: "content" });
-
-      expect(
-        screen.getByText("This story has no source PDF linked.")
-      ).toBeInTheDocument();
-    });
-
-    it("shows searching state", () => {
-      renderImageTab(mockStory, {
-        imageSourceTab: "content",
-        isSearchingContent: true,
-      });
-
-      expect(screen.getByText("Searching...")).toBeInTheDocument();
-    });
-
-    it("disables search button while searching", () => {
-      renderImageTab(mockStory, {
-        imageSourceTab: "content",
-        isSearchingContent: true,
-      });
-
-      const button = screen.getByText("Searching...").closest("button");
-      expect(button).toBeDisabled();
-    });
-
-    it("calls handleSearchContent when search button is clicked", async () => {
-      const user = userEvent.setup();
-      const { state } = renderImageTab(mockStory, { imageSourceTab: "content" });
-
-      await user.click(screen.getByText("Search PDF Images"));
-
-      expect(state.handleSearchContent).toHaveBeenCalled();
-    });
-
-    it("shows no images found message after search", () => {
-      renderImageTab(mockStory, {
-        imageSourceTab: "content",
-        contentSearched: true,
-        contentImages: [],
-      });
-
-      expect(
-        screen.getByText("No images found in the PDF content.")
-      ).toBeInTheDocument();
-    });
-
-    it("shows image count and navigation after search with results", () => {
-      const images: ContentImage[] = [
-        {
-          filename: "img1.jpg",
-          sourcePdf: "guide.pdf",
-          pageNumber: 1,
-          width: 800,
-          height: 600,
-          aspectRatio: 1.33,
-          type: "jpeg",
-          url: "/content/images/img1.jpg",
-          score: 0.95,
-        },
-        {
-          filename: "img2.jpg",
-          sourcePdf: "guide.pdf",
-          pageNumber: 2,
-          width: 1200,
-          height: 800,
-          aspectRatio: 1.5,
-          type: "jpeg",
-          url: "/content/images/img2.jpg",
-          score: 0.85,
-        },
-      ];
-
-      renderImageTab(mockStory, {
-        imageSourceTab: "content",
-        contentSearched: true,
-        contentImages: images,
-        contentImageIndex: 0,
-        currentContentImage: images[0],
-      });
-
-      expect(screen.getByText("1 of 2 images")).toBeInTheDocument();
-    });
-
-    it("shows content image details (dimensions, page, type)", () => {
-      const contentImage: ContentImage = {
-        filename: "img1.jpg",
-        sourcePdf: "guide.pdf",
-        pageNumber: 3,
-        width: 1920,
-        height: 1080,
-        aspectRatio: 1.78,
-        type: "png",
-        url: "/content/images/img1.jpg",
-        score: 0.9,
-      };
-
-      renderImageTab(mockStory, {
-        imageSourceTab: "content",
-        contentSearched: true,
-        contentImages: [contentImage],
-        contentImageIndex: 0,
-        currentContentImage: contentImage,
-      });
-
-      expect(screen.getByText("1920 × 1080px")).toBeInTheDocument();
-      expect(screen.getByText(/Page 3/)).toBeInTheDocument();
-      expect(screen.getByText(/png/)).toBeInTheDocument();
-    });
-
-    it("calls handleContentImageNav when nav buttons are clicked", async () => {
-      const user = userEvent.setup();
-      const images: ContentImage[] = [
-        {
-          filename: "img1.jpg",
-          sourcePdf: "guide.pdf",
-          pageNumber: 1,
-          width: 800,
-          height: 600,
-          aspectRatio: 1.33,
-          type: "jpeg",
-          url: "/content/images/img1.jpg",
-          score: 0.95,
-        },
-        {
-          filename: "img2.jpg",
-          sourcePdf: "guide.pdf",
-          pageNumber: 2,
-          width: 1200,
-          height: 800,
-          aspectRatio: 1.5,
-          type: "jpeg",
-          url: "/content/images/img2.jpg",
-          score: 0.85,
-        },
-      ];
-
-      const { state } = renderImageTab(mockStory, {
-        imageSourceTab: "content",
-        contentSearched: true,
-        contentImages: images,
-        contentImageIndex: 0,
-        currentContentImage: images[0],
-      });
-
-      await user.click(screen.getByLabelText("Next image"));
-      expect(state.handleContentImageNav).toHaveBeenCalledWith("next");
-
-      await user.click(screen.getByLabelText("Previous image"));
-      expect(state.handleContentImageNav).toHaveBeenCalledWith("prev");
-    });
-
-    it("does not show content results before search", () => {
-      renderImageTab(mockStory, {
-        imageSourceTab: "content",
-        contentSearched: false,
-        contentImages: [],
-      });
-
-      expect(screen.queryByText("No images found in the PDF content.")).not.toBeInTheDocument();
-      expect(screen.queryByText(/of.*images/)).not.toBeInTheDocument();
+  describe("current image review", () => {
+    it("explains the retired guide-photo selector without offering search", () => {
+      const { state } = renderImageTab(mockStory);
+      expect(screen.queryByText("Search PDF Images")).not.toBeInTheDocument();
+      expect(screen.getByText(/Las fotos extraídas de guías/)).toBeInTheDocument();
+      expect(state.handleSearchContent).not.toHaveBeenCalled();
     });
   });
-
-  // ---------------------------------------------------------------------------
-  // URL tab
-  // ---------------------------------------------------------------------------
 
   describe("URL tab", () => {
     it("renders URL input", () => {
@@ -501,7 +325,7 @@ describe("ImageTab", () => {
       expect(fileInputs.length).toBe(1);
       expect(fileInputs[0]).toHaveAttribute(
         "accept",
-        "image/jpeg,image/png,image/webp,image/gif"
+        "image/jpeg,image/png,image/webp,image/gif,image/avif"
       );
     });
 
@@ -529,63 +353,22 @@ describe("ImageTab", () => {
   // Image Attribution
   // ---------------------------------------------------------------------------
 
-  describe("image attribution", () => {
-    it("renders attribution input on all tabs", () => {
-      // Content tab
-      const { unmount: unmount1 } = renderImageTab(mockStory, {
-        imageSourceTab: "content",
-      }).state
-        ? renderImageTab(mockStory, { imageSourceTab: "content" })
-        : renderImageTab(mockStory, { imageSourceTab: "content" });
-
-      expect(screen.getByLabelText("Image Attribution")).toBeInTheDocument();
-      unmount1();
-
-      // URL tab
-      const { unmount: unmount2 } = renderImageTab(mockStory, {
-        imageSourceTab: "url",
-      });
-      expect(screen.getByLabelText("Image Attribution")).toBeInTheDocument();
-      unmount2();
-
-      // Upload tab
-      renderImageTab(mockStory, { imageSourceTab: "upload" });
-      expect(screen.getByLabelText("Image Attribution")).toBeInTheDocument();
+  describe("manual photo review", () => {
+    it.each(["content", "url", "upload"] as const)("renders explicit review on %s tab", tab => {
+      renderImageTab(mockStory, { imageSourceTab: tab });
+      expect(screen.getByLabelText("Prueba de permiso / registro conservado")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Confirmar revisión de la foto" })).toBeDisabled();
     });
-
-    it("shows attribution value", () => {
+    it("keeps previous free credit visible without asserting permission", () => {
       renderImageTab(mockStory, { imageSource: "Photo by Juan" });
-
-      const input = screen.getByLabelText("Image Attribution");
-      expect(input).toHaveValue("Photo by Juan");
+      expect(screen.getByLabelText("Crédito mostrado")).toHaveValue("Photo by Juan");
+      expect(screen.getByLabelText("Licencia")).toHaveValue("");
+      expect(screen.getByLabelText("Nombre de quien revisa")).toHaveValue("");
     });
-
-    it("shows attribution placeholder", () => {
-      renderImageTab(mockStory, { imageSource: "" });
-
-      const input = screen.getByLabelText("Image Attribution");
-      expect(input).toHaveAttribute(
-        "placeholder",
-        "e.g., Photo by Juan on Unsplash"
-      );
-    });
-
-    it("calls setImageSource when attribution is edited", async () => {
-      const user = userEvent.setup();
-      const { state } = renderImageTab(mockStory, { imageSource: "" });
-
-      const input = screen.getByLabelText("Image Attribution");
-      await user.type(input, "Photo by Test");
-
-      expect(state.setImageSource).toHaveBeenCalled();
-    });
-
-    it("shows helper text about attribution display", () => {
-      renderImageTab(mockStory);
-
-      expect(
-        screen.getByText("Will be displayed below the image in stories")
-      ).toBeInTheDocument();
+    it("invalidates proof when an operator edits review fields", async () => {
+      const user = userEvent.setup(); const { state } = renderImageTab(mockStory);
+      await user.type(screen.getByLabelText("Crédito mostrado"), "Fotógrafo/a");
+      expect(state.setImageSource).toHaveBeenCalledWith("");
     });
   });
 });

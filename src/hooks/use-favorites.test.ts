@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 
@@ -41,6 +42,7 @@ Object.defineProperty(window, "localStorage", { value: localStorageMock });
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+import { favoritesStorageKey } from "@/lib/client-query";
 import { useFavorites } from "./use-favorites";
 
 describe("useFavorites", () => {
@@ -55,6 +57,129 @@ describe("useFavorites", () => {
     mockAuthReturn.session = null;
     mockAuthReturn.isLoading = false;
     mockFetch.mockReset();
+  });
+
+  it("budget fixture: catalogue browse emits one read and 25 favorite toggles emit exactly 25 mutations", async () => {
+    mockAuthReturn.user = { id: "fixture-user" };
+    mockAuthReturn.session = { access_token: "fixture-token" };
+    mockFetch.mockImplementation(async (_url: string, options?: RequestInit) => ({ ok: true, json: async () => options?.method ? { success: true } : [] }));
+    const { result } = renderHook(() => useFavorites());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    for (let i = 0; i < 25; i++) await act(async () => { await result.current.toggleFavorite(`story-${i}`); });
+    const reads = mockFetch.mock.calls.filter(([, options]) => !options.method);
+    const writes = mockFetch.mock.calls.filter(([, options]) => options.method === "POST" || options.method === "DELETE");
+    expect(reads).toHaveLength(1);
+    expect(writes).toHaveLength(25);
+  });
+
+  it.each([200, 429])("a pending cloud read (%s) cannot overwrite a newer successful favorite mutation", async (status) => {
+    mockAuthReturn.user = { id: "fixture-user" };
+    mockAuthReturn.session = { access_token: "fixture-token" };
+    let finishRead!: (response: Response) => void;
+    mockFetch.mockReturnValueOnce(new Promise<Response>(resolve => { finishRead = resolve; }))
+      .mockResolvedValueOnce(Response.json({ success: true }))
+      .mockResolvedValueOnce(Response.json(["story-1"]));
+    const { result } = renderHook(() => useFavorites());
+    await act(async () => { await result.current.toggleFavorite("story-1"); });
+    expect(result.current.favorites).toEqual(["story-1"]);
+    await act(async () => {
+      finishRead(status === 200 ? Response.json([]) : Response.json({}, { status: 429, headers: { "Retry-After": "13" } }));
+    });
+    expect(result.current.favorites).toEqual(["story-1"]);
+    expect(result.current.retryAfter).toBeNull();
+    expect(JSON.parse(localStorageMock._getStore()[favoritesStorageKey("fixture-user")]!).data).toEqual(["story-1"]);
+  });
+
+  it.each([200, 429, 500])("reconciles existing cloud favorites after an overlapping mutation completes (%s)", async (status) => {
+    mockAuthReturn.user = { id: "fixture-user" };
+    mockAuthReturn.session = { access_token: "fixture-token" };
+    let finishRead!: (response: Response) => void;
+    let finishWrite!: (response: Response) => void;
+    const expected = status === 200 ? ["existing", "new"] : ["existing"];
+    mockFetch.mockReturnValueOnce(new Promise<Response>(resolve => { finishRead = resolve; }))
+      .mockReturnValueOnce(new Promise<Response>(resolve => { finishWrite = resolve; }))
+      .mockResolvedValueOnce(Response.json(expected));
+    const { result } = renderHook(() => useFavorites());
+    let pendingWrite: unknown;
+    await act(async () => { pendingWrite = result.current.toggleFavorite("new"); });
+    await act(async () => { finishRead(Response.json(["existing"])); });
+    expect(result.current.favorites).toEqual(["new"]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      finishWrite(Response.json({}, { status, headers: { "Retry-After": "13" } }));
+      await pendingWrite;
+    });
+    await waitFor(() => expect(result.current.favorites).toEqual(expected));
+    expect(JSON.parse(localStorageMock._getStore()[favoritesStorageKey("fixture-user")]!).data).toEqual(expected);
+    expect(result.current.retryAfter).toBe(status === 429 ? 13 : null);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("mutation429 rolls back, exposes timing and explicit retry completes the original action", async () => {
+    mockAuthReturn.user = { id: "fixture-user" };
+    mockAuthReturn.session = { access_token: "fixture-token" };
+    mockFetch.mockResolvedValueOnce(Response.json([]));
+    const { result } = renderHook(() => useFavorites());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    mockFetch.mockResolvedValueOnce(Response.json({}, { status: 429, headers: { "Retry-After": "13" } }));
+    await act(async () => { await result.current.toggleFavorite("story-1"); });
+    expect(result.current.favorites).toEqual([]);
+    expect(result.current.retryAfter).toBe(13);
+    mockFetch.mockResolvedValueOnce(Response.json({ success: true }));
+    await act(async () => { await result.current.retry(); });
+    expect(result.current.favorites).toEqual(["story-1"]);
+    expect(result.current.retryAfter).toBeNull();
+  });
+
+  it.each(["account", "token"])("%s change clears A429 recovery and retry cannot mutate the new identity while its read is pending", async (change) => {
+    mockAuthReturn.user = { id: "user-A" };
+    mockAuthReturn.session = { access_token: "token-A" };
+    mockFetch.mockResolvedValueOnce(Response.json([]));
+    const { result, rerender } = renderHook(() => useFavorites());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    mockFetch.mockResolvedValueOnce(Response.json({}, { status: 429, headers: { "Retry-After": "13" } }));
+    await act(async () => { await result.current.toggleFavorite("A-story"); });
+    expect(result.current.retryAfter).toBe(13);
+    const oldRetry = result.current.retry;
+    mockAuthReturn.user = { id: change === "account" ? "user-B" : "user-A" };
+    mockAuthReturn.session = { access_token: "token-B" };
+    mockFetch.mockImplementation(() => new Promise(() => {}));
+    rerender();
+    expect(result.current.retryAfter).toBeNull();
+    const before = mockFetch.mock.calls.length;
+    await act(async () => { await result.current.retry(); await oldRetry(); });
+    expect(mockFetch).toHaveBeenCalledTimes(before);
+    mockFetch.mockResolvedValueOnce(Response.json({ success: true }));
+    await act(async () => { await result.current.toggleFavorite("B-story"); });
+    expect(mockFetch.mock.calls.filter(([, init]) => init?.method === "POST").at(-1)?.[1]).toMatchObject({ method: "POST", headers: expect.objectContaining({ Authorization: "Bearer token-B" }), body: JSON.stringify({ storyIds: ["B-story"] }) });
+    expect(result.current.retryAfter).toBeNull();
+    expect(result.current.favorites).toContain("B-story");
+  });
+
+  it("late A429 cannot install recovery or roll back B state after identity changes", async () => {
+    mockAuthReturn.user = { id: "user-A" };
+    mockAuthReturn.session = { access_token: "token-A" };
+    mockFetch.mockResolvedValueOnce(Response.json([]));
+    const { result, rerender } = renderHook(() => useFavorites());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    let finishA!: (value: Response) => void;
+    mockFetch.mockReturnValueOnce(new Promise<Response>(resolve => { finishA = resolve; }));
+    let pendingA: unknown;
+    await act(async () => { pendingA = result.current.toggleFavorite("A-story"); });
+    mockAuthReturn.user = { id: "user-B" };
+    mockAuthReturn.session = { access_token: "token-B" };
+    mockFetch.mockResolvedValueOnce(Response.json([]));
+    rerender();
+    await waitFor(() => expect(result.current.favorites).toEqual([]));
+    await act(async () => { finishA(Response.json({}, { status: 429, headers: { "Retry-After": "13" } })); await pendingA; });
+    expect(result.current.retryAfter).toBeNull();
+    expect(result.current.favorites).toEqual([]);
+    const before = mockFetch.mock.calls.length;
+    await act(async () => { await result.current.retry(); });
+    expect(mockFetch).toHaveBeenCalledTimes(before);
+    mockFetch.mockResolvedValueOnce(Response.json({ success: true }));
+    await act(async () => { await result.current.toggleFavorite("B-story"); });
+    expect(result.current.favorites).toEqual(["B-story"]);
   });
 
   describe("initialization", () => {
@@ -73,7 +198,7 @@ describe("useFavorites", () => {
       mockAuthReturn.session = { access_token: "test-token" };
 
       localStorageMock.getItem.mockReturnValue(
-        JSON.stringify(["story-1", "story-2"])
+        JSON.stringify({ version: 1, userId: "user-1", data: ["story-1", "story-2"], timestamp: Date.now() })
       );
 
       // Mock the cloud sync GET to return same favorites
@@ -98,7 +223,7 @@ describe("useFavorites", () => {
       mockAuthReturn.session = null;
 
       localStorageMock.getItem.mockReturnValue(
-        JSON.stringify(["story-1", "story-2"])
+        JSON.stringify({ version: 1, userId: "user-1", data: ["story-1", "story-2"], timestamp: Date.now() })
       );
 
       const { result } = renderHook(() => useFavorites());
@@ -287,7 +412,7 @@ describe("useFavorites", () => {
       );
       const togglePostCall = postCalls.find((call: unknown[]) => {
         try {
-          const body = JSON.parse((call[1] as Record<string, string>)?.body);
+          const body = JSON.parse(requiredValue((requiredValue(call[1], "src/hooks/use-favorites.test.ts: call[1]") as Record<string, string>).body, "Favorite POST JSON body"));
           return (
             body.storyIds &&
             body.storyIds.length === 1 &&
@@ -342,9 +467,9 @@ describe("useFavorites", () => {
       );
       expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
 
-      const deleteCall = deleteCalls[0];
-      expect(deleteCall[0]).toBe("/api/favorites?storyId=story-1");
-      expect(deleteCall[1]).toEqual(
+      const deleteCall = requiredValue(deleteCalls[0], "src/hooks/use-favorites.test.ts: deleteCalls[0]");
+      expect(requiredValue(deleteCall[0], "src/hooks/use-favorites.test.ts: deleteCall[0]")).toBe("/api/favorites?storyId=story-1");
+      expect(requiredValue(deleteCall[1], "src/hooks/use-favorites.test.ts: deleteCall[1]")).toEqual(
         expect.objectContaining({
           method: "DELETE",
           headers: expect.objectContaining({
@@ -427,9 +552,9 @@ describe("useFavorites", () => {
       expect(result.current.favorites).not.toContain("story-1");
 
       const lastSetCall = localStorageMock.setItem.mock.calls
-        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .filter((call: unknown[]) => call[0] === favoritesStorageKey("user-1"))
         .pop();
-      expect(JSON.parse(lastSetCall![1])).toEqual([]);
+      expect(JSON.parse(lastSetCall![1]).data).toEqual([]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Error syncing favorite to cloud")
@@ -473,9 +598,9 @@ describe("useFavorites", () => {
 
       // localStorage should be reverted to pre-toggle value
       const lastSetCall = localStorageMock.setItem.mock.calls
-        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .filter((call: unknown[]) => call[0] === favoritesStorageKey("user-1"))
         .pop();
-      const savedFavorites = JSON.parse(lastSetCall![1]);
+      const savedFavorites = JSON.parse(lastSetCall![1]).data;
       expect(savedFavorites).toContain("story-1");
 
       consoleSpy.mockRestore();
@@ -512,9 +637,9 @@ describe("useFavorites", () => {
       expect(result.current.favorites).toContain("story-1");
 
       const lastSetCall = localStorageMock.setItem.mock.calls
-        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .filter((call: unknown[]) => call[0] === favoritesStorageKey("user-1"))
         .pop();
-      expect(JSON.parse(lastSetCall![1])).toEqual(["story-1"]);
+      expect(JSON.parse(lastSetCall![1]).data).toEqual(["story-1"]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Error syncing favorite to cloud")
@@ -658,10 +783,10 @@ describe("useFavorites", () => {
 
       // localStorage should be updated with cloud favorites only
       const setItemCalls = localStorageMock.setItem.mock.calls.filter(
-        (call: unknown[]) => call[0] === "paisaxe_favorites"
+        (call: unknown[]) => call[0] === favoritesStorageKey("user-1")
       );
-      const lastCall = setItemCalls[setItemCalls.length - 1];
-      const savedFavorites = JSON.parse(lastCall[1]);
+      const lastCall = requiredValue(setItemCalls[setItemCalls.length - 1], "src/hooks/use-favorites.test.ts: setItemCalls[setItemCalls.length - 1]");
+      const savedFavorites = JSON.parse(requiredValue(lastCall[1], "src/hooks/use-favorites.test.ts: lastCall[1]")).data;
       expect(savedFavorites).toEqual(["story-2"]);
     });
 

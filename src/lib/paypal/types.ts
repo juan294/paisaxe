@@ -1,6 +1,6 @@
 /**
  * The PayPal adapter's contract (PayPal hackathon plan, Phase 4). The rest of
- * the booking code depends on these shapes only, never on pay-pal-server-sdk
+ * the booking code depends on these shapes only, never on @paypal/paypal-server-sdk
  * types. Amounts are integer cents; PayPal's "30.00" strings stay inside the
  * adapter.
  */
@@ -136,6 +136,30 @@ export interface CreateInvoiceInput {
 export interface PaypalRefund {
   id: string;
   status: PaypalRefundStatus;
+}
+
+/** One movement in PayPal's Transaction Search (APIMatic plan, Phase 2): what PayPal itself recorded. */
+export interface PaypalLedgerEntry {
+  transactionId: string;
+  /** The capture a refund refers to (paypal_reference_id), or null. */
+  referenceId: string | null;
+  /** PayPal's event code, e.g. T0006 (a checkout capture) or T1107 (a refund). */
+  eventCode: string | null;
+  /** S (success), P (pending), V (reversed), D (denied) or F (failed). */
+  status: string | null;
+  /** Signed: a refund is negative. */
+  amountCents: number | null;
+  currency: string | null;
+  /** custom_field: our booking id. */
+  customId: string | null;
+}
+
+export interface PaypalLedger {
+  entries: PaypalLedgerEntry[];
+  /** last_refreshed_datetime as ISO 8601: PayPal lists nothing newer yet. */
+  refreshedAt: string | null;
+  /** More than one page: only the first page_size entries are here. */
+  truncated: boolean;
 }
 
 /** Webhook verification body field -> the PayPal transmission header that carries it. */

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { NextRequest, NextResponse } from "next/server";
+import { withAdminSession } from "@/lib/admin-auth";
 import { promises as fs } from "fs";
 import path from "path";
 import type {
@@ -52,7 +52,7 @@ function parseHealth(content: string): AgentHealthStatus {
 
   // Pattern 1: "Health Status: GREEN/YELLOW/RED" (with optional markdown heading)
   const healthLine = normalized.match(/health\s*status\s*:\s*(green|yellow|red)/i);
-  if (healthLine) {
+  if (healthLine?.[1] !== undefined) {
     return healthLine[1].toLowerCase() as AgentHealthStatus;
   }
 
@@ -93,14 +93,14 @@ function parseHealth(content: string): AgentHealthStatus {
 function parseHealthSummary(content: string): string {
   // Try executive summary first
   const execMatch = content.match(/##\s*Executive\s*Summary\s*\n+(.+)/i);
-  if (execMatch) {
+  if (execMatch?.[1] !== undefined) {
     return extractFirstSentence(execMatch[1]);
   }
 
   // Try line right after health status (strip emojis so \w+ can match the status word)
   const stripped = content.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, "");
   const afterHealth = stripped.match(/health\s*status\s*:\s*\w+[^\n]*\n+(.+)/i);
-  if (afterHealth) {
+  if (afterHealth?.[1] !== undefined) {
     const clean = afterHealth[1].replace(/\*+/g, "").replace(/^[-#>\s]+/, "").trim();
     if (clean.length > 5) {
       return extractFirstSentence(clean);
@@ -109,13 +109,13 @@ function parseHealthSummary(content: string): string {
 
   // Try summary section
   const summaryMatch = content.match(/##\s*Summary\s*\n+(.+)/i);
-  if (summaryMatch) {
+  if (summaryMatch?.[1] !== undefined) {
     return extractFirstSentence(summaryMatch[1]);
   }
 
   // Fallback: first non-empty paragraph after any ## heading that isn't a table or code
   const fallback = content.match(/^##\s+.+\n+(?:>[^\n]*\n+)?([^#|`\n][^\n]{10,})/m);
-  if (fallback) {
+  if (fallback?.[1] !== undefined) {
     return extractFirstSentence(fallback[1]);
   }
 
@@ -124,7 +124,7 @@ function parseHealthSummary(content: string): string {
 
 function extractFirstSentence(raw: string): string {
   const clean = raw.replace(/\*+/g, "").replace(/^[-|>\s]+/, "").trim();
-  const firstSentence = clean.split(/\.\s/)[0];
+  const firstSentence = clean.split(/\.\s/)[0] ?? "";
   if (firstSentence.length > 120) return firstSentence.slice(0, 117) + "...";
   return firstSentence.endsWith(".") ? firstSentence : firstSentence + ".";
 }
@@ -139,9 +139,9 @@ function parseSharedContext(content: string): SharedContextEntry[] {
 
   let match;
   while ((match = entryRegex.exec(content)) !== null) {
-    const agentFlag = match[1];
-    const timestamp = match[2];
-    let entryContent = match[3].replace(/<!--\s*ENTRY:END\s*-->/g, "").trim();
+    const [, agentFlag, timestamp, body] = match;
+    if (agentFlag === undefined || timestamp === undefined || body === undefined) continue;
+    let entryContent = body.replace(/<!--\s*ENTRY:END\s*-->/g, "").trim();
 
     // Clean up the content — remove trailing markers
     entryContent = entryContent.replace(/<!--[^>]*-->/g, "").trim();
@@ -183,73 +183,72 @@ function computeOverallHealth(agents: AgentStatus[]): AgentHealthStatus {
   return "green";
 }
 
-export async function GET() {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+export async function GET(request?: NextRequest) {
+  return withAdminSession(async () => {
 
-  try {
-    // Use specific subdirectory to avoid Turbopack tracing the entire project root.
-    const reportsDir = path.join(process.cwd(), "docs", "agents");
-    const agentStatuses: AgentStatus[] = [];
+    try {
+      // Use specific subdirectory to avoid Turbopack tracing the entire project root.
+      const reportsDir = path.join(process.cwd(), "docs", "agents");
+      const agentStatuses: AgentStatus[] = [];
 
-    for (const agent of AGENTS) {
-      const filePath = path.join(reportsDir, agent.reportFilename);
-      const reportFile = `${REPORTS_DIR}/${agent.reportFilename}`;
-      let lastRun: string | null = null;
-      let health: AgentHealthStatus = "unknown";
-      let healthSummary = "Report not found.";
+      for (const agent of AGENTS) {
+        const filePath = path.join(reportsDir, agent.reportFilename);
+        const reportFile = `${REPORTS_DIR}/${agent.reportFilename}`;
+        let lastRun: string | null = null;
+        let health: AgentHealthStatus = "unknown";
+        let healthSummary = "Report not found.";
 
-      try {
-        const stats = await fs.stat(filePath);
-        lastRun = stats.mtime.toISOString();
+        try {
+          const stats = await fs.stat(filePath);
+          lastRun = stats.mtime.toISOString();
 
-        const content = await fs.readFile(filePath, "utf-8");
-        health = parseHealth(content);
-        healthSummary = parseHealthSummary(content);
-      } catch {
-        // File doesn't exist or can't be read
+          const content = await fs.readFile(filePath, "utf-8");
+          health = parseHealth(content);
+          healthSummary = parseHealthSummary(content);
+        } catch {
+          // File doesn't exist or can't be read
+        }
+
+        agentStatuses.push({
+          flagKey: agent.flagKey,
+          name: agent.name,
+          schedule: agent.schedule,
+          reportFile,
+          lastRun,
+          health,
+          healthSummary,
+        });
       }
 
-      agentStatuses.push({
-        flagKey: agent.flagKey,
-        name: agent.name,
-        schedule: agent.schedule,
-        reportFile,
-        lastRun,
-        health,
-        healthSummary,
+      // Parse shared context
+      let sharedContext: SharedContextEntry[] = [];
+      try {
+        const sharedContextPath = path.join(reportsDir, "shared-context.md");
+        const sharedContextContent = await fs.readFile(sharedContextPath, "utf-8");
+        sharedContext = parseSharedContext(sharedContextContent);
+      } catch {
+        // shared-context.md doesn't exist yet
+      }
+
+      const data: AgentsDashboardData = {
+        overallHealth: computeOverallHealth(agentStatuses),
+        agents: agentStatuses,
+        sharedContext,
+        recentActivity: buildActivity(agentStatuses),
+      };
+
+      return NextResponse.json({ data }, {
+        headers: {
+          "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
+        },
       });
+    } catch (error) {
+      logger.error("Error building agents summary:", { error: error instanceof Error ? error.message : String(error) });
+      return NextResponse.json(
+        { error: "Failed to build agents summary" },
+        { status: 500 }
+      );
     }
 
-    // Parse shared context
-    let sharedContext: SharedContextEntry[] = [];
-    try {
-      const sharedContextPath = path.join(reportsDir, "shared-context.md");
-      const sharedContextContent = await fs.readFile(sharedContextPath, "utf-8");
-      sharedContext = parseSharedContext(sharedContextContent);
-    } catch {
-      // shared-context.md doesn't exist yet
-    }
-
-    const data: AgentsDashboardData = {
-      overallHealth: computeOverallHealth(agentStatuses),
-      agents: agentStatuses,
-      sharedContext,
-      recentActivity: buildActivity(agentStatuses),
-    };
-
-    return NextResponse.json({ data }, {
-      headers: {
-        "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
-      },
-    });
-  } catch (error) {
-    logger.error("Error building agents summary:", { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json(
-      { error: "Failed to build agents summary" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }

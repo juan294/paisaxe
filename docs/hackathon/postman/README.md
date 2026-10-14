@@ -84,10 +84,12 @@ uses `.env.local`, which targets production. Prerequisites: the local Supabase s
 
 **Terminal 1: the runner.** It starts the PayPal mock on `127.0.0.1:4010` and the control routes
 on `127.0.0.1:4011`. It also turns the `experience_booking` flag on in the local database
-(development row), re-seeds the fixture experience if a reset lost it, and issues a local
-voucher. Then it writes the filled environment to
-`$TMPDIR/paisaxe-postman/paisaxe-booking.local.postman_environment.json`, outside the
-repository, and stays up until Ctrl-C.
+(development row), re-seeds the fixture experience if a reset lost it, issues a local voucher
+and an operator link for the fixture merchant (for request 08). Then it writes the filled
+environment to `$TMPDIR/paisaxe-postman/paisaxe-booking.local.postman_environment.json`, outside
+the repository, and stays up until Ctrl-C. The operator link is signed with a local
+`BOOKING_LINK_SECRET` the runner keeps in `$TMPDIR/paisaxe-postman/booking-link-secret`
+(created once, owner-only); `next dev` reads the same file.
 
 ```bash
 npx tsx scripts/booking/postman-local.ts
@@ -104,7 +106,7 @@ env -i HOME="$HOME" PATH="$PATH" TMPDIR="$TMPDIR" \
   NEXT_PUBLIC_SUPABASE_URL="$API_URL" \
   NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" \
   SUPABASE_SERVICE_KEY="$SERVICE_ROLE_KEY" \
-  BOOKING_LINK_SECRET="$(openssl rand -hex 32)" \
+  BOOKING_LINK_SECRET="$(cat "$TMPDIR/paisaxe-postman/booking-link-secret")" \
   PAYPAL_CLIENT_ID=local-mock PAYPAL_CLIENT_SECRET=local-mock PAYPAL_WEBHOOK_ID=local-mock \
   PAYPAL_API_BASE=http://127.0.0.1:4010 \
   NEXT_PUBLIC_SITE_URL=http://localhost:3006 \
@@ -127,6 +129,11 @@ git checkout -- AGENTS.md
 ```
 
 Notes:
+
+- **08 Operator ledger** asks the operator panel's PayPal check (Transaction Search, read-only)
+  whether PayPal's records list this run's deposit. Against the mock it is listed at once, as
+  refunded. Against the sandbox PayPal lists a movement up to about three hours late (the
+  request accepts `pending`), and the sandbox app needs the "Transaction search" permission.
 
 - The mock completes refunds later (`PENDING`). The cancellation therefore ends in
   `refund_pending`, and the mock-signed refund webhook moves it to `refunded`, as a sandbox

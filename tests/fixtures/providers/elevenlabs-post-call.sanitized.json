@@ -1,0 +1,521 @@
+{
+  "type": "post_call_transcription",
+  "event_timestamp": 1791956389,
+  "data": {
+    "agent_id": "agent_recorded_elevenlabs_release190",
+    "agent_name": "Paisaxe isolated recorded text test",
+    "conversation_product": "agent",
+    "status": "done",
+    "user_id": null,
+    "branch_id": "00000000-0000-4000-8000-000000000191",
+    "version_id": "00000000-0000-4000-8000-000000000192",
+    "metadata": {
+      "start_time_unix_secs": 1791956385,
+      "accepted_time_unix_secs": 1791956385,
+      "call_duration_secs": 1,
+      "queue_wait_secs": null,
+      "cost": 14,
+      "deletion_settings": {
+        "deletion_time_unix_secs": 1792042789,
+        "deleted_logs_at_time_unix_secs": null,
+        "deleted_audio_at_time_unix_secs": null,
+        "deleted_transcript_at_time_unix_secs": null,
+        "delete_transcript_and_pii": false,
+        "delete_audio": true
+      },
+      "feedback": {
+        "type": null,
+        "overall_score": null,
+        "likes": 0,
+        "dislikes": 0,
+        "rating": null,
+        "comment": null
+      },
+      "authorization_method": "signed_url",
+      "charging": {
+        "dev_discount": false,
+        "is_burst": false,
+        "tier": "redacted",
+        "llm_usage": {
+          "irreversible_generation": {
+            "model_usage": {
+              "gemini-2.5-flash-lite": {
+                "input": {
+                  "tokens": 341,
+                  "price": 3.41e-05
+                },
+                "input_cache_read": {
+                  "tokens": 0,
+                  "price": 0.0
+                },
+                "input_cache_write": {
+                  "tokens": 0,
+                  "price": 0.0
+                },
+                "output_total": {
+                  "tokens": 5,
+                  "price": 2e-06
+                }
+              }
+            },
+            "detailed_model_usage": [
+              {
+                "config": {
+                  "model": "gemini-2.5-flash-lite",
+                  "service_tier": "standard"
+                },
+                "usage": {
+                  "input": {
+                    "tokens": 341,
+                    "price": 3.41e-05
+                  },
+                  "input_cache_read": {
+                    "tokens": 0,
+                    "price": 0.0
+                  },
+                  "input_cache_write": {
+                    "tokens": 0,
+                    "price": 0.0
+                  },
+                  "output_total": {
+                    "tokens": 5,
+                    "price": 2e-06
+                  }
+                }
+              }
+            ]
+          },
+          "initiated_generation": {
+            "model_usage": {
+              "gemini-2.5-flash-lite": {
+                "input": {
+                  "tokens": 341,
+                  "price": 3.41e-05
+                },
+                "input_cache_read": {
+                  "tokens": 0,
+                  "price": 0.0
+                },
+                "input_cache_write": {
+                  "tokens": 0,
+                  "price": 0.0
+                },
+                "output_total": {
+                  "tokens": 5,
+                  "price": 2e-06
+                }
+              }
+            },
+            "detailed_model_usage": [
+              {
+                "config": {
+                  "model": "gemini-2.5-flash-lite",
+                  "service_tier": "standard"
+                },
+                "usage": {
+                  "input": {
+                    "tokens": 341,
+                    "price": 3.41e-05
+                  },
+                  "input_cache_read": {
+                    "tokens": 0,
+                    "price": 0.0
+                  },
+                  "input_cache_write": {
+                    "tokens": 0,
+                    "price": 0.0
+                  },
+                  "output_total": {
+                    "tokens": 5,
+                    "price": 2e-06
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "llm_price": 3.61e-05,
+        "llm_charge": 0,
+        "call_charge": 14,
+        "platform_charge": 14,
+        "platform_usage": {
+          "category_usage": {
+            "text_message": {
+              "credits": 14,
+              "price": 0.003,
+              "quantity": 1.0
+            }
+          }
+        },
+        "platform_price": 0.003,
+        "free_minutes_consumed": 0.0,
+        "free_llm_dollars_consumed": 0.0,
+        "tts_usage": {
+          "primary_tts_model": "eleven_v4_turbo",
+          "total_audio_output_seconds": 0.0,
+          "total_characters": 0,
+          "per_voice_usage": []
+        },
+        "asr_usage": {
+          "asr_model": null,
+          "total_transcription_calls": 0,
+          "total_audio_input_seconds": 0.0
+        },
+        "analysis": null
+      },
+      "phone_call": null,
+      "batch_call": null,
+      "termination_reason": "Client disconnected: 1000",
+      "error": null,
+      "warnings": [],
+      "main_language": "es",
+      "rag_usage": null,
+      "text_only": true,
+      "features_usage": {
+        "language_detection": {
+          "enabled": false,
+          "used": false
+        },
+        "transfer_to_agent": {
+          "enabled": false,
+          "used": false
+        },
+        "transfer_to_number": {
+          "enabled": false,
+          "used": false
+        },
+        "multivoice": {
+          "enabled": false,
+          "used": false
+        },
+        "dtmf_tones": {
+          "enabled": false,
+          "used": false
+        },
+        "external_mcp_servers": {
+          "enabled": false,
+          "used": false
+        },
+        "pii_zrm_workspace": false,
+        "pii_zrm_agent": false,
+        "tool_dynamic_variable_updates": {
+          "enabled": false,
+          "used": false
+        },
+        "is_livekit": false,
+        "voicemail_detection": {
+          "enabled": false,
+          "used": false
+        },
+        "dtmf_input": {
+          "enabled": false,
+          "used": false
+        },
+        "workflow": {
+          "enabled": false,
+          "tool_node": {
+            "enabled": false,
+            "used": false
+          },
+          "standalone_agent_node": {
+            "enabled": false,
+            "used": false
+          },
+          "phone_number_node": {
+            "enabled": false,
+            "used": false
+          },
+          "end_node": {
+            "enabled": false,
+            "used": false
+          },
+          "override_agent_node": {
+            "enabled": false,
+            "used": false
+          },
+          "say_node": {
+            "enabled": false,
+            "used": false
+          },
+          "update_state_node": {
+            "enabled": false,
+            "used": false
+          },
+          "subgraph_node": {
+            "enabled": false,
+            "used": false
+          },
+          "transfer_to_genesys_node": {
+            "enabled": false,
+            "used": false
+          }
+        },
+        "agent_testing": {
+          "enabled": false,
+          "tests_ran_after_last_modification": false,
+          "tests_ran_in_last_7_days": false
+        },
+        "versioning": {
+          "enabled": true,
+          "used": false
+        },
+        "file_input": {
+          "enabled": false,
+          "used": false
+        },
+        "freeform_procedure": {
+          "enabled": false,
+          "used": false
+        },
+        "structured_procedure": {
+          "enabled": false,
+          "used": false
+        }
+      },
+      "eleven_assistant": {
+        "is_eleven_assistant": false
+      },
+      "initiator_id": null,
+      "conversation_initiation_source": "unknown",
+      "conversation_initiation_source_version": null,
+      "timezone": null,
+      "async_metadata": null,
+      "whatsapp": null,
+      "sms": null,
+      "agent_created_from": "api",
+      "agent_last_updated_from": "api",
+      "stream_state": null,
+      "voice_rewards": [],
+      "cost_fiat": 0.0030361
+    },
+    "analysis": {
+      "evaluation_criteria_results": {},
+      "data_collection_results": {},
+      "evaluation_criteria_results_list": [],
+      "data_collection_results_list": [],
+      "call_successful": "success",
+      "call_success_score": null,
+      "transcript_summary": "The user sent a synthetic test message, which the agent confirmed.",
+      "call_summary_title": "Mensaje de prueba",
+      "scoped": [],
+      "sentiment_analysis": {
+        "overall_label": "neutral",
+        "overall_sentiment_score": 0.0,
+        "overall_frustration_score": 0.0,
+        "min_user_sentiment_score": 0.0,
+        "max_user_frustration_score": 0.0,
+        "num_scored_user_turns": 0
+      }
+    },
+    "visited_agents": [
+      {
+        "agent_id": "agent_recorded_elevenlabs_release190",
+        "branch_id": "00000000-0000-4000-8000-000000000191"
+      }
+    ],
+    "conversation_initiation_client_data": {
+      "conversation_config_override": {
+        "asr": null,
+        "turn": null,
+        "tts": null,
+        "conversation": null,
+        "agent": null
+      },
+      "custom_llm_extra_body": {},
+      "user_id": null,
+      "source_info": {
+        "source": null,
+        "version": null
+      },
+      "branch_id": null,
+      "environment": null,
+      "starting_workflow_node_id": null,
+      "experiments": [],
+      "procedure_ids": null,
+      "dynamic_variables": {
+        "system__agent_id": "agent_recorded_elevenlabs_release190",
+        "system__agent_turns": 1,
+        "system__current_agent_turns": 1,
+        "system__current_subagent_turns": 1,
+        "system__current_agent_id": "agent_recorded_elevenlabs_release190",
+        "system__conversation_id": "conv_recorded_elevenlabs_release190",
+        "system__call_duration_secs": 0,
+        "system__time_utc": "2026-10-14T05:39:46.058808+00:00",
+        "system__timezone": null,
+        "system__time": "Wednesday, 05:39 14 October 2026",
+        "system__time_hour": 5,
+        "system__time_minute": 39,
+        "system__time_second": 46,
+        "system__is_text_only": true,
+        "system__channel": "unknown",
+        "system__caller_id": null,
+        "system__called_number": null,
+        "system__call_sid": null,
+        "system__call_id": null,
+        "system__conversation_history": "{\"x-elevenlabs-history\": true, \"entries\": [{\"role\": \"user\", \"message\": \"Este es un mensaje sint\\u00e9tico de prueba.\"}, {\"role\": \"agent\", \"message\": \"Prueba confirmada.\"}]}",
+        "system__user_id": null,
+        "system__initiator_id": null,
+        "system__environment": "production"
+      },
+      "tool_mock_config": {
+        "mocking_strategy": "none",
+        "fallback_strategy": "raise_error",
+        "mocked_tool_names": []
+      },
+      "tool_mock_overrides": {}
+    },
+    "environment": "production",
+    "experiment_assignments": null,
+    "hiding_reason": null,
+    "smb_metadata": null,
+    "conversation_id": "conv_recorded_elevenlabs_release190",
+    "has_audio": false,
+    "has_user_audio": false,
+    "has_response_audio": false,
+    "has_auxiliary_audio": false,
+    "transcript": [
+      {
+        "role": "user",
+        "agent_metadata": null,
+        "message": "Este es un mensaje sintético de prueba.",
+        "multivoice_message": null,
+        "tool_calls": [],
+        "tool_results": [],
+        "feedback": null,
+        "llm_override": null,
+        "producing_llm": null,
+        "time_in_call_secs": 0,
+        "conversation_turn_metrics": null,
+        "rag_retrieval_info": null,
+        "llm_usage": null,
+        "interrupted": false,
+        "ignored_as_backchannel": false,
+        "platform_event": null,
+        "original_message": null,
+        "reasoning": [],
+        "source_medium": "text",
+        "source_event_id": 1,
+        "used_static_kb_document_ids": [],
+        "analysis": null,
+        "user_identifier": null,
+        "id": null,
+        "compaction": null,
+        "triggered_guardrails": [],
+        "file_input": null,
+        "file_inputs": [],
+        "contextual_update_info": null,
+        "config_snapshot_id": null,
+        "reasoned": false
+      },
+      {
+        "role": "agent",
+        "agent_metadata": {
+          "agent_id": "agent_recorded_elevenlabs_release190",
+          "branch_id": "00000000-0000-4000-8000-000000000191",
+          "workflow_node_id": null,
+          "version_id": "00000000-0000-4000-8000-000000000192"
+        },
+        "message": "Prueba confirmada.",
+        "multivoice_message": null,
+        "tool_calls": [],
+        "tool_results": [],
+        "feedback": null,
+        "llm_override": null,
+        "producing_llm": "gemini-2.5-flash-lite",
+        "time_in_call_secs": 0,
+        "conversation_turn_metrics": {
+          "metrics": {
+            "convai_llm_service_ttf_sentence": {
+              "elapsed_time": 0.3505368590122089
+            },
+            "convai_llm_service_ttfb": {
+              "elapsed_time": 0.30225074000190943
+            },
+            "convai_llm_service_tt_last_sentence": {
+              "elapsed_time": 0.3505247390130535
+            },
+            "convai_ttf_response_since_user_message": {
+              "elapsed_time": 0.3538389790337533
+            }
+          },
+          "convai_asr_provider": null,
+          "convai_tts_model": null,
+          "convai_tts_cascade": null,
+          "voice_id": null
+        },
+        "rag_retrieval_info": null,
+        "llm_usage": {
+          "model_usage": {
+            "gemini-2.5-flash-lite": {
+              "input": {
+                "tokens": 341,
+                "price": 3.41e-05
+              },
+              "input_cache_read": {
+                "tokens": 0,
+                "price": 0.0
+              },
+              "input_cache_write": {
+                "tokens": 0,
+                "price": 0.0
+              },
+              "output_total": {
+                "tokens": 5,
+                "price": 2e-06
+              }
+            }
+          },
+          "detailed_model_usage": [
+            {
+              "config": {
+                "model": "gemini-2.5-flash-lite",
+                "service_tier": "standard"
+              },
+              "usage": {
+                "input": {
+                  "tokens": 341,
+                  "price": 3.41e-05
+                },
+                "input_cache_read": {
+                  "tokens": 0,
+                  "price": 0.0
+                },
+                "input_cache_write": {
+                  "tokens": 0,
+                  "price": 0.0
+                },
+                "output_total": {
+                  "tokens": 5,
+                  "price": 2e-06
+                }
+              }
+            }
+          ]
+        },
+        "interrupted": false,
+        "ignored_as_backchannel": false,
+        "platform_event": null,
+        "original_message": null,
+        "reasoning": [],
+        "source_medium": null,
+        "source_event_id": 1,
+        "used_static_kb_document_ids": [],
+        "analysis": null,
+        "user_identifier": null,
+        "id": null,
+        "compaction": null,
+        "triggered_guardrails": [],
+        "file_input": null,
+        "file_inputs": [],
+        "contextual_update_info": null,
+        "config_snapshot_id": null,
+        "reasoned": false
+      }
+    ],
+    "tag_ids": [],
+    "realtime_config_snapshots": null,
+    "orchestrator": "conversational",
+    "realtime_context": null,
+    "otlp_traces": null
+  }
+}

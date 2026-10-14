@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 /**
  * Vector search through the same path the app uses: PostgREST with the public
  * anon key calling match_chunks (migration 111).
@@ -77,7 +78,7 @@ describe.skipIf(!dbReachable)("match_chunks (live local Supabase)", () => {
     expect(status).toBe(200);
     const rows = body as Array<{ content: string; similarity: number }>;
     expect(rows.map((r) => r.content)).toEqual(["MC-TEST axis 0"]);
-    expect(rows[0].similarity).toBeGreaterThan(0.999);
+    expect(requiredValue(rows[0], "src/lib/match-chunks.postgrest-rls.test.ts:80 rows[0]").similarity).toBeGreaterThan(0.999);
   });
 
   it("applies the similarity threshold: orthogonal chunks are not returned", async () => {

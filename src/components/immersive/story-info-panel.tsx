@@ -1,5 +1,8 @@
 "use client";
 
+import { ImageAttribution } from "@/components/permitted-story-image";
+import { resolvePermittedImage } from "@/lib/image-provenance";
+
 import { memo, type RefObject } from "react";
 import { Camera, Bookmark, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -125,7 +128,7 @@ export const StoryInfoPanel = memo(function StoryInfoPanel({
       {story.imageSource && (
         <p className="text-xs text-white/60 mb-6 flex items-center gap-1">
           <Camera className="h-3 w-3" aria-hidden="true" />
-          <span>{story.imageSource}</span>
+          <ImageAttribution source={resolvePermittedImage(story.image, story.imageSource).imageSource} />
         </p>
       )}
 

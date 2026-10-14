@@ -1,8 +1,12 @@
 "use client";
 
+import { CacheRetryNotice } from "@/components/cache-retry-notice";
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import Image from "next/image";
+import { PermittedStoryImage } from "@/components/permitted-story-image";
 import Link from "next/link";
+import { useTimedValue } from "@/hooks/use-timed-value";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useStories } from "@/hooks/use-stories";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,8 +21,8 @@ const ITEMS_PER_PAGE = 20;
 const UNDO_TIMEOUT_MS = 6000;
 
 export default function FavoritesPage() {
-  const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth } = useFavorites();
-  const { stories: allStories, isLoading } = useStories();
+  const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth, retryAfter, retry, error: favoritesError } = useFavorites();
+  const { stories: allStories, isLoading, error: storiesError, refresh: refreshStories } = useStories();
   const { signInWithGoogle } = useAuth();
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -30,37 +34,24 @@ export default function FavoritesPage() {
   // toast; undo re-adds via the same toggle rather than delaying the
   // original write (which would change ordering if the backend sorts by
   // creation time — see the issue's regression-risk note).
-  const [undoState, setUndoState] = useState<{ storyId: string; title: string } | null>(null);
-  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearUndoTimeout = useCallback(() => {
-    if (undoTimeoutRef.current !== null) {
-      clearTimeout(undoTimeoutRef.current);
-      undoTimeoutRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => clearUndoTimeout, [clearUndoTimeout]);
+  const { value: undoState, show: showUndo, clear: clearUndo } = useTimedValue<{
+    storyId: string;
+    title: string;
+  }>(UNDO_TIMEOUT_MS);
 
   const handleRemove = useCallback(
     (storyId: string, title: string) => {
       toggleFavorite(storyId);
-      clearUndoTimeout();
-      setUndoState({ storyId, title });
-      undoTimeoutRef.current = setTimeout(() => {
-        setUndoState(null);
-        undoTimeoutRef.current = null;
-      }, UNDO_TIMEOUT_MS);
+      showUndo({ storyId, title });
     },
-    [toggleFavorite, clearUndoTimeout]
+    [toggleFavorite, showUndo]
   );
 
   const handleUndo = useCallback(() => {
     if (!undoState) return;
     toggleFavorite(undoState.storyId);
-    setUndoState(null);
-    clearUndoTimeout();
-  }, [undoState, toggleFavorite, clearUndoTimeout]);
+    clearUndo();
+  }, [undoState, toggleFavorite, clearUndo]);
 
   // requiresAuth is true for anonymous users — they can never have saved favorites.
   const canWaitForStories = !requiresAuth || favorites.length > 0;
@@ -94,7 +85,7 @@ export default function FavoritesPage() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore) {
+        if (entries[0]?.isIntersecting && hasMore) {
           loadMore();
         }
       },
@@ -170,6 +161,9 @@ export default function FavoritesPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <CacheRetryNotice error={storiesError} onRetry={() => void refreshStories()} />
+        <CacheRetryNotice error={retryAfter == null ? favoritesError : null} onRetry={() => void retry()} />
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void retry(); }} />
         {favoriteStories.length === 0 ? (
           <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
             <Bookmark className="h-16 w-16 text-neutral-700 mb-4" />
@@ -288,7 +282,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0]?.isIntersecting) {
           setIsVisible(true);
           observer.disconnect();
         }
@@ -326,9 +320,9 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
       )}>
         {isVisible && story.image ? (
           <>
-            <Image
-              src={story.image}
-              alt={localizedStory.title}
+            <PermittedStoryImage
+              image={story.image}
+              imageSource={story.imageSource}
               fill
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               sizes={isFeature

@@ -66,7 +66,7 @@ describe("checkElevenLabsVoicePreflight", () => {
     [{ ...HEALTH, fingerprint: "not-a-fingerprint" }, /fingerprint.*malformed/i],
     [{ ...HEALTH, fingerprint_matches: false }, /fingerprint.*not bound/i],
     [{ ...HEALTH, agents: ["pelayo"] }, /agent coverage/i],
-  ])("fails closed for incomplete evidence", async (body, message) => {
+  ])("[case %#] fails closed for incomplete evidence", async (body, message) => {
     await expect(
       checkElevenLabsVoicePreflight({
         ...DEFAULT_OPTIONS,
@@ -95,7 +95,7 @@ describe("checkElevenLabsVoicePreflight", () => {
     [{ ...HEALTH, signed_url: "wss://signed.example/secret" }, /unsafe/i],
     [{ ...HEALTH, api_key: "sk_runtime_secret" }, /unsafe/i],
     [{ ...HEALTH, authorization: "Bearer secret" }, /unsafe/i],
-  ])("rejects unsafe evidence", async (body, message) => {
+  ])("[case %#] rejects unsafe evidence", async (body, message) => {
     await expect(
       checkElevenLabsVoicePreflight({
         ...DEFAULT_OPTIONS,

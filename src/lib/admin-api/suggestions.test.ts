@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   fetchSuggestions,
@@ -36,7 +37,7 @@ describe("admin-api/suggestions", () => {
       const result = await fetchSuggestions();
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/suggestions.test.ts:39 mock call tuple");
       expect(String(url)).toBe(`${ORIGIN}/api/admin/suggestions`);
       expect(result).toEqual({ data: mockData });
     });
@@ -46,7 +47,7 @@ describe("admin-api/suggestions", () => {
 
       await fetchSuggestions("pending" as never);
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/suggestions.test.ts:49 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("status")).toBe("pending");
     });
@@ -56,7 +57,7 @@ describe("admin-api/suggestions", () => {
 
       await fetchSuggestions();
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/suggestions.test.ts:59 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.has("status")).toBe(false);
     });
@@ -107,7 +108,7 @@ describe("admin-api/suggestions", () => {
       await updateSuggestion("sug-1", { status: "approved" as never, adminNotes: "LGTM" });
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/suggestions.test.ts:110 mock call tuple");
       expect(String(url)).toBe("/api/admin/suggestions/sug-1");
       expect(init.method).toBe("PUT");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -169,7 +170,7 @@ describe("admin-api/suggestions", () => {
       await deleteSuggestion("sug-1");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/suggestions.test.ts:172 mock call tuple");
       expect(String(url)).toBe("/api/admin/suggestions/sug-1");
       expect(init.method).toBe("DELETE");
     });

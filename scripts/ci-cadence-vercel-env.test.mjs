@@ -37,7 +37,9 @@ test('Vercel env assertion body is exactly the retained original step', () => {
   assert.equal(assertion.run, original.run);
   assert.match(assertion.run, /jq -r '\.envs\[\]\?\.key' > env-keys\.txt/);
   const callable = parse(readFileSync(new URL('../.github/workflows/ci-cadence-security-full.yml', import.meta.url), 'utf8')).jobs['vercel-env-safety'].steps.find(step => step.name === assertion.name);
-  assert.equal(callable.run, original.run);
+  // The callable copy differs only where its key list lives: RUNNER_TEMP, outside the guarded checkout.
+  assert.equal(callable.run, original.run.replace("> env-keys.txt", '> "$RUNNER_TEMP/env-keys.txt"').replace('"$legacy_key" env-keys.txt', '"$legacy_key" "$RUNNER_TEMP/env-keys.txt"'));
+  assert.notEqual(callable.run, original.run);
 });
 test('actual Vercel assertion passes without the legacy key and fails when it is present', t => {
   assert.equal(execute(t, { envs: [{ key: 'SAFE_KEY' }] }).status, 0);

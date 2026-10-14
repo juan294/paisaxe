@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { CategoryFilterBadge } from "./category-filter-badge";
@@ -43,7 +44,7 @@ function renderBadge(overrides = {}) {
 
 // Helper to get toggle button (first element with category label)
 function getToggleButton(label: string) {
-  return screen.getAllByText(label)[0];
+  return requiredValue(screen.getAllByText(label)[0], `Category toggle for ${label}`);
 }
 
 describe("CategoryFilterBadge", () => {
@@ -166,12 +167,12 @@ describe("CategoryFilterBadge", () => {
 
     // Open dropdown - "Ciudades" appears in toggle button
     const allCiudades = screen.getAllByText(CATEGORY_LABELS.cities);
-    fireEvent.click(allCiudades[0]); // click toggle to open
+    fireEvent.click(requiredValue(allCiudades[0], "src/components/immersive/category-filter-badge.test.tsx: allCiudades[0]")); // click toggle to open
 
     // Now "Ciudades" appears both in the toggle and as a chip in the dropdown
     const allCiudadesAfterOpen = screen.getAllByText(CATEGORY_LABELS.cities);
     // Click the chip in the dropdown (last occurrence)
-    fireEvent.click(allCiudadesAfterOpen[allCiudadesAfterOpen.length - 1]);
+    fireEvent.click(requiredValue(allCiudadesAfterOpen[allCiudadesAfterOpen.length - 1], "src/components/immersive/category-filter-badge.test.tsx: allCiudadesAfterOpen[allCiudadesAfterOpen.length - 1]"));
 
     expect(onCategoryChange).toHaveBeenCalledWith(null);
   });

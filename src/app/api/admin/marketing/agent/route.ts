@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import * as fs from "fs/promises";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdminSession } from "@/lib/admin-auth";
 import {
   getAgentById,
   getAllAgents,
@@ -132,116 +132,112 @@ Respond helpfully while staying true to the Paisaxe brand voice.`;
 export async function POST(
   request: Request
 ): Promise<NextResponse<AgentChatResponse | { error: string }>> {
-  // Validate admin auth
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error as NextResponse<{ error: string }>;
-  }
+  return withAdminSession(async () => {
 
-  try {
-    const rawBody: unknown = await request.json();
-    const parsed = agentChatRequestSchema.safeParse(rawBody);
-    if (!parsed.success) {
-      const firstIssue = parsed.error.issues[0];
+    try {
+      const rawBody: unknown = await request.json();
+      const parsed = agentChatRequestSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        const firstIssue = parsed.error.issues[0];
+        return NextResponse.json(
+          { error: firstIssue?.message ?? "Invalid request body" },
+          { status: 400 }
+        );
+      }
+
+      const { agentId, message, conversationHistory = [] } = parsed.data;
+
+      // Validate agent ID
+      const agent = getAgentById(agentId);
+      if (!agent) {
+        return NextResponse.json(
+          { error: `Invalid agent ID: ${agentId}` },
+          { status: 400 }
+        );
+      }
+
+      const system = await buildAgentSystem(agent);
+
+      // Build messages array
+      const messages: Array<{ role: "user" | "assistant"; content: string }> = [
+        ...conversationHistory,
+        { role: "user", content: message.trim() },
+      ];
+
+      // Call Claude API
+      const anthropic = new Anthropic();
+      const response = await anthropic.messages.create({
+        model: CHAT_MODEL,
+        max_tokens: 16000,
+        output_config: { effort: "low" },
+        system,
+        messages,
+        // The full conversationHistory is re-sent every turn: automatic caching
+        // moves one breakpoint to the end of it (2 of 4 breakpoints in use).
+        cache_control: { type: "ephemeral" },
+      });
+
+      recordAnthropicUsageInBackground({
+        model: CHAT_MODEL,
+        usage: response.usage,
+        source: `marketing_${agent.id}`,
+      });
+
+      // Extract response text
+      const responseText = response.content
+        .filter((block) => block.type === "text")
+        .map((block) => (block as { type: "text"; text: string }).text)
+        .join("\n");
+
+      return NextResponse.json({
+        response: responseText,
+        agentId: agent.id,
+        agentName: agent.name,
+        usage: {
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+          cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+          cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+        },
+      });
+    } catch (error) {
+      logger.error("Agent chat error:", { error: error instanceof Error ? error.message : String(error) });
+
+      if (error instanceof Error && error.message.includes("Could not read")) {
+        return NextResponse.json(
+          { error: "Agent persona files not found" },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json(
-        { error: firstIssue?.message ?? "Invalid request body" },
-        { status: 400 }
-      );
-    }
-
-    const { agentId, message, conversationHistory = [] } = parsed.data;
-
-    // Validate agent ID
-    const agent = getAgentById(agentId);
-    if (!agent) {
-      return NextResponse.json(
-        { error: `Invalid agent ID: ${agentId}` },
-        { status: 400 }
-      );
-    }
-
-    const system = await buildAgentSystem(agent);
-
-    // Build messages array
-    const messages: Array<{ role: "user" | "assistant"; content: string }> = [
-      ...conversationHistory,
-      { role: "user", content: message.trim() },
-    ];
-
-    // Call Claude API
-    const anthropic = new Anthropic();
-    const response = await anthropic.messages.create({
-      model: CHAT_MODEL,
-      max_tokens: 16000,
-      output_config: { effort: "low" },
-      system,
-      messages,
-      // The full conversationHistory is re-sent every turn: automatic caching
-      // moves one breakpoint to the end of it (2 of 4 breakpoints in use).
-      cache_control: { type: "ephemeral" },
-    });
-
-    recordAnthropicUsageInBackground({
-      model: CHAT_MODEL,
-      usage: response.usage,
-      source: `marketing_${agent.id}`,
-    });
-
-    // Extract response text
-    const responseText = response.content
-      .filter((block) => block.type === "text")
-      .map((block) => (block as { type: "text"; text: string }).text)
-      .join("\n");
-
-    return NextResponse.json({
-      response: responseText,
-      agentId: agent.id,
-      agentName: agent.name,
-      usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-        cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
-        cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
-      },
-    });
-  } catch (error) {
-    logger.error("Agent chat error:", { error: error instanceof Error ? error.message : String(error) });
-
-    if (error instanceof Error && error.message.includes("Could not read")) {
-      return NextResponse.json(
-        { error: "Agent persona files not found" },
+        { error: "Failed to process agent request" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(
-      { error: "Failed to process agent request" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }
 
 /**
  * GET /api/admin/marketing/agent
  * List available agents.
  */
-export async function GET(): Promise<NextResponse<AgentListResponse | { error: string }>> {
-  // Validate admin auth
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error as NextResponse<{ error: string }>;
-  }
+export async function GET(request?: NextRequest): Promise<NextResponse<AgentListResponse | { error: string }>> {
+  return withAdminSession(async () => {
 
-  const agents = getAllAgents().map((agent) => ({
-    id: agent.id,
-    name: agent.name,
-    platform: agent.platform,
-    description: agent.description,
-    capabilities: agent.capabilities,
-    voice: agent.voice
-      ? { style: agent.voice.style, tone: agent.voice.tone }
-      : undefined,
-  }));
+    const agents = getAllAgents().map((agent) => ({
+      id: agent.id,
+      name: agent.name,
+      platform: agent.platform,
+      description: agent.description,
+      capabilities: agent.capabilities,
+      voice: agent.voice
+        ? { style: agent.voice.style, tone: agent.voice.tone }
+        : undefined,
+    }));
 
-  return NextResponse.json({ agents });
+    return NextResponse.json({ agents });
+
+  }, request);
 }

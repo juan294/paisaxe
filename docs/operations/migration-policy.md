@@ -136,11 +136,11 @@ NNN_description.sql
 
 Where `NNN` is a zero-padded integer incremented from the last migration. The description should be lowercase with underscores.
 
-Examples:
+Existing examples:
 ```
-074_add_user_preferences.sql
-075_drop_legacy_sessions.sql
-076_revert_drop_legacy_sessions.sql   # compensation migration
+074_grant_user_profiles_authenticated.sql
+075_grant_missing_table_permissions.sql
+076_admin_audit_log.sql
 ```
 
 ### Automated Migration Check (CI)
@@ -242,3 +242,7 @@ This is preferable to auto-migration failures that can be harder to reason about
 - [Rollback Procedures](./rollback.md) — Vercel rollback, code revert, compensation migrations
 - [Operations Guide](./operations.md) — pg_cron, health endpoint, CI/CD
 - [Supabase skill](./../../../.claude/skills/) — local migration testing workflow
+
+## Documentation contract checks
+
+`src/app/api/health/route.docs-consistency.test.ts` scans Markdown in `docs/operations/` and `docs/runbooks/` against actual migration basenames. A removed historical migration needs an exact inline annotation with a reason: `<!-- migration-history: NNN_retired_name.sql: removed during consolidation -->` (replace `NNN` with its original number). Naming examples should use existing files or the generic `NNN_description.sql` form. A wrong name is not historical evidence.

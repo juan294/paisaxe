@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { AnalyticsTabs } from "./analytics-tabs";
@@ -56,7 +57,7 @@ describe("AnalyticsTabs", () => {
     );
 
     const tabs = screen.getAllByRole("tab");
-    tabs[3].click();
+    requiredValue(tabs[3], "src/components/admin/analytics-tabs.test.tsx: tabs[3]").click();
 
     expect(onTabChange).toHaveBeenCalledWith("costs");
   });

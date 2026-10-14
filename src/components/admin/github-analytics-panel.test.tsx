@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -209,8 +210,8 @@ describe("GitHubAnalyticsPanel", () => {
 
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/);
     // First input is "from", second is "to"
-    const fromInput = dateInputs[0];
-    const toInput = dateInputs[1];
+    const fromInput = requiredValue(dateInputs[0], "src/components/admin/github-analytics-panel.test.tsx: dateInputs[0]");
+    const toInput = requiredValue(dateInputs[1], "src/components/admin/github-analytics-panel.test.tsx: dateInputs[1]");
 
     // Change "from" date
     await user.clear(fromInput);
@@ -475,7 +476,7 @@ describe("GitHubAnalyticsPanel", () => {
   // 2. Line 246: `{typeof value === "number" ? value.toLocaleString() : value}`
   //    The string branch (`: value`) never runs because all 5 StatCard call sites in
   //    GitHubAnalyticsPanel pass number values from the API summary object.
-  //    StatCard is a non-exported internal function so it cannot be called externally.
+  //    The public panel only passes number values to its colocated StatCard component.
 
   it("documents StatCard || fallback and string-value branch (lines 238, 246) as unreachable dead code", async () => {
     // Confirm: all StatCard call sites pass valid colors and number values.

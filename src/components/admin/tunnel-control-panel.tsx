@@ -17,7 +17,7 @@ interface TunnelTableRowProps {
 
 /**
  * Tunnel control rendered as a table row for the System category.
- * Development-only - returns null in production.
+ * Development-only - discloses unavailable capability in production.
  *
  * Renders the full UI immediately with default OFF state,
  * then updates in background when status is fetched.
@@ -36,7 +36,7 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
         setStatus(data);
         setError(null);
         onRunningChange?.(data.running);
-      } else if (response.status === 403) {
+      } else if (response.status === 403 || response.status === 404) {
         // Production environment - tunnel control not available
         setIsProduction(true);
       }
@@ -50,6 +50,7 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
   }, [fetchStatus]);
 
   const handleToggle = async () => {
+    if (isProduction) return;
     setIsUpdating(true);
     setError(null);
 
@@ -61,6 +62,8 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
         const data = await response.json();
         setStatus({ running: data.running, url: data.url });
         onRunningChange?.(data.running);
+      } else if (response.status === 403 || response.status === 404) {
+        setIsProduction(true);
       } else {
         const data = await response.json();
         setError(data.error || "Failed to toggle tunnel");
@@ -72,40 +75,35 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
     }
   };
 
-  // Don't render in production
-  if (isProduction) {
-    return null;
-  }
-
   return (
-    <tr className={cn("group", status.running && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
-      <td className="py-5 text-center align-top font-mono text-sm tabular-nums text-[#a39e98]">
+    <tr className={cn("group", status.running && "bg-admin-paper/50 dark:bg-admin-panel/50")}>
+      <td className="py-5 text-center align-top font-mono text-sm tabular-nums text-admin-subtle">
         {String(rowNumber).padStart(2, "0")}
       </td>
       <td className="py-5 align-top">
-        <div className="flex items-center gap-2 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+        <div className="flex items-center gap-2 text-sm font-medium text-admin-ink dark:text-admin-paper">
           Dev Tunnel
           {status.running && status.url && (
             <a
               href={status.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+              className="inline-flex items-center gap-1 text-xs text-admin-muted hover:text-admin-ink dark:text-admin-subtle dark:hover:text-admin-paper"
             >
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
       </td>
-      <td className="py-5 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
-        {status.running && status.url ? (
+      <td className="py-5 pr-4 align-top text-sm text-admin-muted dark:text-admin-subtle">
+        {isProduction ? "Solo disponible en desarrollo local. Inicia la aplicación con npm run dev." : status.running && status.url ? (
           <span>
             Exposes localhost:3000 at{" "}
             <a
               href={status.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#2d2a26] hover:underline dark:text-[#f5f3ee]"
+              className="text-admin-ink hover:underline dark:text-admin-paper"
             >
               {status.url.replace("https://", "")}
             </a>
@@ -116,16 +114,16 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
         {error && <span className="ml-2 text-xs text-red-500">({error})</span>}
       </td>
       <td className="py-5 align-top">
-        <span className="text-xs text-[#a39e98]">—</span>
+        <span className="text-xs text-admin-subtle">—</span>
       </td>
       <td className="py-5 text-center align-top">
         {status.running ? (
-          <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-[#2d2a26] dark:text-[#f5f3ee]">
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-admin-ink dark:text-admin-paper">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             On
           </span>
         ) : (
-          <span className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <span className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Off
           </span>
         )}
@@ -133,12 +131,12 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
       <td className="py-5 text-center align-top">
         <button
           onClick={handleToggle}
-          disabled={isUpdating}
+          disabled={isUpdating || isProduction}
           className={cn(
             "relative h-6 w-11 rounded-full transition-colors",
             status.running
-              ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
-              : "bg-[#e5e3de] dark:bg-[#3d3a36]",
+              ? "bg-admin-ink dark:bg-admin-paper"
+              : "bg-admin-line dark:bg-admin-depth",
             isUpdating && "cursor-wait opacity-50"
           )}
           role="switch"
@@ -149,8 +147,8 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
             className={cn(
               "absolute top-0.5 h-5 w-5 rounded-full transition-all",
               status.running
-                ? "left-[22px] bg-white dark:bg-[#2d2a26]"
-                : "left-0.5 bg-white dark:bg-[#6b6560]"
+                ? "left-[22px] bg-white dark:bg-admin-ink"
+                : "left-0.5 bg-white dark:bg-admin-muted"
             )}
           />
         </button>

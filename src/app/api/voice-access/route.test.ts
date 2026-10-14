@@ -1,3 +1,4 @@
+import { resetRateLimit } from "@/lib/rate-limit";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -21,11 +22,7 @@ vi.mock("@supabase/ssr", () => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           gt: vi.fn(() => ({
-            order: vi.fn(() => ({
-              limit: vi.fn(() => ({
-                maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
-              })),
-            })),
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
           })),
         })),
       })),
@@ -53,23 +50,15 @@ function mockVoicePurchaseFrom(result: {
   data: unknown;
   error: unknown;
 }) {
-  return vi.fn(() => ({
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        gt: vi.fn(() => ({
-          order: vi.fn(() => ({
-            limit: vi.fn(() => ({
-              maybeSingle: vi.fn(() => Promise.resolve(result)),
-            })),
-          })),
-        })),
-      })),
-    })),
-  }));
+  const query: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "gt", "lte", "order", "limit"]) query[method] = vi.fn(() => query);
+  query.maybeSingle = vi.fn().mockResolvedValue(result);
+  return vi.fn(() => query);
 }
 
 describe("Voice Access API", () => {
   beforeEach(() => {
+    resetRateLimit();
     vi.clearAllMocks();
   });
 
@@ -81,6 +70,14 @@ describe("Voice Access API", () => {
     });
   };
 
+  it("reports an expired prior purchase instead of indistinguishable new-buyer state", async () => {
+    const results=[{data:null,error:null},{data:null,error:null},{data:{entitlement_state:"active"},error:null}];
+    const from=vi.fn(()=>{const query:Record<string,unknown>={}; for(const method of ["select","eq","gt","lte","order","limit"])query[method]=vi.fn(()=>query); query.maybeSingle=vi.fn().mockResolvedValue(results.shift()); return query;});
+    const client={auth:{getUser:vi.fn().mockResolvedValue({data:{user:{id:"phase4-user"}},error:null})},from} as unknown as ReturnType<typeof createServerClient>;
+    mockCreateServerClient.mockReturnValueOnce(client).mockReturnValueOnce(client);
+    const response=await GET(createRequest({headers:{Authorization:"Bearer phase4-local-token"}}));
+    expect(await response.json()).toMatchObject({hasAccess:false,status:"expired"});
+  });
   describe("GET /api/voice-access", () => {
     it("should return 401 when Authorization header is missing", async () => {
       const request = createRequest();

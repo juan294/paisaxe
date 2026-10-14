@@ -1,106 +1,97 @@
 'use client';
 
-import {
-  createContext,
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  type ReactNode,
-} from 'react';
-import type { Locale } from './types';
+import { createContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import type { Locale, Translations } from './types';
 import { es } from './es';
-import { en } from './en';
 import { resolveTranslation } from './resolve';
-import { resolveLocale, storeLocale } from './detect-language';
-import type { Translations } from './types';
+import { getStoredLocale, resolveLocale, storeLocale } from './detect-language';
+import { getLocaleCookie, isLocale } from './preference';
+import { cachedDictionary, loadDictionary, resetDictionaryCacheForTesting } from './dictionaries';
 
-// Module-level cache — es and en are always available (static imports)
-const translationCache = new Map<Locale, Translations>();
-translationCache.set('es', es);
-translationCache.set('en', en);
-
-// Lazy loaders for other locales (~14KB each, loaded on demand)
-// es and en are pre-populated in translationCache above — no loader needed
-const localeLoaders: Partial<Record<Locale, () => Promise<Translations>>> = {
-  fr: () => import('./fr').then(m => m.fr),
-  de: () => import('./de').then(m => m.de),
-  pt: () => import('./pt').then(m => m.pt),
-  ast: () => import('./ast').then(m => m.ast),
-};
-
-/** Reset cache to only static locales. Test-only. */
-export function _resetTranslationCacheForTesting(): void {
-  const keep = new Map<Locale, Translations>();
-  keep.set('es', es);
-  keep.set('en', en);
-  translationCache.clear();
-  for (const [k, v] of keep) translationCache.set(k, v);
-}
+export const _resetTranslationCacheForTesting = resetDictionaryCacheForTesting;
 
 export interface LanguageContextValue {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: (key: string) => string;
+  dictionaryLocale?: Locale;
+  loadError?: boolean;
+  isLanguageLoading?: boolean;
+  legacyMigrated?: boolean;
+  retryLanguage?: () => void;
 }
 
 export const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 interface LanguageProviderProps {
   children: ReactNode;
-  /** Optional initial locale for testing; if omitted, auto-detects. */
   initialLocale?: Locale;
+  initialDictionary?: Translations;
+  initialDictionaryLocale?: Locale;
+  initialLanguageError?: boolean;
+  /** The server cannot observe legacy localStorage on the first visit. */
+  reconcileLegacyPreference?: boolean;
 }
 
-export function LanguageProvider({ children, initialLocale }: LanguageProviderProps) {
-  // Always start with 'es' (SSR default) to prevent hydration mismatch.
-  // Browser locale detection runs in useEffect after hydration.
+export function LanguageProvider({ children, initialLocale, initialDictionary, initialDictionaryLocale, initialLanguageError = false, reconcileLegacyPreference = false }: LanguageProviderProps) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale ?? 'es');
+  const [dictionary, setDictionary] = useState(() => ({ locale: initialLocale ?? 'es', language: initialDictionaryLocale ?? initialLocale ?? 'es', data: initialDictionary ?? cachedDictionary(initialLocale ?? 'es') }));
+  const [loadError, setLoadError] = useState(initialLanguageError);
+  const [legacyMigrated, setLegacyMigrated] = useState(false);
   const [loadGeneration, setLoadGeneration] = useState(0);
 
-  // After hydration, resolve the actual locale from browser/storage
   useEffect(() => {
-    if (initialLocale) return; // explicit prop — skip detection
-    const resolved = resolveLocale();
-    if (resolved !== 'es') {
-      setLocaleState(resolved);
+    if (reconcileLegacyPreference && !getLocaleCookie()) {
+      const legacy = getStoredLocale();
+      if (legacy) {
+        storeLocale(legacy);
+        setLocaleState(legacy);
+        setLegacyMigrated(true);
+      }
+    } else if (!initialLocale) {
+      setLocaleState(resolveLocale());
     }
-  }, [initialLocale]);
+  }, [initialLocale, reconcileLegacyPreference]);
 
-  // Load translations for the current locale if not cached
   useEffect(() => {
-    if (translationCache.has(locale)) return;
+    // The supplied active dictionary covers server paint and hydration.
+    if (dictionary.locale === locale && dictionary.language === locale && dictionary.data) return;
+    if (initialLanguageError && locale === initialLocale && loadGeneration === 0) return;
     let cancelled = false;
-    localeLoaders[locale]?.().then(translations => {
+    setLoadError(false);
+    const timer = setTimeout(() => {
       if (cancelled) return;
-      translationCache.set(locale, translations);
-      setLoadGeneration(n => n + 1);
+      cancelled = true;
+      setDictionary({ locale, language: 'es', data: undefined });
+      setLoadError(true);
+    }, 1500);
+    void loadDictionary(locale).then(data => {
+      clearTimeout(timer);
+      if (!cancelled) setDictionary({ locale, language: locale, data });
+    }).catch(() => {
+      clearTimeout(timer);
+      if (!cancelled) {
+        setDictionary({ locale, language: 'es', data: undefined });
+        setLoadError(true);
+      }
     });
-    return () => { cancelled = true; };
-  }, [locale]);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // Dictionary completion must not start another load; locale/generation own it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale, loadGeneration]);
 
   const setLocale = useCallback((newLocale: Locale) => {
+    if (!isLocale(newLocale)) return;
+    setLoadGeneration(n => n + 1);
     setLocaleState(newLocale);
+    setLoadError(false);
+    setLegacyMigrated(false);
     storeLocale(newLocale);
   }, []);
-
-  const t = useCallback(
-    (key: string): string => {
-      const translations = translationCache.get(locale) ?? es;
-      return resolveTranslation(key, translations);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale, loadGeneration]
-  );
-
-  const value = useMemo<LanguageContextValue>(
-    () => ({ locale, setLocale, t }),
-    [locale, setLocale, t]
-  );
-
-  return (
-    <LanguageContext.Provider value={value}>
-      {children}
-    </LanguageContext.Provider>
-  );
+  const retryLanguage = useCallback(() => setLoadGeneration(n => n + 1), []);
+  const active = dictionary.locale === locale ? dictionary.data : cachedDictionary(locale);
+  const dictionaryLocale = active ? (dictionary.locale === locale ? dictionary.language : locale) : 'es';
+  const t = useCallback((key: string) => resolveTranslation(key, active ?? es), [active]);
+  const value = useMemo<LanguageContextValue>(() => ({ locale, setLocale, t, dictionaryLocale, loadError, isLanguageLoading: !active && !loadError, legacyMigrated, retryLanguage }), [locale, setLocale, t, dictionaryLocale, loadError, active, legacyMigrated, retryLanguage]);
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

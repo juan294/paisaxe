@@ -9,9 +9,10 @@ const logger = vi.hoisted(() => ({
 vi.mock("@/lib/logger", () => ({ logger }));
 
 // Mock dependencies
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 const { mockStat, mockReadFile } = vi.hoisted(() => ({
   mockStat: vi.fn(),
@@ -802,3 +803,6 @@ describe("GET /api/admin/agents-summary", () => {
     }
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

@@ -52,7 +52,9 @@ evidence for each phase).
 - **Money moves only on a button.** Accepting an offer, paying and confirming a
   cancellation are buttons. The model cannot call them, and a typed "I accept" or
   "cancel it" does nothing by itself.
-- **PayPal deposit.** Orders are created over the PayPal REST API with an idempotency key,
+- **PayPal deposit.** Orders are created through the official PayPal Server SDK
+  (`@paypal/paypal-server-sdk` 2.5.0, built with the PayPal Context Plugin; see
+  [docs/hackathon/apimatic.md](docs/hackathon/apimatic.md)) with an idempotency key,
   and the buyer approves by redirect. A single capture path is shared by the return page,
   the `CHECKOUT.ORDER.APPROVED` webhook and a reconciliation cron that runs every 5 minutes,
   so a buyer who approves and closes the browser is still confirmed. Webhooks are
@@ -75,7 +77,9 @@ evidence for each phase).
 - **Operator view.** `/operator/<id>.<token>` is a capability link for the merchant. It
   shows upcoming and recent bookings, deposits collected, the balance due, exceptions,
   active holds (with a release action), free places for 14 days, and a link re-issue for a
-  booking. This view is in Spanish.
+  booking. It also checks each deposit against PayPal's own records (Transaction Search,
+  read-only): "PayPal confirma", "Reembolso en PayPal", or "Pendiente en PayPal" while PayPal
+  has not listed it yet. This view is in Spanish.
 - **Postman collection.** [`docs/hackathon/postman/`](docs/hackathon/postman/README.md)
   walks the same journey over HTTP, including the negative cases.
 

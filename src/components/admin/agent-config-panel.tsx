@@ -80,16 +80,16 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
       {/* Schedule Info */}
       <div className="flex items-center gap-8 text-sm">
         <div>
-          <span className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+          <span className="font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
             Schedule
           </span>
-          <p className="mt-1 text-[#6b6560] dark:text-[#a39e98]">{scheduleInfo}</p>
+          <p className="mt-1 text-admin-muted dark:text-admin-subtle">{scheduleInfo}</p>
         </div>
         <div>
-          <span className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+          <span className="font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
             Output
           </span>
-          <p className="mt-1 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+          <p className="mt-1 font-mono text-xs text-admin-muted dark:text-admin-subtle">
             {outputFile}
           </p>
         </div>
@@ -100,14 +100,14 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
         <div className="flex items-center justify-between">
           <label
             htmlFor={`prompt-${flag.flagKey}`}
-            className="block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]"
+            className="block font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle"
           >
             Agent Prompt
           </label>
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-1 text-xs text-[#6b6560] transition-colors hover:text-[#6b6560] dark:text-[#a39e98] dark:hover:text-[#a39e98]"
+            className="flex items-center gap-1 text-xs text-admin-muted transition-colors hover:text-admin-muted dark:text-admin-subtle dark:hover:text-admin-subtle"
             title="Reset to default prompt"
           >
             <RotateCcw className="h-3 w-3" />
@@ -122,10 +122,10 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
             setSaved(false);
           }}
           rows={12}
-          className="w-full resize-y border border-[#e5e3de] bg-transparent px-4 py-3 font-mono text-xs leading-relaxed text-[#2d2a26] placeholder-[#a39e98] focus-visible:border-[#c9a55c] focus-visible:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
+          className="w-full resize-y border border-admin-line bg-transparent px-4 py-3 font-mono text-xs leading-relaxed text-admin-ink placeholder-admin-subtle focus-visible:border-admin-warning focus-visible:outline-none dark:border-admin-depth dark:text-admin-paper"
           placeholder="Enter the prompt/instructions for this agent..."
         />
-        <p className="text-xs text-[#6b6560] dark:text-[#a39e98]">
+        <p className="text-xs text-admin-muted dark:text-admin-subtle">
           This prompt is passed to Claude when the agent runs. Modify it to change the agent&apos;s behavior.
         </p>
       </div>
@@ -147,8 +147,8 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
           className={cn(
             "flex items-center gap-2 border px-6 py-2 font-mono text-xs uppercase tracking-widest transition-all",
             isSaving || !hasChanges
-              ? "cursor-not-allowed border-[#e5e3de] text-[#a39e98] dark:border-[#3d3a36] dark:text-[#6b6560]"
-              : "border-[#2d2a26] text-[#2d2a26] hover:bg-[#2d2a26] hover:text-white dark:border-[#f5f3ee] dark:text-[#f5f3ee] dark:hover:bg-[#f5f3ee] dark:hover:text-[#2d2a26]"
+              ? "cursor-not-allowed border-admin-line text-admin-subtle dark:border-admin-depth dark:text-admin-muted"
+              : "border-admin-ink text-admin-ink hover:bg-admin-ink hover:text-white dark:border-admin-paper dark:text-admin-paper dark:hover:bg-admin-paper dark:hover:text-admin-ink"
           )}
         >
           {isSaving ? (
@@ -166,7 +166,7 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
           </span>
         )}
         {!hasChanges && !saved && (
-          <span className="text-xs text-[#6b6560] dark:text-[#a39e98]">No changes to save</span>
+          <span className="text-xs text-admin-muted dark:text-admin-subtle">No changes to save</span>
         )}
       </div>
     </div>

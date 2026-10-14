@@ -122,11 +122,18 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 1. Check Vercel Cron logs: Vercel dashboard → Project → Deployments → Functions → Cron Logs
 2. Search for `[CRON_FAILURE]` events — the `job` and `error` fields identify the failing handler.
 3. Identify which cron route failed (see `vercel.json` for the schedule definitions).
-4. Test the route manually:
+4. After separate authorization for the affected job, substitute its concrete route in this example (shown for `fail-stale-bookings`):
    ```bash
-   curl -X POST https://paisaxe.es/api/cron/<route> \
+   curl -X POST https://paisaxe.es/api/cron/fail-stale-bookings \
      -H "x-webhook-secret: $WEBHOOK_SECRET"
    ```
+   The equivalent scheduler authentication shape is:
+   ```bash
+   curl https://paisaxe.es/api/cron/fail-stale-bookings \
+     -H "Authorization: Bearer $CRON_SECRET"
+   ```
+   These examples are checked as text using synthetic secrets and the real auth verifiers; the check never sends a request. Supported fenced cron examples use `curl`, optional `-s`/`-sS`, `-o /dev/null`, `-w "%{http_code}"`, optional `-X GET|POST`, a concrete URL and quoted `-H "name: value"` headers, with optional backslash-newline continuation. The literal `$BASE_URL` URL prefix is mapped to a synthetic URL during checking. Explicit `# Expected: 401` comments declare rejection probes; unannotated commands must authenticate successfully. Other syntax fails with a document line and the supported form.
+
    (`GET` is what Vercel Cron itself sends, authenticated via `Authorization: Bearer $CRON_SECRET` — see
    `verifyVercelCron` in `src/lib/cron-auth.ts`. The `POST` handler used for manual/pg_cron recovery
    checks `verifyWebhookSecret` instead, which reads the `x-webhook-secret` header against
@@ -153,7 +160,7 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 4. Once the secret is correctly configured, trigger the affected cron manually to confirm (see the
    `POST` auth note under [Cron Job Failure](#cron-job-failure) above):
    ```bash
-   curl -X POST https://paisaxe.es/api/cron/<route> \
+   curl -X POST https://paisaxe.es/api/cron/fail-stale-bookings \
      -H "x-webhook-secret: $WEBHOOK_SECRET"
    ```
 

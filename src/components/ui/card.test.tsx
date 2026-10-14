@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import {
@@ -35,7 +36,7 @@ describe("Card", () => {
       const ref = vi.fn();
       render(<Card ref={ref}>Content</Card>);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLDivElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/card.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/card.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLDivElement);
     });
 
     it("should pass through HTML attributes", () => {
@@ -75,7 +76,7 @@ describe("Card", () => {
       const ref = vi.fn();
       render(<CardHeader ref={ref}>Header</CardHeader>);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLDivElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/card.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/card.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLDivElement);
     });
   });
 
@@ -104,7 +105,7 @@ describe("Card", () => {
       const ref = vi.fn();
       render(<CardTitle ref={ref}>Title</CardTitle>);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLDivElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/card.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/card.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLDivElement);
     });
   });
 
@@ -133,7 +134,7 @@ describe("Card", () => {
       const ref = vi.fn();
       render(<CardDescription ref={ref}>Description</CardDescription>);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLDivElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/card.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/card.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLDivElement);
     });
   });
 
@@ -162,7 +163,7 @@ describe("Card", () => {
       const ref = vi.fn();
       render(<CardContent ref={ref}>Content</CardContent>);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLDivElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/card.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/card.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLDivElement);
     });
   });
 
@@ -191,7 +192,7 @@ describe("Card", () => {
       const ref = vi.fn();
       render(<CardFooter ref={ref}>Footer</CardFooter>);
       expect(ref).toHaveBeenCalled();
-      expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLDivElement);
+      expect(requiredValue(requiredValue(ref.mock.calls[0], "src/components/ui/card.test.tsx: ref.mock.calls[0]")[0], "src/components/ui/card.test.tsx: ref.mock.calls[0][0]")).toBeInstanceOf(HTMLDivElement);
     });
   });
 

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * The phone-confirmation stretch against the live local stack (PayPal
@@ -241,7 +242,7 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
         `INSERT INTO public.payments (booking_id, amount_cents, status, authorization_id, phone_call_id) ` +
           `VALUES ('${bookingId}', 4000, 'authorized', 'AUTH-IT-${bookingId.slice(0, 8)}', '${callId}') RETURNING id;`
       ).split("\n")[0];
-      return { paymentId, callId };
+      return { paymentId: requiredValue(paymentId, "src/lib/booking/phone-confirmation.postgrest-integration.test.ts:245 paymentId"), callId: requiredValue(callId, "src/lib/booking/phone-confirmation.postgrest-integration.test.ts:245 callId") };
     }
     const claim = (paymentId: string) => psql(`UPDATE public.payments SET status = 'capture_pending' WHERE id = '${paymentId}';`);
 
@@ -264,6 +265,39 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
     });
   });
 
+  describe("recorded ElevenLabs delivery", () => {
+    it("replays the sanitized authentic text call through signature, route, database and idempotent settlement", async () => {
+      const recorded = JSON.parse(readFileSync(new URL("../../../tests/fixtures/providers/elevenlabs-post-call.sanitized.json", import.meta.url), "utf8"));
+      // Preserve provider analysis/transcript. The current adapter classifies
+      // the synthetic Spanish word "mensaje" as no_answer before confirmation.
+      expect(recorded.data.analysis.call_successful).toBe("success");
+      expect(recorded.data.transcript[0].message).toBe("Este es un mensaje sintético de prueba.");
+      expect(recorded.data.metadata.text_only).toBe(true);
+      expect(recorded.data.metadata.call_duration_secs).toBe(1);
+      const conversationId = recorded.data.conversation_id;
+      expect(conversationId).toBe("conv_recorded_elevenlabs_release190");
+      const bookingId = newBooking();
+      await approveAndReturn(bookingId);
+      const callId = callOf(bookingId);
+      await localServiceClient().from("pending_bookings").update({ conversation_id: conversationId }).eq("id", callId).throwOnError();
+      expect(one(`SELECT status FROM public.pending_bookings WHERE id = '${callId}';`)).toBe("pending");
+      const first = await elevenLabsWebhook(signedWebhook(recorded));
+      expect(first.status).toBe(200);
+      expect(await first.json()).toMatchObject({ success: true });
+      expect(one(`SELECT status FROM public.pending_bookings WHERE id = '${callId}';`)).toBe("no_answer");
+      expect(paymentOf(bookingId)).toBe("voided:no_answer");
+      expect(bookingStatus(bookingId)).toBe("expired");
+      expect(mock.captures.size).toBe(0);
+      expect(one(`SELECT count(*) FROM public.elevenlabs_webhook_events WHERE booking_id = '${callId}';`)).toBe("1");
+      const duplicate = await elevenLabsWebhook(signedWebhook(recorded));
+      expect(duplicate.status).toBe(200);
+      expect(paymentOf(bookingId)).toBe("voided:no_answer");
+      expect(one(`SELECT count(*) FROM public.elevenlabs_webhook_events WHERE booking_id = '${callId}';`)).toBe("1");
+      expect(mock.requestsTo("POST", /\/v2\/payments\/authorizations\/[^/]+\/void$/)).toHaveLength(1);
+      expect(one(`SELECT count(*) FROM public.booking_sms_jobs WHERE booking_id = '${callId}';`)).toBe("0");
+    });
+  });
+
   describe("the flow", () => {
     it("approval authorizes (never captures) and calls the test number; 'confirmed' captures once and confirms", async () => {
       const bookingId = newBooking();
@@ -275,7 +309,7 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
       expect(paymentOf(bookingId)).toBe("authorized:-");
       expect(bookingStatus(bookingId)).toBe("pending_payment");
       expect(dial.initiateCall).toHaveBeenCalledTimes(1);
-      expect(dial.initiateCall.mock.calls[0][0]).toBe(TEST_PHONE);
+      expect(requiredValue(dial.initiateCall.mock.calls[0], "src/lib/booking/phone-confirmation.postgrest-integration.test.ts:278 dial.initiateCall.mock.calls[0]")[0]).toBe(TEST_PHONE);
       expect(one(`SELECT status || ':' || venue_phone || ':' || idempotency_key FROM public.pending_bookings WHERE id = '${callOf(bookingId)}';`)).toMatch(
         /^pending:\+34612345678:phone-confirmation:/
       );
@@ -288,7 +322,7 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
       expect(paymentOf(bookingId)).toBe("captured:confirmed");
       expect(mock.captures.size).toBe(1);
       const [capture] = [...mock.captures.values()];
-      expect(one(`SELECT capture_id FROM public.payments WHERE booking_id = '${bookingId}';`)).toBe(capture.id);
+      expect(one(`SELECT capture_id FROM public.payments WHERE booking_id = '${bookingId}';`)).toBe(requiredValue(capture, "src/lib/booking/phone-confirmation.postgrest-integration.test.ts:292 capture").id);
       expect(mock.authorizations.get(authorizationOf(bookingId))?.status).toBe("CAPTURED");
 
       // Redelivery and a reconciliation run change nothing and never capture again.
@@ -338,8 +372,17 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
         settlePhoneConfirmationCall(localServiceClient(), callId),
       ]);
 
-      expect(results.sort()).toEqual(["confirmed", "unchanged"]);
-      expect(mock.requestsTo("POST", /\/v2\/payments\/authorizations\/[^/]+\/capture$/)).toHaveLength(1);
+      // Which outcome the second settlement reports depends on when it reads the payment: before the
+      // other's claim it finds nothing to do ("unchanged"); after it, it resolves the pending capture
+      // and may ask PayPal again with the same PayPal-Request-Id, which PayPal answers with the same
+      // capture (phone-confirmation.ts, resolveAuthorizationCapture). Either way: one capture.
+      results.sort();
+      expect(results[0]).toBe("confirmed");
+      expect(["confirmed", "unchanged"]).toContain(results[1]);
+      const attempts = mock.requestsTo("POST", /\/v2\/payments\/authorizations\/[^/]+\/capture$/);
+      expect(attempts.length).toBeGreaterThanOrEqual(1);
+      expect(new Set(attempts.map((request) => request.headers["paypal-request-id"])).size).toBe(1);
+      expect(mock.captures.size).toBe(1);
       expect(bookingStatus(bookingId)).toBe("confirmed");
     });
 

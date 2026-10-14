@@ -1,3 +1,4 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
 import fs from "fs";
 import path from "path";
 import { config } from "dotenv";
@@ -282,7 +283,7 @@ Generate up to ${maxStories} stories. Return ONLY valid JSON, no explanations.`;
       console.log(formatUsageLine(pdfName, attempt, response.usage));
 
       const content = response.content[0];
-      if (content.type !== "text") {
+      if (!content || content.type !== "text") {
         throw new Error("Unexpected response type");
       }
 
@@ -455,5 +456,5 @@ const isDirectExecution = process.argv[1]?.endsWith("generate-stories.ts") ||
   process.argv[1]?.endsWith("generate-stories");
 
 if (isDirectExecution) {
-  main().catch(console.error);
+  rejectLegacyContentOperation("generate-stories.ts", main);
 }

@@ -310,6 +310,7 @@ export const chatRequestSchema = z
       )
       .optional(),
     messageIndex: z.unknown().optional(),
+    locale: z.enum(['es', 'en', 'fr', 'de', 'pt', 'ast']).optional(),
   })
   .transform((parsed) => {
     const rawIndex = parsed.messageIndex;
@@ -323,6 +324,7 @@ export const chatRequestSchema = z
       message: parsed.message,
       context: parsed.context,
       messageIndex,
+      ...(parsed.locale ? { locale: parsed.locale } : {}),
     };
   });
 

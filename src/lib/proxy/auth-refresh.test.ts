@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { requiredValue } from "@/test/required-value";
 import { NextRequest } from "next/server";
 
 const mockGetUser = vi.fn().mockResolvedValue({ data: { user: null }, error: null });
@@ -58,6 +59,13 @@ describe("isTokenNearExpiry", () => {
 
   it("returns true when token is empty string", () => {
     expect(isTokenNearExpiry("")).toBe(true);
+  });
+
+  it("treats a token with no payload segment as near expiry and accepts a corrected future token", () => {
+    expect(isTokenNearExpiry("malformed")).toBe(true);
+
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    expect(isTokenNearExpiry(makeJwt(future))).toBe(false);
   });
 
   it("returns true for a malformed token", () => {
@@ -339,7 +347,7 @@ describe("refreshAuthSession", () => {
 
       expect(res.status).toBe(200);
       expect(mockPostHogFetch).toHaveBeenCalledTimes(1);
-      const [url, init] = mockPostHogFetch.mock.calls[0];
+      const [url, init] = requiredValue(mockPostHogFetch.mock.calls[0], "PostHog timeout capture call");
       expect(url).toContain("/capture/");
       expect(init.method).toBe("POST");
       const body = JSON.parse(init.body);

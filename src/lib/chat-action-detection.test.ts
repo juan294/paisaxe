@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import {
   detectPhoneNumbers,
@@ -13,8 +14,8 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34985123456");
-      expect(result[0].display).toBe("+34 985 123 456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:16 result[0]").number).toBe("+34985123456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:17 result[0]").display).toBe("+34 985 123 456");
     });
 
     it("detects Spanish phone numbers with +34 and no spaces", () => {
@@ -22,8 +23,8 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34985123456");
-      expect(result[0].display).toBe("+34985123456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:25 result[0]").number).toBe("+34985123456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:26 result[0]").display).toBe("+34985123456");
     });
 
     it("detects local Spanish landline numbers (9XX XXX XXX)", () => {
@@ -31,8 +32,8 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34985123456");
-      expect(result[0].display).toBe("985 123 456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:34 result[0]").number).toBe("+34985123456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:35 result[0]").display).toBe("985 123 456");
     });
 
     it("detects mobile numbers starting with 6 or 7", () => {
@@ -40,8 +41,8 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(2);
-      expect(result[0].number).toBe("+34612345678");
-      expect(result[1].number).toBe("+34722987654");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:43 result[0]").number).toBe("+34612345678");
+      expect(requiredValue(result[1], "src/lib/chat-action-detection.test.ts:44 result[1]").number).toBe("+34722987654");
     });
 
     it("detects phone numbers without spaces", () => {
@@ -49,7 +50,7 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34985123456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:52 result[0]").number).toBe("+34985123456");
     });
 
     it("returns empty array when no phone numbers found", () => {
@@ -85,8 +86,8 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34985105500");
-      expect(result[0].display).toBe("985 10 55 00");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:88 result[0]").number).toBe("+34985105500");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:89 result[0]").display).toBe("985 10 55 00");
     });
 
     it("detects phone numbers in 3-2-2-2 format with mobile prefix", () => {
@@ -94,8 +95,8 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34612345678");
-      expect(result[0].display).toBe("612 34 56 78");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:97 result[0]").number).toBe("+34612345678");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:98 result[0]").display).toBe("612 34 56 78");
     });
 
     it("ignores +34 numbers whose digit groups do not total 9 digits (line 54 false arm)", () => {
@@ -111,7 +112,7 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34985123456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:114 result[0]").number).toBe("+34985123456");
     });
 
     it("deduplicates repeated 3-2-2-2 numbers (line 85 seen dedup)", () => {
@@ -119,7 +120,7 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34985105500");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:122 result[0]").number).toBe("+34985105500");
     });
 
     it("deduplicates repeated 9-digit numbers without spaces (line 99 seen dedup)", () => {
@@ -127,7 +128,7 @@ describe("chat-action-detection", () => {
       const result = detectPhoneNumbers(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].number).toBe("+34985123456");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:130 result[0]").number).toBe("+34985123456");
     });
   });
 
@@ -137,8 +138,8 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("Calle San Francisco");
-      expect(result[0].mapsUrl).toContain("google.com/maps");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:140 result[0]").text).toContain("Calle San Francisco");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:141 result[0]").mapsUrl).toContain("google.com/maps");
     });
 
     it("detects addresses with C. abbreviation", () => {
@@ -146,7 +147,7 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("C. Uría");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:149 result[0]").text).toContain("C. Uría");
     });
 
     it("detects addresses starting with Avenida", () => {
@@ -154,7 +155,7 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("Avenida de Galicia");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:157 result[0]").text).toContain("Avenida de Galicia");
     });
 
     it("detects addresses with Av. abbreviation", () => {
@@ -162,7 +163,7 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("Av. de la Constitución");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:165 result[0]").text).toContain("Av. de la Constitución");
     });
 
     it("detects addresses starting with Plaza", () => {
@@ -170,7 +171,7 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("Plaza del Ayuntamiento");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:173 result[0]").text).toContain("Plaza del Ayuntamiento");
     });
 
     it("detects addresses with Pl. abbreviation", () => {
@@ -178,7 +179,7 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("Pl. Mayor");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:181 result[0]").text).toContain("Pl. Mayor");
     });
 
     it("detects addresses with postal codes", () => {
@@ -186,8 +187,8 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("33001");
-      expect(result[0].text).toContain("Oviedo");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:189 result[0]").text).toContain("33001");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:190 result[0]").text).toContain("Oviedo");
     });
 
     it("ignores postal codes outside Asturias (non-33 prefix)", () => {
@@ -202,7 +203,7 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("33001");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:205 result[0]").text).toContain("33001");
     });
 
     it("generates correct Google Maps URL", () => {
@@ -211,7 +212,7 @@ describe("chat-action-detection", () => {
 
       expect(result).toHaveLength(1);
       // encodeURIComponent uses %20 for spaces (both %20 and + are valid)
-      expect(result[0].mapsUrl).toBe(
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:214 result[0]").mapsUrl).toBe(
         "https://www.google.com/maps/search/?api=1&query=Calle%20San%20Francisco%2C%2012%2C%20Oviedo"
       );
     });
@@ -244,7 +245,7 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("Paseo del Muelle");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:247 result[0]").text).toContain("Paseo del Muelle");
     });
 
     it("detects addresses with Carretera", () => {
@@ -252,7 +253,7 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toContain("Carretera de la Costa");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:255 result[0]").text).toContain("Carretera de la Costa");
     });
 
     it("removes trailing period from address text (line 321)", () => {
@@ -263,8 +264,8 @@ describe("chat-action-detection", () => {
 
       expect(result).toHaveLength(1);
       // The trailing period should be stripped from the detected address
-      expect(result[0].text.endsWith(".")).toBe(false);
-      expect(result[0].text).toContain("Calle Mayor");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:266 result[0]").text.endsWith(".")).toBe(false);
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:267 result[0]").text).toContain("Calle Mayor");
     });
 
     // COVERAGE NOTE: Line 321 — the `true` branch of `if (addressText.endsWith("."))`
@@ -291,8 +292,8 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Lagos de Covadonga");
-      expect(result[0].mapsUrl).toContain("google.com/maps");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:294 result[0]").text).toBe("Lagos de Covadonga");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:295 result[0]").mapsUrl).toContain("google.com/maps");
     });
 
     it("detects Basilica de Covadonga", () => {
@@ -300,7 +301,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Basílica de Covadonga");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:303 result[0]").text).toBe("Basílica de Covadonga");
     });
 
     it("detects Picos de Europa", () => {
@@ -308,7 +309,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Picos de Europa");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:311 result[0]").text).toBe("Picos de Europa");
     });
 
     it("detects Ruta del Cares", () => {
@@ -316,7 +317,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Ruta del Cares");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:319 result[0]").text).toBe("Ruta del Cares");
     });
 
     it("detects Playa de Gulpiyuri", () => {
@@ -324,7 +325,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Playa de Gulpiyuri");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:327 result[0]").text).toBe("Playa de Gulpiyuri");
     });
 
     it("detects Catedral de Oviedo", () => {
@@ -332,7 +333,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Catedral de Oviedo");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:335 result[0]").text).toBe("Catedral de Oviedo");
     });
 
     it("detects Santa María del Naranco", () => {
@@ -340,7 +341,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Santa María del Naranco");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:343 result[0]").text).toBe("Santa María del Naranco");
     });
 
     it("detects multiple landmarks in one text", () => {
@@ -358,7 +359,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text.toLowerCase()).toBe("lagos de covadonga");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:361 result[0]").text.toLowerCase()).toBe("lagos de covadonga");
     });
 
     it("returns empty array when no landmarks found", () => {
@@ -380,7 +381,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Bufones de Pría");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:383 result[0]").text).toBe("Bufones de Pría");
     });
 
     it("detects Playa de Rodiles", () => {
@@ -388,7 +389,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Playa de Rodiles");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:391 result[0]").text).toBe("Playa de Rodiles");
     });
 
     it("documents place-name sort tie-breaker (line 247) as unreachable with the current landmark list", () => {
@@ -423,7 +424,7 @@ describe("chat-action-detection", () => {
       const result = detectPlaceNames(text);
 
       expect(result).toHaveLength(1);
-      expect(result[0].text).toBe("Santa Cueva de Covadonga");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:426 result[0]").text).toBe("Santa Cueva de Covadonga");
     });
   });
 
@@ -579,8 +580,8 @@ describe("chat-action-detection", () => {
       const result = detectAddresses(text);
 
       expect(result).toHaveLength(2);
-      expect(result[0].text).toContain("Calle Uría");
-      expect(result[1].text).toContain("Plaza del Sol");
+      expect(requiredValue(result[0], "src/lib/chat-action-detection.test.ts:582 result[0]").text).toContain("Calle Uría");
+      expect(requiredValue(result[1], "src/lib/chat-action-detection.test.ts:583 result[1]").text).toContain("Plaza del Sol");
     });
 
     it("handles candidate fully contained within an existing match (line 377)", () => {

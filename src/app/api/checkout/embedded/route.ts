@@ -1,6 +1,7 @@
+import { checkRequestBudget, rateLimitResponse } from "@/lib/request-rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import { createEmbeddedCheckoutSession, type PurchaseType } from "@/lib/stripe";
-import { getSupabaseClient } from "@/lib/supabase-auth";
+import { getUserFromRequest } from "@/lib/supabase-auth";
 import { checkoutBodySchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 import { getSiteUrl } from "@/lib/env";
@@ -62,15 +63,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getUserFromRequest(request);
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const requestLimit = await checkRequestBudget("POST /api/checkout/embedded", user.id);
+    if (!requestLimit.allowed) return rateLimitResponse({ error: "Too many requests. Please try again later." }, requestLimit);
 
     const rawOrigin = request.headers.get("origin");
     if (rawOrigin && !ALLOWED_ORIGINS.includes(rawOrigin)) {

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Image from "next/image";
+import { PermittedStoryImage } from "@/components/permitted-story-image";
 import Link from "next/link";
 import { getStoriesFromDB, getStoryBySlugFromDB } from "@/lib/stories-data";
 import { CATEGORY_LABELS } from "@/types/immersive";
@@ -86,9 +86,9 @@ export default async function StoryPage({ params }: StoryPageProps) {
       <div className="mx-auto max-w-3xl px-6 py-16">
         {story.image ? (
           <div className="relative mb-8 aspect-video w-full overflow-hidden rounded-2xl">
-            <Image
-              src={story.image}
-              alt={story.title}
+            <PermittedStoryImage
+              image={story.image}
+              imageSource={story.imageSource}
               fill
               priority
               className="object-cover"

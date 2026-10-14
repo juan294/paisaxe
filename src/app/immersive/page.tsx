@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
+import { StoryNavigationRecovery } from "@/components/immersive/story-toolbar";
+import styles from "./page.module.css";
 import { ImmersiveDataLoader } from "./immersive-data-loader";
 
 /**
@@ -9,8 +11,11 @@ import { ImmersiveDataLoader } from "./immersive-data-loader";
  */
 export default function ImmersivePage() {
   return (
-    <Suspense fallback={<StoryCardSkeleton />}>
-      <ImmersiveDataLoader />
-    </Suspense>
+    <div className={styles.page}>
+      <StoryNavigationRecovery className={styles.recovery} />
+      <Suspense fallback={<StoryCardSkeleton />}>
+        <ImmersiveDataLoader />
+      </Suspense>
+    </div>
   );
 }

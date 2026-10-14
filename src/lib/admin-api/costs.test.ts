@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   fetchCostsAnalytics,
@@ -35,7 +36,7 @@ describe("admin-api/costs", () => {
       const result = await fetchCostsAnalytics();
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/costs.test.ts:38 mock call tuple");
       expect(String(url)).toBe(`${ORIGIN}/api/admin/costs-analytics`);
       expect(result).toEqual({ data: mockData });
     });
@@ -45,7 +46,7 @@ describe("admin-api/costs", () => {
 
       await fetchCostsAnalytics("2026-01-01", "2026-01-31");
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/costs.test.ts:48 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("from")).toBe("2026-01-01");
       expect(parsedUrl.searchParams.get("to")).toBe("2026-01-31");
@@ -56,7 +57,7 @@ describe("admin-api/costs", () => {
 
       await fetchCostsAnalytics("2026-01-01", "2026-01-31", { includeUsage: true });
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/costs.test.ts:59 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("includeUsage")).toBe("true");
     });
@@ -66,7 +67,7 @@ describe("admin-api/costs", () => {
 
       await fetchCostsAnalytics();
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/costs.test.ts:69 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.has("from")).toBe(false);
       expect(parsedUrl.searchParams.has("to")).toBe(false);
@@ -126,7 +127,7 @@ describe("admin-api/costs", () => {
       await createManualCostEntry(costData as never);
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/costs.test.ts:129 mock call tuple");
       expect(String(url)).toBe("/api/admin/costs-analytics");
       expect(init.method).toBe("POST");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -188,7 +189,7 @@ describe("admin-api/costs", () => {
       await updateManualCostEntry("c1", { amount: 30 } as never);
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/costs.test.ts:191 mock call tuple");
       expect(String(url)).toBe("/api/admin/costs-analytics/c1");
       expect(init.method).toBe("PUT");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -250,7 +251,7 @@ describe("admin-api/costs", () => {
       await deleteManualCostEntry("c1");
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/costs.test.ts:253 mock call tuple");
       expect(String(url)).toBe("/api/admin/costs-analytics/c1");
       expect(init.method).toBe("DELETE");
     });
@@ -262,7 +263,7 @@ describe("admin-api/costs", () => {
 
       await deleteManualCostEntry("c1");
 
-      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/costs.test.ts:265 mock call tuple");
       expect(init.headers).toEqual({});
       expect(init.body).toBeUndefined();
     });

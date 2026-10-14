@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { initiateCall } from "./elevenlabs-call-service";
 import { logger } from "@/lib/logger";
@@ -116,7 +117,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
       conversationId: "conv_123",
     });
 
-    const [url, options] = mockFetch.mock.calls[0];
+    const [url, options] = requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:120 mock call tuple");
     expect(url).toBe(
       "https://api.us.elevenlabs.io/v1/convai/twilio/outbound-call"
     );
@@ -154,7 +155,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
       booking_id: "pending-row-abc-123",
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const body = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:157 mockFetch.mock.calls[0]")[1].body);
     expect(body.conversation_initiation_client_data.dynamic_variables.booking_id).toBe(
       "pending-row-abc-123"
     );
@@ -168,7 +169,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
 
     await initiateCall("+34985887797", baseRequest);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const body = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:171 mockFetch.mock.calls[0]")[1].body);
     expect(
       "booking_id" in body.conversation_initiation_client_data.dynamic_variables
     ).toBe(false);
@@ -185,7 +186,7 @@ describe("elevenlabs-call-service.initiateCall", () => {
       special_requests: undefined,
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const body = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:188 mockFetch.mock.calls[0]")[1].body);
     expect(
       body.conversation_initiation_client_data.dynamic_variables.special_requests
     ).toBe("ninguna");
@@ -264,4 +265,45 @@ describe("elevenlabs-call-service.initiateCall", () => {
     expect(result.success).toBe(false);
     expect(result.timedOut).toBeUndefined();
   });
+
+  it.each(["AbortError", "TimeoutError"])(
+    "preserves booking reconciliation and the next successful call after plain %s",
+    async (name) => {
+      mockFetch.mockRejectedValueOnce({ name }).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ conversation_id: "conv_recovered" }),
+      });
+      const request = { ...baseRequest, booking_id: "pending-reconciliation" };
+
+      const ambiguous = await initiateCall("+34985887797", request);
+      expect(ambiguous).toEqual({
+        success: false,
+        error: "ElevenLabs request timed out",
+        timedOut: true,
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/lib/services/elevenlabs-call-service.test.ts:284 mockFetch.mock.calls[0]")[1].body);
+      expect(body.conversation_initiation_client_data.dynamic_variables.booking_id).toBe(
+        request.booking_id
+      );
+
+      const recovered = await initiateCall("+34985887797", request);
+      expect(recovered.success).toBe(true);
+      expect(recovered.conversationId).toBe("conv_recovered");
+      expect(recovered.timedOut).toBeUndefined();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it.each([null, undefined, { name: "RPC_TIMEOUT" }])(
+    "does not mark an unrelated unknown rejection as an ambiguous booking timeout (%j)",
+    async (error) => {
+      mockFetch.mockRejectedValueOnce(error);
+      const result = await initiateCall("+34985887797", baseRequest);
+      expect(result).toEqual({
+        success: false,
+        error: "ElevenLabs request unavailable",
+      });
+    }
+  );
 });

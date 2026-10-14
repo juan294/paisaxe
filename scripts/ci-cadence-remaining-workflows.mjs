@@ -8,7 +8,7 @@ import { SOURCE_GUARD, SOURCE_SHELL, SOURCE_ENV } from './ci-cadence-source-guar
 
 const CATALOGUE = [
   { slug: 'e2e', sha256: '1f3cd010204ec27d8ac2d12f832dcd80613cbef0217a2b2ff7705993156e2218', jobs: ['e2e', 'visual-regression'] },
-  { slug: 'lighthouse', sha256: '7da4649d9eab412e5f580ba19fa5d92238db2ae32d2b2e9aa1197a78000c408b', jobs: ['lighthouse'] },
+  { slug: 'lighthouse', sha256: 'ca8684e5744a4c1ec8c5495f692a53bf7378c949e63c17256fcb25c15ac06c2d', jobs: ['lighthouse'] },
   { slug: 'security', sha256: '6059cf6f6d4ce610b63d5f96ce9c2125c3875dbc8c465cbaf34bcda0a9ea83a0', jobs: ['gitleaks', 'audit', 'vercel-env-safety'] },
 ];
 const BASELINE = 'tests/fixtures/ci-cadence-adapter/native/remaining-workflow-baselines.json';
@@ -25,6 +25,30 @@ const CHECKOUT = SOURCE_GUARD;
 // Schedule payloads need not carry sender; schedules run only from this repository's default branch.
 const trusted = "github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))";
 const digest = source => createHash('sha256').update(source).digest('hex');
+// The completed-source guard rejects any untracked or changed file, so the
+// scratch output of these canonical steps goes to $RUNNER_TEMP. Each rewrite
+// must match the canonical bytes exactly once; anything else is drift.
+const SCRATCH = {
+  'security/gitleaks': {
+    'Install Gitleaks': [['wget -q "', 'wget -q -P "$RUNNER_TEMP" "'], ['tar xzf "gitleaks_', 'tar -C "$RUNNER_TEMP" -xzf "$RUNNER_TEMP/gitleaks_'], ['chmod +x gitleaks', 'chmod +x "$RUNNER_TEMP/gitleaks"']],
+    'Run Gitleaks': [['./gitleaks detect', '"$RUNNER_TEMP/gitleaks" detect']],
+  },
+  'security/vercel-env-safety': {
+    'Assert legacy agent override is absent from Vercel env': [["jq -r '.envs[]?.key' > env-keys.txt", "jq -r '.envs[]?.key' > \"$RUNNER_TEMP/env-keys.txt\""], ['"$legacy_key" env-keys.txt', '"$legacy_key" "$RUNNER_TEMP/env-keys.txt"']],
+  },
+};
+// treosh/lighthouse-ci-action has no output directory input; it writes .lighthouseci here.
+const LIGHTHOUSE_SCRATCH = { name: 'Remove Lighthouse CI scratch output', run: 'rm -rf .lighthouseci' };
+function relocateScratch(slug, id, steps) {
+  for (const [name, rewrites] of Object.entries(SCRATCH[slug + '/' + id] ?? {})) {
+    const step = steps.find(item => item.name === name);
+    for (const [from, to] of rewrites) {
+      if (typeof step?.run !== 'string' || step.run.split(from).length !== 2) throw Error('Canonical scratch step changed: ' + name);
+      step.run = step.run.replace(from, to);
+    }
+  }
+  if (steps.some(step => step.uses === 'treosh/lighthouse-ci-action@v12')) steps.push(structuredClone(LIGHTHOUSE_SCRATCH));
+}
 function source(root, path) {
   const file = join(root, path), metadata = lstatSync(file);
   if (!metadata.isFile() || metadata.nlink !== 1 || realpathSync(file) !== file) throw Error('Unaliased regular source required: ' + path);
@@ -71,6 +95,7 @@ function workflow(definition, original) {
       if (step.uses?.startsWith('actions/upload-artifact@')) step.with.name = `\${{ inputs.invocation_id }}.artifact-${step.with.name}`;
       if (step.uses === 'treosh/lighthouse-ci-action@v12') step.with.artifactName = `\${{ inputs.invocation_id }}.artifact-${step.with.artifactName}`;
     }
+    relocateScratch(definition.slug, id, app.steps);
     app.steps.push({name:'Verify completed callable source checkout',run:CHECKOUT,shell:SOURCE_SHELL,env:{...SOURCE_ENV,SOURCE_SHA:'${{ inputs.source_sha }}'}});
     jobs[id] = app;
   }

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { StoriesTabPanel } from "./stories-tab-panel";
 import type { AdminStory } from "@/types/admin";
+import { selectStoryCatalog } from "@/lib/admin-story-catalog";
 
 // Mock matchMedia for next-themes
 beforeAll(() => {
@@ -210,7 +211,15 @@ const mockBulkUpdateStoryStatus = vi.fn();
 const mockBulkDeleteStories = vi.fn();
 const mockApproveAllPendingStories = vi.fn();
 vi.mock("@/lib/admin-api", () => ({
-  fetchStories: (...args: unknown[]) => mockFetchStories(...args),
+  // This network fixture holds the complete catalog. Exercise the real server
+  // selector so the component receives only the requested page, plus global
+  // statistics and the exact pending approval inventory.
+  fetchStories: async (options: Parameters<typeof selectStoryCatalog>[1]) => {
+    const result = await mockFetchStories(options);
+    return result.data
+      ? { ...result, data: selectStoryCatalog(result.data.stories, options) }
+      : result;
+  },
   bulkUpdateStoryStatus: (...args: unknown[]) =>
     mockBulkUpdateStoryStatus(...args),
   bulkDeleteStories: (...args: unknown[]) => mockBulkDeleteStories(...args),
@@ -324,8 +333,8 @@ describe("StoriesTabPanel", () => {
     }, 15000);
 
     it("renders Prev and Next buttons when total > pageSize", async () => {
-      const stories = Array.from({ length: 20 }, (_, i) =>
-        makeStory({ id: `story-${i}`, displayOrder: i + 1 })
+      const stories = Array.from({ length: 40 }, (_, i) =>
+        makeStory({ id: `story-${i}`, curationStatus: "needs_curation", displayOrder: i + 1 })
       );
       mockFetchStories.mockResolvedValue({ data: { stories, total: 40 } });
 
@@ -340,8 +349,8 @@ describe("StoriesTabPanel", () => {
     it("Prev button is disabled on first page", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
-          stories: Array.from({ length: 20 }, (_, i) =>
-            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          stories: Array.from({ length: 40 }, (_, i) =>
+            makeStory({ id: `s-${i}`, curationStatus: "needs_curation", displayOrder: i + 1 })
           ),
           total: 40,
         },
@@ -359,8 +368,8 @@ describe("StoriesTabPanel", () => {
       // total=25, pageSize=20 → page 2 has 5 stories, no next page
       mockFetchStories.mockResolvedValue({
         data: {
-          stories: Array.from({ length: 5 }, (_, i) =>
-            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          stories: Array.from({ length: 25 }, (_, i) =>
+            makeStory({ id: `s-${i}`, curationStatus: "needs_curation", displayOrder: i + 1 })
           ),
           total: 25,
         },
@@ -381,8 +390,8 @@ describe("StoriesTabPanel", () => {
     it("clicking Next advances to page 2 via router.push", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
-          stories: Array.from({ length: 20 }, (_, i) =>
-            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          stories: Array.from({ length: 40 }, (_, i) =>
+            makeStory({ id: `s-${i}`, curationStatus: "needs_curation", displayOrder: i + 1 })
           ),
           total: 40,
         },
@@ -413,8 +422,8 @@ describe("StoriesTabPanel", () => {
       );
       mockFetchStories.mockResolvedValue({
         data: {
-          stories: Array.from({ length: 20 }, (_, i) =>
-            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          stories: Array.from({ length: 40 }, (_, i) =>
+            makeStory({ id: `s-${i}`, curationStatus: "needs_curation", displayOrder: i + 1 })
           ),
           total: 40,
         },
@@ -439,8 +448,8 @@ describe("StoriesTabPanel", () => {
     it("clicking Prev decrements page via router.push", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
-          stories: Array.from({ length: 20 }, (_, i) =>
-            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          stories: Array.from({ length: 40 }, (_, i) =>
+            makeStory({ id: `s-${i}`, curationStatus: "needs_curation", displayOrder: i + 1 })
           ),
           total: 40,
         },
@@ -470,7 +479,7 @@ describe("StoriesTabPanel", () => {
       mockSearchParamsGet.mockImplementation((key: string) =>
         key === "storiesPage" ? "3" : null
       );
-      mockFetchStories.mockResolvedValue({ data: { stories: [], total: 60 } });
+      mockFetchStories.mockResolvedValue({ data: { stories: Array.from({ length: 60 }, (_, i) => makeStory({ id: `s-${i}`, curationStatus: "needs_curation" })), total: 60 } });
 
       render(<StoriesTabPanel />);
 
@@ -485,8 +494,8 @@ describe("StoriesTabPanel", () => {
     it("shows current page info when paginated", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
-          stories: Array.from({ length: 20 }, (_, i) =>
-            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          stories: Array.from({ length: 40 }, (_, i) =>
+            makeStory({ id: `s-${i}`, curationStatus: "needs_curation", displayOrder: i + 1 })
           ),
           total: 40,
         },
@@ -797,9 +806,8 @@ describe("StoriesTabPanel", () => {
       });
 
       await waitFor(() => {
-        // The 3 `mixed` stories are all missing translations and are kept;
-        // the fully-translated story is excluded via the `!hasMissingTranslations`
-        // early-return, so the grid shows only 3 (not 4).
+        // The server selector excludes the fully translated story before
+        // pagination. The panel renders only those three matching rows.
         expect(screen.getByTestId("story-grid")).toHaveTextContent("3 stories");
       });
     });
@@ -956,6 +964,7 @@ describe("StoriesTabPanel", () => {
 
       await renderAndSelect(["s1"]);
 
+      mockFetchStories.mockResolvedValue({ data: { stories: [stories[1]], total: 1 } });
       await act(async () => {
         fireEvent.click(screen.getByTestId("bulk-delete"));
       });
@@ -963,6 +972,9 @@ describe("StoriesTabPanel", () => {
       await waitFor(() => {
         expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("delete 1 story"));
         expect(mockBulkDeleteStories).toHaveBeenCalledWith(["s1"]);
+        expect(screen.queryByTestId("story-edit-s1")).not.toBeInTheDocument();
+        expect(screen.getByTestId("story-edit-s2")).toBeInTheDocument();
+        expect(screen.getByTestId("stat-card-total")).toHaveTextContent("Total: 1");
       });
       confirmSpy.mockRestore();
     });
@@ -1040,13 +1052,17 @@ describe("StoriesTabPanel", () => {
       });
     });
 
-    it("bulk mark approved only updates the selected story, leaving others unchanged (line 201 false path)", async () => {
+    it("bulk mark approved refreshes rows from the server while retaining unselected stories", async () => {
       mockBulkUpdateStoryStatus.mockResolvedValue({
         data: { updatedIds: ["s1"], status: "approved" },
       });
 
       await renderAndSelect(["s1"]);
 
+      mockFetchStories.mockResolvedValue({ data: { stories: [
+        ...stories,
+        makeStory({ id: "server-added", curationStatus: "approved" }),
+      ], total: 3 } });
       await act(async () => {
         fireEvent.click(screen.getByTestId("bulk-approve"));
       });
@@ -1055,18 +1071,21 @@ describe("StoriesTabPanel", () => {
         expect(screen.queryByTestId("selection-toolbar")).not.toBeInTheDocument();
       });
 
-      // s2 was never selected, so it must still render (map's ternary false
-      // path — story object passed through unchanged).
       expect(screen.getByTestId("story-edit-s2")).toBeInTheDocument();
+      expect(screen.getByTestId("story-edit-server-added")).toBeInTheDocument();
+      expect(screen.getByTestId("stat-card-total")).toHaveTextContent("Total: 3");
     });
 
-    it("bulk mark pending only updates the selected story, leaving others unchanged (line 224-226 false path)", async () => {
+    it("bulk mark pending refreshes global counts and retains unselected stories", async () => {
       mockBulkUpdateStoryStatus.mockResolvedValue({
         data: { updatedIds: ["s1"], status: "needs_curation" },
       });
 
       await renderAndSelect(["s1"]);
 
+      mockFetchStories.mockResolvedValue({ data: { stories: [
+        { ...stories[0], curationStatus: "needs_curation" }, stories[1],
+      ], total: 2 } });
       await act(async () => {
         fireEvent.click(screen.getByTestId("bulk-pending"));
       });
@@ -1075,9 +1094,9 @@ describe("StoriesTabPanel", () => {
         expect(screen.queryByTestId("selection-toolbar")).not.toBeInTheDocument();
       });
 
-      // s2 was never selected, so the ternary's false branch (return story
-      // unchanged) must have executed for it.
       expect(screen.getByTestId("story-edit-s2")).toBeInTheDocument();
+      expect(screen.getByTestId("stat-card-pending")).toHaveTextContent("Pending: 1");
+      expect(screen.getByTestId("stat-card-approved")).toHaveTextContent("Approved: 1");
     });
 
     it("bulk mark approved is a no-op when nothing is selected (line 191)", async () => {
@@ -1178,6 +1197,22 @@ describe("StoriesTabPanel", () => {
       });
     });
 
+    it("shows global pending counts and confirms IDs beyond the visible page", async () => {
+      const pending = Array.from({ length: 25 }, (_, i) => makeStory({ id: `pending-${i}`, curationStatus: "needs_curation" }));
+      mockFetchStories.mockResolvedValue({ data: { stories: [...pending, makeStory({ id: "already" })], total: 26 } });
+      render(<StoriesTabPanel />);
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toHaveTextContent("20 stories");
+        expect(screen.getByTestId("stat-card-total")).toHaveTextContent("Total: 26");
+      });
+      expect(screen.queryByTestId("story-edit-pending-24")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Approve All (25)" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("Se aprobarán 25 historias pendientes de todo el catálogo, incluidas las que no aparecen en esta página o búsqueda. Las historias añadidas después de abrir esta confirmación quedan fuera.")).toBeInTheDocument();
+      await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Approve All" })); });
+      expect(mockApproveAllPendingStories).toHaveBeenCalledWith(pending.map(story => story.id));
+    });
+
     it("Cancel closes the approve-all confirm dialog", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
@@ -1229,7 +1264,7 @@ describe("StoriesTabPanel", () => {
       });
 
       await waitFor(() => {
-        expect(mockApproveAllPendingStories).toHaveBeenCalled();
+        expect(mockApproveAllPendingStories).toHaveBeenCalledWith(["p"]);
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       });
     });
@@ -1261,7 +1296,7 @@ describe("StoriesTabPanel", () => {
       });
     });
 
-    it("Approve All only flips needs_curation stories, leaving already-approved ones untouched (lines 249-253)", async () => {
+    it("Approve All refreshes the catalog and global counts from the server", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
           stories: [
@@ -1287,6 +1322,11 @@ describe("StoriesTabPanel", () => {
 
       const dialog = await screen.findByRole("dialog");
       const confirmBtn = within(dialog).getByRole("button", { name: /Approve All/i });
+      mockFetchStories.mockResolvedValue({ data: { stories: [
+        makeStory({ id: "p1", curationStatus: "approved" }),
+        makeStory({ id: "p2", curationStatus: "approved" }),
+        makeStory({ id: "already", curationStatus: "approved" }),
+      ], total: 3 } });
       await act(async () => {
         fireEvent.click(confirmBtn);
       });
@@ -1295,9 +1335,11 @@ describe("StoriesTabPanel", () => {
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       });
 
-      // Switch to "Approved" filter — now all 3 stories should be approved:
-      // the 2 flipped ones (ternary true path) plus the 1 already-approved
-      // one that passed through the map untouched (ternary false path).
+      expect(mockApproveAllPendingStories).toHaveBeenCalledWith(["p1", "p2"]);
+      expect(screen.getByTestId("stat-card-pending")).toHaveTextContent("Pending: 0");
+      expect(screen.getByRole("status")).toHaveTextContent("Se han aprobado 2 historias.");
+      // The refreshed server response, rather than a client-side status map,
+      // determines the approved rows and the global counts.
       await act(async () => {
         fireEvent.click(screen.getByTestId("stat-card-approved"));
       });
@@ -1307,7 +1349,7 @@ describe("StoriesTabPanel", () => {
       });
     });
 
-    it("pluralizes the confirm dialog copy when more than one story is pending (line 468)", async () => {
+    it("discloses the exact global pending snapshot in the confirmation", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
           stories: [
@@ -1327,7 +1369,7 @@ describe("StoriesTabPanel", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/This will approve 2 pending stories\./)
+          screen.getByText("Se aprobarán 2 historias pendientes de todo el catálogo, incluidas las que no aparecen en esta página o búsqueda. Las historias añadidas después de abrir esta confirmación quedan fuera.")
         ).toBeInTheDocument();
       });
     });
@@ -1434,10 +1476,8 @@ describe("StoriesTabPanel", () => {
       });
 
       await waitFor(() => {
-        expect(mockRouterPush).toHaveBeenCalledWith(
-          expect.stringContaining("storiesPage=1"),
-          expect.anything()
-        );
+        expect(mockFetchStories).toHaveBeenLastCalledWith({ page: 1, pageSize: 20, filter: "needs_curation", search: "" });
+        expect(mockFetchStories.mock.calls.length).toBeGreaterThan(1);
       });
     });
   });
@@ -1464,7 +1504,7 @@ describe("StoriesTabPanel", () => {
       });
     });
 
-    it("shows 'No stories match this filter' when stories exist but filter rejects them", async () => {
+    it("shows the empty state when the server returns no matching stories", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
           stories: [makeStory({ id: "x", curationStatus: "approved" })],
@@ -1477,7 +1517,7 @@ describe("StoriesTabPanel", () => {
       // Default filter is "needs_curation"; approved story will be filtered out.
       await waitFor(() => {
         expect(
-          screen.getByText("No stories match this filter")
+          screen.getByText("No stories found")
         ).toBeInTheDocument();
       });
     });
@@ -1515,8 +1555,8 @@ describe("StoriesTabPanel", () => {
     it("Next from last page is a no-op (clamped)", async () => {
       mockFetchStories.mockResolvedValue({
         data: {
-          stories: Array.from({ length: 5 }, (_, i) =>
-            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          stories: Array.from({ length: 25 }, (_, i) =>
+            makeStory({ id: `s-${i}`, curationStatus: "needs_curation", displayOrder: i + 1 })
           ),
           total: 25,
         },

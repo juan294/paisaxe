@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 // Mock dependencies
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 vi.mock("@/lib/costs", () => ({
   getManualCost: vi.fn(),
@@ -314,3 +315,6 @@ describe("DELETE /api/admin/costs-analytics/[id]", () => {
     expect(data.error).toBe("Failed to delete cost entry");
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

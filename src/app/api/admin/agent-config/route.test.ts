@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -16,9 +17,10 @@ const { mockReadFile, mockWriteFile } = vi.hoisted(() => ({
 }));
 
 // Mock dependencies before importing the route
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn());
+});
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
@@ -214,7 +216,7 @@ describe("PUT /api/admin/agent-config", () => {
     expect(mockWriteFile).toHaveBeenCalledOnce();
     // Verify the written config has master_enabled=true
     const writtenConfig = JSON.parse(
-      mockWriteFile.mock.calls[0][1] as string,
+      requiredValue(mockWriteFile.mock.calls[0], "src/app/api/admin/agent-config/route.test.ts:218 mockWriteFile.mock.calls[0]")[1] as string,
     );
     expect(writtenConfig.master_enabled).toBe(true);
   });
@@ -413,3 +415,6 @@ describe("PUT /api/admin/agent-config", () => {
     expect(logger.error).toHaveBeenCalled();
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

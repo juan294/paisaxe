@@ -80,7 +80,7 @@ function checkSentry(): SentryProbeResult {
 }
 
 /**
- * DO-H2 (#823): actively probe Redis instead of reading `_rateLimitDegraded`,
+ * DO-H2 (#823): actively probe Redis instead of reading per-process state,
  * module-level state set only inside the process that experienced an Upstash
  * failure. Vercel routes are separate isolates, so this endpoint could never
  * observe a flag set by `/api/chat/stream` — meaning a total Upstash outage

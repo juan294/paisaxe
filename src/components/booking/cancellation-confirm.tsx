@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { dateTime, money } from "@/lib/booking-format";
@@ -78,23 +80,23 @@ export function CancellationConfirm({ capability, terms: initialTerms, onCancell
 
   return (
     <div className="space-y-2" aria-live="polite">
-      {state === "termsChanged" && <p className="text-amber-200">{t("booking.cancel.termsChanged").replace("{amount}", amount)}</p>}
+      {state === "termsChanged" && <p className="text-amber-200">{interpolate(t("booking.cancel.termsChanged"), { amount: amount })}</p>}
       {terms.refundCents > 0 ? (
         <>
-          <p>{t("booking.cancel.refund").replace("{amount}", amount)}</p>
+          <p>{interpolate(t("booking.cancel.refund"), { amount: amount })}</p>
           {terms.termsValidUntil && (
-            <p className="text-white/60">{t("booking.cancel.refundUntil").replace("{when}", dateTime(terms.termsValidUntil, locale))}</p>
+            <p className="text-white/70">{interpolate(t("booking.cancel.refundUntil"), { when: dateTime(terms.termsValidUntil, locale) })}</p>
           )}
         </>
       ) : (
-        <p>{t("booking.cancel.noRefund").replace("{hours}", String(terms.cancellationWindowHours))}</p>
+        <p>{interpolate(t("booking.cancel.noRefund"), { hours: String(terms.cancellationWindowHours) })}</p>
       )}
       {state !== "unavailable" && (
-        <Button type="button" variant="destructive" className="w-full" disabled={state === "confirming"} onClick={() => void confirm()}>
+        <Button type="button" variant="glassDestructive" className="w-full" disabled={state === "confirming"} onClick={() => void confirm()}>
           {state === "confirming"
             ? t("booking.cancel.confirming")
             : terms.refundCents > 0
-              ? t("booking.cancel.confirmRefund").replace("{amount}", amount)
+              ? interpolate(t("booking.cancel.confirmRefund"), { amount: amount })
               : t("booking.cancel.confirmNoRefund")}
         </Button>
       )}

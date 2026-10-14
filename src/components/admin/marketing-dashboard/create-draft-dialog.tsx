@@ -64,12 +64,12 @@ export function CreateDraftDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-md border-[#e5e3de] bg-white dark:border-[#3d3a36] dark:bg-[#252320]">
+      <DialogContent className="max-w-md border-admin-line bg-white dark:border-admin-depth dark:bg-admin-panel">
         <DialogHeader>
-          <DialogTitle className="text-[#2d2a26] dark:text-[#f5f3ee]">
+          <DialogTitle className="text-admin-ink dark:text-admin-paper">
             Create Draft
           </DialogTitle>
-          <DialogDescription className="font-mono text-xs text-[#6b6560]">
+          <DialogDescription className="font-mono text-xs text-admin-muted">
             Create a new content draft for manual posting
           </DialogDescription>
         </DialogHeader>
@@ -77,7 +77,7 @@ export function CreateDraftDialog({
         <div className="mt-4 space-y-4">
           {/* Platform selector */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Platform
             </label>
             <div className="flex gap-2">
@@ -88,8 +88,8 @@ export function CreateDraftDialog({
                   className={cn(
                     "flex h-10 w-10 items-center justify-center border font-mono text-xs font-medium transition-colors",
                     platform === p
-                      ? "border-[#2d2a26] text-[#2d2a26] dark:border-[#f5f3ee] dark:text-[#f5f3ee]"
-                      : "border-[#e5e3de] text-[#a39e98] hover:border-[#a39e98] dark:border-[#4d4944]"
+                      ? "border-admin-ink text-admin-ink dark:border-admin-paper dark:text-admin-paper"
+                      : "border-admin-line text-admin-subtle hover:border-admin-subtle dark:border-admin-secondary"
                   )}
                 >
                   {PLATFORM_BADGES[p]}
@@ -100,7 +100,7 @@ export function CreateDraftDialog({
 
           {/* Content */}
           <div>
-            <label htmlFor="draft-content" className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <label htmlFor="draft-content" className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Content
               <span className={cn(
                 "normal-case",
@@ -115,7 +115,7 @@ export function CreateDraftDialog({
               onChange={(e) => setContent(e.target.value)}
               placeholder={`Write your ${PLATFORM_NAMES[platform]} post...`}
               rows={5}
-              className="w-full resize-none border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus-visible:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+              className="w-full resize-none border border-admin-line bg-transparent px-3 py-2 text-sm text-admin-ink placeholder-admin-subtle outline-none transition-colors focus-visible:border-admin-subtle dark:border-admin-secondary dark:text-admin-paper"
             />
           </div>
 
@@ -128,18 +128,18 @@ export function CreateDraftDialog({
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-3 border-t border-[#e5e3de] pt-4 dark:border-[#3d3a36]">
+          <div className="flex items-center gap-3 border-t border-admin-line pt-4 dark:border-admin-depth">
             <Button
               variant="ghost"
               onClick={onClose}
-              className="flex-1 font-mono text-xs uppercase tracking-widest text-[#a39e98] hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
+              className="flex-1 font-mono text-xs uppercase tracking-widest text-admin-subtle hover:text-admin-ink dark:hover:text-admin-paper"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving || content.length > maxLength}
-              className="flex-1 bg-[#2d2a26] font-mono text-xs uppercase tracking-widest text-white hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+              className="flex-1 bg-admin-ink font-mono text-xs uppercase tracking-widest text-white hover:bg-admin-depth dark:bg-admin-paper dark:text-admin-ink dark:hover:bg-admin-line"
             >
               {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Save Draft"}
             </Button>

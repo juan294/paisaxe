@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { SERVICE_TIERS } from "./service-tiers";
 import { PLATFORM_SERVICES } from "@/types/costs-analytics";
@@ -60,7 +61,7 @@ describe("SERVICE_TIERS config", () => {
     expect(el).toBeDefined();
     expect(el!.currentTierName).toBe("Creator");
     expect(el!.currentMonthlyCostUsd).toBe(22.18);
-    expect(el!.limits[0].monthlyLimit).toBe(100);
+    expect(requiredValue(el!.limits[0], "src/config/service-tiers.test.ts:63 el!.limits[0]").monthlyLimit).toBe(100);
   });
 
   it("should include Vercel tier", () => {
@@ -72,7 +73,7 @@ describe("SERVICE_TIERS config", () => {
   it("should include PostHog tier", () => {
     const ph = SERVICE_TIERS.find((t) => t.serviceId === "posthog");
     expect(ph).toBeDefined();
-    expect(ph!.limits[0].monthlyLimit).toBe(1000000);
+    expect(requiredValue(ph!.limits[0], "src/config/service-tiers.test.ts:75 ph!.limits[0]").monthlyLimit).toBe(1000000);
   });
 
   it("should include Supabase tier", () => {

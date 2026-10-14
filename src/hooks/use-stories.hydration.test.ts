@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { stubStoriesApiFetch } from "@/test/mock-stories-api-fetch";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 // FE-H1 (#759): use-stories.ts now fetches through /api/stories instead of
 // calling getStoriesFromDB directly. See use-stories.test.ts for the full
@@ -96,6 +97,8 @@ const serverStories = [
 const cachedStoriesFromStorage = cachedStories.map((story) => ({
   ...story,
   sourcePdf: "",
+  image: NEUTRAL_IMAGE,
+  imageSource: NEUTRAL_CREDIT,
 }));
 
 const fallbackStory = {

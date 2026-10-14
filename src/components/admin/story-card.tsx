@@ -1,42 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { ImageIcon, Pencil, Check } from "lucide-react";
+import { ImageIcon, Pencil } from "lucide-react";
 import type { AdminStory } from "@/types/admin";
 import { CATEGORY_LABELS } from "@/types/immersive";
-import type { StoryMetadata, TranslationStatus } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
-import { TRANSLATION_LOCALES } from "@/lib/translation-locales";
-
-/**
- * Check if a story is missing any translations.
- */
-function hasMissingTranslations(story: AdminStory): boolean {
-  const metadata = story.metadata as StoryMetadata | undefined;
-  if (!metadata) return true;
-
-  const translations = metadata.translations || {};
-  const status = metadata.translation_status || {};
-
-  for (const locale of TRANSLATION_LOCALES) {
-    const translation = translations[locale];
-    const localeStatus = status[locale] as TranslationStatus | undefined;
-
-    // Missing if no translation content or status is not complete
-    const hasContent = translation && (
-      translation.title?.trim() ||
-      translation.subtitle?.trim() ||
-      translation.description?.trim()
-    );
-
-    if (!hasContent || localeStatus?.status !== "complete") {
-      return true;
-    }
-  }
-
-  return false;
-}
+import { hasMissingTranslations } from "@/lib/admin-formatters";
+import { StorySelectionCheckbox } from "./story-card/selection-checkbox";
 
 interface StoryCardProps {
   story: AdminStory;
@@ -77,14 +48,14 @@ export function StoryCard({
     <button
       onClick={handleClick}
       className={cn(
-        "group relative w-full overflow-hidden rounded-2xl bg-white text-left transition-all hover:shadow-lg dark:bg-[#252320]",
+        "group relative w-full overflow-hidden rounded-2xl bg-white text-left transition-all hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-approve focus-visible:ring-offset-2 dark:bg-admin-panel",
         span === 2 && "sm:col-span-2",
-        isSelected && "ring-2 ring-[#5a7a5a] ring-offset-2 ring-offset-[#f5f3ee] dark:ring-offset-[#1a1917]"
+        isSelected && "ring-2 ring-admin-approve ring-offset-2 ring-offset-admin-paper dark:ring-offset-admin-canvas-dark"
       )}
     >
       {/* Image Container */}
       <div className={cn(
-        "relative w-full overflow-hidden bg-[#f5f3ee] dark:bg-[#2d2a26]",
+        "relative w-full overflow-hidden bg-admin-paper dark:bg-admin-ink",
         span === 2 ? "aspect-[21/9]" : "aspect-[4/3]"
       )}>
         {story.image ? (
@@ -100,45 +71,25 @@ export function StoryCard({
               }
             />
 
-            {/* Gradient overlay - appears on hover */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#2d2a26]/80 via-[#2d2a26]/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            {/* Reveal readable content for hover, keyboard focus and touch. */}
+            <div className="absolute inset-0 bg-gradient-to-t from-admin-ink/80 via-admin-ink/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100" />
 
             {/* Selection checkbox - top left */}
             {onToggleSelect && (
-              <div
-                role="checkbox"
-                aria-checked={isSelected}
-                tabIndex={0}
-                onClick={handleCheckboxClick}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleCheckboxClick(e as unknown as React.MouseEvent);
-                  }
-                }}
-                className={cn(
-                  "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all",
-                  isSelected
-                    ? "border-[#5a7a5a] bg-[#5a7a5a]"
-                    : "border-white/80 bg-white/20 opacity-0 backdrop-blur-sm group-hover:opacity-100",
-                  selectionMode && !isSelected && "opacity-100"
-                )}
-              >
-                {isSelected && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
-              </div>
+              <StorySelectionCheckbox storyTitle={story.title} isSelected={isSelected} selectionMode={selectionMode} onClick={handleCheckboxClick} hasImage={true} />
             )}
 
-            {/* Content overlay - appears on hover */}
-            <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 transition-all duration-300 group-hover:opacity-100">
-              <div className="translate-y-2 transform transition-transform duration-300 group-hover:translate-y-0">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-[#f5f3ee]/70">
+            {/* Content overlay follows the same access modes as the gradient. */}
+            <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 transition-all duration-300 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+              <div className="translate-y-2 transform transition-transform duration-300 group-hover:translate-y-0 group-focus-within:translate-y-0 pointer-coarse:translate-y-0">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-admin-paper/70">
                   {CATEGORY_LABELS[story.category]}
                 </p>
-                <h3 className="mt-1 text-sm font-semibold text-[#f5f3ee]">
+                <h3 className="mt-1 text-sm font-semibold text-admin-paper">
                   {story.title}
                 </h3>
                 {story.subtitle && (
-                  <p className="mt-0.5 line-clamp-1 text-xs text-[#f5f3ee]/80">
+                  <p className="mt-0.5 line-clamp-1 text-xs text-admin-paper/80">
                     {story.subtitle}
                   </p>
                 )}
@@ -149,7 +100,7 @@ export function StoryCard({
             <div className="absolute right-3 top-3 flex items-center gap-1.5">
               {/* Pending badge */}
               {needsCuration && (
-                <span className="rounded-full bg-[#c9a55c] px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white shadow-lg">
+                <span className="rounded-full bg-admin-warning px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white shadow-lg">
                   Pending
                 </span>
               )}
@@ -174,9 +125,9 @@ export function StoryCard({
                 </span>
               )}
 
-              {/* Edit button - appears on hover */}
-              <div className="flex h-7 w-7 scale-90 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 group-hover:scale-100 group-hover:opacity-100 dark:bg-[#252320]/90">
-                <Pencil className="h-3 w-3 text-[#2d2a26] dark:text-[#f5f3ee]" />
+              {/* Visual edit affordance for the parent card button. */}
+              <div className="flex h-7 w-7 scale-90 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100 pointer-coarse:scale-100 pointer-coarse:opacity-100 dark:bg-admin-panel/90">
+                <Pencil className="h-3 w-3 text-admin-ink dark:text-admin-paper" />
               </div>
             </div>
           </>
@@ -185,42 +136,22 @@ export function StoryCard({
           <div className="relative flex h-full flex-col items-center justify-center gap-3">
             {/* Selection checkbox - top left */}
             {onToggleSelect && (
-              <div
-                role="checkbox"
-                aria-checked={isSelected}
-                tabIndex={0}
-                onClick={handleCheckboxClick}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleCheckboxClick(e as unknown as React.MouseEvent);
-                  }
-                }}
-                className={cn(
-                  "absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-2 transition-all",
-                  isSelected
-                    ? "border-[#5a7a5a] bg-[#5a7a5a]"
-                    : "border-[#a39e98]/50 bg-white/50 opacity-0 group-hover:opacity-100 dark:bg-[#2d2a26]/50",
-                  selectionMode && !isSelected && "opacity-100"
-                )}
-              >
-                {isSelected && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
-              </div>
+              <StorySelectionCheckbox storyTitle={story.title} isSelected={isSelected} selectionMode={selectionMode} onClick={handleCheckboxClick} hasImage={false} />
             )}
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white dark:bg-[#2d2a26]">
-              <ImageIcon className="h-6 w-6 text-[#a39e98]" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white dark:bg-admin-ink">
+              <ImageIcon className="h-6 w-6 text-admin-subtle" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+              <p className="text-sm font-medium text-admin-ink dark:text-admin-paper">
                 {story.title}
               </p>
-              <p className="mt-0.5 text-xs text-[#6b6560] dark:text-[#a39e98]">
+              <p className="mt-0.5 text-xs text-admin-muted dark:text-admin-subtle">
                 No image · Click to add
               </p>
             </div>
             <div className="flex items-center gap-1.5">
               {needsCuration && (
-                <span className="rounded-full bg-[#c9a55c] px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white">
+                <span className="rounded-full bg-admin-warning px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white">
                   Pending
                 </span>
               )}

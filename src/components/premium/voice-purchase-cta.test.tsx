@@ -216,14 +216,14 @@ describe("VoicePurchaseCTA", () => {
     it("uses green palette on the full CTA button (not amber/yellow)", () => {
       render(<VoicePurchaseCTA />);
       const button = screen.getByRole("button", { name: /Get Day Pass/ });
-      expect(button.className).toMatch(/from-green-/);
+      expect(button.className).toMatch(/from-paisaxe-green-/);
       expect(button.className).not.toMatch(/amber-|yellow-/);
     });
 
     it("uses green palette on the compact CTA button (not amber/yellow)", () => {
       render(<VoicePurchaseCTA compact />);
       const button = screen.getByRole("button", { name: /Get Day Pass/ });
-      expect(button.className).toMatch(/from-green-/);
+      expect(button.className).toMatch(/from-paisaxe-green-/);
       expect(button.className).not.toMatch(/amber-|yellow-/);
     });
 

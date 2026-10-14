@@ -94,6 +94,7 @@ test.beforeAll(async ({ request, baseURL }) => {
   const [quote] = cards(turn.events, "quote");
   expect(quote?.quoteId, "the replayed get_quote must return a quote card").toEqual(expect.any(String));
 
+  if (!quote) throw new Error("The replayed get_quote returned no quote card");
   const accepted = await request.post(`/api/booking/quotes/${quote.quoteId as string}/accept`, { headers: authed(owner, baseURL!) });
   expect(accepted.status()).toBe(200);
   const card = (await accepted.json()).card as { bookingId: string; link: string };
@@ -117,6 +118,7 @@ test("@release-required @local-docker booking-access-boundary: capability withou
     expect(await opened.json()).toMatchObject({ status: "pending_payment", reference: expect.any(String) });
 
     const [id, token] = ownerBooking.capability.split(".");
+    if (!id || !token) throw new Error("Booking capability must contain an id and token");
     const forged = `${id}.${token.startsWith("A") ? "B" : "A"}${token.slice(1)}`;
     expect((await anonymous.get(`/api/booking/bookings/${forged}`)).status(), "a wrong token for the same booking").toBe(404);
   } finally {

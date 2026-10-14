@@ -11,5 +11,5 @@ export const LOCALE_COVERAGE: Partial<Record<Locale, number>> = {
   "fr": 99,
   "de": 99,
   "pt": 89,
-  "ast": 81
+  "ast": 82
 };

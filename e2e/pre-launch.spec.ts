@@ -1,3 +1,4 @@
+import { mockFeatureFlagsAfterSsr } from "./fixtures/mock-feature-flags";
 import { test, expect } from "./fixtures/base-test";
 import type { APIRequestContext } from "@playwright/test";
 import {
@@ -239,16 +240,14 @@ test.describe("Chat messageIndex", () => {
 
 test.describe("Feature flag gating", () => {
   test("suggest button hidden when flag off", async ({ page }) => {
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_FEATURE_FLAGS),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ user_story_suggestions: true }));
 
     await page.goto("/immersive");
+    await settleFlags();
     await expect(page.locator("h1").first()).toBeVisible();
+    // On mobile the enabled control is CSS-hidden, but it must be mounted.
+    await expect(page.locator("[data-suggest-place-trigger]")).toHaveCount(1);
+    await settleFlags(MOCK_FEATURE_FLAGS);
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
@@ -259,17 +258,10 @@ test.describe("Feature flag gating", () => {
     // Suggest button uses hidden md:block — skip on mobile
     const viewport = page.viewportSize();
     if (viewport && viewport.width < 768) testInfo.skip(true, "Suggest button uses hidden md:block — not visible on mobile");
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          withFeatureFlags({ user_story_suggestions: true })
-        ),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ user_story_suggestions: true }));
 
     await page.goto("/immersive");
+    await settleFlags();
     await expect(page.locator("h1").first()).toBeVisible();
 
     await expect(
@@ -278,16 +270,13 @@ test.describe("Feature flag gating", () => {
   });
 
   test("fullscreen button hidden when flag off", async ({ page }) => {
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_FEATURE_FLAGS),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ fullscreen_button: true }));
 
     await page.goto("/immersive");
+    await settleFlags();
     await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /fullscreen|pantalla completa|plein|ecrã/i })).toBeVisible();
+    await settleFlags(MOCK_FEATURE_FLAGS);
 
     // Fullscreen button has translated aria-label (Fullscreen, Pantalla completa, etc.)
     await expect(
@@ -296,17 +285,10 @@ test.describe("Feature flag gating", () => {
   });
 
   test("fullscreen button visible when flag on", async ({ page }) => {
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          withFeatureFlags({ fullscreen_button: true })
-        ),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ fullscreen_button: true }));
 
     await page.goto("/immersive");
+    await settleFlags();
     await expect(page.locator("h1").first()).toBeVisible();
 
     // The FullscreenButton renders conditionally after a useEffect checks

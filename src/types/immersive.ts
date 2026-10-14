@@ -1,3 +1,5 @@
+import { resolvePermittedImage } from "@/lib/image-provenance";
+
 /**
  * Types for immersive story viewing experience.
  *
@@ -272,9 +274,7 @@ export function rowToStory(row: StoryRow): Story {
     title: row.title,
     subtitle: row.subtitle || "",
     description: row.description || "",
-    image: row.image_path || "",
-    imageSource: row.image_source || undefined,
-    blurDataUrl: row.blur_data_url || undefined,
+    ...resolvePermittedImage(row.image_path, row.image_source, row.blur_data_url),
     category: row.category as StoryCategory,
     sourcePdf: row.source_pdf || "",
     location: row.location ? (row.location as StoryLocation) : undefined,
@@ -296,9 +296,7 @@ export function rowToPublicStory(row: PublicStoryRow): Story {
     title: row.title,
     subtitle: row.subtitle || "",
     description: row.description || "",
-    image: row.image_path || "",
-    imageSource: row.image_source || undefined,
-    blurDataUrl: row.blur_data_url || undefined,
+    ...resolvePermittedImage(row.image_path, row.image_source, row.blur_data_url),
     category: row.category as StoryCategory,
     location: row.location ? (row.location as StoryLocation) : undefined,
     duration: row.duration ? (row.duration as StoryDuration) : undefined,
@@ -318,9 +316,7 @@ export function toPublicStory(story: Story): PublicStory {
     title: story.title,
     subtitle: story.subtitle,
     description: story.description,
-    image: story.image,
-    imageSource: story.imageSource,
-    blurDataUrl: story.blurDataUrl,
+    ...resolvePermittedImage(story.image, story.imageSource, story.blurDataUrl),
     category: story.category,
     location: story.location,
     duration: story.duration,
@@ -340,9 +336,7 @@ export function publicStoryToStory(story: PublicStory): Story {
     title: story.title,
     subtitle: story.subtitle,
     description: story.description,
-    image: story.image,
-    imageSource: story.imageSource,
-    blurDataUrl: story.blurDataUrl,
+    ...resolvePermittedImage(story.image, story.imageSource, story.blurDataUrl),
     category: story.category,
     sourcePdf: "",
     location: story.location,

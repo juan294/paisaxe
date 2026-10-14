@@ -1,8 +1,14 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { useState, useEffect, useCallback, useRef, useMemo, RefObject } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { PermittedStoryImage } from "@/components/permitted-story-image";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE, resolvePermittedImage } from "@/lib/image-provenance";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
@@ -49,7 +55,7 @@ const SuggestPlaceDialog = dynamic(
   { ssr: false, loading: () => null }
 );
 import { useTranslation } from "@/lib/i18n";
-import { getLocalizedStory } from "@/lib/localize-story";
+import { getLocalizedStory, hasTranslation } from "@/lib/localize-story";
 import { NavigationHint } from "./navigation-hint";
 import { AuthorTypewriter } from "./author-typewriter";
 import { StoryProgressBar } from "./story-progress-bar";
@@ -102,6 +108,7 @@ export function StoryViewer({
 }: StoryViewerProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
+  const [failedHero, setFailedHero] = useState<string>();
   const [autoPlay, setAutoPlay] = useState(false);
   const [ambientMode, setAmbientMode] = useState(false);
   // #328: lifted suggest-dialog state — avoids DOM coupling in overflow menu
@@ -110,12 +117,14 @@ export function StoryViewer({
   const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
 
-  const { requiresAuth, isFavorite, toggleFavorite } = useFavorites();
+  const { requiresAuth, isFavorite, toggleFavorite, retryAfter, retry } = useFavorites();
 
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const story = stories[currentIndex];
+  const heroIdentity = story ? `${story.image}\0${story.imageSource ?? ""}` : "";
+  const effectiveStory = useMemo(() => story ? { ...story, ...(failedHero === heroIdentity ? { image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT, blurDataUrl: undefined } : resolvePermittedImage(story.image, story.imageSource, story.blurDataUrl)) } : undefined, [story, heroIdentity, failedHero]);
   const ambientStartRef = useRef<number | null>(null);
   // FE-M1: Single ref to track the pending transition timer so rapid navigation
   // cancels any in-flight timer before setting a new one, preventing stacking.
@@ -228,14 +237,16 @@ export function StoryViewer({
     const prevIndex = currentIndex > 0 ? currentIndex - 1 : len - 1;
     const urls = new Set<string>();
     for (const idx of [nextIndex, prevIndex]) {
-      const img = stories[idx]?.image;
-      if (img && idx !== currentIndex) urls.add(img);
+      const adjacent = stories[idx];
+      if (!adjacent?.image || idx === currentIndex) continue;
+      const img = resolvePermittedImage(adjacent.image, adjacent.imageSource).image;
+      if (img !== effectiveStory?.image) urls.add(img);
     }
     return Array.from(urls);
-  }, [stories, currentIndex]);
+  }, [stories, currentIndex, effectiveStory?.image]);
 
   // Asturianu labels
-  const ast = isEnabled("asturianu_touches");
+  const ast = isEnabled("asturianu_touches") && locale === 'ast';
 
   // Get localized story text based on current locale (falls back to Spanish).
   // FE-M2 (#764): useMemo so this object keeps its identity across renders that
@@ -252,7 +263,7 @@ export function StoryViewer({
   // the same order (React rules-of-hooks).
   const handleFavoritesNav = useCallback(() => router.push("/favorites"), [router]);
 
-  if (!story || !localizedStory) return null;
+  if (!story || !localizedStory || !effectiveStory) return null;
 
   // Question prompts from metadata.
   // UX-H6 (#892): resolve the translated prompts for the active locale,
@@ -264,7 +275,7 @@ export function StoryViewer({
 
   return (
     <main
-      className="relative h-dvh w-screen overflow-hidden bg-black"
+      className="relative h-dvh w-screen overflow-hidden bg-scene-black"
       aria-hidden={chatOpen ? "true" : undefined}
       // UX-H2 (#888): aria-hidden alone doesn't stop keyboard focus — nav,
       // toggles, and arrows inside stayed Tab-reachable while announced as
@@ -274,17 +285,16 @@ export function StoryViewer({
       // it, so its own backdrop/close controls are unaffected.
       inert={chatOpen}
     >
-      {/* PE-H1/FE-M3 (#804, #765): adjacent story images, rendered as hidden,
-          `priority` next/image elements so Next.js itself generates the
-          preload — a hand-built <link rel="preload" href={rawUrl}> pointed at
-          the raw origin URL while the real <Image> below requests the
-          optimizer URL, so nothing was ever actually warmed (~350KB wasted
-          per navigation). `sizes` must match the visible <Image> ("100vw")
-          so the computed optimizer URL/srcset is identical to what gets
-          requested once this image becomes current. */}
+      <div className="absolute left-4 right-4 top-32 z-30">
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void retry(); }} />
+        {!hasTranslation(story, locale) && <p role="status" className="rounded-lg bg-scene-black/90 p-3 text-sm text-scene-white">{t("locale.storyFallback")}</p>}
+      </div>
+      {/* Warm adjacent optimizer URLs without competing with the current image's
+          critical preload. Matching sizes keeps the eventual visible request
+          identical; eager low-priority loading preserves navigation warming. */}
       {adjacentImages.map((src) => (
         <div key={src} aria-hidden="true" className="sr-only pointer-events-none">
-          <Image src={src} alt="" fill sizes="100vw" priority />
+          <Image src={src} alt="" fill sizes="100vw" loading="eager" fetchPriority="low" />
         </div>
       ))}
 
@@ -294,9 +304,7 @@ export function StoryViewer({
         aria-live="polite"
         className="sr-only"
       >
-        {t("accessibility.story_counter")
-          .replace("{current}", String(currentIndex + 1))
-          .replace("{total}", String(stories.length))}: {localizedStory.title} — {localizedStory.subtitle}
+        {interpolate(t("accessibility.story_counter"), { current: String(currentIndex + 1), total: String(stories.length) })}: {localizedStory.title} — {localizedStory.subtitle}
       </div>
 
       {/* Transparent overlay button for toggling info — desktop (pointer:fine) only.
@@ -322,9 +330,12 @@ export function StoryViewer({
         )}
       >
         {story.image ? (
-          <Image
-            src={story.image}
-            alt={localizedStory.title}
+          <PermittedStoryImage
+            image={effectiveStory.image}
+            imageSource={effectiveStory.imageSource}
+            blurDataUrl={effectiveStory.blurDataUrl || darkPlaceholder}
+            onError={() => setFailedHero(heroIdentity)}
+            showCredit={false}
             fill
             sizes="100vw"
             // FE-M6 (#768): motion-reduce:animate-none is a CSS-layer backstop —
@@ -334,23 +345,25 @@ export function StoryViewer({
             // and the effect that corrects prefersReducedMotion.
             className={cn("object-cover", zoomClass, "motion-reduce:animate-none")}
             priority={currentIndex === 0}
+            fetchPriority="high"
             placeholder="blur"
-            blurDataURL={story.blurDataUrl || darkPlaceholder}
             key={story.id}
           />
         ) : null}
         {/* Gradient overlays */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-scene-black/80 via-scene-black/20 to-scene-black/40" />
       </div>
 
       {/* Progress bar - extracted & memoized component with event delegation */}
-      <StoryProgressBar
-        storiesLength={stories.length}
-        currentIndex={currentIndex}
-        onIndexChange={onIndexChange}
-        t={t}
-        storyTitles={storyTitles}
-      />
+      <div data-story-keyboard-local>
+        <StoryProgressBar
+          storiesLength={stories.length}
+          currentIndex={currentIndex}
+          onIndexChange={onIndexChange}
+          t={t}
+          storyTitles={storyTitles}
+        />
+      </div>
 
       {/* Category badge / Filter */}
       <CategoryFilterBadge
@@ -380,7 +393,7 @@ export function StoryViewer({
 
       {/* Main content — extracted to StoryInfoPanel (FE-H2) */}
       <StoryInfoPanel
-        story={story}
+        story={effectiveStory}
         localizedStory={localizedStory}
         showInfo={showInfo}
         t={t}
@@ -398,13 +411,13 @@ export function StoryViewer({
       />
 
       {/* Navigation arrows — extracted to StoryToolbar (FE-H2) */}
-      <StoryToolbar onPrev={goToPrev} onNext={goToNext} t={t} />
+      <StoryToolbar onPrev={goToPrev} onNext={goToNext} t={t} showReadiness={false} />
 
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
       <nav
         aria-label={t("accessibility.story_controls")}
         className={cn(
-          "absolute top-16 right-4 md:right-6 z-20 flex items-center gap-2 md:gap-3 max-w-[calc(100%-8rem)] transition-all duration-500 motion-reduce:transition-none",
+          "absolute top-16 right-4 md:right-6 z-40 flex items-center gap-2 md:gap-3 max-w-[calc(100%-8rem)] transition-all duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 motion-reduce:translate-y-0 pointer-events-none"
         )}
       >
@@ -428,7 +441,7 @@ export function StoryViewer({
             }}
             className={cn(
               "flex p-2",
-              ambientMode && "ring-1 ring-white/30"
+              ambientMode && "ring-1 ring-scene-white/30"
             )}
             aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
             title={
@@ -439,9 +452,9 @@ export function StoryViewer({
             aria-pressed={autoPlay}
           >
             {autoPlay ? (
-              <Pause className="h-5 w-5 text-white" />
+              <Pause className="h-5 w-5 text-scene-white" />
             ) : (
-              <Play className="h-5 w-5 text-white" />
+              <Play className="h-5 w-5 text-scene-white" />
             )}
           </Button>
         )}
@@ -484,7 +497,7 @@ export function StoryViewer({
                   .filter((i) => !viewedIndices.has(i) && i !== currentIndex);
                 if (unviewed.length > 0) {
                   const randomIndex = unviewed[Math.floor(Math.random() * unviewed.length)];
-                  onIndexChange(randomIndex);
+                  if (randomIndex !== undefined) onIndexChange(randomIndex);
                 } else {
                   // All viewed, pick random
                   const randomIndex = Math.floor(Math.random() * stories.length);
@@ -516,6 +529,7 @@ export function StoryViewer({
         {isEnabled("fullscreen_button") && <FullscreenButton />}
         {/* Bookmark - always visible, toggles favorite for current story */}
         <BookmarkButton
+          disabled={authLoading}
           requiresAuth={requiresAuth}
           onAuthRequired={signInWithGoogle}
           isFavorite={story ? isFavorite(story.id) : false}
@@ -528,7 +542,7 @@ export function StoryViewer({
       {/* Keyboard hints - hidden on mobile and touch-only devices */}
       <div
         className={cn(
-          "hidden md:block desktop-pointer-only absolute bottom-4 right-4 z-20 text-white/60 text-xs transition-opacity duration-500 motion-reduce:transition-none",
+          "hidden md:block desktop-pointer-only absolute bottom-4 right-4 z-20 text-scene-white/60 text-xs transition-opacity duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100" : "opacity-0"
         )}
         aria-hidden="true"

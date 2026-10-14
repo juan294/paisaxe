@@ -1,3 +1,4 @@
+import { checkRequestBudget, rateLimitResponse } from "@/lib/request-rate-limit";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
@@ -21,31 +22,42 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const requestLimit = await checkRequestBudget("GET /api/voice-access", user.id);
+  if (!requestLimit.allowed) return rateLimitResponse({ error: "Too many requests. Please try again later." }, requestLimit);
+
   const supabase = await getSupabaseClient(request);
 
-  // Query for active voice purchase — maybeSingle() returns {data: null, error: null}
-  // when no row is found (no PGRST116 needed)
-  const { data, error } = await supabase
-    .from("voice_purchases")
-    .select("id, purchase_type, expires_at")
-    .eq("user_id", user.id)
+  // Bound each query at the server. A longer blocked purchase must never
+  // hide an independent shorter active pass behind PostgREST's row cap.
+  const activeResult = await supabase.from("voice_purchases")
+    .select("id, purchase_type, expires_at, entitlement_state")
+    .eq("user_id", user.id).eq("entitlement_state", "active")
     .gt("expires_at", new Date().toISOString())
-    .order("expires_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    logger.error("[VOICE_ACCESS_FETCH_FAILED]", { user_id: user.id, error });
-    return NextResponse.json(
-      { error: "Failed to check access" },
-      { status: 500 }
-    );
+    .order("expires_at", { ascending: false }).limit(1).maybeSingle();
+  if (activeResult.error) {
+    logger.error("[VOICE_ACCESS_FETCH_FAILED]", { user_id: user.id, error: activeResult.error });
+    return NextResponse.json({ error: "Failed to check access" }, { status: 500 });
   }
-
+  const active = activeResult.data;
+  let status: VoiceAccessResponse["status"] = active ? "active" : "none";
+  if (!active) {
+    const blocked = await supabase.from("voice_purchases")
+      .select("entitlement_state").eq("user_id", user.id)
+      .gt("expires_at", new Date().toISOString())
+      .order("entitlement_state", { ascending: false }).limit(1).maybeSingle();
+    if (blocked.error) return NextResponse.json({ error: "Failed to check access" }, { status: 500 });
+    if (blocked.data) status = blocked.data.entitlement_state;
+    else {
+      const expired = await supabase.from("voice_purchases").select("id")
+        .eq("user_id", user.id).lte("expires_at", new Date().toISOString())
+        .order("expires_at", { ascending: false }).limit(1).maybeSingle();
+      if (expired.error) return NextResponse.json({ error: "Failed to check access" }, { status: 500 });
+      if (expired.data) status = "expired";
+    }
+  }
   const response: VoiceAccessResponse = {
-    hasAccess: !!data,
-    expiresAt: data?.expires_at ?? null,
-    purchaseType: data?.purchase_type ?? null,
+    hasAccess: !!active, expiresAt: active?.expires_at ?? null,
+    purchaseType: active?.purchase_type ?? null, status,
   };
 
   return NextResponse.json(response);

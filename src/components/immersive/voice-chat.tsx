@@ -1,5 +1,9 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
+import { RateLimitNotice } from "@/components/rate-limit-notice";
+
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Story } from "@/types/immersive";
 import { PrivacyNotice } from "./privacy-notice";
@@ -114,10 +118,14 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
   const {
     canUseVoice,
     needsPurchase,
+    isSuspended,
+    isAccessDenied,
+    accessStatus,
     agentId,
     expiresAt,
     hoursUntilExpiry,
-    isLoading: isVoiceAccessLoading
+    isLoading: isVoiceAccessLoading,
+    retryAfter, refresh
   } = useVoiceAccess();
 
   // Stream chat hooks for SSE message handling. A visitor with an active
@@ -125,7 +133,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
   // discovery chat. Both hooks always run (rules of hooks); one is used.
   const discoveryChat = useStreamChat({ canUseVoice });
   const bookingChat = useBookingChat();
-  const { active: bookingActive } = useBookingAccess();
+  const { active: bookingActive, isLoading: isBookingAccessLoading } = useBookingAccess();
   const chat = bookingActive ? bookingChat : discoveryChat;
   const {
     messages,
@@ -164,8 +172,10 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
     }
   }, [isVoiceAccessLoading, willUseVoiceMode, setUseElevenLabs]);
 
-  // Don't render content until we've determined the default mode
-  const isInitializing = isVoiceAccessLoading;
+  // Don't render content until we've determined the default mode, and which
+  // chat a turn goes to: a turn sent before booking access resolved would go
+  // to the discovery chat and then vanish when the booking chat takes over.
+  const isInitializing = isVoiceAccessLoading || isBookingAccessLoading;
 
   // Reset messages when story changes
   useEffect(() => {
@@ -293,7 +303,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
       className="fixed inset-0 z-50 flex items-end justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] md:items-center"
       role="dialog"
       aria-modal="true"
-      aria-label={t("accessibility.chat_dialog").replace("{title}", localizedStory.title)}
+      aria-label={interpolate(t("accessibility.chat_dialog"), { title: localizedStory.title })}
     >
       {/* Backdrop */}
       <div
@@ -309,12 +319,20 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
           useElevenLabs={useElevenLabs}
           isInitializing={isInitializing}
           canUseVoice={canUseVoice}
+          isSuspended={isSuspended}
+          isAccessDenied={isAccessDenied}
           agentId={agentId}
           storySlug={story.slug}
           onToggleMode={handleToggleMode}
           onClose={handleClose}
           tryVoiceLabel={bookingActive ? t("booking.chat.voiceDiscovery") : undefined}
         />
+
+        {!isInitializing && isAccessDenied && <p role="status">{t("voice.accessUnavailable")} <button type="button" className="underline" onClick={() => { void refresh(); }}>{t("voice.checkAccess")}</button> <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
+        {!isInitializing && isSuspended && <p role="status">{t("voice.suspended")} <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
+        {!isInitializing && accessStatus === "revoked" && <p role="status">{t("voice.revoked")} <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
+        {!isInitializing && accessStatus === "expired" && <p role="status">{t("voice.expired")}</p>}
+        <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
 
         {/* Privacy Notice */}
         {!privacyAcknowledged && (
@@ -325,9 +343,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
         {canUseVoice && hoursUntilExpiry !== null && hoursUntilExpiry < 6 && expiresAt && (
           <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-amber-500/10 p-3 border border-amber-500/20">
             <p className="text-xs text-amber-200">
-              {t("premium.voice_pass_expiry")
-                .replace("{hours}", String(Math.ceil(hoursUntilExpiry)))
-                .replace("{time}", expiresAt.toLocaleTimeString(toIntlLocale(locale), { hour: '2-digit', minute: '2-digit' }))}
+              {interpolate(t("premium.voice_pass_expiry"), { hours: String(Math.ceil(hoursUntilExpiry)), time: expiresAt.toLocaleTimeString(toIntlLocale(locale), { hour: '2-digit', minute: '2-digit' }) })}
             </p>
           </div>
         )}
@@ -345,10 +361,11 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
             story={story}
             agentId={agentId}
             onFallbackToText={handleVoiceFallback}
+            onAccessDenied={() => refresh({afterIssuanceDenial:true})}
             userAccessToken={session?.access_token}
             initialMessage={initialMessageRef.current}
           />
-        ) : useElevenLabs && needsPurchase ? (
+        ) : useElevenLabs && needsPurchase && !isSuspended && !isAccessDenied ? (
           /* Show purchase CTA when user wants voice but needs to pay */
           <VoicePurchaseCTA returnTo={story.slug} />
         ) : (

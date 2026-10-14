@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Unit tests for the deposit's payment flow. capture.postgrest-integration.test.ts
@@ -677,7 +678,7 @@ describe("ensurePaymentOrder", () => {
       cancelUrl: `${link()}?cancelled=1`,
       operationKey: "new-key",
     });
-    expect(paypal.createOrder.mock.calls[0][0].returnUrl).toMatch(new RegExp(`^https://paisaxe\\.es/booking/${ID}\\.[A-Za-z0-9_-]{43}/return$`));
+    expect(requiredValue(paypal.createOrder.mock.calls[0], "src/lib/booking/capture.test.ts:680 paypal.createOrder.mock.calls[0]")[0].returnUrl).toMatch(new RegExp(`^https://paisaxe\\.es/booking/${ID}\\.[A-Za-z0-9_-]{43}/return$`));
     expect(store.update).toHaveBeenCalledWith({ order_id: ORDER_ID, approve_url: APPROVE_URL });
     expect(store.eq).toHaveBeenCalledWith("id", "pay-1");
   });
@@ -689,7 +690,7 @@ describe("ensurePaymentOrder", () => {
     paypal.createOrder.mockResolvedValue(createdOrder);
 
     await ensurePaymentOrder(fake.client, ID);
-    expect(paypal.createOrder.mock.calls[0][0].description).toBe(" (demo)");
+    expect(requiredValue(paypal.createOrder.mock.calls[0], "src/lib/booking/capture.test.ts:692 paypal.createOrder.mock.calls[0]")[0].description).toBe(" (demo)");
   });
 
   it("a payment whose order was never created is continued with its own key, without a new row", async () => {
@@ -698,7 +699,7 @@ describe("ensurePaymentOrder", () => {
     paypal.createOrder.mockResolvedValue(createdOrder);
 
     expect((await ensurePaymentOrder(fake.client, ID)).approveUrl).toBe(APPROVE_URL);
-    expect(paypal.createOrder.mock.calls[0][0].operationKey).toBe("open-key");
+    expect(requiredValue(paypal.createOrder.mock.calls[0], "src/lib/booking/capture.test.ts:701 paypal.createOrder.mock.calls[0]")[0].operationKey).toBe("open-key");
     expect(store.insert).not.toHaveBeenCalled();
     expect(store.eq).toHaveBeenCalledWith("id", "pay-open");
     expect(touched()).toEqual(["bookings", "payments", "payments"]);
@@ -712,7 +713,7 @@ describe("ensurePaymentOrder", () => {
 
     await ensurePaymentOrder(fake.client, ID);
     expect(insert.insert).toHaveBeenCalled();
-    expect(paypal.createOrder.mock.calls[0][0].operationKey).toBe("fresh-key");
+    expect(requiredValue(paypal.createOrder.mock.calls[0], "src/lib/booking/capture.test.ts:715 paypal.createOrder.mock.calls[0]")[0].operationKey).toBe("fresh-key");
   });
 
   it("a concurrent insert that loses (23505) continues the winner's open payment", async () => {
@@ -725,7 +726,7 @@ describe("ensurePaymentOrder", () => {
     expect((await ensurePaymentOrder(fake.client, ID)).approveUrl).toBe(APPROVE_URL);
     expect(open.eq).toHaveBeenCalledWith("booking_id", ID);
     expect(open.eq).toHaveBeenCalledWith("status", "created");
-    expect(paypal.createOrder.mock.calls[0][0].operationKey).toBe("winner-key");
+    expect(requiredValue(paypal.createOrder.mock.calls[0], "src/lib/booking/capture.test.ts:728 paypal.createOrder.mock.calls[0]")[0].operationKey).toBe("winner-key");
     expect(store.eq).toHaveBeenCalledWith("id", "pay-winner");
   });
 

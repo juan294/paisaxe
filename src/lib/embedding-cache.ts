@@ -1,3 +1,5 @@
+import { isAuthoredCitation } from "./corpus-citation";
+import { parseImageProvenance } from "./image-provenance";
 import "server-only";
 import { createHash } from "crypto";
 import { Redis } from "@upstash/redis";
@@ -7,12 +9,9 @@ import type { SearchResult } from "@/types";
 const KEY_PREFIX = "embed:";
 const TTL_SECONDS = 86400; // 24 hours
 
-// PE-M2 (#810): full retrieval results (vector search + rerank + image lookup)
-// keyed on the normalized query text. TTL is intentionally much shorter than
-// the embedding cache's 24h — there is no content-version marker wired to
-// `npm run seed-db`, so a short TTL is the bound on how long a reseed can
-// serve stale retrieval results (see regression risk in issue #810).
-const SEARCH_KEY_PREFIX = "search:";
+// Complete retrieval results are isolated by an explicitly captured corpus version.
+// The old unversioned namespace is never read after this migration.
+const SEARCH_KEY_PREFIX = "search:v2:";
 const SEARCH_TTL_SECONDS = 600; // 10 minutes
 
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
@@ -121,7 +120,14 @@ export class EmbeddingCache {
   }
 
   async get(text: string): Promise<number[] | null> {
-    return redisJsonGet<number[]>(this.hashKey(text), "[EMBEDDING_CACHE_MISS]");
+    const value = await redisJsonGet<unknown>(this.hashKey(text), "[EMBEDDING_CACHE_MISS]");
+    if (value === null) return null;
+    if (!Array.isArray(value) || value.length !== this.dimensions
+      || !value.every(coordinate => typeof coordinate === "number" && Number.isFinite(coordinate))) {
+      logger.warn("[EMBEDDING_CACHE_MISS]", { reason: "invalid_embedding_shape" });
+      return null;
+    }
+    return value;
   }
 
   async set(text: string, embedding: number[]): Promise<void> {
@@ -140,21 +146,46 @@ export class EmbeddingCache {
  * see the module-level comment on `SEARCH_TTL_SECONDS` for why.
  */
 export class SearchResultCache {
-  private hashKey(queryText: string, limit: number): string {
+  private hashKey(queryText: string, limit: number, version: string): string {
     const normalized = normalizeQueryText(queryText);
-    return `${SEARCH_KEY_PREFIX}${limit}:${createHash("sha256").update(normalized).digest("hex")}`;
+    return `${SEARCH_KEY_PREFIX}${version}:${limit}:${createHash("sha256").update(normalized).digest("hex")}`;
   }
 
-  async get(queryText: string, limit: number): Promise<SearchResult | null> {
-    return redisJsonGet<SearchResult>(this.hashKey(queryText, limit), "[SEARCH_RESULT_CACHE_MISS]");
+  async get(queryText: string, limit: number, version: string): Promise<SearchResult | null> {
+    const result = await redisJsonGet<unknown>(this.hashKey(queryText, limit, version), "[SEARCH_RESULT_CACHE_MISS]");
+    if (result === null) return null;
+    if (!isSearchResult(result, version)) {
+      logger.warn("[SEARCH_RESULT_CACHE_MISS]", { reason: "invalid_result_shape" });
+      return null;
+    }
+    return result;
   }
 
-  async set(queryText: string, limit: number, result: SearchResult): Promise<void> {
+  async set(queryText: string, limit: number, result: SearchResult, version: string): Promise<void> {
     return redisJsonSet(
-      this.hashKey(queryText, limit),
+      this.hashKey(queryText, limit, version),
       result,
       SEARCH_TTL_SECONDS,
       "[SEARCH_RESULT_CACHE_SET_FAILED]"
     );
   }
+}
+
+function isSearchResult(value: unknown, version: string): value is SearchResult {
+  if (!value || typeof value !== "object") return false;
+  const { chunks, images } = value as Record<string, unknown>;
+  if (!Array.isArray(chunks) || !Array.isArray(images)) return false;
+  const nullableString = (value: unknown) => value == null || typeof value === "string";
+  return chunks.every(chunk => chunk && typeof chunk === "object"
+    && typeof chunk.id === "string" && typeof chunk.content === "string"
+    && (version === "legacy" ? typeof chunk.sourcePdf === "string" && chunk.sourcePdf.trim().length > 0 && chunk.citation == null : isAuthoredCitation(chunk.citation) && chunk.sourcePdf == null && chunk.pageNumber == null)
+    && nullableString(chunk.sectionTitle)
+    && (chunk.pageNumber == null || typeof chunk.pageNumber === "number")
+    && (chunk.similarity == null || typeof chunk.similarity === "number")
+    && (chunk.imageRefs == null || (Array.isArray(chunk.imageRefs) && chunk.imageRefs.every((ref: unknown) => typeof ref === "string"))))
+    && (version !== "legacy" || images.length === 0)
+    && images.every(image => image && typeof image === "object"
+      && typeof image.id === "string" && typeof image.path === "string" && typeof image.sourcePdf === "string"
+      && parseImageProvenance(image.provenance)?.assetUrl === image.path
+      && nullableString(image.caption));
 }

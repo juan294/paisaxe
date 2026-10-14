@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Unit tests for the Zapier sync of booking transitions (PayPal hackathon
@@ -119,10 +120,10 @@ describe("payload", () => {
 
     expect(received).toHaveLength(1);
     const [request] = received;
-    expect(request.method).toBe("POST");
-    expect(request.url).toBe("/hooks/catch/1/abc/");
-    expect(request.headers["content-type"]).toBe("application/json");
-    const body = JSON.parse(request.body);
+    expect(requiredValue(request, "src/lib/booking/zapier.test.ts:123 request").method).toBe("POST");
+    expect(requiredValue(request, "src/lib/booking/zapier.test.ts:124 request").url).toBe("/hooks/catch/1/abc/");
+    expect(requiredValue(requiredValue(request, "src/lib/booking/zapier.test.ts:125 request").headers["content-type"], "src/lib/booking/zapier.test.ts:124 request.headers[\"content-type\"]")).toBe("application/json");
+    const body = JSON.parse(requiredValue(request, "src/lib/booking/zapier.test.ts:126 request").body);
     expect(Object.keys(body).sort()).toEqual(EXPECTED_KEYS);
     expect(body).toEqual({
       id: "RS-ABC123",
@@ -160,7 +161,7 @@ describe("payload", () => {
     notifyBookingSync(fake.client, ID, "booking.refunded");
     await settle();
 
-    const { body } = received[0];
+    const { body } = requiredValue(received[0], "src/lib/booking/zapier.test.ts:163 received[0]");
     for (const forbidden of [ID, "user-secret-1", "guest@example.com", "CAP-1", "ORDER-1", "REF-1", "/booking/", "hold-1", "link"]) {
       expect(body).not.toContain(forbidden);
     }
@@ -173,7 +174,7 @@ describe("payload", () => {
     notifyBookingSync(fake.client, ID, "booking.confirmed");
     await settle();
 
-    expect(JSON.parse(received[0].body).experienceTitle).toBe("");
+    expect(JSON.parse(requiredValue(received[0], "src/lib/booking/zapier.test.ts:176 received[0]").body).experienceTitle).toBe("");
     expect(failures()).toEqual([]);
   });
 });

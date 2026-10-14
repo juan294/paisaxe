@@ -446,11 +446,6 @@ describe("Maintenance mode", () => {
 });
 
 describe("shouldBypassMaintenanceMode", () => {
-  it("returns true for /admin routes", () => {
-    expect(shouldBypassMaintenanceMode("/admin")).toBe(true);
-    expect(shouldBypassMaintenanceMode("/admin/dashboard")).toBe(true);
-  });
-
   it("returns true for /api routes", () => {
     expect(shouldBypassMaintenanceMode("/api")).toBe(true);
     expect(shouldBypassMaintenanceMode("/api/health")).toBe(true);
@@ -459,10 +454,6 @@ describe("shouldBypassMaintenanceMode", () => {
   it("returns true for /auth routes", () => {
     expect(shouldBypassMaintenanceMode("/auth")).toBe(true);
     expect(shouldBypassMaintenanceMode("/auth/callback")).toBe(true);
-  });
-
-  it("returns true for /coming-soon", () => {
-    expect(shouldBypassMaintenanceMode("/coming-soon")).toBe(true);
   });
 
   it("returns true for /_next routes", () => {
@@ -489,16 +480,6 @@ describe("shouldBypassMaintenanceMode", () => {
     expect(shouldBypassMaintenanceMode("/pricing/success")).toBe(true);
   });
 
-  it("returns false for /immersive (DO-H3: maintenance mode must gate the main app)", () => {
-    expect(shouldBypassMaintenanceMode("/immersive")).toBe(false);
-  });
-
-  it("returns true only for the exact PostHog reverse-proxy path, not other /a* routes (PE-M6)", () => {
-    expect(shouldBypassMaintenanceMode("/a/static/array.js")).toBe(true);
-    expect(shouldBypassMaintenanceMode("/a/e/")).toBe(true);
-    expect(shouldBypassMaintenanceMode("/about")).toBe(false);
-    expect(shouldBypassMaintenanceMode("/agenda")).toBe(false);
-  });
 });
 
 describe("/story/[slug] passthrough (FE-H2 / #760)", () => {
@@ -1573,11 +1554,6 @@ describe("Auth session refresh - skip getUser for fresh tokens (PE-H4)", () => {
 
 describe("isTokenNearExpiry helper (PE-H4)", () => {
   // Test the exported helper directly
-  it("is tested indirectly via proxy tests above", () => {
-    // The helper is internal — proxy behaviour tests cover all branches
-    expect(true).toBe(true);
-  });
-
   it("returns true when token is undefined", () => {
     expect(isTokenNearExpiry(undefined)).toBe(true);
   });

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import GlobalError from "./global-error";
 
@@ -19,7 +19,12 @@ describe("GlobalError", () => {
     .spyOn(console, "error")
     .mockImplementation(() => {});
 
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     consoleSpy.mockClear();
     mockCaptureException.mockClear();
     mockResolveLocale.mockReturnValue("es");
@@ -83,20 +88,22 @@ describe("GlobalError", () => {
   });
 
   // DO-M3: Sentry.captureException must be called on mount with the error
-  it("DO-M3: calls Sentry.captureException on mount with the error", () => {
+  it("DO-M3: calls Sentry.captureException on mount with the error", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://example@sentry.io/1");
     const error = new Error("Global layout error for Sentry");
     render(<GlobalError error={error} reset={vi.fn()} />);
-    expect(mockCaptureException).toHaveBeenCalledOnce();
+    await waitFor(() => expect(mockCaptureException).toHaveBeenCalledOnce());
     expect(mockCaptureException).toHaveBeenCalledWith(error);
   });
 
-  it("DO-M3: calls Sentry.captureException again when error prop changes", () => {
+  it("DO-M3: calls Sentry.captureException again when error prop changes", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://example@sentry.io/1");
     const error1 = new Error("First error");
     const error2 = new Error("Second error");
     const { rerender } = render(<GlobalError error={error1} reset={vi.fn()} />);
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockCaptureException).toHaveBeenCalledTimes(1));
     rerender(<GlobalError error={error2} reset={vi.fn()} />);
-    expect(mockCaptureException).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(mockCaptureException).toHaveBeenCalledTimes(2));
     expect(mockCaptureException).toHaveBeenLastCalledWith(error2);
   });
 

@@ -1,3 +1,5 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
+import { resolvePermittedImage } from "../src/lib/image-provenance";
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
@@ -373,11 +375,12 @@ async function generateContextualizedEmbeddingsWithRetry(
       });
 
       // voyageai 0.4.x ExtendedClient returns { results: [{ embeddings: number[][] }], totalTokens }
-      if (!result.results || result.results.length === 0 || !result.results[0].embeddings) {
+      const firstResult = result.results?.[0];
+      if (!firstResult?.embeddings) {
         throw new Error(`No contextualized embeddings returned for ${sourcePdf}`);
       }
 
-      const chunkEmbeddings = result.results[0].embeddings.map((embedding) => ({ embedding }));
+      const chunkEmbeddings = firstResult.embeddings.map((embedding) => ({ embedding }));
       return {
         data: chunkEmbeddings,
         totalTokens: result.totalTokens || 0,
@@ -418,13 +421,14 @@ async function seedStories(): Promise<void> {
       console.log(`  → Assigned placeholder image for "${story.title}"`);
     }
 
+    const permittedImage = resolvePermittedImage(imagePath, imageSource);
     return {
       slug,
       title: story.title,
       subtitle: story.subtitle || null,
       description: story.description || null,
-      image_path: imagePath,
-      image_source: imageSource,
+      image_path: permittedImage.image,
+      image_source: permittedImage.imageSource,
       category: story.category,
       source_pdf: story.sourcePdf || null,
       location: story.location || null,
@@ -540,12 +544,14 @@ async function seedChunks(): Promise<void> {
 
       // Prepare records for database
       const records = groupChunks.map((chunk, idx) => {
+        const embedding = result.data[idx];
+        if (!embedding) throw new Error(`Embedding count mismatch for ${sourcePdf}: missing chunk ${idx}`);
         const refsKey = `${chunk.sourcePdf}:${chunk.pageNumber}`;
         const refs = imageRefsMap[refsKey] || [];
         if (refs.length > 0) chunksWithImages++;
         return {
           content: chunk.content,
-          embedding: result.data[idx].embedding,
+          embedding: embedding.embedding,
           source_pdf: chunk.sourcePdf,
           page_number: chunk.pageNumber,
           section_title: chunk.sectionTitle || null,
@@ -638,5 +644,6 @@ async function main(): Promise<void> {
 }
 
 if (isDirectExecution) {
-  main().catch(console.error);
+  if (!process.argv.includes("--stories") || process.argv.includes("--clear")) rejectLegacyContentOperation("seed-database chunks/clear");
+  main().catch(error => { console.error(error); process.exitCode = 1; });
 }

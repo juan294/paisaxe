@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "scope": "Reviewed PayPal sandbox refund, Stripe test checkout export and authentic ElevenLabs isolated text-call delivery. Recordings establish only named adapter shapes, not every provider interaction or live availability.",
+  "fixtures": [
+    {
+      "id": "paypal-webhooks",
+      "provider": "PayPal",
+      "kind": "recorded",
+      "file": "tests/fixtures/providers/paypal-refund.sanitized.json",
+      "sha256": "a1345c94a696b875a474145e8855d2d9cfef72e67494906238b92cc1efb1cbfe",
+      "refresh_owner": "Juan (Paisaxe owner)",
+      "refresh_action": "Review or refresh the existing sandbox refund export and real adapter/database replay on expiry or PayPal schema/SDK/adapter changes; fresh provider calls need separate authorization.",
+      "api_version": "event_version 1.0; resource_version 2.0",
+      "captured_at": "2026-10-08T15:16:06.016490Z",
+      "expires_at": "2026-11-07T15:16:06.016490Z",
+      "sanitized": true,
+      "upstream_change": "Review and refresh on PayPal webhook/resource schema or adapter/SDK contract change. No automatic provider requests.",
+      "provenance_file": "tests/fixtures/providers/paypal-refund.provenance.json"
+    },
+    {
+      "id": "elevenlabs-post-call",
+      "provider": "ElevenLabs",
+      "kind": "recorded",
+      "file": "tests/fixtures/providers/elevenlabs-post-call.sanitized.json",
+      "sha256": "f698701c41d17f8fad4b996a671bcbdef80617e4ac52c44d4202675bc4f64a11",
+      "refresh_owner": "Juan (Paisaxe owner)",
+      "refresh_action": "Review or refresh the sanitized isolated post_call_transcription delivery and real signed route/database replay on expiry or provider schema/SDK/adapter changes; new provider calls require separate authorization.",
+      "api_version": "v1 conversation API; unversioned post_call_transcription webhook envelope observed 2026-10-14",
+      "captured_at": "2026-10-14T05:39:50.151584Z",
+      "expires_at": "2026-11-13T05:39:50.151584Z",
+      "sanitized": true,
+      "upstream_change": "Review on ElevenLabs webhook schema, SDK, parser or adapter change; no automatic provider calls.",
+      "provenance_file": "tests/fixtures/providers/elevenlabs-post-call.provenance.json"
+    },
+    {
+      "id": "stripe-grant-events",
+      "provider": "Stripe",
+      "kind": "recorded",
+      "file": "tests/fixtures/providers/stripe-checkout-completed.sanitized.json",
+      "sha256": "8301ccdcc301db3230aa6537ac0c44d3b51d75beafb1e643328998066dfb8e9c",
+      "refresh_owner": "Juan (Paisaxe owner)",
+      "refresh_action": "Review or refresh the existing test checkout.session.completed export and real signed route/database replay on expiry or Stripe schema/SDK/adapter changes; fresh provider calls need separate authorization.",
+      "api_version": "2025-08-27.basil",
+      "captured_at": "2026-10-08T15:19:59.695050Z",
+      "expires_at": "2026-11-07T15:19:59.695050Z",
+      "sanitized": true,
+      "upstream_change": "Review and refresh on Stripe SDK, webhook schema/API-version, or adapter contract change; no automatic provider requests.",
+      "provenance_file": "tests/fixtures/providers/stripe-checkout-completed.provenance.json"
+    }
+  ]
+}

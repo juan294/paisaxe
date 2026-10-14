@@ -7,6 +7,7 @@ import {
   UNSPLASH_POOLS,
 } from "./unsplash-placeholders";
 import type { StoryCategory } from "@/types/immersive";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "./image-provenance";
 
 describe("unsplash-placeholders", () => {
   describe("PLACEHOLDER_PREFIX", () => {
@@ -246,20 +247,22 @@ describe("unsplash-placeholders", () => {
       expect(result).toHaveProperty("imageSource");
     });
 
-    it("should return a valid Unsplash URL as image", () => {
+    it("returns the local authored neutral illustration without selecting a remote photograph", () => {
       const result = getPlaceholderForStory("test-slug", "nature");
-      expect(result.image).toMatch(/^https:\/\/images\.unsplash\.com\//);
+      expect(result.image).toBe(NEUTRAL_IMAGE);
+      expect(result.image).toMatch(/^\/images\//);
     });
 
-    it("should return imageSource with placeholder prefix", () => {
+    it("returns the explicit neutral illustration disclosure", () => {
       const result = getPlaceholderForStory("test-slug", "nature");
-      expect(result.imageSource).toMatch(/^unsplash-placeholder:/);
+      expect(result.imageSource).toBe(NEUTRAL_CREDIT);
     });
 
-    it("should include author attribution in imageSource", () => {
+    it("does not imply an Unsplash photo or a named-place likeness", () => {
       const result = getPlaceholderForStory("test-slug", "nature");
-      expect(result.imageSource).toContain("Photo by");
-      expect(result.imageSource).toContain("on Unsplash");
+      expect(result.imageSource).toContain("Ilustración temática");
+      expect(result.imageSource).toContain("no representa un lugar concreto");
+      expect(result.imageSource).not.toContain("Unsplash");
     });
 
     it("should be deterministic - same slug always gets same image", () => {
@@ -268,8 +271,7 @@ describe("unsplash-placeholders", () => {
       expect(result1).toEqual(result2);
     });
 
-    it("should produce different images for different slugs", () => {
-      // With enough slugs, at least some should get different images
+    it("never infers permission or chooses a pool photo from a different story slug", () => {
       const results = new Set<string>();
       const slugs = [
         "slug-a",
@@ -285,18 +287,19 @@ describe("unsplash-placeholders", () => {
         const r = getPlaceholderForStory(slug, "nature");
         results.add(r.image);
       }
-      // With 8 slugs and 8+ images, expect at least 2 distinct images
-      expect(results.size).toBeGreaterThanOrEqual(2);
+      expect([...results]).toEqual([NEUTRAL_IMAGE]);
     });
 
-    it("should select from the correct category pool", () => {
+    it("retains the legacy pools for inventory while serving none of their unreviewed photos", () => {
       const natureResult = getPlaceholderForStory("test", "nature");
       const natureUrls = UNSPLASH_POOLS.nature.map((p) => p.url);
-      expect(natureUrls).toContain(natureResult.image);
+      expect(natureUrls).not.toContain(natureResult.image);
+      expect(natureResult.image).toBe(NEUTRAL_IMAGE);
 
       const foodResult = getPlaceholderForStory("test", "food");
       const foodUrls = UNSPLASH_POOLS.food.map((p) => p.url);
-      expect(foodUrls).toContain(foodResult.image);
+      expect(foodUrls).not.toContain(foodResult.image);
+      expect(foodResult.image).toBe(NEUTRAL_IMAGE);
     });
 
     it("should handle all categories", () => {

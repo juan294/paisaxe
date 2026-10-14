@@ -1,3 +1,4 @@
+import { mockFeatureFlagsAfterSsr } from "./fixtures/mock-feature-flags";
 /**
  * E2E tests for the VISITOR-FACING voice flow — Pelayo, the ElevenLabs
  * voice guide gated behind the `visitor_voice_agent` feature flag and a
@@ -63,15 +64,10 @@ test.describe("Visitor voice — paywall gate (no access)", () => {
     // visitor_voice_agent enabled — the gate we're testing is the paid
     // access check, not the feature flag (the flag only controls whether
     // the immersive experience surfaces voice at all upstream of this).
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(withFeatureFlags({ visitor_voice_agent: true })),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ visitor_voice_agent: true }));
 
     await page.goto("/immersive");
+    await settleFlags();
     await expect(page.locator("h1").first()).toBeVisible();
 
     await page.locator('[data-testid="ask-button"]').first().click();

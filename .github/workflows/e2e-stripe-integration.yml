@@ -47,24 +47,12 @@ jobs:
           STRIPE_TEST_SECRET_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.STRIPE_TEST_SECRET_KEY || '' }}
           STRIPE_TEST_DAY_PASS_PRICE_ID: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.STRIPE_TEST_DAY_PASS_PRICE_ID || '' }}
           NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY || '' }}
-          STRIPE_TEST_WEBHOOK_SECRET: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.STRIPE_TEST_WEBHOOK_SECRET || '' }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
-          SUPABASE_SERVICE_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.SUPABASE_SERVICE_KEY || '' }}
-          QA_TEST_USER_EMAIL: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.QA_TEST_USER_EMAIL || '' }}
-          QA_TEST_USER_PASSWORD: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.QA_TEST_USER_PASSWORD || '' }}
         run: |
           missing=0
           for key in \
             STRIPE_TEST_SECRET_KEY \
             STRIPE_TEST_DAY_PASS_PRICE_ID \
-            NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY \
-            STRIPE_TEST_WEBHOOK_SECRET \
-            NEXT_PUBLIC_SUPABASE_URL \
-            NEXT_PUBLIC_SUPABASE_ANON_KEY \
-            SUPABASE_SERVICE_KEY \
-            QA_TEST_USER_EMAIL \
-            QA_TEST_USER_PASSWORD; do
+            NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY; do
             if [ -z "${!key}" ]; then
               echo "Missing required secret: $key"
               missing=1
@@ -93,6 +81,36 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
 
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      # Internal Docker networking contains historical migration webhooks;
+      # prepareStack sanitizes their configuration before creating the QA user.
+      - name: Provision owned local Stripe datastore
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync, writeFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import { randomBytes } from 'node:crypto';
+          import { join } from 'node:path';
+          import { prepareStack } from './scripts/prepare-contract-stack.mjs';
+          import { localDockerEnvironment, validateKeys } from './scripts/run-contracts.mjs';
+          import { provisionSmokeEnvironment } from './scripts/ci-cadence-smoke-env.mjs';
+          const manifest = await prepareStack();
+          appendFileSync(process.env.GITHUB_ENV, `CONTRACT_STACK_DIR=${manifest.taskDir}\n`);
+          const status = JSON.parse(execFileSync('supabase', ['status', '--workdir', manifest.taskDir, '--output', 'json'], {env:localDockerEnvironment(),encoding:'utf8',stdio:['ignore','pipe','pipe']}));
+          validateKeys(status, manifest);
+          const environment = await provisionSmokeEnvironment(status);
+          environment.STRIPE_TEST_WEBHOOK_SECRET = 'whsec_' + randomBytes(32).toString('hex');
+          writeFileSync(join(manifest.taskDir, 'stripe-qa.json'), JSON.stringify({project:manifest.projectId,nonce:manifest.nonce,email:environment.QA_TEST_USER_EMAIL,password:environment.QA_TEST_USER_PASSWORD}), {mode:0o600,flag:'wx'});
+          for (const [key, value] of Object.entries(environment)) {
+            console.log(`::add-mask::${value}`);
+            appendFileSync(process.env.GITHUB_ENV, `${key}=${value}\n`);
+          }
+          JS
+
       - name: Run real Stripe checkout integration
         env:
           ANTHROPIC_API_KEY: dummy_key_for_e2e
@@ -101,14 +119,21 @@ jobs:
           STRIPE_TEST_SECRET_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.STRIPE_TEST_SECRET_KEY || '' }}
           STRIPE_TEST_DAY_PASS_PRICE_ID: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.STRIPE_TEST_DAY_PASS_PRICE_ID || '' }}
           NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY || '' }}
-          STRIPE_TEST_WEBHOOK_SECRET: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.STRIPE_TEST_WEBHOOK_SECRET || '' }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
-          SUPABASE_SERVICE_KEY: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.SUPABASE_SERVICE_KEY || '' }}
-          QA_TEST_USER_EMAIL: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.QA_TEST_USER_EMAIL || '' }}
-          QA_TEST_USER_PASSWORD: ${{ github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326 && github.event.pull_request.head.repo.fork == false)))) && secrets.QA_TEST_USER_PASSWORD || '' }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/stripe-e2e-report.json
         run: npm run test:e2e:stripe
+
+      - name: Stop owned local Stripe datastore
+        if: ${{ always() && env.CONTRACT_STACK_DIR != '' }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { validateManifest, localDockerEnvironment } from './scripts/run-contracts.mjs';
+          import { stopOwnedStack } from './scripts/ci-contracts.mjs';
+          const task = process.env.CONTRACT_STACK_DIR;
+          const manifest = validateManifest(JSON.parse(readFileSync(join(task, 'contracts-stack.json'), 'utf8')), task);
+          await stopOwnedStack(manifest, localDockerEnvironment());
+          JS
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7

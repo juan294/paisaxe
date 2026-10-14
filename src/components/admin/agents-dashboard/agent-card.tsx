@@ -25,9 +25,9 @@ export function AgentCard({
   // Determine what to show: running state > recent run result > report data
   const showLastRun = lastRunResult && !isRunning;
   const healthDot = isRunning
-    ? "bg-[#c9a55c] animate-pulse"
+    ? "bg-admin-warning animate-pulse"
     : showLastRun
-      ? lastRunResult.status === "success" ? "bg-[#7a9e7a]" : lastRunResult.status === "error" ? "bg-[#c97a7a]" : "bg-[#c9a55c]"
+      ? lastRunResult.status === "success" ? "bg-admin-health-success" : lastRunResult.status === "error" ? "bg-admin-health-error" : "bg-admin-warning"
       : HEALTH_COLORS[agent.health];
 
   const summaryText = isRunning
@@ -41,15 +41,15 @@ export function AgentCard({
       : agent.healthSummary;
 
   const summaryColor = showLastRun && lastRunResult.status === "error"
-    ? "text-[#c97a7a]"
-    : "text-[#6b6560] dark:text-[#a39e98]";
+    ? "text-admin-health-error"
+    : "text-admin-muted dark:text-admin-subtle";
 
   const timeText = showLastRun ? relativeTime(lastRunResult.time) : relativeTime(agent.lastRun);
 
   return (
     <div
       className={cn(
-        "rounded-2xl bg-white p-5 dark:bg-[#252320]",
+        "rounded-2xl bg-white p-5 dark:bg-admin-panel",
         onClick && "cursor-pointer transition-colors hover:bg-[#fafaf8] dark:hover:bg-[#2a2724]"
       )}
       onClick={onClick}
@@ -59,10 +59,10 @@ export function AgentCard({
     >
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+          <h3 className="text-sm font-medium text-admin-ink dark:text-admin-paper">
             {agent.name}
           </h3>
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#a39e98] dark:text-[#6b6560]">
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-admin-subtle dark:text-admin-muted">
             {agent.schedule}
           </p>
         </div>
@@ -70,7 +70,7 @@ export function AgentCard({
           {isRunning && !hideStop ? (
             <button
               onClick={(e) => { e.stopPropagation(); onStop(); }}
-              className="rounded-full p-1 text-[#c97a7a] transition-colors hover:bg-[#c97a7a]/10"
+              className="rounded-full p-1 text-admin-health-error transition-colors hover:bg-admin-health-error/10"
               aria-label={`Stop ${agent.name}`}
             >
               <Square className="h-3.5 w-3.5" />
@@ -78,7 +78,7 @@ export function AgentCard({
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); onRun(); }}
-              className="rounded-full p-1 text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
+              className="rounded-full p-1 text-admin-subtle transition-colors hover:bg-admin-paper hover:text-admin-muted dark:hover:bg-admin-depth"
               aria-label={`Run ${agent.name}`}
             >
               <Play className="h-3.5 w-3.5" />
@@ -90,7 +90,7 @@ export function AgentCard({
       <p className={cn("mt-3 text-xs leading-relaxed", summaryColor)}>
         {summaryText}
       </p>
-      <p className="mt-3 font-mono text-[10px] text-[#a39e98] dark:text-[#6b6560]">
+      <p className="mt-3 font-mono text-[10px] text-admin-subtle dark:text-admin-muted">
         {timeText}
       </p>
     </div>

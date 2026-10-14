@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const en: Translations = {
   common: {
+    rateLimited: "Temporary limit. Wait {seconds} seconds and try again.",
+    retry: "Try again",
     loading: 'Loading...',
     close: 'Close',
   },
 
+  navigation: {
+    preparing: "Preparing navigation…",
+    recovery: "If the controls do not become available, reload the page and check that JavaScript is enabled.",
+    reload: "Reload the page",
+    ready: "Navigation is ready.",
+  },
+
+  locale: {
+    loadFailed: "The selected language could not be loaded. Spanish is shown while you try again.",
+    retry: "Retry loading the language",
+    storyFallback: "Some story content or questions are not yet available in the selected language and are shown in Spanish.",
+    legacyMigrated: "Your language preference saved in this browser has been restored.",
+  },
+
   chat: {
+    safety_redirect: "Hello! I’m {name}, your {region} tourism guide. How can I help you discover our region?",
     placeholder: 'Ask about this place...',
     listening: 'Listening...',
     thinking: 'Thinking...',
@@ -165,6 +182,8 @@ export const en: Translations = {
   },
 
   auth: {
+    verificationFailed: "Your session could not be verified. Try again to continue.",
+    retryVerification: "Verify the session again",
     user: 'User',
     user_avatar: 'User avatar',
     sign_out: 'Sign out',
@@ -187,6 +206,12 @@ export const en: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "Voice access is currently unavailable.",
+    checkAccess: "Check voice access",
+    contactSupport: "Contact support",
+    suspended: "Voice access is suspended while a payment dispute is reviewed.",
+    revoked: "This voice pass was revoked after a payment reversal.",
+    expired: "Your voice pass has expired. You can purchase a new pass to continue using voice.",
     try_voice: 'Talk',
     use_text: 'Type',
     upgrade_cta: 'Use your voice',
@@ -513,6 +538,20 @@ export const en: Translations = {
       returnProblem: 'There is a problem with this payment and we are reviewing it. If it was charged, we will refund the deposit.',
       returnFailed: 'PayPal declined the payment and nothing was charged. We are reviewing it.',
       returnError: 'The payment could not be checked. Open the booking to see its status.',
+      statusConfirming: 'Confirming payment',
+      holdCountdown: 'We\'re holding your place: {time} left',
+      when: '{day} · {time} · {people} people',
+      steps: {
+        label: 'Booking progress',
+        offer: 'Offer accepted',
+        deposit: 'Deposit paid',
+        balance: 'Balance paid',
+      },
+      receiptTitle: 'PayPal receipt',
+      copy: 'Copy',
+      copied: 'Copied',
+      copyFailed: 'Couldn\'t copy; select the code instead',
+      returnSlow: 'This is taking longer than usual. You can check the status on your booking.',
     },
     cancel: {
       title: 'Cancel the booking',
@@ -568,6 +607,10 @@ export const en: Translations = {
       sandbox: 'PayPal sandbox: test payment, no real money',
       pay: 'Pay with PayPal',
       payBefore: 'Pay before {time}; after that the place is released',
+      payWith: 'Pay with',
+      demoSandbox: 'Demo · sandbox',
+      depositPaid: 'Deposit paid',
+      balancePaid: 'Balance paid',
       cancellationTitle: 'Cancellation',
       suitability: {
         suitable: 'Fits what you are looking for',

@@ -1,8 +1,11 @@
+import { requiredValue } from "@/test/required-value";
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import FavoritesPage from "./page";
 import { createMockT } from "@/test/i18n-mock";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 // Mock i18n. UX-H6 (#892): mutable locale so tests can exercise a
 // non-Spanish visitor viewing the favorites gallery.
@@ -16,6 +19,8 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
+const imageRequests = vi.hoisted((): string[] => []);
+
 // Mock next/image
 vi.mock("next/image", () => ({
   default: ({
@@ -26,10 +31,13 @@ vi.mock("next/image", () => ({
     src: string;
     alt: string;
     className?: string;
-  }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} className={className} />
-  ),
+  }) => {
+    imageRequests.push(src);
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={alt} className={className} />
+    );
+  },
 }));
 
 // Mock next/link - must forward ref for IntersectionObserver to work
@@ -71,6 +79,7 @@ const mockStories = [
     subtitle: "Picos de Europa",
     description: "Beautiful glacial lakes",
     image: "/images/lagos.jpg",
+    imageSource: imageProvenanceFixture("/images/lagos.jpg", undefined, undefined, { alt: "Lagos de Covadonga" }),
     category: "nature" as const,
     sourcePdf: "nature.pdf",
   },
@@ -81,6 +90,7 @@ const mockStories = [
     subtitle: "Arte Romanico",
     description: "Historic cathedral",
     image: "/images/catedral.jpg",
+    imageSource: imageProvenanceFixture("/images/catedral.jpg", undefined, undefined, { alt: "Catedral de Oviedo" }),
     category: "culture" as const,
     sourcePdf: "culture.pdf",
   },
@@ -93,9 +103,58 @@ vi.mock("@/hooks/use-stories", () => ({
   useStories: () => mockUseStories(),
 }));
 
+describe("FavoritesPage indexed observer boundary", () => {
+  it("ignores empty observer batches and accepts later real intersections", () => {
+    const original = global.IntersectionObserver;
+    const observations: { callback: IntersectionObserverCallback; target: Element; observer: IntersectionObserver }[] = [];
+    class ControlledObserver implements IntersectionObserver {
+      readonly root = null;
+      readonly rootMargin = "";
+      readonly scrollMargin = "";
+      readonly thresholds = [];
+      constructor(private callback: IntersectionObserverCallback) {}
+      observe(target: Element) { observations.push({ callback: this.callback, target, observer: this }); }
+      unobserve() {}
+      disconnect() {}
+      takeRecords(): IntersectionObserverEntry[] { return []; }
+    }
+    global.IntersectionObserver = ControlledObserver;
+    const stories = Array.from({ length: 21 }, (_, index) => ({
+      ...requiredValue(mockStories[0], "Favorite observer story fixture"),
+      id: `observer-${index}`, slug: `observer-${index}`, title: `Observer place ${index}`,
+    }));
+    mockUseAuth.mockReturnValue({ signInWithGoogle: mockSignInWithGoogle });
+    mockUseFavorites.mockReturnValue({ favorites: stories.map((story) => story.id), toggleFavorite: mockToggleFavorite, isLoading: false, requiresAuth: false });
+    mockUseStories.mockReturnValue({ stories, isLoading: false });
+    const view = render(<FavoritesPage />);
+    try {
+      expect(() => act(() => {
+        for (const { callback, observer } of observations) callback([], observer);
+      })).not.toThrow();
+      act(() => {
+        for (const { callback, target, observer } of [...observations]) {
+          const rect = target.getBoundingClientRect();
+          callback([{ target, isIntersecting: true, intersectionRatio: 1, boundingClientRect: rect, intersectionRect: rect, rootBounds: null, time: 0 }], observer);
+        }
+      });
+      act(() => {
+        for (const { callback, target, observer } of [...observations]) {
+          const rect = target.getBoundingClientRect();
+          callback([{ target, isIntersecting: true, intersectionRatio: 1, boundingClientRect: rect, intersectionRect: rect, rootBounds: null, time: 0 }], observer);
+        }
+      });
+      expect(screen.getByText("Observer place 20")).toBeInTheDocument();
+    } finally {
+      view.unmount();
+      global.IntersectionObserver = original;
+    }
+  });
+});
+
 describe("FavoritesPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    imageRequests.length = 0;
     mockLocale = "es";
     mockUseAuth.mockReturnValue({
       user: null,
@@ -486,6 +545,28 @@ describe("FavoritesPage", () => {
         const image = screen.getByAltText("Lagos de Covadonga");
         expect(image).toHaveAttribute("src", "/images/lagos.jpg");
       });
+    });
+
+    it.each([
+      ["legacy credit", "Unreviewed legacy credit"],
+      ["proof for another asset", imageProvenanceFixture("/images/other.jpg")],
+    ])("shows neutral imagery for %s without losing the favorite link", async (_label, imageSource) => {
+      mockUseStories.mockReturnValue({
+        stories: [{ ...requiredValue(mockStories[0], "Favorite image fixture"), imageSource }],
+        isLoading: false, error: null, refresh: vi.fn(),
+      });
+      const { container } = render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("img", { name: NEUTRAL_CREDIT })).toHaveAttribute("src", NEUTRAL_IMAGE);
+      });
+      expect(container.querySelector('img[src="/images/lagos.jpg"]')).toBeNull();
+      expect(imageRequests.length).toBeGreaterThan(0);
+      expect(imageRequests.every(src => src === NEUTRAL_IMAGE)).toBe(true);
+      expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+      expect(screen.queryByText("Synthetic fixture credit")).not.toBeInTheDocument();
+      expect(screen.queryByText("Unreviewed legacy credit")).not.toBeInTheDocument();
+      expect(screen.getByText("Lagos de Covadonga").closest("a")).toHaveAttribute("href", "/immersive?story=lagos-covadonga");
     });
 
     it("should display story category on hover content", async () => {
@@ -1242,7 +1323,8 @@ describe("FavoritesPage", () => {
 
   // UX-H6 (#892): getLocalizedStory was bypassed across the entire favorites
   // gallery — a non-Spanish visitor's saved places always rendered raw
-  // Spanish title/subtitle/image-alt, reverting their chosen language.
+  // Spanish title/subtitle, reverting their chosen language. Image alt remains
+  // the separately reviewed provenance text.
   describe("UX-H6 (#892): locale-aware gallery text", () => {
     const storyWithTranslation = {
       id: "story-1",
@@ -1251,6 +1333,7 @@ describe("FavoritesPage", () => {
       subtitle: "Picos de Europa",
       description: "Beautiful glacial lakes",
       image: "/images/lagos.jpg",
+      imageSource: imageProvenanceFixture("/images/lagos.jpg", undefined, undefined, { alt: "Illustration synthétique autorisée" }),
       category: "nature" as const,
       sourcePdf: "nature.pdf",
       metadata: {
@@ -1291,14 +1374,15 @@ describe("FavoritesPage", () => {
       expect(screen.queryByText("Picos de Europa")).not.toBeInTheDocument();
     });
 
-    it("uses the localized title as the image alt text for a non-Spanish locale", async () => {
+    it("uses reviewed image alt text alongside the localized title for a non-Spanish locale", async () => {
       mockLocale = "fr";
 
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByAltText("Lacs de Covadonga")).toBeInTheDocument();
+        expect(screen.getByAltText("Illustration synthétique autorisée")).toHaveAttribute("src", "/images/lagos.jpg");
       });
+      expect(screen.getByText("Lacs de Covadonga")).toBeInTheDocument();
     });
 
     it("falls back to Spanish text when no translation exists for the active locale", async () => {

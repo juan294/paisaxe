@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * PayPal webhook events: normalization, processing and the processed/failed
@@ -326,7 +327,7 @@ describe("PAYMENT.CAPTURE.COMPLETED", () => {
 
     await expect(processPaypalEvent(fake.client, captureEvent())).resolves.toBe("confirmed");
 
-    const fields = record.update.mock.calls[0][0];
+    const fields = requiredValue(record.update.mock.calls[0], "src/lib/booking/webhook-events.test.ts:329 record.update.mock.calls[0]")[0];
     expect(fields).toEqual({ status: "captured", capture_id: "CAP-1", captured_at: expect.any(String) });
     expect(record.in).toHaveBeenCalledWith("status", RECORDABLE);
     expect(capture.finalizeCaptured).toHaveBeenCalledWith(fake.client, booking, expect.objectContaining({ id: "pay-1", ...fields }));
@@ -473,7 +474,7 @@ describe("PAYMENT.CAPTURE.REFUNDED", () => {
     await expect(processPaypalEvent(fake.client, refundEvent())).resolves.toBe("recorded");
 
     expect(refunded.update).toHaveBeenCalledWith({ status: "refunded", refunded_at: expect.any(String), capture_id: "CAP-1", refund_id: "RF-1" });
-    const from = refunded.in.mock.calls[0][1] as string[];
+    const from = requiredValue(refunded.in.mock.calls[0], "src/lib/booking/webhook-events.test.ts:476 refunded.in.mock.calls[0]")[1] as string[];
     expect(from).toEqual(expect.arrayContaining([...RECORDABLE, "refund_pending", "refund_failed"]));
     expect(from).not.toContain("refunded");
     expect(bookingRefunded.update).toHaveBeenCalledWith({ status: "refunded" });

@@ -100,3 +100,10 @@ describe("computeCoverage", () => {
     expect(coverage).toBe(0);
   });
 });
+
+// Missing/empty dictionary values cannot count as translated copy.
+describe("incomplete locale coverage", () => {
+  it("counts missing, empty and object values as incomplete", () => {
+    expect(computeCoverage({a:"Uno", b:"Dos", c:"Tres", d:"Cuatro"}, {b:"", c:{nested:"text"}, d:"Four"})).toBe(25);
+  });
+});

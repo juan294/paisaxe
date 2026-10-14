@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { randomBytes } from "node:crypto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -107,11 +108,11 @@ describe("getStoriesServer", () => {
     const result = await getStoriesServer();
 
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("story-1");
+    expect(requiredValue(result[0], "src/lib/stories-server.test.ts:110 result[0]").id).toBe("story-1");
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     // Verify the URL pattern
-    const callUrl = mockFetch.mock.calls[0][0];
+    const callUrl = requiredValue(mockFetch.mock.calls[0], "src/lib/stories-server.test.ts:114 mockFetch.mock.calls[0]")[0];
     expect(callUrl).toContain("/rest/v1/stories");
     expect(callUrl).toContain("is_active=eq.true");
     expect(callUrl).toContain("curation_status=eq.approved");
@@ -154,7 +155,7 @@ describe("getStoriesServer", () => {
     const { getStoriesServer } = await import("./stories-server");
     const result = await getStoriesServer();
 
-    const callUrl = new URL(mockFetch.mock.calls[0][0]);
+    const callUrl = new URL(requiredValue(mockFetch.mock.calls[0], "src/lib/stories-server.test.ts:157 mockFetch.mock.calls[0]")[0]);
     const selectedFields = callUrl.searchParams.get("select")?.split(",") ?? [];
 
     expect(callUrl.searchParams.get("select")).not.toBe("*");
@@ -188,7 +189,7 @@ describe("getStoriesServer", () => {
     );
     expect(result[0]).not.toHaveProperty("suggestionId");
     expect(result[0]).not.toHaveProperty("sourcePdf", "private-guide.pdf");
-    expect(result[0].metadata).not.toHaveProperty("translation_status");
+    expect(requiredValue(result[0], "src/lib/stories-server.test.ts:191 result[0]").metadata).not.toHaveProperty("translation_status");
   });
 
   it("returns FALLBACK_STORIES when API fails", async () => {
@@ -256,7 +257,7 @@ describe("getStoriesServer", () => {
     const { getStoriesServer } = await import("./stories-server");
     await getStoriesServer();
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/stories-server.test.ts:259 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.next).toEqual({ revalidate: 60 });
     expect(fetchOptions.cache).toBeUndefined();
   });
@@ -274,7 +275,7 @@ describe("getStoriesServer", () => {
     const { getStoriesServer } = await import("./stories-server");
     await getStoriesServer();
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/stories-server.test.ts:277 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.cache).toBe("no-store");
     expect(fetchOptions.next).toBeUndefined();
   });
@@ -299,7 +300,7 @@ describe("getStoriesServer", () => {
     const { getStoriesServer } = await import("./stories-server");
     await getStoriesServer();
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/stories-server.test.ts:302 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.headers).toEqual({
       apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test-anon-key",
       Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test-anon-key",
@@ -315,7 +316,7 @@ describe("getStoriesServer", () => {
     const { getStoriesServer } = await import("./stories-server");
     await getStoriesServer();
 
-    const fetchOptions = mockFetch.mock.calls[0][1];
+    const fetchOptions = requiredValue(mockFetch.mock.calls[0], "src/lib/stories-server.test.ts:318 mockFetch.mock.calls[0]")[1];
     expect(fetchOptions.signal).toBeDefined();
     // AbortSignal.timeout returns an AbortSignal instance
     expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);

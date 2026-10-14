@@ -1,4 +1,6 @@
 import type { Locale } from './types';
+import { getLocaleCookie, isLocale, LOCALE_COOKIE, mapLanguageTag } from './preference';
+export { mapLanguageTag } from './preference';
 
 const SUPPORTED_LOCALES: Locale[] = ['es', 'en', 'fr', 'de', 'pt', 'ast'];
 const DEFAULT_LOCALE: Locale = 'es';
@@ -8,13 +10,6 @@ const STORAGE_KEY = 'paisaxe-locale';
  * Map a browser language tag (e.g. 'en-US', 'es-MX') to a supported Locale.
  * Returns null if the language is not supported.
  */
-export function mapLanguageTag(tag: string): Locale | null {
-  const primary = tag.split('-')[0].toLowerCase();
-  if (SUPPORTED_LOCALES.includes(primary as Locale)) {
-    return primary as Locale;
-  }
-  return null;
-}
 
 /**
  * Detect the user's preferred locale from the browser.
@@ -69,6 +64,8 @@ export function getStoredLocale(): Locale | null {
  */
 export function storeLocale(locale: Locale): void {
   if (typeof window === 'undefined') return;
+  if (!isLocale(locale)) return;
+  document.cookie = `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=31536000; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
 
   try {
     localStorage.setItem(STORAGE_KEY, locale);
@@ -84,6 +81,8 @@ export function storeLocale(locale: Locale): void {
  * 3. Default to 'es'
  */
 export function resolveLocale(): Locale {
+  const cookie = getLocaleCookie();
+  if (cookie) return cookie;
   const stored = getStoredLocale();
   if (stored) return stored;
 

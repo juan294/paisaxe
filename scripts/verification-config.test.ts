@@ -1,3 +1,4 @@
+import { requiredValue } from "../src/test/required-value";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -97,7 +98,7 @@ describe("verification coverage config", () => {
     const workflow = readText(".github/workflows/ci.yml");
 
     const parsed = parse(workflow) as { jobs: Record<string, { needs: string[]; if: string }> };
-    const merge = parsed.jobs["coverage-merge"];
+    const merge = requiredValue(parsed.jobs["coverage-merge"], "coverage merge job");
     expect(merge.needs).toContain("coverage-shard");
     const expression = merge.if.replace(/^\$\{\{\s*|\s*\}\}$/g, "")
       .replace(/needs\.([A-Za-z_][A-Za-z0-9_-]*)/g, (_match: string, key: string) => `needs[${JSON.stringify(key)}]`);
@@ -134,9 +135,9 @@ describe("verification coverage config", () => {
     const parsed = parse(previewSmokeWorkflow) as { on: Record<string, { branches: string[] }>; permissions: Record<string, string>; jobs: Record<string, { name: string; if?: string; "timeout-minutes": number; permissions: Record<string, string>; steps: Step[] }> };
     // Release PRs only, one job, and its name is the required check context.
     expect(Object.keys(parsed.on)).toEqual(["pull_request"]);
-    expect(parsed.on.pull_request.branches).toEqual(["main"]);
+    expect(requiredValue(parsed.on.pull_request, "release pull_request trigger").branches).toEqual(["main"]);
     expect(Object.keys(parsed.jobs)).toEqual(["preview-smoke"]);
-    const job = parsed.jobs["preview-smoke"];
+    const job = requiredValue(parsed.jobs["preview-smoke"], "release smoke job");
     expect(job.name).toBe("Release artifact smoke");
     // Unconditional: a skipped required context would satisfy branch protection.
     expect(job.if).toBeUndefined();
@@ -155,18 +156,18 @@ describe("verification coverage config", () => {
       expect(found, name).toBeGreaterThanOrEqual(0);
       return found;
     };
-    const checkout = steps[index("Checkout release candidate")];
+    const checkout = requiredValue(steps[index("Checkout release candidate")], "Checkout release candidate step");
     expect(checkout.with).toEqual({ ref: "${{ github.sha }}", "persist-credentials": false });
     // Identity comes from the physical checkout and must precede the build that embeds it.
-    const identity = steps[index("Bind candidate identity")];
+    const identity = requiredValue(steps[index("Bind candidate identity")], "Bind candidate identity step");
     expect(identity.run).toContain('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"');
     expect(identity.run).toContain('echo "VERCEL_GIT_COMMIT_SHA=$GITHUB_SHA"');
     expect(identity.run).toContain("BUILD_TREE_HASH=$(git rev-parse 'HEAD^{tree}')");
     const order = ["Start local Supabase", "Provision synthetic smoke environment", "Bind candidate identity", "Build release candidate", "Record build manifest", "Smoke production server on loopback"].map(index);
     expect(order).toEqual([...order].sort((left, right) => left - right));
-    expect(steps[index("Build release candidate")].run).toBe("npm run build");
-    expect(steps[index("Record build manifest")].run).toBe('node scripts/ci-cadence-artifact.mjs "$GITHUB_SHA" "$RELEASE_ARTIFACT_MANIFEST"');
-    expect(steps[index("Smoke production server on loopback")].run).toBe("npm run test:e2e:release-artifact");
+    expect(requiredValue(steps[index("Build release candidate")], "Build release candidate step").run).toBe("npm run build");
+    expect(requiredValue(steps[index("Record build manifest")], "Record build manifest step").run).toBe('node scripts/ci-cadence-artifact.mjs "$GITHUB_SHA" "$RELEASE_ARTIFACT_MANIFEST"');
+    expect(requiredValue(steps[index("Smoke production server on loopback")], "Smoke production server on loopback step").run).toBe("npm run test:e2e:release-artifact");
     // Every gating step is unconditional; only evidence upload uses always().
     for (const step of steps) if (step.name !== "Upload smoke evidence") expect(step.if, step.name).toBeUndefined();
 
@@ -183,7 +184,7 @@ describe("verification coverage config", () => {
     // build+dev servers and the PayPal stand-in) and leaves its booking probes
     // out, while develop's own `--project=release-required-local` keeps both.
     const argv = (script: string) => ["node", "playwright", ...script.split(" ").slice(1)];
-    const artifact = argv(scripts["test:e2e:release-artifact"]);
+    const artifact = argv(requiredValue(scripts["test:e2e:release-artifact"], "release artifact script"));
     expect(isReleaseArtifactRun(artifact)).toBe(true);
     expect(isReleaseLocalRun(artifact)).toBe(false);
     for (const local of [argv("playwright test --project=release-required-local"), argv("playwright test --project release-required-local")]) {
@@ -191,7 +192,7 @@ describe("verification coverage config", () => {
       expect(isReleaseArtifactRun(local)).toBe(false);
     }
     expect(isReleaseArtifactRun(argv("playwright test --project release-artifact-smoke"))).toBe(true);
-    expect(playwrightConfig).toContain('...(releaseArtifactRun ? { testIgnore: ["**/booking-*.spec.ts"] } : {}),');
+    expect(playwrightConfig).toContain('testIgnore: ["**/presentation-local.spec.ts", "**/stripe-real-checkout.spec.ts", ...(releaseArtifactRun ? ["**/booking-*.spec.ts"] : [])],');
 
     // Identity, readiness and hydration are asserted, and absence throws rather than skips.
     const probe = readText("e2e/release-artifact-smoke.spec.ts");
@@ -372,19 +373,19 @@ describe("verification coverage config", () => {
     // The skip step's last echo line is immediately followed by the next
     // step (no `exit 1` in between) — proves the secret-withheld path passes.
     const parsed = parse(workflow) as { jobs: Record<string, { steps: { name: string; if?: string; run?: string }[] }> };
-    const steps = parsed.jobs["vercel-env-safety"].steps;
+    const steps = requiredValue(parsed.jobs["vercel-env-safety"], "Vercel safety job").steps;
     const skipIndex = steps.findIndex(step => step.name === "Skip when Vercel credentials are unavailable (secret-withheld PR)");
-    const skip = steps[skipIndex];
+    const skip = requiredValue(steps[skipIndex], "secret-withheld skip step");
     const fail = steps.find(step => step.name === "Fail when Vercel credentials are unavailable (trusted event)")!;
     expect(skip.run).toContain('echo "Skipping the Vercel env safety assertion in this secret-withheld PR context."');
     expect(skip.run).not.toMatch(/exit\s+1/);
     expect(fail.run?.trim()).toMatch(/exit 1$/);
-    expect(steps[skipIndex + 1].name).toBe("Assert legacy agent override is absent from Vercel env");
+    expect(requiredValue(steps[skipIndex + 1], "post-skip Vercel assertion").name).toBe("Assert legacy agent override is absent from Vercel env");
     for (const withheld of ["true", "false"]) {
       const context = { env: { VERCEL_TOKEN: "", VERCEL_PROJECT_ID: "", VERCEL_ORG_ID: "", SECRETS_WITHHELD_PR: withheld } };
       const evaluate = (condition: string) => Boolean(vm.runInNewContext(condition.replace(/^\$\{\{\s*|\s*\}\}$/g, ""), context, { timeout: 100 }));
       expect(evaluate(fail.if!)).toBe(withheld === "false");
-      expect(evaluate(skip.if!)).toBe(withheld === "true");
+      expect(evaluate(requiredValue(skip.if, "skip condition"))).toBe(withheld === "true");
     }
 
     // The fail path must exclude only fork and Dependabot PRs; the skip path

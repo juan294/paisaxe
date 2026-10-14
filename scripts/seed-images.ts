@@ -1,3 +1,4 @@
+import { rejectLegacyContentOperation } from "./lib/legacy-content-gate";
 /**
  * Seed images from extracted PDFs into Supabase Storage and the images table.
  *
@@ -163,7 +164,8 @@ export function selectImages(
     const sorted = group
       .map((img) => ({ img, score: scoreImage(img) }))
       .sort((a, b) => b.score - a.score);
-    selected.push({ image: sorted[0].img });
+    const best = sorted[0];
+    if (best) selected.push({ image: best.img });
   }
 
   return selected;
@@ -436,5 +438,5 @@ const isDirectExecution = process.argv[1]?.endsWith("seed-images.ts") ||
   process.argv[1]?.includes("seed-images");
 
 if (isDirectExecution && !process.env.VITEST) {
-  main().catch(console.error);
+  rejectLegacyContentOperation("seed-images.ts", main);
 }

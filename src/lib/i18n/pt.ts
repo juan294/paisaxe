@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const pt: Translations = {
   common: {
+    rateLimited: "Limite temporário. Aguarde {seconds} segundos e tente novamente.",
+    retry: "Tentar novamente",
     loading: 'Carregando...',
     close: 'Fechar',
   },
 
+  navigation: {
+    preparing: "A preparar a navegação…",
+    recovery: "Se os controlos não ficarem disponíveis, recarregue a página e verifique se o JavaScript está ativado.",
+    reload: "Recarregar a página",
+    ready: "A navegação está pronta.",
+  },
+
+  locale: {
+    loadFailed: "Não foi possível carregar o idioma escolhido. O conteúdo é apresentado em espanhol enquanto tenta novamente.",
+    retry: "Tentar carregar o idioma novamente",
+    storyFallback: "Alguns conteúdos ou perguntas desta história ainda não estão disponíveis no idioma escolhido e são apresentados em espanhol.",
+    legacyMigrated: "A preferência de idioma guardada neste navegador foi recuperada.",
+  },
+
   chat: {
+    safety_redirect: "Olá! Sou {name}, o seu guia turístico de {region}. Como posso ajudar a descobrir a nossa região?",
     placeholder: 'Pergunte sobre este lugar...',
     listening: 'Ouvindo...',
     thinking: 'Pensando...',
@@ -165,6 +182,8 @@ export const pt: Translations = {
   },
 
   auth: {
+    verificationFailed: "Não foi possível verificar a sua sessão. Tente novamente para continuar.",
+    retryVerification: "Verificar a sessão novamente",
     user: 'Utilizador',
     user_avatar: 'Avatar do utilizador',
     sign_out: 'Terminar sessão',
@@ -187,6 +206,12 @@ export const pt: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "O acesso à voz não está disponível neste momento.",
+    checkAccess: "Verificar o acesso à voz",
+    contactSupport: "Contactar o apoio",
+    suspended: "O acesso à voz está suspenso enquanto uma disputa de pagamento é analisada.",
+    revoked: "Este passe de voz foi revogado após a reversão de um pagamento.",
+    expired: "O seu passe de voz expirou. Pode comprar um novo para continuar a usar a voz.",
     try_voice: 'Falar',
     use_text: 'Escrever',
     upgrade_cta: 'Use sua voz',
@@ -471,7 +496,7 @@ export const pt: Translations = {
       limitReached: 'Já usou tudo o que este código inclui. Peça um novo para continuar.',
       rateLimited: 'Demasiadas tentativas. Aguarde um minuto e tente de novo.',
       failed: 'Não foi possível verificar o código. Tente novamente.',
-      welcome: 'Bem-vindo! A abrir o assistente de reservas…',
+      welcome: 'Boas-vindas! A abrir o assistente de reservas…',
     },
     chat: {
       checking: 'A verificar disponibilidade…',
@@ -513,6 +538,20 @@ export const pt: Translations = {
       returnProblem: 'Há um problema com este pagamento e estamos a revê-lo. Se foi cobrado, devolvemos o sinal.',
       returnFailed: 'O PayPal recusou o pagamento e nada foi cobrado. Estamos a rever a situação.',
       returnError: 'Não foi possível verificar o pagamento. Abra a reserva para ver o estado.',
+      statusConfirming: 'A confirmar o pagamento',
+      holdCountdown: 'Guardamos o seu lugar: faltam {time}',
+      when: '{day} · {time} · {people} pessoas',
+      steps: {
+        label: 'Estado da reserva',
+        offer: 'Oferta aceite',
+        deposit: 'Sinal pago',
+        balance: 'Restante pago',
+      },
+      receiptTitle: 'Comprovativo PayPal',
+      copy: 'Copiar',
+      copied: 'Copiado',
+      copyFailed: 'Não foi possível copiar; selecione o código',
+      returnSlow: 'Está a demorar mais do que o habitual. Pode ver o estado na sua reserva.',
     },
     cancel: {
       title: 'Cancelar a reserva',
@@ -568,6 +607,10 @@ export const pt: Translations = {
       sandbox: 'PayPal sandbox: pagamento de teste, sem dinheiro real',
       pay: 'Pagar com PayPal',
       payBefore: 'Pague antes das {time}; depois disso o lugar é libertado',
+      payWith: 'Pagar com',
+      demoSandbox: 'Demo · sandbox',
+      depositPaid: 'Sinal pago',
+      balancePaid: 'Restante pago',
       cancellationTitle: 'Cancelamento',
       suitability: {
         suitable: 'Corresponde ao que procura',

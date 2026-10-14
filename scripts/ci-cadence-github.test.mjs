@@ -14,7 +14,7 @@ const sha = value => value.repeat(40);
 const workflow = '.github/workflows/ci-nightly.yml';
 const expected = { repository, sourceSha: sha('a'), targetBranch: 'develop', definitionSha: sha('b'), policyFingerprint: 'policy:1', helperFingerprint: 'helper:1', lockfileFingerprint: 'lock:1', runtimeFingerprint: 'node24/npm11/linux' };
 const policy = { schemaVersion: 1, repository, defaultBranch: 'main', integrationBranch: 'develop', productionBranch: 'main', owners: ['juan294'], refreshHours: 168, coverageMaxAgeHours: 192, changedHeadDeadlineHours: 36, workflows: [{ path: workflow, definitionSha: sha('c'), jobs: [{ id: 'lint', needs: [] }, { id: 'test', needs: ['lint'] }], contexts: { Lint: ['lint'], Test: ['test'] } }] };
-const projection = { kind: 'full', jobs: { lint: 'Lint', test: 'Test' }, workflowPins: { [workflow]: sha('c'), '.github/workflows/ci.yml': sha('d') }, admissionJob: 'Cadence admission', admissionStep: 'Execute Cadence admission', measurementJob: 'Test', measurementStep: 'Upload measurement', workflowSources: { [workflow]: sha('b'), '.github/workflows/ci.yml': sha('b') }, referencedWorkflows: [{ path: 'juan294/paisaxe/.github/workflows/ci.yml@refs/heads/main', sha: sha('b'), ref: 'refs/heads/main' }], steps: { lint: ['Execute Lint'], test: ['Execute Test'] }, ignoredSteps: { lint: ['Complete job'], test: ['Complete job', 'Upload measurement'] } };
+const projection = { kind: 'full', jobs: { lint: 'Lint', test: 'Test' }, workflowPins: { [workflow]: sha('c'), '.github/workflows/ci.yml': sha('d') }, admissionJob: 'Cadence admission', admissionStep: 'Execute Cadence admission', measurementJob: 'Test', measurementStep: 'Upload measurement', workflowSources: { [workflow]: sha('b'), '.github/workflows/ci.yml': sha('b') }, referencedWorkflows: [{ path: `juan294/paisaxe/.github/workflows/ci.yml@${sha('b')}`, sha: sha('b'), ref: 'refs/heads/main' }], steps: { lint: ['Execute Lint'], test: ['Execute Test'] }, ignoredSteps: { lint: ['Complete job'], test: ['Complete job', 'Upload measurement'] } };
 const at = '2026-10-02T01:00:00Z';
 const nativeRun = () => ({ id: 123, run_attempt: 1, path: workflow, event: 'schedule', head_sha: expected.definitionSha, head_branch: 'main', status: 'completed', conclusion: 'success', html_url: `https://github.com/${repository}/actions/runs/123`, repository: { full_name: repository, id: 1141286326, owner: { login: 'juan294', id: 3944118, type: 'User' }, default_branch: 'main', fork: false }, head_repository: { full_name: repository, id: 1141286326, owner: { login: 'juan294', id: 3944118, type: 'User' }, default_branch: 'main', fork: false }, actor: { login: 'juan294', id: 3944118, type: 'User' }, check_suite_id: 99, referenced_workflows: projection.referencedWorkflows, updated_at: '2026-10-03T00:00:00Z' });
 const nativeJob = (id, name, conclusion = 'success', completed = at) => {
@@ -251,6 +251,30 @@ test('native referenced workflow commit cannot be replaced with forged artifact-
   const f = fixture({ run: { ...nativeRun(), referenced_workflows: [{ ...projection.referencedWorkflows[0], sha: sha('f') }] } });
   assert.equal((await read(f)).available, false);
 });
+// GitHub names each reference path@<commit> and lists them in no fixed order (run 37721477388).
+test('native referenced workflows match in any order, but only as path@commit with that commit', async () => {
+  const e2e = { path: `juan294/paisaxe/.github/workflows/e2e.yml@${sha('b')}`, sha: sha('b'), ref: 'refs/heads/main' };
+  const twoCallees = { ...projection, workflowPins: { ...projection.workflowPins, '.github/workflows/e2e.yml': sha('e') },
+    workflowSources: { ...projection.workflowSources, '.github/workflows/e2e.yml': sha('b') }, referencedWorkflows: [projection.referencedWorkflows[0], e2e] };
+  const served = references => fixture({ run: { ...nativeRun(), referenced_workflows: references }, admit: { ...admission(), workflowPins: twoCallees.workflowPins },
+    override: { [`/repos/juan294/paisaxe/contents/.github/workflows/e2e.yml?ref=${expected.definitionSha}`]: { type: 'file', path: '.github/workflows/e2e.yml', sha: sha('e') } } });
+  const available = async (references, projected = twoCallees) => (await read(served(references), { projection: projected })).available;
+  // GitHub's own key order and an arbitrary list order.
+  assert.equal(await available([{ ref: e2e.ref, sha: e2e.sha, path: e2e.path }, projection.referencedWorkflows[0]]), true);
+  // A branch-named path is not what GitHub reports, so it can neither be projected nor observed.
+  const branchNamed = list => list.map(item => ({ ...item, path: item.path.replace(/@[a-f0-9]{40}$/, '@refs/heads/main') }));
+  assert.equal(await available(branchNamed(twoCallees.referencedWorkflows), { ...twoCallees, referencedWorkflows: branchNamed(twoCallees.referencedWorkflows) }), false);
+  assert.equal(await available(branchNamed(twoCallees.referencedWorkflows)), false);
+  // A path naming one commit while .sha names another is rejected.
+  assert.equal(await available([{ ...e2e, path: `juan294/paisaxe/.github/workflows/e2e.yml@${sha('f')}` }, projection.referencedWorkflows[0]]), false);
+  // A missing reference, an unprojected extra one, a repeated one or an extra field is rejected.
+  assert.equal(await available([projection.referencedWorkflows[0]]), false);
+  assert.equal(await available([...twoCallees.referencedWorkflows, { ...e2e, path: `juan294/paisaxe/.github/workflows/other.yml@${sha('b')}` }]), false);
+  assert.equal(await available([...twoCallees.referencedWorkflows, e2e]), false);
+  assert.equal(await available([projection.referencedWorkflows[0], { ...e2e, extra: true }]), false);
+  // The same path and commit reached through another branch ref is a different native reference.
+  assert.equal(await available([projection.referencedWorkflows[0], { ...e2e, ref: 'refs/heads/develop' }]), false);
+});
 
 test('cancelled after authenticated pre-suite admission but before app work remains known blocked', async () => {
   const run = { ...nativeRun(), conclusion: 'cancelled' };
@@ -333,7 +357,7 @@ test('admission artifact created after successful uploader step cannot be attrib
 
 test('native reference projection cannot count one callee twice while omitting another pinned callee', async () => {
   const pins = { ...projection.workflowPins, '.github/workflows/e2e.yml': sha('e') };
-  const refs = [projection.referencedWorkflows[0], { ...projection.referencedWorkflows[0], path: 'juan294/paisaxe/.github/workflows/ci.yml@refs/heads/develop', ref: 'refs/heads/develop' }];
+  const refs = [projection.referencedWorkflows[0], { ...projection.referencedWorkflows[0], ref: 'refs/heads/develop' }];
   const f = fixture(); const result = await read(f, { projection: { ...projection, workflowPins: pins, workflowSources: { ...projection.workflowSources, '.github/workflows/e2e.yml': expected.definitionSha }, referencedWorkflows: refs } });
   assert.equal(result.available, false); assert.equal(f.requests.length, 0);
 });
@@ -464,7 +488,7 @@ async function executedRootFixture(t, variant = 'app-only', event = 'push', conc
   const reviewedBlob = blobAt(before, workflow);
   const actualExpected = { ...expected, definitionSha: before, sourceSha: after };
   const actualPolicy = { ...policy, workflows: [{ ...policy.workflows[0], definitionSha: reviewedBlob }] };
-  const actualProjection = { ...projection, workflowPins: { [workflow]: reviewedBlob, [calleePath]: callee }, workflowSources: { [workflow]: before, [calleePath]: before }, referencedWorkflows: [{ ...projection.referencedWorkflows[0], sha: before }] };
+  const actualProjection = { ...projection, workflowPins: { [workflow]: reviewedBlob, [calleePath]: callee }, workflowSources: { [workflow]: before, [calleePath]: before }, referencedWorkflows: [{ ...projection.referencedWorkflows[0], path: `juan294/paisaxe/.github/workflows/ci.yml@${before}`, sha: before }] };
   const run = { ...nativeRun(), event, conclusion, head_sha: event === 'push' ? after : before, head_branch: event === 'push' ? 'develop' : 'main', referenced_workflows: actualProjection.referencedWorkflows };
   const admit = { ...admission(), ...actualExpected, lane: event === 'push' ? 'full' : 'nightly', testedCheckoutSha: after, workflowDefinitionSha: reviewedBlob, workflowPins: actualProjection.workflowPins };
   const measured = { ...measurement(), ...actualExpected, checkouts: { 1: after, 2: after } };

@@ -4,6 +4,7 @@ import React from "react";
 import { useStories, clearStoriesCache, prefetchStories, StoriesProvider } from "./use-stories";
 import type { Story } from "@/types/immersive";
 import { stubStoriesApiFetch } from "@/test/mock-stories-api-fetch";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 const mockStories: Story[] = [
   {
@@ -197,7 +198,7 @@ describe("useStories", () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toBe("Failed to load stories");
+    expect(result.current.error?.message).toBe("Failed to fetch stories");
   });
 
   it("should refresh and force-fetch new data", async () => {
@@ -283,9 +284,9 @@ describe("useStories", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // Cached stories are retained (no throw, no error state).
+    // Safe stale stories remain visible, with an error for executable retry.
     expect(result.current.stories).toEqual(mockStories);
-    expect(result.current.error).toBeNull();
+    expect(result.current.error?.message).toBe("Failed to fetch stories");
 
     consoleSpy.mockRestore();
   });
@@ -337,7 +338,7 @@ describe("useStories", () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toBe("Failed to refresh stories");
+    expect(result.current.error?.message).toBe("Failed to fetch stories");
   });
 
   it("should revalidate stale data on window focus", async () => {
@@ -676,7 +677,7 @@ describe("useStories with initialStories", () => {
     // Second: render with initialStories — initialStories overwrites cache
     // to ensure post-deploy freshness (FE-M2)
     const wrapperWithInitial = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(StoriesProvider, { initialStories: serverStories }, children);
+      React.createElement(StoriesProvider, { initialStories: serverStories, initialUpdatedAt: Date.now() + 1 }, children);
     const { result: result2 } = renderHook(() => useStories(), { wrapper: wrapperWithInitial });
     expect(result2.current.stories).toEqual(serverStories);
     expect(result2.current.isLoading).toBe(false);
@@ -741,7 +742,9 @@ describe("useStories localStorage persistence", () => {
     // Parse the stored data and verify structure
     const stored = JSON.parse(storiesCall![1]);
     expect(stored.version).toBe(1);
-    expect(stored.data).toEqual(mockStories.map(({ sourcePdf: _sourcePdf, ...story }) => story));
+    expect(stored.data).toEqual(mockStories.map(({ sourcePdf: _sourcePdf, ...story }) => ({
+      ...story, image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT,
+    })));
     expect(stored.timestamp).toBeDefined();
   });
 
@@ -814,7 +817,9 @@ describe("useStories localStorage persistence", () => {
 
     // Should immediately have stories from localStorage, mapped back to Story compatibility
     expect(result.current.stories).toEqual(
-      mockStories.map((story) => ({ ...story, sourcePdf: "" }))
+      mockStories.map((story) => ({
+        ...story, sourcePdf: "", image: NEUTRAL_IMAGE, imageSource: NEUTRAL_CREDIT,
+      }))
     );
     expect(result.current.isLoading).toBe(false);
   });

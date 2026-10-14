@@ -20,7 +20,7 @@ export function StatCard({ value, label, color }: StatCardProps) {
     typeof value === "number" ? value.toLocaleString() : value;
   const colorClass = color
     ? statColorClasses[color]
-    : "text-[#2d2a26] dark:text-[#f5f3ee]";
+    : "text-admin-ink dark:text-admin-paper";
   return (
     <div>
       <p
@@ -28,7 +28,7 @@ export function StatCard({ value, label, color }: StatCardProps) {
       >
         {displayValue}
       </p>
-      <p className="mt-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+      <p className="mt-4 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
         {label}
       </p>
     </div>
@@ -99,7 +99,7 @@ export function CostChart({ data }: CostChartProps) {
               x={padding.left + (i * chartWidth) / data.length + barWidth / 2}
               y={height - 8}
               textAnchor="middle"
-              className="fill-[#a39e98] font-mono text-[10px]"
+              className="fill-admin-subtle font-mono text-[10px]"
             >
               {formatDateShort(d.date)}
             </text>
@@ -111,7 +111,7 @@ export function CostChart({ data }: CostChartProps) {
           x={padding.left - 10}
           y={padding.top + 4}
           textAnchor="end"
-          className="fill-[#a39e98] font-mono text-[10px]"
+          className="fill-admin-subtle font-mono text-[10px]"
         >
           {formatCurrencyShort(maxCost)}
         </text>
@@ -119,7 +119,7 @@ export function CostChart({ data }: CostChartProps) {
           x={padding.left - 10}
           y={padding.top + chartHeight + 4}
           textAnchor="end"
-          className="fill-[#a39e98] font-mono text-[10px]"
+          className="fill-admin-subtle font-mono text-[10px]"
         >
           $0
         </text>
@@ -155,7 +155,7 @@ export function ServiceBreakdownTable({
 }: ServiceBreakdownTableProps) {
   if (services.length === 0) {
     return (
-      <p className="py-6 text-center font-mono text-xs text-[#a39e98]">
+      <p className="py-6 text-center font-mono text-xs text-admin-subtle">
         No cost data available
       </p>
     );
@@ -164,25 +164,25 @@ export function ServiceBreakdownTable({
   return (
     <table className="w-full">
       <thead>
-        <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Service
           </th>
-          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Category
           </th>
-          <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Cost
           </th>
-          <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Actions
           </th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+      <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
         {services.map((service) => (
           <tr key={`${service.serviceId}-${service.billingPeriodStart}`}>
-            <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+            <td className="py-2 text-sm text-admin-secondary dark:text-admin-subtle">
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   {service.serviceName}
@@ -191,7 +191,7 @@ export function ServiceBreakdownTable({
                       href={service.dashboardUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#a39e98] hover:text-[#6b6560]"
+                      className="text-admin-subtle hover:text-admin-muted"
                       aria-label={`Open ${service.serviceName} dashboard`}
                     >
                       <ExternalLink className="h-3 w-3" />
@@ -199,7 +199,7 @@ export function ServiceBreakdownTable({
                   )}
                 </div>
                 {service.notes && (
-                  <span className="text-xs text-[#a39e98]">
+                  <span className="text-xs text-admin-subtle">
                     {service.notes}
                   </span>
                 )}
@@ -217,7 +217,7 @@ export function ServiceBreakdownTable({
                   <button
                     onClick={() => onEdit(service)}
                     aria-label={`Edit ${service.serviceName} cost`}
-                    className="rounded p-1 text-[#a39e98] hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
+                    className="rounded p-1 text-admin-subtle hover:bg-admin-paper hover:text-admin-muted dark:hover:bg-admin-depth"
                   >
                     <Pencil className="h-3 w-3" />
                   </button>
@@ -228,13 +228,13 @@ export function ServiceBreakdownTable({
                       )
                     }
                     aria-label={`Delete ${service.serviceName} cost`}
-                    className="rounded p-1 text-[#a39e98] hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20"
+                    className="rounded p-1 text-admin-subtle hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20"
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
               ) : (
-                <span className="text-[#a39e98]">—</span>
+                <span className="text-admin-subtle">—</span>
               )}
             </td>
           </tr>

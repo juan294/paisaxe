@@ -23,6 +23,7 @@ vi.mock("@/lib/supabase-browser", () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
       onAuthStateChange: vi.fn().mockReturnValue({
         data: { subscription: { unsubscribe: vi.fn() } },
       }),
@@ -427,12 +428,12 @@ describe("Accessibility: VoiceChat", () => {
   };
 
   describe("aria-live region for chat messages", () => {
-    it("should have an aria-live region for chat messages", () => {
+    it("should have an aria-live region for chat messages", async () => {
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
         wrapper: TestWrapper,
       });
 
-      const liveRegion = screen.getByRole("log");
+      const liveRegion = await screen.findByRole("log");
       expect(liveRegion).toBeInTheDocument();
       expect(liveRegion).toHaveAttribute("aria-live", "polite");
     });
@@ -444,7 +445,7 @@ describe("Accessibility: VoiceChat", () => {
         wrapper: TestWrapper,
       });
 
-      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      const input = await screen.findByPlaceholderText("Escribe tu pregunta...");
       await userEvent.type(input, "Tell me about this");
 
       const form = input.closest("form");
@@ -487,12 +488,12 @@ describe("Accessibility: VoiceChat", () => {
       expect(closeButton).toBeInTheDocument();
     });
 
-    it("should have aria-label on the submit button", () => {
+    it("should have aria-label on the submit button", async () => {
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />, {
         wrapper: TestWrapper,
       });
 
-      const submitButton = screen.getByRole("button", { name: /enviar/i });
+      const submitButton = await screen.findByRole("button", { name: /enviar/i });
       expect(submitButton).toBeInTheDocument();
     });
   });

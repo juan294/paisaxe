@@ -13,7 +13,7 @@
   "workflows": [
     {
       "path": ".github/workflows/ci.yml",
-      "definitionSha": "fa583062712c4c2bff78ebfc7c07a825909f240e",
+      "definitionSha": "911440837d9f016be751b2624a0e70bb4c580841",
       "jobs": [
         {
           "id": "ci-lint-and-typecheck",
@@ -110,7 +110,7 @@
     },
     {
       "path": ".github/workflows/coverage.yml",
-      "definitionSha": "662f3870251115a92b8d49a484127d4bad474be0",
+      "definitionSha": "d64063a2633a6a8595b06f208184839126f1c5f2",
       "jobs": [
         {
           "id": "coverage-coverage",
@@ -125,7 +125,7 @@
     },
     {
       "path": ".github/workflows/lighthouse.yml",
-      "definitionSha": "ed465dc895e329013ccd9b39c3b8693aabe23846",
+      "definitionSha": "88891f4b1f50b418a8e70de29379af02a9962ff1",
       "jobs": [
         {
           "id": "lighthouse-lighthouse",
@@ -214,7 +214,7 @@
     },
     {
       "path": ".github/workflows/e2e-stripe-integration.yml",
-      "definitionSha": "7a803bd2c0b4df6309c12bd1a0e8f611867ea112",
+      "definitionSha": "cb686455a7854112a3d216e0bd814f62657ffc76",
       "jobs": [
         {
           "id": "e2e-stripe-integration-e2e-stripe",

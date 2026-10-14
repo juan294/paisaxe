@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import type { MarketingScheduleRow } from "@/types/marketing";
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }));
+});
 
 // Create mock functions
 const mockSelect = vi.fn();

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SignInPrompt } from "./sign-in-prompt";
@@ -178,7 +179,7 @@ describe("SignInPrompt", () => {
 
       const buttons = dialog.querySelectorAll<HTMLElement>("button");
       const firstButton = buttons[0];
-      const lastButton = buttons[buttons.length - 1];
+      const lastButton = requiredValue(buttons[buttons.length - 1], "src/components/auth/sign-in-prompt.test.tsx: buttons[buttons.length - 1]");
 
       lastButton.focus();
       expect(document.activeElement).toBe(lastButton);
@@ -192,7 +193,7 @@ describe("SignInPrompt", () => {
       const dialog = screen.getByRole("dialog");
 
       const buttons = dialog.querySelectorAll<HTMLElement>("button");
-      const firstButton = buttons[0];
+      const firstButton = requiredValue(buttons[0], "src/components/auth/sign-in-prompt.test.tsx: buttons[0]");
       const lastButton = buttons[buttons.length - 1];
 
       firstButton.focus();

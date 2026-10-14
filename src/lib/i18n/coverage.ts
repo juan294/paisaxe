@@ -50,7 +50,8 @@ export function computeCoverage(reference: Translations, target: Translations): 
   if (referenceKeys.length === 0) return 0;
   let translated = 0;
   for (const key of referenceKeys) {
-    if (getByPath(target, key) !== getByPath(reference, key)) translated++;
+    const value = getByPath(target, key);
+    if (typeof value === "string" && value.trim().length > 0 && value !== getByPath(reference, key)) translated++;
   }
   return Math.round((translated / referenceKeys.length) * 100);
 }

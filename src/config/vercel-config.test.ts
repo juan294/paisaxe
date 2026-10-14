@@ -18,10 +18,9 @@ describe("vercel.json", () => {
     expect(vercelConfig.crons).toContainEqual({ path: "/api/cron/reconcile-bookings", schedule: "*/5 * * * *" });
   });
 
-  // Vercel skips the build when ignoreCommand exits 0. Previews cost money, so
-  // the only one built is the release PR's (head `develop`, the documented
-  // exception its "Smoke test Vercel preview" check needs); Dependabot and
-  // feature PRs, and direct pushes, build nothing.
+  // Vercel skips the build when ignoreCommand exits 0. Previews cost money and
+  // nothing needs one (owner, 2026-10-06; `Release artifact smoke` replaced the
+  // Preview smoke in main's required checks on 2026-10-07): only production builds.
   describe("ignoreCommand", () => {
     const decide = (env: Record<string, string>): "build" | "skip" => {
       const result = spawnSync("sh", ["-c", vercelConfig.ignoreCommand as string], {
@@ -34,11 +33,9 @@ describe("vercel.json", () => {
       expect(decide({ VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main" })).toBe("build");
     });
 
-    it("builds the release PR from develop", () => {
-      expect(decide({ VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "develop", VERCEL_GIT_PULL_REQUEST_ID: "1000" })).toBe("build");
-    });
 
     it.each([
+      ["the release PR from develop (Release artifact smoke replaced the Preview smoke)", { VERCEL_GIT_COMMIT_REF: "develop", VERCEL_GIT_PULL_REQUEST_ID: "1000" }],
       ["a direct develop push", { VERCEL_GIT_COMMIT_REF: "develop" }],
       ["a Dependabot PR", { VERCEL_GIT_COMMIT_REF: "dependabot/npm_and_yarn/develop/stripe-23.0.0", VERCEL_GIT_PULL_REQUEST_ID: "993" }],
       ["a feature PR", { VERCEL_GIT_COMMIT_REF: "feature/x", VERCEL_GIT_PULL_REQUEST_ID: "12" }],

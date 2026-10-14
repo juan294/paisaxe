@@ -1,3 +1,4 @@
+import { requiredValue } from "../src/test/required-value";
 import { describe, it, expect, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -84,9 +85,9 @@ describe("groupChunksByPdf", () => {
       { content: "third", sourcePdf: "doc.pdf", pageNumber: 3 },
     ];
     const group = groupChunksByPdf(chunks).get("doc.pdf")!;
-    expect(group[0].content).toBe("first");
-    expect(group[1].content).toBe("second");
-    expect(group[2].content).toBe("third");
+    expect(requiredValue(group[0], "first chunk").content).toBe("first");
+    expect(requiredValue(group[1], "second chunk").content).toBe("second");
+    expect(requiredValue(group[2], "third chunk").content).toBe("third");
   });
 
   it("preserves sectionTitle on each chunk", () => {
@@ -94,7 +95,7 @@ describe("groupChunksByPdf", () => {
       { content: "body text here", sourcePdf: "guide.pdf", pageNumber: 5, sectionTitle: "NATURALEZA" },
     ];
     const group = groupChunksByPdf(chunks).get("guide.pdf")!;
-    expect(group[0].sectionTitle).toBe("NATURALEZA");
+    expect(requiredValue(group[0], "first chunk").sectionTitle).toBe("NATURALEZA");
   });
 
   it("handles a single chunk correctly", () => {

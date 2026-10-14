@@ -1,5 +1,7 @@
+import { rateLimitResponse } from "@/lib/request-rate-limit";
+import { getEnv } from "@/lib/env";
 import { NextResponse } from "next/server";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, normalizeIpForRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
 import { withRouteContext } from "@/lib/request-validation";
@@ -101,7 +103,7 @@ const ASTURIAS_CITIES: Record<string, { lat: number; lon: number }> = {
 };
 
 async function fetchWeather(city: string): Promise<WeatherResponse> {
-  const apiKey = process.env.OPENWEATHERMAP_API_KEY?.trim();
+  const apiKey = getEnv("OPENWEATHERMAP_API_KEY");
 
   if (!apiKey) {
     throw new Error("Weather API not configured");
@@ -161,7 +163,7 @@ function extractConversationId(source: unknown): string | null {
 function buildPerCallerRateLimitKey(conversationId: string | null, ip: string): string {
   return conversationId
     ? `mcp-weather:conv:${conversationId}`
-    : `mcp-weather:ip:${ip}`;
+    : `mcp-weather:ip:${normalizeIpForRateLimit(ip)}`;
 }
 
 interface RateLimitCheck {
@@ -187,13 +189,7 @@ async function checkWeatherRateLimits(
 }
 
 function tooManyRequestsResponse(retryAfter?: number): NextResponse {
-  return NextResponse.json(
-    { error: "Too many requests" },
-    {
-      status: 429,
-      headers: { "Retry-After": String(retryAfter) },
-    }
-  );
+  return rateLimitResponse({ error: "Too many requests" }, { retryAfter });
 }
 
 // BE-M8 (#789): a safe, stable response for any failure inside fetchWeather().
@@ -272,7 +268,7 @@ async function handleGet(request: Request): Promise<NextResponse> {
   }
   const { city } = queryParsed.data;
 
-  if (!process.env.OPENWEATHERMAP_API_KEY) {
+  if (!getEnv("OPENWEATHERMAP_API_KEY")) {
     return NextResponse.json(
       { error: "Weather API not configured" },
       { status: 500 }
@@ -283,7 +279,7 @@ async function handleGet(request: Request): Promise<NextResponse> {
     const weather = await fetchWeather(city);
     return NextResponse.json(weather, {
       headers: {
-        "Cache-Control": "public, max-age=300", // Cache for 5 minutes
+        "Cache-Control": "private, max-age=300", // Cache for 5 minutes
       },
     });
   } catch (err) {
@@ -330,7 +326,7 @@ async function handlePost(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!process.env.OPENWEATHERMAP_API_KEY) {
+  if (!getEnv("OPENWEATHERMAP_API_KEY")) {
     return NextResponse.json(
       { error: "Weather API not configured" },
       { status: 500 }
@@ -343,7 +339,7 @@ async function handlePost(request: Request): Promise<NextResponse> {
     const weather = await fetchWeather(city);
     return NextResponse.json(weather, {
       headers: {
-        "Cache-Control": "public, max-age=300", // Cache for 5 minutes (matches GET)
+        "Cache-Control": "private, max-age=300", // Cache for 5 minutes (matches GET)
       },
     });
   } catch (err) {

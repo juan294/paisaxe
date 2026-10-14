@@ -22,7 +22,7 @@ test('counts unique executed identities and unions actual line hits across overl
   const a = suite('app'), b = suite('scripts');
   b.coverage[`${root}/apps/a.ts`].s = { 0: 0, 1: 1 };
   assert.deepEqual(aggregate([a,b]), { testCount: 1, testFiles: 1, passed: 1, failed: 0,
-    observedExecutions: 2, coverage: 100, coveredLines: 2, totalLines: 2,
+    observedExecutions: 2, coverage: 100, coveredLines: 2, totalLines: 2, environmentGatedSkipped: 0,
     suites: [{ id: 'app', executed: 1, failed: 0 }, { id: 'scripts', executed: 1, failed: 0 }] });
 });
 test('distinct file identities count separately, failed repeated identity vetoes success', () => {
@@ -79,3 +79,40 @@ test('disjoint line reports retain weighted exact line totals', () => {
   delete b.coverage[`${root}/apps/a.ts`];
   const r=aggregate([a,b]); assert.equal(r.coverage,50); assert.equal(r.totalLines,4); assert.equal(r.coveredLines,2);
 });
+
+// A describe.skipIf(!dbReachable) group skips as a whole on a runner without the
+// local Supabase stack. Only exact reviewed (file, group) pairs may skip, and only whole.
+const GATED = [{ file: 'src/lib/x.postgrest-integration.test.ts', describe: 'x against live local Supabase', cases: 2 }];
+function gated(statuses = ['skipped', 'skipped'], describe = GATED[0].describe, file = GATED[0].file) {
+  const s = suite('app');
+  const cases = statuses.map((status, index) => ({ ancestorTitles: [describe, 'nested'], title: `case ${index}`, fullName: `${describe} nested case ${index}`, status, failureMessages: [] }));
+  s.tests.testResults.push({ name: `${root}/${file}`, status: 'passed', message: '', assertionResults: cases });
+  const skipped = statuses.filter(status => status !== 'passed').length;
+  Object.assign(s.tests, { numTotalTests: 1 + statuses.length, numPassedTests: 1 + statuses.length - skipped, numPendingTests: skipped, numTotalTestSuites: 3, numPassedTestSuites: 3 });
+  return s;
+}
+const aggregateGated = (s, environmentGated = GATED) => aggregateMeasuredSuites({ root, requiredSuites: ['app'], suites: [s], environmentGated });
+test('a whole reviewed environment-gated group may skip; it is disclosed and never counted as a test', () => {
+  const r = aggregateGated(gated());
+  assert.equal(r.testCount, 1); assert.equal(r.passed, 1); assert.equal(r.testFiles, 1); assert.equal(r.observedExecutions, 1); assert.equal(r.environmentGatedSkipped, 2);
+  // With the stack available the same group runs and counts like any other.
+  const ran = aggregateGated(gated(['passed', 'passed']));
+  assert.equal(ran.testCount, 3); assert.equal(ran.testFiles, 2); assert.equal(ran.environmentGatedSkipped, 0);
+});
+for (const [name, build, allowlist] of [
+  ['a gated skip without the reviewed allowlist', () => gated(), []],
+  ['a skip in another file', () => gated(['skipped'], GATED[0].describe, 'src/lib/y.postgrest-integration.test.ts')],
+  ['a skip in another group of the reviewed file', () => gated(['skipped'], 'another group')],
+  ['a partly skipped gated group', () => gated(['skipped', 'passed'])],
+  ['a pending or todo case in a gated group', () => gated(['skipped', 'pending'])],
+  ['a native pending total that exceeds the admitted skips', () => { const s = gated(); s.tests.numPendingTests += 1; s.tests.numTotalTests += 1; return s; }],
+  ['a native pending count no case accounts for', () => { const s = gated(); s.tests.numPendingTests += 1; return s; }],
+  ['a todo total', () => { const s = gated(); s.tests.numTodoTests = 1; return s; }],
+  ['a case added to a skipped gated group', () => gated(['skipped', 'skipped', 'skipped'])],
+  ['a case moved out of a skipped gated group', () => gated(['skipped'])],
+  ['an allowlist entry without its pinned case count', () => gated(), [{ file: GATED[0].file, describe: GATED[0].describe }]],
+  ['an allowlist entry with a non-positive case count', () => gated(), [{ ...GATED[0], cases: 0 }]],
+  ['a skipped describe-level suite census', () => { const s = gated(); s.tests.numPendingTestSuites = 1; s.tests.numTotalTestSuites += 1; return s; }],
+  ['a malformed allowlist', () => gated(), [{ file: GATED[0].file, cases: 2 }]],
+  ['a duplicated allowlist entry', () => gated(), [GATED[0], GATED[0]]],
+]) test(`rejects ${name}`, () => assert.throws(() => aggregateGated(build(), allowlist), /Incomplete coverage measurement/));

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createStory,
@@ -45,7 +46,7 @@ describe("admin-api/stories", () => {
       await createStory({ title: "New Story", content: "Content" } as never);
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:48 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories");
       expect(init.method).toBe("POST");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -105,7 +106,7 @@ describe("admin-api/stories", () => {
 
       await updateStory("s1", { title: "Updated" } as never);
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:108 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/s1");
       expect(init.method).toBe("PATCH");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -157,7 +158,7 @@ describe("admin-api/stories", () => {
       const result = await fetchStories();
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:160 mock call tuple");
       expect(String(url)).toBe(`${ORIGIN}/api/admin/stories`);
       expect(result).toEqual({ data: [{ id: "1", title: "Story" }] });
     });
@@ -167,7 +168,7 @@ describe("admin-api/stories", () => {
 
       await fetchStories("approved");
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:170 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("filter")).toBe("approved");
     });
@@ -177,7 +178,7 @@ describe("admin-api/stories", () => {
 
       await fetchStories();
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:180 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.has("filter")).toBe(false);
     });
@@ -187,7 +188,7 @@ describe("admin-api/stories", () => {
 
       await fetchStories({ page: 2 });
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:190 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("page")).toBe("2");
     });
@@ -197,7 +198,7 @@ describe("admin-api/stories", () => {
 
       await fetchStories({ pageSize: 50 });
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:200 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("pageSize")).toBe("50");
     });
@@ -207,7 +208,7 @@ describe("admin-api/stories", () => {
 
       await fetchStories({ filter: "approved", page: 1, pageSize: 25 });
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:210 mock call tuple");
       const parsedUrl = new URL(String(url));
       expect(parsedUrl.searchParams.get("filter")).toBe("approved");
       expect(parsedUrl.searchParams.get("page")).toBe("1");
@@ -262,7 +263,7 @@ describe("admin-api/stories", () => {
 
       await updateStoryImageUrl(storyId, imageUrl, "unsplash");
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:265 mock call tuple");
       expect(String(url)).toBe(`/api/admin/stories/${storyId}/image`);
       expect(init.method).toBe("PUT");
       expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -276,7 +277,7 @@ describe("admin-api/stories", () => {
 
       await updateStoryImageUrl(storyId, imageUrl);
 
-      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:279 mock call tuple");
       const body = JSON.parse(init.body);
       expect(body.imageUrl).toBe(imageUrl);
     });
@@ -328,7 +329,7 @@ describe("admin-api/stories", () => {
 
       await uploadStoryImage(storyId, file, "user_upload");
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:331 mock call tuple");
       expect(String(url)).toBe(`/api/admin/stories/${storyId}/image`);
       expect(init.method).toBe("PUT");
       const body = init.body as FormData;
@@ -345,7 +346,7 @@ describe("admin-api/stories", () => {
 
       await uploadStoryImage(storyId, file);
 
-      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:348 mock call tuple");
       const body = init.body as FormData;
       expect(body.get("imageSource")).toBeNull();
     });
@@ -358,7 +359,7 @@ describe("admin-api/stories", () => {
 
       await uploadStoryImage(storyId, file);
 
-      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:361 mock call tuple");
       expect(init.headers).toEqual({});
     });
 
@@ -410,7 +411,7 @@ describe("admin-api/stories", () => {
 
       await updateStoryImageSource("s1", "Turismo Asturias");
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:413 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/s1/image-source");
       expect(init.method).toBe("PUT");
       expect(JSON.parse(init.body)).toEqual({ imageSource: "Turismo Asturias" });
@@ -451,7 +452,7 @@ describe("admin-api/stories", () => {
 
       await updateStoryStatus("s1", "approved");
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:454 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/s1/status");
       expect(init.method).toBe("PUT");
       expect(JSON.parse(init.body)).toEqual({ status: "approved" });
@@ -492,7 +493,7 @@ describe("admin-api/stories", () => {
 
       await bulkUpdateStoryStatus(["a", "b"], "approved");
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:495 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/bulk-status");
       expect(init.method).toBe("PUT");
       expect(JSON.parse(init.body)).toEqual({ storyIds: ["a", "b"], status: "approved" });
@@ -533,7 +534,7 @@ describe("admin-api/stories", () => {
 
       await bulkDeleteStories(["a", "b"]);
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:536 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/bulk-delete");
       expect(init.method).toBe("DELETE");
       expect(JSON.parse(init.body)).toEqual({ storyIds: ["a", "b"] });
@@ -572,25 +573,25 @@ describe("admin-api/stories", () => {
         mockResponse({ data: { approvedCount: 5, approvedIds: ["a", "b", "c", "d", "e"] } })
       );
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:578 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/approve-all");
       expect(init.method).toBe("POST");
       expect(result).toEqual({ data: { approvedCount: 5, approvedIds: ["a", "b", "c", "d", "e"] } });
     });
 
-    it("does not send request body or Content-Type header", async () => {
+    it("sends the explicit confirmation snapshot as JSON", async () => {
       global.fetch = vi.fn().mockResolvedValue(
         mockResponse({ data: { approvedCount: 0, approvedIds: [] } })
       );
 
-      await approveAllPendingStories();
+      await approveAllPendingStories(["a", "b"]);
 
-      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(init.body).toBeUndefined();
-      expect(init.headers).toEqual({});
+      const [, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:591 mock call tuple");
+      expect(JSON.parse(init.body)).toEqual({ storyIds: ["a", "b"] });
+      expect(init.headers).toEqual(expect.objectContaining({ "Content-Type": "application/json" }));
     });
 
     it("returns error from response body on non-ok response", async () => {
@@ -598,15 +599,20 @@ describe("admin-api/stories", () => {
         mockResponse({ error: "Forbidden" }, false)
       );
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(result).toEqual({ error: "Forbidden" });
+    });
+
+    it("preserves the actual receipt when a later approval batch fails", async () => {
+      global.fetch = vi.fn().mockResolvedValue(mockResponse({ error: "Stopped", data: { approvedCount: 1, approvedIds: ["a"] } }, false));
+      expect(await approveAllPendingStories(["a", "b"])).toEqual({ error: "Stopped", data: { approvedCount: 1, approvedIds: ["a"] } });
     });
 
     it("returns fallback error when response body has no error field", async () => {
       global.fetch = vi.fn().mockResolvedValue(mockResponse({}, false));
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(result).toEqual({ error: "Failed to approve all stories" });
     });
@@ -614,7 +620,7 @@ describe("admin-api/stories", () => {
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("fail"));
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(result).toEqual({ error: "Network error" });
     });
@@ -622,7 +628,7 @@ describe("admin-api/stories", () => {
     it("returns network error when fetch throws a non-Error value", async () => {
       global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
-      const result = await approveAllPendingStories();
+      const result = await approveAllPendingStories(["a", "b"]);
 
       expect(result).toEqual({ error: "Network error" });
     });
@@ -638,7 +644,7 @@ describe("admin-api/stories", () => {
 
       await searchContentImages("s1");
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:641 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/s1/content-images");
     });
 
@@ -684,7 +690,7 @@ describe("admin-api/stories", () => {
 
       await fetchStoryTranslations("s1");
 
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:687 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/s1/translations");
     });
 
@@ -723,7 +729,7 @@ describe("admin-api/stories", () => {
 
       await updateStoryTranslation("s1", "es" as never, { title: "Hola" } as never);
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:726 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/s1/translations");
       expect(init.method).toBe("PATCH");
       expect(JSON.parse(init.body)).toEqual({ locale: "es", translation: { title: "Hola" } });
@@ -764,7 +770,7 @@ describe("admin-api/stories", () => {
 
       await generateStoryTranslations("s1", { locales: ["es" as never], forceRetranslate: true });
 
-      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:767 mock call tuple");
       expect(String(url)).toBe("/api/admin/stories/s1/translations");
       expect(init.method).toBe("POST");
       expect(JSON.parse(init.body)).toEqual({ locales: ["es"], forceRetranslate: true });
@@ -775,7 +781,7 @@ describe("admin-api/stories", () => {
 
       await generateStoryTranslations("s1");
 
-      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [, init] = requiredValue((fetch as ReturnType<typeof vi.fn>).mock.calls[0], "src/lib/admin-api/stories.test.ts:778 mock call tuple");
       expect(JSON.parse(init.body)).toEqual({});
     });
 

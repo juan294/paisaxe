@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { FullscreenButton } from "./fullscreen-button";
@@ -266,9 +267,9 @@ describe("FullscreenButton", () => {
       });
 
       // useFocusTrap should have been called with (ref, true, onEscape)
-      const lastCall = mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1];
-      expect(lastCall[1]).toBe(true); // active = true
-      expect(typeof lastCall[2]).toBe("function"); // onEscape callback
+      const lastCall = requiredValue(mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1], "src/components/immersive/fullscreen-button.test.tsx: mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1]");
+      expect(requiredValue(lastCall[1], "src/components/immersive/fullscreen-button.test.tsx: lastCall[1]")).toBe(true); // active = true
+      expect(typeof requiredValue(lastCall[2], "src/components/immersive/fullscreen-button.test.tsx: lastCall[2]")).toBe("function"); // onEscape callback
     });
 
     it("should call useFocusTrap with active=false when modal is closed", async () => {
@@ -281,8 +282,8 @@ describe("FullscreenButton", () => {
       });
 
       // Initially, the modal is not open — useFocusTrap should be called with active=false
-      const initialCall = mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1];
-      expect(initialCall[1]).toBe(false); // active = false
+      const initialCall = requiredValue(mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1], "src/components/immersive/fullscreen-button.test.tsx: mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1]");
+      expect(requiredValue(initialCall[1], "src/components/immersive/fullscreen-button.test.tsx: initialCall[1]")).toBe(false); // active = false
     });
 
     it("should have role=dialog and aria-modal=true on the modal container", async () => {
@@ -330,8 +331,8 @@ describe("FullscreenButton", () => {
       });
 
       // Get the onEscape callback that was passed to useFocusTrap
-      const lastCallWhenOpen = mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1];
-      const onEscapeCallback = lastCallWhenOpen[2];
+      const lastCallWhenOpen = requiredValue(mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1], "src/components/immersive/fullscreen-button.test.tsx: mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1]");
+      const onEscapeCallback = requiredValue(lastCallWhenOpen[2], "src/components/immersive/fullscreen-button.test.tsx: lastCallWhenOpen[2]");
 
       // Invoke the escape callback — should close the modal
       await act(async () => {

@@ -1,3 +1,4 @@
+import { resolvePermittedImage } from "./image-provenance";
 import "server-only";
 import { cache } from "react";
 import type { PublicStoryRow, Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
@@ -253,14 +254,15 @@ export function getAllDurations(): StoryDuration[] {
  * Convert Story to database format for seeding
  */
 export function storyToRow(story: Story, order: number = 0): Omit<StoryRow, "id" | "created_at" | "updated_at"> {
+  const image = resolvePermittedImage(story.image, story.imageSource, story.blurDataUrl);
   return {
     slug: story.slug || story.id,
     title: story.title,
     subtitle: story.subtitle || null,
     description: story.description || null,
-    image_path: story.image || null,
-    image_source: story.imageSource || null,
-    blur_data_url: story.blurDataUrl || null,
+    image_path: image.image,
+    image_source: image.imageSource,
+    blur_data_url: image.blurDataUrl || null,
     category: story.category,
     source_pdf: story.sourcePdf || null,
     location: story.location || null,

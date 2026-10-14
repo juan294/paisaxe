@@ -1,70 +1,38 @@
 "use client";
-
 import {
   createContext,
   createElement,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
+  useCallback,
   type ReactNode,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  getBrowserQueryClient,
+  publicQueryKey,
+  useClientQueryClient,
+} from "@/lib/client-query";
 import { FALLBACK_STORIES } from "@/lib/stories-fallback";
 import { clientLogger } from "@/lib/client-logger";
 import type { PublicStory, Story } from "@/types/immersive";
-import { publicStoryToStory, toPublicStory } from "@/types/immersive";
-
-// LocalStorage key for persistent cache
+import {
+  publicStoryToStory,
+  toPublicStory,
+  VALID_CATEGORIES,
+  STORY_SOURCE_TYPES,
+} from "@/types/immersive";
 const STORAGE_KEY = "paisaxe-stories-cache";
-const STORAGE_VERSION = 1; // Increment to invalidate old caches
-
-// Simple in-memory cache for stories
-interface StoriesCache {
-  data: Story[] | null;
-  timestamp: number;
-  promise: Promise<Story[]> | null;
-}
-
-// LocalStorage cache structure
+const STORAGE_VERSION = 1;
+const CACHE_TTL = 5 * 60 * 1000;
+const key = publicQueryKey("stories");
 interface PersistedCache {
   version: number;
   data: PublicStory[];
   timestamp: number;
 }
-
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Fetch stories through the server-side API route instead of calling
- * Supabase directly from the browser.
- *
- * FE-H1 (#759): `@/lib/stories-data` (the direct DB-fetch module) imports
- * `@/lib/logger`, which transitively pulls in Pino and
- * `request-context.ts`'s `node:async_hooks` require. Reaching the browser
- * bundle triggered a CSP `unsafe-eval` violation on every page load. Routing
- * through `/api/stories` keeps all logger-touching code server-side; the
- * route handler still calls the real `getStoriesFromDB()` (with its
- * FALLBACK_STORIES safety net and `[TABLE_FALLBACK]` logging) — only the
- * caller moved.
- */
-async function fetchStoriesFromApi(): Promise<Story[]> {
-  const response = await fetch("/api/stories");
-  if (!response.ok) {
-    throw new Error(`Failed to fetch stories: ${response.status}`);
-  }
-  const payload: { data: Story[] } = await response.json();
-  return payload.data;
-}
-
-// Singleton cache shared across all hook instances
-const cache: StoriesCache = {
-  data: null,
-  timestamp: 0,
-  promise: null,
-};
-
 interface UseStoriesResult {
   stories: Story[];
   isLoading: boolean;
@@ -74,10 +42,83 @@ interface UseStoriesResult {
 
 const StoriesContext = createContext<UseStoriesResult | null>(null);
 
-/**
- * Try to load stories from localStorage
- * Returns null if no valid cache exists
- */
+const strings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+const record = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+const optionalStrings = (value: Record<string, unknown>, keys: string[]) =>
+  keys.every(
+    (key) => value[key] === undefined || typeof value[key] === "string",
+  );
+function validPublicStory(value: unknown): value is PublicStory {
+  if (
+    !record(value) ||
+    !["id", "title", "subtitle", "description", "image"].every(
+      (key) => typeof value[key] === "string",
+    )
+  )
+    return false;
+  if (
+    !optionalStrings(value, [
+      "slug",
+      "imageSource",
+      "blurDataUrl",
+      "createdAt",
+      "location",
+      "duration",
+    ])
+  )
+    return false;
+  if (
+    !VALID_CATEGORIES.includes(value.category as PublicStory["category"]) ||
+    (value.sourceType !== undefined &&
+      !STORY_SOURCE_TYPES.includes(
+        value.sourceType as PublicStory["sourceType"] & string,
+      ))
+  )
+    return false;
+  if (
+    value.displayOrder !== undefined &&
+    (typeof value.displayOrder !== "number" ||
+      !Number.isFinite(value.displayOrder))
+  )
+    return false;
+  if (value.relatedStories !== undefined && !strings(value.relatedStories))
+    return false;
+  if (
+    value.bestMonths !== undefined &&
+    (!Array.isArray(value.bestMonths) ||
+      !value.bestMonths.every(
+        (month) => Number.isInteger(month) && month >= 1 && month <= 12,
+      ))
+  )
+    return false;
+  if (value.metadata === undefined) return true;
+  if (
+    !record(value.metadata) ||
+    !optionalStrings(value.metadata, ["asturianu_title", "asturianu_subtitle"])
+  )
+    return false;
+  const metadata = value.metadata;
+  if (
+    ["question_prompts", "mood_tags"].some(
+      (key) => metadata[key] !== undefined && !strings(metadata[key]),
+    )
+  )
+    return false;
+  if (metadata.translations === undefined) return true;
+  return (
+    record(metadata.translations) &&
+    Object.values(metadata.translations).every(
+      (translation) =>
+        record(translation) &&
+        optionalStrings(translation, ["title", "subtitle", "description"]) &&
+        (translation.question_prompts === undefined ||
+          strings(translation.question_prompts)),
+    )
+  );
+}
+
 function loadFromStorage(): Story[] | null {
   if (typeof window === "undefined") return null;
 
@@ -86,6 +127,14 @@ function loadFromStorage(): Story[] | null {
     if (!stored) return null;
 
     const parsed: PersistedCache = JSON.parse(stored);
+
+    if (
+      !Number.isFinite(parsed.timestamp) ||
+      parsed.timestamp > Date.now() ||
+      !Array.isArray(parsed.data) ||
+      !parsed.data.every(validPublicStory)
+    )
+      throw new Error("Invalid story cache");
 
     // Check version compatibility
     if (parsed.version !== STORAGE_VERSION) {
@@ -127,243 +176,144 @@ function saveToStorage(data: Story[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
   } catch {
     // Storage full or other error - ignore
-    clientLogger.warn("[STORIES_CACHE] Failed to persist stories to localStorage");
+    clientLogger.warn(
+      "[STORIES_CACHE] Failed to persist stories to localStorage",
+    );
   }
 }
 
+async function fetchStories(signal?: AbortSignal): Promise<Story[]> {
+  try {
+    const response = await fetch("/api/stories", { signal });
+    if (!response.ok)
+      throw new Error(`Failed to fetch stories: ${response.status}`);
+    const payload: { data: Story[] } = await response.json();
+    signal?.throwIfAborted();
+    saveToStorage(payload.data);
+    return payload.data;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    clientLogger.warn("Failed to refresh stories, using cached", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error instanceof Error ? error : new Error("Failed to fetch stories");
+  }
+}
 
-/**
- * Hook for fetching and caching stories data.
- *
- * Implements stale-while-revalidate pattern with localStorage persistence:
- * - On first load, tries to restore from localStorage (after hydration, in useEffect)
- * - Returns server-provided initialStories immediately when available
- * - Revalidates in background if cache is stale
- * - Deduplicates concurrent requests
- * - Persists to localStorage for next visit
- *
- * localStorage bootstrap is intentionally deferred to a useEffect so the initial
- * render is identical between server and client, preventing hydration mismatches.
- * Only server-provided `initialStories` may seed the cache during render.
- */
 function useStoriesState(
   initialStories?: Story[],
+  initialUpdatedAt?: number,
 ): UseStoriesResult {
-  // Seed in-memory cache from server-provided stories during render.
-  // localStorage is intentionally NOT read here — that happens in useEffect
-  // below so the server render and first client render produce identical output.
-  const initializedFromServer = useRef(false);
-  if (!initializedFromServer.current) {
-    if (initialStories?.length) {
-      // Always apply server-provided stories to ensure freshness post-deploy
-      cache.data = initialStories;
-      cache.timestamp = Date.now();
-    }
-    initializedFromServer.current = true;
-  }
-
-  const hasInitial = !!(initialStories && initialStories.length > 0);
-  // Initial state: use server-provided stories or in-memory cache (set by StoriesProvider
-  // or a previous mount), but never from localStorage at render time.
-  const [stories, setStories] = useState<Story[]>(cache.data || FALLBACK_STORIES);
-  // If we have server-provided initial stories or a warm in-memory cache, skip loading.
-  const [isLoading, setIsLoading] = useState(!cache.data && !hasInitial);
-  const [error, setError] = useState<Error | null>(null);
-
-  // Bootstrap from localStorage after hydration.
-  // This effect runs once per hook instance on the client, after the first render.
-  // By running in useEffect (not during render), the server render and first client
-  // render produce identical output, preventing hydration mismatches.
-  const localStorageBootstrapped = useRef(false);
+  const client = useClientQueryClient();
+  const [ready, setReady] = useState(false);
+  const seed = initialStories?.length ? initialStories : undefined;
+  const query = useQuery(
+    {
+      queryKey: key,
+      queryFn: ({ signal }) => fetchStories(signal),
+      staleTime: CACHE_TTL,
+      enabled: ready,
+    },
+    client,
+  );
   useEffect(() => {
-    if (localStorageBootstrapped.current) return;
-    localStorageBootstrapped.current = true;
-
-    // If in-memory cache already has data (from initialStories or a prior mount), skip.
-    if (cache.data) return;
-
-    const stored = loadFromStorage();
-    if (stored && stored.length > 0) {
-      cache.data = stored;
-      // Mark as slightly stale so the initial-load effect below triggers revalidation.
-      cache.timestamp = Date.now() - CACHE_TTL + 30000; // Revalidate in ~30 s
-      setStories(stored);
-      setIsLoading(false);
+    const cachedAt = client.getQueryState(key)?.dataUpdatedAt;
+    if (
+      seed &&
+      (!client.getQueryData(key) ||
+        (initialUpdatedAt !== undefined &&
+          Number.isFinite(initialUpdatedAt) &&
+          initialUpdatedAt > (cachedAt ?? 0)))
+    ) {
+      // A newer seed supersedes reads started against the previous snapshot.
+      void client.cancelQueries({ queryKey: key, exact: true });
+      client.setQueryData(
+        key,
+        seed,
+        initialUpdatedAt === undefined
+          ? undefined
+          : { updatedAt: initialUpdatedAt },
+      );
+    } else if (!client.getQueryData(key)) {
+      const stored = loadFromStorage();
+      // Preserve the previous persistent-cache bootstrap's 30-second grace.
+      if (stored)
+        client.setQueryData(key, stored, {
+          updatedAt: Date.now() - CACHE_TTL + 30_000,
+        });
     }
-   
-  }, []);
-
-  const fetchStories = useCallback(async (force = false): Promise<Story[]> => {
-    const now = Date.now();
-    const isStale = now - cache.timestamp > CACHE_TTL;
-
-    // Return cached data if fresh and not forcing refresh
-    if (cache.data && !isStale && !force) {
-      return cache.data;
-    }
-
-    // Deduplicate concurrent requests
-    if (cache.promise) {
-      return cache.promise;
-    }
-
-    // Create new fetch promise
-    cache.promise = fetchStoriesFromApi()
-      .then((data) => {
-        cache.data = data;
-        cache.timestamp = Date.now();
-        cache.promise = null;
-
-        // Persist to localStorage for next visit
-        saveToStorage(data);
-
-        return data;
-      })
-      .catch((err) => {
-        cache.promise = null;
-        // Keep stale data on error
-        if (cache.data) {
-          clientLogger.warn("[STORIES_REFRESH] Failed to refresh stories, using cached data", {
-            error: err instanceof Error ? err.message : String(err),
-          });
-          return cache.data;
-        }
-        throw err;
-      });
-
-    return cache.promise;
-  }, []);
-
-  // Initial load
+    setReady(true);
+  }, [client, seed, initialUpdatedAt]);
   useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      try {
-        // If we have cached data, use it immediately
-        if (cache.data) {
-          setStories(cache.data);
-          setIsLoading(false);
-
-          // Check if we need to revalidate in background
-          const isStale = Date.now() - cache.timestamp > CACHE_TTL;
-          if (isStale) {
-            const fresh = await fetchStories();
-            if (mounted) {
-              setStories(fresh);
-            }
-          }
-        } else {
-          // No cache, need to fetch
-          const data = await fetchStories();
-          if (mounted) {
-            setStories(data);
-            setIsLoading(false);
-          }
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err : new Error("Failed to load stories"));
-          setIsLoading(false);
-          // Use fallback on error
-          setStories(FALLBACK_STORIES);
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      mounted = false;
+    const focus = () => {
+      const state = client.getQueryState(key);
+      if (state?.data && Date.now() - state.dataUpdatedAt >= CACHE_TTL)
+        void client.refetchQueries(
+          { queryKey: key, exact: true, type: "active" },
+          { cancelRefetch: false },
+        );
     };
-  }, [fetchStories]);
-
-  // Revalidate on window focus (like SWR)
-  useEffect(() => {
-    function handleFocus() {
-      const isStale = Date.now() - cache.timestamp > CACHE_TTL;
-      if (isStale && cache.data) {
-        fetchStories().then(setStories);
-      }
-    }
-
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [fetchStories]);
-
+    window.addEventListener("focus", focus);
+    return () => window.removeEventListener("focus", focus);
+  }, [client]);
+  const refetch = query.refetch;
   const refresh = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await fetchStories(true);
-      setStories(data);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error("Failed to refresh stories"));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [fetchStories]);
-
-  // FE-M1: memoize the returned value so that StoriesProvider consumers
-  // only re-render when stories, isLoading, error, or refresh actually change.
+    await refetch();
+  }, [refetch]);
+  const stories =
+    !ready && seed ? seed : (query.data ?? seed ?? FALLBACK_STORIES);
+  const isLoading = !seed && query.isPending && !query.error;
+  const error = query.error;
   return useMemo(
     () => ({ stories, isLoading, error, refresh }),
     [stories, isLoading, error, refresh],
   );
 }
 
-interface StoriesProviderProps {
+export function StoriesProvider({
+  children,
+  initialStories,
+  initialUpdatedAt,
+}: {
   children?: ReactNode;
   initialStories?: Story[];
+  initialUpdatedAt?: number;
+}) {
+  return createElement(
+    StoriesContext.Provider,
+    { value: useStoriesState(initialStories, initialUpdatedAt) },
+    children,
+  );
 }
-
-export function StoriesProvider({ children, initialStories }: StoriesProviderProps) {
-  const value = useStoriesState(initialStories);
-
-  return createElement(StoriesContext.Provider, { value }, children);
-}
-
 export function useStories() {
   const context = useContext(StoriesContext);
-  if (!context) {
+  if (!context)
     throw new Error("useStories must be used within a StoriesProvider");
-  }
   return context;
 }
-
-/**
- * Prefetch stories data without subscribing to updates.
- * Call this on hover or route prefetch to warm the cache.
- */
 export function prefetchStories(): void {
-  const isStale = Date.now() - cache.timestamp > CACHE_TTL;
-  if (!cache.data || isStale) {
-    fetchStoriesFromApi()
-      .then((data) => {
-        cache.data = data;
-        cache.timestamp = Date.now();
-        saveToStorage(data);
-      })
-      .catch((err: unknown) =>
-        clientLogger.error("[STORIES_PREFETCH_FAILURE]", {
-          error: err instanceof Error ? err.message : String(err),
-        }),
-      );
-  }
+  const client = getBrowserQueryClient();
+  void client
+    .fetchQuery({
+      queryKey: key,
+      queryFn: ({ signal }) => fetchStories(signal),
+      staleTime: CACHE_TTL,
+    })
+    .catch((error: unknown) =>
+      clientLogger.error("[STORIES_PREFETCH_FAILURE]", {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
 }
-
-/**
- * Clear the stories cache (both memory and localStorage)
- * Useful for debugging or forcing a fresh fetch
- */
 export function clearStoriesCache(): void {
-  cache.data = null;
-  cache.timestamp = 0;
-  cache.promise = null;
+  const client = getBrowserQueryClient();
+  void client.cancelQueries({ queryKey: key });
+  client.removeQueries({ queryKey: key });
   if (typeof window !== "undefined") {
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
-      // Ignore storage errors
+      /* Optional persistence. */
     }
   }
 }

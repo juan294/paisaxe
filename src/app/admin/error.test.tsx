@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import * as Sentry from "@sentry/nextjs";
 import { LanguageProvider } from "@/lib/i18n";
 import AdminError from "./error";
@@ -21,7 +21,12 @@ describe("AdminError", () => {
 
   const captureSpy = vi.mocked(Sentry.captureException);
 
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     consoleSpy.mockClear();
     captureSpy.mockClear();
   });
@@ -84,10 +89,11 @@ describe("AdminError", () => {
     expect(consoleSpy).toHaveBeenCalledWith(error);
   });
 
-  it("captures the error to Sentry", () => {
+  it("captures the error to Sentry", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://example@sentry.io/1");
     const error = new Error("Admin error for Sentry");
     renderWithI18n(<AdminError error={error} reset={vi.fn()} />);
-    expect(captureSpy).toHaveBeenCalledWith(error);
+    await waitFor(() => expect(captureSpy).toHaveBeenCalledWith(error));
   });
 
   it("has admin-style background", () => {

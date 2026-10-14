@@ -3,12 +3,19 @@ import type { AgentsDashboardData, AgentRunStatus, AgentLogsResponse } from "@/t
 import { csrfHeaders } from "@/lib/csrf-client";
 import { clientLogger } from "@/lib/client-logger";
 
+type LocalApiResponse<T> = AdminApiResponse<T> & { unavailable?: boolean };
+
+async function localError(response: Response, fallback: string) {
+  const body = await response.json().catch(() => ({}));
+  return { error: body.error || fallback, ...(response.status === 403 || response.status === 404 || body.localOnly === true ? { unavailable: true } : {}) };
+}
+
 const API_BASE = "/api/admin";
 
 /**
  * Fetch agents dashboard summary
  */
-export async function fetchAgentsSummary(): Promise<AdminApiResponse<AgentsDashboardData>> {
+export async function fetchAgentsSummary(): Promise<LocalApiResponse<AgentsDashboardData>> {
   try {
     const response = await fetch(`${API_BASE}/agents-summary`);
 
@@ -29,7 +36,7 @@ export async function fetchAgentsSummary(): Promise<AdminApiResponse<AgentsDashb
  */
 export async function triggerAgentRun(
   agentKey: string,
-): Promise<AdminApiResponse<{ started: boolean; agentKey: string; startedAt: string }>> {
+): Promise<LocalApiResponse<{ started: boolean; agentKey: string; startedAt: string }>> {
   try {
     const response = await fetch(`${API_BASE}/agents/run`, {
       method: "POST",
@@ -38,8 +45,7 @@ export async function triggerAgentRun(
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      return { error: error.error || "Failed to start agent" };
+      return localError(response, "Failed to start agent");
     }
 
     return { data: await response.json() };
@@ -52,13 +58,12 @@ export async function triggerAgentRun(
 /**
  * Check which agents are currently running
  */
-export async function fetchRunningAgents(): Promise<AdminApiResponse<AgentRunStatus>> {
+export async function fetchRunningAgents(): Promise<LocalApiResponse<AgentRunStatus>> {
   try {
     const response = await fetch(`${API_BASE}/agents/run`);
 
     if (!response.ok) {
-      const error = await response.json();
-      return { error: error.error || "Failed to fetch running agents" };
+      return localError(response, "Failed to fetch running agents");
     }
 
     return { data: await response.json() };
@@ -71,7 +76,7 @@ export async function fetchRunningAgents(): Promise<AdminApiResponse<AgentRunSta
 /**
  * Stop a running agent
  */
-export async function stopAgent(agentKey: string): Promise<AdminApiResponse<{ stopped: boolean; agentKey: string }>> {
+export async function stopAgent(agentKey: string): Promise<LocalApiResponse<{ stopped: boolean; agentKey: string }>> {
   try {
     const response = await fetch(`${API_BASE}/agents/run`, {
       method: "DELETE",
@@ -80,8 +85,7 @@ export async function stopAgent(agentKey: string): Promise<AdminApiResponse<{ st
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      return { error: error.error || "Failed to stop agent" };
+      return localError(response, "Failed to stop agent");
     }
 
     return { data: await response.json() };
@@ -97,7 +101,7 @@ export async function stopAgent(agentKey: string): Promise<AdminApiResponse<{ st
 export async function fetchAgentLogs(
   agentKey: string,
   since?: number,
-): Promise<AdminApiResponse<AgentLogsResponse>> {
+): Promise<LocalApiResponse<AgentLogsResponse>> {
   try {
     const url = new URL(`${API_BASE}/agents/run`, window.location.origin);
     url.searchParams.set("agentKey", agentKey);
@@ -106,8 +110,7 @@ export async function fetchAgentLogs(
     const response = await fetch(url.toString());
 
     if (!response.ok) {
-      const error = await response.json();
-      return { error: error.error || "Failed to fetch agent logs" };
+      return localError(response, "Failed to fetch agent logs");
     }
 
     return { data: await response.json() };

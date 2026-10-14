@@ -90,15 +90,15 @@ export function AccountConfigDialog({
 
   return (
     <Dialog open={!!platform} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md border-[#e5e3de] bg-white dark:border-[#3d3a36] dark:bg-[#252320]">
+      <DialogContent className="max-w-md border-admin-line bg-white dark:border-admin-depth dark:bg-admin-panel">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3 text-[#2d2a26] dark:text-[#f5f3ee]">
-            <div className="flex h-8 w-8 items-center justify-center border border-[#2d2a26] font-mono text-xs font-medium dark:border-[#f5f3ee]">
+          <DialogTitle className="flex items-center gap-3 text-admin-ink dark:text-admin-paper">
+            <div className="flex h-8 w-8 items-center justify-center border border-admin-ink font-mono text-xs font-medium dark:border-admin-paper">
               {PLATFORM_BADGES[platform]}
             </div>
             {existingAccount ? "Configure" : "Connect"} {PLATFORM_NAMES[platform]}
           </DialogTitle>
-          <DialogDescription className="font-mono text-xs text-[#6b6560]">
+          <DialogDescription className="font-mono text-xs text-admin-muted">
             Enter your API credentials to enable automated posting
           </DialogDescription>
         </DialogHeader>
@@ -106,7 +106,7 @@ export function AccountConfigDialog({
         <div className="mt-6 space-y-4">
           {/* Account Name */}
           <div>
-            <label htmlFor="account-display-name" className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <label htmlFor="account-display-name" className="mb-2 block font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Account Name
             </label>
             <input
@@ -115,13 +115,13 @@ export function AccountConfigDialog({
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
               placeholder="Paisaxe"
-              className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus-visible:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+              className="w-full border border-admin-line bg-transparent px-3 py-2 text-sm text-admin-ink placeholder-admin-subtle outline-none transition-colors focus-visible:border-admin-subtle dark:border-admin-secondary dark:text-admin-paper"
             />
           </div>
 
           {/* Account Handle */}
           <div>
-            <label htmlFor="account-handle" className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <label htmlFor="account-handle" className="mb-2 block font-mono text-xs uppercase tracking-widest text-admin-subtle">
               Handle / Username
             </label>
             <input
@@ -130,18 +130,18 @@ export function AccountConfigDialog({
               value={accountHandle}
               onChange={(e) => setAccountHandle(e.target.value)}
               placeholder="@paisaxe"
-              className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus-visible:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+              className="w-full border border-admin-line bg-transparent px-3 py-2 text-sm text-admin-ink placeholder-admin-subtle outline-none transition-colors focus-visible:border-admin-subtle dark:border-admin-secondary dark:text-admin-paper"
             />
           </div>
 
           {/* Credential Fields */}
-          <div className="space-y-3 border-t border-[#e5e3de] pt-4 dark:border-[#3d3a36]">
-            <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <div className="space-y-3 border-t border-admin-line pt-4 dark:border-admin-depth">
+            <p className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
               API Credentials
             </p>
             {credentialFields.map((field) => (
               <div key={field.key}>
-                <label htmlFor={`account-credential-${field.key}`} className="mb-2 flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                <label htmlFor={`account-credential-${field.key}`} className="mb-2 flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-admin-subtle">
                   {field.label}
                   {field.required && <span className="text-red-500">*</span>}
                 </label>
@@ -154,14 +154,14 @@ export function AccountConfigDialog({
                       setCredentials((prev) => ({ ...prev, [field.key]: e.target.value }))
                     }
                     placeholder={field.placeholder}
-                    className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 pr-10 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus-visible:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+                    className="w-full border border-admin-line bg-transparent px-3 py-2 pr-10 text-sm text-admin-ink placeholder-admin-subtle outline-none transition-colors focus-visible:border-admin-subtle dark:border-admin-secondary dark:text-admin-paper"
                   />
                   <button
                     type="button"
                     onClick={() =>
                       setShowSecrets((prev) => ({ ...prev, [field.key]: !prev[field.key] }))
                     }
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a39e98] hover:text-[#6b6560]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-admin-subtle hover:text-admin-muted"
                   >
                     {showSecrets[field.key] ? (
                       <EyeOff className="h-4 w-4" />
@@ -183,18 +183,18 @@ export function AccountConfigDialog({
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-3 border-t border-[#e5e3de] pt-4 dark:border-[#3d3a36]">
+          <div className="flex items-center gap-3 border-t border-admin-line pt-4 dark:border-admin-depth">
             <Button
               variant="ghost"
               onClick={onClose}
-              className="flex-1 font-mono text-xs uppercase tracking-widest text-[#a39e98] hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
+              className="flex-1 font-mono text-xs uppercase tracking-widest text-admin-subtle hover:text-admin-ink dark:hover:text-admin-paper"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 bg-[#2d2a26] font-mono text-xs uppercase tracking-widest text-white hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+              className="flex-1 bg-admin-ink font-mono text-xs uppercase tracking-widest text-white hover:bg-admin-depth dark:bg-admin-paper dark:text-admin-ink dark:hover:bg-admin-line"
             >
               {isSaving ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />

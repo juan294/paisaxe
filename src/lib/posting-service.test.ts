@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ─── Mock supabase ───────────────────────────────────────────────────
@@ -264,8 +265,8 @@ describe("posting-service", () => {
       const result = await getDrafts();
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("post-1");
-      expect(result[0].platform).toBe("x");
+      expect(requiredValue(result[0], "src/lib/posting-service.test.ts:267 result[0]").id).toBe("post-1");
+      expect(requiredValue(result[0], "src/lib/posting-service.test.ts:268 result[0]").platform).toBe("x");
     });
 
     it("should filter by platform when provided", async () => {
@@ -304,9 +305,9 @@ describe("posting-service", () => {
       const result = await getDrafts();
 
       expect(result).toHaveLength(1);
-      expect(result[0].mediaUrls).toEqual([]);
-      expect(result[0].hashtags).toEqual([]);
-      expect(result[0].engagement).toEqual({});
+      expect(requiredValue(result[0], "src/lib/posting-service.test.ts:307 result[0]").mediaUrls).toEqual([]);
+      expect(requiredValue(result[0], "src/lib/posting-service.test.ts:308 result[0]").hashtags).toEqual([]);
+      expect(requiredValue(result[0], "src/lib/posting-service.test.ts:309 result[0]").engagement).toEqual({});
     });
 
     it("should return empty array on database error", async () => {

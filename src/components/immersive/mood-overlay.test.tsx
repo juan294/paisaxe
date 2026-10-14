@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MoodOverlay } from "./mood-overlay";
@@ -128,7 +129,7 @@ describe("MoodOverlay", () => {
 
       // Get all focusable buttons inside the dialog
       const buttons = dialog.querySelectorAll<HTMLElement>("button");
-      const lastButton = buttons[buttons.length - 1];
+      const lastButton = requiredValue(buttons[buttons.length - 1], "src/components/immersive/mood-overlay.test.tsx: buttons[buttons.length - 1]");
       const firstButton = buttons[0];
 
       // Focus the last button
@@ -145,7 +146,7 @@ describe("MoodOverlay", () => {
       const dialog = screen.getByRole("dialog");
 
       const buttons = dialog.querySelectorAll<HTMLElement>("button");
-      const firstButton = buttons[0];
+      const firstButton = requiredValue(buttons[0], "src/components/immersive/mood-overlay.test.tsx: buttons[0]");
       const lastButton = buttons[buttons.length - 1];
 
       // Focus the first button

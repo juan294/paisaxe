@@ -82,4 +82,13 @@ export default [
       ],
     },
   },
+  {
+    files: ["src/app/api/admin/**/route.ts", "src/lib/local-operations/agents.ts", "src/lib/local-operations/tunnel.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        paths: [{ name: "@/lib/admin-auth", importNames: ["validateAdminAuth"],
+          message: "Use withAdmin, withAdminRead or withAdminSession so mutations revalidate the role." }],
+      }],
+    },
+  },
 ];

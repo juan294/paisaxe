@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Invoicing v2 adapter (PayPal hackathon plan, Phase 8a) against the local
@@ -54,10 +55,10 @@ describe("createInvoice", () => {
     await createInvoice(input);
 
     const [request] = mock.requestsTo("POST", INVOICES);
-    expect(request.headers["paypal-request-id"]).toBe(`invoice:${BOOKING_ID}`);
-    expect(request.headers.prefer).toBe("return=representation");
-    expect(request.headers.authorization).toBe(`Bearer ${await getAccessToken()}`);
-    expect(request.body).toEqual({
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/invoices.test.ts:58 request").headers["paypal-request-id"], "src/lib/paypal/invoices.test.ts:57 request.headers[\"paypal-request-id\"]")).toBe(`invoice:${BOOKING_ID}`);
+    expect(requiredValue(request, "src/lib/paypal/invoices.test.ts:59 request").headers.prefer).toBe("return=representation");
+    expect(requiredValue(request, "src/lib/paypal/invoices.test.ts:60 request").headers.authorization).toBe(`Bearer ${await getAccessToken()}`);
+    expect(requiredValue(request, "src/lib/paypal/invoices.test.ts:61 request").body).toEqual({
       detail: {
         currency_code: "EUR",
         reference: "RS-ABC123",
@@ -148,8 +149,8 @@ describe("sendInvoice", () => {
     const sent = await sendInvoice(id, BOOKING_ID);
 
     const [request] = mock.requestsTo("POST", `${INVOICES}/${id}/send`);
-    expect(request.headers["paypal-request-id"]).toBe(`invoice-send:${BOOKING_ID}`);
-    expect(request.body).toEqual({ send_to_invoicer: false, send_to_recipient: true });
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/invoices.test.ts:152 request").headers["paypal-request-id"], "src/lib/paypal/invoices.test.ts:151 request.headers[\"paypal-request-id\"]")).toBe(`invoice-send:${BOOKING_ID}`);
+    expect(requiredValue(request, "src/lib/paypal/invoices.test.ts:153 request").body).toEqual({ send_to_invoicer: false, send_to_recipient: true });
     expect(sent).toEqual({ recipientViewUrl: `https://www.sandbox.paypal.com/invoice/p/#${id}` });
     expect(mock.invoices.get(id)?.status).toBe("SENT");
   });
@@ -197,8 +198,8 @@ describe("cancelInvoice", () => {
     await expect(cancelInvoice(id)).resolves.toBeUndefined();
 
     const [request] = mock.requestsTo("POST", `${INVOICES}/${id}/cancel`);
-    expect(request.body).toEqual({ send_to_invoicer: false, send_to_recipient: true });
-    expect(request.headers.authorization).toBe(`Bearer ${await getAccessToken()}`);
+    expect(requiredValue(request, "src/lib/paypal/invoices.test.ts:201 request").body).toEqual({ send_to_invoicer: false, send_to_recipient: true });
+    expect(requiredValue(request, "src/lib/paypal/invoices.test.ts:202 request").headers.authorization).toBe(`Bearer ${await getAccessToken()}`);
     expect(mock.invoices.get(id)?.status).toBe("CANCELLED");
   });
 

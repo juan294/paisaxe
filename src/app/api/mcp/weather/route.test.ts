@@ -1,7 +1,9 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock rate-limit module
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/rate-limit", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/rate-limit")>(),
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 29, retryAfter: 0 }),
 }));
 
@@ -31,6 +33,25 @@ describe("/api/mcp/weather", () => {
 
   afterEach(() => {
     process.env = originalEnv;
+  });
+
+  it.each(["GET", "POST"])("%s rejects whitespace configuration without transport and recovers after correction", async (verb) => {
+    process.env.OPENWEATHERMAP_API_KEY = " \n ";
+    const makeRequest = () => new Request("http://localhost/api/mcp/weather?city=Oviedo", {
+      method: verb, headers: { "x-mcp-secret": MCP_SECRET, "Content-Type": "application/json" },
+      ...(verb === "POST" ? { body: JSON.stringify({ city: "Oviedo" }) } : {}),
+    });
+    const handler = verb === "GET" ? GET : POST;
+    const missing = await handler(makeRequest());
+    expect(missing.status).toBe(500);
+    expect(await missing.json()).toEqual({ error: "Weather API not configured" });
+    expect(mockFetch).not.toHaveBeenCalled();
+    process.env.OPENWEATHERMAP_API_KEY = " corrected-key ";
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ name: "Oviedo", main: { temp: 15, feels_like: 14, humidity: 70 }, weather: [], wind: { speed: 1 } }) });
+    const recovered = await handler(makeRequest());
+    expect(recovered.status).toBe(200);
+    expect(recovered.headers.get("Cache-Control")).toBe("private, max-age=300");
+    expect(requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/weather/route.test.ts:53 mockFetch.mock.calls[0]")[0]).toContain("appid=corrected-key&");
   });
 
   describe("GET", () => {
@@ -243,7 +264,7 @@ describe("/api/mcp/weather", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
+      expect(response.headers.get("Cache-Control")).toBe("private, max-age=300");
     });
 
     it("should return 400 for invalid MCP request", async () => {
@@ -619,7 +640,7 @@ describe("/api/mcp/weather", () => {
       await GET(request);
 
       // Should use coordinates endpoint, not city name search
-      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      const fetchUrl = requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/weather/route.test.ts:642 mockFetch.mock.calls[0]")[0] as string;
       expect(fetchUrl).toContain("lat=43.3619");
       expect(fetchUrl).toContain("lon=-5.8494");
       expect(fetchUrl).not.toContain("q=oviedo");
@@ -743,7 +764,7 @@ describe("/api/mcp/weather", () => {
       );
       await GET(request);
 
-      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      const fetchUrl = requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/weather/route.test.ts:766 mockFetch.mock.calls[0]")[0] as string;
       expect(fetchUrl).toContain("q=Santander");
       expect(fetchUrl).toContain(",ES");
       expect(fetchUrl).not.toContain("lat=");

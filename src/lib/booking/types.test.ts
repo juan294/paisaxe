@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ function checkValues(table: string, column: string): string[] {
   const block = schemaSql.slice(schemaSql.indexOf(`CREATE TABLE public.${table} (`));
   const match = new RegExp(`${column}[^;]*?CHECK \\(${column} IN \\(([^)]*)\\)`).exec(block);
   if (!match) throw new Error(`no CHECK for ${table}.${column}`);
-  return [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  return [...requiredValue(match[1], "migration CHECK alternatives").matchAll(/'([a-z_]+)'/g)].map(m => requiredValue(m[1], "migration CHECK value"));
 }
 
 describe("status and key lists match the migration CHECK constraints", () => {

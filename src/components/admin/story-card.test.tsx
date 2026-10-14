@@ -1,5 +1,8 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { StoryCard } from "./story-card";
 import type { AdminStory } from "@/types/admin";
 import { PLACEHOLDER_PREFIX } from "@/lib/unsplash-placeholders";
@@ -221,7 +224,7 @@ describe("StoryCard", () => {
       expect(checkboxes.length).toBeGreaterThan(0);
 
       // Click on the checkbox in no-image state
-      fireEvent.click(checkboxes[0]);
+      fireEvent.click(requiredValue(checkboxes[0], "src/components/admin/story-card.test.tsx: checkboxes[0]"));
       expect(onToggleSelect).toHaveBeenCalledWith("story-1");
     });
 
@@ -440,6 +443,118 @@ describe("StoryCard", () => {
       const button = container.querySelector("button");
       expect(button).toHaveClass("group");
     });
+  });
+
+  describe.each([
+    { state: "with an image", image: "/images/test.jpg" },
+    { state: "without an image", image: "" },
+  ])("keyboard and pointer access $state", ({ image }) => {
+    const story = { ...mockStory, image };
+
+    it("gives selection its own accessible name and keyboard focus", async () => {
+      const user = userEvent.setup();
+      render(<StoryCard story={story} onEdit={mockOnEdit} onToggleSelect={vi.fn()} />);
+
+      const card = screen.getByRole("button");
+      const checkbox = screen.getByRole("checkbox", { name: "Seleccionar Test Story" });
+      await user.tab();
+      expect(card).toHaveFocus();
+      await user.tab();
+      expect(checkbox).toHaveFocus();
+      expect(mockOnEdit).not.toHaveBeenCalled();
+    });
+
+    it.each(["click", "Enter", "Space"])(
+      "%s selects once and keeps focus without opening the editor",
+      async (activation) => {
+        const user = userEvent.setup();
+        const onToggleSelect = vi.fn();
+        function SelectionHarness() {
+          const [selected, setSelected] = useState(false);
+          return (
+            <StoryCard
+              story={story}
+              onEdit={mockOnEdit}
+              isSelected={selected}
+              onToggleSelect={(id) => {
+                onToggleSelect(id);
+                setSelected((value) => !value);
+              }}
+            />
+          );
+        }
+        render(<SelectionHarness />);
+        const checkbox = screen.getByRole("checkbox");
+
+        if (activation === "click") {
+          await user.click(checkbox);
+        } else {
+          await user.tab();
+          await user.tab();
+          expect(checkbox).toHaveFocus();
+          await user.keyboard(activation === "Enter" ? "{Enter}" : " ");
+        }
+
+        expect(onToggleSelect).toHaveBeenCalledTimes(1);
+        expect(onToggleSelect).toHaveBeenCalledWith(story.id);
+        expect(checkbox).toHaveAttribute("aria-checked", "true");
+        expect(checkbox).toHaveFocus();
+        expect(mockOnEdit).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(["{Enter}", " "])("%j opens the focused card exactly once", async (key) => {
+      const user = userEvent.setup();
+      const onToggleSelect = vi.fn();
+      render(<StoryCard story={story} onEdit={mockOnEdit} onToggleSelect={onToggleSelect} />);
+      await user.tab();
+      expect(screen.getByRole("button")).toHaveFocus();
+
+      await user.keyboard(key);
+
+      expect(mockOnEdit).toHaveBeenCalledTimes(1);
+      expect(mockOnEdit).toHaveBeenCalledWith(story);
+      expect(onToggleSelect).not.toHaveBeenCalled();
+    });
+
+    it.each(["{Enter}", " "])("%j selects the focused card once in selection mode", async (key) => {
+      const user = userEvent.setup();
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard story={story} onEdit={mockOnEdit} onToggleSelect={onToggleSelect} selectionMode />,
+      );
+      await user.tab();
+      expect(screen.getByRole("button")).toHaveFocus();
+
+      await user.keyboard(key);
+
+      expect(onToggleSelect).toHaveBeenCalledTimes(1);
+      expect(onToggleSelect).toHaveBeenCalledWith(story.id);
+      expect(mockOnEdit).not.toHaveBeenCalled();
+    });
+
+    it("provides focus and coarse-pointer visibility for unselected controls", () => {
+      render(<StoryCard story={story} onEdit={mockOnEdit} onToggleSelect={vi.fn()} />);
+
+      // jsdom does not apply Tailwind pseudo/media rules. This pins the access
+      // contract; the real /admin browser journey must prove computed visibility.
+      expect(screen.getByRole("button")).toHaveClass("focus-visible:ring-2");
+      expect(screen.getByRole("checkbox")).toHaveClass(
+        "group-focus-within:opacity-100",
+        "pointer-coarse:opacity-100",
+        "focus-visible:ring-2",
+      );
+    });
+  });
+
+  it("reveals every image overlay on card focus and coarse pointers", () => {
+    const { container } = render(<StoryCard story={mockStory} onEdit={mockOnEdit} />);
+    const overlays = container.querySelectorAll(".opacity-0");
+    // Gradient, title/subtitle, and edit indicator must all remain readable.
+    expect(overlays).toHaveLength(3);
+    for (const overlay of overlays) {
+      expect(overlay).toHaveClass("group-focus-within:opacity-100", "pointer-coarse:opacity-100");
+    }
   });
 
   describe("no image state", () => {

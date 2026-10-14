@@ -10,13 +10,13 @@ const statColorClasses = {
 
 export function StatCard({ value, label, color }: StatCardProps) {
   const displayValue = typeof value === "number" ? value.toLocaleString() : value;
-  const colorClass = color ? statColorClasses[color] : "text-[#2d2a26] dark:text-[#f5f3ee]";
+  const colorClass = color ? statColorClasses[color] : "text-admin-ink dark:text-admin-paper";
   return (
     <div>
       <p className={`text-5xl font-extralight tabular-nums tracking-tighter lg:text-6xl ${colorClass}`}>
         {displayValue}
       </p>
-      <p className="mt-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+      <p className="mt-4 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
         {label}
       </p>
     </div>
@@ -99,7 +99,7 @@ export function RevenueChart({ data, currency }: RevenueChartProps) {
               x={padding.left + (i * chartWidth) / data.length + barWidth / 2}
               y={height - 8}
               textAnchor="middle"
-              className="fill-[#a39e98] font-mono text-[10px]"
+              className="fill-admin-subtle font-mono text-[10px]"
             >
               {formatDateShort(d.date)}
             </text>
@@ -111,7 +111,7 @@ export function RevenueChart({ data, currency }: RevenueChartProps) {
           x={padding.left - 10}
           y={padding.top + 4}
           textAnchor="end"
-          className="fill-[#a39e98] font-mono text-[10px]"
+          className="fill-admin-subtle font-mono text-[10px]"
         >
           {formatCurrencyShort(maxRevenue, currency)}
         </text>
@@ -119,7 +119,7 @@ export function RevenueChart({ data, currency }: RevenueChartProps) {
           x={padding.left - 10}
           y={padding.top + chartHeight + 4}
           textAnchor="end"
-          className="fill-[#a39e98] font-mono text-[10px]"
+          className="fill-admin-subtle font-mono text-[10px]"
         >
           €0
         </text>

@@ -221,15 +221,17 @@ export async function validateImageBuffer(
       return { valid: false, error: "Unable to detect image format" };
     }
 
+    // Sharp identifies AVIF as the HEIF container with AV1 compression.
+    const format = metadata.format === "heif" && metadata.compression === "av1" ? "avif" : metadata.format;
     const supportedFormats = ["jpeg", "png", "webp", "gif", "avif", "tiff"];
-    if (!supportedFormats.includes(metadata.format)) {
+    if (!supportedFormats.includes(format)) {
       return {
         valid: false,
         error: `Unsupported format: ${metadata.format}. Supported: ${supportedFormats.join(", ")}`,
       };
     }
 
-    return { valid: true, format: metadata.format };
+    return { valid: true, format };
   } catch (error) {
     return {
       valid: false,

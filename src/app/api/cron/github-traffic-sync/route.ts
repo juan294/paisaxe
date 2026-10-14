@@ -103,7 +103,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
     }>();
 
     for (const view of viewsData.views || []) {
-      const date = view.timestamp.split("T")[0];
+      const [date = ""] = view.timestamp.split("T");
       const existing = dailyMap.get(date) || {
         date,
         views: 0,
@@ -117,7 +117,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
     }
 
     for (const clone of clonesData.clones || []) {
-      const date = clone.timestamp.split("T")[0];
+      const [date = ""] = clone.timestamp.split("T");
       const existing = dailyMap.get(date) || {
         date,
         views: 0,

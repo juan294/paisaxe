@@ -7,9 +7,11 @@ import { logger } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+type AdminAuthError = NextResponse<{ error: string }>;
+
 type AuthResult =
   | { valid: true; userId: string }
-  | { valid: false; error: NextResponse };
+  | { valid: false; error: AdminAuthError };
 
 /** BE-M2: In-process cache keyed by user_id. 30-second TTL. */
 const ROLE_CACHE_TTL_MS = 30_000;
@@ -234,17 +236,32 @@ function isMutatingRequest(request?: Pick<Request, "method">): boolean {
  * Use for mutations (INSERT/UPDATE/DELETE) that need to bypass RLS.
  */
 export async function withAdmin<T>(
-  handler: (supabase: SupabaseClient) => Promise<T>,
+  handler: (supabase: SupabaseClient, auth: { userId: string }) => Promise<T>,
   request?: Pick<Request, "headers" | "method">
-): Promise<T | NextResponse> {
-  const run = async (): Promise<T | NextResponse> => {
-    const auth = await validateAdminAuth({ skipCache: isMutatingRequest(request) });
-    if (!auth.valid) {
-      return auth.error;
-    }
-    return handler(createAdminClient());
-  };
+): Promise<T | AdminAuthError> {
+  return withAdminSession((auth) => handler(createAdminClient(), auth), request);
+}
 
+/** Preserve validation and error handling before client construction in existing
+ * handlers while enforcing the same service-role authorization boundary. */
+export async function withAdminDeferred<T>(
+  handler: (getClient: () => SupabaseClient, auth: { userId: string }) => Promise<T>,
+  request?: Pick<Request, "headers" | "method">
+): Promise<T | AdminAuthError> {
+  return withAdminSession((auth) => handler(createAdminClient, auth), request);
+}
+
+/** Admin session boundary for provider and local-file handlers that need no
+ * database client. Shares mutation freshness and request logging with withAdmin. */
+export async function withAdminSession<T>(
+  handler: (auth: { userId: string }) => Promise<T>,
+  request?: Pick<Request, "headers" | "method">
+): Promise<T | AdminAuthError> {
+  const run = async (): Promise<T | AdminAuthError> => {
+    const auth = await validateAdminAuth({ skipCache: isMutatingRequest(request) });
+    if (!auth.valid) return auth.error;
+    return handler({ userId: auth.userId });
+  };
   return request ? withRequestContext(request, run) : run();
 }
 
@@ -257,14 +274,10 @@ export async function withAdmin<T>(
  * withAdmin (service-role) instead.
  */
 export async function withAdminRead<T>(
-  handler: (supabase: SupabaseClient) => Promise<T>,
+  handler: (supabase: SupabaseClient, auth: { userId: string }) => Promise<T>,
   request?: Pick<Request, "headers" | "method">
-): Promise<T | NextResponse> {
-  const run = async (): Promise<T | NextResponse> => {
-    const auth = await validateAdminAuth({ skipCache: isMutatingRequest(request) });
-    if (!auth.valid) {
-      return auth.error;
-    }
+): Promise<T | AdminAuthError> {
+  return withAdminSession(async (auth) => {
     const cookieStore = await cookies();
     const supabase = createServerClient(
       getSupabaseUrl() ?? "",
@@ -286,8 +299,6 @@ export async function withAdminRead<T>(
         },
       }
     );
-    return handler(supabase);
-  };
-
-  return request ? withRequestContext(request, run) : run();
+    return handler(supabase, { userId: auth.userId });
+  }, request);
 }

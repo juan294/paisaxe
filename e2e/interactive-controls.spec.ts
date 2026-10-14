@@ -1,3 +1,4 @@
+import { mockFeatureFlagsAfterSsr } from "./fixtures/mock-feature-flags";
 import { test, expect } from "./fixtures/base-test";
 import {
   withFeatureFlags,
@@ -23,20 +24,13 @@ test.describe("Ambient toggle behavior", () => {
     test.skip(isMobile, "Ambient button is desktop-only (hidden md:flex)");
 
     // Enable both autoplay_button and ambient_discovery
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          withFeatureFlags({
-            autoplay_button: true,
-            ambient_discovery: true,
-          })
-        ),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({
+      autoplay_button: true,
+      ambient_discovery: true,
+    }));
 
     await page.goto("/immersive");
+    await settleFlags();
     await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
@@ -250,6 +244,11 @@ test.describe("Navigation behavior", () => {
 
     await page.goto("/immersive");
     await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
+    // A server-rendered title can appear before the keyboard listener mounts.
+    const navigation = page.locator('[data-story-navigation-ready]:visible');
+    await expect(navigation).toHaveCount(1);
+    await expect(navigation).toHaveAttribute("data-story-navigation-ready", "true");
+    await expect(navigation).toBeEnabled();
   });
 
   test("right arrow key advances to next story", async ({
@@ -353,15 +352,7 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
   test.beforeEach(async ({ page, isMobile }) => {
     test.skip(isMobile, "Keyboard shortcuts are desktop-only");
 
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          withFeatureFlags({ user_story_suggestions: true })
-        ),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ user_story_suggestions: true }));
 
     // Mock the suggestion API so form submission doesn't fail
     await page.route("**/api/suggestions", (route) =>
@@ -373,6 +364,7 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     );
 
     await page.goto("/immersive");
+    await settleFlags();
     const title = page.getByTestId("story-title").first();
     await expect(title).toContainText(/\S+/);
   });

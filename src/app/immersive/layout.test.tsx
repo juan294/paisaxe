@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render } from "@testing-library/react";
 import ImmersiveLayout, { metadata } from "./layout";
@@ -48,9 +49,9 @@ describe("ImmersiveLayout", () => {
         alt: string;
       }>;
       expect(images.length).toBeGreaterThan(0);
-      expect(images[0].width).toBe(1200);
-      expect(images[0].height).toBe(630);
-      expect(images[0].alt).toBeTruthy();
+      expect(requiredValue(images[0], "src/app/immersive/layout.test.tsx: images[0]").width).toBe(1200);
+      expect(requiredValue(images[0], "src/app/immersive/layout.test.tsx: images[0]").height).toBe(630);
+      expect(requiredValue(images[0], "src/app/immersive/layout.test.tsx: images[0]").alt).toBeTruthy();
     });
 
     it("includes Twitter card tags", () => {

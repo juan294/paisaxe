@@ -30,9 +30,9 @@ export function hasMissingTranslations(story: AdminStory): boolean {
 
     const hasContent =
       translation &&
-      (translation.title?.trim() ||
-        translation.subtitle?.trim() ||
-        translation.description?.trim());
+      [translation.title, translation.subtitle, translation.description].some(
+        (text) => typeof text === "string" && text.trim().length > 0
+      );
 
     if (!hasContent || localeStatus?.status !== "complete") {
       return true;

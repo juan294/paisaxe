@@ -102,11 +102,11 @@ export async function fetchElevenLabsCosts(
     const endUnix = data.billing_period?.end_unix;
 
     const billingStart = startUnix && startUnix > 0
-      ? new Date(startUnix * 1000).toISOString().split("T")[0]
-      : defaultStart.toISOString().split("T")[0];
+      ? new Date(startUnix * 1000).toISOString().replace(/T.*$/, "")
+      : defaultStart.toISOString().replace(/T.*$/, "");
     const billingEnd = endUnix && endUnix > 0
-      ? new Date(endUnix * 1000).toISOString().split("T")[0]
-      : defaultEnd.toISOString().split("T")[0];
+      ? new Date(endUnix * 1000).toISOString().replace(/T.*$/, "")
+      : defaultEnd.toISOString().replace(/T.*$/, "");
 
     return {
       serviceId: PLATFORM_SERVICES.elevenlabs.id,

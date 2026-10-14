@@ -43,14 +43,43 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        // Brand tokens — standardised accent is Tailwind green-500 (#22c55e).
-        // Use `paisaxe-green` / `paisaxe-green-hover` on conversion surfaces
-        // instead of raw green-500/green-400 utilities.
+        // Fixed swatches preserve the explicit light/dark and alpha pairings.
+        admin: {
+          ink: "#2d2a26",
+          paper: "#f5f3ee",
+          muted: "#6b6560",
+          subtle: "#a39e98",
+          line: "#e5e3de",
+          depth: "#3d3a36",
+          panel: "#252320",
+          secondary: "#4d4944",
+          "canvas-dark": "#1a1917",
+          approve: "#5a7a5a",
+          "approve-hover": "#4a6a4a",
+          "health-success": "#7a9e7a",
+          warning: "#c9a55c",
+          "warning-hover": "#b89545",
+          "health-error": "#c97a7a",
+          delete: "#a85454",
+          "delete-hover": "#8b4444",
+          "skeleton-dot": "#d5d3ce",
+        },
+        scene: {
+          black: "#000",
+          white: "#fff",
+          canvas: "oklch(14.5% 0 none)",
+        },
+        // Brand accent (#1011): the conversion-surface green, as one scale to
+        // retune in one place. Use `paisaxe-green-*`, never raw `green-*`
+        // utilities (brand-colors.test.ts enforces it). Values equal
+        // Tailwind v4's green-200..500, so adopting them changed no pixels.
         paisaxe: {
-          green: "#22c55e",       // = Tailwind green-500
-          "green-hover": "#4ade80", // = Tailwind green-400
-          blue: "#0077b6",
-          sand: "#e9c46a",
+          green: {
+            200: "oklch(92.5% 0.084 155.995)",
+            300: "oklch(87.1% 0.15 154.449)",
+            400: "oklch(79.2% 0.209 151.711)", // hover, text on dark
+            500: "oklch(72.3% 0.219 149.579)", // the accent
+          },
         },
       },
       borderRadius: {

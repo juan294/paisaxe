@@ -5,56 +5,59 @@ description: "Supabase migration safety, local testing workflow, grant requireme
 
 # Supabase
 
-## Migration Testing
+## Local migration testing
 
-Wrong -- push migration directly to remote:
-
-```bash
-supabase db push  # bug in migration -> production database corrupted
-```
-
-Right -- test locally first:
+Use a disposable, task-owned local stack. Inspect its project ID, loopback endpoints and synthetic credentials before starting or resetting it. Preserve shared local data; never reset an existing user's stack. From the repository root, prepare a new isolated stack:
 
 ```bash
-supabase start                    # requires Docker Desktop
-supabase db reset                 # apply all migrations locally
-docker exec supabase_db_<project> psql -U postgres -c "SELECT * FROM new_table LIMIT 1;"
-supabase db push                  # only after local verification
+npm run prepare:contracts
 ```
 
-The local instance runs full Postgres with RLS and extensions enabled -- treat
-it as a UAT environment, not a lightweight mock.
+Preparation runs `supabase start`, verifies the fresh task's Docker identity, and runs `supabase db reset --local` only in its newly created task directory. The required runner verifies `supabase status` before its database cases. It blocks outbound network access during reset, because historical migrations seed production webhook configuration. The preparation command prints the required `test:contracts` invocation with `CONTRACT_STACK_DIR`. Run that printed command from the repository root, where package.json and the real adapters exist. The required tier accepts no required skips. Preparation and real database qualification remain blocked when Docker or local sockets are unavailable.
 
-## Table Grants
+A postgres-only smoke query does not prove client permissions or RLS. Exercise anon, authenticated owner, authenticated nonowner and service_role through real adapters, including known allowed operations and exact forbidden-operation errors. A connection failure, unknown relation or wrong JWT is not an expected permission denial. Missing Docker, credentials or required cases leaves local acceptance blocked; it cannot become a passing skip. Record the tested migration/schema identity and cleanup result.
 
-Wrong -- create table without grants (RLS blocks access):
+## Remote migration authority
+
+Local success does not prove remote parity. Remote `supabase db push` is a separately authorized action after target inspection and completed local gates. Do not add it to the local testing recipe or invoke it as an automatic follow-up. Production migration activation remains separately authorized.
+
+## Access contracts
+
+Declare intended access for each table, view, column and RPC before writing grants or policies. SQL grants permit operations; RLS policies constrain rows. Both must allow an intended query. Missing grants cause a permission failure even if an RLS policy would allow the row; a grant does not bypass RLS for ordinary client roles. Views, security-definer functions and service-role access need their own explicit review.
+
+Grant only the operations and columns required by that object’s contract. For example, an intentionally public article may expose its ID and title while retaining private editorial fields:
 
 ```sql
-CREATE TABLE public.posts (id uuid PRIMARY KEY, title text NOT NULL);
--- Clients get 403: permission denied
+GRANT SELECT (id, title) ON public.public_articles TO anon, authenticated;
 ```
 
-Right -- include explicit grants:
+This grant is only an example for a deliberately public table; its row policy must still enforce the approved visibility. Do not copy it to private tables. A service-role write contract can require separate DML grants on its exact table, without broadening client access:
 
 ```sql
-CREATE TABLE public.posts (id uuid PRIMARY KEY, title text NOT NULL);
-GRANT SELECT ON public.posts TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.feature_flags TO service_role;
 ```
 
-## Default Privileges
+Test positive operations and expected denial cases separately from catalog grant assertions. Include forbidden columns, private tables, owner/nonowner row behavior and RPC execution. Preserve existing deliberately restricted column grants; do not replace them with table-wide SELECT.
 
-Wrong -- grant per-table, forget on future tables:
+## Default privileges
+
+Default privileges affect only future objects created by the named owner. They do not repair existing tables, and changing one creator's defaults does not change another creator's defaults. Inventory actual object owners, global and per-schema defaults, effective client grants and RLS separately before choosing a migration. Global grants are additive with per-schema defaults; a per-schema revoke cannot cancel a global grant. Do not assume the current session role created every application object.
+
+Inspect both default scopes and their owner explicitly:
 
 ```sql
-GRANT SELECT ON posts TO anon;  -- next table has same bug
+SELECT pg_catalog.pg_get_userbyid(defaclrole) AS object_owner,
+       CASE WHEN defaclnamespace = 0 THEN '(global)'
+            ELSE defaclnamespace::regnamespace::text END AS scope,
+       defaclobjtype,
+       defaclacl
+FROM pg_catalog.pg_default_acl
+ORDER BY object_owner, scope, defaclobjtype;
 ```
 
-Right -- set default privileges in initial setup migration:
+Do not grant blanket future-table SELECT to anon, authenticated or PUBLIC. Use explicit intended table/column grants in each forward-only migration. If a reviewed service-role default contract is required, scope it with `FOR ROLE` to the actual creating owner and inspect both default scopes; this is not permission to grant public client access. A fresh-reset future private-table fixture must prove it inherits no public client SELECT, before any fixture-specific revokes could hide an unsafe inherited grant. Run the fixture under each relevant creating owner and clean it up. Keep grant checks and real RLS checks distinct.
 
-```sql
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT ON TABLES TO anon, authenticated;
-```
+Check both native skill copies with `node scripts/check-supabase-guidance.mjs`. This offline guidance guard catches prohibited examples and drift; it does not prove database grants, RLS or remote parity.
 
 ## Fallback Observability
 

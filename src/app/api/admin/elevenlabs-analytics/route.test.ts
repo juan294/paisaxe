@@ -11,9 +11,10 @@ const logger = vi.hoisted(() => ({
 vi.mock("@/lib/logger", () => ({ logger }));
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn().mockResolvedValue({ valid: true }),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn().mockResolvedValue({ valid: true }));
+});
 
 // Mock config
 vi.mock("@/config/elevenlabs-agents", () => ({
@@ -1210,6 +1211,58 @@ describe("ElevenLabs Analytics API Route", () => {
     }
   });
 
+  it.each([
+    [{ name: "AbortError" }, "upstream_timeout"],
+    [{ name: "TimeoutError" }, "upstream_timeout"],
+    [null, "upstream_unavailable"],
+    [{ name: "RPC_TIMEOUT" }, "upstream_unavailable"],
+  ])("preserves empty analytics and recovery after unknown rejection %j", async (error, failureClass) => {
+    const originalFetch = global.fetch;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({ ok: true, json: async () => ({ agents: [] }) });
+      }
+      return Promise.reject(error);
+    });
+    global.fetch = fetchMock;
+    try {
+      const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+      const response = await GET(request);
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.data.summary.totalConversations).toBe(0);
+      expect(body.data.recentConversations).toEqual([]);
+      expect(logger.error).toHaveBeenCalledWith(
+        "[ELEVENLABS_PROVIDER_UNAVAILABLE]",
+        expect.objectContaining({ failure_class: failureClass })
+      );
+
+      logger.error.mockClear();
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          agents: [{ agent_id: "agent_recovered", name: "Paisaxe - Recovered" }],
+          conversations: [{
+            conversation_id: "conv_recovered",
+            agent_id: "agent_recovered",
+            status: "done",
+            call_duration_secs: 60,
+          }],
+          count: 0,
+        }),
+      });
+      const recovered = await GET(request);
+      expect(recovered.status).toBe(200);
+      const recoveredBody = await recovered.json();
+      expect(recoveredBody.data.summary.totalConversations).toBe(1);
+      expect(recoveredBody.data.summary.totalMinutesUsed).toBe(1);
+      expect(fetchMock).toHaveBeenCalledTimes(5);
+      expect(logger.error).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it("PE-L2: logs a distinct timed_out marker when the conversations fetch aborts (#816)", async () => {
     vi.stubEnv("ELEVENLABS_API_KEY", "test-api-key");
 
@@ -1234,3 +1287,6 @@ describe("ElevenLabs Analytics API Route", () => {
     );
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

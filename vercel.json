@@ -1,7 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "test \"$VERCEL_ENV\" != \"production\" && ! { test -n \"$VERCEL_GIT_PULL_REQUEST_ID\" && test \"$VERCEL_GIT_COMMIT_REF\" = develop; }",
-  "regions": ["fra1"],
+  "git": {
+    "deploymentEnabled": {
+      "sutura/*": false
+    }
+  },
+  "ignoreCommand": "test \"$VERCEL_ENV\" != \"production\"",
+  "regions": [
+    "fra1"
+  ],
   "crons": [
     {
       "path": "/api/cron/elevenlabs-voice-canary",

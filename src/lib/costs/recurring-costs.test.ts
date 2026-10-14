@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { generateRecurringCosts } from "./recurring-costs";
 
@@ -130,7 +131,7 @@ describe("generateRecurringCosts with endDate subscriptions", () => {
     const costs = genCosts("2024-07-01", "2024-07-31");
 
     expect(costs).toHaveLength(1);
-    expect(costs[0].serviceId).toBe("active-service");
+    expect(requiredValue(costs[0], "src/lib/costs/recurring-costs.test.ts:133 costs[0]").serviceId).toBe("active-service");
   });
 
   it("should include subscriptions whose endDate overlaps the query period", async () => {
@@ -156,8 +157,8 @@ describe("generateRecurringCosts with endDate subscriptions", () => {
     const costs = genCosts("2024-07-01", "2024-07-31");
 
     expect(costs).toHaveLength(1);
-    expect(costs[0].serviceId).toBe("ending-service");
-    expect(costs[0].costUsd).toBe(15);
+    expect(requiredValue(costs[0], "src/lib/costs/recurring-costs.test.ts:159 costs[0]").serviceId).toBe("ending-service");
+    expect(requiredValue(costs[0], "src/lib/costs/recurring-costs.test.ts:160 costs[0]").costUsd).toBe(15);
   });
 
   it("should fall back to sub.dashboardUrl when service not in PLATFORM_SERVICES", async () => {
@@ -182,6 +183,6 @@ describe("generateRecurringCosts with endDate subscriptions", () => {
 
     expect(costs).toHaveLength(1);
     // Should fall back to the subscription's own dashboardUrl
-    expect(costs[0].dashboardUrl).toBe("https://unknown.example.com/billing");
+    expect(requiredValue(costs[0], "src/lib/costs/recurring-costs.test.ts:185 costs[0]").dashboardUrl).toBe("https://unknown.example.com/billing");
   });
 });

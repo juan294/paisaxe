@@ -4,7 +4,8 @@ import { Providers } from "./providers";
 
 const mockUsePathname = vi.fn(() => "/");
 
-// Mock all provider dependencies to isolate the Providers component
+// Legacy structural tests isolate provider composition and route policy only.
+// Real auth/language seed and continuity are covered by providers.presentation.test.tsx.
 vi.mock("@/lib/i18n", () => ({
   LanguageProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="language-provider">{children}</div>
@@ -13,6 +14,7 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 vi.mock("@/components/auth/auth-provider", () => ({
+  useAuthContext: () => ({}),
   AuthProvider: ({ children, deferInitialAuth }: { children: React.ReactNode; deferInitialAuth?: boolean }) => (
     <div data-testid="auth-provider" data-defer-initial-auth={String(!!deferInitialAuth)}>
       {children}

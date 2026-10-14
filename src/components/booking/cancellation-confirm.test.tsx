@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CancellationTerms } from "@/types/booking-page";
@@ -27,6 +28,13 @@ beforeEach(() => {
 });
 
 describe("CancellationConfirm", () => {
+  it("never makes cancelling the loudest control: a red tint, not solid red (U04)", () => {
+    render(<CancellationConfirm capability={CAPABILITY} terms={fullRefund} />);
+    const button = screen.getByRole("button", { name: "booking.cancel.confirmRefund" });
+    expect(button).toHaveClass("bg-red-500/10", "text-red-200");
+    expect(button).not.toHaveClass("bg-destructive");
+  });
+
   it("shows the refund and confirms with the refund the visitor saw", async () => {
     const onCancelled = vi.fn();
     mockFetch.mockResolvedValueOnce(json(200, { status: "refund_pending", refundCents: 3000 }));
@@ -37,7 +45,7 @@ describe("CancellationConfirm", () => {
     fireEvent.click(screen.getByRole("button", { name: "booking.cancel.confirmRefund" }));
 
     await waitFor(() => expect(onCancelled).toHaveBeenCalledWith({ status: "refund_pending", refundCents: 3000 }));
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = requiredValue(mockFetch.mock.calls[0], "src/components/booking/cancellation-confirm.test.tsx:48 mock call tuple");
     expect(url).toBe(`/api/booking/bookings/${CAPABILITY}/cancel`);
     expect(init).toMatchObject({ method: "POST", headers: { "Content-Type": "application/json", "x-csrf-token": "csrf-1" } });
     expect(JSON.parse(init.body)).toEqual({ expectedRefundCents: 3000 });
@@ -60,7 +68,7 @@ describe("CancellationConfirm", () => {
     fireEvent.click(screen.getByRole("button", { name: "booking.cancel.confirmNoRefund" }));
 
     expect(await screen.findByText("booking.cancel.done")).toBeInTheDocument();
-    expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({ expectedRefundCents: 0 });
+    expect(JSON.parse(requiredValue(requiredValue(mockFetch.mock.calls[1], "src/components/booking/cancellation-confirm.test.tsx: mockFetch.mock.calls[1]")[1], "src/components/booking/cancellation-confirm.test.tsx: mockFetch.mock.calls[1][1]").body)).toEqual({ expectedRefundCents: 0 });
   });
 
   it("a refund PayPal refused for good says it is being reviewed", async () => {

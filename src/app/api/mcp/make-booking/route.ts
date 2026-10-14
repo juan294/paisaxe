@@ -1,3 +1,5 @@
+import { rateLimitResponse } from "@/lib/request-rate-limit";
+import { getEnv } from "@/lib/env";
 import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { logger } from "@/lib/logger";
@@ -72,17 +74,14 @@ function buildRateLimitedResponse(
   retryAfter: number | undefined,
   message: string
 ): NextResponse<MakeBookingResponse> {
-  return NextResponse.json<MakeBookingResponse>(
+  return rateLimitResponse<MakeBookingResponse>(
     {
       success: false,
       message,
       status: "failed",
       fallback_action: `Tell the user they can call ${venueName} directly at ${phoneNumber} to make a reservation.`,
     },
-    {
-      status: 429,
-      headers: { "Retry-After": String(retryAfter ?? 60) },
-    }
+    { retryAfter }
   );
 }
 
@@ -232,8 +231,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Check if ElevenLabs outbound calling is configured
     if (
-      !process.env.ELEVENLABS_API_KEY ||
-      !process.env.ELEVENLABS_PHONE_NUMBER_ID
+      !getEnv("ELEVENLABS_API_KEY") ||
+      !getEnv("ELEVENLABS_PHONE_NUMBER_ID")
     ) {
       // Return a helpful message for testing/development
       return NextResponse.json<MakeBookingResponse>({
@@ -441,9 +440,9 @@ export async function POST(request: Request): Promise<NextResponse> {
 // GET endpoint for health checks and documentation
 export async function GET(): Promise<NextResponse> {
   const outboundConfigured = !!(
-    process.env.ELEVENLABS_API_KEY &&
-    process.env.ELEVENLABS_PHONE_NUMBER_ID &&
-    process.env.ELEVENLABS_BOOKING_AGENT_ID
+    getEnv("ELEVENLABS_API_KEY") &&
+    getEnv("ELEVENLABS_PHONE_NUMBER_ID") &&
+    getEnv("ELEVENLABS_BOOKING_AGENT_ID")
   );
 
   return NextResponse.json({

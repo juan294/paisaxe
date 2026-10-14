@@ -46,7 +46,7 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
         </div>
         <button
           onClick={handlePurchase}
-          className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 text-black font-medium rounded-full hover:from-green-400 hover:to-green-300 transition-all text-sm flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+          className="px-4 py-2 bg-gradient-to-r from-paisaxe-green-500 to-paisaxe-green-400 text-black font-medium rounded-full hover:from-paisaxe-green-400 hover:to-paisaxe-green-300 transition-all text-sm flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
         >
           {t("premium.get_day_pass")} - {DEFAULT_TIER.price}
         </button>
@@ -63,10 +63,10 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
     >
       {/* Icon */}
       <div className="relative mb-6">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500/20 to-green-400/20 flex items-center justify-center">
-          <Mic className="h-10 w-10 text-green-400" />
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-paisaxe-green-500/20 to-paisaxe-green-400/20 flex items-center justify-center">
+          <Mic className="h-10 w-10 text-paisaxe-green-400" />
         </div>
-        <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+        <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-paisaxe-green-500 flex items-center justify-center">
           <Sparkles className="h-3.5 w-3.5 text-black" />
         </div>
       </div>
@@ -84,15 +84,15 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
       {/* Features */}
       <div className="flex flex-col gap-2 mb-6 text-left w-full max-w-xs">
         <div className="flex items-center gap-3 text-white/80 text-sm">
-          <Clock className="h-4 w-4 text-green-400 flex-shrink-0" />
+          <Clock className="h-4 w-4 text-paisaxe-green-400 flex-shrink-0" />
           <span>{t("premium.feature_24h")}</span>
         </div>
         <div className="flex items-center gap-3 text-white/80 text-sm">
-          <MapPin className="h-4 w-4 text-green-400 flex-shrink-0" />
+          <MapPin className="h-4 w-4 text-paisaxe-green-400 flex-shrink-0" />
           <span>{t("premium.feature_realtime")}</span>
         </div>
         <div className="flex items-center gap-3 text-white/80 text-sm">
-          <Phone className="h-4 w-4 text-green-400 flex-shrink-0" />
+          <Phone className="h-4 w-4 text-paisaxe-green-400 flex-shrink-0" />
           <span>{t("premium.feature_booking")}</span>
         </div>
       </div>
@@ -106,7 +106,7 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
       {/* CTA Button */}
       <button
         onClick={handlePurchase}
-        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black font-semibold rounded-full hover:from-green-400 hover:to-green-300 transition-all shadow-lg shadow-green-500/25 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-paisaxe-green-500 to-paisaxe-green-400 text-black font-semibold rounded-full hover:from-paisaxe-green-400 hover:to-paisaxe-green-300 transition-all shadow-lg shadow-paisaxe-green-500/25 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
       >
         {user ? t("premium.get_day_pass") : t("premium.sign_in_to_purchase")}
       </button>

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startPaypalMock, type PaypalMock } from "@/test/paypal-mock-server";
@@ -7,7 +8,7 @@ import { getCapture, getRefund, refundCapture } from "./payments";
 import { PaypalError } from "./types";
 
 const BOOKING_ID = "11111111-2222-4333-8444-555555555555";
-const OPERATION_KEY = "6f1c2d3e-4b5a-4c6d-8e7f-001122334455";
+const OPERATION_KEY = "00000000-0000-4000-8000-000000000001";
 
 let mock: PaypalMock;
 
@@ -76,9 +77,9 @@ describe("refundCapture", () => {
     const refund = await refundCapture(captureId, 3000, OPERATION_KEY);
 
     const [request] = mock.requestsTo("POST", `/v2/payments/captures/${captureId}/refund`);
-    expect(request.headers["paypal-request-id"]).toBe(`refund:${OPERATION_KEY}`);
-    expect(request.headers.prefer).toBe("return=representation");
-    expect(request.body).toEqual({ amount: { currency_code: "EUR", value: "30.00" } });
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/payments.test.ts:80 request").headers["paypal-request-id"], "src/lib/paypal/payments.test.ts:79 request.headers[\"paypal-request-id\"]")).toBe(`refund:${OPERATION_KEY}`);
+    expect(requiredValue(request, "src/lib/paypal/payments.test.ts:81 request").headers.prefer).toBe("return=representation");
+    expect(requiredValue(request, "src/lib/paypal/payments.test.ts:82 request").body).toEqual({ amount: { currency_code: "EUR", value: "30.00" } });
     expect(refund).toEqual({ id: expect.stringMatching(/^REF/), status: "COMPLETED" });
   });
 

@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
@@ -5,6 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { VoiceChat } from "./voice-chat";
 import { Story } from "@/types/immersive";
 import { createMockT } from "@/test/i18n-mock";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 // Mock i18n
 const mockT = createMockT();
@@ -32,6 +35,9 @@ vi.mock("@/hooks/use-auth", () => ({
 
 // Mutable mock state for useVoiceAccess
 const mockVoiceAccess = {
+  isSuspended: false,
+  isAccessDenied: false,
+  accessStatus: "none",
   canUseVoice: false,
   needsSignIn: false,
   needsPurchase: false,
@@ -71,26 +77,33 @@ vi.mock("@/components/posthog-provider", () => ({
   usePaisaxePostHog: () => mockAppPostHog.current,
 }));
 
-// Mock next/image — renders a plain <img> with all props forwarded for test assertions
+const imageRequests = vi.hoisted((): string[] => []);
+
+// Mock only next/image; the real provenance guard still chooses every URL.
 vi.mock("next/image", () => ({
-  default: ({ src, alt, className, width, height, sizes }: {
+  default: ({ src, alt, className, width, height, sizes, onError }: {
     src: string;
     alt: string;
     className?: string;
     width?: number;
     height?: number;
     sizes?: string;
-  }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      className={className}
-      data-width={width}
-      data-height={height}
-      data-sizes={sizes}
-    />
-  ),
+    onError?: React.ReactEventHandler<HTMLImageElement>;
+  }) => {
+    imageRequests.push(src);
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        data-width={width}
+        data-height={height}
+        data-sizes={sizes}
+        onError={onError}
+      />
+    );
+  },
 }));
 
 // Mock Supabase browser client
@@ -143,21 +156,23 @@ vi.mock("next/dynamic", async () => {
 // Mock VoiceChatElevenLabs component (to avoid navigator.mediaDevices issues in tests)
 // Store onFallbackToText and forwarded props so tests can invoke/assert them
 let capturedOnFallbackToText: (() => void) | undefined;
-let capturedVoiceChatProps: { userAccessToken?: string | null; initialMessage?: string } = {};
+let capturedVoiceChatProps: { onAccessDenied?: () => Promise<void>; userAccessToken?: string | null; initialMessage?: string } = {};
 vi.mock("./voice-chat-elevenlabs", () => ({
   VoiceChatElevenLabs: ({
     story,
     onFallbackToText,
+    onAccessDenied,
     userAccessToken,
     initialMessage,
   }: {
     story: { title: string };
     onFallbackToText?: () => void;
+    onAccessDenied?: () => Promise<void>;
     userAccessToken?: string | null;
     initialMessage?: string;
   }) => {
     capturedOnFallbackToText = onFallbackToText;
-    capturedVoiceChatProps = { userAccessToken, initialMessage };
+    capturedVoiceChatProps = { onAccessDenied, userAccessToken, initialMessage };
     return (
       <div data-testid="elevenlabs-voice-chat">
         Voice chat active for {story.title}
@@ -255,6 +270,10 @@ vi.mock("@/components/premium/voice-purchase-cta", () => ({
 const resetMockVoiceAccess = () => {
   mockAuthState.session = null;
   mockBookingAccess.active = false;
+  mockBookingAccess.isLoading = false;
+  mockVoiceAccess.isSuspended = false;
+  mockVoiceAccess.isAccessDenied = false;
+  mockVoiceAccess.accessStatus = "none";
   mockVoiceAccess.canUseVoice = false;
   mockVoiceAccess.needsSignIn = false;
   mockVoiceAccess.needsPurchase = false;
@@ -269,6 +288,7 @@ const resetMockVoiceAccess = () => {
 describe("VoiceChat", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    imageRequests.length = 0;
     mockCapture.mockReset();
     mockReactPostHog.current = { capture: mockCapture };
     mockAppPostHog.current = { capture: mockCapture };
@@ -575,7 +595,7 @@ describe("VoiceChat", () => {
       fireEvent.submit(form!);
 
       await waitFor(() => {
-        const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+        const callBody = JSON.parse(requiredValue(requiredValue(mockFetch.mock.calls[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0]")[1], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0][1]").body);
         expect(callBody.context).toContain("Lagos de Covadonga");
         expect(callBody.context).toContain("Picos de Europa");
         expect(callBody.context).toContain("nature-guide.pdf");
@@ -901,6 +921,7 @@ describe("VoiceChat", () => {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
             caption: "Lagos de Covadonga at sunset",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/lagos.jpg", undefined, undefined, { alt: "Lagos de Covadonga at sunset" }),
             sourcePdf: "nature-guide.pdf",
           },
         ])
@@ -922,13 +943,14 @@ describe("VoiceChat", () => {
       });
     });
 
-    it("should display image caption when available", async () => {
+    it("should display the reviewed image caption", async () => {
       mockFetch.mockResolvedValueOnce(
         createStreamingResponse("Beautiful place.", [
           {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
             caption: "Picos de Europa mountain view",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/lagos.jpg", undefined, undefined, { alt: "Picos de Europa mountain view" }),
             sourcePdf: "nature-guide.pdf",
           },
         ])
@@ -955,6 +977,7 @@ describe("VoiceChat", () => {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/test.jpg",
             caption: "Test image",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/test.jpg", undefined, undefined, { alt: "Test image" }),
             sourcePdf: "hiking-guide.pdf",
           },
         ])
@@ -970,7 +993,9 @@ describe("VoiceChat", () => {
       fireEvent.submit(form!);
 
       await waitFor(() => {
-        expect(screen.getByText(/hiking-guide\.pdf/)).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Synthetic fixture credit" })).toHaveAttribute("href", "https://example.com/synthetic-photo-review");
+        expect(screen.getByText(/owner-permission/)).toBeInTheDocument();
+        expect(screen.queryByText(/hiking-guide\.pdf/)).not.toBeInTheDocument();
       });
     });
 
@@ -981,12 +1006,14 @@ describe("VoiceChat", () => {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/img1.jpg",
             caption: "First image",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/img1.jpg", undefined, undefined, { alt: "First image" }),
             sourcePdf: "guide-1.pdf",
           },
           {
             id: "img-2",
             path: "https://example.supabase.co/storage/v1/images/img2.jpg",
             caption: "Second image",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/img2.jpg", undefined, undefined, { alt: "Second image" }),
             sourcePdf: "guide-2.pdf",
           },
         ])
@@ -1052,6 +1079,7 @@ describe("VoiceChat", () => {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/optimized.jpg",
             caption: "Optimized photo",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/optimized.jpg", undefined, undefined, { alt: "Optimized photo" }),
             sourcePdf: "guide.pdf",
           },
         ])
@@ -1076,12 +1104,13 @@ describe("VoiceChat", () => {
       });
     });
 
-    it("should use fallback alt text when image has no caption", async () => {
+    it("should use reviewed alt text when the response image has no caption", async () => {
       mockFetch.mockResolvedValueOnce(
         createStreamingResponse("Image without caption.", [
           {
             id: "img-1",
             path: "https://example.supabase.co/storage/v1/images/no-caption.jpg",
+            provenance: imageProvenanceFixture("https://example.supabase.co/storage/v1/images/no-caption.jpg"),
             sourcePdf: "guide.pdf",
           },
         ])
@@ -1102,7 +1131,58 @@ describe("VoiceChat", () => {
         // Should have a meaningful alt text even without caption
         expect(img.getAttribute("alt")).toBeTruthy();
         expect(img.getAttribute("alt")).not.toBe("");
+        expect(img).toHaveAttribute("alt", "Synthetic geometric fixture");
+        expect(img).toHaveAttribute("src", "https://example.supabase.co/storage/v1/images/no-caption.jpg");
       });
+    });
+
+    it.each([
+      ["legacy image", undefined],
+      ["mismatched image proof", imageProvenanceFixture("https://example.supabase.co/storage/v1/images/other.jpg")],
+    ])("renders a %s neutrally without fabricated caption or PDF attribution", async (_label, provenance) => {
+      const path = "https://example.supabase.co/storage/v1/images/unreviewed.jpg";
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Image review pending.", [{
+        id: "pending-image", path, provenance, caption: "Unreviewed place claim", sourcePdf: "unreviewed-guide.pdf",
+      }]));
+      const { container } = render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Show an image");
+      const form = input.closest("form");
+      if (!form) throw new Error("Voice image form is missing");
+      fireEvent.submit(form);
+
+      await waitFor(() => expect(screen.getByRole("img", { name: NEUTRAL_CREDIT })).toHaveAttribute("src", NEUTRAL_IMAGE));
+      expect(container.querySelector(`img[src="${path}"]`)).toBeNull();
+      expect(imageRequests).not.toContain(path);
+      expect(imageRequests.length).toBeGreaterThan(0);
+      expect(imageRequests.every(src => src === NEUTRAL_IMAGE)).toBe(true);
+      expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+      expect(screen.queryByText("Unreviewed place claim")).not.toBeInTheDocument();
+      expect(screen.queryByText(/unreviewed-guide\.pdf/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Synthetic fixture credit" })).not.toBeInTheDocument();
+    });
+
+    it("replaces a failed approved chat image and its attribution with neutral imagery", async () => {
+      const path = "https://example.supabase.co/storage/v1/images/reviewed.jpg";
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Reviewed image.", [{
+        id: "reviewed-image", path,
+        provenance: imageProvenanceFixture(path), caption: "Unreviewed cached caption", sourcePdf: "legacy-guide.pdf",
+      }]));
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Show an image");
+      const form = input.closest("form");
+      if (!form) throw new Error("Voice image form is missing");
+      fireEvent.submit(form);
+      const image = await screen.findByRole("img", { name: "Synthetic geometric fixture" });
+      expect(image).toHaveAttribute("src", path);
+      expect(screen.getByRole("link", { name: "Synthetic fixture credit" })).toBeInTheDocument();
+      fireEvent.error(image);
+      expect(screen.getByRole("img", { name: NEUTRAL_CREDIT })).toHaveAttribute("src", NEUTRAL_IMAGE);
+      expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Synthetic fixture credit" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Unreviewed cached caption")).not.toBeInTheDocument();
+      expect(screen.queryByText(/legacy-guide\.pdf/)).not.toBeInTheDocument();
     });
   });
 });
@@ -1127,6 +1207,42 @@ describe("VoiceChat with voice access", () => {
   afterEach(() => {
     vi.clearAllMocks();
     resetMockVoiceAccess();
+  });
+
+  it("passes authoritative access refresh into the signed-session component", async () => {
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument());
+    await capturedVoiceChatProps.onAccessDenied!();
+    expect(mockVoiceAccess.refresh).toHaveBeenCalledWith({afterIssuanceDenial:true});
+  });
+
+  it("shows suspended support while preserving text input and hiding purchase action", async () => {
+    mockVoiceAccess.canUseVoice = false; mockVoiceAccess.hasAccess = false;
+    mockVoiceAccess.isSuspended = true; mockVoiceAccess.accessStatus = "suspended";
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText(mockT("voice.suspended"))).toBeInTheDocument());
+    expect(screen.getByRole("link", {name:mockT("voice.contactSupport")})).toHaveAttribute("href","mailto:support@paisaxe.es");
+    expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
+    expect(screen.queryByTestId("voice-purchase-cta")).not.toBeInTheDocument();
+  });
+
+  it("unknown issuance denial shows retry/support and text without inventing dispute or purchase reason", async () => {
+    mockVoiceAccess.canUseVoice=false; mockVoiceAccess.hasAccess=false;
+    mockVoiceAccess.isAccessDenied=true; mockVoiceAccess.needsPurchase=false;
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(()=>expect(screen.getByText(mockT("voice.accessUnavailable"))).toBeInTheDocument());
+    expect(screen.queryByText(mockT("voice.suspended"))).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
+    expect(screen.queryByTestId("voice-purchase-cta")).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="/pricing"]')).toBeNull();
+    fireEvent.click(screen.getByRole("button",{name:mockT("voice.checkAccess")}));
+    expect(mockVoiceAccess.refresh).toHaveBeenCalledWith();
+  });
+
+  it.each(["revoked","expired"])("discloses %s purchase state", async status => {
+    mockVoiceAccess.canUseVoice = false; mockVoiceAccess.accessStatus = status;
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(mockT(`voice.${status}`)));
   });
 
   it("should default to voice mode when user has voice access", async () => {
@@ -1334,7 +1450,7 @@ describe("VoiceChat initialMessage", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const requestBody = JSON.parse(
-      (mockFetch.mock.calls[0][1] as RequestInit).body as string
+      (requiredValue(requiredValue(mockFetch.mock.calls[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0]")[1], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0][1]") as RequestInit).body as string
     );
     expect(requestBody.message).toBe("What are the best hiking trails?");
 
@@ -1874,7 +1990,7 @@ describe("VoiceChat error UI for API failures", () => {
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      const retryCall = mockFetch.mock.calls[1][1].body;
+      const retryCall = requiredValue(requiredValue(mockFetch.mock.calls[1], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[1]")[1], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[1][1]").body;
       expect(retryCall).toContain("Retry question");
     });
   });
@@ -1951,6 +2067,36 @@ describe("VoiceChat booking mode (PayPal hackathon Phase 3, F06)", () => {
     expect(await screen.findByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
   });
 
+  it("shows no composer while booking access is still being checked, so a first turn cannot go to the discovery chat", async () => {
+    mockAuthState.session = { access_token: "token-1" };
+    mockBookingAccess.isLoading = true;
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`));
+          controller.close();
+        },
+      }),
+    });
+
+    const { rerender } = render(<VoiceChat story={mockStory} open={true} onClose={() => {}} bookingMode />);
+    await act(async () => {});
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(document.querySelector(".animate-pulse")).not.toBeNull();
+
+    mockBookingAccess.isLoading = false;
+    mockBookingAccess.active = true;
+    rerender(<VoiceChat story={mockStory} open={true} onClose={() => {}} bookingMode />);
+    await userEvent.type(await screen.findByRole("textbox"), "Somos cuatro");
+    await userEvent.keyboard("{Enter}");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    expect(mockFetch.mock.calls.map((call) => call[0])).toEqual(["/api/booking/chat/stream"]);
+  });
+
   it("sends turns to the booking chat route while booking access is active", async () => {
     mockAuthState.session = { access_token: "token-1" };
     mockBookingAccess.active = true;
@@ -1971,7 +2117,7 @@ describe("VoiceChat booking mode (PayPal hackathon Phase 3, F06)", () => {
     await userEvent.keyboard("{Enter}");
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
-    expect(mockFetch.mock.calls[0][0]).toBe("/api/booking/chat/stream");
+    expect(requiredValue(requiredValue(mockFetch.mock.calls[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0]")[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0][0]")).toBe("/api/booking/chat/stream");
   });
 
   it("without booking access, uses the discovery chat route (unchanged)", async () => {
@@ -1992,6 +2138,6 @@ describe("VoiceChat booking mode (PayPal hackathon Phase 3, F06)", () => {
     await userEvent.keyboard("{Enter}");
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
-    expect(mockFetch.mock.calls[0][0]).toBe("/api/chat/stream");
+    expect(requiredValue(requiredValue(mockFetch.mock.calls[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0]")[0], "src/components/immersive/voice-chat.test.tsx: mockFetch.mock.calls[0][0]")).toBe("/api/chat/stream");
   });
 });

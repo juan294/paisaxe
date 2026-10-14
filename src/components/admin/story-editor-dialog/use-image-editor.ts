@@ -92,18 +92,19 @@ export function useImageEditor(
   const validateAndSetFile = useCallback((file: File) => {
     setError("");
 
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
     if (!allowedTypes.includes(file.type)) {
-      setError("Invalid file type. Allowed: JPEG, PNG, WebP, GIF");
+      setError("Invalid file type. Allowed: JPEG, PNG, WebP, GIF, AVIF");
       return false;
     }
 
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      setError("File too large. Maximum size is 5MB");
+      setError("File too large. Maximum size is 10MB");
       return false;
     }
 
+    setImageSource("");
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
     return true;
@@ -151,6 +152,7 @@ export function useImageEditor(
   );
 
   const handleUrlChange = useCallback((url: string) => {
+    setImageSource(url || selectedFile ? "" : story?.imageSource || "");
     setImageUrl(url);
     setError("");
     if (url) {
@@ -158,13 +160,14 @@ export function useImageEditor(
     } else {
       setPreviewUrl(null);
     }
-  }, [setError]);
+  }, [setError, selectedFile, story?.imageSource]);
 
   const clearUpload = useCallback(() => {
+    setImageSource(imageUrl ? "" : story?.imageSource || "");
     setSelectedFile(null);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [imageUrl, story?.imageSource]);
 
   const handleSearchContent = useCallback(async () => {
     if (!story) return;
@@ -181,11 +184,11 @@ export function useImageEditor(
         setContentImageIndex(0);
         setContentSearched(true);
 
-        if (result.data.images.length > 0) {
-          const firstImage = result.data.images[0];
+        const firstImage = result.data.images[0];
+        if (firstImage) {
           setPreviewUrl(firstImage.url);
           setImageUrl(firstImage.url);
-          setImageSource("Turismo de Asturias");
+          setImageSource("");
         }
       }
     } catch {
@@ -205,11 +208,12 @@ export function useImageEditor(
       newIndex = contentImageIndex === contentImages.length - 1 ? 0 : contentImageIndex + 1;
     }
 
-    setContentImageIndex(newIndex);
     const image = contentImages[newIndex];
+    if (!image) return;
+    setContentImageIndex(newIndex);
     setPreviewUrl(image.url);
     setImageUrl(image.url);
-    setImageSource("Turismo de Asturias");
+    setImageSource("");
   }, [contentImages, contentImageIndex]);
 
   const currentContentImage = contentImages[contentImageIndex] || null;

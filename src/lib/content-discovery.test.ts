@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 
 // Mock unsplash-placeholders so we can make getPlaceholderForStory throw in specific tests
@@ -237,9 +238,9 @@ describe("searchPlaces", () => {
 
     const results = await searchPlaces("playas asturias", "test-api-key");
     expect(results).toHaveLength(2);
-    expect(results[0].name).toBe("Playa de Gulpiyuri");
-    expect(results[0].types).toContain("natural_feature");
-    expect(results[1].name).toBe("Bufones de Pría");
+    expect(requiredValue(results[0], "src/lib/content-discovery.test.ts:240 results[0]").name).toBe("Playa de Gulpiyuri");
+    expect(requiredValue(results[0], "src/lib/content-discovery.test.ts:241 results[0]").types).toContain("natural_feature");
+    expect(requiredValue(results[1], "src/lib/content-discovery.test.ts:242 results[1]").name).toBe("Bufones de Pría");
   });
 
   it("returns empty array when API returns no places", async () => {
@@ -293,11 +294,11 @@ describe("searchPlaces", () => {
 
     const results = await searchPlaces("test", "test-api-key");
     expect(results).toHaveLength(1);
-    expect(results[0].name).toBe("Unknown");
-    expect(results[0].address).toBe("");
-    expect(results[0].types).toEqual([]);
-    expect(results[0].rating).toBeNull();
-    expect(results[0].placeId).toBe("place_minimal");
+    expect(requiredValue(results[0], "src/lib/content-discovery.test.ts:296 results[0]").name).toBe("Unknown");
+    expect(requiredValue(results[0], "src/lib/content-discovery.test.ts:297 results[0]").address).toBe("");
+    expect(requiredValue(results[0], "src/lib/content-discovery.test.ts:298 results[0]").types).toEqual([]);
+    expect(requiredValue(results[0], "src/lib/content-discovery.test.ts:299 results[0]").rating).toBeNull();
+    expect(requiredValue(results[0], "src/lib/content-discovery.test.ts:300 results[0]").placeId).toBe("place_minimal");
   });
 });
 
@@ -460,6 +461,39 @@ function createMockSupabase(existingStories: Array<{ title: string; slug: string
 describe("runDiscovery", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("fails locally for an empty query pool and recovers after it is restored", async () => {
+    const originalQueries = DISCOVERY_QUERIES.splice(0);
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ places: [] }),
+    });
+    global.fetch = fetchMock;
+    const deps = {
+      supabase: createMockSupabase([]),
+      googleApiKey: "fixture-google-key",
+      anthropicApiKey: "fixture-anthropic-key",
+    };
+
+    try {
+      const result = await runDiscovery(deps);
+      expect(result).toEqual({
+        discovered: 0,
+        created: 0,
+        skippedDuplicates: 0,
+        errors: ["No discovery queries available"],
+        stories: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      DISCOVERY_QUERIES.push(...originalQueries);
+    }
+
+    const recovered = await runDiscovery(deps);
+    expect(recovered.errors).toEqual([]);
+    expect(recovered.created).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("discovers new places and creates story drafts", async () => {

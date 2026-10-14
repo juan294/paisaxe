@@ -3,11 +3,19 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { RelatedStories } from "./related-stories";
 import type { Story } from "@/types/immersive";
 import { createMockT } from "@/test/i18n-mock";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
+import { requiredValue } from "@/test/required-value";
+
+const imageRequests = vi.hoisted((): unknown[] => []);
 
 // Mock next/image
 vi.mock("next/image", () => ({
-  // eslint-disable-next-line @next/next/no-img-element
-  default: (props: Record<string, unknown>) => <img {...props} />,
+  default: (props: Record<string, unknown>) => {
+    imageRequests.push(props.src);
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img {...props} />;
+  },
 }));
 
 // Mock i18n
@@ -28,6 +36,7 @@ const mockRelatedStories: Story[] = [
     subtitle: "Subtitle 1",
     description: "Description",
     image: "/img1.png",
+    imageSource: imageProvenanceFixture("/img1.png", undefined, undefined, { alt: "Related Story 1" }),
     category: "nature",
     sourcePdf: "test.pdf",
     location: "eastern",
@@ -40,6 +49,7 @@ const mockRelatedStories: Story[] = [
     subtitle: "Subtitle 2",
     description: "Description",
     image: "/img2.png",
+    imageSource: imageProvenanceFixture("/img2.png", undefined, undefined, { alt: "Related Story 2" }),
     category: "cities",
     sourcePdf: "test.pdf",
     location: "central",
@@ -55,6 +65,7 @@ describe("RelatedStories", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    imageRequests.length = 0;
   });
 
   it("should render related stories section title", () => {
@@ -120,8 +131,8 @@ describe("RelatedStories", () => {
     expect(screen.getByRole("region", { name: new RegExp(mockT("accessibility.related_stories"), "i") })).toBeInTheDocument();
   });
 
-  // UX-M5: Related story images must have meaningful alt text (story title), not empty
-  it("UX-M5: related story images have non-empty alt text derived from story title", () => {
+  // UX-M5: approved fixtures retain meaningful reviewed alt text.
+  it("UX-M5: related story images have non-empty reviewed alt text", () => {
     const { container } = render(<RelatedStories {...defaultProps} />);
 
     const img1 = container.querySelector('img[src="/img1.png"]');
@@ -131,6 +142,25 @@ describe("RelatedStories", () => {
     expect(img2).not.toBeNull();
     expect(img1).toHaveAttribute("alt", "Related Story 1");
     expect(img2).toHaveAttribute("alt", "Related Story 2");
+  });
+
+  it.each([
+    ["legacy credit", "Unreviewed legacy credit"],
+    ["proof for another asset", imageProvenanceFixture("/other.png")],
+  ])("uses neutral imagery and credit for %s while preserving selection", (_label, imageSource) => {
+    const story: Story = { ...requiredValue(mockRelatedStories[0], "Related image fixture"), imageSource };
+    const onSelectStory = vi.fn();
+    const { container } = render(<RelatedStories stories={[story]} onSelectStory={onSelectStory} />);
+
+    expect(screen.getByRole("img", { name: NEUTRAL_CREDIT })).toHaveAttribute("src", NEUTRAL_IMAGE);
+    expect(container.querySelector('img[src="/img1.png"]')).toBeNull();
+    expect(imageRequests.length).toBeGreaterThan(0);
+    expect(imageRequests.every(src => src === NEUTRAL_IMAGE)).toBe(true);
+    expect(screen.getByText(NEUTRAL_CREDIT)).toBeInTheDocument();
+    expect(screen.queryByText("Synthetic fixture credit")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unreviewed legacy credit")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(story.title));
+    expect(onSelectStory).toHaveBeenCalledWith(story);
   });
 
   it("UX-M5: related story images do not have empty alt text", () => {

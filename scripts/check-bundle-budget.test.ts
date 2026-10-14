@@ -1,3 +1,4 @@
+import { requiredValue } from "../src/test/required-value";
 import { gzipSync } from "zlib";
 import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
@@ -122,8 +123,8 @@ describe("checkBundleBudget", () => {
     const report = checkBundleBudget({ buildDir });
 
     expect(report.violations).toHaveLength(1);
-    expect(report.violations[0].route).toBe("/");
-    expect(report.violations[0].gzipBytes).toBeGreaterThan(report.violations[0].budgetBytes);
+    expect(requiredValue(report.violations[0], "budget violation").route).toBe("/");
+    expect(requiredValue(report.violations[0], "budget violation").gzipBytes).toBeGreaterThan(requiredValue(report.violations[0], "budget violation").budgetBytes);
   });
 
   it("fails loudly with a structural error instead of silently reporting 0KB when the expected build shape is missing", () => {

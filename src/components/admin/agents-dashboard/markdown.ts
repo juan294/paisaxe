@@ -25,7 +25,7 @@ export function renderMarkdown(md: string): string {
         // Headings → bold text
         if (/^#{1,3}\s+/.test(line)) {
           const text = line.replace(/^#{1,3}\s+/, "");
-          return `<strong class="text-[#2d2a26] dark:text-[#f5f3ee]">${text}</strong>`;
+          return `<strong class="text-admin-ink dark:text-admin-paper">${text}</strong>`;
         }
         // List items → bullet
         if (/^[-*]\s+/.test(line)) {
@@ -43,7 +43,7 @@ export function renderMarkdown(md: string): string {
     })
     .join("")
     // Bold
-    .replace(/\*\*([^*]+)\*\*/g, '<strong class="text-[#2d2a26] dark:text-[#f5f3ee]">$1</strong>');
+    .replace(/\*\*([^*]+)\*\*/g, '<strong class="text-admin-ink dark:text-admin-paper">$1</strong>');
 }
 
 /**

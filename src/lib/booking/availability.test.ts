@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBookingSupabaseFake, experienceRow, type BookingSupabaseFake } from "@/test/booking-supabase-fake";
 import { listAvailability, searchExperiences } from "./availability";
@@ -85,13 +86,13 @@ describe("searchExperiences", () => {
       ["canoe", "rejected", ["constraint_unsupported"]],
       ["jeep", "rejected", ["over_budget"]],
     ]);
-    expect(results[0].slots).toEqual([
+    expect(requiredValue(results[0], "src/lib/booking/availability.test.ts:88 results[0]").slots).toEqual([
       { date: "2026-11-21", startTime: "10:00", available: 12 },
       { date: "2026-11-21", startTime: "16:00", available: 12 },
     ]);
     // Rejected options cost no availability lookups.
     expect(fake.rpc).toHaveBeenCalledTimes(1);
-    expect(results[2].verdicts).toEqual([
+    expect(requiredValue(results[2], "src/lib/booking/availability.test.ts:94 results[2]").verdicts).toEqual([
       { key: "step_free", verdict: "unknown", detail: "step_free unknown", confirmedByProvider: false },
     ]);
   });
@@ -106,7 +107,7 @@ describe("searchExperiences", () => {
       { partySize: 2, date: "2026-11-21", constraints: { step_free: true } },
       NOW
     );
-    expect(result.suitability).toBe("unconfirmed");
+    expect(requiredValue(result, "src/lib/booking/availability.test.ts:110 result").suitability).toBe("unconfirmed");
   });
 
   it("rejects a party larger than the experience allows", async () => {
@@ -114,7 +115,7 @@ describe("searchExperiences", () => {
     fake.onTable("experiences", { data: [experience("canoe", { max_party: 4 })] });
 
     const [result] = await searchExperiences(fake.client, { partySize: 5, date: "2026-11-21" }, NOW);
-    expect(result.reasons).toEqual(["party_too_large"]);
+    expect(requiredValue(result, "src/lib/booking/availability.test.ts:118 result").reasons).toEqual(["party_too_large"]);
   });
 
   it("keeps only slots with room for the party, and offers the following days when the date is full", async () => {
@@ -126,10 +127,10 @@ describe("searchExperiences", () => {
 
     const [result] = await searchExperiences(fake.client, { partySize: 4, date: "2026-11-21" }, NOW);
 
-    expect(result.suitability).toBe("rejected");
-    expect(result.reasons).toEqual(["no_availability"]);
-    expect(result.slots).toEqual([]);
-    expect(result.alternatives).toEqual([{ date: "2026-11-22", startTime: "16:00", available: 4 }]);
+    expect(requiredValue(result, "src/lib/booking/availability.test.ts:130 result").suitability).toBe("rejected");
+    expect(requiredValue(result, "src/lib/booking/availability.test.ts:131 result").reasons).toEqual(["no_availability"]);
+    expect(requiredValue(result, "src/lib/booking/availability.test.ts:132 result").slots).toEqual([]);
+    expect(requiredValue(result, "src/lib/booking/availability.test.ts:133 result").alternatives).toEqual([{ date: "2026-11-22", startTime: "16:00", available: 4 }]);
     expect(fake.rpc).toHaveBeenNthCalledWith(2, "experience_availability", {
       p_experience_id: "id-walk",
       p_date: "2026-11-22",
@@ -148,8 +149,8 @@ describe("searchExperiences", () => {
       p_experience_id: "id-walk",
       p_date: "2026-11-20",
     });
-    expect(result.suitability).toBe("suitable");
-    expect(result.slots).toHaveLength(14);
+    expect(requiredValue(result, "src/lib/booking/availability.test.ts:152 result").suitability).toBe("suitable");
+    expect(requiredValue(result, "src/lib/booking/availability.test.ts:153 result").slots).toHaveLength(14);
   });
 
   it("reads only active experiences, with their facts", async () => {

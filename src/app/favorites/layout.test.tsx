@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render } from "@testing-library/react";
 import FavoritesLayout, { metadata } from "./layout";
+import { LanguageProvider } from "@/lib/i18n";
 
 vi.mock("@/lib/stories-data", () => ({
   FALLBACK_STORIES: [],
@@ -10,9 +11,9 @@ vi.mock("@/lib/stories-data", () => ({
 describe("FavoritesLayout", () => {
   it("renders children", () => {
     const { getByText } = render(
-      <FavoritesLayout>
+      <LanguageProvider initialLocale="es"><FavoritesLayout>
         <div>Test content</div>
-      </FavoritesLayout>
+      </FavoritesLayout></LanguageProvider>
     );
     expect(getByText("Test content")).toBeInTheDocument();
   });

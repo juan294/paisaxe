@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 /**
  * Booking domain guarantees against the REAL local Supabase stack
@@ -127,9 +128,9 @@ function seedFixtures(): void {
 }
 
 function insertDraft(userId: string): string {
-  return psql(
+  return requiredValue(psql(
     `INSERT INTO public.booking_drafts (user_id, status) VALUES ('${userId}', 'abandoned') RETURNING id;`
-  ).split("\n")[0];
+  ).split("\n")[0], "src/lib/booking/booking.postgrest-integration.test.ts:131 psql(\n    `INSERT INTO public.booking_drafts (user_id, status) VALUES ('${userId}', 'abandoned') RETURNING id;`\n  ).split(\"\\n\")[0]");
 }
 
 /** Inserts a quote directly so RPC tests do not depend on the TS service. */
@@ -143,12 +144,12 @@ function insertQuote(args: {
   superseded?: boolean;
 }): string {
   const draftId = insertDraft(args.userId);
-  return psql(
+  return requiredValue(psql(
     `INSERT INTO public.quotes (draft_id, user_id, experience_id, version, slot_date, slot_time, party_size, ` +
       `total_cents, deposit_cents, currency, cancellation_window_hours, expires_at, superseded_at) VALUES (` +
       `'${draftId}', '${args.userId}', '${args.experienceId}', 1, '${args.date}', '${args.time ?? "10:00"}', ${args.party}, ` +
       `8000, 2000, 'EUR', 24, now() + interval '${args.expires ?? "20 minutes"}', ${args.superseded ? "now()" : "null"}) RETURNING id;`
-  ).split("\n")[0];
+  ).split("\n")[0], "src/lib/booking/booking.postgrest-integration.test.ts:147 psql(\n    `INSERT INTO public.quotes (draft_id, user_id, experience_id, version, slot_date, slot_time, party_size, ` +\n      `total_cents, deposit_cents, currency, cancellation_window_hours, expires_at, superseded_at) VALUES (` +\n      `'${draftId}', '${args.userId}', '${args.experienceId}', 1, '${args.date}', '${args.time ?? \"10:00\"}', ${args.party}, ` +\n      `8000, 2000, 'EUR', 24, now() + interval '${args.expires ?? \"20 minutes\"}', ${args.superseded ? \"now()\" : \"null\"}) RETURNING id;`\n  ).split(\"\\n\")[0]");
 }
 
 async function available(experienceId: string, date: string, time = "10:00:00"): Promise<number> {
@@ -282,7 +283,7 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
 
       expect(wins).toHaveLength(1);
       expect(losses).toHaveLength(1);
-      expect(losses[0].error?.message).toBe("no_capacity");
+      expect(requiredValue(losses[0], "src/lib/booking/booking.postgrest-integration.test.ts:285 losses[0]").error?.message).toBe("no_capacity");
       expect(await available(EXP_SMALL, date)).toBe(0);
     });
 
@@ -628,14 +629,14 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       });
       const bySlug = Object.fromEntries(results.map((r) => [r.experience.slug, r]));
 
-      expect(bySlug[FIXTURE_EXPERIENCE_SLUGS.coastalWalk].suitability).toBe("suitable");
-      expect(bySlug[FIXTURE_EXPERIENCE_SLUGS.coastalWalk].slots.length).toBeGreaterThan(0);
-      expect(bySlug[FIXTURE_EXPERIENCE_SLUGS.canoe].suitability).toBe("rejected");
-      expect(bySlug[FIXTURE_EXPERIENCE_SLUGS.canoe].reasons).toContain("constraint_unsupported");
+      expect(requiredValue(bySlug[FIXTURE_EXPERIENCE_SLUGS.coastalWalk], "src/lib/booking/booking.postgrest-integration.test.ts:631 bySlug[FIXTURE_EXPERIENCE_SLUGS.coastalWalk]").suitability).toBe("suitable");
+      expect(requiredValue(bySlug[FIXTURE_EXPERIENCE_SLUGS.coastalWalk], "src/lib/booking/booking.postgrest-integration.test.ts:632 bySlug[FIXTURE_EXPERIENCE_SLUGS.coastalWalk]").slots.length).toBeGreaterThan(0);
+      expect(requiredValue(bySlug[FIXTURE_EXPERIENCE_SLUGS.canoe], "src/lib/booking/booking.postgrest-integration.test.ts:633 bySlug[FIXTURE_EXPERIENCE_SLUGS.canoe]").suitability).toBe("rejected");
+      expect(requiredValue(bySlug[FIXTURE_EXPERIENCE_SLUGS.canoe], "src/lib/booking/booking.postgrest-integration.test.ts:634 bySlug[FIXTURE_EXPERIENCE_SLUGS.canoe]").reasons).toContain("constraint_unsupported");
       // The 4x4 costs 200 EUR: over budget, and its step-free fact is unknown.
-      expect(bySlug[FIXTURE_EXPERIENCE_SLUGS.jeep].reasons).toContain("over_budget");
+      expect(requiredValue(bySlug[FIXTURE_EXPERIENCE_SLUGS.jeep], "src/lib/booking/booking.postgrest-integration.test.ts:636 bySlug[FIXTURE_EXPERIENCE_SLUGS.jeep]").reasons).toContain("over_budget");
       expect(
-        bySlug[FIXTURE_EXPERIENCE_SLUGS.jeep].verdicts.find((v) => v.key === "step_free")?.verdict
+        requiredValue(bySlug[FIXTURE_EXPERIENCE_SLUGS.jeep], "src/lib/booking/booking.postgrest-integration.test.ts:638 bySlug[FIXTURE_EXPERIENCE_SLUGS.jeep]").verdicts.find((v) => v.key === "step_free")?.verdict
       ).toBe("unknown");
     });
   });
@@ -646,10 +647,10 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
         `INSERT INTO public.vouchers (code_hash, label, expires_at, chat_turns_limit) ` +
           `VALUES (encode(sha256(gen_random_uuid()::text::bytea), 'hex'), 'it-booking-voucher', now() + interval '30 days', ${chatTurnsLimit}) RETURNING id;`
       ).split("\n")[0];
-      return psql(
+      return requiredValue(psql(
         `INSERT INTO public.voucher_redemptions (voucher_id, user_id) VALUES ('${voucherId}', '${USER_A}') ` +
           `ON CONFLICT (voucher_id, user_id) DO UPDATE SET user_id = EXCLUDED.user_id RETURNING id;`
-      ).split("\n")[0];
+      ).split("\n")[0], "src/lib/booking/booking.postgrest-integration.test.ts:650 psql(\n        `INSERT INTO public.voucher_redemptions (voucher_id, user_id) VALUES ('${voucherId}', '${USER_A}') ` +\n          `ON CONFLICT (voucher_id, user_id) DO UPDATE SET user_id = EXCLUDED.user_id RETURNING id;`\n      ).split(\"\\n\")[0]");
     }
 
     it("grant_voucher_voice_pass_idempotent grants once inside the window and renews after it", async () => {

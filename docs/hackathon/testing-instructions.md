@@ -86,7 +86,10 @@ is 120 euros, and one of us needs a step-free route."
   marked "demo", shows:
   - upcoming bookings ("Próximas"), "Depósitos cobrados" (deposits collected), "Pendiente
     de cobro" (balance due) and "Incidencias" (exceptions, which also filters the list);
-  - the booking tables with status and payment;
+  - the booking tables with status and payment, and a PayPal check on each deposit: "PayPal
+    confirma" once PayPal's own records list it, "Reembolso en PayPal" after a refund, or
+    "Pendiente en PayPal" before PayPal lists it (PayPal takes up to a few hours; the line above
+    the tables says how current PayPal's data is, and "Comprobar de nuevo" checks again);
   - active holds, with "Liberar" to release one;
   - free places for the next 14 days.
 - Your booking appears there with its deposit and status, and changes when you cancel.

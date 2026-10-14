@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { ImageResult } from "@/types";
+import { ImageResult, type Source } from "@/types";
 import type { BookingCard } from "@/types/booking-cards";
 import { useTranslation } from "@/lib/i18n";
 import {
@@ -32,6 +32,7 @@ export interface StreamChatMessage {
   role: "user" | "assistant";
   content: string;
   images?: ImageResult[];
+  sources?: Source[];
   upsellReason?: UpsellReason;
   upsellDismissed?: boolean;
   /** Booking chat only: structured cards shown under the bubble. */
@@ -171,6 +172,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         updateMessages((prev) => {
           const updated = [...prev];
           const current = updated[assistantIndex];
+          if (!current) return prev;
           updated[assistantIndex] = {
             ...current,
             content: current.content + toAppend,
@@ -221,8 +223,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           const data = await response.json();
           updateMessages((prev) => {
             const updated = [...prev];
+            const current = updated[assistantIndex];
+            if (!current) return prev;
             updated[assistantIndex] = {
-              ...updated[assistantIndex],
+              ...current,
               role: "assistant",
               content: data.message || t("chat.error_processing"),
               images: data.images,
@@ -255,6 +259,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             updateMessages((prev) => {
               const updated = [...prev];
               const currentMsg = updated[assistantIndex];
+              if (!currentMsg) return prev;
               const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
                 currentMsg.content
               );
@@ -270,6 +275,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
                 ...currentMsg,
                 content: cleanContent,
                 images: event.images,
+                sources: event.sources,
                 upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
               };
               return updated;
@@ -290,6 +296,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             updateMessages((prev) => {
               const updated = [...prev];
               const current = updated[assistantIndex];
+              if (!current) return prev;
 
               updated[assistantIndex] = {
                 ...current,
@@ -297,7 +304,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
                 content: isTimeout
                   ? t("chat.error_timeout")
                   : t("chat.error_generic"),
-                images: current?.images,
+                images: current.images,
               };
               return updated;
             });
@@ -329,9 +336,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             setError(t("chat.error"));
             updateMessages((prev) => {
               const updated = [...prev];
-              if (updated[assistantIndex]) {
+              const current = updated[assistantIndex];
+              if (current) {
                 updated[assistantIndex] = {
-                  ...updated[assistantIndex],
+                  ...current,
                   role: "assistant",
                   content: t("chat.error_generic"),
                 };
@@ -351,9 +359,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         if (err instanceof HandledError) {
           updateMessages((prev) => {
             const updated = [...prev];
-            if (updated[assistantIndex]) {
+            const current = updated[assistantIndex];
+            if (current) {
               updated[assistantIndex] = {
-                ...updated[assistantIndex],
+                ...current,
                 role: "assistant",
                 content: t("chat.error_generic"),
               };
@@ -373,9 +382,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             setError(t("chat.connection_lost"));
             updateMessages((prev) => {
               const updated = [...prev];
-              if (updated[assistantIndex]) {
+              const current = updated[assistantIndex];
+              if (current) {
                 updated[assistantIndex] = {
-                  ...updated[assistantIndex],
+                  ...current,
                   role: "assistant",
                   content: t("chat.error_timeout"),
                 };
@@ -394,9 +404,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         setError(t("chat.error"));
         updateMessages((prev) => {
           const updated = [...prev];
-          if (updated[assistantIndex]) {
+          const current = updated[assistantIndex];
+          if (current) {
             updated[assistantIndex] = {
-              ...updated[assistantIndex],
+              ...current,
               role: "assistant",
               content: t("chat.error_generic"),
             };

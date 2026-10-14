@@ -643,33 +643,48 @@ CURRENT_PHASE="phase 2 browser journey tests"
 JOURNEY_PASSED=0
 JOURNEY_FAILED=0
 JOURNEY_OUTPUT=""
+JOURNEY_STATUS="disabled"
+JOURNEY_FAILURES=1
+JOURNEY_FLAKY=0
+JOURNEY_EXIT_CODE=1
 
 if [[ "$ENABLE_JOURNEY_TESTS" == "true" ]]; then
   log_info "=== Phase 2: Browser Journey Tests ===" | tee -a "$LOG_FILE"
 
-  # Run Playwright journey tests
-  JOURNEY_OUTPUT=$(npx playwright test qa-journey.spec.ts --project=qa-journey --reporter=list 2>&1) || JOURNEY_EXIT_CODE=$?
-  JOURNEY_EXIT_CODE=${JOURNEY_EXIT_CODE:-0}
-
-  # Parse journey test results
-  JOURNEY_PASSED=$(echo "$JOURNEY_OUTPUT" | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || echo "0")
-  JOURNEY_FAILED=$(echo "$JOURNEY_OUTPUT" | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || echo "0")
-
-  log_info "Journey test results: $JOURNEY_PASSED passed, $JOURNEY_FAILED failed" | tee -a "$LOG_FILE"
+  # The collector probes Playwright's actual target (3100 by default), binds
+  # its candidate, keeps JSON/report diagnostics and fails closed on no tests.
+  export ENABLE_JOURNEY_TESTS
+  JOURNEY_OUTPUT=$(npx tsx "$PROJECT_DIR/scripts/run-qa-journey.ts") || JOURNEY_EXIT_CODE=$?
+  if printf '%s' "$JOURNEY_OUTPUT" | jq -e '(.status | IN("startup_failed", "invalid_report", "tests_failed", "passed")) and (.failures | type == "number")' >/dev/null 2>&1; then
+    JOURNEY_STATUS=$(printf '%s' "$JOURNEY_OUTPUT" | jq -r '.status')
+    JOURNEY_PASSED=$(printf '%s' "$JOURNEY_OUTPUT" | jq -r '.passed')
+    JOURNEY_FAILED=$(printf '%s' "$JOURNEY_OUTPUT" | jq -r '.failed')
+    JOURNEY_FLAKY=$(printf '%s' "$JOURNEY_OUTPUT" | jq -r '.flaky')
+    JOURNEY_FAILURES=$(printf '%s' "$JOURNEY_OUTPUT" | jq -r '.failures')
+    JOURNEY_EXIT_CODE=$(printf '%s' "$JOURNEY_OUTPUT" | jq -r '.exitCode // 1')
+  else
+    JOURNEY_STATUS="invalid_report"
+    JOURNEY_OUTPUT="Collector produced no valid result. Inspect $LOG_FILE, repair the collector invocation and rerun."
+  fi
+  log_info "Journey status: $JOURNEY_STATUS; $JOURNEY_PASSED passed, $JOURNEY_FAILED failed, $JOURNEY_FLAKY flaky retry passes" | tee -a "$LOG_FILE"
 
   # Write journey metrics
   {
     echo ""
     echo "BROWSER JOURNEY TEST RESULTS:"
+    echo "- Status: $JOURNEY_STATUS"
+    echo "- Unverified/error failures: $JOURNEY_FAILURES"
+    echo "- Exit code: $JOURNEY_EXIT_CODE"
     echo "- Passed: $JOURNEY_PASSED"
     echo "- Failed: $JOURNEY_FAILED"
+    echo "- Flaky retry passes: $JOURNEY_FLAKY"
     echo ""
     echo "JOURNEY TEST OUTPUT:"
     echo "$JOURNEY_OUTPUT"
   } > "$JOURNEY_METRICS_FILE"
 else
   log_info "=== Phase 2: Browser Journey Tests (SKIPPED - disabled in config) ===" | tee -a "$LOG_FILE"
-  echo "Browser journey tests skipped (disabled in config)" > "$JOURNEY_METRICS_FILE"
+  echo "Browser journey status: disabled; unverified (1 failure). Enable journey tests in config and rerun." > "$JOURNEY_METRICS_FILE"
 fi
 
 # =============================================================================
@@ -707,7 +722,7 @@ fi
 log_info "=== Phase 4: GitHub Issue Filing ===" | tee -a "$LOG_FILE"
 CURRENT_PHASE="phase 4 GitHub issue filing"
 
-TOTAL_FAILURES=$((FAILED_TESTS + JOURNEY_FAILED + HEALTH_CHECKS_FAILED))
+TOTAL_FAILURES=$((FAILED_TESTS + JOURNEY_FAILURES + HEALTH_CHECKS_FAILED))
 
 if [[ "$ENABLE_GITHUB_ISSUES" == "true" && $TOTAL_FAILURES -gt 0 ]]; then
   log_info "Filing GitHub issues for $TOTAL_FAILURES failures..." | tee -a "$LOG_FILE"
@@ -724,9 +739,8 @@ if [[ "$ENABLE_GITHUB_ISSUES" == "true" && $TOTAL_FAILURES -gt 0 ]]; then
   fi
 
   # File issues for journey test failures
-  if [[ $JOURNEY_FAILED -gt 0 ]]; then
-    JOURNEY_FAILURES=$(echo "$JOURNEY_OUTPUT" | grep -E "^\s*[✗×]|FAIL" | head -5 || echo "Journey test failures detected")
-    create_journey_failure_issue "Browser Journey Tests" "$JOURNEY_FAILURES" "" 2>&1 | tee -a "$LOG_FILE" || {
+  if [[ $JOURNEY_FAILURES -gt 0 ]]; then
+    create_journey_failure_issue "Browser Journey Tests ($JOURNEY_STATUS)" "$JOURNEY_OUTPUT" "" 2>&1 | tee -a "$LOG_FILE" || {
       log_warn "Failed to create journey failure issue" | tee -a "$LOG_FILE"
     }
   fi
@@ -915,6 +929,10 @@ Additional context:
 - Date: $(date '+%Y-%m-%d')
 - Test file location: src/tests/qa/llm-quality.test.ts
 - Journey tests enabled: $ENABLE_JOURNEY_TESTS
+- Journey verification status: $JOURNEY_STATUS
+- Journey failures/unverified: $JOURNEY_FAILURES
+- Journey flaky retry passes: $JOURNEY_FLAKY
+- Disabled, startup_failed and invalid_report are unverified failures. Preserve the status, recovery action and retained diagnostic paths in the report; never describe them as 0/0 success.
 - GitHub issues enabled: $ENABLE_GITHUB_ISSUES
 
 Integration health checks:
@@ -966,3 +984,6 @@ CURRENT_PHASE="complete"
 RUN_COMPLETED=true
 log_success "QA report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== QA Agent finished ===" | tee -a "$LOG_FILE"
+if [[ $TOTAL_FAILURES -gt 0 ]]; then
+  exit 1
+fi

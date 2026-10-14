@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
@@ -158,6 +159,17 @@ describe("VoiceChatElevenLabs", () => {
     });
   });
 
+  it("refreshes authoritative access on 403 before falling back without starting SDK", async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined), fallback = vi.fn();
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({error:"denied"}), {status:403}));
+    render(<VoiceChatElevenLabs story={mockStory} agentId="test-agent" onFallbackToText={fallback} onAccessDenied={refresh} />);
+    fireEvent.click(screen.getByRole("button", {name:/Háblame/i}));
+    await waitFor(() => expect(fallback).toHaveBeenCalledOnce());
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(requiredValue(refresh.mock.invocationCallOrder[0], "src/components/immersive/voice-chat-elevenlabs.test.tsx: refresh.mock.invocationCallOrder[0]")).toBeLessThan(requiredValue(fallback.mock.invocationCallOrder[0], "src/components/immersive/voice-chat-elevenlabs.test.tsx: fallback.mock.invocationCallOrder[0]"));
+    expect(mockStartSession).not.toHaveBeenCalled();
+  });
+
   describe("starting a conversation", () => {
     it("should mint and use a signed session when orb is clicked", async () => {
       mockStartSession.mockResolvedValue(undefined);
@@ -187,7 +199,7 @@ describe("VoiceChatElevenLabs", () => {
           body: JSON.stringify({ agentKey: "pelayo" }),
         })
       );
-      expect(mockStartSession.mock.calls[0][0]).not.toHaveProperty("agentId");
+      expect(requiredValue(requiredValue(mockStartSession.mock.calls[0], "src/components/immersive/voice-chat-elevenlabs.test.tsx: mockStartSession.mock.calls[0]")[0], "src/components/immersive/voice-chat-elevenlabs.test.tsx: mockStartSession.mock.calls[0][0]")).not.toHaveProperty("agentId");
     });
 
     it("should pass user_access_token as dynamic variable when provided", async () => {
@@ -232,7 +244,7 @@ describe("VoiceChatElevenLabs", () => {
 
       await waitFor(() => {
         expect(mockStartSession).toHaveBeenCalled();
-        const callArgs = mockStartSession.mock.calls[0][0];
+        const callArgs = requiredValue(requiredValue(mockStartSession.mock.calls[0], "src/components/immersive/voice-chat-elevenlabs.test.tsx: mockStartSession.mock.calls[0]")[0], "src/components/immersive/voice-chat-elevenlabs.test.tsx: mockStartSession.mock.calls[0][0]");
         expect(callArgs.dynamicVariables).not.toHaveProperty("user_access_token");
       });
     });
@@ -1197,7 +1209,7 @@ describe("VoiceChatElevenLabs", () => {
 
       await waitFor(() => {
         expect(mockStartSession).toHaveBeenCalled();
-        const callArgs = mockStartSession.mock.calls[0][0];
+        const callArgs = requiredValue(requiredValue(mockStartSession.mock.calls[0], "src/components/immersive/voice-chat-elevenlabs.test.tsx: mockStartSession.mock.calls[0]")[0], "src/components/immersive/voice-chat-elevenlabs.test.tsx: mockStartSession.mock.calls[0][0]");
         expect(callArgs.dynamicVariables).not.toHaveProperty("opening_question");
       });
     });

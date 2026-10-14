@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET, POST } from "./route";
 
@@ -136,6 +137,29 @@ describe("/api/mcp/make-booking", () => {
 
       expect(data.outbound_configured).toBe(true);
     });
+  });
+
+  it("whitespace outbound config stays unavailable with no provider/DB I/O and corrected presence is disclosed", async () => {
+    process.env.ELEVENLABS_API_KEY = " \n ";
+    process.env.ELEVENLABS_PHONE_NUMBER_ID = " ";
+    process.env.ELEVENLABS_BOOKING_AGENT_ID = " ";
+    expect((await (await GET()).json()).outbound_configured).toBe(false);
+    const request = () => new Request("http://localhost/api/mcp/make-booking", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "fixture-key" },
+      body: JSON.stringify({ venue_name: "Casa Gerardo", phone_number: "+34 985 88 77 97", party_size: 4, date: "hoy", time: "21:00", customer_name: "Juan García", customer_phone: "612345678" }),
+    });
+    const denied = await POST(request());
+    expect((await denied.json()).status).toBe("not_configured");
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(checkRateLimit).not.toHaveBeenCalled();
+    process.env.ELEVENLABS_API_KEY = " fixture-key ";
+    process.env.ELEVENLABS_PHONE_NUMBER_ID = " fixture-phone ";
+    process.env.ELEVENLABS_BOOKING_AGENT_ID = " fixture-agent ";
+    expect((await (await GET()).json()).outbound_configured).toBe(true);
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ conversation_id: "fixture-conversation" }) });
+    const recovered = await POST(request());
+    expect((await recovered.json()).success).toBe(true);
   });
 
   describe("POST", () => {
@@ -785,7 +809,7 @@ describe("/api/mcp/make-booking", () => {
 
       // Verify ElevenLabs API was called
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, options] = mockFetch.mock.calls[0];
+      const [url, options] = requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/make-booking/route.test.ts:812 mockFetch.mock.calls[0]");
       expect(url).toContain("elevenlabs.io");
       expect(url).toContain("outbound-call");
       expect(options.method).toBe("POST");
@@ -1159,7 +1183,7 @@ describe("/api/mcp/make-booking", () => {
       await POST(request);
 
       // Verify request body includes dynamic variables
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
 
       expect(body.agent_id).toBe("test-booking-agent-id");
@@ -1204,7 +1228,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
 
       // Verify +34 was stripped from customer_phone
@@ -1598,7 +1622,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request1);
 
-      const [, options1] = mockFetch.mock.calls[0];
+      const [, options1] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body1 = JSON.parse(options1.body);
       expect(body1.conversation_initiation_client_data.dynamic_variables.date).toBe("el viernes");
 
@@ -1624,7 +1648,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request2);
 
-      const [, options2] = mockFetch.mock.calls[1];
+      const [, options2] = requiredValue(mockFetch.mock.calls[1], "second fetch fixture call");
       const body2 = JSON.parse(options2.body);
       expect(body2.conversation_initiation_client_data.dynamic_variables.date).toBe("hoy");
     });
@@ -1655,7 +1679,7 @@ describe("/api/mcp/make-booking", () => {
       });
 
       await POST(request1);
-      const body1 = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body1 = JSON.parse(requiredValue(mockFetch.mock.calls[0], "src/app/api/mcp/make-booking/route.test.ts:1681 mockFetch.mock.calls[0]")[1].body);
       expect(body1.conversation_initiation_client_data.dynamic_variables.time).toBe("dos y media de la tarde");
 
       // Test "9:15" → "nueve y cuarto de la mañana"
@@ -1679,7 +1703,7 @@ describe("/api/mcp/make-booking", () => {
       });
 
       await POST(request2);
-      const body2 = JSON.parse(mockFetch.mock.calls[1][1].body);
+      const body2 = JSON.parse(requiredValue(mockFetch.mock.calls[1], "src/app/api/mcp/make-booking/route.test.ts:1705 mockFetch.mock.calls[1]")[1].body);
       expect(body2.conversation_initiation_client_data.dynamic_variables.time).toBe("nueve y cuarto de la mañana");
 
       // Test "12:45" → "una menos cuarto de la tarde"
@@ -1703,7 +1727,7 @@ describe("/api/mcp/make-booking", () => {
       });
 
       await POST(request3);
-      const body3 = JSON.parse(mockFetch.mock.calls[2][1].body);
+      const body3 = JSON.parse(requiredValue(mockFetch.mock.calls[2], "src/app/api/mcp/make-booking/route.test.ts:1729 mockFetch.mock.calls[2]")[1].body);
       expect(body3.conversation_initiation_client_data.dynamic_variables.time).toBe("una menos cuarto de la mañana");
     });
 
@@ -1794,7 +1818,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       // normalizePhoneNumber should add + prefix
       expect(body.to_number).toBe("+34985887797");
@@ -1826,7 +1850,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       // Should NOT double-prefix with "el el viernes"
       expect(body.conversation_initiation_client_data.dynamic_variables.date).toBe("el viernes");
@@ -1858,7 +1882,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       // Non-clock format should be returned as-is
       expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("esta noche");
@@ -1890,7 +1914,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       // 14:20 → "dos y 20 de la tarde"
       expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("dos y 20 de la tarde");
@@ -2149,7 +2173,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       // hour 0 → hour12 = 12 → "doce de la noche"
       expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("doce de la noche");
@@ -2181,7 +2205,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       // "pasado mañana" should NOT get "el" prefix
       expect(body.conversation_initiation_client_data.dynamic_variables.date).toBe("pasado mañana");
@@ -2215,7 +2239,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       // hour=0 → hour12=12 → nextHour = 1 → "una menos cuarto de la noche"
       expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("una menos cuarto de la noche");
@@ -2249,7 +2273,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       // hour=13 → hour12=1 → nextHour=2 → "dos menos cuarto de la tarde"
       expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("dos menos cuarto de la tarde");
@@ -2465,7 +2489,7 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       const body = JSON.parse(options.body);
       expect(body.conversation_initiation_client_data.dynamic_variables.special_requests).toBe("ninguna");
     });
@@ -2940,7 +2964,7 @@ describe("/api/mcp/make-booking", () => {
       await POST(request);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [, options] = mockFetch.mock.calls[0];
+      const [, options] = requiredValue(mockFetch.mock.calls[0], "first fetch fixture call");
       // The fetch must include a signal for timeout
       expect(options.signal).toBeDefined();
       expect(options.signal).toBeInstanceOf(AbortSignal);

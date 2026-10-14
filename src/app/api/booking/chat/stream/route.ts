@@ -11,6 +11,8 @@ import { detectInjectionAttempt, detectPromptLeakage, sanitizeInput } from "@/li
 import {
   BOOKING_CHAT_TOTAL_CAP_MS,
   CHAT_STREAM_STAGE_TIMEOUTS_MS,
+  createBoundedGenerationTimer,
+  createChildAbortController,
   withChatStreamStageTiming,
 } from "@/lib/chat-stream-timeouts";
 import { logger } from "@/lib/logger";
@@ -89,6 +91,7 @@ async function handlePost(request: NextRequest): Promise<Response> {
   const access = await requireBookingAccess(request);
   if (access instanceof NextResponse) return access;
   const { userId, redemption } = access;
+  if (request.signal.aborted) return sseResponse(new ReadableStream({ start(controller) { controller.close(); } }));
 
   const rateLimit = await withChatStreamStageTiming(
     "rateLimit",
@@ -135,33 +138,53 @@ async function handlePost(request: NextRequest): Promise<Response> {
     return singleEventResponse({ type: "error", message: BOOKING_CHAT_ERRORS.limitReached });
   }
 
-  const [draft, bookings, retrieval] = await Promise.all([
-    getOrCreateOpenDraft(admin, userId),
-    listBookingsForUser(admin, userId),
-    message ? retrieveGuideContext(message, request.signal) : Promise.resolve(null),
-  ]);
-
-  const turnAbort = new AbortController();
-  request.signal.addEventListener("abort", () => turnAbort.abort(), { once: true });
+  const turn = createChildAbortController(request.signal);
+  const turnAbort = turn.controller;
+  let prepared: [Awaited<ReturnType<typeof getOrCreateOpenDraft>>, Awaited<ReturnType<typeof listBookingsForUser>>, Awaited<ReturnType<typeof retrieveGuideContext>>];
+  try {
+    prepared = await Promise.all([
+      getOrCreateOpenDraft(admin, userId),
+      listBookingsForUser(admin, userId),
+      message ? retrieveGuideContext(message, turnAbort.signal) : Promise.resolve(null),
+    ]);
+  } catch (error) {
+    turn.dispose();
+    throw error;
+  }
+  if (turnAbort.signal.aborted) {
+    turn.dispose();
+    return sseResponse(new ReadableStream({ start(controller) { controller.close(); } }));
+  }
+  const [draft, bookings, retrieval] = prepared;
   const encoder = new TextEncoder();
 
+  let ended = false;
+  let generationTimer: ReturnType<typeof createBoundedGenerationTimer> | undefined;
+  let removeGenerationAbort: (() => void) | undefined;
+  const cleanup = () => {
+    generationTimer?.dispose();
+    removeGenerationAbort?.();
+    turn.dispose();
+  };
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       // The stream ends at most once: on completion, a timeout, the leak
       // filter, a model failure or a client disconnect. Later sends are no-ops,
       // so a turn still unwinding in the background cannot write or throw.
-      let ended = false;
       const send = (event: ChatStreamEvent) => {
-        if (ended) return;
+        if (ended || turnAbort.signal.aborted) return;
         try {
           controller.enqueue(encoder.encode(encodeSseEvent(event)));
         } catch {
           ended = true;
+          cleanup();
+          turnAbort.abort();
         }
       };
       const end = () => {
         if (ended) return;
         ended = true;
+        cleanup();
         try {
           controller.close();
         } catch {
@@ -174,23 +197,26 @@ async function handlePost(request: NextRequest): Promise<Response> {
         end();
         turnAbort.abort();
       };
-      const timeOut = (limitMs: number) => {
-        logger.warn("[BOOKING_CHAT_TIMEOUT]", { userId, limitMs });
-        stop("response_timeout");
+      const onAbort = () => {
+        if (!ended) logger.info("[BOOKING_CHAT_CLIENT_ABORT]", { userId });
+        end();
       };
-
-      let idleTimer: ReturnType<typeof setTimeout> | undefined;
-      const armIdle = () => {
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => timeOut(CHAT_STREAM_STAGE_TIMEOUTS_MS.response), CHAT_STREAM_STAGE_TIMEOUTS_MS.response);
-      };
-      const capTimer = setTimeout(() => timeOut(BOOKING_CHAT_TOTAL_CAP_MS), BOOKING_CHAT_TOTAL_CAP_MS);
+      turnAbort.signal.addEventListener("abort", onAbort, { once: true });
+      removeGenerationAbort = () => turnAbort.signal.removeEventListener("abort", onAbort);
+      if (turnAbort.signal.aborted) { end(); return; }
+      generationTimer = createBoundedGenerationTimer({
+        idleMs: CHAT_STREAM_STAGE_TIMEOUTS_MS.response,
+        totalMs: BOOKING_CHAT_TOTAL_CAP_MS,
+        onTimeout(reason, limitMs) {
+          logger.warn("[BOOKING_CHAT_TIMEOUT]", { userId, limitMs, reason });
+          stop("response_timeout");
+        },
+      });
 
       try {
         const { createBookingModelClient, streamBookingTurn } = await import("@/lib/booking/agent");
         const anthropic = await createBookingModelClient();
         let assistantText = "";
-        armIdle();
 
         for await (const event of streamBookingTurn({
           anthropic,
@@ -204,8 +230,8 @@ async function handlePost(request: NextRequest): Promise<Response> {
           locale: body.locale ?? null,
           signal: turnAbort.signal,
         })) {
-          if (ended) break;
-          armIdle();
+          if (ended || turnAbort.signal.aborted) break;
+          generationTimer.resetIdle();
           if (event.type === "text") {
             assistantText += event.content;
             // Leak filter over assistant text only, never over tool results.
@@ -233,12 +259,12 @@ async function handlePost(request: NextRequest): Promise<Response> {
           send({ type: "error", message: BOOKING_CHAT_ERRORS.aiUnavailable });
         }
       } finally {
-        clearTimeout(idleTimer);
-        clearTimeout(capTimer);
         end();
       }
     },
     cancel() {
+      ended = true;
+      cleanup();
       turnAbort.abort();
     },
   });
@@ -268,19 +294,12 @@ async function retrieveGuideContext(
   signal: AbortSignal
 ): Promise<{ contextText: string; sources: ReturnType<typeof import("@/lib/claude").extractSourcesFromChunks> } | null> {
   try {
-    const [{ generateEmbedding }, { search }, { buildContextText, extractSourcesFromChunks }] = await Promise.all([
-      import("@/lib/embeddings"),
-      import("@/lib/search"),
+    const [{ retrieveChatContext }, { buildContextText, extractSourcesFromChunks }] = await Promise.all([
+      import("@/lib/retrieve-chat-context"),
       import("@/lib/claude"),
     ]);
-    const embeddingAbort = new AbortController();
-    signal.addEventListener("abort", () => embeddingAbort.abort(), { once: true });
-    const embedding = await withChatStreamStageTiming(
-      "embedding",
-      generateEmbedding(message, { signal: embeddingAbort.signal }),
-      embeddingAbort
-    );
-    const { chunks } = await withChatStreamStageTiming("search", search(embedding, 3, message));
+    const { chunks } = await retrieveChatContext(message, 3, { signal });
+    signal.throwIfAborted();
     if (chunks.length === 0) return null;
     return { contextText: buildContextText(chunks), sources: extractSourcesFromChunks(chunks) };
   } catch (error) {

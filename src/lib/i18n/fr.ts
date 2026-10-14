@@ -15,11 +15,28 @@ import type { Translations } from './types';
 
 export const fr: Translations = {
   common: {
+    rateLimited: "Limite temporaire. Attendez {seconds} secondes avant de réessayer.",
+    retry: "Réessayer",
     loading: 'Chargement...',
     close: 'Fermer',
   },
 
+  navigation: {
+    preparing: "Préparation de la navigation…",
+    recovery: "Si les commandes ne deviennent pas disponibles, rechargez la page et vérifiez que JavaScript est activé.",
+    reload: "Recharger la page",
+    ready: "La navigation est prête.",
+  },
+
+  locale: {
+    loadFailed: "La langue choisie n’a pas pu être chargée. L’espagnol est affiché en attendant une nouvelle tentative.",
+    retry: "Réessayer de charger la langue",
+    storyFallback: "Certains contenus ou certaines questions de cette histoire ne sont pas encore disponibles dans la langue choisie et sont affichés en espagnol.",
+    legacyMigrated: "Votre préférence de langue enregistrée dans ce navigateur a été rétablie.",
+  },
+
   chat: {
+    safety_redirect: "Bonjour ! Je suis {name}, votre guide touristique pour les {region}. Comment puis-je vous aider à découvrir notre région ?",
     placeholder: 'Posez une question sur ce lieu...',
     listening: 'Écoute en cours...',
     thinking: 'Réflexion...',
@@ -165,6 +182,8 @@ export const fr: Translations = {
   },
 
   auth: {
+    verificationFailed: "Votre session n’a pas pu être vérifiée. Réessayez pour continuer.",
+    retryVerification: "Vérifier à nouveau la session",
     user: 'Utilisateur',
     user_avatar: 'Avatar de l\'utilisateur',
     sign_out: 'Se déconnecter',
@@ -187,6 +206,12 @@ export const fr: Translations = {
 
   // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
+    accessUnavailable: "L’accès vocal est indisponible pour le moment.",
+    checkAccess: "Vérifier l’accès vocal",
+    contactSupport: "Contacter l’assistance",
+    suspended: "L’accès vocal est suspendu pendant l’examen d’un litige de paiement.",
+    revoked: "Ce pass vocal a été révoqué à la suite de l’annulation d’un paiement.",
+    expired: "Votre pass vocal a expiré. Vous pouvez en acheter un nouveau pour continuer à utiliser la voix.",
     try_voice: 'Parler',
     use_text: 'Écrire',
     upgrade_cta: 'Utilisez votre voix',
@@ -513,6 +538,20 @@ export const fr: Translations = {
       returnProblem: 'Ce paiement présente un problème et nous le vérifions. S\'il a été débité, nous rembourserons l\'acompte.',
       returnFailed: 'PayPal a refusé le paiement et rien n\'a été débité. Nous vérifions la situation.',
       returnError: 'Le paiement n\'a pas pu être vérifié. Ouvrez la réservation pour voir son état.',
+      statusConfirming: 'Confirmation du paiement',
+      holdCountdown: 'Nous gardons votre place : encore {time}',
+      when: '{day} · {time} · {people} personnes',
+      steps: {
+        label: 'Avancement de la réservation',
+        offer: 'Offre acceptée',
+        deposit: 'Acompte payé',
+        balance: 'Solde payé',
+      },
+      receiptTitle: 'Reçu PayPal',
+      copy: 'Copier',
+      copied: 'Copié',
+      copyFailed: 'Copie impossible ; sélectionnez le code',
+      returnSlow: 'Cela prend plus de temps que d\'habitude. Vous pouvez voir l\'état dans votre réservation.',
     },
     cancel: {
       title: 'Annuler la réservation',
@@ -568,6 +607,10 @@ export const fr: Translations = {
       sandbox: 'PayPal sandbox : paiement de test, sans argent réel',
       pay: 'Payer avec PayPal',
       payBefore: 'Payez avant {time} ; ensuite la place est libérée',
+      payWith: 'Payer avec',
+      demoSandbox: 'Démo · sandbox',
+      depositPaid: 'Acompte payé',
+      balancePaid: 'Solde payé',
       cancellationTitle: 'Annulation',
       suitability: {
         suitable: 'Correspond à ce que vous cherchez',

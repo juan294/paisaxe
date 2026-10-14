@@ -1,3 +1,4 @@
+import { requiredValue } from "../src/test/required-value";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -32,6 +33,14 @@ function config(): PaisaxeConfig {
 }
 
 describe("modernizeConfig", () => {
+  it.each(["en", "fr", "pt-br"])("rejects a missing %s native voice preset before rewriting configuration", language => {
+    const original = config();
+    delete original.conversation_config.language_presets[language];
+    const before = structuredClone(original);
+    expect(() => modernizeConfig(original, "pelayo", "native-voices")).toThrow(`Missing native voice preset: ${language}`);
+    expect(original).toEqual(before);
+  });
+
   it("keeps focus and prompt-injection as isolated revisions", () => {
     const focused = modernizeConfig(config(), "booking", "focus");
     expect(focused.platform_settings.guardrails.focus.is_enabled).toBe(true);
@@ -63,13 +72,13 @@ describe("modernizeConfig", () => {
       "pt-br",
     ]);
     expect(
-      updated.conversation_config.language_presets.en.overrides.tts?.voice_id,
+      requiredValue(updated.conversation_config.language_presets.en, "en preset").overrides.tts?.voice_id,
     ).toBe("7EzWGsX10sAS4c9m9cPf");
     expect(
-      updated.conversation_config.language_presets.fr.overrides.tts?.voice_id,
+      requiredValue(updated.conversation_config.language_presets.fr, "fr preset").overrides.tts?.voice_id,
     ).toBe("YxrwjAKoUKULGd0g8K9Y");
     expect(
-      updated.conversation_config.language_presets["pt-br"].overrides.tts
+      requiredValue(updated.conversation_config.language_presets["pt-br"], "pt-br preset").overrides.tts
         ?.voice_id,
     ).toBe("oJebhZNaPllxk6W0LSBA");
   });

@@ -1,9 +1,16 @@
+import { requiredValue } from "@/test/required-value";
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startPaypalMock, type PaypalMock } from "@/test/paypal-mock-server";
 import { getAccessToken, resetPaypalClientForTests } from "./client";
 import { PaypalError, PaypalNotConfigured } from "./types";
 import { verifyWebhookSignature } from "./webhooks";
+import { readFileSync } from "node:fs";
+import { normalizePaypalEvent } from "@/lib/booking/webhook-events";
+
+const RECORDED_REFUND_RAW = readFileSync(
+  new URL("../../../tests/fixtures/providers/paypal-refund.sanitized.json", import.meta.url), "utf8"
+);
 
 const VERIFY_PATH = "/v1/notifications/verify-webhook-signature";
 const EVENT = {
@@ -41,13 +48,28 @@ afterEach(async () => {
 });
 
 describe("verifyWebhookSignature", () => {
+  it("sends the recorded sandbox refund through the real verification adapter and normalizes its capture link", async () => {
+    // These headers and the local SUCCESS answer do not attest the original signature.
+    expect(await verifyWebhookSignature(signedHeaders(), RECORDED_REFUND_RAW)).toBe("SUCCESS");
+    const requests = mock.requestsTo("POST", VERIFY_PATH);
+    expect(requests).toHaveLength(1);
+    expect(requiredValue(requests[0], "src/lib/paypal/webhooks.test.ts:55 requests[0]").body).toMatchObject({
+      auth_algo: "SHA256withRSA", webhook_id: "WH-ID-1", transmission_sig: "sig==",
+      webhook_event: JSON.parse(RECORDED_REFUND_RAW),
+    });
+    const body = requiredValue(requests[0], "src/lib/paypal/webhooks.test.ts:59 requests[0]").body as { webhook_event: unknown };
+    expect(normalizePaypalEvent(body.webhook_event)).toMatchObject({
+      event_id: "WH-RECORDED000000005-RECORDED000000005", event_type: "PAYMENT.CAPTURE.REFUNDED",
+      capture_id: "RECORDED000000004", refund_id: "RECORDED000000006", order_id: null, custom_id: "recorded-demo-01",
+    });
+  });
   it("returns SUCCESS and sends the transmission headers, webhook id and event", async () => {
     expect(await verifyWebhookSignature(signedHeaders(), RAW_BODY)).toBe("SUCCESS");
 
     const [request] = mock.requestsTo("POST", VERIFY_PATH);
-    expect(request.headers.authorization).toBe(`Bearer ${await getAccessToken()}`);
-    expect(request.headers["content-type"]).toBe("application/json");
-    expect(request.body).toEqual({
+    expect(requiredValue(request, "src/lib/paypal/webhooks.test.ts:70 request").headers.authorization).toBe(`Bearer ${await getAccessToken()}`);
+    expect(requiredValue(requiredValue(request, "src/lib/paypal/webhooks.test.ts:71 request").headers["content-type"], "src/lib/paypal/webhooks.test.ts:70 request.headers[\"content-type\"]")).toBe("application/json");
+    expect(requiredValue(request, "src/lib/paypal/webhooks.test.ts:72 request").body).toEqual({
       auth_algo: "SHA256withRSA",
       cert_url: "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-1",
       transmission_id: "tx-1",

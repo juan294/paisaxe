@@ -1,6 +1,8 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { useSearchParams } from "next/navigation";
+import { ReadonlyURLSearchParams } from "next/dist/client/components/navigation.react-server";
 import { useStories } from "@/hooks/use-stories";
 import { useStoryFilters } from "@/hooks/use-story-filters";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
@@ -67,23 +69,27 @@ vi.mock("@/components/ui/component-error-boundary", () => ({
     <>{children}</>
   ),
 }));
+const voiceStoryInputs = vi.hoisted((): (Story | undefined)[] => []);
+
 // Mock voice-chat module directly to prevent EnvironmentTeardownError — the dynamic
 // import resolver can still trigger module loading after environment teardown unless
 // the underlying module is mocked before it is ever resolved.
 vi.mock("@/components/immersive/voice-chat", () => ({
-  VoiceChat: (props: Record<string, unknown>) => (
-    <div data-testid="voice-chat" data-open={String(props.open)} data-booking-mode={String(props.bookingMode ?? false)}>
-      <button data-testid="voice-chat-close" onClick={() => (props.onClose as () => void)()} />
-    </div>
-  ),
+  VoiceChat: (props: { story?: Story; open?: boolean; bookingMode?: boolean; onClose: () => void }) => {
+    voiceStoryInputs.push(props.story);
+    return <div data-story-id={props.story?.id} data-testid="voice-chat" data-open={String(props.open)} data-booking-mode={String(props.bookingMode ?? false)}>
+      <button data-testid="voice-chat-close" onClick={props.onClose} />
+    </div>;
+  },
 }));
 // Mock dynamic import for VoiceChat — renders a div so we can detect it
 vi.mock("next/dynamic", () => ({
-  default: () => (props: Record<string, unknown>) => (
-    <div data-testid="voice-chat" data-open={String(props.open)} data-booking-mode={String(props.bookingMode ?? false)}>
-      <button data-testid="voice-chat-close" onClick={() => (props.onClose as () => void)()} />
-    </div>
-  ),
+  default: () => (props: { story?: Story; open?: boolean; bookingMode?: boolean; onClose: () => void }) => {
+    voiceStoryInputs.push(props.story);
+    return <div data-story-id={props.story?.id} data-testid="voice-chat" data-open={String(props.open)} data-booking-mode={String(props.bookingMode ?? false)}>
+      <button data-testid="voice-chat-close" onClick={props.onClose} />
+    </div>;
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -148,7 +154,7 @@ function setupDefaults(overrides?: { isLoading?: boolean; stories?: Story[] }) {
   vi.mocked(useStoryFilters).mockReturnValue(filtersMock);
 
   vi.mocked(useFeatureFlags).mockReturnValue({
-    flags: [],
+    flags: [], error: null, refresh: async () => {},
     isReady: true,
     isEnabled: () => false,
     isEnabledWithDefault: () => false,
@@ -259,7 +265,7 @@ describe("ImmersivePageContent", () => {
     setupDefaults();
     // Enable mood_discovery flag
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "mood_discovery",
       isEnabledWithDefault: () => false,
@@ -289,7 +295,7 @@ describe("ImmersivePageContent", () => {
     setupDefaults();
     // Enable mood_discovery
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "mood_discovery",
       isEnabledWithDefault: () => false,
@@ -305,6 +311,22 @@ describe("ImmersivePageContent", () => {
 
     // sessionStorage should be set
     expect(sessionStorage.getItem("paisaxe-mood-dismissed")).toBe("true");
+  });
+
+  it("keeps an open chat bound to a real story while filtered results shrink and recover", () => {
+    setupDefaults();
+    voiceStoryInputs.length = 0;
+    vi.mocked(useSearchParams).mockReturnValue(new ReadonlyURLSearchParams("story=oviedo-cathedral&voice=ready"));
+    const view = render(<ImmersivePageContent serverShuffleSeed={null} />);
+    expect(screen.getByTestId("voice-chat")).toHaveAttribute("data-story-id", "2");
+    vi.mocked(useStoryFilters).mockReturnValue(defaultFiltersMock([requiredValue(mockStories[0], "Remaining story after filter shrink")]));
+    view.rerender(<ImmersivePageContent serverShuffleSeed={null} />);
+    expect(voiceStoryInputs).not.toContain(undefined);
+    expect(screen.getByTestId("voice-chat")).toHaveAttribute("data-story-id", "1");
+    vi.mocked(useStoryFilters).mockReturnValue(defaultFiltersMock(mockStories));
+    view.rerender(<ImmersivePageContent serverShuffleSeed={null} />);
+    expect(screen.getByTestId("voice-chat")).toHaveAttribute("data-story-id", "1");
+    expect(voiceStoryInputs).not.toContain(undefined);
   });
 
   // -----------------------------------------------------------------------
@@ -330,7 +352,7 @@ describe("ImmersivePageContent", () => {
   it("?story= query param finds story in shuffled filteredStories", () => {
     setupDefaults();
     // Simulate shuffled order: oviedo-cathedral is now at index 0
-    const shuffledStories = [mockStories[1], mockStories[0]];
+    const shuffledStories = [requiredValue(mockStories[1], "src/app/immersive/immersive-page-content.test.tsx: mockStories[1]"), requiredValue(mockStories[0], "src/app/immersive/immersive-page-content.test.tsx: mockStories[0]")];
     vi.mocked(useStoryFilters).mockReturnValue({
       ...defaultFiltersMock(shuffledStories),
     });
@@ -426,7 +448,7 @@ describe("ImmersivePageContent", () => {
     // The component manages currentIndex internally, so we simulate by re-rendering
     // with a single-story filter result after the user would have navigated.
     vi.mocked(useStoryFilters).mockReturnValue({
-      ...defaultFiltersMock([mockStories[0]]),
+      ...defaultFiltersMock([requiredValue(mockStories[0], "src/app/immersive/immersive-page-content.test.tsx: mockStories[0]")]),
     });
 
     rerender(<ImmersivePageContent serverShuffleSeed={null} />);
@@ -460,7 +482,7 @@ describe("ImmersivePageContent", () => {
     const { applySeasonalWeighting } = await import("@/lib/seasonal-weighting");
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "seasonal_surfacing",
       isEnabledWithDefault: () => false,
@@ -500,7 +522,7 @@ describe("ImmersivePageContent", () => {
   // -----------------------------------------------------------------------
   it("deep-link does not reset index when filters change after initial load", () => {
     setupDefaults();
-    const shuffledStories = [mockStories[1], mockStories[0]];
+    const shuffledStories = [requiredValue(mockStories[1], "src/app/immersive/immersive-page-content.test.tsx: mockStories[1]"), requiredValue(mockStories[0], "src/app/immersive/immersive-page-content.test.tsx: mockStories[0]")];
     vi.mocked(useStoryFilters).mockReturnValue({
       ...defaultFiltersMock(shuffledStories),
     });
@@ -516,7 +538,7 @@ describe("ImmersivePageContent", () => {
 
     // Simulate filter change: only lagos-covadonga remains, oviedo filtered out
     vi.mocked(useStoryFilters).mockReturnValue({
-      ...defaultFiltersMock([mockStories[0]]),
+      ...defaultFiltersMock([requiredValue(mockStories[0], "src/app/immersive/immersive-page-content.test.tsx: mockStories[0]")]),
     });
 
     rerender(<ImmersivePageContent serverShuffleSeed={42} />);
@@ -537,7 +559,7 @@ describe("ImmersivePageContent", () => {
 
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "mood_discovery",
       isEnabledWithDefault: () => false,
@@ -567,7 +589,7 @@ describe("ImmersivePageContent", () => {
 
     // Now reduce filteredStories to just 1 story — currentIndex (1) >= length (1)
     vi.mocked(useStoryFilters).mockReturnValue({
-      ...defaultFiltersMock([mockStories[0]]),
+      ...defaultFiltersMock([requiredValue(mockStories[0], "src/app/immersive/immersive-page-content.test.tsx: mockStories[0]")]),
     });
 
     rerender(<ImmersivePageContent serverShuffleSeed={null} />);
@@ -603,7 +625,7 @@ describe("ImmersivePageContent", () => {
     // that cannot be exercised in jsdom without overriding globals.
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "mood_discovery",
       isEnabledWithDefault: () => false,
@@ -617,7 +639,7 @@ describe("ImmersivePageContent", () => {
   it("renders story-viewer when visitor_voice_agent is enabled", () => {
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "visitor_voice_agent",
       isEnabledWithDefault: () => false,
@@ -638,7 +660,7 @@ describe("ImmersivePageContent", () => {
 
     setupDefaults();
     vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
+      flags: [], error: null, refresh: async () => {},
       isReady: true,
       isEnabled: (flag: string) => flag === "visitor_voice_agent",
       isEnabledWithDefault: () => false,

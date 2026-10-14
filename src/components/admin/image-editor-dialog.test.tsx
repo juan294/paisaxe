@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { requiredValue } from "@/test/required-value";
+import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { ImageEditorDialog } from "./image-editor-dialog";
 import type { AdminStory } from "@/types/admin";
 import { PLACEHOLDER_PREFIX } from "@/lib/unsplash-placeholders";
@@ -88,6 +90,27 @@ const defaultProps = {
   onUpdate: vi.fn(),
 };
 
+
+afterEach(() => vi.unstubAllGlobals());
+async function completeReview() {
+  const urlInput = screen.queryByPlaceholderText("https://example.com/image.jpg") as HTMLInputElement | null;
+  const url = urlInput?.value || (document.querySelector('input[type="file"]') ? "https://example.com/uploaded.avif" : screen.getAllByTestId("next-image")[0]?.getAttribute("data-src") || mockStory.image);
+  const proof = JSON.parse(imageProvenanceFixture(url));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { ...proof, preview: "data:image/jpeg;base64,AA==", width: 1200, height: 800 } }) }));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Preparar revisión de la foto" })); });
+  for (const [label, value] of Object.entries({ "Página de origen (HTTPS)": "https://example.com/source", "Fotógrafo/a": "Actual Fotógrafo/a", "Prueba de permiso / registro conservado": "Permission retained by owner", "Fecha de revisión": "2026-10-13", "Crédito mostrado": "Reviewed photographer credit", "Descripción precisa de la imagen": "Reviewed named location", "Nombre de quien revisa": "Actual reviewer", "Notas del encuadre en móvil": "Center crop verified", "Notas del encuadre en escritorio": "Center crop verified", "Registro o pruebas de permiso y revisión visual": "Retained permission and visual review record" })) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  fireEvent.change(screen.getByLabelText("Licencia"), { target: { value: "owner-permission" } });
+  fireEvent.change(screen.getByLabelText("Contexto de la imagen"), { target: { value: "named-place" } });
+  fireEvent.click(screen.getByRole("checkbox"));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Confirmar revisión de la foto" })); });
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Revisión de la foto completada"));
+}
+async function save() { await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); }); }
+function selectUrl(url = "https://example.com/new.jpg") {
+  fireEvent.click(screen.getByText("URL"));
+  fireEvent.change(screen.getByPlaceholderText("https://example.com/image.jpg"), { target: { value: url } });
+}
+
 describe("ImageEditorDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -135,11 +158,11 @@ describe("ImageEditorDialog", () => {
   describe("Tabs", () => {
     it("shows Content tab by default", () => {
       render(<ImageEditorDialog {...defaultProps} />);
-      expect(screen.getByText("Content")).toBeInTheDocument();
+      expect(screen.getByText("Actual")).toBeInTheDocument();
       expect(screen.getByText("URL")).toBeInTheDocument();
       expect(screen.getByText("Upload")).toBeInTheDocument();
       // Content tab should be visible with Search PDF button
-      expect(screen.getByText(/Search PDF/i)).toBeInTheDocument();
+      expect(screen.getByText(/Las fotos extraídas de guías/)).toBeInTheDocument();
     });
 
     it("can switch to URL tab", () => {
@@ -158,7 +181,7 @@ describe("ImageEditorDialog", () => {
 
       // Upload area should appear (with "Click or drag" text)
       expect(screen.getByText("Click or drag")).toBeInTheDocument();
-      expect(screen.getByText("JPEG, PNG, WebP, GIF · Max 5MB")).toBeInTheDocument();
+      expect(screen.getByText("JPEG, PNG, WebP, GIF, AVIF · Max 10MB")).toBeInTheDocument();
     });
 
     it("can switch back to URL tab from Upload tab", () => {
@@ -192,242 +215,90 @@ describe("ImageEditorDialog", () => {
     });
   });
 
-  describe("Image source input", () => {
-    it("renders image source / attribution input", () => {
+  describe("Explicit photo review", () => {
+    it("shows structured permission fields instead of a raw JSON input", () => {
       render(<ImageEditorDialog {...defaultProps} />);
-      expect(screen.getByText("Image Source / Attribution")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash")).toBeInTheDocument();
+      expect(screen.getByLabelText("Prueba de permiso / registro conservado")).toBeInTheDocument();
+      expect(screen.getByLabelText("Crédito mostrado")).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Reviewed photo record")).not.toBeInTheDocument();
     });
-
-    it("image source input works", () => {
-      render(<ImageEditorDialog {...defaultProps} />);
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Photo by Test" } });
-      expect(sourceInput).toHaveValue("Photo by Test");
-    });
-
-    it("initializes imageSource from story", () => {
-      const storyWithSource = { ...mockStory, imageSource: "Original source" };
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSource} />);
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      expect(sourceInput).toHaveValue("Original source");
+    it("keeps legacy credit for review without approving it", () => {
+      render(<ImageEditorDialog {...defaultProps} story={{ ...mockStory, imageSource: "Original credit" }} />);
+      expect(screen.getByLabelText("Crédito mostrado")).toHaveValue("Original credit");
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
   });
 
+  it("restores the current review when a selected upload is discarded through Actual", async () => {
+    const source = imageProvenanceFixture(mockStory.image);
+    render(<ImageEditorDialog {...defaultProps} story={{ ...mockStory, imageSource: source }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(["draft"], "draft.jpg", { type: "image/jpeg" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Actual" }));
+    expect(screen.getByLabelText("Crédito mostrado")).toHaveValue(JSON.parse(source).credit);
+    await save();
+    expect(mockUpdateStoryImageUrl).not.toHaveBeenCalled();
+    expect(mockUploadStoryImage).not.toHaveBeenCalled();
+    expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+  });
+
   describe("Save with URL", () => {
-    it("calls updateStoryImageUrl on save with URL", async () => {
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: "https://example.com/new.jpg", imageSource: undefined },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      // Switch to URL tab first (Content is default)
-      fireEvent.click(screen.getByText("URL"));
-
-      const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
-      fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
-
-      const saveButton = screen.getByRole("button", { name: "Save" });
-      await act(async () => {
-        fireEvent.click(saveButton);
-      });
-
-      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
-        "story-1",
-        "https://example.com/new.jpg",
-        undefined
-      );
+    it("requires an explicit review before calling the image endpoint", async () => {
+      render(<ImageEditorDialog {...defaultProps} />); selectUrl(); await save();
+      expect(mockUpdateStoryImageUrl).not.toHaveBeenCalled();
+      expect(screen.getByText(/Completa y confirma/)).toBeInTheDocument();
     });
-
-    it("passes imageSource to updateStoryImageUrl when provided", async () => {
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: "https://example.com/new.jpg", imageSource: "Test source" },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      // Switch to URL tab first (Content is default)
-      fireEvent.click(screen.getByText("URL"));
-
-      const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
-      fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
-
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Test source" } });
-
-      const saveButton = screen.getByRole("button", { name: "Save" });
-      await act(async () => {
-        fireEvent.click(saveButton);
-      });
-
-      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
-        "story-1",
-        "https://example.com/new.jpg",
-        "Test source"
-      );
+    it("saves exact reviewed URL and proof, then updates and closes", async () => {
+      mockUpdateStoryImageUrl.mockResolvedValue({ data: { image: "https://example.com/new.jpg", imageSource: "saved proof" } });
+      render(<ImageEditorDialog {...defaultProps} />); selectUrl(); await completeReview(); await save();
+      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith("story-1", "https://example.com/new.jpg", expect.any(String));
+      const proof = JSON.parse(mockUpdateStoryImageUrl.mock.calls[0]![2]);
+      expect(proof.assetUrl).toBe("https://example.com/new.jpg"); expect(proof.credit).toBe("Reviewed photographer credit"); expect(proof.status).toBe("approved");
+      expect(defaultProps.onUpdate).toHaveBeenCalledWith("story-1", { image: "https://example.com/new.jpg", imageSource: "saved proof" });
+      expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
     });
-
-    it("calls onUpdate and onClose on successful URL save", async () => {
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: "https://example.com/new.jpg", imageSource: "src" },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      // Switch to URL tab first (Content is default)
-      fireEvent.click(screen.getByText("URL"));
-
-      const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
-      fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(defaultProps.onUpdate).toHaveBeenCalledWith("story-1", {
-        image: "https://example.com/new.jpg",
-        imageSource: "src",
-      });
-      expect(defaultProps.onClose).toHaveBeenCalled();
+    it("invalidates review after URL changes", async () => {
+      render(<ImageEditorDialog {...defaultProps} />); selectUrl(); await completeReview();
+      fireEvent.change(screen.getByPlaceholderText("https://example.com/image.jpg"), { target: { value: "https://example.com/other.jpg" } }); await save();
+      expect(mockUpdateStoryImageUrl).not.toHaveBeenCalled(); expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
   });
 
   describe("Save with file upload", () => {
-    it("calls uploadStoryImage on save with file", async () => {
-      mockUploadStoryImage.mockResolvedValue({
-        data: { id: "story-1", image: "https://cdn.example.com/uploaded.jpg", imageSource: undefined },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      // Switch to upload tab
-      fireEvent.click(screen.getByText("Upload"));
-
-      // Simulate file input change
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      expect(fileInput).toBeTruthy();
-
-      const file = new File(["image data"], "test.jpg", { type: "image/jpeg" });
-      Object.defineProperty(file, "size", { value: 1024 * 1024 }); // 1MB
-
-      await act(async () => {
-        fireEvent.change(fileInput, { target: { files: [file] } });
-      });
-
-      // The file name should appear
-      expect(screen.getByText("test.jpg")).toBeInTheDocument();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(mockUploadStoryImage).toHaveBeenCalledWith(
-        "story-1",
-        file,
-        undefined
-      );
+    it("saves the selected original with explicitly reviewed optimized proof", async () => {
+      mockUploadStoryImage.mockResolvedValue({ data: { image: "https://example.com/uploaded.avif" } });
+      render(<ImageEditorDialog {...defaultProps} />); fireEvent.click(screen.getByText("Upload"));
+      const file = new File(["image data"], "photo.avif", { type: "image/avif" });
+      fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+      await completeReview(); await save();
+      expect(mockUploadStoryImage).toHaveBeenCalledWith("story-1", file, expect.any(String));
+      expect(JSON.parse(mockUploadStoryImage.mock.calls[0]![2]).replacementSha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(defaultProps.onClose).toHaveBeenCalled();
     });
   });
 
   describe("Error handling", () => {
-    it("shows error when no image provided on save for story without image", async () => {
-      // Story without an image (needs one)
-      const storyWithoutImage: AdminStory = {
-        ...mockStory,
-        image: "",
-      };
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithoutImage} />);
-
-      // URL input is empty, no file selected - just click save
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(screen.getByText("Please provide an image URL, upload a file, or select a content image")).toBeInTheDocument();
+    it.each(["Image URL is not accessible", "Retry image"])("retains reviewed URL and draft after %s", async message => {
+      mockUpdateStoryImageUrl.mockResolvedValue({ error: message });
+      render(<ImageEditorDialog {...defaultProps} />); selectUrl(); await completeReview(); await save();
+      expect(screen.getByText(message)).toBeInTheDocument(); expect(defaultProps.onClose).not.toHaveBeenCalled();
+      expect(screen.getByPlaceholderText("https://example.com/image.jpg")).toHaveValue("https://example.com/new.jpg");
+      expect(screen.getByLabelText("Crédito mostrado")).toHaveValue("Reviewed photographer credit");
     });
-
-    it("shows error from API response on URL save", async () => {
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        error: "Image URL is not accessible",
-      });
-
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      // Switch to URL tab first (Content is default)
-      fireEvent.click(screen.getByText("URL"));
-
-      const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
-      fireEvent.change(urlInput, { target: { value: "https://example.com/bad.jpg" } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(screen.getByText("Image URL is not accessible")).toBeInTheDocument();
-    });
-
-    it("shows error from API response on file upload", async () => {
-      mockUploadStoryImage.mockResolvedValue({
-        error: "Upload failed: file too large",
-      });
-
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      fireEvent.click(screen.getByText("Upload"));
-
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const file = new File(["image data"], "test.jpg", { type: "image/jpeg" });
-      Object.defineProperty(file, "size", { value: 1024 * 1024 });
-
-      await act(async () => {
-        fireEvent.change(fileInput, { target: { files: [file] } });
-      });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(screen.getByText("Upload failed: file too large")).toBeInTheDocument();
-    });
-
-    it("shows generic error on exception during save", async () => {
+    it("shows generic errors on image save exceptions", async () => {
       mockUpdateStoryImageUrl.mockRejectedValue(new Error("Network error"));
-
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      // Switch to URL tab first (Content is default)
-      fireEvent.click(screen.getByText("URL"));
-
-      const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
-      fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
+      render(<ImageEditorDialog {...defaultProps} />); selectUrl(); await completeReview(); await save();
       expect(screen.getByText("Failed to update image")).toBeInTheDocument();
     });
-
-    it("does nothing when URL save returns neither error nor data", async () => {
+    it("does not close or update when the endpoint returns no data", async () => {
       mockUpdateStoryImageUrl.mockResolvedValue({});
-
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      fireEvent.click(screen.getByText("URL"));
-
-      const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
-      fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      // Neither error shown nor update/close called — just stops loading
-      expect(defaultProps.onUpdate).not.toHaveBeenCalled();
-      expect(defaultProps.onClose).not.toHaveBeenCalled();
-      expect(screen.queryByText(/Failed/)).not.toBeInTheDocument();
+      render(<ImageEditorDialog {...defaultProps} />); selectUrl(); await completeReview(); await save();
+      expect(defaultProps.onUpdate).not.toHaveBeenCalled(); expect(defaultProps.onClose).not.toHaveBeenCalled();
+    });
+    it("reports upload errors without losing the file", async () => {
+      mockUploadStoryImage.mockResolvedValue({ error: "Upload failed" }); render(<ImageEditorDialog {...defaultProps} />); fireEvent.click(screen.getByText("Upload"));
+      fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(["bytes"], "photo.jpg", { type: "image/jpeg" })] } });
+      await completeReview(); await save(); expect(screen.getByText("Upload failed")).toBeInTheDocument(); expect(screen.getByText("photo.jpg")).toBeInTheDocument();
     });
   });
 
@@ -561,6 +432,7 @@ describe("ImageEditorDialog", () => {
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
 
+      await completeReview();
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
       });
@@ -599,24 +471,24 @@ describe("ImageEditorDialog", () => {
       });
 
       expect(
-        screen.getByText("Invalid file type. Allowed: JPEG, PNG, WebP, GIF")
+        screen.getByText("Invalid file type. Allowed: JPEG, PNG, WebP, GIF, AVIF")
       ).toBeInTheDocument();
     });
 
-    it("rejects oversized files (>5MB)", async () => {
+    it("rejects oversized files (>10MB)", async () => {
       render(<ImageEditorDialog {...defaultProps} />);
 
       fireEvent.click(screen.getByText("Upload"));
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const file = new File(["data"], "large.jpg", { type: "image/jpeg" });
-      Object.defineProperty(file, "size", { value: 6 * 1024 * 1024 }); // 6MB
+      Object.defineProperty(file, "size", { value: 11 * 1024 * 1024 }); // 6MB
 
       await act(async () => {
         fireEvent.change(fileInput, { target: { files: [file] } });
       });
 
-      expect(screen.getByText("File too large. Maximum size is 5MB")).toBeInTheDocument();
+      expect(screen.getByText("File too large. Maximum size is 10MB")).toBeInTheDocument();
     });
 
     it("accepts valid file types (JPEG)", async () => {
@@ -634,7 +506,7 @@ describe("ImageEditorDialog", () => {
 
       expect(screen.getByText("test.jpg")).toBeInTheDocument();
       expect(
-        screen.queryByText("Invalid file type. Allowed: JPEG, PNG, WebP, GIF")
+        screen.queryByText("Invalid file type. Allowed: JPEG, PNG, WebP, GIF, AVIF")
       ).not.toBeInTheDocument();
     });
 
@@ -716,7 +588,7 @@ describe("ImageEditorDialog", () => {
 
       // Find the maximize button (the one containing the maximize icon)
       const maximizeIcons = screen.getAllByTestId("icon-maximize");
-      const maximizeButton = maximizeIcons[0].closest("button")!;
+      const maximizeButton = requiredValue(maximizeIcons[0], "src/components/admin/image-editor-dialog.test.tsx: maximizeIcons[0]").closest("button")!;
       fireEvent.click(maximizeButton);
 
       // Should show the story title in the fullscreen overlay at the bottom
@@ -730,7 +602,7 @@ describe("ImageEditorDialog", () => {
 
       // Open fullscreen
       const maximizeIcons = screen.getAllByTestId("icon-maximize");
-      const maximizeButton = maximizeIcons[0].closest("button")!;
+      const maximizeButton = requiredValue(maximizeIcons[0], "src/components/admin/image-editor-dialog.test.tsx: maximizeIcons[0]").closest("button")!;
       fireEvent.click(maximizeButton);
 
       // Fullscreen overlay should contain a next-image with the story image
@@ -756,7 +628,7 @@ describe("ImageEditorDialog", () => {
 
       // Open fullscreen
       const maximizeIcons = screen.getAllByTestId("icon-maximize");
-      const maximizeButton = maximizeIcons[0].closest("button")!;
+      const maximizeButton = requiredValue(maximizeIcons[0], "src/components/admin/image-editor-dialog.test.tsx: maximizeIcons[0]").closest("button")!;
       fireEvent.click(maximizeButton);
 
       // Verify overlay is visible (title appears twice)
@@ -778,7 +650,7 @@ describe("ImageEditorDialog", () => {
 
       // Open fullscreen
       const maximizeIcons = screen.getAllByTestId("icon-maximize");
-      const maximizeButton = maximizeIcons[0].closest("button")!;
+      const maximizeButton = requiredValue(maximizeIcons[0], "src/components/admin/image-editor-dialog.test.tsx: maximizeIcons[0]").closest("button")!;
       fireEvent.click(maximizeButton);
 
       // Verify overlay is visible
@@ -866,581 +738,70 @@ describe("ImageEditorDialog", () => {
     });
   });
 
-  describe("Source-only updates", () => {
-    const storyWithRealImage: AdminStory = {
-      ...mockStory,
-      image: "https://supabase.co/storage/story-images/real-photo.avif",
-      imageSource: undefined,
-    };
-
-    beforeEach(() => {
-      vi.clearAllMocks();
+  describe("Review existing photos", () => {
+    it("reviews a legacy uploaded photo through byte-verifying image PUT", async () => {
+      mockUpdateStoryImageUrl.mockResolvedValue({ data: { image: mockStory.image, imageSource: "reviewed" } });
+      render(<ImageEditorDialog {...defaultProps} />); await completeReview(); await save();
+      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith("story-1", mockStory.image, expect.any(String));
+      expect(mockUpdateStoryImageSource).not.toHaveBeenCalled(); expect(defaultProps.onClose).toHaveBeenCalled();
     });
-
-    it("allows saving just imageSource when story already has a non-placeholder image", async () => {
-      mockUpdateStoryImageSource.mockResolvedValue({
-        data: { id: "story-1", imageSource: "Turismo Asturias" },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithRealImage} />);
-
-      // Enter just the source without selecting a new image
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
-
-      // Save should not require selecting a new image
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      // Should NOT show the "please provide an image" error
-      expect(screen.queryByText(/Please provide an image/)).not.toBeInTheDocument();
-      // Should have called updateStoryImageSource
-      expect(mockUpdateStoryImageSource).toHaveBeenCalledWith("story-1", "Turismo Asturias");
+    it("requires and accepts an explicit first review of a current placeholder-tagged photo", async () => {
+      const image = "https://images.unsplash.com/reviewed-manual-photo.jpg";
+      mockUpdateStoryImageUrl.mockResolvedValue({ data: { image, imageSource: "reviewed" } });
+      render(<ImageEditorDialog {...defaultProps} story={{ ...mockStory, image, imageSource: `${PLACEHOLDER_PREFIX}Legacy credit` }} />);
+      await completeReview(); await save();
+      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith("story-1", image, expect.any(String));
+      expect(mockUpdateStoryImageSource).not.toHaveBeenCalled();
     });
-
-    it("calls onUpdate and onClose on successful source-only save", async () => {
-      mockUpdateStoryImageSource.mockResolvedValue({
-        data: { id: "story-1", imageSource: "Turismo Asturias" },
-      });
-
-      const onClose = vi.fn();
-      const onUpdate = vi.fn();
-
-      render(<ImageEditorDialog story={storyWithRealImage} onClose={onClose} onUpdate={onUpdate} />);
-
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(onUpdate).toHaveBeenCalledWith("story-1", { imageSource: "Turismo Asturias" });
-      expect(onClose).toHaveBeenCalled();
+    it("updates a previously reviewed photo through its source-only endpoint", async () => {
+      mockUpdateStoryImageSource.mockResolvedValue({ data: { imageSource: "reviewed" } });
+      render(<ImageEditorDialog {...defaultProps} story={{ ...mockStory, imageSource: imageProvenanceFixture(mockStory.image) }} />);
+      await completeReview(); await save(); expect(mockUpdateStoryImageSource).toHaveBeenCalledWith("story-1", expect.any(String));
+      expect(mockUpdateStoryImageUrl).not.toHaveBeenCalled();
     });
-
-    it("shows error when story has placeholder image and no new image selected", async () => {
-      const placeholderStory: AdminStory = {
-        ...mockStory,
-        image: "https://images.unsplash.com/photo-123?w=1920",
-        imageSource: `${PLACEHOLDER_PREFIX}Photo by Test Author on Unsplash`,
-      };
-
-      render(<ImageEditorDialog {...defaultProps} story={placeholderStory} />);
-
-      // Enter source but don't select new image
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      // Should show error because placeholder images need replacement
-      expect(screen.getByText(/Please provide an image/)).toBeInTheDocument();
-    });
-
-    it("closes dialog when nothing has changed for story with real image", async () => {
-      const storyWithSource: AdminStory = {
-        ...storyWithRealImage,
-        imageSource: "Existing Source",
-      };
-
-      const onClose = vi.fn();
-
-      render(<ImageEditorDialog story={storyWithSource} onClose={onClose} onUpdate={vi.fn()} />);
-
-      // Don't change anything, just click save
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      // Should close dialog without error since story already has real image
-      expect(onClose).toHaveBeenCalled();
-    });
-
-    it("shows error when source-only update API fails", async () => {
-      mockUpdateStoryImageSource.mockResolvedValue({
-        error: "Failed to update image source",
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithRealImage} />);
-
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(screen.getByText("Failed to update image source")).toBeInTheDocument();
-    });
-
-    it("does nothing when source-only update returns neither error nor data", async () => {
-      mockUpdateStoryImageSource.mockResolvedValue({});
-
-      const onClose = vi.fn();
-      const onUpdate = vi.fn();
-
-      render(<ImageEditorDialog story={storyWithRealImage} onClose={onClose} onUpdate={onUpdate} />);
-
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "New Source" } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      // Neither error shown nor update/close called — just stops loading
-      expect(onUpdate).not.toHaveBeenCalled();
-      expect(onClose).not.toHaveBeenCalled();
-      expect(screen.queryByText(/Failed/)).not.toBeInTheDocument();
+    it("retains review after source-only failure", async () => {
+      mockUpdateStoryImageSource.mockResolvedValue({ error: "Source update failed" });
+      render(<ImageEditorDialog {...defaultProps} story={{ ...mockStory, imageSource: imageProvenanceFixture(mockStory.image) }} />);
+      await completeReview(); await save(); expect(screen.getByText("Source update failed")).toBeInTheDocument(); expect(defaultProps.onClose).not.toHaveBeenCalled();
     });
   });
 
-  describe("Content images tab", () => {
-    const mockContentImages = [
-      {
-        filename: "test_page1_img.png",
-        sourcePdf: "test.pdf",
-        pageNumber: 1,
-        width: 1200,
-        height: 800,
-        aspectRatio: 1.5,
-        type: "extracted",
-        url: "/content/images/test/test_page1_img.png",
-        score: 170,
-      },
-      {
-        filename: "test_page2_img.png",
-        sourcePdf: "test.pdf",
-        pageNumber: 2,
-        width: 900,
-        height: 600,
-        aspectRatio: 1.5,
-        type: "extracted",
-        url: "/content/images/test/test_page2_img.png",
-        score: 150,
-      },
-    ];
-
-    const storyWithSourcePdf = { ...mockStory, sourcePdf: "test.pdf" };
-
-    beforeEach(() => {
-      vi.clearAllMocks();
+  describe("Review save recovery", () => {
+    it.each([
+      ["current", "error"], ["current", "empty"], ["current", "throw"],
+      ["reviewed", "empty"], ["reviewed", "throw"], ["upload", "empty"], ["upload", "throw"],
+    ])("retains %s photo draft when save returns %s", async (mode, outcome) => {
+      const endpoint = mode === "reviewed" ? mockUpdateStoryImageSource : mode === "upload" ? mockUploadStoryImage : mockUpdateStoryImageUrl;
+      if (outcome === "throw") endpoint.mockRejectedValue(new Error("Network error"));
+      else endpoint.mockResolvedValue(outcome === "error" ? { error: "Imagen rechazada" } : {});
+      render(<ImageEditorDialog {...defaultProps} story={mode === "reviewed" ? { ...mockStory, imageSource: imageProvenanceFixture(mockStory.image) } : mockStory} />);
+      if (mode === "upload") {
+        fireEvent.click(screen.getByText("Upload"));
+        fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(["bytes"], "photo.jpg", { type: "image/jpeg" })] } });
+      }
+      await completeReview(); await save();
+      expect(endpoint).toHaveBeenCalled(); expect(defaultProps.onClose).not.toHaveBeenCalled(); expect(defaultProps.onUpdate).not.toHaveBeenCalled();
+      if (outcome === "error") expect(screen.getByText("Imagen rechazada")).toBeInTheDocument();
+      if (outcome === "throw") expect(screen.getByText("Failed to update image")).toBeInTheDocument();
+      expect(screen.getByLabelText("Crédito mostrado")).toHaveValue("Reviewed photographer credit");
+      expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
     });
-
-    it("renders Content tab button", () => {
-      render(<ImageEditorDialog {...defaultProps} />);
-      expect(screen.getByText("Content")).toBeInTheDocument();
+    it("requires an image when no image or replacement is available", async () => {
+      render(<ImageEditorDialog {...defaultProps} story={{ ...mockStory, image: "" }} />); await save();
+      expect(screen.getByText(/Please provide an image URL/)).toBeInTheDocument();
+      expect(mockUpdateStoryImageUrl).not.toHaveBeenCalled(); expect(defaultProps.onClose).not.toHaveBeenCalled();
     });
-
-    it("can switch to Content tab from URL tab", () => {
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      // Switch to URL tab first
-      fireEvent.click(screen.getByText("URL"));
-      expect(screen.getByPlaceholderText("https://example.com/image.jpg")).toBeInTheDocument();
-
-      // Then switch back to Content
-      fireEvent.click(screen.getByText("Content"));
-
-      // Content tab should show search button
-      expect(screen.getByText(/Search PDF/i)).toBeInTheDocument();
+    it("closes an unchanged existing photo without a write", async () => {
+      render(<ImageEditorDialog {...defaultProps} />); await save();
+      expect(mockUpdateStoryImageUrl).not.toHaveBeenCalled(); expect(mockUpdateStoryImageSource).not.toHaveBeenCalled(); expect(defaultProps.onClose).toHaveBeenCalled();
     });
-
-    it("shows no source PDF message when story has no sourcePdf", () => {
-      render(<ImageEditorDialog {...defaultProps} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      expect(screen.getByText(/no source PDF/i)).toBeInTheDocument();
-    });
-
-    it("search button calls searchContentImages API", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      expect(mockSearchContentImages).toHaveBeenCalledWith("story-1");
-    });
-
-    it("shows image count after successful search", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      expect(screen.getByText(/1 of 2/i)).toBeInTheDocument();
-    });
-
-    it("shows no images found message when search returns empty", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: [], total: 0 },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      expect(screen.getByText(/No images found/i)).toBeInTheDocument();
-    });
-
-    it("can navigate to previous image with chevron buttons", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Should show 1 of 2
-      expect(screen.getByText(/1 of 2/i)).toBeInTheDocument();
-
-      // Click prev button — should wrap around to last image
-      const prevButton = screen.getByTestId("icon-chevron-left").closest("button")!;
-      fireEvent.click(prevButton);
-
-      // Should now show 2 of 2 (wraps around from first to last)
-      expect(screen.getByText(/2 of 2/i)).toBeInTheDocument();
-    });
-
-    it("can navigate to next image with chevron buttons", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Should show 1 of 2
-      expect(screen.getByText(/1 of 2/i)).toBeInTheDocument();
-
-      // Click next button
-      const nextButton = screen.getByTestId("icon-chevron-right").closest("button")!;
-      fireEvent.click(nextButton);
-
-      // Should now show 2 of 2
-      expect(screen.getByText(/2 of 2/i)).toBeInTheDocument();
-    });
-
-    it("shows resolution info for selected content image", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Should show resolution info (appears in multiple places, so use getAllByText)
-      const resolutionElements = screen.getAllByText(/1200 × 800/);
-      expect(resolutionElements.length).toBeGreaterThan(0);
-    });
-
-    it("auto-populates imageSource when searching content images", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Should auto-populate the imageSource field
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      expect(sourceInput).toHaveValue("Turismo de Asturias");
-    });
-
-    it("updates imageSource when navigating between content images", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      fireEvent.click(screen.getByText("Content"));
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Clear the imageSource to verify it gets set again on navigation
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "" } });
-      expect(sourceInput).toHaveValue("");
-
-      // Navigate to next image
-      const nextButton = screen.getByTestId("icon-chevron-right").closest("button")!;
-      fireEvent.click(nextButton);
-
-      // Should have set imageSource again
-      expect(sourceInput).toHaveValue("Turismo de Asturias");
-    });
-
-    it("calls onUpdate with curationStatus on successful mark as pending", async () => {
-      mockUpdateStoryStatus.mockResolvedValue({
-        data: { id: "story-1", curationStatus: "needs_curation" },
-      });
-
-      const approvedStory = { ...mockStory, curationStatus: "approved" as const };
-      const onUpdate = vi.fn();
-      const onClose = vi.fn();
-
-      render(
-        <ImageEditorDialog story={approvedStory} onClose={onClose} onUpdate={onUpdate} />
-      );
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("Mark as pending"));
-      });
-
-      expect(onUpdate).toHaveBeenCalledWith("story-1", {
-        curationStatus: "needs_curation",
-      });
-      // Modal stays open after status change
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it("saves content image with auto-populated imageSource", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Turismo de Asturias" },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
-        "story-1",
-        mockContentImages[0].url,
-        "Turismo de Asturias"
-      );
-    });
-
-    it("calls onUpdate and onClose on successful content image save", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Turismo de Asturias" },
-      });
-
-      const onClose = vi.fn();
-      const onUpdate = vi.fn();
-
-      render(<ImageEditorDialog story={storyWithSourcePdf} onClose={onClose} onUpdate={onUpdate} />);
-
-      // Search for content images
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Save the selected content image
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(onUpdate).toHaveBeenCalledWith("story-1", {
-        image: mockContentImages[0].url,
-        imageSource: "Turismo de Asturias",
-      });
-      expect(onClose).toHaveBeenCalled();
-    });
-
-    it("saves navigated content image (not just the first one)", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[1].url, imageSource: "Turismo de Asturias" },
-      });
-
-      const onUpdate = vi.fn();
-
-      render(<ImageEditorDialog story={storyWithSourcePdf} onClose={vi.fn()} onUpdate={onUpdate} />);
-
-      // Search for content images
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Navigate to second image
-      const nextButton = screen.getByTestId("icon-chevron-right").closest("button")!;
-      fireEvent.click(nextButton);
-
-      // Should show 2 of 2
-      expect(screen.getByText(/2 of 2/i)).toBeInTheDocument();
-
-      // Save the second content image
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
-        "story-1",
-        mockContentImages[1].url,
-        "Turismo de Asturias"
-      );
-      expect(onUpdate).toHaveBeenCalledWith("story-1", {
-        image: mockContentImages[1].url,
-        imageSource: "Turismo de Asturias",
-      });
-    });
-
-    it("shows error from API response on content image save", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        error: "Failed to update image URL",
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      // Search for content images
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Save the selected content image
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(screen.getByText("Failed to update image URL")).toBeInTheDocument();
-      expect(defaultProps.onUpdate).not.toHaveBeenCalled();
-      expect(defaultProps.onClose).not.toHaveBeenCalled();
-    });
-
-    it("shows generic error when content image save throws", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-      mockUpdateStoryImageUrl.mockRejectedValue(new Error("Network error"));
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      // Search for content images
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Save the selected content image
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(screen.getByText("Failed to update image")).toBeInTheDocument();
-    });
-
-    it("saves content image with empty imageSource as undefined", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[0].url, imageSource: undefined },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      // Search for content images
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Clear the auto-populated imageSource
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "" } });
-
-      // Save the selected content image with no source
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
-        "story-1",
-        mockContentImages[0].url,
-        undefined
-      );
-    });
-
-    it("passes custom imageSource (not auto-populated) on content image save", async () => {
-      mockSearchContentImages.mockResolvedValue({
-        data: { images: mockContentImages, total: 2 },
-      });
-      mockUpdateStoryImageUrl.mockResolvedValue({
-        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Custom Attribution" },
-      });
-
-      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
-
-      // Search for content images
-      await act(async () => {
-        fireEvent.click(screen.getByText(/Search PDF/i));
-      });
-
-      // Override the auto-populated imageSource with a custom value
-      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
-      fireEvent.change(sourceInput, { target: { value: "Custom Attribution" } });
-
-      // Save the selected content image
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      });
-
-      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
-        "story-1",
-        mockContentImages[0].url,
-        "Custom Attribution"
-      );
+  });
+
+  describe("Retired guide images", () => {
+    it("offers review of current upload instead of PDF-image search", () => {
+      render(<ImageEditorDialog {...defaultProps} story={{ ...mockStory, sourcePdf: "guide.pdf" }} />);
+      expect(screen.getByText("Actual")).toBeInTheDocument(); expect(screen.queryByText(/Search PDF/)).not.toBeInTheDocument();
+      expect(mockSearchContentImages).not.toHaveBeenCalled();
     });
   });
 
@@ -1477,4 +838,16 @@ describe("ImageEditorDialog", () => {
       expect(screen.queryByText("Mark as pending")).not.toBeInTheDocument();
     });
   });
+});
+
+it("retains the focused image draft and exact proof after failure, then retries", async () => {
+  mockUpdateStoryImageUrl.mockReset().mockResolvedValueOnce({ error: "Retry image" }).mockResolvedValueOnce({ data: { image: "https://example.com/retry.jpg", imageSource: "Retained proof" } });
+  const onClose = vi.fn(); const onUpdate = vi.fn();
+  render(<ImageEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />);
+  selectUrl("https://example.com/retry.jpg"); await completeReview();
+  const url = screen.getByPlaceholderText("https://example.com/image.jpg"); url.focus(); expect(url).toHaveFocus();
+  await save(); expect(screen.getByText("Retry image")).toBeInTheDocument(); expect(url).toHaveValue("https://example.com/retry.jpg"); expect(screen.getByPlaceholderText("https://example.com/image.jpg")).toBe(url);
+  expect(onClose).not.toHaveBeenCalled(); const proof = mockUpdateStoryImageUrl.mock.calls[0]![2]; await save();
+  expect(mockUpdateStoryImageUrl).toHaveBeenNthCalledWith(2, "story-1", "https://example.com/retry.jpg", proof);
+  expect(onUpdate).toHaveBeenCalledWith("story-1", { image: "https://example.com/retry.jpg", imageSource: "Retained proof" }); expect(onClose).toHaveBeenCalledTimes(1);
 });

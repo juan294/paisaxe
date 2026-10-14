@@ -57,16 +57,16 @@ export function ScalingForecastSection({ services, dateRange }: ScalingForecastS
     <section>
       <button
         onClick={handleToggle}
-        className="flex w-full items-center justify-between rounded-lg px-1 py-2 transition-colors hover:bg-[#f5f3ee] dark:hover:bg-[#2d2a26]"
+        className="flex w-full items-center justify-between rounded-lg px-1 py-2 transition-colors hover:bg-admin-paper dark:hover:bg-admin-ink"
       >
         <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-[#a39e98]" />
-          <h3 className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+          <TrendingUp className="h-4 w-4 text-admin-subtle" />
+          <h3 className="font-mono text-xs uppercase tracking-widest text-admin-subtle">
             Scaling Forecast
           </h3>
         </div>
         <ChevronDown
-          className={`h-4 w-4 text-[#a39e98] transition-transform ${isExpanded ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-admin-subtle transition-transform ${isExpanded ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -74,16 +74,16 @@ export function ScalingForecastSection({ services, dateRange }: ScalingForecastS
         <div className="mt-4 space-y-8">
           {isLoadingUsage ? (
             <div className="flex items-center justify-center py-8">
-              <p className="animate-pulse font-mono text-xs text-[#a39e98]">
+              <p className="animate-pulse font-mono text-xs text-admin-subtle">
                 Loading usage data...
               </p>
             </div>
           ) : !usageMetrics ? (
             <div className="flex flex-col items-center justify-center gap-2 py-8">
-              <p className="font-mono text-xs text-[#a39e98]">
+              <p className="font-mono text-xs text-admin-subtle">
                 No usage data available yet
               </p>
-              <p className="font-mono text-xs text-[#6b6560]">
+              <p className="font-mono text-xs text-admin-muted">
                 Chat events will appear after users interact with the chat
               </p>
             </div>
@@ -91,29 +91,29 @@ export function ScalingForecastSection({ services, dateRange }: ScalingForecastS
             <>
               {/* Reality Table */}
               <div>
-                <h4 className="mb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+                <h4 className="mb-3 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
                   Current Period Reality
                   {usageMetrics.periodDays < 30 && (
-                    <span className="ml-2 normal-case text-[#a39e98]">
+                    <span className="ml-2 normal-case text-admin-subtle">
                       (based on {usageMetrics.periodDays} days of data)
                     </span>
                   )}
                 </h4>
                 <table className="w-full max-w-lg">
                   <thead>
-                    <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-                      <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                    <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+                      <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">
                         Metric
                       </th>
-                      <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                      <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
                         This Period
                       </th>
-                      <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                      <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle">
                         Monthly Rate
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+                  <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
                     <RealityRow
                       label="Visitors"
                       actual={usageMetrics.visitors}
@@ -142,25 +142,25 @@ export function ScalingForecastSection({ services, dateRange }: ScalingForecastS
               {/* Forecast Table */}
               {forecasts && forecasts.length > 0 && (
                 <div>
-                  <h4 className="mb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+                  <h4 className="mb-3 font-mono text-xs uppercase tracking-widest text-admin-muted dark:text-admin-subtle">
                     Growth Projections
                   </h4>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]" />
+                        <tr className="border-b border-admin-line text-left dark:border-admin-depth">
+                          <th className="pb-2 font-mono text-xs uppercase tracking-widest text-admin-subtle" />
                           {forecasts.map((f) => (
                             <th
                               key={f.label}
-                              className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]"
+                              className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-admin-subtle"
                             >
                               {f.label}
                             </th>
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+                      <tbody className="divide-y divide-admin-paper dark:divide-admin-depth">
                         <ForecastRow
                           label="Monthly Visitors"
                           values={forecasts.map((f) => formatNum(f.visitors))}
@@ -194,8 +194,8 @@ export function ScalingForecastSection({ services, dateRange }: ScalingForecastS
                           )}
                           isCost
                         />
-                        <tr className="border-t-2 border-[#e5e3de] dark:border-[#3d3a36]">
-                          <td className="py-2 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                        <tr className="border-t-2 border-admin-line dark:border-admin-depth">
+                          <td className="py-2 text-sm font-medium text-admin-ink dark:text-admin-paper">
                             Est. Monthly
                           </td>
                           {forecasts.map((f) => (
@@ -237,13 +237,13 @@ function RealityRow({
 
   return (
     <tr>
-      <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+      <td className="py-2 text-sm text-admin-secondary dark:text-admin-subtle">
         {label}
       </td>
-      <td className="py-2 text-right font-mono text-sm tabular-nums text-[#2d2a26] dark:text-[#f5f3ee]">
+      <td className="py-2 text-right font-mono text-sm tabular-nums text-admin-ink dark:text-admin-paper">
         {formatted}
       </td>
-      <td className="py-2 text-right font-mono text-sm tabular-nums text-[#6b6560] dark:text-[#a39e98]">
+      <td className="py-2 text-right font-mono text-sm tabular-nums text-admin-muted dark:text-admin-subtle">
         {monthlyFormatted}
       </td>
     </tr>
@@ -261,7 +261,7 @@ function ForecastRow({
 }) {
   return (
     <tr>
-      <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
+      <td className="py-2 text-sm text-admin-secondary dark:text-admin-subtle">
         {label}
       </td>
       {values.map((v, i) => (
@@ -270,7 +270,7 @@ function ForecastRow({
           className={`py-2 text-right font-mono text-sm tabular-nums ${
             isCost
               ? "text-rose-600 dark:text-rose-400"
-              : "text-[#2d2a26] dark:text-[#f5f3ee]"
+              : "text-admin-ink dark:text-admin-paper"
           }`}
         >
           {v}

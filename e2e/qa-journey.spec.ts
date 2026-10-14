@@ -1,3 +1,4 @@
+import { mockFeatureFlagsAfterSsr } from "./fixtures/mock-feature-flags";
 import { test, expect } from "./fixtures/base-test";
 import {
   test as authTest,
@@ -14,19 +15,17 @@ import {
 import type { Locator } from "@playwright/test";
 
 /**
- * /immersive is PPR-prerendered: the static shell can render a nav button
- * visible+enabled before React attaches its click handler, so an early click
- * is swallowed. Retry click+assert as a unit until the title actually changes.
+ * Native controls remain disabled until hydration is ready. Make one action
+ * and let only the resulting title assertion wait for the transition.
  */
 async function clickAndAwaitTitleChange(
   button: Locator,
   title: Locator,
   previousTitle: string
 ) {
-  await expect(async () => {
-    await button.click();
-    await expect(title).not.toHaveText(previousTitle, { timeout: 1000 });
-  }).toPass({ timeout: 15000 });
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(title).not.toHaveText(previousTitle, { timeout: 15000 });
 }
 
 /**
@@ -336,15 +335,7 @@ test.describe("QA Journey: New Features", () => {
     const viewport = page.viewportSize();
     if (viewport && viewport.width < 768) testInfo.skip(true, "Suggest button uses hidden md:block — not visible on mobile");
     // Enable suggestion feature flag
-    await page.route("**/api/feature-flags", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          withFeatureFlags({ user_story_suggestions: true })
-        ),
-      })
-    );
+    const settleFlags = await mockFeatureFlagsAfterSsr(page, withFeatureFlags({ user_story_suggestions: true }));
 
     // Mock suggestion API
     await page.route("**/api/suggestions", (route) =>
@@ -357,6 +348,7 @@ test.describe("QA Journey: New Features", () => {
 
     // Step 1: Navigate to immersive view and wait for it to load
     await page.goto("/immersive", { waitUntil: "networkidle" });
+    await settleFlags();
     await expect(page.locator('[data-testid="story-title"]').first()).toBeVisible({ timeout: 15000 });
 
     // Step 2: Click the suggest button

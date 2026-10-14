@@ -1,0 +1,8 @@
+/* /design-sync stylesheet: the app CSS plus the classes only the previews use.
+   globals.css excludes .design-sync from scanning; this entry scans the previews but not
+   the docs, which name classes as examples and gaps. */
+@import "tailwindcss";
+@import "../src/app/base.css";
+@config "../tailwind.config.ts";
+@source not "./conventions.md";
+@source not "./NOTES.md";

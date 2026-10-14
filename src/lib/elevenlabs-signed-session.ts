@@ -286,11 +286,15 @@ export async function probeElevenLabsVoiceAgents(
     (outcome) => outcome.status === "rejected"
   );
   if (failedIndex >= 0) {
-    const failed = outcomes[failedIndex] as PromiseRejectedResult;
+    const failed = outcomes[failedIndex];
+    const failedAgent = resolved[failedIndex];
+    if (failed?.status !== "rejected" || failedAgent === undefined) {
+      throw new Error("Signed-session result missing matching agent");
+    }
     normalizeLogAndThrow(
       failed.reason,
       source,
-      resolved[failedIndex].agentKey
+      failedAgent.agentKey
     );
   }
 

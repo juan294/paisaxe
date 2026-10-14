@@ -697,4 +697,26 @@ describe("CreateStoryDialog", () => {
       })
     );
   });
+  it("keeps the focused draft through edits and a failed save, then retries successfully", async () => {
+    vi.mocked(createStory).mockResolvedValueOnce({ error: "Retry creation" }).mockResolvedValueOnce({ data: {
+      id: "retry-story", slug: "retained-draft", title: "Retained draft", category: "nature", displayOrder: 1,
+      curationStatus: "needs_curation", createdAt: "2026-10-11",
+    } });
+    render(<CreateStoryDialog {...defaultProps} />);
+    const title = screen.getByLabelText(/Title/);
+    title.focus();
+    fireEvent.change(title, { target: { value: "Retained draft" } });
+    expect(screen.getByLabelText(/Title/)).toBe(title);
+    expect(title).toHaveFocus();
+    fireEvent.change(screen.getByTestId("select-native-category"), { target: { value: "nature" } });
+    await userEvent.click(screen.getByRole("button", { name: /Create Story/i }));
+    expect(screen.getByText("Retry creation")).toBeInTheDocument();
+    expect(title).toHaveValue("Retained draft");
+    expect(mockOnOpenChange).not.toHaveBeenCalledWith(false);
+    await userEvent.click(screen.getByRole("button", { name: /Create Story/i }));
+    expect(createStory).toHaveBeenCalledTimes(2);
+    expect(mockOnCreated).toHaveBeenCalledWith(expect.objectContaining({ id: "retry-story" }));
+    expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+  });
+
 });

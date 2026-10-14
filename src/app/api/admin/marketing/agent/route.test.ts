@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { CHAT_MODEL } from "@/lib/models";
@@ -66,9 +67,10 @@ vi.mock("fs/promises", async () => {
 });
 
 // Mock admin auth
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
-}));
+vi.mock("@/lib/admin-auth", async () => {
+  const { mockAdminBoundary } = await import("@/test/mock-admin-boundary");
+  return mockAdminBoundary(vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }));
+});
 
 // Shared mock data for Supabase context queries
 let mockStoryCount: number | null = 10;
@@ -427,7 +429,7 @@ describe("/api/admin/marketing/agent", () => {
       await POST(request);
 
       // The unmarked second system block carries gatherContext() output
-      const callArgs = mocks.anthropicCreate.mock.calls[0][0];
+      const callArgs = requiredValue(mocks.anthropicCreate.mock.calls[0], "src/app/api/admin/marketing/agent/route.test.ts:431 mocks.anthropicCreate.mock.calls[0]")[0];
       expect(callArgs.system[1].text).toContain("10 active stories");
       expect(callArgs.system[1].text).toContain("Recent marketing content");
       expect(callArgs.system[1].text).toContain("x: photo_caption (draft)");
@@ -446,7 +448,7 @@ describe("/api/admin/marketing/agent", () => {
 
       expect(response.status).toBe(200);
       // System prompt should NOT include story count text
-      const callArgs = mocks.anthropicCreate.mock.calls[0][0];
+      const callArgs = requiredValue(mocks.anthropicCreate.mock.calls[0], "src/app/api/admin/marketing/agent/route.test.ts:450 mocks.anthropicCreate.mock.calls[0]")[0];
       const systemText = callArgs.system.map((b: { text: string }) => b.text).join("\n");
       expect(systemText).not.toContain("active stories");
       expect(systemText).not.toContain("Recent marketing content");
@@ -489,7 +491,7 @@ describe("/api/admin/marketing/agent", () => {
           body: JSON.stringify({ agentId, message: "Hello", conversationHistory }),
         })
       );
-      return mocks.anthropicCreate.mock.calls[0][0];
+      return requiredValue(mocks.anthropicCreate.mock.calls[0], "src/app/api/admin/marketing/agent/route.test.ts:493 mocks.anthropicCreate.mock.calls[0]")[0];
     }
 
     it("sends system as [persona + instructions (marked), DB context (unmarked)]", async () => {
@@ -644,3 +646,6 @@ describe("/api/admin/marketing/agent", () => {
     expect(logger.error).toHaveBeenCalled();
   });
 });
+
+// Unused service client in routes backed by separate providers or local files.
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "event": "schedule",
+  "head_branch": "main",
+  "head_sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf",
+  "id": 37721477388,
+  "path": ".github/workflows/ci-nightly.yml",
+  "referenced_workflows": [
+    {
+      "path": "juan294/paisaxe/.github/workflows/ci-cadence-knip-full.yml@623d3229314b7bd99169232a90aa75ba47fcfdbf",
+      "ref": "refs/heads/main",
+      "sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf"
+    },
+    {
+      "path": "juan294/paisaxe/.github/workflows/ci-cadence-e2e-full.yml@623d3229314b7bd99169232a90aa75ba47fcfdbf",
+      "ref": "refs/heads/main",
+      "sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf"
+    },
+    {
+      "path": "juan294/paisaxe/.github/workflows/ci-cadence-bundle-size-full.yml@623d3229314b7bd99169232a90aa75ba47fcfdbf",
+      "ref": "refs/heads/main",
+      "sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf"
+    },
+    {
+      "path": "juan294/paisaxe/.github/workflows/ci-cadence-license-check-full.yml@623d3229314b7bd99169232a90aa75ba47fcfdbf",
+      "ref": "refs/heads/main",
+      "sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf"
+    },
+    {
+      "path": "juan294/paisaxe/.github/workflows/ci-cadence-security-full.yml@623d3229314b7bd99169232a90aa75ba47fcfdbf",
+      "ref": "refs/heads/main",
+      "sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf"
+    },
+    {
+      "path": "juan294/paisaxe/.github/workflows/ci.yml@623d3229314b7bd99169232a90aa75ba47fcfdbf",
+      "ref": "refs/heads/main",
+      "sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf"
+    },
+    {
+      "path": "juan294/paisaxe/.github/workflows/validate-merged-pr.yml@623d3229314b7bd99169232a90aa75ba47fcfdbf",
+      "ref": "refs/heads/main",
+      "sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf"
+    },
+    {
+      "path": "juan294/paisaxe/.github/workflows/ci-cadence-lighthouse-full.yml@623d3229314b7bd99169232a90aa75ba47fcfdbf",
+      "ref": "refs/heads/main",
+      "sha": "623d3229314b7bd99169232a90aa75ba47fcfdbf"
+    }
+  ],
+  "run_attempt": 1,
+  "source": "GET /repos/juan294/paisaxe/actions/runs/37721477388 (CI nightly, schedule, attempt 1)"
+}

@@ -1,5 +1,7 @@
 "use client";
 
+import { readRetryAfter } from "@/lib/retry-after";
+import { RateLimitNotice } from "@/components/rate-limit-notice";
 import { Suspense, useCallback, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -33,7 +35,7 @@ export default function CheckoutPage() {
 }
 
 function CheckoutPageContent() {
-  const { user, session, signInWithGoogle } = useAuth();
+  const { user, session, isLoading, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
@@ -51,6 +53,7 @@ function CheckoutPageContent() {
   // survives the sign-in redirect instead of silently defaulting to day_pass
   // when the user returns from Google OAuth.
   const checkoutPath = buildCheckoutUrl(purchaseType, returnTo ?? undefined);
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchClientSecret = useCallback(async () => {
@@ -64,11 +67,13 @@ function CheckoutPageContent() {
         }),
       });
 
+      if (response.status === 429) setRetryAfter(readRetryAfter(response));
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${response.status}`);
       }
 
+      setRetryAfter(null);
       const { clientSecret } = await response.json();
       return clientSecret;
     } catch (err) {
@@ -77,17 +82,21 @@ function CheckoutPageContent() {
     }
   }, [returnTo, purchaseType, t]);
 
-  // Show sign-in prompt if not authenticated
+  if (isLoading) {
+    return <div role="status" aria-busy="true" className="min-h-screen bg-scene-canvas p-6 text-scene-white">{t('common.loading')}</div>;
+  }
+
+  // Tokens reconcile separately from the narrow server presentation seed.
   if (!user || !session) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-scene-canvas flex flex-col items-center justify-center p-6">
         <div className="max-w-sm w-full text-center">
-          <h1 className="text-xl font-semibold text-white mb-4">
+          <h1 className="text-xl font-semibold text-scene-white mb-4">
             {t("premium.sign_in_to_purchase")}
           </h1>
           <button
             onClick={() => signInWithGoogle(checkoutPath)}
-            className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+            className="w-full px-5 py-3 bg-paisaxe-green-500 text-scene-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-scene-canvas"
           >
             {t("auth.continue_with_google")}
           </button>
@@ -97,14 +106,14 @@ function CheckoutPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950">
+    <div className="min-h-screen bg-scene-canvas">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-neutral-950/80 backdrop-blur-md">
+      <header className="sticky top-0 z-40 bg-scene-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
           <Link
             href="/pricing"
             aria-label={t("premium.checkout_back_to_pricing")}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-scene-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-scene-white/70"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -119,18 +128,19 @@ function CheckoutPageContent() {
         {error ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <AlertCircle className="h-8 w-8 text-red-400 mb-4" />
-            <h2 className="text-lg font-medium text-white mb-2">
+            <h2 className="text-lg font-medium text-scene-white mb-2">
               {t("errors.generic_title")}
             </h2>
             <p className="text-sm text-neutral-400 mb-6">
               {t("errors.generic_description")}
             </p>
-            <button
+            <RateLimitNotice retryAfter={retryAfter} onRetry={() => { setError(null); setRetryAfter(null); }} />
+            {!retryAfter && <button
               onClick={() => setError(null)}
-              className="px-5 py-2.5 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+              className="px-5 py-2.5 bg-paisaxe-green-500 text-scene-black text-sm font-medium rounded-lg hover:bg-paisaxe-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-scene-canvas"
             >
               {t("errors.retry")}
-            </button>
+            </button>}
           </div>
         ) : (
           <div id="checkout" className="rounded-xl overflow-hidden">

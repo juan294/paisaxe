@@ -3,7 +3,7 @@ run-name: "${{ format('{0}: {1} #{2} ({3}) on {4}', github.event.workflow_run.co
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["CI", "CI cadence"]
     types: [completed]
 
 permissions:
@@ -22,6 +22,9 @@ jobs:
     if: >-
       ${{
         vars.CI_CADENCE_REPAIR_ENABLED == 'true' &&
+        (github.event.workflow_run.name == 'CI' ||
+         (vars.CI_CADENCE_MODE == 'lean' &&
+          github.event.workflow_run.name == 'CI cadence')) &&
         github.event.workflow_run.actor.login == 'juan294' &&
         github.event.workflow_run.head_repository.full_name == github.repository &&
         github.event.workflow_run.event == 'push' &&
@@ -31,10 +34,20 @@ jobs:
       }}
     runs-on: ubuntu-latest
     steps:
+      - name: Create repository-scoped Sutura token
+        id: sutura-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.SUTURA_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SUTURA_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-checks: write
+          permission-contents: write
+          permission-pull-requests: write
       - name: Verify and repair failed CI
         uses: juan294/sutura@cc3281485b4364d7c8fcb2e820e03ffbaf893c2a # v0.3.9
         with:
-          github-token: ${{ github.token }}
+          github-token: ${{ steps.sutura-app-token.outputs.token }}
           run-id: ${{ github.event.workflow_run.id }}
           capture-replay: true
           runtime: auto

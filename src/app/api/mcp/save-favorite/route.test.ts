@@ -1,3 +1,5 @@
+import { requiredValue } from "@/test/required-value";
+import { resetRateLimit } from "@/lib/rate-limit";
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -31,6 +33,7 @@ function makeRequest(body: unknown): Request {
 
 describe("POST /api/mcp/save-favorite", () => {
   beforeEach(() => {
+    resetRateLimit();
     vi.clearAllMocks();
     mockValidateMcpSecret.mockReturnValue(true);
     mockUpsert.mockResolvedValue({ error: null });
@@ -63,7 +66,7 @@ describe("POST /api/mcp/save-favorite", () => {
 
     expect(mockFrom).toHaveBeenCalledWith("voice_saved_places");
     expect(mockUpsert).toHaveBeenCalledTimes(1);
-    const row = mockUpsert.mock.calls[0][0];
+    const row = requiredValue(mockUpsert.mock.calls[0], "src/app/api/mcp/save-favorite/route.test.ts:68 mockUpsert.mock.calls[0]")[0];
     expect(row.place_name).toBe("Casa Marcial");
     expect(row.place_address).toBe("La Salgar, Arriondas");
     expect(row.place_id).toBe("gpid-123");
@@ -83,7 +86,7 @@ describe("POST /api/mcp/save-favorite", () => {
   it("still works when conversation_id is absent (anonymous bookmark)", async () => {
     const res = await POST(makeRequest({ place_name: "Casa Marcial" }));
     expect(res.status).toBe(200);
-    const row = mockUpsert.mock.calls[0][0];
+    const row = requiredValue(mockUpsert.mock.calls[0], "src/app/api/mcp/save-favorite/route.test.ts:88 mockUpsert.mock.calls[0]")[0];
     expect(row.conversation_id).toBe("unknown");
   });
 
@@ -101,7 +104,7 @@ describe("POST /api/mcp/save-favorite", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
 
-    const row = mockUpsert.mock.calls[0][0];
+    const row = requiredValue(mockUpsert.mock.calls[0], "src/app/api/mcp/save-favorite/route.test.ts:106 mockUpsert.mock.calls[0]")[0];
     expect(row.place_name).toBe("Casa Marcial");
     expect(row.place_address).toBe("La Salgar, Arriondas");
     expect(row.place_id).toBe("gpid-123");
@@ -134,7 +137,7 @@ describe("POST /api/mcp/save-favorite", () => {
       })
     );
     expect(res.status).toBe(200);
-    const row = mockUpsert.mock.calls[0][0];
+    const row = requiredValue(mockUpsert.mock.calls[0], "src/app/api/mcp/save-favorite/route.test.ts:139 mockUpsert.mock.calls[0]")[0];
     expect(row.place_address).toBeNull();
     expect(row.notes).toBeNull();
   });

@@ -36,3 +36,20 @@ test('caller identity stays original native root and never fabricated per-callee
  assert.equal(r.projection.referencedWorkflows.length,7);
  for(const ref of r.projection.referencedWorkflows)assert.equal(ref.sha,'b'.repeat(40));
 });
+
+// GitHub's native run lists every reusable workflow the run references, nested
+// calls included, as path@<commit> with that commit in .sha (run 37721477388).
+test('projected references equal GitHub\'s actual referenced_workflows for the pinned nightly head', async () => {
+  const { projectFullGraph } = await project();
+  const actual = JSON.parse(readFileSync(new URL('../tests/fixtures/ci-cadence-adapter/native/nightly-referenced-workflows.json', import.meta.url)));
+  const catalogue = JSON.parse(readFileSync(new URL('../.github/ci-cadence-native.json', import.meta.url)));
+  const definitionSha = actual.head_sha, nightly = '.github/workflows/ci-nightly.yml';
+  const r = projectFullGraph({ protectedPolicy, profile: 'nightly', definitionSha, caller: catalogue.callers[nightly],
+    callees: Object.fromEntries(Object.entries(catalogue.callees).map(([path, callee]) => [path, { ...callee, definitionSha }])),
+    nestedCallees: Object.values(catalogue.nestedCallees ?? {}), auxiliaryJobs: catalogue.censusByCaller[nightly], stepInventory: catalogue.stepInventory,
+    admissionJob: 'Cadence admission', admissionStep: 'Upload Cadence admission', measurementJob: 'Cadence measurement', measurementStep: 'Upload Cadence measurement' });
+  assert.equal(r.available, true, r.error);
+  const set = list => list.map(item => [item.path, item.ref, item.sha].join(' ')).sort();
+  assert.deepEqual(set(r.projection.referencedWorkflows), set(actual.referenced_workflows));
+  for (const ref of r.projection.referencedWorkflows) assert.equal(r.projection.workflowSources[ref.path.split('@')[0].slice('juan294/paisaxe/'.length)], ref.sha);
+});

@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 function contextualizedModel(relativePath: string): string {
   const source = readFileSync(join(process.cwd(), relativePath), "utf8");
   const match = source.match(/const CONTEXTUALIZED_MODEL = "([^"]+)"/);
-  if (!match) throw new Error(`CONTEXTUALIZED_MODEL not found in ${relativePath}`);
+  if (!match?.[1]) throw new Error(`CONTEXTUALIZED_MODEL not found in ${relativePath}`);
   return match[1];
 }
 

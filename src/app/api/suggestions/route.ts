@@ -1,10 +1,11 @@
+import { checkRequestBudget, rateLimitResponse } from "@/lib/request-rate-limit";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { StorySuggestionRow } from "@/types/suggestions";
 import { rowToStorySuggestion } from "@/types/suggestions";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { getClientIp } from "@/lib/request-utils";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, normalizeIpForRateLimit } from "@/lib/rate-limit";
 import { createSuggestionSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 
@@ -25,7 +26,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const supabase = await getSupabaseClient();
+  const requestLimit = await checkRequestBudget("GET /api/suggestions", user.id);
+  if (!requestLimit.allowed) return rateLimitResponse({ error: "Too many requests. Please try again later." }, requestLimit);
+
+  const supabase = await getSupabaseClient(request);
 
   const { data, error } = await supabase
     .from("story_suggestions")
@@ -47,10 +51,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/suggestions - Submit a new suggestion (auth optional)
 export async function POST(request: NextRequest) {
-  // Detect user from cookie session (covers logged-in users without Authorization header)
-  const supabase = await getSupabaseClient();
-  const { data: { user: sessionUser } } = await supabase.auth.getUser();
-  const user = sessionUser ?? await getUserFromRequest(request);
+  const user = await getUserFromRequest(request);
+  if (request.headers.get("Authorization")?.startsWith("Bearer ") && !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const supabase = await getSupabaseClient(request);
 
   // Parse and validate body BEFORE rate limiting — invalid requests shouldn't consume tokens
   let rawBody: unknown;
@@ -90,14 +95,11 @@ export async function POST(request: NextRequest) {
 
   // Rate limit after validation — only valid requests consume tokens
   const ip = getClientIp(request);
-  const identifier = `suggestion:${user?.id ?? ip}`;
+  const identifier = `suggestion:${user?.id ?? normalizeIpForRateLimit(ip)}`;
   const rateLimit = await checkRateLimit(identifier, SUGGESTION_RATE_LIMIT);
 
   if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: "Rate limit exceeded. Please wait before submitting another suggestion." },
-      { status: 429 }
-    );
+    return rateLimitResponse({ error: "Rate limit exceeded. Please wait before submitting another suggestion." }, rateLimit);
   }
 
   const { data, error } = await supabase

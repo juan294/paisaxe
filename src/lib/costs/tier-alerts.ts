@@ -62,13 +62,13 @@ export function computeTierAlerts(
 
         if (remaining <= 0) {
           projectedDaysToLimit = 0;
-          projectedDate = now.toISOString().split("T")[0];
+          projectedDate = now.toISOString().replace(/T.*$/, "");
           alertLevel = "critical";
         } else {
           projectedDaysToLimit = Math.ceil(remaining / dailyRate);
           const projected = new Date(now);
           projected.setDate(projected.getDate() + projectedDaysToLimit);
-          projectedDate = projected.toISOString().split("T")[0];
+          projectedDate = projected.toISOString().replace(/T.*$/, "");
 
           if (projectedDaysToLimit < ALERT_THRESHOLDS.critical) {
             alertLevel = "critical";

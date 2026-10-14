@@ -210,3 +210,10 @@ describe("getLocalizedQuestionPrompts", () => {
     ]);
   });
 });
+
+describe('complete translated question batches', () => {
+  it.each([{questions:["Translated one"]}, {questions:["", "Translated two"]}])('falls back to the complete source for an incomplete target %j', ({questions}) => {
+    const story: Story = {id:"prompt-batch", title:"Lugar",subtitle:"",description:"",image:"/test.jpg",category:"nature",sourcePdf:"test.pdf", metadata:{question_prompts:["¿Uno?", "¿Dos?"],translations:{fr:{title:"Lieu",subtitle:"",description:"",question_prompts:questions}}}};
+    expect(getLocalizedQuestionPrompts(story,"fr")).toEqual(story.metadata?.question_prompts);
+  });
+});

@@ -86,7 +86,7 @@ describe("PostRow", () => {
     renderInTable(<PostRow post={draftPost} index={0} />);
 
     const statusEl = screen.getByText("draft");
-    expect(statusEl.className).toContain("text-[#a39e98]");
+    expect(statusEl.className).toContain("text-admin-subtle");
   });
 
   it("shows failed status with red styling", () => {

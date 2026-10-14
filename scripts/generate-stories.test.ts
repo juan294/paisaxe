@@ -1,3 +1,4 @@
+import { requiredValue } from "../src/test/required-value";
 import { describe, it, expect } from "vitest";
 import {
   validateGeneratedStories,
@@ -93,7 +94,7 @@ describe("validateGeneratedStories", () => {
     const result = validateGeneratedStories(stories, sampleChunks);
     expect(result.valid).toHaveLength(0);
     expect(result.excluded).toHaveLength(1);
-    expect(result.excluded[0].reason).toContain("citation");
+    expect(requiredValue(result.excluded[0], "excluded story").reason).toContain("citation");
   });
 
   it("excludes a story with a non-Asturian place in the title", () => {
@@ -106,7 +107,7 @@ describe("validateGeneratedStories", () => {
     const result = validateGeneratedStories(stories, sampleChunks);
     expect(result.valid).toHaveLength(0);
     expect(result.excluded).toHaveLength(1);
-    expect(result.excluded[0].reason).toContain("geographic");
+    expect(requiredValue(result.excluded[0], "excluded story").reason).toContain("geographic");
   });
 
   it("excludes a story with a non-Asturian place in the subtitle", () => {
@@ -119,7 +120,7 @@ describe("validateGeneratedStories", () => {
     const result = validateGeneratedStories(stories, sampleChunks);
     expect(result.valid).toHaveLength(0);
     expect(result.excluded).toHaveLength(1);
-    expect(result.excluded[0].reason).toContain("geographic");
+    expect(requiredValue(result.excluded[0], "excluded story").reason).toContain("geographic");
   });
 
   it("uses fuzzy matching for sourceQuote (substring match)", () => {
@@ -165,7 +166,7 @@ describe("validateGeneratedStories", () => {
 
     const result = validateGeneratedStories(stories, sampleChunks);
     expect(result.valid).toHaveLength(1);
-    expect(result.valid[0].id).toBe("valid-1");
+    expect(requiredValue(result.valid[0], "valid story").id).toBe("valid-1");
     expect(result.excluded).toHaveLength(2);
   });
 
@@ -195,7 +196,7 @@ describe("validateGeneratedStories", () => {
     const result = validateGeneratedStories(stories, []);
     expect(result.valid).toHaveLength(0);
     expect(result.excluded).toHaveLength(1);
-    expect(result.excluded[0].reason).toContain("citation");
+    expect(requiredValue(result.excluded[0], "excluded story").reason).toContain("citation");
   });
 
   it("reports both citation and geographic failures", () => {
@@ -208,7 +209,7 @@ describe("validateGeneratedStories", () => {
     const result = validateGeneratedStories(stories, sampleChunks);
     expect(result.excluded).toHaveLength(1);
     // Should mention both failures
-    expect(result.excluded[0].reason).toContain("citation");
-    expect(result.excluded[0].reason).toContain("geographic");
+    expect(requiredValue(result.excluded[0], "excluded story").reason).toContain("citation");
+    expect(requiredValue(result.excluded[0], "excluded story").reason).toContain("geographic");
   });
 });

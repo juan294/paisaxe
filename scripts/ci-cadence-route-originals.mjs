@@ -26,6 +26,21 @@ export function routeOriginalWorkflow(source) {
     job.steps=protect(job.steps);
   }
   if(ci){
+    const test=value.jobs.test;
+    const ordinary=test.steps.find(step=>step.name==='Verify test/coverage suite succeeded')?.if;
+    const checkoutGuard=test.steps.findIndex(step=>step.name==='Verify callable source checkout');
+    const completed=test.steps.findIndex(step=>step.name==='Verify completed callable source checkout');
+    if(!ordinary||checkoutGuard<0||completed<0)throw Error('Reviewed Test source guards disappeared');
+    const receipt="${{ runner.temp }}/database-contracts-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.invocation_id || 'ordinary' }}";
+    test['timeout-minutes']=50;
+    test.steps.splice(completed,0,
+      {name:'Setup database contract Node',uses:'actions/setup-node@v7',with:{'node-version':'24.21.0'}},
+      {name:'Install database contract dependencies',run:'npm ci'},
+      {name:'Setup database contract Supabase',uses:'supabase/setup-cli@v1',with:{version:'2.120.0'}},
+      {name:'Check database contract PostgreSQL client',run:'command -v psql\npsql --version'},
+      {name:'Run required database contracts',run:'node scripts/ci-contracts.mjs','timeout-minutes':43,env:{CI_CONTRACT_RECEIPT_DIR:receipt}},
+      {name:'Upload sanitized database contract receipt',if:'${{ always() }}',uses:'actions/upload-artifact@v7',with:{name:"database-contracts-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.invocation_id || 'ordinary' }}",path:receipt+'/receipt.json','if-no-files-found':'error','retention-days':7}});
+    test.steps.splice(checkoutGuard+1,0,{name:'Checkout database contract source',if:ordinary,uses:'actions/checkout@v7',with:{ref:'${{ github.sha }}','fetch-depth':0,'persist-credentials':false}});
     const producer=value.jobs['coverage-merge']?.steps.find(step=>step.name==='Produce actual callable coverage JSON');
     if(!producer)throw Error('Reviewed callable producer disappeared');
     const pins=Object.fromEntries(['ci-cadence-producer.mjs','ci-cadence-coverage.mjs','ci-cadence-native.mjs'].map(name=>['scripts/'+name,createHash('sha256').update(readFileSync(new URL('./'+name,import.meta.url))).digest('hex')]));

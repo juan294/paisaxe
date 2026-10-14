@@ -90,7 +90,7 @@ function parseMigrations(migrationsDir: string): {
 
   for (const entry of entries) {
     const match = MIGRATION_PATTERN.exec(entry);
-    if (!match) {
+    if (!match?.[1]) {
       errors.push(`  Invalid filename format: ${entry} (expected NNN_description.sql)`);
       continue;
     }
@@ -130,6 +130,7 @@ function checkForUnexpectedGaps(migrations: MigrationFile[]): string[] {
   for (let i = 1; i < numbers.length; i++) {
     const prev = numbers[i - 1];
     const curr = numbers[i];
+    if (prev === undefined || curr === undefined) continue;
     const gapSize = curr - prev - 1;
 
     if (gapSize <= 0) continue;
@@ -269,18 +270,23 @@ function collectTableEvents(sql: string): TableEvent[] {
   const events: TableEvent[] = [];
 
   for (const match of sql.matchAll(CREATE_TABLE_RE)) {
+    if (match[1] === undefined) continue;
     events.push({ index: match.index ?? 0, kind: "create", name: match[1] });
   }
   for (const match of sql.matchAll(DROP_TABLE_RE)) {
+    if (match[1] === undefined) continue;
     events.push({ index: match.index ?? 0, kind: "drop", name: match[1] });
   }
   for (const match of sql.matchAll(RENAME_TABLE_RE)) {
+    if (match[1] === undefined || match[2] === undefined) continue;
     events.push({ index: match.index ?? 0, kind: "rename", from: match[1], to: match[2] });
   }
   for (const match of sql.matchAll(RLS_TOGGLE_RE)) {
+    if (match[1] === undefined || match[2] === undefined) continue;
     events.push({ index: match.index ?? 0, kind: "rls", name: match[1], enabled: match[2] === "enable" });
   }
   for (const match of sql.matchAll(REVOKE_ROLES_RE)) {
+    if (match[1] === undefined || match[2] === undefined) continue;
     events.push({
       index: match.index ?? 0,
       kind: "revoke",
@@ -407,6 +413,25 @@ const FUNCTION_DEFINITION_RE =
 // (possibly non-compliant) that would wrongly flag a function that no longer exists.
 const FUNCTION_DROP_RE = /drop\s+function(?:\s+if\s+exists)?\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(/g;
 
+function hasEmptySearchPath(header: string): boolean {
+  // Skip quoted values/identifiers so another option's value cannot masquerade
+  // as a SET clause. PostgreSQL applies the last setting for a given parameter.
+  const tokens = /(\$(?:[a-z_][a-z0-9_]*)?\$)[\s\S]*?\1|e'(?:\\[\s\S]|''|[^'\\])*'|'(?:''|[^'])*'|"(?:""|[^"])*"|\bset\s+(?:search_path\b|"search_path")/g;
+  let lastSettingEnd: number | undefined;
+  for (const token of header.matchAll(tokens)) {
+    if (token[0].startsWith("set ")) {
+      lastSettingEnd = token.index + token[0].length;
+    }
+  }
+  if (lastSettingEnd === undefined) return false;
+
+  // Match the entire empty value, followed by the end or another function
+  // option. A comma list, doubled quote or escaped nonempty string is unsafe.
+  return /^\s*(?:=|to\b)\s*''(?=$|\s+(?:language|transform|window|immutable|stable|volatile|not|leakproof|called|returns|strict|external|security|parallel|cost|rows|support|set|as)\b)/.test(
+    header.slice(lastSettingEnd)
+  );
+}
+
 // Every SECURITY DEFINER function in the schema must pin `SET search_path = ''`
 // (see CLAUDE.md's "Database function security" guardrail). Walks migrations in
 // filename order, replaying each migration's CREATE/DROP FUNCTION statements in
@@ -436,6 +461,7 @@ function checkSecurityDefinerSearchPaths(migrations: MigrationFile[]): string[] 
     ].sort((a, b) => a.index - b.index);
 
     for (const event of events) {
+      if (event.name === undefined) continue;
       if (event.kind === "create") {
         latestHeaders.set(event.name, extractHeader(sql, event.index));
       } else {
@@ -447,7 +473,7 @@ function checkSecurityDefinerSearchPaths(migrations: MigrationFile[]): string[] 
   for (const [functionName, header] of latestHeaders) {
     if (!header.includes("security definer")) continue;
 
-    if (!header.includes("set search_path = ''")) {
+    if (!hasEmptySearchPath(header)) {
       errors.push(
         `SECURITY DEFINER function public.${functionName} must use SET search_path = ''`
       );

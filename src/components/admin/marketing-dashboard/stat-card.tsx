@@ -20,18 +20,18 @@ export function StatCard({
     ? "text-red-500"
     : color
       ? statColorClasses[color]
-      : "text-[#2d2a26] dark:text-[#f5f3ee]";
+      : "text-admin-ink dark:text-admin-paper";
 
   return (
     <div>
-      <p className="font-mono text-xs tabular-nums text-[#a39e98]">{number}</p>
+      <p className="font-mono text-xs tabular-nums text-admin-subtle">{number}</p>
       <p className={cn(
         "mt-2 text-5xl font-extralight tabular-nums tracking-tighter",
         colorClass
       )}>
         {value.toLocaleString()}
       </p>
-      <p className="mt-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">{label}</p>
+      <p className="mt-2 font-mono text-xs uppercase tracking-widest text-admin-subtle">{label}</p>
     </div>
   );
 }

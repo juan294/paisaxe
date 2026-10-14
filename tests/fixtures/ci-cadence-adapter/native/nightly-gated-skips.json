@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "source": "CI nightly run 37721477388 attempt 1, merged coverage-blob-ci.shard-1..4, tested commit c268b9e8c0ef716cbdad5fdb8a4980ae347777a0",
+  "native": {
+    "numTotalTests": 9527,
+    "numPassedTests": 9323,
+    "numFailedTests": 0,
+    "numPendingTests": 204,
+    "numTodoTests": 0,
+    "numTotalTestSuites": 2388,
+    "numPassedTestSuites": 2388,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 0
+  },
+  "skippedGroups": [
+    {
+      "file": "scripts/booking/create-operator-link.test.ts",
+      "describe": "createOperatorAccess against live local Supabase",
+      "status": "skipped",
+      "cases": 1
+    },
+    {
+      "file": "src/app/api/feature-flags/route.postgrest-rls.test.ts",
+      "describe": "SE-H1/BE-M9: feature_flags anon PostgREST access (live local Supabase)",
+      "status": "skipped",
+      "cases": 4
+    },
+    {
+      "file": "src/app/api/webhooks/stripe/route.postgrest-integration.test.ts",
+      "describe": "QA-H4: grant_day_pass_idempotent guarantees against live local Supabase",
+      "status": "skipped",
+      "cases": 4
+    },
+    {
+      "file": "src/lib/booking/booking.postgrest-integration.test.ts",
+      "describe": "booking domain against live local Supabase",
+      "status": "skipped",
+      "cases": 50
+    },
+    {
+      "file": "src/lib/booking/cancel.postgrest-integration.test.ts",
+      "describe": "cancellation against live local Supabase",
+      "status": "skipped",
+      "cases": 15
+    },
+    {
+      "file": "src/lib/booking/capture.postgrest-integration.test.ts",
+      "describe": "deposit flow against live local Supabase",
+      "status": "skipped",
+      "cases": 28
+    },
+    {
+      "file": "src/lib/booking/invoice.postgrest-integration.test.ts",
+      "describe": "balance invoice against live local Supabase and the PayPal mock",
+      "status": "skipped",
+      "cases": 14
+    },
+    {
+      "file": "src/lib/booking/operator.postgrest-integration.test.ts",
+      "describe": "operator view against live local Supabase",
+      "status": "skipped",
+      "cases": 20
+    },
+    {
+      "file": "src/lib/booking/phone-confirmation.postgrest-integration.test.ts",
+      "describe": "phone confirmation against live local Supabase",
+      "status": "skipped",
+      "cases": 14
+    },
+    {
+      "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
+      "describe": "PayPal webhook inbox and reconciliation against live local Supabase",
+      "status": "skipped",
+      "cases": 31
+    },
+    {
+      "file": "src/lib/booking/tools.postgrest-integration.test.ts",
+      "describe": "booking tools against the fixture merchant",
+      "status": "skipped",
+      "cases": 2
+    },
+    {
+      "file": "src/lib/booking/vouchers.postgrest-integration.test.ts",
+      "describe": "vouchers against live local Supabase",
+      "status": "skipped",
+      "cases": 9
+    },
+    {
+      "file": "src/lib/definer-function-privileges.postgrest-rls.test.ts",
+      "describe": "SECURITY DEFINER function privileges (live local Supabase)",
+      "status": "skipped",
+      "cases": 2
+    },
+    {
+      "file": "src/lib/match-chunks.postgrest-rls.test.ts",
+      "describe": "match_chunks (live local Supabase)",
+      "status": "skipped",
+      "cases": 5
+    },
+    {
+      "file": "src/lib/proxy/maintenance.postgrest-integration.test.ts",
+      "describe": "SE-H1/BE-M9 regression: isMaintenanceModeEnabled() against live local Supabase",
+      "status": "skipped",
+      "cases": 2
+    },
+    {
+      "file": "src/lib/stories-rls.postgrest-rls.test.ts",
+      "describe": "SE-H2: stories anon PostgREST access (live local Supabase)",
+      "status": "skipped",
+      "cases": 3
+    }
+  ]
+}

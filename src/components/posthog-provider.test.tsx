@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import {
@@ -390,7 +391,7 @@ describe("PostHog production initialization (non-localhost)", () => {
     );
     await vi.waitFor(() => expect(mockInit).toHaveBeenCalled());
 
-    const beforeSend = mockInit.mock.calls[0][1].before_send as (event: unknown) => unknown;
+    const beforeSend = requiredValue(requiredValue(mockInit.mock.calls[0], "src/components/posthog-provider.test.tsx: mockInit.mock.calls[0]")[1], "src/components/posthog-provider.test.tsx: mockInit.mock.calls[0][1]").before_send as (event: unknown) => unknown;
     const capability = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
     const event = {
       event: "chat_message_sent",

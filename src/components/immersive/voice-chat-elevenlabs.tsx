@@ -1,5 +1,7 @@
 "use client";
 
+import { interpolate } from "@/lib/i18n/interpolate";
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import { Mic, MicOff, X, AlertCircle } from "lucide-react";
@@ -27,6 +29,7 @@ interface VoiceChatElevenLabsProps {
   story: Story;
   agentId: string;
   onFallbackToText: () => void;
+  onAccessDenied?: () => Promise<void>;
   userAccessToken?: string | null;
   /** FE-H4: a prompt-chip question captured before voice mode became active. */
   initialMessage?: string;
@@ -119,6 +122,7 @@ export function VoiceChatElevenLabs({
   story,
   agentId,
   onFallbackToText,
+  onAccessDenied,
   userAccessToken,
   initialMessage,
 }: VoiceChatElevenLabsProps) {
@@ -131,6 +135,7 @@ export function VoiceChatElevenLabs({
         story={story}
         agentId={agentId}
         onFallbackToText={onFallbackToText}
+        onAccessDenied={onAccessDenied}
         userAccessToken={userAccessToken}
         initialMessage={initialMessage}
       />
@@ -142,6 +147,7 @@ function VoiceChatElevenLabsContent({
   story,
   agentId,
   onFallbackToText,
+  onAccessDenied,
   userAccessToken,
   initialMessage,
 }: VoiceChatElevenLabsProps) {
@@ -165,7 +171,7 @@ function VoiceChatElevenLabsContent({
       setError(null);
       addMessage(
         "assistant",
-        t("voice.welcome_message").replace("{title}", localizedStory.title)
+        interpolate(t("voice.welcome_message"), { title: localizedStory.title })
       );
     },
     onDisconnect: () => {
@@ -261,6 +267,11 @@ function VoiceChatElevenLabsContent({
         },
         body: JSON.stringify({ agentKey: "pelayo" }),
       });
+      if (signedSessionResponse.status === 403 && onAccessDenied) {
+        await onAccessDenied();
+        onFallbackToText();
+        return;
+      }
       const signedSession = (await signedSessionResponse.json()) as {
         signedUrl?: unknown;
       };

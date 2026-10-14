@@ -1,3 +1,4 @@
+import { interpolate } from "@/lib/i18n/interpolate";
 /**
  * The booking conversation's tool loop (PayPal hackathon plan, Phase 3).
  *
@@ -210,8 +211,8 @@ export async function* streamBookingTurn(input: BookingTurnInput): AsyncGenerato
 
 /** The fixed post-accept line, in the visitor's language (Spanish when unknown). */
 function acceptedLine(locale: string | null | undefined, key: string, reference: string): string {
-  const translations = locale && Object.hasOwn(TRANSLATIONS, locale) ? TRANSLATIONS[locale] : es;
-  return resolveTranslation(key, translations).replace("{reference}", reference);
+  const translations = locale && Object.hasOwn(TRANSLATIONS, locale) ? TRANSLATIONS[locale] ?? es : es;
+  return interpolate(resolveTranslation(key, translations), { reference: reference });
 }
 
 /** The turn after "Accept offer": the payment order and its card, no model (#1003). */

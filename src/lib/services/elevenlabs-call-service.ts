@@ -1,4 +1,5 @@
 import "server-only";
+import { isTimeoutError } from "@/lib/is-timeout-error";
 import { ELEVENLABS_BOOKING_AGENT_ID } from "@/config/elevenlabs-owned-agents";
 import {
   ElevenLabsCredentialError,
@@ -182,11 +183,7 @@ export async function initiateCall(
     // AbortSignal.timeout) from a definitive ElevenLabs error.  On timeout we
     // do NOT know whether ElevenLabs accepted the call, so callers must leave
     // the pending_bookings row in 'initiating' for later reconciliation.
-    // We check .name directly (not just instanceof Error) because DOMException
-    // may not extend Error in all JS runtimes/environments.
-    const errorName = (error as { name?: string } | null)?.name;
-    const isTimeout =
-      errorName === "AbortError" || errorName === "TimeoutError";
+    const isTimeout = isTimeoutError(error);
 
     logElevenLabsFailure({
       source: "booking-call",

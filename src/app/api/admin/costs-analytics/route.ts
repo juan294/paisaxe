@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdminSession } from "@/lib/admin-auth";
 import { getEnv } from "@/lib/env";
+import { isTimeoutError } from "@/lib/is-timeout-error";
 import {
   fetchAnthropicCosts,
   fetchAnthropicCostsByDay,
@@ -49,148 +50,147 @@ function formatUsd(amount: number): string {
  * Aggregates costs from all platform services.
  */
 export async function GET(request: NextRequest) {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+  return withAdminSession(async () => {
 
-  try {
-    const url = new URL(request.url);
+    try {
+      const url = new URL(request.url);
 
-    // Default to current month
-    const now = new Date();
-    const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .split("T")[0];
-    const defaultTo = now.toISOString().split("T")[0];
+      // Default to current month
+      const now = new Date();
+      const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .replace(/T.*$/, "");
+      const defaultTo = now.toISOString().replace(/T.*$/, "");
 
-    const fromParam = url.searchParams.get("from") || defaultFrom;
-    const toParam = url.searchParams.get("to") || defaultTo;
+      const fromParam = url.searchParams.get("from") || defaultFrom;
+      const toParam = url.searchParams.get("to") || defaultTo;
 
-    // Fetch costs from all sources in parallel
-    const [anthropicCost, twilioCost, elevenLabsCost, manualCosts] =
-      await Promise.all([
-        fetchAnthropicCosts(fromParam, toParam),
-        fetchTwilioCosts(fromParam, toParam),
-        fetchElevenLabsCosts(fromParam, toParam),
-        fetchManualCosts(fromParam, toParam),
-      ]);
+      // Fetch costs from all sources in parallel
+      const [anthropicCost, twilioCost, elevenLabsCost, manualCosts] =
+        await Promise.all([
+          fetchAnthropicCosts(fromParam, toParam),
+          fetchTwilioCosts(fromParam, toParam),
+          fetchElevenLabsCosts(fromParam, toParam),
+          fetchManualCosts(fromParam, toParam),
+        ]);
 
-    // Collect all service costs
-    const services: ServiceCost[] = [];
+      // Collect all service costs
+      const services: ServiceCost[] = [];
 
-    if (anthropicCost) {
-      services.push(anthropicCost);
-    }
-
-    if (twilioCost) {
-      services.push(twilioCost);
-    }
-
-    if (elevenLabsCost) {
-      services.push(elevenLabsCost);
-    }
-
-    // Add manual costs, deduplicating by service ID if API data exists
-    const apiServiceIds = new Set(services.map((s) => s.serviceId));
-    for (const manualCost of manualCosts) {
-      if (!apiServiceIds.has(manualCost.serviceId)) {
-        services.push(manualCost);
+      if (anthropicCost) {
+        services.push(anthropicCost);
       }
-    }
 
-    // Add recurring costs for services not already covered by API or manual
-    const coveredServiceIds = new Set(services.map((s) => s.serviceId));
-    const recurringCosts = generateRecurringCosts(fromParam, toParam);
-    for (const recurringCost of recurringCosts) {
-      if (!coveredServiceIds.has(recurringCost.serviceId)) {
-        services.push(recurringCost);
+      if (twilioCost) {
+        services.push(twilioCost);
       }
+
+      if (elevenLabsCost) {
+        services.push(elevenLabsCost);
+      }
+
+      // Add manual costs, deduplicating by service ID if API data exists
+      const apiServiceIds = new Set(services.map((s) => s.serviceId));
+      for (const manualCost of manualCosts) {
+        if (!apiServiceIds.has(manualCost.serviceId)) {
+          services.push(manualCost);
+        }
+      }
+
+      // Add recurring costs for services not already covered by API or manual
+      const coveredServiceIds = new Set(services.map((s) => s.serviceId));
+      const recurringCosts = generateRecurringCosts(fromParam, toParam);
+      for (const recurringCost of recurringCosts) {
+        if (!coveredServiceIds.has(recurringCost.serviceId)) {
+          services.push(recurringCost);
+        }
+      }
+
+      // Sort by cost descending
+      services.sort((a, b) => b.costUsd - a.costUsd);
+
+      // Calculate totals
+      const totalMonthlyUsd = services.reduce((sum, s) => sum + s.costUsd, 0);
+      const automatedServices = services.filter((s) => s.source === "api").length;
+
+      // Fetch daily costs from services that support it
+      const dailyCosts = await fetchAnthropicCostsByDay(fromParam, toParam);
+
+      // Build costs by day map
+      const costsByDayMap = new Map<string, number>();
+
+      // Initialize all days in range
+      const startDate = new Date(fromParam);
+      const endDate = new Date(toParam);
+      for (
+        let d = new Date(startDate);
+        d <= endDate;
+        d.setDate(d.getDate() + 1)
+      ) {
+        const dateKey = d.toISOString().replace(/T.*$/, "");
+        costsByDayMap.set(dateKey, 0);
+      }
+
+      // Add Anthropic daily costs (primary source of daily data)
+      for (const day of dailyCosts) {
+        const existing = costsByDayMap.get(day.date) || 0;
+        costsByDayMap.set(day.date, existing + day.costUsd);
+      }
+
+      const costsByDay: CostsByDay[] = Array.from(costsByDayMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, costUsd]) => ({
+          date,
+          costUsd,
+        }));
+
+      // Calculate 30-day costs
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDayUsd = costsByDay
+        .filter((d) => new Date(d.date) >= thirtyDaysAgo)
+        .reduce((sum, d) => sum + d.costUsd, 0);
+
+      const summary: CostsAnalyticsSummary = {
+        totalMonthlyUsd,
+        totalMonthlyFormatted: formatUsd(totalMonthlyUsd),
+        thirtyDayUsd,
+        thirtyDayFormatted: formatUsd(thirtyDayUsd),
+        servicesTracked: services.length,
+        automatedServices,
+      };
+
+      // Optionally fetch usage metrics for forecast
+      let usageMetrics: UsageMetrics | undefined;
+      if (url.searchParams.get("includeUsage") === "true") {
+        usageMetrics = await fetchUsageMetrics(fromParam, toParam);
+      }
+
+      const data: CostsAnalyticsDashboardData = {
+        summary,
+        services,
+        costsByDay,
+        dateRange: {
+          from: fromParam,
+          to: toParam,
+        },
+        usageMetrics,
+      };
+
+      return NextResponse.json({ data }, {
+        headers: {
+          "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
+        },
+      });
+    } catch (error) {
+      logger.error("[COSTS_ANALYTICS_GET_UNHANDLED_ERROR]", { error });
+      return NextResponse.json(
+        { error: "Failed to fetch costs data" },
+        { status: 500 }
+      );
     }
 
-    // Sort by cost descending
-    services.sort((a, b) => b.costUsd - a.costUsd);
-
-    // Calculate totals
-    const totalMonthlyUsd = services.reduce((sum, s) => sum + s.costUsd, 0);
-    const automatedServices = services.filter((s) => s.source === "api").length;
-
-    // Fetch daily costs from services that support it
-    const dailyCosts = await fetchAnthropicCostsByDay(fromParam, toParam);
-
-    // Build costs by day map
-    const costsByDayMap = new Map<string, number>();
-
-    // Initialize all days in range
-    const startDate = new Date(fromParam);
-    const endDate = new Date(toParam);
-    for (
-      let d = new Date(startDate);
-      d <= endDate;
-      d.setDate(d.getDate() + 1)
-    ) {
-      const dateKey = d.toISOString().split("T")[0];
-      costsByDayMap.set(dateKey, 0);
-    }
-
-    // Add Anthropic daily costs (primary source of daily data)
-    for (const day of dailyCosts) {
-      const existing = costsByDayMap.get(day.date) || 0;
-      costsByDayMap.set(day.date, existing + day.costUsd);
-    }
-
-    const costsByDay: CostsByDay[] = Array.from(costsByDayMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, costUsd]) => ({
-        date,
-        costUsd,
-      }));
-
-    // Calculate 30-day costs
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDayUsd = costsByDay
-      .filter((d) => new Date(d.date) >= thirtyDaysAgo)
-      .reduce((sum, d) => sum + d.costUsd, 0);
-
-    const summary: CostsAnalyticsSummary = {
-      totalMonthlyUsd,
-      totalMonthlyFormatted: formatUsd(totalMonthlyUsd),
-      thirtyDayUsd,
-      thirtyDayFormatted: formatUsd(thirtyDayUsd),
-      servicesTracked: services.length,
-      automatedServices,
-    };
-
-    // Optionally fetch usage metrics for forecast
-    let usageMetrics: UsageMetrics | undefined;
-    if (url.searchParams.get("includeUsage") === "true") {
-      usageMetrics = await fetchUsageMetrics(fromParam, toParam);
-    }
-
-    const data: CostsAnalyticsDashboardData = {
-      summary,
-      services,
-      costsByDay,
-      dateRange: {
-        from: fromParam,
-        to: toParam,
-      },
-      usageMetrics,
-    };
-
-    return NextResponse.json({ data }, {
-      headers: {
-        "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
-      },
-    });
-  } catch (error) {
-    logger.error("[COSTS_ANALYTICS_GET_UNHANDLED_ERROR]", { error });
-    return NextResponse.json(
-      { error: "Failed to fetch costs data" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }
 
 /**
@@ -378,10 +378,7 @@ async function fetchUsageMetrics(
         // emitted by AbortSignal.timeout) from a definitive ElevenLabs
         // error, since this call already degrades to partial data — a
         // hung upstream should be visible separately from a real failure.
-        // We check .name directly (not just instanceof Error) because
-        // DOMException may not extend Error in all JS runtimes/environments.
-        const errorName = (error as { name?: string } | null)?.name;
-        const isTimeout = errorName === "AbortError" || errorName === "TimeoutError";
+        const isTimeout = isTimeoutError(error);
 
         logElevenLabsFailure({
           source: "costs-usage-analytics",
@@ -411,44 +408,43 @@ async function fetchUsageMetrics(
  * Creates a new manual cost entry.
  */
 export async function POST(request: NextRequest) {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+  return withAdminSession(async ({ userId }) => {
 
-  try {
-    const body: CreateManualCostRequest = await request.json();
+    try {
+      const body: CreateManualCostRequest = await request.json();
 
-    // Validate required fields
-    if (
-      !body.serviceId ||
-      !body.serviceName ||
-      !body.category ||
-      body.costUsd === undefined ||
-      !body.billingPeriodStart ||
-      !body.billingPeriodEnd
-    ) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
+      // Validate required fields
+      if (
+        !body.serviceId ||
+        !body.serviceName ||
+        !body.category ||
+        body.costUsd === undefined ||
+        !body.billingPeriodStart ||
+        !body.billingPeriodEnd
+      ) {
+        return NextResponse.json(
+          { error: "Missing required fields" },
+          { status: 400 }
+        );
+      }
 
-    const entry = await createManualCost(body, auth.userId);
+      const entry = await createManualCost(body, userId);
 
-    if (!entry) {
+      if (!entry) {
+        return NextResponse.json(
+          { error: "Failed to create cost entry" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ data: entry });
+    } catch (error) {
+      logger.error("[COSTS_ANALYTICS_CREATE_MANUAL_COST_FAILED]", { error });
       return NextResponse.json(
         { error: "Failed to create cost entry" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ data: entry });
-  } catch (error) {
-    logger.error("[COSTS_ANALYTICS_CREATE_MANUAL_COST_FAILED]", { error });
-    return NextResponse.json(
-      { error: "Failed to create cost entry" },
-      { status: 500 }
-    );
-  }
+  }, request);
 }

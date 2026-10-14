@@ -1,9 +1,12 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { request as httpRequest } from "node:http";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { assertTestsExecuted } from "./lib/playwright-report";
+import { isMain } from "./lib/is-main";
+import { assertLocalDatastore } from "./release/probe-guards";
+import { validateManifest, validateKeys, inspectStack, localDockerEnvironment, dockerSql, schemaDigest, migrationInventory } from "./run-contracts.mjs";
 
 const REQUIRED_ENV_KEYS = [
   "STRIPE_TEST_SECRET_KEY",
@@ -101,7 +104,46 @@ function readReport(path: string) {
   }
 }
 
+/** Cheap fail-closed guard also used by direct Playwright project invocation. */
+export function assertStripeLocalInputs(env: NodeJS.ProcessEnv = process.env) {
+  if (!/^(?:sk_test_|rk_test_)[A-Za-z0-9]+$/.test(env.STRIPE_TEST_SECRET_KEY ?? "") ||
+      !/^pk_test_[A-Za-z0-9]+$/.test(env.NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY ?? "")) {
+    throw new Error("Stripe integration requires test-mode credentials (sk_test_/rk_test_ and pk_test_)");
+  }
+  assertLocalDatastore(env.NEXT_PUBLIC_SUPABASE_URL);
+  const task = env.CONTRACT_STACK_DIR;
+  if (!task) throw new Error("Stripe integration requires an owned local CONTRACT_STACK_DIR");
+  const manifest = validateManifest(JSON.parse(readFileSync(join(task, "contracts-stack.json"), "utf8")), task);
+  if (env.NEXT_PUBLIC_SUPABASE_URL !== manifest.apiUrl) throw new Error("Stripe integration requires the exact owned local API endpoint");
+  const fixture = JSON.parse(readFileSync(join(task, "stripe-qa.json"), "utf8"));
+  if (fixture.project !== manifest.projectId || fixture.nonce !== manifest.nonce ||
+      !/^qa-test-[a-z0-9]+@paisaxe\.dev$/.test(fixture.email) ||
+      !fixture.password || fixture.email !== env.QA_TEST_USER_EMAIL || fixture.password !== env.QA_TEST_USER_PASSWORD) {
+    throw new Error("Stripe integration requires the owned local QA fixture");
+  }
+  return manifest;
+}
+
+async function verifyStripeLocalStack() {
+  const manifest = assertStripeLocalInputs();
+  const env = { ...localDockerEnvironment(), NODE_ENV: process.env.NODE_ENV ?? "test" };
+  await inspectStack(manifest, env);
+  if (migrationInventory(process.cwd()).digest !== manifest.migrationDigest ||
+      schemaDigest(manifest.projectId, env) !== manifest.schemaDigest ||
+      dockerSql(manifest.projectId, "SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database();", env) !==
+        `paisaxe-contracts:${manifest.nonce}:${manifest.migrationDigest}`) {
+    throw new Error("Stripe integration owned local database identity mismatch");
+  }
+  const status = JSON.parse(execFileSync("supabase", ["status", "--workdir", manifest.taskDir, "--output", "json"],
+    { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 }));
+  const keys = validateKeys(status, manifest);
+  if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== keys.anon || process.env.SUPABASE_SERVICE_KEY !== keys.service) {
+    throw new Error("Stripe integration requires the owned local Supabase credentials");
+  }
+}
+
 async function main() {
+  await verifyStripeLocalStack();
   for (const key of REQUIRED_ENV_KEYS) {
     getEnv(key);
   }
@@ -168,7 +210,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+if (isMain(import.meta.url)) main().catch((error) => {
   console.error("[stripe-e2e] Failed:", error);
   process.exit(1);
 });

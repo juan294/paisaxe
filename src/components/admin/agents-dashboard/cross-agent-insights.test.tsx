@@ -1,3 +1,4 @@
+import { requiredValue } from "@/test/required-value";
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -79,7 +80,7 @@ describe("CrossAgentInsights", () => {
     const user = userEvent.setup();
     render(<CrossAgentInsights entries={mockEntries} />);
 
-    await user.click(screen.getAllByText("Security Agent")[0]);
+    await user.click(requiredValue(screen.getAllByText("Security Agent")[0], "src/components/admin/agents-dashboard/cross-agent-insights.test.tsx: screen.getAllByText(\"Security Agent\")[0]"));
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
   });
 });

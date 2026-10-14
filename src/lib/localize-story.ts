@@ -1,5 +1,41 @@
-import type { Story, StoryLocale, StoryMetadata } from '@/types/immersive';
+import type { Story, StoryLocale, StoryMetadata, StoryTranslation } from '@/types/immersive';
 import type { Locale } from '@/lib/i18n';
+
+export interface StoryTranslationSource {
+  title: string;
+  subtitle: string;
+  description: string;
+  question_prompts?: string[];
+}
+
+/** Empty optional source fields do not require invented translated content. */
+export function hasCompleteStoryText(source: StoryTranslationSource, translation: StoryTranslation | undefined): boolean {
+  if (!translation) return false;
+  return (['title', 'subtitle', 'description'] as const).every(field => {
+    const value = translation[field];
+    const required = field === 'title' || source[field].trim().length > 0;
+    return typeof value === 'string' && (!required || value.trim().length > 0);
+  });
+}
+
+/** Structural coverage only; semantic accuracy and question order need review. */
+export function hasCompleteStoryPrompts(source: StoryTranslationSource, translation: StoryTranslation | undefined): boolean {
+  const sourcePrompts = source.question_prompts ?? [];
+  if (!Array.isArray(sourcePrompts) || sourcePrompts.some(prompt => typeof prompt !== 'string' || !prompt.trim())) return false;
+  const prompts = translation?.question_prompts;
+  // Older entries without questions remain valid only for an empty source.
+  if (prompts === undefined) return sourcePrompts.length === 0;
+  return Array.isArray(prompts) && prompts.length === sourcePrompts.length &&
+    prompts.every(prompt => typeof prompt === 'string' && prompt.trim().length > 0);
+}
+
+export function hasCompleteStoryTranslation(source: StoryTranslationSource, translation: StoryTranslation | undefined): boolean {
+  return hasCompleteStoryText(source, translation) && hasCompleteStoryPrompts(source, translation);
+}
+
+function translatedOrFallback(value: string | undefined, fallback: string): string {
+  return typeof value === 'string' && value.trim() ? value : fallback;
+}
 
 /**
  * Get localized story text based on the current locale.
@@ -27,9 +63,9 @@ export function getLocalizedStory(
 
   if (translation) {
     return {
-      title: translation.title || story.title,
-      subtitle: translation.subtitle || story.subtitle,
-      description: translation.description || story.description,
+      title: translatedOrFallback(translation.title, story.title),
+      subtitle: translatedOrFallback(translation.subtitle, story.subtitle),
+      description: translatedOrFallback(translation.description, story.description),
     };
   }
 
@@ -47,7 +83,7 @@ export function getLocalizedStory(
 export function hasTranslation(story: Story, locale: Locale): boolean {
   if (locale === 'es') return true;
   const translation = story.metadata?.translations?.[locale as StoryLocale];
-  return !!(translation?.title && translation?.subtitle && translation?.description);
+  return hasCompleteStoryTranslation({ ...story, question_prompts: story.metadata?.question_prompts }, translation);
 }
 
 /**

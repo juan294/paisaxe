@@ -1,3 +1,4 @@
+import { requiredValue } from "../src/test/required-value";
 import { describe, it, expect } from "vitest";
 import { isSectionHeader, chunkText } from "./process-pdfs";
 import type { ExtractedChunk } from "./process-pdfs";
@@ -54,8 +55,8 @@ describe("chunkText", () => {
     const body = "Los Lagos de Covadonga son dos lagos de origen glaciar en los Picos de Europa. Forman parte del Parque Nacional de los Picos de Europa y son un destino turístico muy popular.";
     const chunks = chunkText(body, FILENAME);
     expect(chunks).toHaveLength(1);
-    expect(chunks[0].sourcePdf).toBe(FILENAME);
-    expect(chunks[0].content).toContain("Lagos de Covadonga");
+    expect(requiredValue(chunks[0], "first PDF chunk").sourcePdf).toBe(FILENAME);
+    expect(requiredValue(chunks[0], "first PDF chunk").content).toContain("Lagos de Covadonga");
   });
 
   it("assigns sectionTitle when a header precedes body text", () => {
@@ -67,7 +68,7 @@ describe("chunkText", () => {
 
     const chunks = chunkText(text, FILENAME);
     expect(chunks.length).toBeGreaterThanOrEqual(1);
-    expect(chunks[0].sectionTitle).toBe("NATURALEZA");
+    expect(requiredValue(chunks[0], "first PDF chunk").sectionTitle).toBe("NATURALEZA");
   });
 
   it("creates multiple chunks when content accumulates across sections to exceed maxChunkLength", () => {
@@ -125,7 +126,7 @@ describe("chunkText", () => {
     const text = "Short.\n\nAlso short.\n\nEste párrafo es lo suficientemente largo como para superar el umbral mínimo de cincuenta caracteres.";
     const chunks = chunkText(text, FILENAME);
     expect(chunks).toHaveLength(1);
-    expect(chunks[0].content).toContain("suficientemente largo");
+    expect(requiredValue(chunks[0], "first PDF chunk").content).toContain("suficientemente largo");
   });
 
   it("does not include the header text in the chunk content", () => {
@@ -136,8 +137,8 @@ describe("chunkText", () => {
     ].join("\n");
 
     const chunks = chunkText(text, FILENAME);
-    expect(chunks[0].content).not.toContain("GASTRONOMÍA");
-    expect(chunks[0].sectionTitle).toBe("GASTRONOMÍA");
+    expect(requiredValue(chunks[0], "first PDF chunk").content).not.toContain("GASTRONOMÍA");
+    expect(requiredValue(chunks[0], "first PDF chunk").sectionTitle).toBe("GASTRONOMÍA");
   });
 
   it("flushes remaining content at end of text even without trailing newlines", () => {

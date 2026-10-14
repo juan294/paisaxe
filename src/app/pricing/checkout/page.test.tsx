@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import CheckoutPage from "./page";
+import { es } from "@/lib/i18n/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 import { Suspense, type ReactElement } from "react";
 
 // --- Mocks ---
@@ -48,7 +50,7 @@ vi.mock("@/hooks/use-auth", () => ({
 
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string) => key === "common.rateLimited" || key === "common.retry" ? resolveTranslation(key, es) : key,
   }),
 }));
 
@@ -81,6 +83,13 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 describe("CheckoutPage", () => {
+  it('shows bounded verification loading before treating a seeded user as signed out', () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'verified', email: 'verified@example.test' }, session: null, signInWithGoogle: mockSignInWithGoogle, isLoading: true });
+    render(<CheckoutPage />);
+    expect(screen.getByRole('status')).toHaveTextContent('common.loading');
+    expect(screen.queryByText('premium.sign_in_to_purchase')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('embedded-checkout-provider')).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     capturedFetchClientSecret = null;
@@ -281,6 +290,23 @@ describe("CheckoutPage", () => {
 
       const checkoutContainer = document.querySelector("#checkout");
       expect(checkoutContainer).toBeInTheDocument();
+    });
+
+    it("budget fixture: initial secret and two user retries emit three checkout requests", async () => {
+      render(<CheckoutPage />);
+      for (let i = 0; i < 3; i++) await act(async () => { await capturedFetchClientSecret!(); });
+      expect(mockFetch.mock.calls.filter(([url]) => url === "/api/checkout/embedded")).toHaveLength(3);
+    });
+
+    it("429 shows retry timing and its retry remount allows a successful checkout", async () => {
+      render(<CheckoutPage />);
+      mockFetch.mockResolvedValueOnce(Response.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": "19" } }));
+      await act(async () => { await expect(capturedFetchClientSecret!()).rejects.toThrow(); });
+      expect(screen.getByRole("alert")).toHaveTextContent("19 segundos");
+      fireEvent.click(screen.getByRole("button", { name: "Volver a intentar" }));
+      mockFetch.mockResolvedValueOnce(Response.json({ clientSecret: "recovered-secret" }));
+      await act(async () => { expect(await capturedFetchClientSecret!()).toBe("recovered-secret"); });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("should call /api/checkout/embedded and return client secret on success", async () => {
