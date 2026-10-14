@@ -8,11 +8,15 @@ import { fileURLToPath } from 'node:url';
 import { migrationInventory } from './run-contracts.mjs';
 import { randomUUID } from 'node:crypto';
 import {
-  POLICY, acquireConsumerLease, createLifecycleReceipt, disposeOwned, finishReusable, inspectOwnership, lifecycleRoot,
+  POLICY, UNKNOWN_PROCESS, acquireConsumerLease, isAlive, processIdentity, createLifecycleReceipt, disposeOwned, finishReusable, inspectOwnership, lifecycleRoot,
   readReceipt, recordInventory, releaseConsumerLease, runOneShot, setRecoveryHold, sweepOwnedStacks, updateReceipt,
 } from './contract-stack-lifecycle.mjs';
 
 const DAY = 86400000;
+// Sweeps prune aged runner detail directories; tests must never scan the real temporary directory.
+const ISOLATED_TMP = realpathSync(mkdtempSync(join(tmpdir(), 'contract-lifecycle-isolated-tmp-')));
+process.on('exit', () => rmSync(ISOLATED_TMP, { recursive: true, force: true }));
+const sweep = (options) => sweepOwnedStacks({ tmpRoot: ISOLATED_TMP, ...options });
 const T0 = new Date('2026-10-14T12:00:00.000Z');
 const at = (ms) => new Date(T0.getTime() + ms);
 const hex = (c) => c.repeat(64);
@@ -39,7 +43,8 @@ function fakeDocker({ daemonId = 'daemon-a' } = {}) {
     if (a === 'network' && b === 'inspect') {
       const net = state.networks.get(c) || [...state.networks.values()].find((n) => n.Name === c);
       if (!net) throw noSuch('network');
-      const Containers = Object.fromEntries([...state.containers.values()].filter((x) => Object.keys(x.NetworkSettings.Networks).includes(net.Name)).map((x) => [x.Id, { Name: x.Name.slice(1) }]));
+      // Like Docker, network inspect lists endpoints of running containers only.
+      const Containers = Object.fromEntries([...state.containers.values()].filter((x) => x.State.Running && Object.keys(x.NetworkSettings.Networks).includes(net.Name)).map((x) => [x.Id, { Name: x.Name.slice(1) }]));
       return JSON.stringify([{ ...net, Containers }]);
     }
     if (a === 'network' && b === 'ls') return [...state.networks.values()].filter((n) => n.Name.includes(filterValue(args, 'name'))).map((n) => `${n.Id} ${n.Name}`).join('\n');
@@ -52,7 +57,9 @@ function fakeDocker({ daemonId = 'daemon-a' } = {}) {
       const filter = args[args.indexOf('--filter') + 1];
       const all = [...state.containers.values()];
       const hits = filter.startsWith('label=com.supabase.cli.project=') ? all.filter((x) => x.Config.Labels['com.supabase.cli.project'] === filterValue(args, 'label=com.supabase.cli.project'))
-        : filter.startsWith('volume=') ? all.filter((x) => x.Mounts.some((m) => m.Name === filterValue(args, 'volume'))) : assert.fail('unexpected ps filter ' + filter);
+        : filter.startsWith('volume=') ? all.filter((x) => x.Mounts.some((m) => m.Name === filterValue(args, 'volume')))
+        : filter.startsWith('network=') ? all.filter((x) => { const ref = filterValue(args, 'network'); const net = state.networks.get(ref) || [...state.networks.values()].find((n) => n.Name === ref); return Boolean(net) && Object.keys(x.NetworkSettings.Networks).includes(net.Name); })
+        : assert.fail('unexpected ps filter ' + filter);
       return hits.map((x) => x.Id).join('\n');
     }
     if (a === 'container' && b === 'inspect') {
@@ -156,7 +163,7 @@ test('successful disposable disposal removes only owned containers, network and 
   assert.ok(fake.state.calls.every((args) => !args.includes('-v') && !args.includes('-f') && !args.includes('--force') && args[1] !== 'prune'));
 });
 
-for (const scenario of ['wrong nonce', 'remote/changed daemon', 'new network consumer', 'foreign volume consumer', 'unrecorded project container', 'same-name replacement', 'replaced volume', 'missing proof']) {
+for (const scenario of ['wrong nonce', 'remote/changed daemon', 'new network consumer', 'stopped network consumer', 'foreign volume consumer', 'unrecorded project container', 'same-name replacement', 'replaced volume', 'missing proof']) {
   test('disposal refuses with zero mutations: ' + scenario, async (t) => {
     const fake = fakeDocker(); unrelated(fake);
     const { root, project, networkId } = preparedTask(t, fake);
@@ -164,6 +171,7 @@ for (const scenario of ['wrong nonce', 'remote/changed daemon', 'new network con
     if (scenario === 'wrong nonce') fake.state.networks.get(networkId).Labels['com.paisaxe.contracts.nonce'] = randomUUID();
     if (scenario === 'remote/changed daemon') fake.state.daemonId = 'daemon-b';
     if (scenario === 'new network consumer') fake.addContainer(hex('3'), 'intruder', null, project);
+    if (scenario === 'stopped network consumer') fake.addContainer(hex('2'), 'stopped-intruder', null, project, { running: false });
     if (scenario === 'foreign volume consumer') fake.addContainer(hex('4'), 'reader', null, 'bridge', { mounts: [`supabase_db_${project}`] });
     if (scenario === 'unrecorded project container') fake.addContainer(hex('5'), `supabase_rest_${project}`, project, project);
     if (scenario === 'same-name replacement') { fake.state.containers.delete(ownedDb.Id); fake.addContainer(hex('6'), ownedDb.Name.slice(1), null, 'bridge'); }
@@ -192,7 +200,7 @@ test('interrupted disposal persists outcomes and the scheduled sweep resumes it 
   assert.equal(interrupted.state, 'disposing');
   assert.ok(Object.values(interrupted.disposal.outcomes).filter((v) => v === 'removed').length >= 2, 'container removals recorded');
   assert.equal(fake.state.containers.size, 1);
-  const report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(2000), processProbe: probe(new Set()) });
+  const report = await sweep({ root, docker: fake.docker, now: at(2000), processProbe: probe(new Set()) });
   assert.equal(report.tasks.find((x) => x.projectId === project).action, 'disposed');
   assert.equal(readReceipt(root, project), null);
   assert.equal([...fake.state.containers.keys()].join(), hex('f'));
@@ -262,10 +270,10 @@ test('consumer leases block disposal while live, dead leases are released by the
   const lease = acquireConsumerLease(root, project, 'paid-voice', { owner: { pid: 777, startedAt: ALIVE }, now: T0 });
   assert.equal(readReceipt(root, project).leases.length, 1);
   await assert.rejects(disposeOwned(root, project, { docker: fake.docker, now: at(8 * DAY), processProbe: probe(new Set([777])) }), /live consumer lease/);
-  let report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(8 * DAY), processProbe: probe(new Set([777])) });
+  let report = await sweep({ root, docker: fake.docker, now: at(8 * DAY), processProbe: probe(new Set([777])) });
   assert.equal(report.tasks[0].action, 'preserve'); assert.match(report.tasks[0].reason, /live consumer lease/);
   assert.equal(fake.state.containers.size, 2);
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(8 * DAY), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(8 * DAY), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].releasedDeadLeases, 1); assert.equal(report.tasks[0].action, 'disposed');
   assert.equal(fake.state.containers.size, 0);
   assert.doesNotThrow(() => releaseConsumerLease(root, lease), 'release after disposal is idempotent');
@@ -282,10 +290,10 @@ test('recovery hold blocks expiry until released', async (t) => {
   const { root, project } = preparedTask(t, fake);
   updateReceipt(root, project, (r) => { r.state = 'failed'; r.retainUntil = at(POLICY.failedRetentionMs).toISOString(); }, T0);
   setRecoveryHold(root, project, 'investigating migration 140', at(1));
-  let report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(30 * DAY), processProbe: probe(new Set()) });
+  let report = await sweep({ root, docker: fake.docker, now: at(30 * DAY), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'preserve'); assert.match(report.tasks[0].reason, /recovery hold/);
   setRecoveryHold(root, project, null, at(2));
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(30 * DAY), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(30 * DAY), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'disposed');
 });
 
@@ -293,16 +301,16 @@ test('failed disposable task is preserved for exactly seven days, then removed; 
   const fake = fakeDocker(); unrelated(fake);
   const { root, project } = preparedTask(t, fake);
   updateReceipt(root, project, (r) => { r.state = 'failed'; r.failedAt = T0.toISOString(); r.retainUntil = at(POLICY.failedRetentionMs).toISOString(); }, T0);
-  let report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(POLICY.failedRetentionMs - 1), processProbe: probe(new Set()) });
+  let report = await sweep({ root, docker: fake.docker, now: at(POLICY.failedRetentionMs - 1), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'preserve'); assert.equal(fake.state.containers.size, 3);
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(POLICY.failedRetentionMs), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(POLICY.failedRetentionMs), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'disposed'); assert.equal(fake.state.containers.size, 1);
   const terminal = join(root, 'terminal', project + '.json');
   assert.equal(JSON.parse(readFileSync(terminal, 'utf8')).priorState, 'failed');
   const disposedAt = at(POLICY.failedRetentionMs).getTime() - T0.getTime();
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(disposedAt + POLICY.terminalRetentionMs - 1), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(disposedAt + POLICY.terminalRetentionMs - 1), processProbe: probe(new Set()) });
   assert.equal(existsSync(terminal), true);
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(disposedAt + POLICY.terminalRetentionMs), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(disposedAt + POLICY.terminalRetentionMs), processProbe: probe(new Set()) });
   assert.deepEqual(report.prunedTerminal, [project]); assert.equal(existsSync(terminal), false);
   assert.ok(existsSync(join(root, 'sweep-latest.json')), 'latest sweep receipt written');
 });
@@ -311,16 +319,16 @@ test('interrupted task with a dead owner becomes abandoned after 24 hours and ex
   const fake = fakeDocker();
   const { root, project } = preparedTask(t, fake);
   updateReceipt(root, project, (r) => { r.state = 'running'; }, T0);
-  let report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs - 1), processProbe: probe(new Set()) });
+  let report = await sweep({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs - 1), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'preserve'); assert.equal(readReceipt(root, project).state, 'running');
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'abandoned');
   const abandoned = readReceipt(root, project);
   assert.equal(abandoned.state, 'abandoned'); assert.equal(abandoned.retainUntil, at(POLICY.abandonAfterMs + POLICY.failedRetentionMs).toISOString());
   assert.equal(JSON.parse(readFileSync(join(root, 'terminal', project + '.json'), 'utf8')).terminalState, 'abandoned');
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs + POLICY.failedRetentionMs - 1), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs + POLICY.failedRetentionMs - 1), processProbe: probe(new Set()) });
   assert.equal(fake.state.containers.size, 2);
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs + POLICY.failedRetentionMs), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs + POLICY.failedRetentionMs), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'disposed'); assert.equal(fake.state.containers.size, 0);
 });
 
@@ -328,16 +336,16 @@ test('live owner keeps an in-progress task regardless of age', async (t) => {
   const fake = fakeDocker();
   const { root, project } = preparedTask(t, fake, { owner: { pid: 5, startedAt: ALIVE } });
   updateReceipt(root, project, (r) => { r.state = 'running'; }, T0);
-  const report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(60 * DAY), processProbe: probe(new Set([5])) });
+  const report = await sweep({ root, docker: fake.docker, now: at(60 * DAY), processProbe: probe(new Set([5])) });
   assert.equal(report.tasks[0].action, 'live'); assert.equal(fake.state.containers.size, 2);
 });
 
 test('reusable stacks never expire automatically; idle reminder is visible; explicit finish enables disposal', async (t) => {
   const fake = fakeDocker();
   const { root, project } = preparedTask(t, fake, { disposable: false });
-  let report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(POLICY.idleReminderMs - 1), processProbe: probe(new Set()) });
+  let report = await sweep({ root, docker: fake.docker, now: at(POLICY.idleReminderMs - 1), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'live');
-  report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(365 * DAY), processProbe: probe(new Set()) });
+  report = await sweep({ root, docker: fake.docker, now: at(365 * DAY), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'reminder'); assert.match(report.tasks[0].reason, /contracts:finish -- paisaxe-contracts-0123456789ab/);
   assert.equal(fake.state.containers.size, 2);
   await assert.rejects(disposeOwned(root, project, { docker: fake.docker, now: at(1), processProbe: probe(new Set()) }), /explicit finish/);
@@ -364,7 +372,7 @@ test('unreadable or proofless receipts stay unknown and inventory-only', async (
   const { root, project } = preparedTask(t, fake);
   updateReceipt(root, project, (r) => { delete r.nonce; r.state = 'failed'; r.retainUntil = T0.toISOString(); }, T0);
   writeFileSync(join(root, 'tasks', 'paisaxe-contracts-ffffffffffff.json'), '{not json');
-  const report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(30 * DAY), processProbe: probe(new Set()) });
+  const report = await sweep({ root, docker: fake.docker, now: at(30 * DAY), processProbe: probe(new Set()) });
   assert.deepEqual(report.tasks.map((x) => x.action).sort(), ['inventory-only', 'inventory-only']);
   assert.equal(fake.state.containers.size, 2);
 });
@@ -374,7 +382,7 @@ test('dry-run sweep reports decisions without mutating receipts or Docker', asyn
   const { root, project } = preparedTask(t, fake);
   updateReceipt(root, project, (r) => { r.state = 'failed'; r.retainUntil = T0.toISOString(); }, T0);
   const before = readFileSync(join(root, 'tasks', project + '.json'), 'utf8');
-  const report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(DAY), processProbe: probe(new Set()), dryRun: true });
+  const report = await sweep({ root, docker: fake.docker, now: at(DAY), processProbe: probe(new Set()), dryRun: true });
   assert.equal(report.tasks[0].action, 'would-dispose');
   assert.equal(readFileSync(join(root, 'tasks', project + '.json'), 'utf8'), before); assert.equal(fake.state.containers.size, 2);
 });
@@ -441,7 +449,7 @@ test('one-shot cleanup failure cannot report success even when contracts passed'
   const result = await runOneShot(h.options);
   assert.equal(result.contracts, 'passed'); assert.equal(result.cleanup, 'failed'); assert.equal(result.ok, false);
   assert.equal(readReceipt(h.root, result.projectId).state, 'disposing', 'interrupted disposal stays resumable');
-  const report = await sweepOwnedStacks({ root: h.root, docker: h.fake.docker, now: at(2000), processProbe: probe(new Set()) });
+  const report = await sweep({ root: h.root, docker: h.fake.docker, now: at(2000), processProbe: probe(new Set()) });
   assert.equal(report.tasks[0].action, 'disposed'); assert.equal(h.fake.state.containers.size, 1);
 });
 
@@ -478,14 +486,14 @@ if(args[0]==='context'){console.log('[{"Endpoints":{"docker":{"Host":"unix:///tm
 const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(state, 'tasks', projectId + '.json'))},'utf8'));
 fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,leases:r.leases.map(l=>l.purpose)})+'\\n');process.exit(1);`);
   chmodSync(join(bin, 'docker'), 0o755);
-  const env = { ...process.env, PATH: bin + ':' + process.env.PATH, PAISAXE_CONTRACT_LIFECYCLE_DIR: state, CONTRACT_STACK_DIR: taskDir };
+  const env = { ...process.env, PATH: bin + ':' + process.env.PATH, PAISAXE_CONTRACT_LIFECYCLE_DIR: state, CONTRACT_STACK_DIR: taskDir, TEST_RECEIPT_DIR: join(root, 'receipts') };
   const observed = () => (existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').map((line) => JSON.parse(line)) : []);
   return { state, projectId, taskDir, env, observed };
 }
 
 test('plain runContracts holds a consumer lease while using the stack and releases it on failure; the stack survives', (t) => {
   const h = leaseObservingDocker(t);
-  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `import {runContracts} from ${JSON.stringify(new URL('./run-contracts.mjs', import.meta.url).href)};const r=await runContracts({taskDir:process.env.CONTRACT_STACK_DIR});console.log(r.status);`],
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `import {runContracts} from ${JSON.stringify(new URL('./run-contracts.mjs', import.meta.url).href)};const r=await runContracts({taskDir:process.env.CONTRACT_STACK_DIR,outputDir:process.env.TEST_RECEIPT_DIR});console.log(r.status);`],
     { cwd: fileURLToPath(new URL('..', import.meta.url)), env: h.env, encoding: 'utf8', timeout: 60000 });
   assert.match(child.stdout, /failed/, child.stderr);
   const seen = h.observed();
@@ -523,4 +531,101 @@ if(['network','ps','volume','stop','rm'].includes(args[0])){console.error('unexp
   if (taskDir) rmSync(taskDir, { recursive: true, force: true });
   assert.equal(child.status, 1, child.stderr); assert.equal(result.ok, false); assert.equal(result.failure, 'preparation'); assert.equal(result.contracts, 'not-run');
   assert.equal(existsSync(join(root, 'state', 'tasks')), false, 'no receipt without a daemon identity');
+});
+
+
+test('real process probe: current process has a stable identity; an exited PID is explicitly dead', async () => {
+  const first = processIdentity(process.pid);
+  assert.equal(typeof first, 'string'); assert.notEqual(first, UNKNOWN_PROCESS); assert.equal(processIdentity(process.pid), first);
+  assert.equal(isAlive({ pid: process.pid, startedAt: first }, processIdentity), true);
+  const child = spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' });
+  const dead = Number(child.stdout.trim());
+  assert.equal(processIdentity(dead), null, 'no such process');
+  assert.equal(isAlive({ pid: dead, startedAt: first }, processIdentity), false);
+});
+
+test('only explicit absence or a different start time proves a dead owner; unknown probe results count as alive', () => {
+  assert.equal(isAlive({ pid: 10, startedAt: ALIVE }, () => UNKNOWN_PROCESS), true);
+  assert.equal(isAlive({ pid: 10, startedAt: null }, () => 'Thu Jan  1 00:00:00 2026'), true, 'no recorded start time: cannot prove reuse');
+  assert.equal(isAlive({ pid: 10, startedAt: ALIVE }, () => 'Thu Jan  1 00:00:00 2026'), false, 'PID reused by another process');
+  assert.equal(isAlive({ pid: 10, startedAt: ALIVE }, () => null), false);
+});
+
+for (const late of ['lease', 'recovery hold']) {
+  test('a ' + late + ' that appears after the pre-check still blocks disposal inside the locked transition', async (t) => {
+    const fake = fakeDocker();
+    const { root, taskDir, project } = preparedTask(t, fake);
+    writeFileSync(join(taskDir, 'transport.sock'), '');
+    const before = snapshot(fake.state);
+    const stopRelay = async () => {
+      if (late === 'lease') acquireConsumerLease(root, project, 'paid-voice', { owner: { pid: 777, startedAt: ALIVE }, now: at(1) });
+      else setRecoveryHold(root, project, 'late hold', at(1));
+    };
+    await assert.rejects(disposeOwned(root, project, { docker: fake.docker, now: at(2), processProbe: probe(new Set([777])), stopRelay }), late === 'lease' ? /live consumer lease/ : /recovery hold/);
+    assert.equal(snapshot(fake.state), before); assert.equal(readReceipt(root, project).state, 'prepared');
+  });
+}
+
+test('a recorded container that vanished before removal is recorded as already-absent, not a failure', async (t) => {
+  const fake = fakeDocker();
+  const { root, taskDir, project } = preparedTask(t, fake);
+  writeFileSync(join(taskDir, 'transport.sock'), '');
+  const vanished = [...fake.state.containers.values()].find((x) => x.Name === `/supabase_kong_${project}`).Id;
+  const stopRelay = async () => { fake.state.containers.delete(vanished); };
+  const terminal = await disposeOwned(root, project, { docker: fake.docker, now: at(1), processProbe: probe(new Set()), stopRelay });
+  assert.equal(terminal.outcomes['container:' + vanished], 'already-absent'); assert.equal(fake.state.containers.size, 0);
+});
+
+test('disposable task left prepared by a dead owner is abandoned after 24 hours; a live owner keeps a passed task', async (t) => {
+  const fake = fakeDocker();
+  const { root, project } = preparedTask(t, fake);
+  let report = await sweep({ root, docker: fake.docker, now: at(POLICY.abandonAfterMs), processProbe: probe(new Set()) });
+  assert.equal(report.tasks[0].action, 'abandoned'); assert.equal(fake.state.containers.size, 2);
+  const other = preparedTask(t, fakeDocker(), { owner: { pid: 31, startedAt: ALIVE } });
+  updateReceipt(other.root, other.project, (r) => { r.state = 'passed'; }, T0);
+  const docker = fakeDocker(); // separate daemon state is irrelevant: a live owner prevents any Docker mutation
+  report = await sweep({ root: other.root, docker: docker.docker, now: at(60 * DAY), processProbe: probe(new Set([31])) });
+  assert.equal(report.tasks[0].action, 'live'); assert.equal(docker.state.calls.some((args) => ['rm', 'stop'].includes(args[0])), false);
+});
+
+test('one-shot preparation failure stops (never removes) the task containers', async (t) => {
+  const h = oneShotHarness(t, { prepareFails: true });
+  const result = await runOneShot(h.options);
+  assert.equal(result.cleanup, 'preserved'); assert.equal(result.preservation, 'stopped');
+  const owned = [...h.fake.state.containers.values()].filter((x) => x.Name.endsWith(result.projectId));
+  assert.equal(owned.length, 2); assert.equal(owned.every((x) => x.State.Running === false), true);
+  assert.equal(h.fake.state.containers.get(hex('f')).State.Running, true);
+});
+
+test('terminal receipts without expiresAt expire 30 days after their terminal time; old receipt detail dirs are pruned', async (t) => {
+  const fake = fakeDocker();
+  const { root } = workspace(t);
+  mkdirSync(join(root, 'terminal'), { recursive: true });
+  writeFileSync(join(root, 'terminal', 'paisaxe-contracts-111111111111.json'), JSON.stringify({ terminalState: 'disposed', disposedAt: T0.toISOString() }));
+  const tmpRoot = realpathSync(mkdtempSync(join(tmpdir(), 'contract-lifecycle-tmp-'))); t.after(() => rmSync(tmpRoot, { recursive: true, force: true }));
+  const oldDetail = join(tmpRoot, 'paisaxe-contract-receipt-old'); const newDetail = join(tmpRoot, 'paisaxe-contract-receipt-new'); const other = join(tmpRoot, 'unrelated-old');
+  for (const dir of [oldDetail, newDetail, other]) mkdirSync(dir);
+  const { utimesSync } = await import('node:fs');
+  for (const dir of [oldDetail, other]) utimesSync(dir, T0, T0);
+  utimesSync(newDetail, at(20 * DAY), at(20 * DAY));
+  let report = await sweep({ root, docker: fake.docker, now: at(POLICY.terminalRetentionMs - 1), processProbe: probe(new Set()), tmpRoot });
+  assert.deepEqual(report.prunedTerminal, []); assert.deepEqual(report.prunedDetails, []);
+  report = await sweep({ root, docker: fake.docker, now: at(POLICY.terminalRetentionMs), processProbe: probe(new Set()), tmpRoot });
+  assert.deepEqual(report.prunedTerminal, ['paisaxe-contracts-111111111111']);
+  assert.deepEqual(report.prunedDetails, ['paisaxe-contract-receipt-old']);
+  assert.equal(existsSync(oldDetail), false); assert.equal(existsSync(newDetail), true); assert.equal(existsSync(other), true);
+});
+
+test('a retained task protects its referenced detail directory even through a path alias', async (t) => {
+  const fake = fakeDocker();
+  const { root, project } = preparedTask(t, fake);
+  const tmpRoot = realpathSync(mkdtempSync(join(tmpdir(), 'contract-lifecycle-tmp-'))); t.after(() => rmSync(tmpRoot, { recursive: true, force: true }));
+  const alias = join(realpathSync(mkdtempSync(join(tmpdir(), 'contract-lifecycle-alias-'))), 'link'); t.after(() => rmSync(join(alias, '..'), { recursive: true, force: true }));
+  const { symlinkSync, utimesSync } = await import('node:fs');
+  symlinkSync(tmpRoot, alias);
+  const detail = join(tmpRoot, 'paisaxe-contract-receipt-kept'); mkdirSync(join(detail, 'run-1'), { recursive: true }); writeFileSync(join(detail, 'run-1', 'receipt.json'), '{}');
+  utimesSync(detail, T0, T0);
+  updateReceipt(root, project, (r) => { r.state = 'failed'; r.retainUntil = at(400 * DAY).toISOString(); r.diagnostics.push(join(alias, 'paisaxe-contract-receipt-kept', 'run-1', 'receipt.json')); }, T0);
+  const report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(60 * DAY), processProbe: probe(new Set()), tmpRoot });
+  assert.deepEqual(report.prunedDetails, []); assert.equal(existsSync(detail), true);
 });

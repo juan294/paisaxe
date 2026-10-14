@@ -6,8 +6,8 @@
 // exact unconsumed owned network, then separately checked owned volumes.
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,13 +38,26 @@ function writePrivate(path, value, flag) {
   renameSync(temporary, path);
 }
 
-/** Process identity is (pid, start time): a reused PID never revives a dead owner. */
-function processIdentity(pid) {
-  try { return execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim() || null; }
-  catch { return null; }
+/** Process identity is (pid, start time) in a fixed locale/zone. Returns null only for an explicit
+ * "no such process"; any other probe failure is UNKNOWN_PROCESS, which never proves death. */
+export const UNKNOWN_PROCESS = 'unknown';
+export function processIdentity(pid) {
+  try { process.kill(pid, 0); }
+  catch (error) { if (error.code === 'ESRCH') return null; if (error.code !== 'EPERM') return UNKNOWN_PROCESS; }
+  try {
+    return execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim() || UNKNOWN_PROCESS;
+  } catch { return UNKNOWN_PROCESS; }
 }
 const selfOwner = (probe = processIdentity) => ({ pid: process.pid, startedAt: probe(process.pid) });
-const isAlive = (owner, probe) => Boolean(owner && Number.isInteger(owner.pid) && owner.startedAt && probe(owner.pid) === owner.startedAt);
+/** Dead only on explicit absence, or a different start time (the PID now belongs to another process). */
+export function isAlive(owner, probe) {
+  if (!owner || !Number.isInteger(owner.pid) || owner.pid <= 0) return false;
+  const current = probe(owner.pid);
+  if (current === null) return false;
+  if (current === UNKNOWN_PROCESS || !owner.startedAt || owner.startedAt === UNKNOWN_PROCESS) return true;
+  return current === owner.startedAt;
+}
 
 function withLock(root, id, action, probe = processIdentity) {
   const lock = join(root, 'tasks', id + '.lock');
@@ -109,6 +122,8 @@ function absent(read) {
 const inspect = (docker, kind, id) => absent(() => JSON.parse(docker([kind, 'inspect', id]))[0] ?? null);
 const lines = (text) => text.split('\n').map((line) => line.trim()).filter(Boolean);
 const projectContainers = (docker, id) => lines(docker(['ps', '-a', '--no-trunc', '--filter', `label=${PROJECT_LABEL}=${id}`, '--format', '{{.ID}}']));
+// `network inspect` lists running endpoints only; stopped attached containers need ps -a.
+const networkConsumers = (docker, id) => lines(docker(['ps', '-a', '--no-trunc', '--filter', `network=${id}`, '--format', '{{.ID}}']));
 const volumeConsumers = (docker, name) => lines(docker(['ps', '-a', '--no-trunc', '--filter', `volume=${name}`, '--format', '{{.ID}}']));
 
 /** Records every current owned identity during preparation; recorded identities are never dropped.
@@ -179,7 +194,7 @@ export function inspectOwnership(root, projectId, { docker }) {
   return {
     projectId, state: r.state, disposable: r.disposable, proof: Boolean(hasProof(r)), leases: r.leases.length, recoveryHold: r.recoveryHold, retainUntil: r.retainUntil,
     relay: existsSync(join(r.taskDir, 'transport.sock')) ? 'present' : 'absent',
-    network: { id: r.resources.network?.id ?? null, present: Boolean(net), internal: net?.Internal === true, nonceMatches: net?.Labels?.[NONCE_LABEL] === r.nonce, attached: Object.keys(net?.Containers || {}) },
+    network: { id: r.resources.network?.id ?? null, present: Boolean(net), internal: net?.Internal === true, nonceMatches: net?.Labels?.[NONCE_LABEL] === r.nonce, attached: net ? [...new Set([...Object.keys(net.Containers || {}), ...networkConsumers(docker, net.Id)])] : [] },
     containers: r.resources.containers.map(({ id, name }) => {
       const data = inspect(docker, 'container', id);
       return { id, name, present: Boolean(data), running: data ? data.State?.Running === true : null, sameIdentity: data ? data.Id === id && data.Name === '/' + name && data.Config?.Labels?.[PROJECT_LABEL] === projectId : null };
@@ -204,7 +219,7 @@ function planDisposal(r, docker) {
   if (net) {
     if (net.Name !== r.projectId || net.Internal !== true || net.Labels?.[NONCE_LABEL] !== r.nonce) refusals.push('network ownership nonce/identity mismatch');
     else network = net.Id;
-    for (const id of Object.keys(net.Containers || {})) if (!recorded.has(id)) refusals.push(`new network consumer ${id}`);
+    for (const id of new Set([...Object.keys(net.Containers || {}), ...networkConsumers(docker, net.Id)])) if (!recorded.has(id)) refusals.push(`new network consumer ${id}`);
   }
   const containers = [];
   for (const { id, name } of r.resources.containers) {
@@ -277,31 +292,26 @@ export async function disposeOwned(root, projectId, { docker, now = new Date(), 
     catch (error) { if (!['ECONNREFUSED', 'ENOENT'].includes(error.code)) throw new Error(`Disposal refused: owned relay could not be stopped (${error.message})`); }
   }
   r = updateReceipt(root, projectId, (x) => {
+    // Re-check under the receipt lock: a lease or hold taken after the pre-check wins.
+    insist(!x.recoveryHold, `Disposal refused: recovery hold on ${projectId}`);
+    insist(liveLeases(x, processProbe).length === 0, `Disposal refused: live consumer lease on ${projectId}`);
     x.disposal ??= { startedAt: iso(now), priorState: x.state, outcomes: {} };
     x.state = 'disposing'; x.owner = selfOwner(processProbe);
   }, now);
   const outcome = (key, value) => updateReceipt(root, projectId, (x) => { x.disposal.outcomes[key] = value; }, now);
-  const running = plan.containers.filter((x) => x.running).map((x) => x.id);
-  if (running.length) docker(['stop', '--time', '10', ...running]);
-  for (const { id } of r.resources.containers) {
-    if (plan.containers.some((x) => x.id === id)) { docker(['rm', id]); outcome('container:' + id, 'removed'); }
-    else outcome('container:' + id, 'already-absent');
-  }
+  // A recorded identity that vanished ("No such ...") is already absent, not a failure.
+  const removed = (args) => (absent(() => docker(args)) === null ? 'already-absent' : 'removed');
+  stopOwned(docker, plan.containers);
+  for (const { id } of r.resources.containers) outcome('container:' + id, plan.containers.some((x) => x.id === id) ? removed(['rm', id]) : 'already-absent');
   if (plan.network) {
     const net = inspect(docker, 'network', plan.network);
-    if (net) {
-      insist(Object.keys(net.Containers || {}).length === 0, 'Owned network gained a consumer during disposal');
-      docker(['network', 'rm', plan.network]);
-    }
-    outcome('network:' + plan.network, net ? 'removed' : 'already-absent');
+    if (net) insist(networkConsumers(docker, plan.network).length === 0, 'Owned network gained a consumer during disposal');
+    outcome('network:' + plan.network, net ? removed(['network', 'rm', plan.network]) : 'already-absent');
   }
   for (const { name, createdAt } of plan.volumes) {
     const data = inspect(docker, 'volume', name);
-    if (data) {
-      insist(data.CreatedAt === createdAt && volumeConsumers(docker, name).length === 0, `Volume ${name} changed or gained a consumer during disposal`);
-      docker(['volume', 'rm', name]);
-    }
-    outcome('volume:' + name, data ? 'removed' : 'already-absent');
+    if (data) insist(data.CreatedAt === createdAt && volumeConsumers(docker, name).length === 0, `Volume ${name} changed or gained a consumer during disposal`);
+    outcome('volume:' + name, data ? removed(['volume', 'rm', name]) : 'already-absent');
   }
   r = readReceipt(root, projectId);
   const terminal = sanitizedTerminal(r, 'disposed', now, { disposedAt: iso(now), outcomes: r.disposal.outcomes });
@@ -311,12 +321,15 @@ export async function disposeOwned(root, projectId, { docker, now = new Date(), 
   return terminal;
 }
 
+function stopOwned(docker, containers) {
+  for (const { id, running } of containers) if (running) absent(() => docker(['stop', '--time', '10', id]));
+}
+
 /** Stops (does not remove) a failed task's verified containers to free memory while preserving its data. */
 function stopPreserved(r, docker) {
   const plan = planDisposal(r, docker);
   if (plan.refusals.length) return `not stopped: ${plan.refusals.join('; ')}`;
-  const running = plan.containers.filter((x) => x.running).map((x) => x.id);
-  if (running.length) docker(['stop', '--time', '10', ...running]);
+  stopOwned(docker, plan.containers);
   return 'stopped';
 }
 
@@ -331,9 +344,10 @@ export async function finishReusable(root, projectId, { docker, now = new Date()
 
 // ---- Scheduled owner verifier ------------------------------------------------------
 
-export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = new Date(), processProbe = processIdentity, dryRun = false, stopRelay } = {}) {
+export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = new Date(), processProbe = processIdentity, dryRun = false, stopRelay, tmpRoot = tmpdir() } = {}) {
   docker ??= await createDocker();
-  const report = { version: 1, checkedAt: iso(now), dryRun, tasks: [], legacy: [], prunedTerminal: [], failures: [] };
+  const report = { version: 1, checkedAt: iso(now), dryRun, tasks: [], legacy: [], prunedTerminal: [], prunedDetails: [], failures: [] };
+  const protectedDiagnostics = [];
   const names = existsSync(join(root, 'tasks')) ? readdirSync(join(root, 'tasks')).filter((name) => /\.json$/.test(name)).sort() : [];
   const known = new Set();
   for (const name of names) {
@@ -342,6 +356,8 @@ export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = n
     if (r?.projectId) known.add(r.projectId);
     if (!hasProof(r)) { report.tasks.push({ projectId, action: 'inventory-only', reason: r ? 'legacy receipt lacks ownership proof' : 'unreadable receipt' }); continue; }
     known.add(projectId);
+    // Compare canonical paths: macOS records /var/... while realpath is /private/var/...
+    for (const path of r.diagnostics) if (typeof path === 'string') { try { protectedDiagnostics.push(realpathSync(path)); } catch { protectedDiagnostics.push(path); } }
     const entry = { projectId, state: r.state, disposable: r.disposable, retainUntil: r.retainUntil };
     report.tasks.push(entry);
     const dead = r.leases.length - liveLeases(r, processProbe).length;
@@ -362,7 +378,7 @@ export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = n
     else if (r.state === 'disposing') {
       if (ownerAlive) Object.assign(entry, { action: 'live', reason: 'disposal in progress' });
       else await disposeNow('resume interrupted disposal');
-    } else if (IN_PROGRESS.includes(r.state)) {
+    } else if (IN_PROGRESS.includes(r.state) || (r.disposable && r.state === 'prepared')) {
       if (ownerAlive) Object.assign(entry, { action: 'live', reason: 'owner process alive' });
       else if (now - new Date(r.updatedAt) < POLICY.abandonAfterMs) Object.assign(entry, { action: 'preserve', reason: `owner dead; abandoned after ${iso(plus(new Date(r.updatedAt), POLICY.abandonAfterMs))}` });
       else if (dryRun) Object.assign(entry, { action: 'would-abandon', reason: 'owner dead for 24 hours' });
@@ -371,8 +387,10 @@ export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = n
         writeTerminal(root, r, 'abandoned', now);
         Object.assign(entry, { action: 'abandoned', state: 'abandoned', retainUntil: r.retainUntil, reason: 'owner dead for 24 hours' });
       }
-    } else if (r.disposable && r.state === 'passed') await disposeNow('contracts passed; disposal was interrupted');
-    else if (r.disposable && DISPOSABLE_EXPIRING.includes(r.state)) {
+    } else if (r.disposable && r.state === 'passed') {
+      if (ownerAlive) Object.assign(entry, { action: 'live', reason: 'one-shot owner is archiving or disposing' });
+      else await disposeNow('contracts passed; disposal was interrupted');
+    } else if (r.disposable && DISPOSABLE_EXPIRING.includes(r.state)) {
       if (r.retainUntil && now >= new Date(r.retainUntil)) await disposeNow('diagnostic retention expired');
       else Object.assign(entry, { action: 'preserve', reason: `diagnostic retention until ${r.retainUntil}` });
     } else if (!r.disposable && r.state === 'finished') await disposeNow('explicitly finished reusable stack');
@@ -386,11 +404,25 @@ export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = n
   }
   const terminalDir = join(root, 'terminal');
   for (const name of existsSync(terminalDir) ? readdirSync(terminalDir).filter((x) => x.endsWith('.json')) : []) {
-    let expiresAt; try { expiresAt = JSON.parse(readFileSync(join(terminalDir, name), 'utf8')).expiresAt; } catch { continue; }
-    if (expiresAt && now >= new Date(expiresAt)) {
+    const path = join(terminalDir, name);
+    let data; try { data = JSON.parse(readFileSync(path, 'utf8')); } catch { data = {}; }
+    // Receipts without expiresAt expire 30 days after their terminal time (file time as last resort).
+    const terminalAt = data.recordedAt || data.disposedAt || data.failedAt || statSync(path).mtime.toISOString();
+    const expiresAt = data.expiresAt || iso(plus(new Date(terminalAt), POLICY.terminalRetentionMs));
+    if (now >= new Date(expiresAt)) {
       if (!dryRun) unlinkSync(join(terminalDir, name));
       report.prunedTerminal.push(name.slice(0, -5));
     }
+  }
+  // Private runner detail directories (paisaxe-contract-receipt-*) follow the same 30-day retention,
+  // unless a retained task still references them as diagnostics.
+  const base = realpathSync(tmpRoot);
+  for (const name of readdirSync(base).filter((x) => x.startsWith('paisaxe-contract-receipt-'))) {
+    const dir = join(base, name); const info = lstatSync(dir);
+    if (!info.isDirectory() || info.uid !== process.getuid() || now - info.mtime < POLICY.terminalRetentionMs) continue;
+    if (protectedDiagnostics.some((path) => path.startsWith(dir + '/'))) continue;
+    if (!dryRun) rmSync(dir, { recursive: true });
+    report.prunedDetails.push(name);
   }
   if (!dryRun) writePrivate(join(root, 'sweep-latest.json'), report);
   return report;
@@ -408,8 +440,14 @@ export async function runOneShot({ root = process.cwd(), lifecycleDir = lifecycl
   let manifest;
   try { manifest = await prepare(root, { lifecycle: { disposable: true, task: 'one-shot', root: lifecycleDir } }); }
   catch (error) {
-    const r = error.projectId ? readReceipt(lifecycleDir, error.projectId) : null;
-    return { ok: false, projectId: error.projectId ?? null, contracts: 'not-run', failure: 'preparation', cleanup: 'preserved', retainUntil: r?.retainUntil ?? null, detail: error.message };
+    let r = error.projectId ? readReceipt(lifecycleDir, error.projectId) : null;
+    let preservation = null;
+    if (r) {
+      // Preserve (stop, never remove) whatever the failed preparation allocated.
+      try { preservation = stopPreserved(r, docker); } catch (stopError) { preservation = `not stopped: ${stopError.message}`; }
+      r = updateReceipt(lifecycleDir, r.projectId, (x) => { x.preservation = preservation; });
+    }
+    return { ok: false, projectId: error.projectId ?? null, contracts: 'not-run', failure: 'preparation', cleanup: 'preserved', retainUntil: r?.retainUntil ?? null, preservation, detail: error.message };
   }
   const { projectId } = manifest;
   const lease = acquireConsumerLease(lifecycleDir, projectId, 'one-shot', { owner: selfOwner(processProbe), now: now() });
