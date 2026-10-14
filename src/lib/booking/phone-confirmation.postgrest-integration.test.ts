@@ -265,6 +265,39 @@ describe.skipIf(!dbReachable)("phone confirmation against live local Supabase", 
     });
   });
 
+  describe("recorded ElevenLabs delivery", () => {
+    it("replays the sanitized authentic text call through signature, route, database and idempotent settlement", async () => {
+      const recorded = JSON.parse(readFileSync(new URL("../../../tests/fixtures/providers/elevenlabs-post-call.sanitized.json", import.meta.url), "utf8"));
+      // Preserve provider analysis/transcript. The current adapter classifies
+      // the synthetic Spanish word "mensaje" as no_answer before confirmation.
+      expect(recorded.data.analysis.call_successful).toBe("success");
+      expect(recorded.data.transcript[0].message).toBe("Este es un mensaje sintético de prueba.");
+      expect(recorded.data.metadata.text_only).toBe(true);
+      expect(recorded.data.metadata.call_duration_secs).toBe(1);
+      const conversationId = recorded.data.conversation_id;
+      expect(conversationId).toBe("conv_recorded_elevenlabs_release190");
+      const bookingId = newBooking();
+      await approveAndReturn(bookingId);
+      const callId = callOf(bookingId);
+      await localServiceClient().from("pending_bookings").update({ conversation_id: conversationId }).eq("id", callId).throwOnError();
+      expect(one(`SELECT status FROM public.pending_bookings WHERE id = '${callId}';`)).toBe("pending");
+      const first = await elevenLabsWebhook(signedWebhook(recorded));
+      expect(first.status).toBe(200);
+      expect(await first.json()).toMatchObject({ success: true });
+      expect(one(`SELECT status FROM public.pending_bookings WHERE id = '${callId}';`)).toBe("no_answer");
+      expect(paymentOf(bookingId)).toBe("voided:no_answer");
+      expect(bookingStatus(bookingId)).toBe("expired");
+      expect(mock.captures.size).toBe(0);
+      expect(one(`SELECT count(*) FROM public.elevenlabs_webhook_events WHERE booking_id = '${callId}';`)).toBe("1");
+      const duplicate = await elevenLabsWebhook(signedWebhook(recorded));
+      expect(duplicate.status).toBe(200);
+      expect(paymentOf(bookingId)).toBe("voided:no_answer");
+      expect(one(`SELECT count(*) FROM public.elevenlabs_webhook_events WHERE booking_id = '${callId}';`)).toBe("1");
+      expect(mock.requestsTo("POST", /\/v2\/payments\/authorizations\/[^/]+\/void$/)).toHaveLength(1);
+      expect(one(`SELECT count(*) FROM public.booking_sms_jobs WHERE booking_id = '${callId}';`)).toBe("0");
+    });
+  });
+
   describe("the flow", () => {
     it("approval authorizes (never captures) and calls the test number; 'confirmed' captures once and confirms", async () => {
       const bookingId = newBooking();

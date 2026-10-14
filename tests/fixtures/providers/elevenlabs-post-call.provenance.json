@@ -1,0 +1,27 @@
+{
+  "provider": "ElevenLabs",
+  "environment": "isolated authenticated text-only test agent on provider service (not a sandbox)",
+  "retrieval": "Original post_call_transcription HTTP delivery from one separately authorized synthetic text exchange; HMAC verified over original bytes at receipt, with created agent and minted conversation identity matched.",
+  "api_version": "v1 conversation API; unversioned post_call_transcription webhook envelope observed 2026-10-14",
+  "captured_at": "2026-10-14T05:39:50.151584Z",
+  "expires_at": "2026-11-13T05:39:50.151584Z",
+  "refresh_owner": "Juan (Paisaxe owner)",
+  "sha256": "f698701c41d17f8fad4b996a671bcbdef80617e4ac52c44d4202675bc4f64a11",
+  "raw_sha256": "0217c232a5d0c648aeed164a3573ffccfe6e03e6e6454dd8bc5a8b0b6398f508",
+  "original_signature_verified": true,
+  "agent_identity_matched": true,
+  "conversation_identity_matched": true,
+  "sanitization": [
+    "Preserved every object key, array entry, scalar type, null, unknown field, timing, usage, synthetic transcript and analysis.",
+    "Consistently pseudonymized agent/conversation/branch/version identifiers and temporary agent name wherever they occur; replaced account tier with redacted.",
+    "Original signature, webhook secret, signed URL and API credentials are not payload fields and are not included."
+  ],
+  "limitations": [
+    "The isolated technical conversation is not a real booking or telephony confirmation.",
+    "Provider call_successful=success describes the synthetic exchange; current booking adapter classifies its Spanish mensaje token as no_answer. Replay records this existing behavior without altering the provider content.",
+    "Sanitization changes bytes; replay creates a synthetic local signature and exercises the real route and database. Original HMAC validation is separately recorded provenance.",
+    "No dedicated webhook semantic API version was provided. branch_id/version_id are agent identifiers, not API schema versions.",
+    "One recorded transcription envelope proves this shape only, not audio events, all ElevenLabs interactions, live availability, or future delivery guarantees."
+  ],
+  "earlier_refresh_criterion": "Review on ElevenLabs webhook schema, SDK, parser or adapter change; no automatic provider calls."
+}

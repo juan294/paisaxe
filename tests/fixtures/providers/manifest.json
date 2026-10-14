@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "Reviewed existing PayPal sandbox refund and Stripe test checkout exports, plus an unverified synthetic ElevenLabs example. Recordings establish only their named adapter shapes, not every provider interaction or live availability.",
+  "scope": "Reviewed PayPal sandbox refund, Stripe test checkout export and authentic ElevenLabs isolated text-call delivery. Recordings establish only named adapter shapes, not every provider interaction or live availability.",
   "fixtures": [
     {
       "id": "paypal-webhooks",
@@ -20,11 +20,17 @@
     {
       "id": "elevenlabs-post-call",
       "provider": "ElevenLabs",
-      "kind": "synthetic",
-      "file": "src/app/api/webhooks/elevenlabs/route.test.ts",
-      "sha256": "f0f2d8ab64756f2b431a1e755af93390e4a72997ddbf5d8fa3b5e2f6f6be9e7b",
-      "refresh_owner": "repository owner",
-      "refresh_action": "Review a separately authorized sanitized post_call_transcription recording against the ElevenLabs webhook parser; pin its schema version, bytes, capture date and expiry."
+      "kind": "recorded",
+      "file": "tests/fixtures/providers/elevenlabs-post-call.sanitized.json",
+      "sha256": "f698701c41d17f8fad4b996a671bcbdef80617e4ac52c44d4202675bc4f64a11",
+      "refresh_owner": "Juan (Paisaxe owner)",
+      "refresh_action": "Review or refresh the sanitized isolated post_call_transcription delivery and real signed route/database replay on expiry or provider schema/SDK/adapter changes; new provider calls require separate authorization.",
+      "api_version": "v1 conversation API; unversioned post_call_transcription webhook envelope observed 2026-10-14",
+      "captured_at": "2026-10-14T05:39:50.151584Z",
+      "expires_at": "2026-11-13T05:39:50.151584Z",
+      "sanitized": true,
+      "upstream_change": "Review on ElevenLabs webhook schema, SDK, parser or adapter change; no automatic provider calls.",
+      "provenance_file": "tests/fixtures/providers/elevenlabs-post-call.provenance.json"
     },
     {
       "id": "stripe-grant-events",
