@@ -8,7 +8,7 @@ describe("requireReleaseTarget", () => {
   });
 
   it.each([undefined, "", "   "])(
-    "fails rather than falling back to a default (%p)",
+    "[case %#] fails rather than falling back to a default (%p)",
     (value) => {
       expect(() => requireReleaseTarget(value)).toThrow(/RELEASE_TARGET_URL is not set/);
     }

@@ -341,7 +341,7 @@ describe("ElevenLabs voice preflight evidence", () => {
     [{ signed_url: "wss://secret.example" }, /unsafe or unexpected field/i],
     [{ api_key: "sk_runtime_secret" }, /unsafe or unexpected field/i],
     [{ token: "eleven-secret" }, /unsafe or unexpected field/i],
-  ])("blocks incomplete or unsafe voice evidence", (override, message) => {
+  ])("[case %#] blocks incomplete or unsafe voice evidence", (override, message) => {
     const result = analyzeVoice({ ...validVoiceProbe, ...override });
 
     expect(result.ok).toBe(false);

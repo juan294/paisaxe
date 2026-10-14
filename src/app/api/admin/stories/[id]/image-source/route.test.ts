@@ -114,7 +114,7 @@ describe("PUT /api/admin/stories/[id]/image-source", () => {
     expect((await response.json()).data.imageSource).toBe(NEUTRAL_CREDIT);
     expect(update).toHaveBeenCalledWith({ image_source: NEUTRAL_CREDIT });
   });
-  it.each([{ current: null }, { readError: { message: "Read failed" } }])("returns 404 on missing/inaccessible current story", async (options) => {
+  it.each([{ current: null }, { readError: { message: "Read failed" } }])("[case %#] returns 404 on missing/inaccessible current story", async (options) => {
     const { update } = setup(options);
     const response = await PUT(request(proof), params);
     expect(response.status).toBe(404);
@@ -133,7 +133,7 @@ describe("PUT /api/admin/stories/[id]/image-source", () => {
     expect(response.status).toBe(500);
     expect((await response.json()).error).toBe("Failed to update image source");
   });
-  it.each([new Error("Unexpected DB failure"), "a plain string failure"])("logs unexpected thrown values without console.error", async (failure) => {
+  it.each([new Error("Unexpected DB failure"), "a plain string failure"])("[case %#] logs unexpected thrown values without console.error", async (failure) => {
     vi.mocked(createAdminClient).mockImplementation(() => { throw failure; });
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const response = await PUT(request(proof), params);

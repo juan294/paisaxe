@@ -89,7 +89,7 @@ it("rejects malformed JSON", async () => {
   const request = new NextRequest("http://localhost/api/admin/stories/story-1/image-review", { method: "POST", body: "{", headers: { "content-type": "application/json" } });
   expect((await POST(request, params)).status).toBe(400);
 });
-it.each([["text/plain", 100], ["image/jpeg", 11 * 1024 * 1024]])("rejects unsupported or oversized files", async (type, size) => {
+it.each([["text/plain", 100], ["image/jpeg", 11 * 1024 * 1024]])("[case %#] rejects unsupported or oversized files", async (type, size) => {
   expect((await POST(await uploadRequest(Buffer.from("bytes"), type as string, size as number), params)).status).toBe(400);
   expect(sdk.upload).not.toHaveBeenCalled(); expect(sdk.update).not.toHaveBeenCalled();
 });

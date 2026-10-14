@@ -56,7 +56,7 @@ describe("assertReplayAllowed (the production guard)", () => {
     [{ nodeEnv: "development", vercel: "1" }],
     [{ nodeEnv: "development", vercelEnv: "preview" }],
     [{ nodeEnv: "development", vercelEnv: "production" }],
-  ])("refuses %o", (env) => {
+  ])("[case %#] refuses %o", (env) => {
     expect(() => assertReplayAllowed(env)).toThrow(/only in local tests/);
   });
 

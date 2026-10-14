@@ -320,7 +320,7 @@ describe("stories-data", () => {
       expect(restored).toMatchObject({ image, imageSource, blurDataUrl: story.blurDataUrl, title: story.title, description: story.description });
     });
 
-    it.each([undefined, "Photo credit", imageProvenanceFixture("/images/different-synthetic.svg")])("does not seed an unreviewed image or its legacy blur", imageSource => {
+    it.each([undefined, "Photo credit", imageProvenanceFixture("/images/different-synthetic.svg")])("[case %#] does not seed an unreviewed image or its legacy blur", imageSource => {
       const story = { ...syntheticImageStory, image: "/images/unknown-synthetic.svg", imageSource, blurDataUrl: "data:image/png;base64,bGVnYWN5" };
       const row = storyToRow(story);
       expect(row.image_path).toBe(NEUTRAL_IMAGE);

@@ -203,7 +203,7 @@ describe("corpus fail-closed input boundaries", () => {
     { embedding: Array.from({ length: 512 }, () => 0) },
     { embedding: [NaN, ...Array.from({ length: 511 }, () => 0)] },
     { embedding: [Infinity, ...Array.from({ length: 511 }, () => 0)] },
-  ])("rejects a missing, wrong-sized, zero or nonfinite vector", ({ embedding }) => {
+  ])("[case %#] rejects a missing, wrong-sized, zero or nonfinite vector", ({ embedding }) => {
     const input = fixture();
     chunk(input).embedding = embedding;
     expect(() => validateCorpus(input, NOW)).toThrow(/vector|number/i);
@@ -319,7 +319,7 @@ describe("official structured source admission (synthetic evidence only)", () =>
     { canonicalUrl: "https://www.turismoasturiasprofesional.es/open-data/turismoasturias?other=data" },
     { attribution: "Turismo Asturias" }, { revision: "2026-10-10" },
     { allowedUse: "structured-facts" }, { namespace: "owner" }, { official: undefined },
-  ])("rejects mislabelled official source metadata", patch => {
+  ])("[case %#] rejects mislabelled official source metadata", patch => {
     const input = officialFixture();
     Object.assign(source(input), patch);
     expect(() => validateCorpus(bindReceipts(input), NOW)).toThrow();
@@ -328,7 +328,7 @@ describe("official structured source admission (synthetic evidence only)", () =>
   it.each([
     { property: "opening-hours", value: "Always open", statementId: "R9999:opening-hours" },
     { value: "Altered municipality" }, { statementId: "wrong-record:Contacto.Concejo.content" },
-  ])("rejects facts outside the exact source projection", patch => {
+  ])("[case %#] rejects facts outside the exact source projection", patch => {
     const input = officialFixture();
     Object.assign(fact(input), patch);
     expect(() => validateCorpus(bindReceipts(input), NOW)).toThrow(/official fact/i);

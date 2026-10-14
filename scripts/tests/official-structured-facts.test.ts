@@ -60,7 +60,7 @@ describe("official structured snapshot projection (synthetic data only)", () => 
     { articles: { article: [] } },
     { articles: [] },
     { error: "upstream failure" },
-  ])("rejects duplicate, empty or malformed restaurant identities", input => {
+  ])("[case %#] rejects duplicate, empty or malformed restaurant identities", input => {
     expect(() => projectOfficialSnapshot("asturias-restaurants", JSON.stringify(input))).toThrow();
   });
 
@@ -68,7 +68,7 @@ describe("official structured snapshot projection (synthetic data only)", () => 
     { features: [gis(), gis()] }, { features: [gis(0)] }, { features: [gis(1.5)] },
     { features: [{ attributes: { objectid: 7, nombre: "Name" } }] },
     { features: [] }, { error: { code: 500 } },
-  ])("rejects malformed or duplicated GIS records and upstream errors", input => {
+  ])("[case %#] rejects malformed or duplicated GIS records and upstream errors", input => {
     expect(() => projectOfficialSnapshot("asturias-beaches", JSON.stringify(input))).toThrow();
   });
 

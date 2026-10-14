@@ -532,7 +532,7 @@ describe("immersive types", () => {
       }
     });
 
-    it.each([null, "Photo by someone", imageProvenanceFixture("/images/a-different-synthetic.svg")])("neutralizes absent/free-credit/mismatched review and removes its legacy blur", imageSource => {
+    it.each([null, "Photo by someone", imageProvenanceFixture("/images/a-different-synthetic.svg")])("[case %#] neutralizes absent/free-credit/mismatched review and removes its legacy blur", imageSource => {
       const row = { ...reviewedRow(), image_source: imageSource };
       const full = rowToStory(row);
       const directPublic = rowToPublicStory(row);

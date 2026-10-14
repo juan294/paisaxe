@@ -27,7 +27,7 @@ describe("manual photo review", () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
-it.each([{ ok: false, body: {} }, { ok: true, body: {} }])("reports missing preparation data without invented success", async response => {
+it.each([{ ok: false, body: {} }, { ok: true, body: {} }])("[case %#] reports missing preparation data without invented success", async response => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: response.ok, json: async () => response.body }));
   await expect(preparePhoto("story-1", "https://example.com/image.jpg")).rejects.toThrow("No se pudo preparar la foto. Reinténtalo o elige otra.");
 });

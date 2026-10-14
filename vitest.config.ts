@@ -38,7 +38,7 @@ export default defineConfig({
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "node_modules/",
-        "src/test/",
+        "src/test/**",
         "**/*.test.{ts,tsx}",
         "**/*.d.ts",
       ],

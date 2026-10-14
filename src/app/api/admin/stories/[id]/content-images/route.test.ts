@@ -82,7 +82,7 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
     expect((await response.json()).error).toBe("Story not found");
     expect(from.mock.calls).toEqual([["stories"]]);
   });
-  it.each([new Error("Unexpected DB failure"), "plain failure"])("logs unexpected errors without console.error", async (failure) => {
+  it.each([new Error("Unexpected DB failure"), "plain failure"])("[case %#] logs unexpected errors without console.error", async (failure) => {
     vi.mocked(createAdminClient).mockImplementation(() => { throw failure; });
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const response = await GET(request(), params);

@@ -77,7 +77,7 @@ it("ignores a late preparation rejection after another asset is selected", async
   expect(await screen.findByAltText("Encuadre de revisión en escritorio")).toBeInTheDocument();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
-it.each(["", "Referencia conservada pero formulario incompleto"])("keeps incomplete review draft unapproved after confirmation error", async receipt => {
+it.each(["", "Referencia conservada pero formulario incompleto"])("[case %#] keeps incomplete review draft unapproved after confirmation error", async receipt => {
   const onChange = vi.fn();
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data }) }));
   render(<PhotoReviewForm title="Título" description="Descripción" storyId="story-1" asset="https://example.com/a.jpg" source="" onChange={onChange} />);

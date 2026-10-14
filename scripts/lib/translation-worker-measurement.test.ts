@@ -56,7 +56,7 @@ describe("translation worker measurement assessment", () => {
     { value: null }, { value: -1 }, { value: Number.NaN }, { value: "0" },
     { sampleCount: 0 }, { sampleCount: 1.5 }, { complete: false },
     { evidence: "" }, { definition: "" },
-  ])("discloses invalid/incomplete aggregate fields (%j)", (fields) => {
+  ])("[case %#] discloses invalid/incomplete aggregate fields (%j)", (fields) => {
     const input = measured();Object.assign(input.metrics.fullTranslationP95Seconds, fields);
     const result = assessTranslationWorkerMeasurements(input);
     expect(result.metrics.fullTranslationP95Seconds.status).toBe("unmeasured");

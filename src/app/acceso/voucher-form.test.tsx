@@ -98,7 +98,7 @@ describe("VoucherForm", () => {
     [403, { reason: "exhausted" }, "booking.access.exhausted"],
     [429, {}, "booking.access.rateLimited"],
     [500, {}, "booking.access.failed"],
-  ])("maps a %s response to its message", async (status, body, message) => {
+  ])("[case %#] maps a %s response to its message", async (status, body, message) => {
     mockFetch.mockResolvedValue({ ok: false, status, json: async () => body });
     render(<VoucherForm />);
     submitCode();

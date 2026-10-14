@@ -24,7 +24,7 @@ describe("isTimeoutError", () => {
     { name: "timeoutError" },
     { name: "AbortError " },
     new Error("The request timed out"),
-  ])("does not infer timeout from an unrelated unknown value (%j)", (error) => {
+  ])("[case %#] does not infer timeout from an unrelated unknown value (%j)", (error) => {
     expect(isTimeoutError(error)).toBe(false);
   });
 

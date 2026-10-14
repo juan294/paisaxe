@@ -226,7 +226,7 @@ describe("actual corpus CLI authorization and quality-file boundaries", () => {
 
   it.each([
     { targetUrl: "http://127.0.0.1:54322" }, { action: "select" }, { manifestHash: "b".repeat(64) }, { targetVersion: "another-corpus" },
-  ])("blocks a receipt for a different target/action/hash/version before HTTP", async patch => {
+  ])("[case %#] blocks a receipt for a different target/action/hash/version before HTTP", async patch => {
     await expect(main(args("stage", patch))).rejects.toThrow(/authorization differs/i);
     expect(fetchMock).not.toHaveBeenCalled();
   });
