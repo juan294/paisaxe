@@ -1,3 +1,4 @@
+import './ci-cadence-test-git-env.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
