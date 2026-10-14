@@ -98,10 +98,15 @@ test.describe("Visual regression — public pages", () => {
     await expect(title).toBeVisible({ timeout: 15000 });
     await stabilizePage(page);
 
-    // Mask the story background image — external/dynamic content
-    await expect(page).toHaveScreenshot("immersive.png", {
-      mask: [page.locator("[data-testid='story-background-image']")],
+    // Hide the dynamic image pixels while keeping overlaid controls visible.
+    const hero = page.locator('main > div > img[fetchpriority="high"]');
+    await expect(hero).toHaveCount(1);
+    await page.addStyleTag({
+      content: 'main > div > img[fetchpriority="high"] { visibility: hidden !important; }',
     });
+    await expect(hero).toHaveCSS("visibility", "hidden");
+    await expect(title).toBeVisible();
+    await expect(page).toHaveScreenshot("immersive.png");
   });
 
   test("pricing checkout — unauthenticated prompt", async ({ page }) => {
