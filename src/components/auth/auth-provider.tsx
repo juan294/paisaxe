@@ -19,6 +19,12 @@ import { mapSupabaseUser, type AuthUser, type AuthContextValue } from "@/types/a
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// Network verification budget. It starts once the browser client is loaded.
+const AUTH_VERIFY_TIMEOUT_MS = 1500;
+// Budget for the first dynamic import only. A cold dev compile can take longer
+// than the verification budget, so the two are not measured together.
+const AUTH_CLIENT_LOAD_TIMEOUT_MS = 15000;
+
 interface AuthProviderProps {
   children: ReactNode;
   deferInitialAuth?: boolean;
@@ -54,7 +60,11 @@ export function AuthProvider({ children, deferInitialAuth = false, initialUser =
     let unsubscribe: (() => void) | undefined;
     let cancelVerification: (() => void) | undefined;
 
-    const verify = (operation: (current: () => boolean) => Promise<void>, clearUser = false) => {
+    const verify = (
+      operation: (current: () => boolean, restartDeadline: (ms: number) => void) => Promise<void>,
+      clearUser = false,
+      initialBudgetMs = AUTH_VERIFY_TIMEOUT_MS,
+    ) => {
       const ticket = ++revision;
       const current = () => !cancelled && revision === ticket;
       cancelVerification?.();
@@ -68,13 +78,18 @@ export function AuthProvider({ children, deferInitialAuth = false, initialUser =
       const superseded = new Promise<void>(resolve => { release = resolve; });
       const cancel = () => { clearTimeout(timer); release(); };
       cancelVerification = cancel;
+      let restartDeadline!: (ms: number) => void;
       const deadline = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Auth verification timeout")), 1500);
+        restartDeadline = ms => {
+          clearTimeout(timer);
+          timer = setTimeout(() => reject(new Error("Auth verification timeout")), ms);
+        };
       });
+      restartDeadline(initialBudgetMs);
 
       // Never await SDK work inside its synchronous auth-event callback.
       void Promise.race([
-        Promise.resolve().then(() => { if (current()) return operation(current); }),
+        Promise.resolve().then(() => { if (current()) return operation(current, restartDeadline); }),
         deadline,
         superseded,
       ]).catch((error: unknown) => {
@@ -113,12 +128,13 @@ export function AuthProvider({ children, deferInitialAuth = false, initialUser =
       setUser(verifiedUser);
     };
 
-    verify(async current => {
+    verify(async (current, restartDeadline) => {
       const anonKey = getSupabaseAnonKey();
       if (!anonKey || !anonKey.startsWith("eyJ")) return;
       const supabase = await getSupabaseClient();
       if (!current()) return;
       if (!supabase) throw new Error("Auth client unavailable");
+      restartDeadline(AUTH_VERIFY_TIMEOUT_MS);
 
       // Subscribe before bootstrap: a logout/login during getUser must win.
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -141,7 +157,7 @@ export function AuthProvider({ children, deferInitialAuth = false, initialUser =
       if (!current()) return;
       if (error && !isAuthSessionMissingError(error)) throw error;
       await verifySession(supabase, error ? null : currentSession, current);
-    });
+    }, false, AUTH_CLIENT_LOAD_TIMEOUT_MS);
 
     return () => {
       cancelled = true;
