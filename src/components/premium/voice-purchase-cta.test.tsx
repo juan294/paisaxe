@@ -171,7 +171,7 @@ describe("VoicePurchaseCTA", () => {
     it("renders purchase button with DEFAULT_TIER price in compact mode", () => {
       render(<VoicePurchaseCTA compact />);
       // Price comes from DEFAULT_TIER.price (shared constant), not a hardcoded literal
-      const regex = new RegExp(`Get Day Pass.*${DEFAULT_TIER.price.replace("€", "€")}`);
+      const regex = new RegExp(`Get Day Pass.*${DEFAULT_TIER.price}`);
       expect(screen.getByRole("button", { name: regex })).toBeInTheDocument();
     });
 

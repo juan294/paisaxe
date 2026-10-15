@@ -284,6 +284,14 @@ describe("processPaypalEvent: resolving the payment", () => {
     await expect(processPaypalEvent(fake.client, inboxEvent("PAYMENT.SALE.COMPLETED"))).resolves.toBe("ignored");
     expect(fake.client.from).not.toHaveBeenCalled();
   });
+
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+    "ignores the inherited object property name %s as an event type",
+    async (eventType) => {
+      await expect(processPaypalEvent(fake.client, inboxEvent(eventType))).resolves.toBe("ignored");
+      expect(fake.client.from).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("CHECKOUT.ORDER.APPROVED", () => {

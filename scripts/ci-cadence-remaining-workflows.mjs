@@ -92,6 +92,8 @@ function workflow(definition, original) {
       // remain present. An outsider never executes this credentialed job.
     }
     for (const step of app.steps) {
+      // A scheduled caller can write the default-branch cache scope while this job runs a caller-supplied source_sha.
+      if (step.uses?.startsWith('actions/setup-node@')) delete step.with?.cache;
       if (step.uses?.startsWith('actions/upload-artifact@')) step.with.name = `\${{ inputs.invocation_id }}.artifact-${step.with.name}`;
       if (step.uses === 'treosh/lighthouse-ci-action@v12') step.with.artifactName = `\${{ inputs.invocation_id }}.artifact-${step.with.artifactName}`;
     }

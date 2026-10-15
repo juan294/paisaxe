@@ -166,6 +166,31 @@ describe("parseReplayFixture", () => {
   });
 });
 
+describe("placeholder matching cost", () => {
+  it("renders a long unterminated dotted placeholder as text in linear time", () => {
+    const malformed = `{{result${".a".repeat(30)}} and {{result${".a".repeat(30)}`;
+    const dotted = parseReplayFixture({
+      scenarios: [{ name: "dotted", when: "^dotted$", steps: [{ text: malformed }] }],
+    });
+    const started = performance.now();
+    const response = replayResponse(dotted, params([{ role: "user", content: "dotted" }]), 1);
+    expect(performance.now() - started).toBeLessThan(250);
+    expect(response.content[0]).toMatchObject({ type: "text", text: malformed });
+  });
+
+  it("still resolves dotted and bracketed paths in one placeholder", () => {
+    const nested = parseReplayFixture({
+      scenarios: [{ name: "nested", when: "^nested$", steps: [{ tools: [{ name: "lookup", input: {} }] }, { text: "{{result.a.b[1].c}}" }] }],
+    });
+    const messages: Anthropic.MessageParam[] = [
+      { role: "user", content: "nested" },
+      assistantToolUse(),
+      toolResult({ a: { b: [{ c: "no" }, { c: "yes" }] } }),
+    ];
+    expect(replayResponse(nested, params(messages), 1).content[0]).toMatchObject({ text: "yes" });
+  });
+});
+
 describe("numeric replay result indexed boundary", () => {
   it.each([
     { label: "empty items", items: [] },

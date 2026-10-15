@@ -121,7 +121,8 @@ interface TemplateScope {
   state: { bookings: Json[] };
 }
 
-const PLACEHOLDER = /\{\{(match|result|state)((?:\.[^{}:]+|\[[^\]]+\])*)(:number)?\}\}/g;
+// A dotted segment cannot hold "." or "[", so each path splits one way and a malformed placeholder fails in linear time.
+const PLACEHOLDER = /\{\{(match|result|state)((?:\.[^{}:.[]+|\[[^\]]+\])*)(:number)?\}\}/g;
 const WHOLE_PLACEHOLDER = new RegExp(`^${PLACEHOLDER.source}$`);
 
 function lookup(scope: TemplateScope, source: string, path: string): Json {

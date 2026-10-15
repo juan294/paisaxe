@@ -60,6 +60,8 @@ function callableWorkflow({ definition, workflow }) {
     // This is publication, not app validation. Canonical PR behavior is untouched.
     app.steps = app.steps.filter(step => step.name !== 'Comment on PR');
   }
+  // A scheduled caller can write the default-branch cache scope while this job runs a caller-supplied source_sha.
+  for (const step of app.steps) if (step.uses?.startsWith('actions/setup-node@')) delete step.with?.cache;
   app.permissions = { contents: 'read' };
   app.needs = ['callable-source'];
   app.if = "${{ always() && needs.callable-source.result == 'success' }}";
