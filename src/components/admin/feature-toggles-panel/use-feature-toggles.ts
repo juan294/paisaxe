@@ -66,6 +66,7 @@ export function useFeatureToggles() {
       experience: [],
       social: [],
       voice: [],
+      booking: [],
       system: [],
     };
 
@@ -87,6 +88,7 @@ export function useFeatureToggles() {
       experience: { enabled: 0, total: 0 },
       social: { enabled: 0, total: 0 },
       voice: { enabled: 0, total: 0 },
+      booking: { enabled: 0, total: 0 },
       system: { enabled: 0, total: 0 },
     };
 
