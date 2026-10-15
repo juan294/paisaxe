@@ -154,7 +154,9 @@ probes:
     notes: >-
       PayPal hackathon plan, Phase 6 (F10). A route check only: a 404 for a
       capability that does not exist does not prove the access boundary
-      (booking-access-boundary does, on local Docker). Three GETs. Reads the
+      (booking-access-boundary does, on local Docker). Four GETs: an unknown
+      booking and an unknown operator capability are both 404 with private,
+      no-store headers (#1015). Reads the
       deployed experience_booking flag from /api/feature-flags: on, /acceso
       renders the code form; off, /acceso is a real 404. Holds before and after
       the release turns the flag on.

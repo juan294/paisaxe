@@ -6,6 +6,8 @@
  * are for API route interception (chat, admin, feature flags).
  */
 
+import type { FeatureFlagKey } from "../../src/types/feature-flags";
+
 export const MOCK_CHAT_RESPONSE = {
   message:
     "Los Lagos de Covadonga son dos lagos de origen glaciar situados en los Picos de Europa. Se puede visitar en cualquier época del año.",
@@ -37,47 +39,61 @@ export const MOCK_CHAT_RESPONSE_FOLLOWUP = {
   images: [],
 };
 
-export const MOCK_FEATURE_FLAGS = {
-  data: [
-    { flagKey: "randomized_order", enabled: false },
-    { flagKey: "seasonal_surfacing", enabled: false },
-    { flagKey: "related_stories", enabled: false },
-    { flagKey: "ambient_discovery", enabled: false },
-    { flagKey: "mood_discovery", enabled: false },
-    { flagKey: "surprise_me", enabled: false },
-    { flagKey: "story_freshness", enabled: false },
-    { flagKey: "contextual_prompts", enabled: false },
-    { flagKey: "story_sharing", enabled: false },
-    { flagKey: "asturianu_touches", enabled: false },
-    { flagKey: "user_story_suggestions", enabled: false },
-    { flagKey: "fullscreen_button", enabled: false },
-    { flagKey: "visitor_voice_agent", enabled: false },
-    { flagKey: "booking_system", enabled: false },
-    { flagKey: "autoplay_button", enabled: false },
-    { flagKey: "sms_booking_confirmation", enabled: false },
-    { flagKey: "maintenance_mode", enabled: false },
-    { flagKey: "automated_agents", enabled: false },
-    { flagKey: "coverage_agent_enabled", enabled: false },
-    { flagKey: "security_agent_enabled", enabled: false },
-    { flagKey: "documentation_agent_enabled", enabled: false },
-    { flagKey: "performance_agent_enabled", enabled: false },
-    { flagKey: "qa_agent_enabled", enabled: false },
-    { flagKey: "localization_agent_enabled", enabled: false },
-    { flagKey: "cost_analyst_agent_enabled", enabled: false },
-    { flagKey: "subscription_optimizer_enabled", enabled: false },
-    { flagKey: "content_discovery_agent_enabled", enabled: false },
-  ],
+// Every mock flag starts off. Order follows the original fixture.
+const MOCK_FLAG_KEYS = [
+  "randomized_order",
+  "seasonal_surfacing",
+  "related_stories",
+  "ambient_discovery",
+  "mood_discovery",
+  "surprise_me",
+  "story_freshness",
+  "contextual_prompts",
+  "story_sharing",
+  "asturianu_touches",
+  "user_story_suggestions",
+  "fullscreen_button",
+  "visitor_voice_agent",
+  "booking_system",
+  "experience_booking",
+  "autoplay_button",
+  "sms_booking_confirmation",
+  "maintenance_mode",
+  "automated_agents",
+  "coverage_agent_enabled",
+  "security_agent_enabled",
+  "documentation_agent_enabled",
+  "performance_agent_enabled",
+  "qa_agent_enabled",
+  "localization_agent_enabled",
+  "cost_analyst_agent_enabled",
+  "subscription_optimizer_enabled",
+  "content_discovery_agent_enabled",
+] as const;
+
+type MockFlagKey = (typeof MOCK_FLAG_KEYS)[number];
+
+// Compile-time check: every runtime FeatureFlagKey needs a mock entry, because
+// withFeatureFlags can only turn on a flag that is listed here (#1015).
+function assertEveryFlagMocked<Unmocked extends never>(): void {
+  // Type-level assertion only.
+}
+assertEveryFlagMocked<Exclude<FeatureFlagKey, MockFlagKey>>();
+
+export const MOCK_FEATURE_FLAGS: { data: { flagKey: MockFlagKey; enabled: boolean }[] } = {
+  data: MOCK_FLAG_KEYS.map((flagKey) => ({ flagKey, enabled: false })),
 };
 
 /**
  * Create a feature flags mock with specific overrides.
- * All flags default to `false` unless overridden.
+ * All flags default to `false` unless overridden. Only listed flags are
+ * accepted, so a misspelled or unmocked flag fails the typecheck.
  *
  * @example
  * withFeatureFlags({ user_story_suggestions: true, fullscreen_button: true })
  */
 export function withFeatureFlags(
-  overrides: Record<string, boolean>
+  overrides: Partial<Record<MockFlagKey, boolean>>
 ): typeof MOCK_FEATURE_FLAGS {
   return {
     data: MOCK_FEATURE_FLAGS.data.map((flag) => ({
