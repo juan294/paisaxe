@@ -23,6 +23,9 @@ case "$FAKE_CLAUDE_MODE" in
   auth) echo 'Failed to authenticate' >&2; exit 1 ;;
   error) echo 'unrelated provider failure' >&2; exit 1 ;;
   success) printf '# Check Report\n\nFresh Claude analysis.\n' > "$FAKE_REPORT_FILE" ;;
+  wrongtitle) printf '# Other Title\n\nWrong heading.\n' > "$FAKE_REPORT_FILE" ;;
+  nowrite) : ;;
+  exit9) exit 9 ;;
 esac
 EOF
 cat > "$CODEX_BIN" <<'EOF'
@@ -78,5 +81,25 @@ grep -q 'Fresh Claude analysis' "$REPORT_FILE"
 export FAKE_CLAUDE_MODE=error FAKE_CODEX_MODE=success
 if run_case; then echo 'Unrelated Claude error fell back' >&2; exit 1; fi
 grep -q 'Old report' "$REPORT_FILE"
+
+# A rejection must say why and keep the rejected output for inspection.
+REJECTED_FILE="${LOG_FILE%.log}.rejected.md"
+ERR_FILE="$TEST_ROOT/err"
+
+export FAKE_CLAUDE_MODE=wrongtitle FAKE_CODEX_MODE=success
+rm -f "$REJECTED_FILE"
+if run_case 2>"$ERR_FILE"; then echo 'Wrong-title report was accepted' >&2; exit 1; fi
+grep -q 'Old report' "$REPORT_FILE" || { echo 'Old report not restored after wrong title' >&2; exit 1; }
+grep -q "first line is '# Other Title'" "$ERR_FILE" || { echo 'Wrong-title reason missing' >&2; cat "$ERR_FILE" >&2; exit 1; }
+grep -q 'Wrong heading' "$REJECTED_FILE" || { echo 'Rejected output not kept' >&2; exit 1; }
+
+export FAKE_CLAUDE_MODE=nowrite
+rm -f "$REJECTED_FILE"
+if run_case 2>"$ERR_FILE"; then echo 'Unchanged report was accepted' >&2; exit 1; fi
+grep -q 'report file unchanged' "$ERR_FILE" || { echo 'Unchanged reason missing' >&2; cat "$ERR_FILE" >&2; exit 1; }
+
+export FAKE_CLAUDE_MODE=exit9
+if run_case 2>"$ERR_FILE"; then echo 'Failed Claude run was accepted' >&2; exit 1; fi
+grep -q 'Claude exited 9' "$ERR_FILE" || { echo 'Exit status reason missing' >&2; cat "$ERR_FILE" >&2; exit 1; }
 
 echo 'agent-runtime tests passed'

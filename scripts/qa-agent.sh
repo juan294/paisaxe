@@ -194,10 +194,14 @@ else
 
   # VOYAGE_API_KEY (and ANTHROPIC_API_KEY) are already exported above when
   # present — no need to re-prefix them per-command.
-  npm run build > "$SERVER_LOG" 2>&1
-  BUILD_EXIT=$?
+  # `set -e` would abort on a bare failing build before BUILD_EXIT is read.
+  BUILD_EXIT=0
+  npm run build > "$SERVER_LOG" 2>&1 || BUILD_EXIT=$?
   if [[ $BUILD_EXIT -ne 0 ]]; then
-    log_error "Production build failed (exit $BUILD_EXIT) — see $SERVER_LOG" | tee -a "$LOG_FILE"
+    log_error "Production build failed (exit $BUILD_EXIT) — see $SERVER_LOG" 2>&1 | tee -a "$LOG_FILE"
+    if grep -Eqi "heap out of memory|allocation fail" "$SERVER_LOG"; then
+      log_error "Build hit the V8 heap limit. Run 'npm ls' in $PROJECT_DIR: packages reported invalid mean node_modules is older than package-lock.json, so run 'npm ci' there." 2>&1 | tee -a "$LOG_FILE"
+    fi
     exit 1
   fi
   log_success "Production build complete" | tee -a "$LOG_FILE"

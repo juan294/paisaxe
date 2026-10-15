@@ -83,7 +83,7 @@ The production license check (`npm run check-licenses`) now enforces an allowlis
 
 | Field | Value |
 |-------|-------|
-| Packages | `lightningcss@1.32.0` and its platform binaries (`lightningcss-darwin-arm64`, `-linux-x64-gnu`, `-win32-x64-msvc`, and the ~9 other `lightningcss-<platform>` variants) |
+| Packages | `lightningcss@1.32.0` (via `@tailwindcss/node@4.3.3`), `lightningcss@1.33.0` (via `vite@8.3.2`; added to this record 2026-10-15, same license and same build-time-only use) and their platform binaries (`lightningcss-darwin-arm64`, `-linux-x64-gnu`, `-win32-x64-msvc`, and the ~9 other `lightningcss-<platform>` variants) |
 | License | MPL-2.0 (Mozilla Public License 2.0) |
 | Parent dependency | `@tailwindcss/postcss` → `@tailwindcss/node` (Tailwind CSS v4 build tooling) and `vite` (via `@vitejs/plugin-react`) |
 | Dependency type | **devDependency / build-time only** — not shipped to clients |

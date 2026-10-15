@@ -251,6 +251,41 @@ describe("verification coverage config", () => {
     expect(qaAgent).toContain("Production build failed");
   });
 
+  // 2026-10-15: `next build` ran out of heap in the TypeScript step. With `set -e`
+  // the bare `npm run build` aborted the script before BUILD_EXIT was read, so the
+  // log said only "command failed at line N" and never named the build.
+  it("reports a failed QA production build instead of aborting silently", () => {
+    const qaAgent = readText("scripts/qa-agent.sh");
+
+    expect(qaAgent).toContain('BUILD_EXIT=0');
+    expect(qaAgent).toContain('npm run build > "$SERVER_LOG" 2>&1 || BUILD_EXIT=$?');
+    expect(qaAgent).toContain("heap out of memory");
+    expect(qaAgent).toContain("npm ls");
+  });
+
+  // 2026-10-15: the coverage agent ran against the shared developer stack, whose
+  // webhook_config points at production. The suites' own guard refused it and four
+  // files failed. Hosted CI has no stack, so those suites self-skip there; the
+  // agent must measure the same way.
+  it("measures coverage without the shared local Supabase stack", () => {
+    const coverageAgent = readText("scripts/coverage-agent.sh");
+
+    expect(coverageAgent).toContain('export SUPABASE_LOCAL_API_URL="http://127.0.0.1:9"');
+    expect(coverageAgent.indexOf("export SUPABASE_LOCAL_API_URL")).toBeLessThan(
+      coverageAgent.indexOf("run_scheduled_analysis")
+    );
+  });
+
+  // 2026-10-15: a rejected report aborted the script before the gaps file was
+  // removed, leaving .docs-gaps.tmp untracked in the repository root.
+  it("removes the documentation gaps file on every exit", () => {
+    const docsAgent = readText("scripts/documentation-agent.sh");
+    const cleanup = /cleanup_documentation_report\(\) \{[\s\S]*?\n\}/.exec(docsAgent)?.[0] ?? "";
+
+    expect(cleanup).toMatch(/rm -f [^\n]*"\$GAPS_FILE"/);
+    expect(docsAgent.indexOf("GAPS_FILE=")).toBeLessThan(docsAgent.indexOf("cleanup_documentation_report() {"));
+  });
+
   // QA-H3 (#870): the SSE endpoint real users hit, not the legacy
   // non-streaming JSON endpoint.
   it("targets the streaming chat endpoint real users hit", () => {
