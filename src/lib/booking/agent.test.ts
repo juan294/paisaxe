@@ -95,20 +95,19 @@ beforeEach(() => {
 });
 
 describe("streamBookingTurn", () => {
-  it("streams text, runs the tool, emits its status and card, and continues with the tool result", async () => {
+  it("runs the tool, emits its status and card, continues with the tool result, and shows only the answer", async () => {
     const fake = fakeAnthropic([
       { texts: ["Miro "], content: [{ type: "text", text: "Miro " }, toolUse("tu_1")], stopReason: "tool_use" },
-      { texts: ["Hay opciones."], content: [{ type: "text", text: "Hay opciones." }], stopReason: "end_turn" },
+      { texts: ["Hay ", "opciones."], content: [{ type: "text", text: "Hay opciones." }], stopReason: "end_turn" },
     ]);
 
     const events = await collect(streamBookingTurn(input(fake.client)));
 
     expect(events).toEqual([
-      { type: "text", content: "Miro " },
       { type: "tool", name: "search_experiences", status: "start" },
       { type: "tool", name: "search_experiences", status: "done" },
       { type: "card", card: { kind: "offer", options: [] } },
-      { type: "text", content: "\n\nHay opciones." },
+      { type: "text", content: "Hay opciones." },
     ]);
     expect(executeBookingTool).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1" }),
@@ -186,12 +185,23 @@ describe("streamBookingTurn", () => {
 
   it("does not retry once something was sent; the error propagates", async () => {
     const fake = fakeAnthropic([
+      { content: [toolUse("tu_1")], stopReason: "tool_use" },
       { texts: ["Hola"], content: [], stopReason: "end_turn", failAfterText: new Error("socket hang up") },
       { texts: ["never"], content: [], stopReason: "end_turn" },
     ]);
 
     await expect(collect(streamBookingTurn(input(fake.client)))).rejects.toThrow("socket hang up");
-    expect(fake.stream).toHaveBeenCalledTimes(1);
+    expect(fake.stream).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries when the model fails mid-answer before anything reached the visitor", async () => {
+    const fake = fakeAnthropic([
+      { texts: ["Hola"], content: [], stopReason: "end_turn", failAfterText: new Error("socket hang up") },
+      { texts: ["Hola de nuevo"], content: [], stopReason: "end_turn" },
+    ]);
+
+    expect(await collect(streamBookingTurn(input(fake.client)))).toEqual([{ type: "text", content: "Hola de nuevo" }]);
+    expect(fake.stream).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the cached system block identical across turns and puts the per-turn state in the unmarked block", async () => {
@@ -252,15 +262,27 @@ describe("streamBookingTurn", () => {
     expect(options.signal).toBe(controller.signal);
   });
 
-  it("separates the text of consecutive model iterations with a paragraph break", async () => {
+  it("never shows the text the model writes before a tool call (#1037)", async () => {
+    const preamble = "Hoy es viernes 2026-10-16, así que el martes es 2026-10-20. Guardo los datos y busco.";
     const fake = fakeAnthropic([
-      { texts: ["Miro para mañana."], content: [toolUse("tu_1")], stopReason: "tool_use" },
-      { texts: ["Pues no hay plazas."], content: [], stopReason: "end_turn" },
+      { texts: [preamble], content: [{ type: "text", text: preamble }, toolUse("tu_1")], stopReason: "tool_use" },
+      { texts: ["Voy a preparar la oferta."], content: [toolUse("tu_2")], stopReason: "tool_use" },
+      { texts: ["Hay plazas a las 10:00 y a las 16:00."], content: [], stopReason: "end_turn" },
     ]);
 
     const events = await collect(streamBookingTurn(input(fake.client)));
     const text = events.flatMap((e) => ((e as { type: string }).type === "text" ? [(e as { content: string }).content] : [])).join("");
-    expect(text).toBe("Miro para mañana.\n\nPues no hay plazas.");
+    expect(text).toBe("Hay plazas a las 10:00 y a las 16:00.");
+    // The model still sees its own words in the turn's tool loop.
+    const third = requiredValue(fake.calls[2], "src/lib/booking/agent.test.ts third call").params.messages as { role: string; content: unknown }[];
+    expect(third.at(-4)).toEqual({ role: "assistant", content: [{ type: "text", text: preamble }, toolUse("tu_1")] });
+  });
+
+  it("shows the answer of a turn that stops at max_tokens or refuses after writing", async () => {
+    for (const stopReason of ["max_tokens", "refusal"] as const) {
+      const fake = fakeAnthropic([{ texts: ["Entiendo que quieres seguir"], content: [], stopReason }]);
+      expect(await collect(streamBookingTurn(input(fake.client)))).toEqual([{ type: "text", content: "Entiendo que quieres seguir" }]);
+    }
   });
 
   it("tells the model the visitor's interface language", async () => {

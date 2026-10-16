@@ -3,7 +3,8 @@ import { interpolate } from "@/lib/i18n/interpolate";
  * The booking conversation's tool loop (PayPal hackathon plan, Phase 3).
  *
  * Streams one visitor turn through the Anthropic SDK with the booking tools:
- * text deltas are yielded as they arrive; when the model asks for tools they
+ * a model call's text is yielded when the call ends, and only if it did not
+ * end in a tool call (that text announces the tool, #1037); when the model asks for tools they
  * run one after another (so two get_quote calls on one draft never race),
  * their status and cards are yielded, and the model continues with the
  * results. At most MAX_TOOL_ITERATIONS model calls per turn.
@@ -132,35 +133,31 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
   const tools = bookingToolDefinitions();
   const messages = conversation(input);
 
-  let textSent = false;
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const stream = input.anthropic.messages.stream(
       { model: CHAT_MODEL, max_tokens: MAX_TOKENS, output_config: { effort: EFFORT }, system, tools, messages },
       { signal: input.signal }
     );
-    // A later iteration's text starts a new paragraph after earlier text.
-    let separate = textSent;
+    // Held until the call ends: text written before a tool call is the model
+    // announcing it ("Guardo los datos y busco", #1037), never the answer.
+    let text = "";
     for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta" && event.delta.text) {
-        yield { type: "text", content: separate ? `\n\n${event.delta.text}` : event.delta.text };
-        separate = false;
-        textSent = true;
-      }
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") text += event.delta.text;
     }
 
     const final = await stream.finalMessage();
     recordAnthropicUsageInBackground({ model: CHAT_MODEL, usage: final.usage, source: "booking_chat" });
-    if (final.stop_reason === "refusal") {
-      logger.warn("[BOOKING_CHAT_REFUSAL]", { userId: input.tools.userId, textSent });
-      // Before any text the route answers ai_unavailable; after it, the turn just ends.
-      if (!textSent) throw new Error("refusal");
+    if (final.stop_reason !== "tool_use") {
+      if (text) yield { type: "text", content: text };
+      if (final.stop_reason === "refusal") {
+        logger.warn("[BOOKING_CHAT_REFUSAL]", { userId: input.tools.userId, textSent: text !== "" });
+        // Before any text the route answers ai_unavailable; after it, the turn just ends.
+        if (!text) throw new Error("refusal");
+      } else if (final.stop_reason === "max_tokens") {
+        logger.warn("[BOOKING_CHAT_MAX_TOKENS]", { userId: input.tools.userId, outputTokens: final.usage.output_tokens });
+      }
       return;
     }
-    if (final.stop_reason === "max_tokens") {
-      logger.warn("[BOOKING_CHAT_MAX_TOKENS]", { userId: input.tools.userId, outputTokens: final.usage.output_tokens });
-      return;
-    }
-    if (final.stop_reason !== "tool_use") return;
 
     messages.push({ role: "assistant", content: final.content });
     const results: Anthropic.ToolResultBlockParam[] = [];
