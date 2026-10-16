@@ -72,9 +72,25 @@ Not covered: the PostHog debug view check deferred from the 2026-10-07 local ses
 
 RS-37C8D0 and RS-0E38B5 stay confirmed as fixture rows for 2026-10-20 and 2026-10-22.
 
+## Step 4: repeatability rehearsal (2026-10-16)
+
+The browser's Supabase session was cleared before each redemption, so each one started as a
+judge's fresh browser would: no session, anonymous sign-in on submit.
+
+| Item | Result |
+| --- | --- |
+| First judge redemption | 05:34:37, anonymous user, voice pass until 2026-10-17 05:34:37 |
+| Booking with that redemption | RS-8DACD2 (canoe descent, 2026-10-23 16:00, 2 people, deposit 1500), owned by the anonymous user; order `0K1902610A108612W`, capture `43L95328HD4997907` at 05:37:17 (return path); `CHECKOUT.ORDER.APPROVED` `WH-5GG4012170690305T-38022385EG283825W` received 05:37:18.70, processed 05:37:18.95; booking `confirmed` |
+| Allowance used | 1 of 10 booking attempts, 3 of 60 chat turns |
+| Second judge redemption | 05:38:50, a second anonymous user with 0 attempts and 0 turns used; the voucher now shows 2 of 50 redemptions |
+
+The first use did not consume the voucher. This proves same-day repeatability only; continuity
+through judging is step 8. The availability preamble from #1037 appeared again in this session.
+
+RS-8DACD2 stays confirmed as a fixture row for 2026-10-23.
+
 ## Remaining steps
 
-4. Repeatability rehearsal with the judge voucher.
 5. Video ([#1019](https://github.com/juan294/paisaxe/issues/1019)).
 7. Submission.
 8. Judging continuity checks on Nov 30 and Dec 8.
