@@ -70,7 +70,7 @@ export function admissionDisposition({decision}) {
 
 /** Concrete CLI invoked exclusively by the reviewed builtins-only loader. */
 export async function controlMain(purpose, { definitionSha, sourceSha, root = process.cwd() }) {
-  need(process.env.CI_CADENCE_MODE === 'lean');
+  // The native receipt path uses its immutable v1 contract; routing has no hosted mode switch.
   const runId = Number(process.env.GITHUB_RUN_ID), attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
   const token = process.env.GITHUB_TOKEN;
   if(purpose === 'admit') {

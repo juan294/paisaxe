@@ -182,13 +182,13 @@ for (const [label, id] of [['missing', () => 'e'.repeat(40)], ['non-commit', (f,
   assert.equal(result, 'Control object absent from checkout'); assert.deepEqual(network, []);
 });
 test('every job that runs a protected launcher checks out full history', () => {
-  const launcher = /scripts\/ci-cadence-(?:control-)?launch\.mjs/; let jobs = 0;
+  const launcher = /scripts\/ci-cadence-(?:control-)?launch\.mjs/; const jobs = [];
   for (const name of ['ci-cadence.yml', 'ci-nightly.yml', 'ci-cadence-finalize.yml']) for (const [id, job] of Object.entries(workflow(name).jobs)) {
-    if (!(job.steps ?? []).some(step => launcher.test(step.run ?? ''))) continue; jobs++;
+    if (!(job.steps ?? []).some(step => launcher.test(step.run ?? ''))) continue; jobs.push(`${name}:${id}`);
     const checkout = job.steps.find(step => step.uses?.startsWith('actions/checkout@'));
     assert.equal(checkout?.with?.['fetch-depth'], 0, `${name}:${id}`);
   }
-  assert.equal(jobs, 6);
+  assert.deepEqual(jobs, ['ci-cadence.yml:entry', 'ci-nightly.yml:admission', 'ci-nightly.yml:measurement', 'ci-cadence-finalize.yml:finalize']);
 });
 each('absent installation disables new nightly without integration resolution', async f => { const x = await f.prepare('schedule', { definition: f.absent }); const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'disabled'); assert.equal(f.requests.filter(r => r.url.endsWith('/git/ref/heads/develop')).length, 0); });
 each('partial installation blocks before code import', async f => { const x = await f.prepare('push', { definition: f.partial }); const r = await launchNative(x.input, x.transports); assert.equal(r.lane, 'blocked'); assert.equal(r.protectedImported, false); });

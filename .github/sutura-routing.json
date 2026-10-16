@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "owner": "sutura",
+  "files": {
+    "scripts/ci-routing-v2.mjs": "0c185fffc97137c5f03858f19de9e204424f90917935138cbb072483c53b8af6",
+    "scripts/ci-routing-workflow-v2.mjs": "c580189d10424c68b68eaeea8cbf478b3cd6a4bd947fd9d8b2414ab15a5d7dce"
+  }
+}

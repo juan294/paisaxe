@@ -8,17 +8,14 @@ import { generateExtraWorkflows } from './ci-cadence-extra-workflows.mjs';
 import { routeOriginalWorkflow } from './ci-cadence-route-originals.mjs';
 const canonical = '.github/workflows/';
 const fastJobPath = '.github/ci-cadence-fast-job.yml';
-// GitHub's `==` ignores case, so a variable set to `LEAN` satisfies every YAML
-// predicate. Shell and JS compare exactly: they only ever receive this value.
-const MODE = "${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}";
 const calls = { ci:'ci.yml', e2e:'ci-cadence-e2e-full.yml', lighthouse:'ci-cadence-lighthouse-full.yml', 'bundle-size':'ci-cadence-bundle-size-full.yml', knip:'ci-cadence-knip-full.yml', 'license-check':'ci-cadence-license-check-full.yml', security:'ci-cadence-security-full.yml' };
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const blob = bytes => createHash('sha1').update(`blob ${Buffer.byteLength(bytes)}\0`).update(bytes).digest('hex');
 const permission = {contents:'read',actions:'read',checks:'read','pull-requests':'read'};
 const acquired = (file,purpose,root) => {
   const pin = sha256(readFileSync(resolve(root,'scripts/'+file)));
-  // Admission and measurement read the loader from the push `before`, so a loader
-  // change cannot match until it lands; they run only under lean, hence the repair.
+  // Native admission and measurement require the installed protected loader;
+  // original application verification never imports a candidate loader.
   const label = file === 'ci-cadence-control-launch.mjs' ? 'control loader' : 'launcher';
   return `set -euo pipefail
 unset NODE_OPTIONS NODE_PATH
@@ -30,7 +27,7 @@ chmod 700 "$private"
 trap 'rm -rf "$private"' EXIT
 git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/${file}" > "$private/${file}"
 if ! printf '%s  %s\n' '${pin}' "$private/${file}" | sha256sum --check --status; then
-  reason='${label} change: the protected base ${label} differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the ${label} change on the base branch, then set lean again.'
+  reason='${label} change: the protected base ${label} differs from the reviewed pin in this workflow. Bring this protected ${label} change to Sutura. Application verification runs through the separately required original workflow gates; reusable native evidence remains unavailable until reviewed installation.'
   echo "::error title=CI cadence::$reason"
   echo "$reason" >> "$GITHUB_STEP_SUMMARY"
   exit 1
@@ -45,7 +42,7 @@ function standaloneCoverage(root) {
   const original=JSON.parse(bytes).source,value=parse(original),job=value.jobs.coverage;
   // Coverage runs on main push, schedule and dispatch; a schedule payload need not carry sender.
   const owner="github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User'))";
-  const lean="vars.CI_CADENCE_MODE == 'lean' && "+owner;
+  const lean=owner;
   job.permissions={contents:'read'};
   job.steps[0].name='Checkout measured main source';job.steps[0].with={'fetch-depth':0,'persist-credentials':false};
   job.steps[1].name='Setup reviewed Node runtime';job.steps[1].with['node-version']='24.21.0';
@@ -58,8 +55,8 @@ function standaloneCoverage(root) {
   job.steps.splice(1,0,before);
   const suite=job.steps.find(step=>step.name==='Run authoritative coverage suite');
   const previous=suite.run;
-  const eligibility={name:'Decide weekly native coverage eligibility',id:'cadence-calendar',env:{CI_CADENCE_MODE:MODE,NATIVE_OWNER:'${{ '+owner+' }}'},run:`set -euo pipefail
-if test "$CI_CADENCE_MODE" = lean && test "$NATIVE_OWNER" = true && test "$GITHUB_EVENT_NAME" = schedule && test "$(date -u +%u)" != 1; then
+  const eligibility={name:'Decide weekly native coverage eligibility',id:'cadence-calendar',env:{NATIVE_OWNER:'${{ '+owner+' }}'},run:`set -euo pipefail
+if test "$NATIVE_OWNER" = true && test "$GITHUB_EVENT_NAME" = schedule && test "$(date -u +%u)" != 1; then
   echo 'eligible=false' >> "$GITHUB_OUTPUT"
 else
   echo 'eligible=true' >> "$GITHUB_OUTPUT"
@@ -69,9 +66,9 @@ fi
   for(const step of job.steps)if(step!==eligibility)step.if='${{ steps.cadence-calendar.outputs.eligible == \'true\' }}';
   before.if='${{ steps.cadence-calendar.outputs.eligible == \'true\' && '+lean+' }}';
   after.if=before.if;
-  suite.env={CI_CADENCE_MODE:MODE,NATIVE_OWNER:'${{ '+owner+' }}'};
+  suite.env={NATIVE_OWNER:'${{ '+owner+' }}'};
   suite.run=`set -euo pipefail
-if test "$CI_CADENCE_MODE" = lean && test "$NATIVE_OWNER" = true; then
+if test "$NATIVE_OWNER" = true; then
 node --input-type=module <<'NODE'
 import {spawnSync} from 'node:child_process';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -104,10 +101,10 @@ ${closure}`;
   return {path:canonical+'coverage.yml',source:stringify(value,{lineWidth:0})};
 }
 function nativeWorkflows(root) {
-  const enabled = "vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118'";
+  const enabled = "github.repository_id == '1141286326' && github.repository_owner_id == '3944118'";
   const native = [ {name:'Checkout native definition',uses:'actions/checkout@v7',with:{ref:'${{ github.sha }}','fetch-depth':0,'persist-credentials':false}}, {name:'Setup reviewed Node runtime',uses:'actions/setup-node@v7',with:{'node-version':'24.21.0'}} ];
   const evidence = '${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}';
-  const environment = { GITHUB_TOKEN:'${{ github.token }}', CI_CADENCE_MODE:MODE, CI_CADENCE_DEFINITION_SHA:'${{ github.sha }}', CI_CADENCE_EVIDENCE_DIR:evidence, NODE_OPTIONS:'',NODE_PATH:'' };
+  const environment = { GITHUB_TOKEN:'${{ github.token }}',  CI_CADENCE_DEFINITION_SHA:'${{ github.sha }}', CI_CADENCE_EVIDENCE_DIR:evidence, NODE_OPTIONS:'',NODE_PATH:'' };
   const launch = acquired('ci-cadence-launch.mjs','',root).replace(/node "\$private\/ci-cadence-launch.mjs" \n$/,`node "$private/ci-cadence-launch.mjs" > "$RUNNER_TEMP/B-native.json"
 python3 - <<'PY' >> "$GITHUB_ENV"
 import json,os,re
@@ -132,27 +129,14 @@ PY
   // A push run scans only its own before..after, so it is never cancelled, and
   // its group is per commit so a later push cannot evict it while it is pending.
   fastRoot.concurrency={group:"B-cadence-${{ github.event_name == 'pull_request' && github.ref || github.sha }}",'cancel-in-progress':"${{ github.event_name == 'pull_request' }}"};
-  // The inlined job IS the `CI Fast` context and the only routine runner. It has
-  // no mode term, so it is produced under legacy too; recovery children start
-  // only on a lean "full" decision, and legacy keeps its original workflows.
+  // Native bounded work stays separate from the required original full gates.
   const fastJob=parse(readFileSync(resolve(root,fastJobPath),'utf8'));
   const rootGuard=fastJob.if.replace(/\s+/g,' ').trim();
   fastRoot.jobs.entry={...fastJob,if:rootGuard,permissions:{contents:'read'}};
-  fastRoot.jobs.admission.needs=['entry'];
-  fastRoot.jobs.admission.if="needs.entry.outputs.decision == 'full' && github.event_name == 'push'";
-  fastRoot.jobs.admission.steps=fastRoot.jobs.admission.steps.filter(s=>s.name!=='Resolve once and authenticate native source');
-  for(const step of fastRoot.jobs.admission.steps)if(step.env)step.env={...step.env,CI_CADENCE_DEFINITION_SHA:'${{ needs.entry.outputs.definition_sha }}',CI_CADENCE_SOURCE_SHA:'${{ needs.entry.outputs.source_sha }}'};
-  for(const slug of Object.keys(calls)){const j=fastRoot.jobs[slug];j.needs=['entry','admission'];j.if="always() && needs.entry.result == 'success' && needs.entry.outputs.decision == 'full' && (github.event_name == 'pull_request' || needs.admission.result == 'success')";j.with.profile='full';j.with.source_sha='${{ needs.entry.outputs.checkout_sha }}';}
-  fastRoot.jobs.measurement.needs=['entry','admission',...Object.keys(calls)];
-  fastRoot.jobs.measurement.if="always() && github.event_name == 'push' && needs.entry.outputs.decision == 'full' && needs.admission.result == 'success' && "+Object.keys(calls).map(id=>`needs.${id}.result == 'success'`).join(' && ');
-  for(const step of fastRoot.jobs.measurement.steps)if(step.env)step.env={...step.env,CI_CADENCE_DEFINITION_SHA:'${{ needs.entry.outputs.definition_sha }}',CI_CADENCE_SOURCE_SHA:'${{ needs.entry.outputs.source_sha }}'};
-  // Starts a runner only when recovery children ran; otherwise skipped at no cost.
-  fastRoot.jobs.complete.name='CI Fast recovery';fastRoot.jobs.complete.needs=['entry','admission',...Object.keys(calls),'measurement'];fastRoot.jobs.complete.if="${{ always() && "+rootGuard+" && needs.entry.outputs.decision == 'full' }}";
-  fastRoot.jobs.complete.steps=[{name:'Require every full recovery child',env:{ENTRY:'${{ needs.entry.result }}',ADMISSION:'${{ needs.admission.result }}',EVENT:'${{ github.event_name }}',MEASURED:'${{ needs.measurement.result }}',...Object.fromEntries(Object.keys(calls).map((id,i)=>['CHILD_'+i,'${{ needs.'+id+'.result }}']))},run:`set -euo pipefail
-test "$ENTRY" = success
-for result in ${Object.keys(calls).map((_,i)=>'"$CHILD_'+i+'"').join(' ')}; do test "$result" = success; done
-if test "$EVENT" = push; then test "$ADMISSION" = success; test "$MEASURED" = success; else test "$ADMISSION" = skipped; test "$MEASURED" = skipped; fi
-`}];
+  // Routine runs never call or measure the owner/nightly graph.
+  fastRoot.jobs={entry:fastRoot.jobs.entry,complete:{name:'CI Fast recovery',needs:['entry'],'runs-on':'ubuntu-latest',permissions:permission}};
+  fastRoot.jobs.complete.if="${{ always() && "+rootGuard+" }}";
+  fastRoot.jobs.complete.steps=[{name:'Require automatic original-workflow disposition',env:{ENTRY:'${{ needs.entry.result }}',DECISION:'${{ needs.entry.outputs.decision }}'},run:'set -euo pipefail\ntest "$ENTRY" = success\ncase "$DECISION" in\n skip) echo "Protected bounded verification passed; application full work is not required." ;;\n originals) echo "Full application verification belongs to separately required CI Verification gates in the original workflows. This policy disposition is not application or release evidence." ;;\n *) exit 1 ;;\nesac\n'}];
   return [{path:canonical+'ci-nightly.yml',source:stringify(nightly,{lineWidth:0})}, {path:canonical+'ci-cadence.yml',source:stringify(fastRoot,{lineWidth:0})},
     {path:canonical+'ci-cadence-finalize.yml',source:stringify({name:'CI cadence completed evidence',on:{workflow_run:{workflows:['CI nightly','Coverage'],types:['completed']}},permissions:permission,concurrency:{group:'B-finalize-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}','cancel-in-progress':false},jobs:{finalize:{if:enabled+" && github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.conclusion == 'success'",'runs-on':'ubuntu-latest',permissions:permission,'timeout-minutes':6,steps:[...native,{name:'Authenticate original completed attempt',env:{...environment,COVERAGE_SECRET:"${{ github.event.workflow_run.path == '.github/workflows/coverage.yml' && secrets.COVERAGE_SECRET || '' }}"},run:acquired('ci-cadence-control-launch.mjs','finalize',root)}]}}},{lineWidth:0})}];
 }
@@ -181,7 +165,7 @@ export function generateNativeWorkflows(root=process.cwd()) {
     const original=policy.workflows.find(w=>w.path===canonical+slug+'.yml');if(!original)throw Error('Canonical app catalogue changed');
     for(const app of original.jobs){const id=app.id.startsWith('ci-coverage-shard-')?'coverage-shard':app.id.slice(slug.length+1);const job=definition.jobs[id];if(!job)throw Error('Callable app disappeared');const steps=job.steps.map(step=>step.name);if(steps.some(name=>typeof name!=='string'||!name)||new Set(steps).size!==steps.length)throw Error('Explicit step census required');stepInventory[app.id]=[...steps,'Set up job','Complete job',...job.steps.filter(step=>step.uses).map(step=>'Post '+step.name)];}
     for(const id of ['callable-source','callable-full']){const job=definition.jobs[id];if(!job)throw Error('Callable auxiliary disappeared');auxiliaryJobs.push({name:slug+' / '+job.name,conclusions:['success'],steps:[...job.steps.map(step=>({name:step.name,conclusions:['success']})),{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}]});}
-    if(slug==='ci')auxiliaryJobs.push({name:'ci / develop_push_source',conclusions:['skipped'],steps:[]});
+    if(slug==='ci')for(const name of ['develop_push_source','Sutura routing','CI Verification (CI)'])auxiliaryJobs.push({name:'ci / '+name,conclusions:['skipped'],steps:[]});
   }
   auxiliaryJobs.push({name:'Nightly disposition',conclusions:['success'],steps:[{name:'Require real full proof or unchanged skip',conclusions:['success']},{name:'Set up job',conclusions:['success']},{name:'Complete job',conclusions:['success']}]});
   const nestedCallees=findNestedCallees(Object.values(callees).map(c=>c.path),source,path=>blob(source(path)));
@@ -194,7 +178,7 @@ export function generateNativeWorkflows(root=process.cwd()) {
   const coverageOnly={path:canonical+'coverage.yml',blobSha:blob(source(canonical+'coverage.yml')),steps:coverageDefinition.jobs.coverage.steps.map(step=>({name:step.name,conclusions:step.name==='Decide weekly native coverage eligibility'?['success']:step.name==='Report coverage to Portfolio'?['skipped']:['success','skipped'],post:Boolean(step.uses)}))};
   const callers=Object.fromEntries(['ci-nightly.yml','ci-cadence.yml'].map(path=>[canonical+path,{path:canonical+path,blobSha:pins[canonical+path]}]));
   files.push({path:'.github/ci-cadence-native.json',source:JSON.stringify({schemaVersion:1,repository:'juan294/paisaxe',caller:callers[canonical+'ci-nightly.yml'],callers,callees,nestedCallees,coverageOnly,workflowPins:pins,stepInventory,auxiliaryJobs,censusByCaller:{[canonical+'ci-nightly.yml']:auxiliaryJobs,[canonical+'ci-cadence.yml']:pushAuxiliary}},null,2)+'\n'});
-  const updatedPolicy=structuredClone(policy);for(const w of updatedPolicy.workflows)w.definitionSha=blob(source(w.path));
+  const updatedPolicy={...structuredClone(policy),ownerId:3944118};for(const w of updatedPolicy.workflows)w.definitionSha=blob(source(w.path));
   files.push({path:'.github/ci-cadence.json',source:JSON.stringify(updatedPolicy,null,2)+'\n'});
   return files;
 }

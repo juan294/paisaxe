@@ -12,7 +12,7 @@ import { parse } from 'yaml';
 const original = JSON.parse(readFileSync(new URL('../tests/fixtures/ci-cadence-adapter/native/workflow-baseline.json', import.meta.url), 'utf8'));
 const baseline = parse(original.originalWorkflow);
 const current = () => parse(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
-const direct = (ref = 'refs/heads/develop', event = 'push') => ({ vars:{CI_CADENCE_MODE:'legacy'}, inputs: { profile: '', source_sha: '', invocation_id: '' }, github: { actor_id:'3944118',event:{sender:{type:'User'},pull_request:{user:{id:3944118,type:'User'},head:{repo:{id:1141286326}}}}, repository: 'juan294/paisaxe', repository_id: '1141286326', repository_owner_id: '3944118', ref, event_name: event, workflow: 'CI', workflow_ref: `juan294/paisaxe/.github/workflows/ci.yml@${ref}`, run_id: '42', run_attempt: '1', sha: 'a'.repeat(40) }, needs: { develop_push_source: { result: 'skipped', outputs: { validated_by_pr: '' } }, 'callable-source': { result: 'skipped' }, 'lint-and-typecheck': { result: 'success' }, 'coverage-shard': { result: 'success' }, 'coverage-merge': { result: 'success' }, test: { result: 'success' }, build: { result: 'success' } } });
+const direct = (ref = 'refs/heads/develop', event = 'push') => ({ vars:{CI_CADENCE_MODE:'legacy'}, inputs: { profile: '', source_sha: '', invocation_id: '' }, github: { actor_id:'3944118',event:{sender:{type:'User'},pull_request:{user:{id:3944118,type:'User'},head:{repo:{id:1141286326}}}}, repository: 'juan294/paisaxe', repository_id: '1141286326', repository_owner_id: '3944118', ref, event_name: event, workflow: 'CI', workflow_ref: `juan294/paisaxe/.github/workflows/ci.yml@${ref}`, run_id: '42', run_attempt: '1', sha: 'a'.repeat(40) }, needs: { routing:{result:'success',outputs:{full:'true',reason:'application'}},develop_push_source: { result: 'skipped', outputs: { validated_by_pr: '' } }, 'callable-source': { result: 'skipped' }, 'lint-and-typecheck': { result: 'success' }, 'coverage-shard': { result: 'success' }, 'coverage-merge': { result: 'success' }, test: { result: 'success' }, build: { result: 'success' } } });
 const called = (profile = 'nightly') => { const c = direct('refs/heads/main', 'schedule'); c.github.workflow = 'Nightly'; c.github.workflow_ref = 'juan294/paisaxe/.github/workflows/ci-nightly.yml@refs/heads/main'; c.inputs = { profile, source_sha: 'b'.repeat(40), invocation_id: 'ci_full' }; c.needs['callable-source'].result = 'success'; return c; };
 function evaluate(expression, context) {
   if (typeof expression !== 'string') return expression;
@@ -29,7 +29,7 @@ const sourceEnv = (change = {}) => ({ GITHUB_REPOSITORY: 'juan294/paisaxe', REPO
 test('baseline binds complete original CI and preserves original triggers', () => {
   assert.equal(createHash('sha256').update(original.originalWorkflow).digest('hex'), original.originalWorkflowSha256);
   assert.equal(original.originalWorkflowSha256, '6ffd53a7ebd8a4037a95a79d9b6a447a142b8cd943951b085687c7496c89042d');
-  const w = current(); assert.deepEqual(w.on.push, baseline.on.push); assert.deepEqual(w.on.pull_request, baseline.on.pull_request);
+  const w = current(); assert.deepEqual(w.on.push.branches, baseline.on.push.branches);assert.equal(w.on.push['paths-ignore'],undefined); assert.deepEqual(w.on.pull_request, baseline.on.pull_request);
 });
 test('callable schema requires three narrow strings and no inherited secrets', () => {
   const call = current().on.workflow_call; assert.ok(call);
@@ -39,7 +39,7 @@ test('callable schema requires three narrow strings and no inherited secrets', (
 });
 for (const [ref, event] of [['refs/heads/develop', 'push'], ['refs/heads/main', 'push'], ['refs/pull/7/merge', 'pull_request']]) test(`direct ${event}/${ref} preserves original selector and concurrency results`, () => {
   const w = current(); const c = direct(ref, event);
-  for (const id of Object.keys(baseline.jobs)) assert.equal(Boolean(evaluate(w.jobs[id].if, c)), Boolean(evaluate(baseline.jobs[id].if, c)), id);
+  for (const id of Object.keys(baseline.jobs).filter(id=>id!=='develop_push_source')) assert.equal(Boolean(evaluate(w.jobs[id].if, c)), Boolean(evaluate(baseline.jobs[id].if, c)), id);
   assert.equal(evaluate(w.concurrency.group, c), evaluate(baseline.concurrency.group, c));
   assert.equal(evaluate(w.concurrency['cancel-in-progress'], c), evaluate(baseline.concurrency['cancel-in-progress'], c));
   assert.equal(Boolean(evaluate(w.jobs['callable-source']?.if, c)), false);

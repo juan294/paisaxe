@@ -109,7 +109,7 @@ describe("verification coverage config", () => {
         inputs: { profile: "", source_sha: "", invocation_id: "" },
         vars: { CI_CADENCE_MODE: "legacy" },
         github: { event_name: "push", ref: "refs/heads/develop", workflow_ref: "juan294/paisaxe/.github/workflows/ci.yml@refs/heads/develop" },
-        needs: { "coverage-shard": { result }, "callable-source": { result: "skipped" } },
+        needs: { routing:{result:"success",outputs:{full:"true"}},"coverage-shard": { result }, "callable-source": { result: "skipped" } },
       }, { timeout: 100 });
       expect(Boolean(actual)).toBe(result === "success");
     }
