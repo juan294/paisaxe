@@ -137,7 +137,7 @@ See `docs/operations/elevenlabs-pelayo-config.md` for full configuration details
 
 **Suggested questions** — Up to three contextual question prompts appear below the story description (e.g., "Can I visit in winter?", "Best time to hike here?"). These are populated from each story's `question_prompts` metadata. Controlled by the `contextual_prompts` feature flag.
 
-> **⚠️ Known limitation (roadmap):** When a paying customer clicks a question prompt chip, the chat modal opens in voice mode by default (Pelayo). However, the selected question is not currently passed to the ElevenLabs voice agent—so Pelayo doesn't know what the user wanted to ask. Two potential solutions:
+> **Known limitation (roadmap):** When a paying customer clicks a question prompt chip, the chat modal opens in voice mode by default (Pelayo). However, the selected question is not currently passed to the ElevenLabs voice agent—so Pelayo doesn't know what the user wanted to ask. Two potential solutions:
 > 1. Open text chat mode instead of voice mode when a prompt chip is clicked
 > 2. Pass the question text to Pelayo via the ElevenLabs conversation context so he can answer it directly
 >
@@ -336,15 +336,18 @@ The story editor **Translations tab** manages multilingual story content for 5 t
 
 ### Feature Flags
 
-The Features tab organizes 17 feature flags into five categories, each with a search input and category tab bar.
+The Features tab organizes 18 feature flags into six categories, each with a search input and category tab bar.
 
 | Category | Description | Flag count |
 |----------|-------------|------------|
 | Discovery | Help visitors find and explore stories | 7 |
-| Experience | Enhance the viewing experience | 5 |
+| Experience | Enhance the viewing experience | 4 |
 | Social | Community and sharing features | 2 |
 | Voice | Voice assistant features | 3 |
+| Booking | Bookings and deposits | 1 |
 | System | System settings and maintenance | 1 |
+
+Every flag key must have a category (`FLAG_CATEGORIES` in `src/components/admin/feature-toggles-panel/categories.tsx` is an exhaustive map): a flag without one is never shown in the panel (#1036).
 
 Each flag shows its label, description, current on/off status, and a toggle switch. A global search filters flags by label or description across the active category. A header displays the overall enabled/total count (e.g., "12/19 Active" — the tunnel counts as one extra in System).
 
@@ -703,7 +706,7 @@ Scheduled via pg_cron + pg_net and deployed with `supabase functions deploy keep
 
 ## Feature Flags Reference
 
-All flags are managed from the admin panel and take effect within approximately 1 minute of toggling. Feature flags are split across two tabs: the Features tab (18 flags in 5 categories) and the Agents tab (10 agent flags).
+All flags are managed from the admin panel and take effect within approximately 1 minute of toggling. Feature flags are split across two tabs: the Features tab (18 flags in 6 categories) and the Agents tab (10 agent flags).
 
 ### Discovery Flags (Features tab)
 
@@ -724,7 +727,6 @@ All flags are managed from the admin panel and take effect within approximately 
 | `ambient_discovery` | Ambient mode (slow auto-play with cinematic transitions) |
 | `autoplay_button` | Play/pause button for auto-play in story viewer |
 | `asturianu_touches` | Asturian language labels and titles |
-| `experience_booking` | Day Pass booking experience and access to the `/acceso` redemption page |
 | `fullscreen_button` | Fullscreen button in toolbar (native fullscreen on desktop, Add to Home Screen on iOS/iPad) |
 
 ### Social Flags (Features tab)
@@ -741,6 +743,12 @@ All flags are managed from the admin panel and take effect within approximately 
 | `visitor_voice_agent` | Voice agent access (whitelisted emails only) |
 | `booking_system` | Master toggle for Pelayo's outbound booking calls to restaurants/hotels |
 | `sms_booking_confirmation` | SMS confirmation to customers via Twilio after booking calls complete |
+
+### Booking Flags (Features tab)
+
+| Flag | Controls |
+|------|----------|
+| `experience_booking` | Voucher bookings with a PayPal deposit: the `/acceso` redemption page, the booking chat, quote acceptance and payment-order creation |
 
 ### System Flags (Features tab)
 

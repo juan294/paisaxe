@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Explicit lifecycle for local database contract stacks: `contracts:oneshot`, `contracts:finish` and `contracts:lifecycle` (inspect, hold, sweep), with ownership receipts and checked disposal.
+
+### Changed
+- The booking chat shows only the model's answer. Text the model writes before a tool call, such as announcing that it will search, no longer reaches the visitor, so the reply now appears when the model finishes instead of word by word (#1037).
+- Dependency updates (#1022 to #1024). Sentry 11 and Stripe 23 / stripe-js 10 majors are held in Dependabot until their planned migrations (#1033, #1034). CI uses `supabase/setup-cli@v3`.
+- The `booking-gate-closed` release probe also checks the operator route (#1015).
+
+### Fixed
+- The admin Features tab lists `experience_booking` in a new Booking category, so the flag can be switched from the panel (#1036).
+- The 1.5 s auth verification deadline starts after the browser auth client loads, so a slow first load no longer reports `Auth verification timeout` (#1025).
+- Code scanning findings: PayPal webhook event types no longer resolve to inherited object properties, the replay template pattern runs in linear time, the agents summary strips nested HTML comments, and the keep-alive function no longer returns its internal error text.
+- Scheduled agents log why a report was rejected and keep the rejected output. The coverage agent measures without the local Supabase stack, as hosted CI does. The QA agent reports a failed production build, with a hint when the build hits the V8 heap limit.
+
+### Security
+- `postcss-selector-parser` is pinned to 7.1.6 under `@tailwindcss/typography` (Dependabot alert #138; the built CSS is unchanged).
+- The ci-cadence full workflows no longer use the setup-node dependency cache (code scanning cache-poisoning alerts 1 to 16).
+
 ## [1.9.0] - 2026-10-14
 
 ### Added

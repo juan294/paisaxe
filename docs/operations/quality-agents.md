@@ -174,6 +174,8 @@ Runs nightly at 2:00 AM. Uses Claude CLI to:
 3. Write missing tests
 4. Update `docs/agents/coverage-report.md`
 
+It measures as hosted CI does, without the local Supabase stack (`SUPABASE_LOCAL_API_URL` points at a closed port), so the database suites skip themselves instead of running against the shared developer stack.
+
 **Prompt**: Configurable via admin panel. Default focuses on pragmatic test coverage.
 
 #### Security Agent
@@ -344,6 +346,8 @@ Opens PRs weekly for:
 - npm production dependencies
 - npm dev/type dependencies
 - GitHub Actions versions
+
+Ignored updates: `voyageai` 0.2.x (broken ESM build), TypeScript majors (outside the lint toolchain's peer range), and, temporarily, the `@sentry/*`, `stripe` and `@stripe/*` majors. Those majors are planned migrations (#1033, #1034); remove each ignore entry when its migration lands.
 
 ---
 
