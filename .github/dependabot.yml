@@ -19,11 +19,9 @@ updates:
       # lint toolchain advertises support.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # Temporary: these majors are planned migrations, not bumps. Sentry 11
-      # is #1033; Stripe 23 / stripe-js 10 is #1034 (held until after the
-      # PayPal hackathon). Remove each entry when its migration lands.
-      - dependency-name: "@sentry/*"
-        update-types: ["version-update:semver-major"]
+      # Temporary: these majors are planned migrations, not bumps. Stripe 23 /
+      # stripe-js 10 is #1034 (held until after the PayPal hackathon). Remove
+      # each entry when its migration lands.
       - dependency-name: "stripe"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@stripe/*"
