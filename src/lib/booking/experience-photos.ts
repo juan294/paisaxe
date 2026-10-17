@@ -12,7 +12,7 @@ export const EXPERIENCE_PHOTOS: Readonly<Record<string, string>> = {
   // A coastal boardwalk at sunset.
   "paseo-senda-costera": "/images/stories/camino-camino-del-norte.webp",
   // A green mountain valley seen from above.
-  "ruta-miradores-4x4": "/images/stories/quesos-asturianos.webp",
+  "ruta-miradores-4x4": "/images/stories/valle-basilica-covadonga.webp",
 };
 
 /** A walker by a river and waterfall. */
