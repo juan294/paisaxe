@@ -235,6 +235,10 @@ async function onCaptureDenied(client: SupabaseClient, event: PaypalInboxEvent, 
 }
 
 async function onCaptureRefunded(client: SupabaseClient, event: PaypalInboxEvent, payment: Row, booking: Row): Promise<EventOutcome> {
+  // PayPal confirming a refund the app already applied (#1038): nothing to write, nothing out of order.
+  const ownRefund = payment.status === "refunded" && event.refund_id !== null && payment.refund_id === event.refund_id;
+  if (ownRefund) return "recorded";
+
   const fields = {
     status: "refunded",
     refunded_at: new Date().toISOString(),

@@ -341,8 +341,8 @@ it("replays the recorded sandbox refund through real normalization, state transi
     expect(again.error).toBeNull();
     expect(again.data).toBe("processed");
     expect(inbox(normalized.event_id, "attempts")).toBe("1");
-    // A direct replay also proves the real state processor's forward-only guard.
-    expect(await processPaypalEvent(client, normalized)).toBe("out_of_order");
+    // A direct replay of the same refund is an idempotent confirmation (#1038) that changes nothing.
+    expect(await processPaypalEvent(client, normalized)).toBe("recorded");
     expect(paymentState(id)).toBe("refunded:RECORDED000000004:RECORDED000000006");
     expect(bookingStatus(id)).toBe("refunded");
     expect(paymentField(id, "refunded_at")).toBe(refundedAt);
