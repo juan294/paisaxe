@@ -3,23 +3,23 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "f924a365af8736fe3bb501b70c248a7ca30908e3"
+    "blobSha": "deab540168b563629c228f398964c761ec6c9635"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "f924a365af8736fe3bb501b70c248a7ca30908e3"
+      "blobSha": "deab540168b563629c228f398964c761ec6c9635"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "baae5642839d73ffbb935e7f074d2c418386293c"
+      "blobSha": "b544025b4cc4bceb124cb84fe23436c3b82d3803"
     }
   },
   "callees": {
     ".github/workflows/ci.yml": {
       "path": ".github/workflows/ci.yml",
       "prefix": "ci",
-      "blobSha": "0d14be30789b5f5d551b20fe9e1552cee5abebda"
+      "blobSha": "7077e1fa17c48aac543c88e21fff4c0137d71f74"
     },
     ".github/workflows/e2e.yml": {
       "path": ".github/workflows/ci-cadence-e2e-full.yml",
@@ -60,7 +60,7 @@
   },
   "coverageOnly": {
     "path": ".github/workflows/coverage.yml",
-    "blobSha": "dd6ff814ea2d5b88a6569ce1d7a403fdd29752d1",
+    "blobSha": "2ec6b9a23bac5b52ec0ce1133a9481723b3f02b8",
     "steps": [
       {
         "name": "Decide weekly native coverage eligibility",
@@ -143,9 +143,9 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "f924a365af8736fe3bb501b70c248a7ca30908e3",
-    ".github/workflows/ci-cadence.yml": "baae5642839d73ffbb935e7f074d2c418386293c",
-    ".github/workflows/ci.yml": "0d14be30789b5f5d551b20fe9e1552cee5abebda",
+    ".github/workflows/ci-nightly.yml": "deab540168b563629c228f398964c761ec6c9635",
+    ".github/workflows/ci-cadence.yml": "b544025b4cc4bceb124cb84fe23436c3b82d3803",
+    ".github/workflows/ci.yml": "7077e1fa17c48aac543c88e21fff4c0137d71f74",
     ".github/workflows/ci-cadence-e2e-full.yml": "031f363d3b79123321af61bc4591e8f3f3cdf1fe",
     ".github/workflows/ci-cadence-lighthouse-full.yml": "992b0cb89702c31cbba1176bc89a191e6abb3139",
     ".github/workflows/ci-cadence-bundle-size-full.yml": "5448fbab7288dccd4f49ff6592b5df35955be95c",
@@ -478,6 +478,20 @@
     },
     {
       "name": "ci / develop_push_source",
+      "conclusions": [
+        "skipped"
+      ],
+      "steps": []
+    },
+    {
+      "name": "ci / Sutura routing",
+      "conclusions": [
+        "skipped"
+      ],
+      "steps": []
+    },
+    {
+      "name": "ci / CI Verification (CI)",
       "conclusions": [
         "skipped"
       ],
@@ -884,6 +898,20 @@
         "steps": []
       },
       {
+        "name": "ci / Sutura routing",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
+        "name": "ci / CI Verification (CI)",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
         "name": "e2e / Callable source",
         "conclusions": [
           "success"
@@ -1283,6 +1311,20 @@
         "steps": []
       },
       {
+        "name": "ci / Sutura routing",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
+        "name": "ci / CI Verification (CI)",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
         "name": "e2e / Callable source",
         "conclusions": [
           "success"
@@ -1608,6 +1650,12 @@
           },
           {
             "name": "Setup reviewed Node runtime",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Plan automatic verification",
             "conclusions": [
               "success"
             ]

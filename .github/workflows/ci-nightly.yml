@@ -13,7 +13,7 @@ concurrency:
 jobs:
   admission:
     name: Cadence admission
-    if: vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118'
+    if: github.repository_id == '1141286326' && github.repository_owner_id == '3944118'
     runs-on: ubuntu-latest
     timeout-minutes: 6
     permissions: *a1
@@ -46,7 +46,6 @@ jobs:
       - name: Resolve once and authenticate native source
         env: &a2
           GITHUB_TOKEN: ${{ github.token }}
-          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
           CI_CADENCE_DEFINITION_SHA: ${{ github.sha }}
           CI_CADENCE_EVIDENCE_DIR: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           NODE_OPTIONS: ""
@@ -62,8 +61,8 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-launch.mjs" > "$private/ci-cadence-launch.mjs"
           if ! printf '%s  %s
-          ' '1ed0a7e1979647dac9f1e676bdcf3a80761b25bdf749f821f2308ef630ce72e0' "$private/ci-cadence-launch.mjs" | sha256sum --check --status; then
-            reason='launcher change: the protected base launcher differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the launcher change on the base branch, then set lean again.'
+          ' 'fd64de89d018b0d1b20136a3cbe8fe743ed67ebcf33f52ef003de741b1908601' "$private/ci-cadence-launch.mjs" | sha256sum --check --status; then
+            reason='launcher change: the protected base launcher differs from the reviewed pin in this workflow. Bring this protected launcher change to Sutura. Application verification runs through the separately required original workflow gates; reusable native evidence remains unavailable until reviewed installation.'
             echo "::error title=CI cadence::$reason"
             echo "$reason" >> "$GITHUB_STEP_SUMMARY"
             exit 1
@@ -91,8 +90,8 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           if ! printf '%s  %s
-          ' '1e12aa8d56ffecf1e589ccd5bf0abd4d5fd7ac1ab321c64ecd4e33b7dcb2a064' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
-            reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again.'
+          ' 'e73fe9c4ff872765f09fbe15bbd8476b9e2cb7f083c85b627d2d573a136cca49' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+            reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Bring this protected control loader change to Sutura. Application verification runs through the separately required original workflow gates; reusable native evidence remains unavailable until reviewed installation.'
             echo "::error title=CI cadence::$reason"
             echo "$reason" >> "$GITHUB_STEP_SUMMARY"
             exit 1
@@ -210,7 +209,6 @@ jobs:
       - name: Produce authenticated native measurement
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CI_CADENCE_MODE: ${{ vars.CI_CADENCE_MODE == 'lean' && 'lean' || 'legacy' }}
           CI_CADENCE_DEFINITION_SHA: ${{ needs.admission.outputs.definition_sha }}
           CI_CADENCE_EVIDENCE_DIR: ${{ runner.temp }}/B-cadence-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           NODE_OPTIONS: ""
@@ -227,8 +225,8 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           if ! printf '%s  %s
-          ' '1e12aa8d56ffecf1e589ccd5bf0abd4d5fd7ac1ab321c64ecd4e33b7dcb2a064' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
-            reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Set CI_CADENCE_MODE to legacy, land the control loader change on the base branch, then set lean again.'
+          ' 'e73fe9c4ff872765f09fbe15bbd8476b9e2cb7f083c85b627d2d573a136cca49' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+            reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Bring this protected control loader change to Sutura. Application verification runs through the separately required original workflow gates; reusable native evidence remains unavailable until reviewed installation.'
             echo "::error title=CI cadence::$reason"
             echo "$reason" >> "$GITHUB_STEP_SUMMARY"
             exit 1
@@ -253,7 +251,7 @@ jobs:
       - license-check
       - security
       - measurement
-    if: ${{ always() && vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' }}
+    if: ${{ always() && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' }}
     runs-on: ubuntu-latest
     permissions: *a1
     steps:

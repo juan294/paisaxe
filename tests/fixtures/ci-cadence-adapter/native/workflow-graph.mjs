@@ -86,6 +86,6 @@ export const account = login => login === 'juan294' ? OWNER : { id: 49699333, ty
 export function nativeContext({ kind, actor = 'juan294', author = actor, ref, baseBranch, headRepository = 'juan294/paisaxe', senderless = false }, mode) {
   const sender = account(actor), same = headRepository === 'juan294/paisaxe';
   return { vars: mode === undefined || mode === null ? {} : { CI_CADENCE_MODE: mode }, inputs: {}, secrets: {}, matrix: {}, env: {},
-    github: { repository: 'juan294/paisaxe', repository_id: '1141286326', repository_owner_id: '3944118', actor: sender.login, actor_id: String(sender.id), event_name: kind, ref, sha: 'a'.repeat(40), run_id: '42', run_attempt: '1',
-      event: { ...(senderless ? {} : { sender }), ...(kind === 'schedule' ? { schedule: '0 3 * * *' } : {}), ...(kind === 'pull_request' ? { action: 'synchronize', pull_request: { user: account(author), base: { ref: baseBranch }, head: { repo: { id: same ? 1141286326 : 999, full_name: headRepository, fork: !same } } } } : {}) } } };
+    github: { repository: 'juan294/paisaxe', repository_id: '1141286326', repository_owner_id: '3944118', actor: sender.login, actor_id: String(sender.id), event_name: kind, ref, base_ref:baseBranch??'', sha: 'a'.repeat(40), run_id: '42', run_attempt: '1',
+      event: { repository:{id:1141286326},head_commit:{author:{username:author}}, ...(senderless ? {} : { sender }), ...(kind === 'schedule' ? { schedule: '0 3 * * *' } : {}), ...(kind === 'pull_request' ? { action: 'synchronize', pull_request: { user: account(author), base: { ref: baseBranch }, head: { repo: { id: same ? 1141286326 : 999, full_name: headRepository, fork: !same } } } } : {}) } } };
 }

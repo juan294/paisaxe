@@ -26,7 +26,7 @@ const PINS = {
   "tests/fixtures/ci-cadence/jobs.json": "08af6060b239cac912889fffc6a5337795593e83381ed1f47e6d902bc0b9cd59",
   "tests/fixtures/ci-cadence/policy.json": "7f290ed3791c910948e489e297e4df1bf87b57ac8e4dc4e071b0fe44f9661e76",
   "tests/fixtures/ci-cadence/contract.json": "dc4d409ef86f17cd212e9d9b9de554dd324bafffebe4762af09929b3832feb16",
-  "scripts/ci-cadence-native.mjs": "a3003983077830deae27ba692c15533edc12a9e987d96d98f8951607bb49563d",
+  "scripts/ci-cadence-native.mjs": "94fee72895e9a6f9348783aa137e6e7baf4f9fcef45eded6525dd502d4e8289c",
   "scripts/ci-fast.mjs": "310c126bc7feca8b4a138c730056b0cdef9c98420892aac850361a4c7eedf853",
   "scripts/ci-cadence-scanner.mjs": "6cf7da7f0c59020aaeed179131051fff931e2ff4ce1f8264a990a15916719e6b"
 };
@@ -183,7 +183,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const metadata = await stat(process.env.GITHUB_EVENT_PATH); if (!metadata.isFile() || metadata.size > 2000000) throw Error('event bound');
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8')); const integer = x => typeof x === 'string' && /^[1-9][0-9]*$/.test(x) ? Number(x) : NaN;
-    const result = await launchNative({ root: process.cwd(), event, eventName: process.env.GITHUB_EVENT_NAME, actor: process.env.GITHUB_ACTOR, mode: process.env.CI_CADENCE_MODE, token: process.env.GITHUB_TOKEN, scanner: { executable: process.env.CI_CADENCE_SCANNER_PATH, sha256: nativeScannerDigest() }, context: { repository: process.env.GITHUB_REPOSITORY, repositoryId: integer(process.env.GITHUB_REPOSITORY_ID), ownerId: integer(process.env.GITHUB_REPOSITORY_OWNER_ID), actorId: integer(process.env.GITHUB_ACTOR_ID), actorType: event.sender?.type, sha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF } });
+    const result = await launchNative({ root: process.cwd(), event, eventName: process.env.GITHUB_EVENT_NAME, actor: process.env.GITHUB_ACTOR, mode: 'lean', token: process.env.GITHUB_TOKEN, scanner: { executable: process.env.CI_CADENCE_SCANNER_PATH, sha256: nativeScannerDigest() }, context: { repository: process.env.GITHUB_REPOSITORY, repositoryId: integer(process.env.GITHUB_REPOSITORY_ID), ownerId: integer(process.env.GITHUB_REPOSITORY_OWNER_ID), actorId: integer(process.env.GITHUB_ACTOR_ID), actorType: event.sender?.type, sha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF } });
     console.log(JSON.stringify(result)); if (result.lane === 'blocked' || (result.lane === 'fast' && !result.success)) process.exitCode = 1;
     if (result.lane === 'blocked') console.error(`protected launcher blocked: ${result.reason}`);
   } catch { console.error('protected launcher event acquisition failed'); process.exitCode = 1; }

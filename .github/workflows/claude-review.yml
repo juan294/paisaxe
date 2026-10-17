@@ -14,25 +14,37 @@ permissions:
 
 jobs:
   claude-review:
-    # Run on PR events (skip bot authors) or when @claude is mentioned in a PR comment
-    # by the owner, a member or a collaborator; outside commenters cannot start it.
-    if: |
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.user.login != 'dependabot[bot]' &&
-       github.event.pull_request.user.login != 'renovate[bot]') ||
-      (github.event_name == 'issue_comment' &&
-       github.event.issue.pull_request &&
-       contains(github.event.comment.body, '@claude') &&
-       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    # Only the exact human owner can request this paid auxiliary review.
+    if: >-
+      (github.event_name == 'pull_request' && github.actor_id == '3944118' && github.event.sender.id == 3944118 && github.event.sender.type == 'User' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == github.event.repository.id && github.repository == 'juan294/paisaxe' && github.event.repository.id > 0 && github.event.repository.full_name == github.repository && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.base.repo.id == github.event.repository.id && github.event.pull_request.base.repo.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' && github.actor_id == '3944118' && github.event.sender.id == 3944118 && github.event.sender.type == 'User' && github.event.comment.user.id == 3944118 && github.event.comment.user.type == 'User' && github.event.issue.user.id == 3944118 && github.event.issue.user.type == 'User' && github.event.issue.pull_request && contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
+      - name: Verify owner PR comment metadata
+        id: review-trust
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY_ID: ${{ github.event.repository.id }}
+        run: |
+          echo "trusted=false" >> "$GITHUB_OUTPUT"
+          RESPONSE="$RUNNER_TEMP/claude-review-pr.json"
+          if gh api "repos/$GH_REPO/pulls/$PR_NUMBER" > "$RESPONSE" &&
+             jq -e --argjson repo "$REPOSITORY_ID" '.user.id == 3944118 and .user.type == "User" and .head.repo.id == $repo and .base.repo.id == $repo' "$RESPONSE" > /dev/null; then
+            echo "trusted=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout code
+        if: github.event_name == 'pull_request' || steps.review-trust.outputs.trusted == 'true'
         uses: actions/checkout@v7
 
       - name: Claude Code Review
+        if: github.event_name == 'pull_request' || steps.review-trust.outputs.trusted == 'true'
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          model: "claude-sonnet-4-5-20250929"
+          anthropic_api_key: ${{ ((github.event_name == 'pull_request' && github.actor_id == '3944118' && github.event.sender.id == 3944118 && github.event.sender.type == 'User' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == github.event.repository.id && github.repository == 'juan294/paisaxe' && github.event.repository.id > 0 && github.event.repository.full_name == github.repository && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.base.repo.id == github.event.repository.id && github.event.pull_request.base.repo.full_name == github.repository) || ((github.event_name == 'issue_comment' && github.actor_id == '3944118' && github.event.sender.id == 3944118 && github.event.sender.type == 'User' && github.event.comment.user.id == 3944118 && github.event.comment.user.type == 'User' && github.event.issue.user.id == 3944118 && github.event.issue.user.type == 'User' && github.event.issue.pull_request && contains(github.event.comment.body, '@claude')) && steps.review-trust.outputs.trusted == 'true')) && secrets.ANTHROPIC_API_KEY || '' }}
+          claude_args: "--model claude-sonnet-4-5-20250929"
