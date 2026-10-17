@@ -16,6 +16,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { appendFileSync, existsSync } from 'fs';
 import {
   validateBookingRequest,
+  validateNoLiveWeather,
   validatePersonalAdvice,
 } from './llm-quality-validators';
 import {
@@ -173,12 +174,8 @@ const RAG_QUALITY_TESTS = [
   {
     name: 'No external search fabrication',
     message: "What's the weather in Oviedo today?",
-    validate: (r: ChatResponse) => {
-      // Should NOT fabricate weather data
-      const fabricatesWeather = /\d+\s*°|sunny|cloudy|rain|clear|warm|cold/i.test(r.content);
-      const declines = /don't have|cannot|static|real-time/i.test(r.content);
-      return !fabricatesWeather || declines;
-    },
+    // Climate talk is fine; a claim about current conditions is not (#1014).
+    validate: (r: ChatResponse) => validateNoLiveWeather(r.content),
     expectedBehavior: 'Does not fabricate real-time data',
   },
   {
