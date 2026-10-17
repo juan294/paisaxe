@@ -347,7 +347,7 @@ Opens PRs weekly for:
 - npm dev/type dependencies
 - GitHub Actions versions
 
-Ignored updates: `voyageai` 0.2.x (broken ESM build), TypeScript majors (outside the lint toolchain's peer range), and, temporarily, the `@sentry/*`, `stripe` and `@stripe/*` majors. Those majors are planned migrations (#1033, #1034); remove each ignore entry when its migration lands.
+Ignored updates: `voyageai` 0.2.x (broken ESM build), TypeScript majors (outside the lint toolchain's peer range), and, temporarily, the `stripe` and `@stripe/*` majors. Those majors are a planned migration (#1034); remove each ignore entry when it lands.
 
 ---
 
