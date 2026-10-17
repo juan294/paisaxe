@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "source": "Release 1.9.0 source census: 1,036 cases qualified by the local full contract run on 2026-10-14, plus the one ordinary operator-link case outside that runner. Source hashes bind all 23 current gated test files. Historical hosted recordings remain unchanged; this inventory is not a hosted recording.",
-  "declaredContractCases": 1036,
-  "ordinaryEnvironmentGatedCases": 1037,
+  "source": "Release 1.9.0 source census extended with the 7 legacy request-key retention cases (#1032): 1,043 cases qualified by the local full contract run on 2026-10-17, plus the one ordinary operator-link case outside that runner. Source hashes bind all 24 current gated test files. Historical hosted recordings remain unchanged; this inventory is not a hosted recording.",
+  "declaredContractCases": 1043,
+  "ordinaryEnvironmentGatedCases": 1044,
   "groups": [
     {
       "file": "scripts/booking/create-operator-link.test.ts",
@@ -118,6 +118,11 @@
       "file": "src/lib/corpus.postgrest-integration.test.ts",
       "describe": "Authored corpus version and permission boundaries (real PostgREST)",
       "cases": 33
+    },
+    {
+      "file": "src/lib/booking/legacy-request-key.postgrest-integration.test.ts",
+      "describe": "Legacy NULL request keys: schema reconciliation and retention hold (real PostgREST)",
+      "cases": 7
     }
   ],
   "sourceSha256": {
@@ -128,6 +133,7 @@
     "src/lib/booking/cancel.postgrest-integration.test.ts": "f910fe11c782379284bb909ede63ed8d11015fa3336063491d37e610b2fa64e0",
     "src/lib/booking/capture.postgrest-integration.test.ts": "70e4a4276bd1442bd8fd3a7ca3f79cceae71bbb6c1fe6bb55594c238d02ade84",
     "src/lib/booking/invoice.postgrest-integration.test.ts": "55f6900043b8d3988175e901af24e823bc5928c52f559e4356db1e82ce825348",
+    "src/lib/booking/legacy-request-key.postgrest-integration.test.ts": "5f12888a59fb86e4cfc5896838b2efe3ba0bc0849a4c34ec83c457e842d29222",
     "src/lib/booking/operator.postgrest-integration.test.ts": "49deeafd15ca851fdb2f18f6f4d5c6e2664a5b0ac00420103d618eb3e7f07882",
     "src/lib/booking/phone-confirmation.postgrest-integration.test.ts": "dcd8ebd3170ab49bcd91d80e36b194c46b9cdc4f76371287368f59d7b91dd4a9",
     "src/lib/booking/reconcile.postgrest-integration.test.ts": "2b0c9dfb250c8d5c36679fc2d246629ed861a3f7a93917f81cc22e534bd8f963",
@@ -146,19 +152,15 @@
     "src/lib/stripe-entitlements.postgrest-integration.test.ts": "a886a3e546d719992a447cebee7e125811b9cb66a380bb28e952adc7a35544fc"
   },
   "qualification": {
-    "receipt": "logs/approved-corpus-release-2026-10-13/release190-final-contracts02/run-aYNjAK/receipt.json",
-    "receiptSha256": "5ba51e7e54b016ea04fd08cc3666a1dbb02063660dd781957dfaef4c5b2a2e20",
-    "candidateDigest": "30799055bd2d10cc927871525c6f652091ae356b21be66a7d708f06f9dfe24f0",
-    "finishedAt": "2026-10-14T06:00:32.873Z",
-    "contractCases": 1036,
+    "receipt": "logs/legacy-request-key-1032-2026-10-17/run-OulcyJ/receipt.json",
+    "receiptSha256": "d51a08f554c2413ada91d4f173c2a4553cbfb0b53d9ed8de6c8ab93203e82ac1",
+    "candidateDigest": "01873aaf4cbe4c32817bad0dbcf964d9c1a559ee41cf08461ffad0c23bfdcc92",
+    "finishedAt": "2026-10-17T11:11:27.174Z",
+    "contractCases": 1043,
     "observedChangedGroups": [
       {
-        "file": "src/lib/booking/phone-confirmation.postgrest-integration.test.ts",
-        "cases": 15
-      },
-      {
-        "file": "src/lib/corpus.postgrest-integration.test.ts",
-        "cases": 33
+        "file": "src/lib/booking/legacy-request-key.postgrest-integration.test.ts",
+        "cases": 7
       }
     ]
   }
