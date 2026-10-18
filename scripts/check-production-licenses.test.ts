@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   ALLOWED_LICENSES,
   CORE_ALLOWED_LICENSES,
   EXCEPTION_LICENSES,
   findDisallowedLicenses,
   isLicenseAllowed,
+  readDeclaredLicenses,
   type LicenseCheckerReport,
 } from "./check-production-licenses";
 
@@ -92,5 +96,66 @@ describe("findDisallowedLicenses", () => {
 
   it("passes clean on an empty report", () => {
     expect(findDisallowedLicenses({})).toEqual([]);
+  });
+});
+
+// The installed Sentry 11 graph reports sentry@0.45.0 as Apache*, while
+// its package.json declares FSL-1.1-Apache-2.0 (nightly run 39092472558).
+describe("Sentry 11 build-tool license inventory", () => {
+  it("uses exact package metadata instead of the scanner's inferred Apache label", () => {
+    const directory = mkdtempSync(join(tmpdir(), "paisaxe-license-"));
+    try {
+      writeFileSync(join(directory, "package.json"), JSON.stringify({ name: "sentry", version: "0.45.0", license: "FSL-1.1-Apache-2.0" }));
+      const report = readDeclaredLicenses({ "sentry@0.45.0": { licenses: "Apache*", path: directory } });
+      expect(report["sentry@0.45.0"]?.licenses).toBe("FSL-1.1-Apache-2.0");
+      expect(findDisallowedLicenses(report)).toEqual([]);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("matches npm's canonical key to a published v-prefixed manifest version", () => {
+    const directory = mkdtempSync(join(tmpdir(), "paisaxe-license-"));
+    try {
+      writeFileSync(join(directory, "package.json"), JSON.stringify({ name: "@upstash/core-analytics", version: "v0.0.10", license: "MIT" }));
+      const report = readDeclaredLicenses({ "@upstash/core-analytics@0.0.10": { licenses: "MIT", path: directory } });
+      expect(findDisallowedLicenses(report)).toEqual([]);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("rejects metadata from a different package even if it declares MIT", () => {
+    const directory = mkdtempSync(join(tmpdir(), "paisaxe-license-"));
+    try {
+      writeFileSync(join(directory, "package.json"), JSON.stringify({ name: "other", version: "0.45.0", license: "MIT" }));
+      expect(() => readDeclaredLicenses({ "sentry@0.45.0": { licenses: "Apache*", path: directory } })).toThrow(/package identity/);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("keeps inferred or missing licenses outside the allowlist when no declared ID exists", () => {
+    const directory = mkdtempSync(join(tmpdir(), "paisaxe-license-"));
+    try {
+      writeFileSync(join(directory, "package.json"), JSON.stringify({ name: "sentry", version: "0.45.0" }));
+      expect(findDisallowedLicenses(readDeclaredLicenses({ "sentry@0.45.0": { licenses: "Apache*", path: directory } }))).toEqual(['sentry@0.45.0: "Apache*"']);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("admits only the reviewed package/version/license pairs", () => {
+    expect(findDisallowedLicenses({
+      "lightningcss@1.33.0": { licenses: "MPL-2.0" },
+      "lightningcss-linux-x64-gnu@1.33.0": { licenses: "MPL-2.0" },
+      "lightningcss-darwin-arm64@1.33.0": { licenses: "MPL-2.0" },
+      "sentry@0.45.0": { licenses: "FSL-1.1-Apache-2.0" },
+    })).toEqual([]);
+    expect(isLicenseAllowed("MPL-2.0")).toBe(false);
+    expect(isLicenseAllowed("FSL-1.1-Apache-2.0")).toBe(false);
+    expect(findDisallowedLicenses({
+      "unknown@1.33.0": { licenses: "MPL-2.0" },
+      "lightningcss-unreviewed@1.33.0": { licenses: "MPL-2.0" },
+      "lightningcss@1.34.0": { licenses: "MPL-2.0" },
+      "sentry@0.46.0": { licenses: "FSL-1.1-Apache-2.0" },
+      "sentry@0.45.0": { licenses: "GPL-3.0" },
+    })).toHaveLength(5);
+  });
+
+  it("lets a caller's explicit license set withhold the package exceptions", () => {
+    expect(findDisallowedLicenses({ "sentry@0.45.0": { licenses: "FSL-1.1-Apache-2.0" } }, CORE_ALLOWED_LICENSES)).toHaveLength(1);
   });
 });

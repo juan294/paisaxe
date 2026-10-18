@@ -23,6 +23,8 @@
 // docs/project/license-exceptions.md.
 
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Baseline permissive-only families allowed under CLAUDE.md's
@@ -52,12 +54,36 @@ export const EXCEPTION_LICENSES = new Set([
 
 export const ALLOWED_LICENSES = new Set([...CORE_ALLOWED_LICENSES, ...EXCEPTION_LICENSES]);
 
+// Exceptions 3 and 4: exact installed build-tool versions, not general license grants.
+const BUILD_TOOL_LICENSES = new Map([
+  ["sentry@0.45.0", "FSL-1.1-Apache-2.0"],
+  ...[
+    "lightningcss", "lightningcss-android-arm64", "lightningcss-darwin-arm64",
+    "lightningcss-darwin-x64", "lightningcss-freebsd-x64", "lightningcss-linux-arm-gnueabihf",
+    "lightningcss-linux-arm64-gnu", "lightningcss-linux-arm64-musl", "lightningcss-linux-x64-gnu",
+    "lightningcss-linux-x64-musl", "lightningcss-win32-arm64-msvc", "lightningcss-win32-x64-msvc",
+  ].map((name): [string, string] => [`${name}@1.33.0`, "MPL-2.0"]),
+]);
+
 export interface LicenseCheckerEntry {
   licenses?: string;
   private?: boolean;
+  path?: string;
 }
 
 export type LicenseCheckerReport = Record<string, LicenseCheckerEntry>;
+
+/** Prefer the package's declared ID over license-checker's inferred license-file label. */
+export function readDeclaredLicenses(report: LicenseCheckerReport): LicenseCheckerReport {
+  return Object.fromEntries(Object.entries(report).map(([pkg, entry]) => {
+    if (!entry.path) return [pkg, entry];
+    const manifest = JSON.parse(readFileSync(join(entry.path, "package.json"), "utf8"));
+    // npm canonicalizes the optional v prefix in published versions (for example Upstash v0.0.10).
+    const version = typeof manifest.version === "string" ? manifest.version.replace(/^v(?=\d)/, "") : manifest.version;
+    if (`${manifest.name}@${version}` !== pkg) throw new Error(`License package identity mismatch: ${pkg}`);
+    return [pkg, { ...entry, licenses: typeof manifest.license === "string" ? manifest.license : entry.licenses }];
+  }));
+}
 
 /**
  * Splits a license-checker SPDX expression into its atomic license IDs and the
@@ -107,7 +133,8 @@ export function findDisallowedLicenses(
   for (const [pkg, entry] of Object.entries(report)) {
     if (entry.private) continue;
     const license = entry.licenses ?? "UNKNOWN";
-    if (!isLicenseAllowed(license, allowed)) {
+    const reviewedBuildTool = allowed === ALLOWED_LICENSES && BUILD_TOOL_LICENSES.get(pkg) === license;
+    if (!isLicenseAllowed(license, allowed) && !reviewedBuildTool) {
       violations.push(`${pkg}: "${license}"`);
     }
   }
@@ -118,7 +145,7 @@ function runCli(): void {
   const json = execSync("npx license-checker --production --json", {
     maxBuffer: 1024 * 1024 * 50,
   }).toString();
-  const report: LicenseCheckerReport = JSON.parse(json);
+  const report = readDeclaredLicenses(JSON.parse(json));
 
   const violations = findDisallowedLicenses(report);
 

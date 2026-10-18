@@ -27,6 +27,10 @@ export function routeOriginalWorkflow(source) {
     job.steps=protect(job.steps);
   }
   if(ci){
+    const shard=value.jobs['coverage-shard'].steps.find(step=>step.name==='Run tests with coverage (sharded)');
+    if(!shard?.run?.includes('--reporter=blob'))throw Error('Reviewed coverage reporter disappeared');
+    // Blob-only output hides the failing test when its success-only upload never runs.
+    shard.run=shard.run.replace('--reporter=blob','--reporter=blob --reporter=default');
     const test=value.jobs.test;
     const ordinary=test.steps.find(step=>step.name==='Verify test/coverage suite succeeded')?.if;
     const checkoutGuard=test.steps.findIndex(step=>step.name==='Verify callable source checkout');

@@ -25,3 +25,13 @@ test('original work runs for every non-reducible event and stands down only for 
   assert.equal(Boolean(evaluate(job.if,context)),false);
  }
 });
+
+test('coverage shards keep blob merging and also print failures in the native log', () => {
+ const file=retained.find(file=>file.path==='.github/workflows/ci.yml');
+ const routed=parse(routeOriginalWorkflow(file.source));
+ const run=routed.jobs['coverage-shard'].steps.find(step=>step.name==='Run tests with coverage (sharded)').run;
+ assert.match(run,/--reporter=default(?: |$)/);
+ assert.match(run,/--reporter=blob(?: |$)/);
+ const original=parse(file.source).jobs['coverage-shard'].steps.find(step=>step.name==='Run tests with coverage (sharded)').run;
+ assert.equal(run.replace(' --reporter=default',''),original,'test selection, coverage flags and failure status remain unchanged');
+});
