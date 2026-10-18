@@ -50,6 +50,9 @@ export async function captureEnvelopes(Sentry: Sentry, setUp?: () => void): Prom
   const envelopes: string[] = [];
   Sentry.init({
     ...sentryInitOptions("https://public@o0.ingest.sentry.io/0"),
+    // CI supplies a release; without one the SDK drops session envelopes,
+    // hiding session-only privacy regressions from local runs.
+    release: "sentry-privacy-regression",
     tracesSampleRate: 1,
     transport: (options: Parameters<Sentry["createTransport"]>[0]) => Sentry.createTransport(options, async ({ body }) => {
       envelopes.push(typeof body === "string" ? body : new TextDecoder().decode(body));

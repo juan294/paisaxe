@@ -125,3 +125,18 @@ export const redactCapabilityTraceContext: Integration = {
     });
   },
 };
+
+/** Sessions bypass beforeSend and may copy an email into their distinct ID. */
+export const redactSessionUserInfo: Integration = {
+  name: "RedactSessionUserInfo",
+  setup(client) {
+    client.on("beforeSendSession", (session) => {
+      if ("aggregates" in session) {
+        if (session.attrs) delete session.attrs.ip_address;
+      } else {
+        delete session.ipAddress;
+        delete session.did;
+      }
+    });
+  },
+};

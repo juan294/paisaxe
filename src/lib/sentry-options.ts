@@ -1,5 +1,5 @@
 import type { DataCollection, Options } from "@sentry/core";
-import { redactCapabilityTraceContext, sanitizeSentryEvent, sanitizeSentrySpan } from "./sentry-before-send";
+import { redactCapabilityTraceContext, redactSessionUserInfo, sanitizeSentryEvent, sanitizeSentrySpan } from "./sentry-before-send";
 
 // v11 collects user info, cookies, HTTP bodies, GenAI, database and queue data
 // unless told otherwise. This is the v10 default (sendDefaultPii unset), as
@@ -29,6 +29,6 @@ export function sentryInitOptions(dsn: string) {
     dataCollection: V10_DATA_COLLECTION,
     beforeSend: sanitizeSentryEvent,
     beforeSendSpan: sanitizeSentrySpan,
-    integrations: [redactCapabilityTraceContext],
+    integrations: [redactCapabilityTraceContext, redactSessionUserInfo],
   } satisfies Options;
 }
