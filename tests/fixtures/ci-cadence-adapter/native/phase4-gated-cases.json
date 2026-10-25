@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "source": "Release 1.9.0 source census extended with the 7 legacy request-key retention cases (#1032): 1,043 cases qualified by the local full contract run of the merged develop tree on 2026-10-17, plus the one ordinary operator-link case outside that runner. Source hashes bind all 24 current gated test files. Historical hosted recordings remain unchanged; this inventory is not a hosted recording.",
+  "source": "Release 1.9.0 source census refreshed after batching the database authorization catalog query: 1,043 cases qualified by the full isolated local contract run on 2026-10-25, with unchanged case identities, plus the one ordinary operator-link case outside that runner. Source hashes bind all 24 gated test files. The private qualification receipt covers the measured candidate before this derived inventory refresh. Historical hosted recordings remain unchanged; this inventory is not a hosted recording.",
   "declaredContractCases": 1043,
   "ordinaryEnvironmentGatedCases": 1044,
   "groups": [
@@ -141,7 +141,7 @@
     "src/lib/booking/tools.postgrest-integration.test.ts": "75f80d4839a3577879491b649a8dc25d41eda314f7e0b15040d59a6f28754df3",
     "src/lib/booking/vouchers.postgrest-integration.test.ts": "a2ef2fbffa3cd291edb98d4cbf4d0cb7c34c8dded370ddba4f3fa96af4f58f6f",
     "src/lib/corpus.postgrest-integration.test.ts": "ad66d2e81115bbf256d54d17ddd5d3c0b13ccf6f1d1c0b2e8a1396848869c35a",
-    "src/lib/database-boundaries.postgrest-rls.test.ts": "9a66abc34b6fac44b9f065d7272107c6a48a62cee82335ad56596428c51adcd3",
+    "src/lib/database-boundaries.postgrest-rls.test.ts": "b95f43d1135ab7675f0b6b9a6f9e0aae00f86cf0119f8250e04eaef803fdd6b0",
     "src/lib/definer-function-privileges.postgrest-rls.test.ts": "41dcaa01c9acb18727f322b8e14ab0b6d49aeb9c37a05d1684db06617f219785",
     "src/lib/feature-flag-consumers.postgrest-integration.test.ts": "f2b21c6bed817fb6e2dca6035694e5816fd06b4fc56a1d6bbd62fcd0d2c7dae7",
     "src/lib/feature-flag-realtime.postgrest-integration.test.ts": "ff1deb38075b9d8a9fe93249c398e81a32c4fdae74ba1a1db85f67e0b700e2bb",
@@ -152,19 +152,15 @@
     "src/lib/stripe-entitlements.postgrest-integration.test.ts": "a886a3e546d719992a447cebee7e125811b9cb66a380bb28e952adc7a35544fc"
   },
   "qualification": {
-    "receipt": "logs/legacy-request-key-1032-2026-10-17/merged-develop-run-gnGV7g/receipt.json",
-    "receiptSha256": "1510f819d699bf03b7a31d0307b814298cda7f1a421c5475cd42be5d543b6ee6",
-    "candidateDigest": "dd2acda0f28ea425c6d92821d23dbf76686163c311d9fa92cb771f0d1db8d3ce",
-    "finishedAt": "2026-10-17T11:32:30.757Z",
+    "receipt": "sutura/docs/agents/2026-10-25-fleet-recovery-implementation/p3-dom/paisaxe-catalog-batch-receipt.json",
+    "receiptSha256": "32d8a556b9b7ab016d464f3e9af2c46f6304a5a60a0f82baaa7f37345aa42cc8",
+    "candidateDigest": "4acfd39e95775bc25b698ab607f0d14fc60b7aa271c48ec38ae35a827b786420",
+    "finishedAt": "2026-10-25T12:14:38.176Z",
     "contractCases": 1043,
     "observedChangedGroups": [
       {
-        "file": "src/lib/booking/legacy-request-key.postgrest-integration.test.ts",
-        "cases": 7
-      },
-      {
-        "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
-        "cases": 32
+        "file": "src/lib/database-boundaries.postgrest-rls.test.ts",
+        "cases": 730
       }
     ]
   }

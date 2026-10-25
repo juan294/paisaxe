@@ -17,6 +17,57 @@ const READINESS_MS = 30000;
 const CONNECTION_MS = 120000;
 const LIFETIME_MS = 3600000;
 
+// Counts describe transport lifecycles, never successful SQL/HTTP assertions.
+// Fixed vocabularies and four samples per list keep the authenticated control
+// proof below its existing 8KiB bound without retaining request/error payloads.
+function diagnostics() {
+  const stages = ['network', 'inventory', 'readiness', 'exec-create', 'exec-start', 'forwarding'];
+  const counts = { accepted: 0, completed: 0, failed: 0, rejected: 0, dropped: 0 };
+  const active = new Map(), recent = [], failures = [];
+  const increment = key => { counts[key] = Math.min(Number.MAX_SAFE_INTEGER, counts[key] + 1); };
+  const retain = (list, sample) => { list.push(sample); if (list.length > 4) { list.shift(); increment('dropped'); } };
+  const begin = api => {
+    increment('accepted');
+    const start = performance.now(); let stageStart = start, finished = false;
+    const sample = { id: counts.accepted, role: api ? 'api' : 'db', startedAt: new Date().toISOString(), finishedAt: null,
+      elapsedMs: 0, stage: 'network', stageMs: Object.fromEntries(stages.map(stage => [stage, 0])),
+      outcome: 'active', reason: null, readinessReason: null };
+    const capture = () => {
+      const now = performance.now();
+      return { ...sample, elapsedMs: Math.floor(now - start),
+        stageMs: { ...sample.stageMs, [sample.stage]: Math.floor(sample.stageMs[sample.stage] + now - stageStart) } };
+    };
+    const trace = {
+      stage(stage) {
+        if (finished) return;
+        const now = performance.now(); sample.stageMs[sample.stage] += now - stageStart;
+        sample.stage = stage; stageStart = now;
+      },
+      readiness(reason) { if (!finished) { trace.stage('readiness'); sample.readinessReason = reason; } },
+      note(outcome, reason) {
+        // EOF is provisional until the client closes; preserve the first real
+        // failure, including an existing deadline during downstream backpressure.
+        if (!finished && (sample.outcome === 'active' || (sample.outcome === 'closed' && ['failed', 'deadline'].includes(outcome)))) {
+          sample.outcome = outcome; sample.reason = reason;
+        }
+      },
+      finish(outcome, reason) {
+        if (finished) return;
+        trace.note(outcome, reason);
+        const terminal = capture(); terminal.finishedAt = new Date().toISOString();
+        finished = true; active.delete(sample.id); increment('completed'); retain(recent, terminal);
+        if (terminal.outcome === 'failed' || terminal.outcome === 'deadline' || terminal.stage !== 'forwarding') {
+          increment('failed'); retain(failures, terminal);
+        }
+      },
+      capture,
+    };
+    active.set(sample.id, trace); return trace;
+  };
+  return { begin, reject: () => increment('rejected'), snapshot: () => ({ version: 1, counts: { ...counts },
+    recent: [...recent], failures: [...failures], active: [...active.values()].slice(-4).map(trace => trace.capture()) }) };
+}
+
 function validate(m, env) {
   insist(m?.version === 1 && /^paisaxe-contracts-[a-f0-9]{12}$/.test(m.projectId), 'Invalid transport task project');
   insist(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(m.nonce), 'Invalid transport nonce');
@@ -130,7 +181,7 @@ function dockerStream(socketPath, execId, signal) {
     request.once('error', reject); request.once('close', () => clearTimeout(timeout)); request.end(bytes);
   });
 }
-function forwardFrames(upstream, client) {
+function forwardFrames(upstream, client, trace) {
   let pending = Buffer.alloc(0);
   upstream.on('data', bytes => {
     pending = pending.length ? Buffer.concat([pending, bytes]) : bytes;
@@ -144,17 +195,22 @@ function forwardFrames(upstream, client) {
         if (type !== 2 && !client.write(payload)) upstream.pause();
       }
       insist(pending.length <= MAX_DOCKER_BYTES + 8, 'Docker stream buffer exceeds limit');
-    } catch { client.destroy(); upstream.destroy(); }
+    } catch { trace.note('failed', 'invalid_frame'); client.destroy(); upstream.destroy(); }
   });
   client.on('drain', () => upstream.resume());
-  upstream.once('end', () => { if (pending.length) client.destroy(); else client.end(); });
-  upstream.once('close', () => { if (!upstream.readableEnded) client.destroy(); }); upstream.on('error', () => client.destroy());
+  upstream.once('end', () => {
+    if (pending.length) { trace.note('failed', 'invalid_frame'); client.destroy(); }
+    else { trace.note('closed', 'upstream_closed'); client.end(); }
+  });
+  upstream.once('close', () => { if (!upstream.readableEnded) { trace.note('failed', 'upstream_closed'); client.destroy(); } });
+  upstream.on('error', () => { trace.note('failed', 'request_failed'); client.destroy(); });
 }
 async function serve(m, env) {
   const ports = validate(m, env); const proof = identity(m, env);
   insist(same(m, proof), 'Transport source changed before launch');
   const dockerSocket = env.DOCKER_HOST.slice('unix://'.length);
   const sockets = new Set(); const streams = new Set(); const controllers = new Set(); const servers = [];
+  const observations = diagnostics();
   let stopping = false;
   const closeStream = stream => {
     if (stream.destroyed) return;
@@ -172,61 +228,76 @@ async function serve(m, env) {
     clearTimeout(lifetime);
   };
   const lifetime = setTimeout(() => { void stop(); }, LIFETIME_MS);
-  const ready = async (api, socket, signal) => {
+  const ready = async (api, socket, signal, trace) => {
     const deadline = Date.now() + READINESS_MS;
     const kinds = api ? ['db', 'kong'] : ['db'];
     const names = kinds.map(kind => `supabase_${kind}_${m.projectId}`);
+    const owned = (ok, message) => { if (!ok) trace.note('failed', 'ownership'); insist(ok, message); };
     while (!stopping && !socket.destroyed && Date.now() < deadline) {
       try {
+        trace.stage('network');
         const network = await dockerJson(dockerSocket, 'GET', `/networks/${m.projectId}`, undefined, signal);
-        insist(network?.Internal === true && network.Labels?.['com.paisaxe.contracts.nonce'] === m.nonce && /^[a-f0-9]{64}$/.test(network.Id), 'Transport network ownership mismatch');
+        owned(network?.Internal === true && network.Labels?.['com.paisaxe.contracts.nonce'] === m.nonce && /^[a-f0-9]{64}$/.test(network.Id), 'Transport network ownership mismatch');
         const filters = encodeURIComponent(JSON.stringify({ name: names.map(name => `^/${name}$`) }));
+        trace.stage('inventory');
         const containers = await dockerJson(dockerSocket, 'GET', `/containers/json?all=1&filters=${filters}`, undefined, signal);
-        insist(Array.isArray(containers), 'Transport invalid container inventory');
+        owned(Array.isArray(containers), 'Transport invalid container inventory');
         let dbId;
         for (const name of names) {
           const matches = containers.filter(container => container.Names?.includes('/' + name));
-          if (matches.length === 0) throw new Error('Container not ready');
-          insist(matches.length === 1, 'Transport ambiguous container identity');
+          if (matches.length === 0) { trace.readiness('missing'); throw new Error('Container not ready'); }
+          owned(matches.length === 1, 'Transport ambiguous container identity');
           const container = matches[0]; const networks = container.NetworkSettings?.Networks || {};
-          insist(/^[a-f0-9]{64}$/.test(container.Id) && container.Labels?.['com.supabase.cli.project'] === m.projectId &&
+          owned(/^[a-f0-9]{64}$/.test(container.Id) && container.Labels?.['com.supabase.cli.project'] === m.projectId &&
             JSON.stringify(Object.keys(networks)) === JSON.stringify([m.projectId]) && networks[m.projectId].NetworkID === network.Id,
           'Transport container ownership/network mismatch');
           const health = container.Health?.Status ?? (/\((healthy|unhealthy|health: starting)\)$/.exec(container.Status ?? '')?.[1]?.replace('health: ', ''));
           const isDb = name === names[0];
           // CLI bootstrap precedes the first Docker health probe. Only DB
           // traffic may reach its owned running container while it is starting.
-          if (container.State !== 'running' || (isDb && !health) || (health && health !== 'healthy' && (api || health !== 'starting'))) throw new Error('Container not ready');
+          if (container.State !== 'running' || (isDb && !health) || (health && health !== 'healthy' && (api || health !== 'starting'))) {
+            trace.readiness(container.State !== 'running' ? 'not_running' : 'health'); throw new Error('Container not ready');
+          }
           if (name === names[0]) dbId = container.Id;
         }
         return dbId;
       } catch (error) {
         if (signal.aborted || error.message.startsWith('Transport ')) throw error;
+        trace.stage('readiness');
         await pause(100);
       }
     }
-    throw new Error('Transport readiness deadline');
+    trace.note('deadline', 'readiness_timeout'); throw new Error('Transport readiness deadline');
   };
   const accept = api => async socket => {
-    if (sockets.size >= MAX_CONNECTIONS || stopping) return socket.destroy();
+    if (sockets.size >= MAX_CONNECTIONS || stopping) { observations.reject(); return socket.destroy(); }
+    const trace = observations.begin(api);
     const controller = new AbortController(); controllers.add(controller);
-    sockets.add(socket); socket.pause(); socket.setTimeout(CONNECTION_MS, () => socket.destroy());
-    let upstream; const deadline = setTimeout(() => socket.destroy(), CONNECTION_MS);
+    const timeout = () => { trace.note('deadline', 'connection_timeout'); socket.destroy(); };
+    sockets.add(socket); socket.pause(); socket.setTimeout(CONNECTION_MS, timeout);
+    let upstream; const deadline = setTimeout(timeout, CONNECTION_MS);
     socket.on('error', () => {});
-    socket.once('close', () => { clearTimeout(deadline); sockets.delete(socket); controllers.delete(controller); controller.abort(); if (upstream) closeStream(upstream); });
+    socket.once('close', () => {
+      trace.finish(stopping ? 'stopped' : 'closed', stopping ? 'shutdown' : 'client_closed');
+      clearTimeout(deadline); sockets.delete(socket); controllers.delete(controller); controller.abort(); if (upstream) closeStream(upstream);
+    });
     try {
-      const containerId = await ready(api, socket, controller.signal);
+      const containerId = await ready(api, socket, controller.signal, trace);
       if (socket.destroyed || stopping) return;
+      trace.stage('exec-create');
       const exec = await dockerJson(dockerSocket, 'POST', `/containers/${containerId}/exec`, {
         AttachStdin: true, AttachStdout: true, AttachStderr: true, Tty: false,
         Cmd: ['/usr/bin/nc', '-w', '120', api ? `supabase_kong_${m.projectId}` : '127.0.0.1', api ? '8000' : '5432'],
       }, controller.signal);
+      if (!/^[a-f0-9]{64}$/.test(exec?.Id)) trace.note('failed', 'ownership');
       insist(/^[a-f0-9]{64}$/.test(exec?.Id), 'Transport invalid exec identity');
+      trace.stage('exec-start');
       upstream = await dockerStream(dockerSocket, exec.Id, controller.signal);
       if (socket.destroyed || stopping) { closeStream(upstream); return; }
       streams.add(upstream); upstream.once('close', () => streams.delete(upstream));
-      forwardFrames(upstream, socket); socket.pipe(upstream); upstream.resume(); socket.resume();
-    } catch { socket.destroy(); }
+      trace.stage('forwarding');
+      forwardFrames(upstream, socket, trace); socket.pipe(upstream); upstream.resume(); socket.resume();
+    } catch { trace.note('failed', 'request_failed'); socket.destroy(); }
   };
   const listen = (server, options) => new Promise((resolve, reject) => { server.once('error', reject); server.listen(options, resolve); });
   try {
@@ -241,7 +312,7 @@ async function serve(m, env) {
           const request = JSON.parse(input);
           insist(same(request.identity, proof) && ['verify', 'stop'].includes(request.action), 'Untrusted control request');
           insist(servers.slice(0, 2).every((s, i) => s.listening && s.address().address === '127.0.0.1' && s.address().port === ports[i]), 'Transport listener ownership lost');
-          socket.end(JSON.stringify({ ...proof, ok: true, pid: process.pid, connectionLimit: MAX_CONNECTIONS, lifetimeMs: LIFETIME_MS }) + '\n');
+          socket.end(JSON.stringify({ ...proof, ok: true, pid: process.pid, connectionLimit: MAX_CONNECTIONS, lifetimeMs: LIFETIME_MS, diagnostics: observations.snapshot() }) + '\n');
           if (request.action === 'stop') socket.once('close', () => { void stop(); });
         } catch { socket.destroy(); }
       });

@@ -213,13 +213,27 @@ describe.skipIf(!reachable)("Declared database authorization matrix (real PostgR
     });
     const rpcs = databaseRpcFixtures(fixtures, () => requiredValue(ids[0], "src/lib/database-boundaries.postgrest-rls.test.ts:208 ids[0]"), STORY, PREFIX, SUGGESTION);
     it("every installed non-trigger SECURITY DEFINER RPC has reviewed arguments and all four HTTP role controls", () => {
-        const installed = psql("SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.prosecdef AND p.prorettype<>'trigger'::regtype ORDER BY 1;").split("\n");
-        expect(installed.sort()).toEqual([...rpcs.map(r => r.signature), ...CORPUS_DEFINER_RPCS].sort());
+        // Read the complete catalog once: each psql call opens a guarded task-local
+        // connection, so per-RPC reads would spend this case's budget on handshakes.
+        const installed: { signature: string; argumentNames: string[]; serviceRole: boolean; anon: boolean; authenticated: boolean }[] = JSON.parse(psql(`
+            SELECT COALESCE(json_agg(json_build_object(
+                'signature', p.oid::regprocedure::text,
+                'argumentNames', COALESCE(to_json(p.proargnames[1:p.pronargs]), '[]'::json),
+                'serviceRole', has_function_privilege('service_role', p.oid, 'EXECUTE'),
+                'anon', has_function_privilege('anon', p.oid, 'EXECUTE'),
+                'authenticated', has_function_privilege('authenticated', p.oid, 'EXECUTE')
+            )), '[]'::json) FROM pg_proc p
+            WHERE p.pronamespace='public'::regnamespace AND p.prosecdef AND p.prorettype<>'trigger'::regtype;
+        `));
+        expect(installed.map(r => r.signature).sort()).toEqual([...rpcs.map(r => r.signature), ...CORPUS_DEFINER_RPCS].sort());
+        const bySignature = new Map(installed.map(r => [r.signature, r]));
         for (const fixture of rpcs) {
             const keys = Object.keys(fixture.args()).sort();
-            const actual = JSON.parse(psql(`SELECT COALESCE(to_json(proargnames[1:pronargs]),'[]'::json)::text FROM pg_proc WHERE oid='public.${fixture.signature}'::regprocedure;`));
-            expect(keys, fixture.signature).toEqual(actual.sort());
-            expect(psql(`SELECT has_function_privilege('service_role','public.${fixture.signature}','EXECUTE') AND NOT has_function_privilege('anon','public.${fixture.signature}','EXECUTE') AND NOT has_function_privilege('authenticated','public.${fixture.signature}','EXECUTE');`)).toBe("t");
+            const actual = requiredValue(bySignature.get(fixture.signature), `installed RPC ${fixture.signature}`);
+            expect(keys, fixture.signature).toEqual(actual.argumentNames.sort());
+            expect(actual.serviceRole, fixture.signature).toBe(true);
+            expect(actual.anon, fixture.signature).toBe(false);
+            expect(actual.authenticated, fixture.signature).toBe(false);
         }
     });
     for (const fixture of rpcs) {
