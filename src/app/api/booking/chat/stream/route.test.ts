@@ -280,6 +280,29 @@ describe("POST /api/booking/chat/stream", () => {
       vi.useRealTimers();
     }
   });
+
+  it("keeps a turn alive while the model writes a held reply for longer than the idle window (#1045)", async () => {
+    vi.useFakeTimers();
+    try {
+      deps.turn = async function* (input) {
+        for (let i = 0; i < 3; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 20_000));
+          (input.onProgress as () => void)();
+        }
+        yield { type: "text", content: "Hay plazas a las 10:00." };
+      };
+      const response = await post({ message: "hola", history: [] });
+      const body = response.text();
+      await vi.advanceTimersByTimeAsync(65_000);
+      const sent = (await body)
+        .split("\n\n")
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => JSON.parse(line.slice(6)));
+      expect(sent.map((event) => event.type)).toEqual(["text", "done"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 

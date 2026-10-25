@@ -78,6 +78,8 @@ export interface BookingTurnInput {
   /** The visitor's interface language (es, en, fr, de, pt, ast), when known. */
   locale?: string | null;
   signal: AbortSignal;
+  /** Called on every model stream event, so the caller's idle window sees a held reply being written (#1045). */
+  onProgress?: () => void;
   now?: Date;
 }
 
@@ -142,6 +144,7 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
     // announcing it ("Guardo los datos y busco", #1037), never the answer.
     let text = "";
     for await (const event of stream) {
+      input.onProgress?.();
       if (event.type === "content_block_delta" && event.delta.type === "text_delta") text += event.delta.text;
     }
 
