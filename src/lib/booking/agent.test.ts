@@ -278,6 +278,17 @@ describe("streamBookingTurn", () => {
     expect(third.at(-4)).toEqual({ role: "assistant", content: [{ type: "text", text: preamble }, toolUse("tu_1")] });
   });
 
+  it("reports progress on every model stream event, including text before a tool call (#1045)", async () => {
+    const fake = fakeAnthropic([
+      { texts: ["Guardo ", "los datos."], content: [toolUse("tu_1")], stopReason: "tool_use" },
+      { texts: ["Hay ", "plazas ", "a las 10:00."], content: [], stopReason: "end_turn" },
+    ]);
+    const onProgress = vi.fn();
+
+    await collect(streamBookingTurn(input(fake.client, { onProgress })));
+    expect(onProgress).toHaveBeenCalledTimes(5);
+  });
+
   it("shows the answer of a turn that stops at max_tokens or refuses after writing", async () => {
     for (const stopReason of ["max_tokens", "refusal"] as const) {
       const fake = fakeAnthropic([{ texts: ["Entiendo que quieres seguir"], content: [], stopReason }]);

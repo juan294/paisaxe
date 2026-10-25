@@ -229,6 +229,7 @@ async function handlePost(request: NextRequest): Promise<Response> {
           acceptedBooking,
           locale: body.locale ?? null,
           signal: turnAbort.signal,
+          onProgress: () => generationTimer?.resetIdle(),
         })) {
           if (ended || turnAbort.signal.aborted) break;
           generationTimer.resetIdle();
