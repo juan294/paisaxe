@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.11.0] - 2026-10-26
 
 ### Fixed
-- Voice-access lookup failures now offer recovery instead of treating an unknown entitlement as a reason to purchase. Checkout return pages confirm activation only after access is verified, preserve return-story navigation while pending, and use tier-neutral wording in all six locales.
+- Voice-access lookup failures now offer recovery instead of treating an unknown entitlement as a reason to purchase. Checkout return pages confirm activation only after access is verified, preserve return-story navigation while pending, and use tier-neutral wording in all six locales. Signed-out visitors can sign in from the return page; failed sign-in attempts show a retryable error.
 - Hidden story information can be restored on touch screens, and hidden controls no longer receive keyboard focus. Chat loading and error states can be closed without reloading the page, with focus restored to the trigger.
 - Refund replay and the existing reconciliation path complete booking updates left behind by partial failures, while preserving duplicate-capture handling and notification idempotency.
 - ElevenLabs webhook lookup failures now return a retryable error when the booking outcome could not be stored.

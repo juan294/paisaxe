@@ -6,6 +6,14 @@ import { Suspense, type ReactElement } from "react";
 // --- Mocks ---
 
 // Mock hooks
+const mockSignInWithGoogle = vi.fn();
+const mockUseAuth = vi.fn(() => ({
+  user: { id: "user" } as { id: string } | null,
+  session: { access_token: "token" } as { access_token: string } | null,
+  signInWithGoogle: mockSignInWithGoogle,
+}));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => mockUseAuth() }));
+
 const mockRefresh = vi.fn();
 const mockUseVoiceAccess = vi.fn(() => ({
   hasAccess: true,
@@ -57,6 +65,7 @@ vi.mock("next/navigation", () => ({
 describe("CheckoutReturnPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: { id: "user" }, session: { access_token: "token" }, signInWithGoogle: mockSignInWithGoogle });
     mockSearchParams.delete("returnTo");
     mockUseSearchParams.mockReturnValue(mockSearchParams);
     mockUseVoiceAccess.mockReturnValue({
@@ -290,6 +299,31 @@ describe("CheckoutReturnPage", () => {
     view.rerender(<CheckoutReturnPage />);
     expect(screen.getByRole("link", { name: "premium.success_cta" })).toHaveAttribute("href", "/immersive?story=oviedo-walking-tour&voice=ready");
     expect(screen.queryByText("premium.pending_title")).not.toBeInTheDocument();
+  });
+
+  it.each([null, { id: "user" }])("offers sign-in recovery when a usable session is missing (user=%j)", (user) => {
+    mockUseAuth.mockReturnValue({ user, session: null, signInWithGoogle: mockSignInWithGoogle });
+    mockUseVoiceAccess.mockReturnValue({ ...mockUseVoiceAccess(), canUseVoice: false, hasAccess: false, needsSignIn: true, expiresAt: null });
+    mockSearchParams.set("returnTo", "oviedo & coast");
+    render(<CheckoutReturnPage />);
+    expect(screen.queryByRole("button", { name: "voice.checkAccess" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "auth.continue_with_google" }));
+    expect(mockSignInWithGoogle).toHaveBeenCalledExactlyOnceWith("/pricing/checkout/return?returnTo=oviedo+%26+coast");
+    expect(screen.queryByRole("link", { name: "premium.success_cta" })).not.toBeInTheDocument();
+  });
+
+  it("shows a retryable error when sign-in recovery fails", async () => {
+    mockUseAuth.mockReturnValue({ user: null, session: null, signInWithGoogle: mockSignInWithGoogle });
+    mockUseVoiceAccess.mockReturnValue({ ...mockUseVoiceAccess(), canUseVoice: false, hasAccess: false, needsSignIn: true, expiresAt: null });
+    mockSignInWithGoogle.mockRejectedValueOnce(new Error("OAuth unavailable"));
+    render(<CheckoutReturnPage />);
+    const button = screen.getByRole("button", { name: "auth.continue_with_google" });
+    fireEvent.click(button);
+    expect(await screen.findByRole("alert")).toHaveTextContent("errors.generic_description");
+    fireEvent.click(button);
+    expect(mockSignInWithGoogle).toHaveBeenCalledTimes(2);
+    expect(mockSignInWithGoogle).toHaveBeenLastCalledWith("/pricing/checkout/return");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   describe("formatted expiry date", () => {
