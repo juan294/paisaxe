@@ -4,7 +4,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { randomInt, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { LOCAL_DB_CONTAINER, isLocalSupabaseReachable, psql, warnLocalSupabaseUnreachable } from "@/test/local-supabase";
+import { LOCAL_DB_CONTAINER, isLocalSupabaseReachable, psql, spawnLocalPsql, warnLocalSupabaseUnreachable } from "@/test/local-supabase";
 vi.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
 const reachable = await isLocalSupabaseReachable();
 if (!reachable)
@@ -36,7 +36,7 @@ function clear() { inStorage(`require('fs').writeFileSync(${JSON.stringify(state
 async function received(path: string) { await vi.waitFor(() => expect(deliveries().some(r => r.url === path)).toBe(true), { timeout: 10000, interval: 100 }); return deliveries().filter(r => r.url === path); }
 function configure(url: string) { psql(`UPDATE public.webhook_config SET value='${url}' WHERE key='base_url'; UPDATE public.webhook_config SET value='${SECRET}' WHERE key='secret';`); }
 async function captureSql(sql: string) {
-    const child = spawn("docker", ["exec", LOCAL_DB_CONTAINER, "psql", "-X", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql]);
+    const child = spawnLocalPsql(sql);
     let output = "";
     let diagnostic = "";
     child.stdout.on("data", c => output += c.toString());
@@ -46,7 +46,7 @@ async function captureSql(sql: string) {
     return { output, diagnostic };
 }
 async function transaction(sql: string, commit: boolean) {
-    const child = spawn("docker", ["exec", "-i", LOCAL_DB_CONTAINER, "psql", "-X", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-t", "-A"]);
+    const child = spawnLocalPsql();
     let output = "";
     let errors = "";
     child.stdout.on("data", chunk => { output += chunk.toString(); });

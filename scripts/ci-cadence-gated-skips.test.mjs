@@ -54,8 +54,8 @@ test('each gated group is gated only by the local Supabase reachability probe, u
 
 test('each reviewed group pins its actual qualified case count', () => {
   assert.deepEqual(ENVIRONMENT_GATED.map(entry => ({...entry})), reviewed.groups);
-  assert.equal(reviewed.declaredContractCases, 1043);
-  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), 1044);
+  assert.equal(reviewed.declaredContractCases, 1046);
+  assert.equal(ENVIRONMENT_GATED.reduce((sum, entry) => sum + entry.cases, 0), 1047);
 });
 
 function skippedSuite(groups) {
@@ -82,7 +82,7 @@ test('historical hosted nightly retains its 204-case provenance and cannot quali
 test('current ordinary measurement discloses only whole reviewed groups, never counts their skipped cases', () => {
   const suite=skippedSuite(reviewed.groups);
   const result=aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[structuredClone(suite)],environmentGated:ENVIRONMENT_GATED});
-  assert.equal(result.environmentGatedSkipped,1044);assert.equal(result.testCount,1);assert.equal(result.testFiles,1);
+  assert.equal(result.environmentGatedSkipped,1047);assert.equal(result.testCount,1);assert.equal(result.testFiles,1);
   for(const omitted of ENVIRONMENT_GATED) assert.throws(() => aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[structuredClone(suite)],environmentGated:ENVIRONMENT_GATED.filter(entry=>entry!==omitted)}), /mandatory cases skipped or unfinished/, key(omitted));
   const partial=structuredClone(suite);partial.tests.testResults.at(-1).assertionResults[0].status='passed';
   assert.throws(() => aggregateMeasuredSuites({root,requiredSuites:['app'],suites:[partial],environmentGated:ENVIRONMENT_GATED}), /mandatory cases skipped or unfinished/);
@@ -100,4 +100,12 @@ test('the reviewed census binds every gated test source to its qualified bytes',
     const entry=ENVIRONMENT_GATED.find(item=>item.file===observed.file);
     assert.equal(entry?.cases,observed.cases,`${observed.file}: qualified count differs`);
   }
+});
+
+// A producer count refresh changes trusted source bytes as well as inventory.
+test('the protected control loader pins the reviewed gated producer bytes', () => {
+  const loader = readFileSync(new URL('./ci-cadence-control-launch.mjs', import.meta.url), 'utf8');
+  const pin = /"scripts\/ci-cadence-producer\.mjs": "([a-f0-9]{64})"/.exec(loader)?.[1];
+  const producer = readFileSync(new URL('./ci-cadence-producer.mjs', import.meta.url));
+  assert.equal(pin, createHash('sha256').update(producer).digest('hex'));
 });

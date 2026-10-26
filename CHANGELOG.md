@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Booking-tool timeouts stop dependent tool calls and disclose uncertain outcomes. Late quote writes cannot supersede a newer unaccepted offer.
 - Marketing agents read actual scheduled posts through the existing admin boundary, count active stories correctly, and report unavailable context instead of silently omitting it.
 - Test compilation and browser assertions now preserve the intended access states and wait for story navigation to hydrate before keyboard interaction.
+- The local test transport creates its control socket with private permissions immediately, preventing intermittent startup rejection. Database delivery tests reuse the validated SQL session helper. Existing CI test counts and protected source pins now match the added integration cases.
 
 ### Changed
 - The canonical outbound-booking tool supplies a per-booking idempotency token. The route accepts the validated body token alongside existing header clients and rejects conflicting tokens.
