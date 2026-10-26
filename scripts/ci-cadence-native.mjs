@@ -115,7 +115,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
     const integer = value => typeof value === 'string' && /^[1-9][0-9]*$/.test(value) ? Number(value) : NaN;
-    const result = await classifyNativeEvent({ root: process.cwd(), event, eventName: process.env.GITHUB_EVENT_NAME, actor: process.env.GITHUB_ACTOR, mode: process.env.CI_CADENCE_MODE, trustedRevision: process.env.CI_CADENCE_TRUSTED_REVISION, defaultSha: process.env.CI_CADENCE_DEFAULT_SHA, context: { repository: process.env.GITHUB_REPOSITORY, repositoryId: integer(process.env.GITHUB_REPOSITORY_ID), ownerId: integer(process.env.GITHUB_REPOSITORY_OWNER_ID), actorId: integer(process.env.GITHUB_ACTOR_ID), actorType: event.sender?.type, sha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF } });
+    const result = await classifyNativeEvent({ root: process.cwd(), event, eventName: process.env.GITHUB_EVENT_NAME, actor: process.env.GITHUB_ACTOR, mode: 'lean', trustedRevision: process.env.CI_CADENCE_TRUSTED_REVISION, defaultSha: process.env.CI_CADENCE_DEFAULT_SHA, context: { repository: process.env.GITHUB_REPOSITORY, repositoryId: integer(process.env.GITHUB_REPOSITORY_ID), ownerId: integer(process.env.GITHUB_REPOSITORY_OWNER_ID), actorId: integer(process.env.GITHUB_ACTOR_ID), actorType: event.sender?.type, sha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF } });
     console.log(JSON.stringify(result, null, 2));
     if (result.lane === 'blocked') process.exitCode = 1;
   } catch { console.error('native event acquisition failed'); process.exitCode = 1; }

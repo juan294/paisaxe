@@ -83,7 +83,7 @@ The production license check (`npm run check-licenses`) now enforces an allowlis
 
 | Field | Value |
 |-------|-------|
-| Packages | `lightningcss@1.32.0` and its platform binaries (`lightningcss-darwin-arm64`, `-linux-x64-gnu`, `-win32-x64-msvc`, and the ~9 other `lightningcss-<platform>` variants) |
+| Packages | `lightningcss@1.32.0` (via `@tailwindcss/node@4.3.3`), `lightningcss@1.33.0` (via `vite@8.3.2`; added to this record 2026-10-15, same license and same build-time-only use) and their platform binaries (`lightningcss-darwin-arm64`, `-linux-x64-gnu`, `-win32-x64-msvc`, and the ~9 other `lightningcss-<platform>` variants) |
 | License | MPL-2.0 (Mozilla Public License 2.0) |
 | Parent dependency | `@tailwindcss/postcss` → `@tailwindcss/node` (Tailwind CSS v4 build tooling) and `vite` (via `@vitejs/plugin-react`) |
 | Dependency type | **devDependency / build-time only** — not shipped to clients |
@@ -105,7 +105,9 @@ Under these conditions, MPL-2.0 imposes **no copyleft obligations** on Paisaxe's
 
 ### CI enforcement
 
-`lightningcss` is a true devDependency (not reachable from any `dependencies` entry in `package.json`), so it is invisible to `scripts/check-production-licenses.ts` / `npm run check-licenses` (the blocking production allowlist) — it is only visible to the **dev-dependency** scan (see "Allowlist enforcement (policy decision)" below), which reports but does not block.
+Since the Sentry 11 upgrade, `@sentry/nextjs` → `@sentry/cloudflare`'s optional Vite peer makes `vite` → `lightningcss@1.33.0` reachable in npm's production dependency graph. This is the same reviewed CSS build tool, exposed through `@sentry/cloudflare/vite`; the runtime SDK entry point does not import that build entry point. The production scan therefore needs the existing exception even though Paisaxe does not use Cloudflare's Vite integration.
+
+`BUILD_TOOL_LICENSES` in `scripts/check-production-licenses.ts` admits only `lightningcss@1.33.0` and the exact platform package names at that version with `MPL-2.0`. MPL-2.0 remains disallowed for arbitrary dependencies, changed versions and changed licenses. The separate `lightningcss@1.32.0` Tailwind installation remains development-only.
 
 ### Review schedule
 
@@ -148,6 +150,18 @@ Revisit if Sentry changes `@sentry/cli`'s license terms in a future release, or 
 
 ---
 
+## Exception 4 update: Sentry 11's `sentry@0.45.0`
+
+Sentry 11 replaces the build plugin's old `@sentry/cli` dependency with `sentry@0.45.0` (`@sentry/nextjs` → `@sentry/bundler-plugins` → `sentry`). The installed package manifest and `LICENSE.md` declare `FSL-1.1-Apache-2.0`. This retains the build-time CLI use covered by Exception 4; its future license is Apache-2.0 rather than MIT. The package is used for build metadata and source maps, not as a Paisaxe service or client feature.
+
+The scanner currently infers `Apache*` from the license text, which loses the FSL restriction. The check now reads the declared license from each installed package's `package.json`, after verifying its name and version against the scanner's package key (normalizing only npm's optional leading `v` version prefix). Missing or unreadable manifests and mismatched identities fail the scan; absent declared IDs retain the scanner's existing value and remain subject to the allowlist.
+
+`BUILD_TOOL_LICENSES` admits only `sentry@0.45.0` with `FSL-1.1-Apache-2.0`. It does not generally allow that license, future CLI versions, a different package, or a changed license on the same package. Revisit this exception on the next CLI version or any change in its use.
+
+Source evidence: installed `sentry@0.45.0/package.json` and `LICENSE.md`, `@sentry/bundler-plugins@11.8.0/package.json`, and `@sentry/cloudflare@11.8.0`'s exported runtime and Vite entry points. Update prepared 2026-10-18 in response to nightly run [39092472558](https://github.com/juan294/paisaxe/actions/runs/39092472558).
+
+---
+
 ## Dual-licensed dependencies (permissive branch selected)
 
 Some dependencies are published under an "OR" dual license where one branch is permissive and satisfies the policy directly. These are **not exceptions** — Paisaxe elects the permissive branch — but they are recorded here because license scanners repeatedly surface the copyleft branch of the "OR" expression.
@@ -168,7 +182,7 @@ The stated policy at the top of this document is **permissive-only, allowlist-ba
 **Decision (#847):** the production check now runs `scripts/check-production-licenses.ts` (via `npm run check-licenses`), which is a real allowlist:
 
 - It does **not** use `license-checker --onlyAllow` — that flag matches by substring (`license.includes(token)`), so an allowed `"MIT"` token also silently matches `"FSL-1.1-MIT"`, `"SUBMIT-1.0"`, or any other license string that merely contains "MIT". That would have recreated the exact silent-pass bug this fix exists to close.
-- Instead it parses each production dependency's exact SPDX expression (a single ID, or a parenthesized `AND`/`OR` compound) and matches every token by **strict equality** against `CORE_ALLOWED_LICENSES` (the four permissive families plus a handful of permissive-equivalent IDs already present in the tree — `BlueOak-1.0.0`, `Unlicense`, `MIT-0`, `0BSD`, `CC-BY-4.0`) union `EXCEPTION_LICENSES` (currently `LGPL-3.0-or-later` and `FSL-1.1-MIT`, mirroring Exceptions 1 and 4 above).
+- Instead it parses each production dependency's exact SPDX expression (a single ID, or a parenthesized `AND`/`OR` compound) and matches every token by **strict equality** against `CORE_ALLOWED_LICENSES` (the four permissive families plus a handful of permissive-equivalent IDs already present in the tree — `BlueOak-1.0.0`, `Unlicense`, `MIT-0`, `0BSD`, `CC-BY-4.0`) union `EXCEPTION_LICENSES` (currently `LGPL-3.0-or-later` and `FSL-1.1-MIT`, mirroring Exceptions 1 and 4 above). Exact package/version/license pairs in `BUILD_TOOL_LICENSES` apply Exceptions 3 and 4 to the Sentry 11 build-tool graph without adding general license grants.
 - Any production license not covered by either set **fails the build** by default. Adding a new exception requires both a justification entry in this document AND the exact SPDX ID added to `EXCEPTION_LICENSES` in the script — a one-place denylist add is no longer sufficient (or possible).
 
 **Dev/build deps** are still scanned separately and only **reported** (non-blocking) — `license-check.yml`'s "Report dev-dependency licenses" step. Build-time-only tooling that never ships to clients (like `lightningcss`, MPL-2.0) does not impose copyleft obligations on Paisaxe, so this surfaces new dev-dep licenses for human review rather than hard-failing CI on them. Any new weak-copyleft dev dep that is acceptable should be recorded here as an exception (gap originally noted in #576 / #623).

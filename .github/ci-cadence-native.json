@@ -3,53 +3,53 @@
   "repository": "juan294/paisaxe",
   "caller": {
     "path": ".github/workflows/ci-nightly.yml",
-    "blobSha": "f924a365af8736fe3bb501b70c248a7ca30908e3"
+    "blobSha": "deab540168b563629c228f398964c761ec6c9635"
   },
   "callers": {
     ".github/workflows/ci-nightly.yml": {
       "path": ".github/workflows/ci-nightly.yml",
-      "blobSha": "f924a365af8736fe3bb501b70c248a7ca30908e3"
+      "blobSha": "deab540168b563629c228f398964c761ec6c9635"
     },
     ".github/workflows/ci-cadence.yml": {
       "path": ".github/workflows/ci-cadence.yml",
-      "blobSha": "baae5642839d73ffbb935e7f074d2c418386293c"
+      "blobSha": "b544025b4cc4bceb124cb84fe23436c3b82d3803"
     }
   },
   "callees": {
     ".github/workflows/ci.yml": {
       "path": ".github/workflows/ci.yml",
       "prefix": "ci",
-      "blobSha": "911440837d9f016be751b2624a0e70bb4c580841"
+      "blobSha": "987c82fa0ab9b2a13a049b94748ef05f5e933e2c"
     },
     ".github/workflows/e2e.yml": {
       "path": ".github/workflows/ci-cadence-e2e-full.yml",
       "prefix": "e2e",
-      "blobSha": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9"
+      "blobSha": "031f363d3b79123321af61bc4591e8f3f3cdf1fe"
     },
     ".github/workflows/lighthouse.yml": {
       "path": ".github/workflows/ci-cadence-lighthouse-full.yml",
       "prefix": "lighthouse",
-      "blobSha": "ff6cf4bc6078aff7c1962b261bccc70415d547b1"
+      "blobSha": "992b0cb89702c31cbba1176bc89a191e6abb3139"
     },
     ".github/workflows/bundle-size.yml": {
       "path": ".github/workflows/ci-cadence-bundle-size-full.yml",
       "prefix": "bundle-size",
-      "blobSha": "bb198d8094581a0fe5d728b61bddb40128766aaf"
+      "blobSha": "5448fbab7288dccd4f49ff6592b5df35955be95c"
     },
     ".github/workflows/knip.yml": {
       "path": ".github/workflows/ci-cadence-knip-full.yml",
       "prefix": "knip",
-      "blobSha": "4453408d8ef1231818df8f32fdce1da95706650d"
+      "blobSha": "3acd1f7b2b84a21447e9cce8b300926feb55b21f"
     },
     ".github/workflows/license-check.yml": {
       "path": ".github/workflows/ci-cadence-license-check-full.yml",
       "prefix": "license-check",
-      "blobSha": "75fd2a1b570303eb0f606cb0d6d9b10cf9933fbf"
+      "blobSha": "3212b1bdf0ee0e804d1ad4d5f061723204fae9f6"
     },
     ".github/workflows/security.yml": {
       "path": ".github/workflows/ci-cadence-security-full.yml",
       "prefix": "security",
-      "blobSha": "338ee0896a8a0192af887a584836ae3cf590d54c"
+      "blobSha": "07704ff8e3a93f66635448c845a42201b74fdf4f"
     }
   },
   "nestedCallees": {
@@ -60,7 +60,7 @@
   },
   "coverageOnly": {
     "path": ".github/workflows/coverage.yml",
-    "blobSha": "d64063a2633a6a8595b06f208184839126f1c5f2",
+    "blobSha": "2ec6b9a23bac5b52ec0ce1133a9481723b3f02b8",
     "steps": [
       {
         "name": "Decide weekly native coverage eligibility",
@@ -143,15 +143,15 @@
     ]
   },
   "workflowPins": {
-    ".github/workflows/ci-nightly.yml": "f924a365af8736fe3bb501b70c248a7ca30908e3",
-    ".github/workflows/ci-cadence.yml": "baae5642839d73ffbb935e7f074d2c418386293c",
-    ".github/workflows/ci.yml": "911440837d9f016be751b2624a0e70bb4c580841",
-    ".github/workflows/ci-cadence-e2e-full.yml": "b9f0b21e7bacf99b80831b8bb5a601ac3b219bc9",
-    ".github/workflows/ci-cadence-lighthouse-full.yml": "ff6cf4bc6078aff7c1962b261bccc70415d547b1",
-    ".github/workflows/ci-cadence-bundle-size-full.yml": "bb198d8094581a0fe5d728b61bddb40128766aaf",
-    ".github/workflows/ci-cadence-knip-full.yml": "4453408d8ef1231818df8f32fdce1da95706650d",
-    ".github/workflows/ci-cadence-license-check-full.yml": "75fd2a1b570303eb0f606cb0d6d9b10cf9933fbf",
-    ".github/workflows/ci-cadence-security-full.yml": "338ee0896a8a0192af887a584836ae3cf590d54c",
+    ".github/workflows/ci-nightly.yml": "deab540168b563629c228f398964c761ec6c9635",
+    ".github/workflows/ci-cadence.yml": "b544025b4cc4bceb124cb84fe23436c3b82d3803",
+    ".github/workflows/ci.yml": "987c82fa0ab9b2a13a049b94748ef05f5e933e2c",
+    ".github/workflows/ci-cadence-e2e-full.yml": "031f363d3b79123321af61bc4591e8f3f3cdf1fe",
+    ".github/workflows/ci-cadence-lighthouse-full.yml": "992b0cb89702c31cbba1176bc89a191e6abb3139",
+    ".github/workflows/ci-cadence-bundle-size-full.yml": "5448fbab7288dccd4f49ff6592b5df35955be95c",
+    ".github/workflows/ci-cadence-knip-full.yml": "3acd1f7b2b84a21447e9cce8b300926feb55b21f",
+    ".github/workflows/ci-cadence-license-check-full.yml": "3212b1bdf0ee0e804d1ad4d5f061723204fae9f6",
+    ".github/workflows/ci-cadence-security-full.yml": "07704ff8e3a93f66635448c845a42201b74fdf4f",
     ".github/workflows/validate-merged-pr.yml": "7c733394f53db4ed685c1cf7cf0e16c9a99f54ff"
   },
   "stepInventory": {
@@ -478,6 +478,20 @@
     },
     {
       "name": "ci / develop_push_source",
+      "conclusions": [
+        "skipped"
+      ],
+      "steps": []
+    },
+    {
+      "name": "ci / Sutura routing",
+      "conclusions": [
+        "skipped"
+      ],
+      "steps": []
+    },
+    {
+      "name": "ci / CI Verification (CI)",
       "conclusions": [
         "skipped"
       ],
@@ -884,6 +898,20 @@
         "steps": []
       },
       {
+        "name": "ci / Sutura routing",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
+        "name": "ci / CI Verification (CI)",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
         "name": "e2e / Callable source",
         "conclusions": [
           "success"
@@ -1283,6 +1311,20 @@
         "steps": []
       },
       {
+        "name": "ci / Sutura routing",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
+        "name": "ci / CI Verification (CI)",
+        "conclusions": [
+          "skipped"
+        ],
+        "steps": []
+      },
+      {
         "name": "e2e / Callable source",
         "conclusions": [
           "success"
@@ -1608,6 +1650,12 @@
           },
           {
             "name": "Setup reviewed Node runtime",
+            "conclusions": [
+              "success"
+            ]
+          },
+          {
+            "name": "Plan automatic verification",
             "conclusions": [
               "success"
             ]

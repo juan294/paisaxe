@@ -1,0 +1,235 @@
+version: 1
+candidate_tree: 2de5e0adbeb818bb6ebbaaddfdb22a2060a9199f
+shipped_tree: 2de5e0adbeb818bb6ebbaaddfdb22a2060a9199f
+deployed_tree: 2de5e0adbeb818bb6ebbaaddfdb22a2060a9199f
+deployed_commit: 5ac380fc1bb26d9a454e7e5c2382d0bdae060e50
+github_deployment_id: "7063212695"
+target_url: https://paisaxe.es
+generated_at: 2026-10-14T11:06:18.364Z
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles:
+      - identity
+    evidence:
+      - artifact: production-probes-ary9hT/identity.stdout
+        sha256: a6a1e2352dcc468899b88d7170e9a013b70f337b5dafe51f500b9c14cf3cba5a
+  - id: health-status
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: production-probes-ary9hT/receipt.json
+        sha256: 425436a5948bb3576cebe98fcd47e637c130aea58195a6c460f3203a062c6d14
+  - id: health-db
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: production-probes-ary9hT/receipt.json
+        sha256: 425436a5948bb3576cebe98fcd47e637c130aea58195a6c460f3203a062c6d14
+  - id: elevenlabs-voice-preflight
+    status: passed
+    oracles:
+      - http
+    provider: ok
+    fingerprint: sha256:1337f33296d87be8
+    fingerprint_matches: true
+    agents:
+      - pelayo
+      - booking
+      - penny
+      - iris
+      - xander
+    custom_llm: not_applicable
+    target_url: https://paisaxe.es
+    response_url: https://paisaxe.es/api/health/voice
+    github_deployment_id: "7063212695"
+    deployment_commit: 5ac380fc1bb26d9a454e7e5c2382d0bdae060e50
+    checked_at: 2026-10-14T10:53:27.917Z
+  - id: csp-canary
+    status: passed
+    oracles:
+      - ui
+    evidence:
+      - artifact: production-probes-ary9hT/receipt.json
+        sha256: 425436a5948bb3576cebe98fcd47e637c130aea58195a6c460f3203a062c6d14
+  - id: story-read-path
+    status: passed
+    oracles:
+      - http
+      - ui
+    evidence:
+      - artifact: production-probes-ary9hT/receipt.json
+        sha256: 425436a5948bb3576cebe98fcd47e637c130aea58195a6c460f3203a062c6d14
+  - id: admin-denial
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: production-probes-ary9hT/receipt.json
+        sha256: 425436a5948bb3576cebe98fcd47e637c130aea58195a6c460f3203a062c6d14
+  - id: webhook-unsigned
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: production-probes-ary9hT/receipt.json
+        sha256: 425436a5948bb3576cebe98fcd47e637c130aea58195a6c460f3203a062c6d14
+  - id: chat-smoke
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: production-probes-ary9hT/receipt.json
+        sha256: 425436a5948bb3576cebe98fcd47e637c130aea58195a6c460f3203a062c6d14
+  - id: booking-gate-closed
+    status: passed
+    oracles:
+      - http
+      - ui
+    evidence:
+      - artifact: production-probes-ary9hT/receipt.json
+        sha256: 425436a5948bb3576cebe98fcd47e637c130aea58195a6c460f3203a062c6d14
+  - id: booking-access-boundary
+    status: passed
+    oracles:
+      - http
+      - cleanup
+    cleanup: removed
+    evidence:
+      - artifact: release190-release-local-summary.json
+        sha256: 0133f1ff29972f62c0813b8f9dff433833460026fae34157b34f698dacfcf75f
+      - artifact: release190-runtime-reuse-proof05.json
+        sha256: bf99939d3a098929ae6aac6677291c8bed64e22b2b00f619ae7aa7ca5c6724f3
+      - artifact: release190-runtime-reuse-proof06.json
+        sha256: 0955bf79392ced78255d3ec21d924798003f635ae4801f7ec9a963f8fbe6e0c0
+      - artifact: release190-runtime-reuse-proof07.json
+        sha256: e626ae82c583a78f2e3debd5653376a4461c4b613a14075b72d1146d31d26355
+  - id: booking-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+    evidence:
+      - artifact: release190-release-local-summary.json
+        sha256: 0133f1ff29972f62c0813b8f9dff433833460026fae34157b34f698dacfcf75f
+      - artifact: release190-runtime-reuse-proof05.json
+        sha256: bf99939d3a098929ae6aac6677291c8bed64e22b2b00f619ae7aa7ca5c6724f3
+      - artifact: release190-runtime-reuse-proof06.json
+        sha256: 0955bf79392ced78255d3ec21d924798003f635ae4801f7ec9a963f8fbe6e0c0
+      - artifact: release190-runtime-reuse-proof07.json
+        sha256: e626ae82c583a78f2e3debd5653376a4461c4b613a14075b72d1146d31d26355
+  - id: favorite-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+    evidence:
+      - artifact: release190-release-local-summary.json
+        sha256: 0133f1ff29972f62c0813b8f9dff433833460026fae34157b34f698dacfcf75f
+      - artifact: release190-runtime-reuse-proof05.json
+        sha256: bf99939d3a098929ae6aac6677291c8bed64e22b2b00f619ae7aa7ca5c6724f3
+      - artifact: release190-runtime-reuse-proof06.json
+        sha256: 0955bf79392ced78255d3ec21d924798003f635ae4801f7ec9a963f8fbe6e0c0
+      - artifact: release190-runtime-reuse-proof07.json
+        sha256: e626ae82c583a78f2e3debd5653376a4461c4b613a14075b72d1146d31d26355
+  - id: migration-posture
+    status: passed
+    oracles:
+      - static
+    evidence:
+      - artifact: release190-final-migration-posture.json
+        sha256: 7b236837e2af1e1c0af319967ae0962b934b97efd359f4c271ce3c330d9d89dd
+exceptions: []
+acceptance:
+  approved_catalog_photos:
+    status: passed
+    owner_scope: 71
+    all71_public_records_verified: true
+    original_images_preserved: true
+    original_credits_preserved: true
+    browser_samples: 6
+    visual_screenshots_reviewed: 6
+    fresh_browser_captures: 1
+    reused_successful_v2_captures: 5
+    failed_harness_attempts_preserved: true
+    evidence:
+      - artifact: release190-public71-final-v2.json
+        sha256: a99476b2f9849599f0c2529571791ae92384ce9e01a01ab542574b6bae072a6b
+      - artifact: release190-public71-missing-mobile-v3.json
+        sha256: 829f42a57ade3a3d087d30e34ef00e9df8a141848c891efb5442240273d9ba03
+      - artifact: public71-visual-review-combined.json
+        sha256: 83bfbbe57d6d8bcfcc7d79214f04abc82b83e25bd98ae87ded315aa2ea5ac613
+  stripe_endpoint:
+    status: passed
+    endpoint_id: we_1SxCl7L06M9hPLY769YZblVE
+    enabled_events:
+      - checkout.session.completed
+      - checkout.session.async_payment_succeeded
+      - charge.refunded
+      - refund.created
+      - refund.updated
+      - refund.failed
+      - charge.dispute.created
+      - charge.dispute.updated
+      - charge.dispute.closed
+    live_payment_lifecycle_executed: false
+    evidence:
+      - artifact: stripe-live-endpoint-5ac380fc1bb26d9a454e7e5c2382d0bdae060e50/result.json
+        sha256: f15d4cdd1478968ab11839957ca7957b3f78e90141c784958c9d54e923c6aa64
+verification:
+  local_full_tests: 11849
+  local_skips: 0
+  provider_database_contract_cases: 1036
+  candidate_workflows_passed: 16
+  main_workflows:
+    - name: Lighthouse CI
+      status: success
+      url: https://github.com/juan294/paisaxe/actions/runs/38551688277
+    - name: E2E Tests
+      status: success
+      url: https://github.com/juan294/paisaxe/actions/runs/38551688273
+    - name: Coverage
+      status: success
+      url: https://github.com/juan294/paisaxe/actions/runs/38551688328
+    - name: Security Scan
+      status: success
+      url: https://github.com/juan294/paisaxe/actions/runs/38551688286
+    - name: CI
+      status: success
+      url: https://github.com/juan294/paisaxe/actions/runs/38551688370
+  evidence:
+    - artifact: hosted90529077/monitor-final.json
+      sha256: eddc3e828de5c5d9edb0ff09b87dc671b43c3525c064a21d2be1ff20f027046d
+    - artifact: hosted-main190/5ac380fc1bb26d9a454e7e5c2382d0bdae060e50/monitor-final.json
+      sha256: 2891831c5b44fa7eb2d54933dcec161424da618edd72985638e57c0094e53f57
+    - artifact: release190-census-commit07-summary.json
+      sha256: 7d5134f9ee1817435981d50b77749882abf8c9bf80b71bca93c69ec165f85f2c
+    - artifact: release190-production-migrations-result.json
+      sha256: e5a1e4f093d773e77041887a8f8686c4ad2aa06c986708591c87f0599e282127
+  conditional_skips_disclosed: true
+  known_separate_dependabot_failure:
+    run_id: 38551723812
+    existing_alert: 138
+    scope: development dependency; outside five main release workflow gates
+operational_dispositions:
+  legacy_booking_request_keys:
+    preserved_records: 12
+    historical_keys_not_fabricated: true
+    current_053_not_null_parity: false
+    retention_activation_blocked_by: https://github.com/juan294/paisaxe/issues/1032
+  feature_flags_permissions: Production anon/authenticated grants are strictly
+    narrower than local; exact independent comparison accepted; no grants
+    restored.
+  booking_retention_active: false
+  active_corpus: legacy
+  full_replacement_corpus_promoted: false
+  owner_closed_content_work_not_reopened: true
+  canonical_identity_first_attempt: Failed on old deployment before
+    provider/browser probes; existing staged build explicitly promoted, then all
+    ten probes passed.

@@ -195,4 +195,12 @@ describe("ElevenLabs webhook: every other call is unchanged (regression)", () =>
     await POST(signed(confirmedCall("conv_456")));
     expect(phone.settlePhoneConfirmationCall).not.toHaveBeenCalled();
   });
+
+  it("a legacy row whose key reads back as NULL (#1032) is still processed and never settled", async () => {
+    stubDatabase({ ...pelayoCall, idempotency_key: null });
+    const response = await POST(signed(confirmedCall("conv_456")));
+    expect(await response.json()).toEqual({ success: true, status: "processed", bookingId: "booking-123", outcome: "confirmed", smsSent: false });
+    expect(rpc).toHaveBeenCalledWith("process_elevenlabs_event_idempotent", expect.objectContaining({ p_booking_id: "booking-123", p_outcome: "confirmed" }));
+    expect(phone.settlePhoneConfirmationCall).not.toHaveBeenCalled();
+  });
 });

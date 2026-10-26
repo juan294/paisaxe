@@ -129,6 +129,16 @@ function extractFirstSentence(raw: string): string {
   return firstSentence.endsWith(".") ? firstSentence : firstSentence + ".";
 }
 
+/** Repeats until stable: removing one comment can join the text around it into a new one. */
+function stripHtmlComments(text: string): string {
+  let result = text;
+  for (let previous = ""; previous !== result; ) {
+    previous = result;
+    result = result.replace(/<!--[\s\S]*?-->/g, "");
+  }
+  return result;
+}
+
 /**
  * Parse shared context entries from shared-context.md.
  * Format: <!-- ENTRY:START agent=flag_key timestamp=ISO -->
@@ -144,7 +154,7 @@ function parseSharedContext(content: string): SharedContextEntry[] {
     let entryContent = body.replace(/<!--\s*ENTRY:END\s*-->/g, "").trim();
 
     // Clean up the content — remove trailing markers
-    entryContent = entryContent.replace(/<!--[^>]*-->/g, "").trim();
+    entryContent = stripHtmlComments(entryContent).trim();
 
     if (entryContent) {
       entries.push({

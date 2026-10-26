@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync, statSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, realpathSync, statSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepareStack, initializeRealtime } from './prepare-contract-stack.mjs';
@@ -8,7 +8,7 @@ import { stopTransport } from './contract-transport.mjs';
 
 test('actual preparer isolates fresh project, validates before reset and preserves safe failures', async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'contract-preparation-fixture-')));
-  const saved = Object.fromEntries(['PATH', 'DOCKER_HOST', 'SUPABASE_ACCESS_TOKEN', 'STRIPE_SECRET_KEY'].map((key) => [key, process.env[key]]));
+  const saved = Object.fromEntries(['PATH', 'DOCKER_HOST', 'SUPABASE_ACCESS_TOKEN', 'STRIPE_SECRET_KEY', 'PAISAXE_CONTRACT_LIFECYCLE_DIR'].map((key) => [key, process.env[key]]));
   const tasks = [];
   try {
     mkdirSync(join(root, 'bin')); mkdirSync(join(root, 'supabase/migrations'), { recursive: true });
@@ -16,11 +16,16 @@ test('actual preparer isolates fresh project, validates before reset and preserv
     writeFileSync(join(root, '.env.local'), 'STRIPE_SECRET_KEY=live-secret');
     writeFileSync(join(root, 'supabase/migrations/001_fixture.sql'), 'select 1;'); writeFileSync(join(root, 'supabase/seed.sql'), '-- local fixture');
     const stateFile = join(root, 'state.json'); const logFile = join(root, 'calls.jsonl');
+    const lifecycleDir = join(root, 'lifecycle'); process.env.PAISAXE_CONTRACT_LIFECYCLE_DIR = lifecycleDir;
     const header = `#!/usr/bin/env node\nconst fs=require('node:fs');const args=process.argv.slice(2);const state=JSON.parse(fs.readFileSync(${JSON.stringify(stateFile)},'utf8'));fs.appendFileSync(${JSON.stringify(logFile)},JSON.stringify({program:require('node:path').basename(process.argv[1]),args,env:process.env})+'\\n');const save=()=>fs.writeFileSync(${JSON.stringify(stateFile)},JSON.stringify(state));`;
     writeFileSync(join(root, 'bin/docker'), header + `
       if(state.mode==='unavailable')process.exit(1);
       if(args[0]==='context')console.log('[{"Endpoints":{"docker":{"Host":"unix:///tmp/fixture.sock"}}}]');
-      else if(args[0]==='network'&&args[1]==='create'){state.project=args.at(-1);state.nonce=args[args.indexOf('--label')+1].split('=')[1];save();console.log('fixture-network-id');}
+      else if(args[0]==='info')console.log('fixture-daemon');
+      else if(args[0]==='network'&&args[1]==='create'){state.project=args.at(-1);state.nonce=args[args.indexOf('--label')+1].split('=')[1];state.receiptBeforeNetwork=fs.existsSync(${JSON.stringify(lifecycleDir)}+'/tasks/'+state.project+'.json');save();console.log('e'.repeat(64));}
+      else if(args[0]==='ps'&&args.includes('{{.ID}}'))console.log(['db','kong'].map(kind=>(kind==='db'?'a':'b').repeat(64)).join('\\n'));
+      else if(args[0]==='container'&&args[1]==='inspect'){const kind=args[2][0]==='a'?'db':'kong';console.log(JSON.stringify([{Id:args[2],Name:'/supabase_'+kind+'_'+state.project,Config:{Labels:{'com.supabase.cli.project':state.project}},Mounts:[]}]));}
+      else if(args[0]==='volume'&&args[1]==='ls')console.log('');
       else if(args[0]==='network')console.log(JSON.stringify([{Internal:true,Labels:{'com.paisaxe.contracts.nonce':state.nonce},Containers:Object.fromEntries((state.mode==='detached'?['db','kong']:['db','kong','auth']).map(kind=>[kind,{Name:'supabase_'+kind+'_'+state.project}]))}]));
       else if(args[0]==='ps')console.log(['db','kong','auth'].map(kind=>'supabase_'+kind+'_'+state.project).join('\\n'));
       else if(args[0]==='inspect'){
@@ -42,6 +47,18 @@ test('actual preparer isolates fresh project, validates before reset and preserv
       };
       try { manifest = await prepareStack(root, { clientFactory, readinessTimeoutMs: 100 }); } catch (error) { failure = error; }
       if (manifest) tasks.push(manifest.taskDir);
+      const lifecycleReceipt = (project) => JSON.parse(readFileSync(join(lifecycleDir, 'tasks', project + '.json'), 'utf8'));
+      if (mode === 'unavailable') assert.equal(existsSync(join(lifecycleDir, 'tasks')) && readdirSync(join(lifecycleDir, 'tasks')).some((name) => name.includes(failure.projectId)), false, 'no receipt without a reachable daemon');
+      else {
+        const project = manifest?.projectId ?? failure.projectId; const receipt = lifecycleReceipt(project);
+        assert.equal(JSON.parse(readFileSync(stateFile, 'utf8')).receiptBeforeNetwork, true, 'receipt precedes network allocation');
+        assert.equal(receipt.disposable, false); assert.equal(receipt.task, 'reusable'); assert.equal(receipt.daemonId, 'fixture-daemon');
+        assert.deepEqual(receipt.resources.network, { id: 'e'.repeat(64), name: project });
+        assert.equal(receipt.state, manifest ? 'prepared' : 'preparation-failed');
+        if (!manifest) { assert.equal(receipt.retainUntil, null, 'reusable failures never expire automatically'); assert.equal(failure.taskDir, receipt.taskDir); }
+        if (mode !== 'start-failure') assert.deepEqual(receipt.resources.containers.map((x) => x.id), ['a'.repeat(64), 'b'.repeat(64)]);
+        assert.equal(JSON.stringify(receipt).includes('private-local-anon-key'), false);
+      }
       if (mode === 'success' || mode === 'cron-api') {
         assert.equal(failure, undefined, failure?.message);
         assert.match(manifest.projectId, /^paisaxe-contracts-[a-f0-9]{12}$/);

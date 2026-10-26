@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-25
+
+### Added
+- Explicit lifecycle for local database contract stacks: `contracts:oneshot`, `contracts:finish` and `contracts:lifecycle` (inspect, hold, sweep), with ownership receipts and checked disposal. Native catalog probes are bounded and keep their transport diagnostics.
+- Workflows use Sutura's automatic routing planner (`.github/sutura-routing.json`): workflow changes and release pull requests select full verification. Hosted activation of the protected controls is coordinated in Sutura and is not part of this release.
+
+### Changed
+- The booking chat shows only the model's answer. Text the model writes before a tool call, such as announcing that it will search, no longer reaches the visitor, so the reply now appears when the model finishes instead of word by word (#1037). A call that fails partway shows no partial text; a failure before anything reached the visitor is retried once. The idle timeout resets while the model writes, so a long answer no longer ends in `response_timeout` (#1045).
+- Sentry moves to 11 (`@sentry/nextjs` and `@sentry/core` ^11.8.0). One shared init configuration pins the v10 data-collection defaults for the client, server and edge runtimes, and capability-link redaction covers events, spans and the trace context (#1033).
+- Dependency updates (#1022 to #1024). Stripe 23 / stripe-js 10 stays held in Dependabot until its planned migration (#1034). CI uses `supabase/setup-cli@v3`.
+- The `booking-gate-closed` release probe also checks the operator route (#1015).
+
+### Fixed
+- The admin Features tab lists `experience_booking` in a new Booking category, so the flag can be switched from the panel (#1036).
+- PayPal's `PAYMENT.CAPTURE.REFUNDED` event for a refund the app made is recorded as a confirmation, not logged as an out-of-order warning (#1038).
+- Migration 131 converges the fresh-reset and 1.9.0 production shapes of `pending_bookings`. Legacy rows without a request key keep it empty and are held from retention; a trigger requires the key on every new row (#1032).
+- Story photos: each story shows its own file again, and the Asturian cheese photo is restored.
+- The 1.5 s auth verification deadline starts after the browser auth client loads, so a slow first load no longer reports `Auth verification timeout` (#1025).
+- Code scanning findings: PayPal webhook event types no longer resolve to inherited object properties, the replay template pattern runs in linear time, the agents summary strips nested HTML comments, and the keep-alive Edge Function no longer returns its internal error text (deployed separately, see below).
+- Scheduled agents log why a report was rejected and keep the rejected output. The coverage agent measures without the local Supabase stack, as hosted CI does. The QA agent reports a failed production build, with a hint when the build hits the V8 heap limit, and judges live-weather answers clause by clause (#1014).
+- The nightly production license check and its failure reporting work again.
+
+### Security
+- Next.js 16.4.2 (Image Optimization and `use cache` remote code execution, Server Actions denial of service). Production received it as a hotfix on 2026-10-22 (#1043); this release carries it to `develop`'s line.
+- Sentry session user data is scrubbed before transport.
+- `undici` 7.30.1, `zod` 4.6.6 and `vite` 8.3.5 clear the current npm audit advisories.
+- `postcss-selector-parser` is pinned to 7.1.6 under `@tailwindcss/typography` (Dependabot alert #138; the built CSS is unchanged).
+- The ci-cadence full workflows no longer use the setup-node dependency cache (code scanning cache-poisoning alerts 1 to 16).
+
+### Release scope and migration notes
+- Includes migration 131 (`legacy_request_key_retention_hold`). Apply it to production in a transaction (`supabase db push`, so its `SET LOCAL lock_timeout` takes effect) and verify the converged `pending_bookings` shape before the release pull request merges.
+- The keep-alive change is a Supabase Edge Function. Merging does not deploy it; it needs a separately authorized `supabase functions deploy keep-alive`.
+- Booking retention scheduling stays inactive; migration 131 runs no redaction.
+
 ## [1.9.0] - 2026-10-14
 
 ### Added

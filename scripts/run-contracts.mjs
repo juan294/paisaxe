@@ -5,6 +5,7 @@ import { basename, join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyTransport } from './contract-transport.mjs';
+import { leaseForCaller } from './contract-stack-lifecycle.mjs';
 
 export const REQUIRED_SUITES = [
   'src/lib/database-boundaries.postgrest-rls.test.ts',
@@ -217,6 +218,7 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
   const runDir = mkdtempSync(join(receiptDir, 'run-'));
   const receipt = { version: 1, status: 'failed', startedAt: new Date().toISOString(), root: resolve(root), suites: [] };
   const failures = [];
+  let lease, manifest, dockerEnv;
   try {
     receipt.suites = discoverSuites(root);
     receipt.candidateDigest = candidateDigest(root);
@@ -227,13 +229,15 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
       if (provider.status !== 0) failures.push('Provider fixture freshness/qualification is unverified; see providerFixtures receipt');
     } else failures.push('Required provider fixture freshness checker is missing');
     insist(taskDir, 'CONTRACT_STACK_DIR is required; run node scripts/prepare-contract-stack.mjs first');
-    const manifest = validateManifest(json(join(taskDir, 'contracts-stack.json')), taskDir);
+    manifest = validateManifest(json(join(taskDir, 'contracts-stack.json')), taskDir);
+    // A reusable stack stays allocated; the lease keeps scheduled disposal away while it is in use.
+    lease = leaseForCaller(manifest.projectId, 'contracts');
     const inventory = migrationInventory(root);
     insist(inventory.digest === manifest.migrationDigest, 'Candidate migrations changed; prepare a fresh contracts stack');
     receipt.migrationDigest = inventory.digest; receipt.projectId = manifest.projectId;
     const config = readFileSync(join(taskDir, 'supabase/config.toml'), 'utf8');
     insist(config.match(/^project_id\s*=\s*"([^"]+)"/m)?.[1] === manifest.projectId, 'Task Supabase project config mismatch');
-    const dockerEnv = { ...localDockerEnvironment(), HOME: runDir }; await inspectStack(manifest, dockerEnv);
+    dockerEnv = { ...localDockerEnvironment(), HOME: runDir }; await inspectStack(manifest, dockerEnv);
     const marker = `paisaxe-contracts:${manifest.nonce}:${manifest.migrationDigest}`;
     insist(dockerSql(manifest.projectId, "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname=current_database();", dockerEnv) === marker, 'Database task marker mismatch; refusing database fixtures');
     const versions = JSON.parse(dockerSql(manifest.projectId, 'SELECT coalesce(json_agg(version ORDER BY version), \'[]\'::json) FROM supabase_migrations.schema_migrations;', dockerEnv));
@@ -272,6 +276,18 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     // External command errors may embed credentials in stdout/stderr. Never serialize those fields.
     failures.push(error instanceof SyntaxError ? 'Malformed local contract data; inspect private diagnostics' :
       error.status !== undefined || error.code ? 'Local stack command unavailable/failed; check local Docker and prepare a fresh task stack' : error.message);
+  } finally {
+    // Preserve the source-bound control proof privately before the caller stops
+    // the stack. Observability failure must not replace the native gate result.
+    receipt.transportDiagnostics = { status: 'unavailable', reason: !manifest ? 'not_started' : manifest.transport !== 'docker-exec-v1' ? 'not_applicable' : 'control_unavailable' };
+    if (manifest?.transport === 'docker-exec-v1' && dockerEnv) {
+      try {
+        const proof = await verifyTransport(manifest, dockerEnv);
+        if (proof.diagnostics?.version === 1) receipt.transportDiagnostics = { status: 'available', proof };
+        else receipt.transportDiagnostics = { status: 'unavailable', reason: 'unknown' };
+      } catch { /* The fixed unavailable reason retains no command/error data. */ }
+    }
+    lease?.release();
   }
   receipt.failures = failures; receipt.status = failures.length ? 'failed' : 'passed'; receipt.finishedAt = new Date().toISOString();
   writeFileSync(join(runDir, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });

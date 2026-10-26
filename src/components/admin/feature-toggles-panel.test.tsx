@@ -368,6 +368,39 @@ describe("FeatureTogglesPanel", () => {
     });
   });
 
+  describe("booking category (#1036)", () => {
+    it("lists experience_booking under Booking so it can be toggled", async () => {
+      const user = userEvent.setup();
+      vi.mocked(fetchFeatureFlags).mockResolvedValue({
+        data: [
+          ...mockFlags,
+          {
+            id: "booking",
+            flagKey: "experience_booking",
+            enabled: false,
+            label: "Experience Booking",
+            description: "Allow voucher holders to book and pay a deposit",
+            config: {},
+            environment: "production",
+            createdAt: "2024-01-01T00:00:00Z",
+            updatedAt: "2024-01-01T00:00:00Z",
+          },
+        ],
+        error: undefined,
+      });
+      render(<FeatureTogglesPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Experience Booking")).not.toBeInTheDocument();
+
+      await user.click(screen.getByTitle("Bookings and deposits"));
+
+      expect(screen.getByText("Experience Booking")).toBeInTheDocument();
+    });
+  });
+
   describe("configurable flag expansion", () => {
     it("expands visitor_voice_agent config panel when Settings button is clicked", async () => {
       const user = userEvent.setup();

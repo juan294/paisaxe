@@ -23,7 +23,7 @@ if [[ -f "$FINAL_REPORT_FILE" ]]; then
   HAD_PRIOR_REPORT=true
 fi
 cleanup_documentation_report() {
-  rm -f "$REPORT_FILE"
+  rm -f "$REPORT_FILE" "$GAPS_FILE"
   if [[ "$DOC_REPORT_PUBLISHED" != true ]]; then
     if [[ "$HAD_PRIOR_REPORT" == true ]]; then
       cp -p "$PRIOR_REPORT" "$FINAL_REPORT_FILE"

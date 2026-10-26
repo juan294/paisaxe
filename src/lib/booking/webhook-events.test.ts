@@ -284,6 +284,14 @@ describe("processPaypalEvent: resolving the payment", () => {
     await expect(processPaypalEvent(fake.client, inboxEvent("PAYMENT.SALE.COMPLETED"))).resolves.toBe("ignored");
     expect(fake.client.from).not.toHaveBeenCalled();
   });
+
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+    "ignores the inherited object property name %s as an event type",
+    async (eventType) => {
+      await expect(processPaypalEvent(fake.client, inboxEvent(eventType))).resolves.toBe("ignored");
+      expect(fake.client.from).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("CHECKOUT.ORDER.APPROVED", () => {
@@ -498,12 +506,25 @@ describe("PAYMENT.CAPTURE.REFUNDED", () => {
     expect(tablesQueried()).toEqual(["payments", "bookings", "payments"]);
   });
 
-  it("is out of order for a payment already refunded", async () => {
+  it("records PayPal's confirmation of the payment's own refund, without a write or a warning (#1038)", async () => {
+    // The app refunded the deposit itself; this event confirms that same refund.
     resolvesTo(payment({ status: "refunded", capture_id: "CAP-1", refund_id: "RF-1" }));
+
+    await expect(processPaypalEvent(fake.client, refundEvent())).resolves.toBe("recorded");
+    expect(tablesQueried()).toEqual(["payments", "bookings"]);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a different refund", "RF-OTHER"],
+    ["no stored refund", null],
+  ])("is out of order for a payment already refunded by %s", async (_label, refundId) => {
+    resolvesTo(payment({ status: "refunded", capture_id: "CAP-1", refund_id: refundId }));
     write("payments", false);
 
     await expect(processPaypalEvent(fake.client, refundEvent())).resolves.toBe("out_of_order");
     expect(tablesQueried()).toEqual(["payments", "bookings", "payments"]);
+    expect(logger.warn).toHaveBeenCalledWith("[PAYPAL_WEBHOOK_OUT_OF_ORDER]", expect.objectContaining({ paymentStatus: "refunded" }));
   });
 });
 

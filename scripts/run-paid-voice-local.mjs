@@ -6,6 +6,7 @@ import {tmpdir} from 'node:os';
 import {join,dirname,resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {validateManifest,validateKeys,inspectStack,localDockerEnvironment,dockerSql,schemaDigest,migrationInventory,isolatedEnvironment,candidateDigest} from './run-contracts.mjs';
+import {leaseForCaller} from './contract-stack-lifecycle.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 function inputDigest(){
  const hash=createHash('sha256').update(candidateDigest(root));
@@ -34,6 +35,10 @@ if(buildOnly && development) throw Error('Build artifact mode requires productio
 const task=process.env.CONTRACT_STACK_DIR;
 if(!task) throw Error('Owned CONTRACT_STACK_DIR required');
 const manifest=validateManifest(JSON.parse(readFileSync(join(task,'contracts-stack.json'),'utf8')),task);
+// Paid-voice reuses the prepared stack: hold a consumer lease for the whole run and keep the stack.
+const lease=leaseForCaller(manifest.projectId,'paid-voice');
+let exitCode=1;
+try{
 const dockerEnv=localDockerEnvironment(); await inspectStack(manifest,dockerEnv);
 if(migrationInventory(root).digest!==manifest.migrationDigest || schemaDigest(manifest.projectId,dockerEnv)!==manifest.schemaDigest) throw Error('Paid voice schema identity rejected');
 if(dockerSql(manifest.projectId,"SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database();",dockerEnv)!==`paisaxe-contracts:${manifest.nonce}:${manifest.migrationDigest}`) throw Error('Paid voice marker rejected');
@@ -96,7 +101,9 @@ try{
  if(buildOnly && exitCode===0)writeFileSync(buildReceipt,JSON.stringify(receipt,null,2),{flag:'wx',mode:0o600});
 }
 const finalReceipt=JSON.parse(readFileSync(join(directory,'receipt.json'),'utf8'));
-const exitCode=finalReceipt.exitCode;
-console.log(JSON.stringify({directory,exitCode,provider:state}));process.exit(exitCode);
+exitCode=finalReceipt.exitCode;
+console.log(JSON.stringify({directory,exitCode,provider:state}));
+}finally{lease.release();}
+process.exit(exitCode);
 
 }

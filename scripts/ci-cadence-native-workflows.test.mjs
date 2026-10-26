@@ -11,7 +11,7 @@ test('concrete generated nightly calls all seven immutable same-definition app g
   const calls=Object.values(w.jobs).filter(job=>job.uses);
   assert.equal(calls.length,7);assert.equal(w.concurrency['cancel-in-progress'],false);
   for(const job of calls){assert.match(job.uses,/^\.\/\.github\/workflows\//);assert.equal(job.with.profile,'nightly');assert.equal(job.with.source_sha,'${{ needs.admission.outputs.source_sha }}');assert.match(job.if,/decision == 'full'/);assert.notEqual(job.secrets,'inherit');}
-  assert.match(w.jobs.admission.if,/CI_CADENCE_MODE/);assert.match(w.jobs.admission.if,/3944118/);
+  assert.doesNotMatch(w.jobs.admission.if,/CI_CADENCE_MODE/);assert.match(w.jobs.admission.if,/3944118/);
   assert.equal(w.jobs.measurement.needs.length,8);
   assert.match(w.jobs.complete.steps[0].run,/test "\$MEASURED" = skipped/);
 });
@@ -28,14 +28,14 @@ test('native generator --check compares complete generated source rather than sy
   for(const file of generateNativeWorkflows())assert.equal(readFileSync(file.path,'utf8'),file.source,file.path);
 });
 
-test('routine root performs full recovery only after protected Fast and never treats a missing child as proof',()=>{
+test('routine root delegates full proof to required originals without creating native receipts',()=>{
  const files=generateNativeWorkflows(),root=parse(files.find(f=>f.path.endsWith('/ci-cadence.yml')).source);
  assert.equal(root.jobs.entry.name,'CI Fast');assert.equal(root.jobs.entry.uses,undefined);assert.equal(root.jobs.complete.name,'CI Fast recovery');
  assert.deepEqual(parse(readFileSync('.github/ci-cadence-fast-job.yml','utf8')).steps,root.jobs.entry.steps);
- assert.equal(Object.values(root.jobs).filter(j=>j.uses).length,7);
+ assert.equal(Object.values(root.jobs).filter(j=>j.uses).length,0);
  assert.match(root.jobs.complete.steps[0].run,/test "\$ENTRY" = success/);
- assert.match(root.jobs.complete.steps[0].run,/test "\$result" = success/);
- assert.match(root.jobs.measurement.if,/github.event_name == 'push'/);
+ assert.match(root.jobs.complete.steps[0].run,/separately required CI Verification/);
+ assert.equal(root.jobs.measurement,undefined);
 });
 test('main coverage completion has a concrete coverage-only reader instead of impersonating the full graph',async()=>{
  const {createGitHubCadenceReader}=await import('./ci-cadence-github.mjs');

@@ -1,3 +1,4 @@
+import './ci-cadence-test-git-env.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,realpath,mkdir,readFile,writeFile,rm} from 'node:fs/promises';

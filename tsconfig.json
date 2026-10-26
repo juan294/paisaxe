@@ -48,6 +48,7 @@
     "scripts",
     "e2e",
     "supabase/functions",
+    "logs",
     "content/processed",
     ".design-sync",
     ".ds-sync",

@@ -59,6 +59,12 @@ done
 LOCK_ACQUIRED=true
 trap 'if [[ "$LOCK_ACQUIRED" == "true" ]]; then rmdir "$LOCK_DIR" 2>/dev/null || true; fi' EXIT
 
+# Measure like hosted CI, which has no local Supabase stack: the database suites
+# then self-skip. The shared developer stack carries production webhook settings,
+# and those suites refuse to run against it (2026-10-15: four files failed).
+export SUPABASE_LOCAL_API_URL="http://127.0.0.1:9"
+unset SUPABASE_LOCAL_REST_URL
+
 PROMPT_TEXT=$(cat <<PROMPT
 $AGENT_PROMPT
 

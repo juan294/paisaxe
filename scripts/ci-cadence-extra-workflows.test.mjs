@@ -1,3 +1,4 @@
+import './ci-cadence-test-git-env.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
@@ -65,13 +66,15 @@ for (const [slug, id, name] of definitions) {
     assert.equal(workflow.jobs[id].name, name);
     for (const job of Object.values(workflow.jobs)) { assert.deepEqual(job.permissions, { contents: 'read' }); assert.equal(job['runs-on'], 'ubuntu-latest'); assert.equal(job.environment, undefined); }
   });
-  test(`${slug} parsed app body equals canonical work except exact checkout and bundle publication transforms`, () => {
+  test(`${slug} parsed app body equals canonical work except exact checkout, cache and bundle publication transforms`, () => {
     const workflow = current(slug); assert.ok(workflow);
     const original = parse(baseline.files.find(f => f.path.endsWith(`/${slug}.yml`)).source).jobs[id];
     const app = workflow.jobs[id];
     assert.equal(app['timeout-minutes'], original['timeout-minutes']);
     const steps = structuredClone(app.steps).filter(s => !['Verify callable source checkout','Verify completed callable source checkout'].includes(s.name));
-    const originalSteps = original.steps.filter(s => s.name !== 'Comment on PR');
+    const originalSteps = structuredClone(original.steps.filter(s => s.name !== 'Comment on PR'));
+    // Reviewed transform: the callable job restores and saves no dependency cache (see ci-cadence-no-cache.test.mjs).
+    for (const step of originalSteps) if (step.uses?.startsWith('actions/setup-node@')) delete step.with.cache;
     steps[0] = structuredClone(originalSteps[0]);
     assert.deepEqual(steps, originalSteps);
     assert.deepEqual(app.needs, ['callable-source']);

@@ -1,8 +1,8 @@
-import { Compass, Sparkles, Users, Mic, Cog } from "lucide-react";
+import { Compass, Sparkles, Users, Mic, CalendarCheck, Cog } from "lucide-react";
 import type { FeatureFlagKey } from "@/types/feature-flags";
 
 // Feature flag categories
-export type FlagCategory = "discovery" | "experience" | "social" | "voice" | "system";
+export type FlagCategory = "discovery" | "experience" | "social" | "voice" | "booking" | "system";
 
 interface CategoryConfig {
   key: FlagCategory;
@@ -37,6 +37,12 @@ export const CATEGORIES: CategoryConfig[] = [
     description: "Voice assistant features",
   },
   {
+    key: "booking",
+    label: "Booking",
+    icon: <CalendarCheck className="h-4 w-4" />,
+    description: "Bookings and deposits",
+  },
+  {
     key: "system",
     label: "System",
     icon: <Cog className="h-4 w-4" />,
@@ -44,8 +50,9 @@ export const CATEGORIES: CategoryConfig[] = [
   },
 ];
 
-// Map each flag to its category
-export const FLAG_CATEGORIES: Partial<Record<FeatureFlagKey, FlagCategory>> = {
+// Map each flag to its category. Exhaustive: a flag without a category is
+// never shown in the panel, so a new FeatureFlagKey must be added here (#1036).
+export const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   // Discovery - help users find stories
   contextual_prompts: "discovery",
   related_stories: "discovery",
@@ -66,6 +73,8 @@ export const FLAG_CATEGORIES: Partial<Record<FeatureFlagKey, FlagCategory>> = {
   visitor_voice_agent: "voice",
   booking_system: "voice",
   sms_booking_confirmation: "voice",
+  // Booking - voucher bookings with a PayPal deposit
+  experience_booking: "booking",
   // System - settings and maintenance
   maintenance_mode: "system",
 };

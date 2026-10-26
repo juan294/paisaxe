@@ -1,14 +1,15 @@
+import { automaticOriginalWorkflow } from './ci-routing-native-v2.mjs';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { parse, stringify } from 'yaml';
 import { resolve } from 'node:path';
+const LEGACY_ROUTED_SHA256 = {".github/workflows/ci.yml":"69a645b1d027704c4973206481cf7f18ef91b45b73b92229fc8dd0e5f2acc84f",".github/workflows/e2e.yml":"8d2326646adc32011865dbf96ea061564a14621c6dc0263094365c66f29e1f8c",".github/workflows/lighthouse.yml":"784117d878c37405363cbca5f3a989bdb3fe45de3b47983ed68e128f8611b650",".github/workflows/bundle-size.yml":"151662136f47983ed7e1758e9c2b287ffaacfbee735d727e63e4bfdc1d2c9d08",".github/workflows/knip.yml":"0657dade5e1c8308f659c1924f49f91063bda45ea74c399c525ff60e2b22c91c",".github/workflows/license-check.yml":"66564c12cb576a7c96e86dbf8e2353f8544d7a35b873e5c86cd49dc7c271a6db",".github/workflows/security.yml":"f778a1f0a5f4f019db4e644e820bf15a148cd84a023a92775a0b12d309576786"};
 const strip = value => typeof value==='string'?value.replace(/^\$\{\{\s*|\s*\}\}$/g,''):value;
 const callable = "(inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != ''";
 // Schedule payloads need not carry sender: the schedule clause rests on repository/owner identity and ref only.
-const reduced = "vars.CI_CADENCE_MODE == 'lean' && github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.actor_id == '3944118' && github.event.sender.type == 'User' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))";
-/** Routing is static: a skipped job starts no runner. Originals run unless the
- * event is a lean owner integration event; `!reduced` therefore keeps every
- * legacy, production and untrusted event on the complete original graph. */
+
+/** Protected Sutura planning selects the original application graphs.
+ * Every applicable full child is enforced by its stable workflow gate. */
 export function routeOriginalWorkflow(source) {
   const value=parse(source),ci=value.name==='CI';
   const trusted="github.repository_id == '1141286326' && github.repository_owner_id == '3944118' && (github.event_name == 'schedule' || (github.actor_id == '3944118' && github.event.sender.type == 'User' && (github.event_name != 'pull_request' || (github.event.pull_request.user.id == 3944118 && github.event.pull_request.user.type == 'User' && github.event.pull_request.head.repo.id == 1141286326))))";
@@ -26,6 +27,10 @@ export function routeOriginalWorkflow(source) {
     job.steps=protect(job.steps);
   }
   if(ci){
+    const shard=value.jobs['coverage-shard'].steps.find(step=>step.name==='Run tests with coverage (sharded)');
+    if(!shard?.run?.includes('--reporter=blob'))throw Error('Reviewed coverage reporter disappeared');
+    // Blob-only output hides the failing test when its success-only upload never runs.
+    shard.run=shard.run.replace('--reporter=blob','--reporter=blob --reporter=default');
     const test=value.jobs.test;
     const ordinary=test.steps.find(step=>step.name==='Verify test/coverage suite succeeded')?.if;
     const checkoutGuard=test.steps.findIndex(step=>step.name==='Verify callable source checkout');
@@ -36,7 +41,7 @@ export function routeOriginalWorkflow(source) {
     test.steps.splice(completed,0,
       {name:'Setup database contract Node',uses:'actions/setup-node@v7',with:{'node-version':'24.21.0'}},
       {name:'Install database contract dependencies',run:'npm ci'},
-      {name:'Setup database contract Supabase',uses:'supabase/setup-cli@v1',with:{version:'2.120.0'}},
+      {name:'Setup database contract Supabase',uses:'supabase/setup-cli@v3',with:{version:'2.120.0'}},
       {name:'Check database contract PostgreSQL client',run:'command -v psql\npsql --version'},
       {name:'Run required database contracts',run:'node scripts/ci-contracts.mjs','timeout-minutes':43,env:{CI_CONTRACT_RECEIPT_DIR:receipt}},
       {name:'Upload sanitized database contract receipt',if:'${{ always() }}',uses:'actions/upload-artifact@v7',with:{name:"database-contracts-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.invocation_id || 'ordinary' }}",path:receipt+'/receipt.json','if-no-files-found':'error','retention-days':7}});
@@ -60,10 +65,10 @@ export function routeOriginalWorkflow(source) {
   if(!value.jobs||value.jobs['cadence-route'])throw Error('Original routing inventory changed');
   for(const[id,job]of Object.entries(value.jobs)) {
     if(ci&&['callable-source','callable-full'].includes(id))continue;
-    const previous=strip(job.if)??'!failure() && !cancelled()';
-    job.if=`\${{ always() && (${ci&&id!=='develop_push_source'?'('+callable+') || ':''}!(${reduced})) && (${previous}) }}`;
+    const previous=strip(job.if)??'true';
+    job.if=`\${{ always() && (${previous}) }}`;
   }
-  return stringify(value,{lineWidth:0});
+  return stringify(automaticOriginalWorkflow(value),{lineWidth:0});
 }
 
 /** Approved original bytes are retained verbatim. Routing may change only the
@@ -71,6 +76,6 @@ export function routeOriginalWorkflow(source) {
 export function canonicalSource(root,path,approved) {
   const current=readFileSync(resolve(root,path),'utf8');
   if(current===approved)return approved;
-  if(current!==routeOriginalWorkflow(approved))throw Error('Canonical source drift: '+path);
+  if(current!==routeOriginalWorkflow(approved) && LEGACY_ROUTED_SHA256[path]!==createHash('sha256').update(current).digest('hex'))throw Error('Canonical source drift: '+path);
   return approved;
 }

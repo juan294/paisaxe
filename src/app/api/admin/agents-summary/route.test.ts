@@ -133,6 +133,31 @@ describe("GET /api/admin/agents-summary", () => {
     expect(data.data.sharedContext[0].content).toBe("Coverage is at 85%.");
   });
 
+  it("should strip nested HTML comments from shared context entries", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockStat.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) {
+        return [
+          "<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-02-01T10:00:00Z -->",
+          "Coverage is at 85%.<!<!-- inner -->-- rebuilt --> Done <!-- a > b -->",
+          "<!-- ENTRY:END -->",
+        ].join("\n");
+      }
+      throw new Error("ENOENT");
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.data.sharedContext).toHaveLength(1);
+    expect(data.data.sharedContext[0].content).toBe("Coverage is at 85%. Done");
+  });
+
   it("should compute overall health as red when any agent is red", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,

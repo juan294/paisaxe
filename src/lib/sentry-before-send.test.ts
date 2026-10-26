@@ -2,9 +2,9 @@ import { requiredValue } from "@/test/required-value";
 import { describe, expect, it } from "vitest";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
-import { sanitizeSentryEvent, sanitizeSentryTransaction } from "./sentry-before-send";
+import { sanitizeSentryEvent, sanitizeSentrySpan } from "./sentry-before-send";
 import { runWithRequestContext } from "./request-context";
-import type { ErrorEvent } from "@sentry/core";
+import type { ErrorEvent, StreamedSpanJSON } from "@sentry/core";
 
 describe("sanitizeSentryEvent", () => {
   it("removes request cookies and data, redacts sensitive headers, and hashes user email", async () => {
@@ -162,6 +162,8 @@ describe("sanitizeSentryEvent", () => {
 
     expect(packageJson.packageManager).toMatch(/^npm@/);
     expect(packageJson.dependencies?.["@sentry/core"]).toBeTruthy();
+    // One @sentry/core in the tree: the direct dependency follows @sentry/nextjs (#1033).
+    expect(packageJson.dependencies?.["@sentry/core"]).toBe(packageJson.dependencies?.["@sentry/nextjs"]);
   });
 });
 
@@ -183,39 +185,57 @@ describe("capability redaction (F05)", () => {
     expect(requiredValue(event.breadcrumbs?.[0], "src/lib/sentry-before-send.test.ts:182 event.breadcrumbs?.[0]").data?.from).toBe("/immersive");
   });
 
-  it("redacts capabilities from transaction events", () => {
-    const transaction = sanitizeSentryTransaction({
-      type: "transaction",
-      transaction: `/booking/${capability}`,
-      request: { url: `https://paisaxe.es/booking/${capability}` },
-      spans: [{ description: `GET /api/booking/bookings/${capability}`, span_id: "s", trace_id: "t", start_timestamp: 0 }],
-    } as never);
+  function span(overrides: Partial<StreamedSpanJSON>): StreamedSpanJSON {
+    return { name: "GET /", span_id: "s", trace_id: "t", start_timestamp: 0, status: "ok", is_segment: true, attributes: {}, ...overrides };
+  }
 
-    expect(JSON.stringify(transaction)).not.toContain(capability);
+  it("redacts capabilities from streamed span names, attributes and links", () => {
+    const sanitized = sanitizeSentrySpan(span({
+      name: `GET /booking/${capability}`,
+      attributes: {
+        "url.full": `https://paisaxe.es/booking/${capability}/return?token=X`,
+        "sentry.segment.name": `/operator/${capability}`,
+        "http.response.status_code": 200,
+      },
+      links: [{ span_id: "l", trace_id: "t", attributes: { "url.path": `/api/booking/bookings/${capability}` } }],
+    }));
+
+    expect(JSON.stringify(sanitized)).not.toContain(capability);
+    expect(sanitized.name).toBe("GET /booking/[redacted]");
+    expect(sanitized.attributes["url.full"]).toBe("https://paisaxe.es/booking/[redacted]/return");
+    expect(sanitized.attributes["http.response.status_code"]).toBe(200);
   });
 
-  it("never walks sdkProcessingMetadata (scopes reach the client and its timers, which are cyclic)", () => {
-    const capability = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
-    const timers: Record<string, unknown> = {};
-    timers.next = timers;
-    const sdkProcessingMetadata = { capturedSpanScope: { client: { timers } } };
+  it("redacts credentials, the request body and the user's email and IP from span attributes", () => {
+    const sanitized = sanitizeSentrySpan(span({
+      attributes: {
+        "user.id": "user-123",
+        "user.email": "traveler@example.com",
+        "user.ip_address": "203.0.113.42",
+        "http.request.header.cookie": ["sb-access=secret-cookie"],
+        "http.request.header.authorization": ["Bearer super-secret"],
+        "http.request.header.x-api-key": ["api-key-value"],
+        "http.response.header.set-cookie": ["sb-access=secret-cookie"],
+        "http.request.body.data": '{"phone":"+34 611 22 33 44"}',
+        "http.request.header.content-type": ["application/json"],
+      },
+    }));
 
-    const transaction = sanitizeSentryTransaction({
-      type: "transaction",
-      transaction: `/booking/${capability}`,
-      spans: [{ description: `GET /booking/${capability}`, span_id: "s", trace_id: "t", start_timestamp: 0 }],
-      sdkProcessingMetadata,
-    } as never);
-
-    expect(transaction.sdkProcessingMetadata).toBe(sdkProcessingMetadata);
-    expect(transaction.transaction).toBe("/booking/[redacted]");
-    expect(requiredValue(transaction.spans?.[0], "src/lib/sentry-before-send.test.ts:211 transaction.spans?.[0]").description).toBe("GET /booking/[redacted]");
+    expect(sanitized.attributes).toEqual({
+      "user.id": "user-123",
+      "user.email": "[REDACTED]",
+      "user.ip_address": "[REDACTED]",
+      "http.request.header.cookie": "[REDACTED]",
+      "http.request.header.authorization": "[REDACTED]",
+      "http.request.header.x-api-key": "[REDACTED]",
+      "http.response.header.set-cookie": "[REDACTED]",
+      "http.request.body.data": "[REDACTED]",
+      "http.request.header.content-type": ["application/json"],
+    });
   });
 
-  it("is wired as beforeSendTransaction in every Sentry init", () => {
-    for (const file of ["sentry.server.config.ts", "sentry.edge.config.ts", "src/lib/sentry-client-init.ts"]) {
-      expect(readFileSync(file, "utf8")).toContain("beforeSendTransaction: sanitizeSentryTransaction");
-    }
+  it("adds no attribute that the span did not have", () => {
+    expect(sanitizeSentrySpan(span({ attributes: { "sentry.op": "http.server" } })).attributes).toEqual({ "sentry.op": "http.server" });
   });
 });
 

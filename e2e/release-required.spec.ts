@@ -113,8 +113,10 @@ test("@release-required webhook-unsigned: webhook rejects an unsigned payload", 
 
 // PayPal hackathon plan, Phase 6 (F10). A ROUTE check only: a 404 for a
 // capability that does not exist proves the route answers, not the access
-// boundary (that is booking-access-boundary, local Docker). Read-only: three
-// GETs. The gate follows the deployed experience_booking flag, read from the
+// boundary (that is booking-access-boundary, local Docker). Read-only: four
+// GETs. The operator route shares the capability guard and is not
+// flag-gated, so an unknown operator capability is a 404 either way (#1015).
+// The gate follows the deployed experience_booking flag, read from the
 // public flags endpoint: on, /acceso renders the code form; off, it is a real
 // 404 (the proxy closes the surface). So the probe holds before the release
 // turns the flag on and after (Phase 6 review finding 1).
@@ -128,6 +130,11 @@ test("@release-required booking-gate-closed: an unknown booking capability is 40
   const response = await request.get(`/api/booking/bookings/${unknownCapability}`);
   expect(response.status()).toBe(404);
   expect(response.headers()["cache-control"]).toContain("no-store");
+
+  const operator = await request.get(`/api/operator/${unknownCapability}`);
+  expect(operator.status()).toBe(404);
+  expect(operator.headers()["cache-control"]).toBe("private, no-store");
+  expect(operator.headers()["referrer-policy"]).toBe("no-referrer");
 
   const flags = await request.get("/api/feature-flags");
   expect(flags.status()).toBe(200);

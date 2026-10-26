@@ -23,8 +23,7 @@ jobs:
       ${{
         vars.CI_CADENCE_REPAIR_ENABLED == 'true' &&
         (github.event.workflow_run.name == 'CI' ||
-         (vars.CI_CADENCE_MODE == 'lean' &&
-          github.event.workflow_run.name == 'CI cadence')) &&
+         github.event.workflow_run.name == 'CI cadence') &&
         github.event.workflow_run.actor.login == 'juan294' &&
         github.event.workflow_run.head_repository.full_name == github.repository &&
         github.event.workflow_run.event == 'push' &&

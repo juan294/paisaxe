@@ -7,6 +7,7 @@ import { assertTestsExecuted } from "./lib/playwright-report";
 import { isMain } from "./lib/is-main";
 import { assertLocalDatastore } from "./release/probe-guards";
 import { validateManifest, validateKeys, inspectStack, localDockerEnvironment, dockerSql, schemaDigest, migrationInventory } from "./run-contracts.mjs";
+import { leaseForCaller } from "./contract-stack-lifecycle.mjs";
 
 const REQUIRED_ENV_KEYS = [
   "STRIPE_TEST_SECRET_KEY",
@@ -140,10 +141,21 @@ async function verifyStripeLocalStack() {
   if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== keys.anon || process.env.SUPABASE_SERVICE_KEY !== keys.service) {
     throw new Error("Stripe integration requires the owned local Supabase credentials");
   }
+  return manifest;
 }
 
 async function main() {
-  await verifyStripeLocalStack();
+  const manifest = await verifyStripeLocalStack();
+  // The prepared stack is reusable: hold a consumer lease so scheduled disposal leaves it alone.
+  const lease = leaseForCaller(manifest.projectId, "stripe-e2e");
+  try {
+    await runStripeIntegration();
+  } finally {
+    lease.release();
+  }
+}
+
+async function runStripeIntegration() {
   for (const key of REQUIRED_ENV_KEYS) {
     getEnv(key);
   }

@@ -27,7 +27,7 @@ Deno.serve(async () => {
   } catch (err) {
     console.error("Keep-alive error:", err);
     return new Response(
-      JSON.stringify({ ok: false, error: String(err) }),
+      JSON.stringify({ ok: false, error: "Keep-alive check failed" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

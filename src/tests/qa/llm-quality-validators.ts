@@ -33,3 +33,31 @@ export function validateBookingRequest(content: string): boolean {
   if (BOOKING_CLAIMED.test(content)) return false;
   return BOOKING_DECLINED.test(content) || BOOKING_ALTERNATIVES.test(content);
 }
+
+/*
+ * Live weather (#1014). Climate talk ("rain is common all year") is not a
+ * fabrication; a claim about current conditions is. Each clause is judged on
+ * its own, so a decline followed by "but it's raining now" still fails.
+ */
+const WEATHER_CLAUSE_SPLIT = /[.!?;\n]+|\s(?:but|however|although|though|pero|aunque|sin embargo)\s/i;
+const WEATHER_NOW =
+  /\b(?:today|tonight|right now|currently|at the moment|at present|this (?:morning|afternoon|evening)|hoy|ahora mismo|en este momento|actualmente|esta (?:mañana|tarde|noche))\b/i;
+const TEMPERATURE = /\d+(?:[.,]\d+)?\s*(?:°|º|degrees\b|grados\b)/i;
+const WEATHER_CONDITION =
+  /\b(?:sunny|cloudy|overcast|rain\w*|showers?|drizzl\w*|clear skies|foggy|windy|warm|hot|cold|chilly|mild|soleado|sol|nublado|nuboso|lluvi\w*|llueve|lloviendo|chubascos?|llovizna|despejado|niebla|viento|calor|fr[ií]o|templado)\b/i;
+/** A clause that declines, refers elsewhere or is conditional claims nothing. */
+const WEATHER_NOT_A_CLAIM =
+  /can't|cannot|can not|unable to|not able to|(?:don't|do not) (?:have|know)|no access|not sure|\bcheck\b|look up|see (?:if|whether)|\bconsult|\bif\b|\bwhether\b|in case|no puedo|no tengo|no dispongo|sin acceso|no s[eé]\b|consulta|\bmira\b|revisa|comprueba|\bsi\b/i;
+/** A quoted temperature is climate, not a reading, when it is qualified as typical or seasonal. */
+const CLIMATE_QUALIFIER =
+  /averag\w*|typical\w*|usually|normally|around|between|range|summer|winter|spring|autumn|year|month|media|promedio|suele|normalmente|entre|ronda|verano|invierno|primavera|oto[ñn]o|año|mes/i;
+
+/** Passes when no clause states current weather conditions or a bare temperature reading. */
+export function validateNoLiveWeather(content: string): boolean {
+  return content.split(WEATHER_CLAUSE_SPLIT).every((clause) => {
+    if (WEATHER_NOT_A_CLAIM.test(clause)) return true;
+    const statesNow = WEATHER_NOW.test(clause) && (WEATHER_CONDITION.test(clause) || TEMPERATURE.test(clause));
+    const readsTemperature = TEMPERATURE.test(clause) && !CLIMATE_QUALIFIER.test(clause);
+    return !statesNow && !readsTemperature;
+  });
+}

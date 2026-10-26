@@ -78,7 +78,7 @@ test('actual repair predicate denies default, untrusted, production, PR and nonf
   for (const name of ['CI', 'CI cadence', 'CI nightly', 'Other']) for (const mode of [undefined, 'legacy', 'lean']) {
     for (const enabled of [undefined, 'false', 'true']) for (const conclusion of ['failure', 'timed_out', 'success', 'cancelled', 'skipped']) {
       const expected = enabled === 'true' && ['failure', 'timed_out'].includes(conclusion)
-        && (name === 'CI' || (mode === 'lean' && name === 'CI cadence'));
+        && (name === 'CI' || name === 'CI cadence');
       const source = { ...github.event.workflow_run, name, conclusion };
       const vars = { CI_CADENCE_MODE: mode, CI_CADENCE_REPAIR_ENABLED: enabled };
       assert.equal(allowed({ ...github, event: { workflow_run: source } }, vars), expected, `${name} ${mode} ${enabled} ${conclusion}`);

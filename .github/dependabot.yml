@@ -19,6 +19,13 @@ updates:
       # lint toolchain advertises support.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
+      # Temporary: these majors are planned migrations, not bumps. Stripe 23 /
+      # stripe-js 10 is #1034 (held until after the PayPal hackathon). Remove
+      # each entry when its migration lands.
+      - dependency-name: "stripe"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@stripe/*"
+        update-types: ["version-update:semver-major"]
     groups:
       # Both groups are restricted to minor/patch so a major version bump
       # (e.g. typescript 6->7) always arrives as its own standalone PR

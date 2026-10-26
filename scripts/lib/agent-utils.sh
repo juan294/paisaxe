@@ -44,6 +44,25 @@ valid_scheduled_report() {
   ! grep -Eiq "you have hit your weekly limit|you've hit your weekly limit|^usage limit|^quota exceeded|^rate limit exceeded|^failed to authenticate" "$report_file"
 }
 
+# Names the first gate run_scheduled_analysis failed, in the same order it checks them.
+scheduled_report_rejection_reason() {
+  local claude_status="$1" report_file="$2" expected_title="$3"
+  local backup="$4" had_report="$5" allow_unchanged="$6" first_line
+  if [[ $claude_status != 0 ]]; then echo "Claude exited $claude_status"; return; fi
+  if [[ ! -s $report_file ]]; then echo "report file missing or empty"; return; fi
+  first_line=$(head -n 1 "$report_file")
+  if [[ $first_line != "$expected_title"* ]]; then
+    echo "first line is '${first_line:0:80}', expected '$expected_title'"; return
+  fi
+  if ! valid_scheduled_report "$report_file" "$expected_title"; then
+    echo "report body is blank or holds a provider limit message"; return
+  fi
+  if [[ $had_report == 1 && $allow_unchanged != 1 ]] && cmp -s "$backup" "$report_file"; then
+    echo "report file unchanged (Claude did not write it)"; return
+  fi
+  echo "unclassified"
+}
+
 find_codex_bin() {
   if [[ -n ${CODEX_BIN:-} && -x $CODEX_BIN ]]; then return 0; fi
   CODEX_BIN=$(command -v codex 2>/dev/null || true)
@@ -65,19 +84,25 @@ run_scheduled_analysis() {
   if [[ -f "$report_file" ]]; then cp -p "$report_file" "$backup"; had_report=1; fi
 
   if [[ -x ${CLAUDE_BIN:-} ]]; then
-    if (unset ANTHROPIC_API_KEY; "$CLAUDE_BIN" -p "$prompt" --model "$model" \
-      --allowedTools "$claude_tools") > "$attempt_log" 2>&1; then
+    local claude_status=0
+    (unset ANTHROPIC_API_KEY; "$CLAUDE_BIN" -p "$prompt" --model "$model" \
+      --allowedTools "$claude_tools") > "$attempt_log" 2>&1 || claude_status=$?
+    if [[ $claude_status == 0 ]]; then
       if ! grep -Eiq "weekly limit|usage limit|quota exceeded|rate limit|too many requests|429|not logged in|failed to authenticate" "$attempt_log" && \
         valid_scheduled_report "$report_file" "$expected_title" && \
         { [[ $allow_unchanged == 1 ]] || [[ $had_report == 0 ]] || ! cmp -s "$backup" "$report_file"; }; then
         cat "$attempt_log" >> "$log_file"
-        rm -f "$backup" "$draft" "$attempt_log"
+        rm -f "$backup" "$draft" "$attempt_log" "${log_file%.log}.rejected.md"
         return 0
       fi
     fi
     if ! grep -Eiq "weekly limit|usage limit|quota exceeded|rate limit|too many requests|429|not logged in|failed to authenticate" "$attempt_log"; then
       cat "$attempt_log" >> "$log_file"
-      log_error "Claude did not produce a new valid report; previous report preserved."
+      log_error "Claude did not produce a new valid report; previous report preserved. Reason: $(scheduled_report_rejection_reason "$claude_status" "$report_file" "$expected_title" "$backup" "$had_report" "$allow_unchanged")"
+      # Keep what Claude left behind: the restore below would otherwise erase the only evidence.
+      if [[ -f "$report_file" ]] && ! { [[ $had_report == 1 ]] && cmp -s "$backup" "$report_file"; }; then
+        cp "$report_file" "${log_file%.log}.rejected.md"
+      fi
       if [[ $had_report == 1 ]]; then cp -p "$backup" "$report_file"; else rm -f "$report_file"; fi
       rm -f "$backup" "$draft" "$attempt_log"
       return 1

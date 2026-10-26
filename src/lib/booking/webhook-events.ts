@@ -235,6 +235,10 @@ async function onCaptureDenied(client: SupabaseClient, event: PaypalInboxEvent, 
 }
 
 async function onCaptureRefunded(client: SupabaseClient, event: PaypalInboxEvent, payment: Row, booking: Row): Promise<EventOutcome> {
+  // PayPal confirming a refund the app already applied (#1038): nothing to write, nothing out of order.
+  const ownRefund = payment.status === "refunded" && event.refund_id !== null && payment.refund_id === event.refund_id;
+  if (ownRefund) return "recorded";
+
   const fields = {
     status: "refunded",
     refunded_at: new Date().toISOString(),
@@ -275,14 +279,15 @@ async function onInvoiceEvent(client: SupabaseClient, event: PaypalInboxEvent): 
  */
 export async function processPaypalEvent(client: SupabaseClient, event: PaypalInboxEvent): Promise<EventOutcome> {
   if (event.event_type === INVOICE_PAID || event.event_type === INVOICE_CANCELLED) return onInvoiceEvent(client, event);
-  const handlers: Record<string, typeof onCaptureCompleted> = {
-    [ORDER_APPROVED]: onOrderApproved,
-    [CAPTURE_COMPLETED]: onCaptureCompleted,
-    [CAPTURE_PENDING]: onCapturePending,
-    [CAPTURE_DENIED]: onCaptureDenied,
-    [CAPTURE_REFUNDED]: onCaptureRefunded,
-  };
-  const handler = handlers[event.event_type];
+  // A Map, not an object: an event type such as "constructor" must not resolve to an inherited property.
+  const handlers = new Map<string, typeof onCaptureCompleted>([
+    [ORDER_APPROVED, onOrderApproved],
+    [CAPTURE_COMPLETED, onCaptureCompleted],
+    [CAPTURE_PENDING, onCapturePending],
+    [CAPTURE_DENIED, onCaptureDenied],
+    [CAPTURE_REFUNDED, onCaptureRefunded],
+  ]);
+  const handler = handlers.get(event.event_type);
   if (!handler) return "ignored";
 
   const { payment, booking } = await resolvePayment(client, event);
