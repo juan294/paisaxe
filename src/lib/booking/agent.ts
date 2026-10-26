@@ -167,8 +167,13 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
     for (const block of final.content) {
       if (block.type !== "tool_use") continue;
       yield { type: "tool", name: block.name, status: "start" };
-      const outcome = await executeBookingTool(input.tools, block.name, block.input);
+      const outcome = await executeBookingTool({ ...input.tools, signal: input.signal }, block.name, block.input);
       yield { type: "tool", name: block.name, status: outcome.isError ? "error" : "done" };
+      if (outcome.isError && typeof outcome.result === "object" && outcome.result !== null &&
+          "error" in outcome.result && outcome.result.error === "timeout") {
+        yield { type: "text", content: "La operación ha tardado demasiado y su resultado aún no está confirmado. Consulta el estado de tu reserva antes de repetirla." };
+        return;
+      }
       if (outcome.card) yield { type: "card", card: outcome.card };
       results.push({
         type: "tool_result",

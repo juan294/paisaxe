@@ -51,8 +51,8 @@ function queueHappyPath(fake: BookingSupabaseFake, latestVersion: number | null 
   queueReads(fake);
   fake.onRpc("experience_availability", ROOM_AT_TEN);
   const version = fake.onTable("quotes", { data: latestVersion === null ? null : { version: latestVersion } });
-  const supersede = fake.onTable("quotes", { data: null });
   const insert = fake.onTable("quotes", { data: quoteRow({ version: (latestVersion ?? 0) + 1 }) });
+  const supersede = fake.onTable("quotes", { data: null });
   return { version, supersede, insert };
 }
 
@@ -80,7 +80,7 @@ describe("createQuote", () => {
     expect(quote).toMatchObject({ totalCents: 12000, depositCents: 3000, balanceCents: 9000, version: 2, slotTime: "10:00" });
   });
 
-  it("supersedes the draft's open quotes before inserting the next version", async () => {
+  it("supersedes only older unaccepted quotes after inserting, so a late write cannot invalidate a newer offer", async () => {
     const fake = createBookingSupabaseFake();
     const { supersede } = queueHappyPath(fake);
 
@@ -90,6 +90,7 @@ describe("createQuote", () => {
     expect(supersede.eq).toHaveBeenCalledWith("draft_id", "draft-1");
     expect(supersede.is).toHaveBeenCalledWith("superseded_at", null);
     expect(supersede.is).toHaveBeenCalledWith("accepted_at", null);
+    expect(supersede.lt).toHaveBeenCalledWith("version", 2);
   });
 
   it("starts at version 1 for a draft without quotes", async () => {
@@ -105,16 +106,47 @@ describe("createQuote", () => {
     queueReads(fake);
     fake.onRpc("experience_availability", ROOM_AT_TEN);
     fake.onTable("quotes", { data: { version: 1 } });
-    fake.onTable("quotes", { data: null });
     fake.onTable("quotes", { error: { message: "duplicate key", code: "23505" } });
     fake.onTable("quotes", { data: { version: 2 } });
-    fake.onTable("quotes", { data: null });
     const retry = fake.onTable("quotes", { data: quoteRow({ version: 3 }) });
+    fake.onTable("quotes", { data: null });
 
     const quote = await createQuote(fake.client, USER, INPUT, NOW);
 
     expect(retry.insert).toHaveBeenCalledWith(expect.objectContaining({ version: 3 }));
     expect(quote.version).toBe(3);
+  });
+
+  it("does not write a quote when availability finishes after the tool deadline", async () => {
+    const fake = createBookingSupabaseFake();
+    queueReads(fake);
+    let finish!: () => void;
+    const available = fake.onRpc("experience_availability", ROOM_AT_TEN);
+    const response = new Promise<typeof ROOM_AT_TEN>((resolve) => { finish = () => resolve(ROOM_AT_TEN); });
+    available.then = response.then.bind(response);
+    const controller = new AbortController();
+    const pending = createQuote(fake.client, USER, INPUT, NOW, controller.signal);
+    const rejected = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    controller.abort();
+    finish();
+    await rejected;
+    expect(fake.client.from).not.toHaveBeenCalledWith("quotes");
+  });
+
+  it("does not retry a version collision after timeout", async () => {
+    const fake = createBookingSupabaseFake();
+    queueReads(fake);
+    fake.onRpc("experience_availability", ROOM_AT_TEN);
+    fake.onTable("quotes", { data: { version: 1 } });
+    const collision = fake.onTable("quotes", { error: { message: "duplicate", code: "23505" } });
+    const controller = new AbortController();
+    const then = collision.then.bind(collision);
+    collision.then = (resolve, reject) => {
+      controller.abort();
+      return then(resolve, reject);
+    };
+    await expect(createQuote(fake.client, USER, INPUT, NOW, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    expect(fake.client.from).toHaveBeenCalledTimes(4);
   });
 
   it("refuses a draft owned by another user", async () => {

@@ -56,8 +56,9 @@ const REFUND_FAILED_FLAGS = ["pending_payment", "needs_attention", "expired", "c
 
 /**
  * Moves a refund_pending payment, and its booking, to PayPal's final refund
- * status. Returns the payment's new status, or null when nothing changed
- * (PayPal still pending, or another caller got there first).
+ * status. A matching terminal payment can replay its booking write after a
+ * partial failure. Returns the payment's new status, or null when the payment
+ * did not change (including booking-only repair).
  */
 export async function applyRefundStatus(
   client: SupabaseClient,
@@ -66,11 +67,19 @@ export async function applyRefundStatus(
   refundStatus: string
 ): Promise<"refunded" | "refund_failed" | null> {
   if (refundStatus === "COMPLETED") {
+    if (payment.status === "refunded") {
+      await markBookingRefunded(client, payment, bookingId);
+      return null;
+    }
     if (!(await guardedUpdate(client, "payments", payment.id, { status: "refunded", refunded_at: new Date().toISOString() }, ["refund_pending"]))) return null;
     await markBookingRefunded(client, payment, bookingId);
     return "refunded";
   }
   if (refundStatus === "FAILED" || refundStatus === "CANCELLED") {
+    if (payment.status === "refund_failed") {
+      if (payment.compensation_reason !== "duplicate_capture") await flagNeedsAttention(client, bookingId, REFUND_FAILED_FLAGS);
+      return null;
+    }
     if (!(await guardedUpdate(client, "payments", payment.id, { status: "refund_failed" }, ["refund_pending"]))) return null;
     await flagNeedsAttention(client, bookingId, REFUND_FAILED_FLAGS);
     logger.error("[PAYPAL_REFUND_FAILED]", { bookingId, paymentId: payment.id, refundStatus });

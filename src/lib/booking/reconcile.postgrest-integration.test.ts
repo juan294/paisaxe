@@ -751,6 +751,29 @@ it("replays the recorded sandbox refund through real normalization, state transi
       expect(bookingStatus(id)).toBe("needs_attention");
     });
 
+    it.each([
+      ["COMPLETED", "refunded", "refunded"],
+      ["FAILED", "refund_failed", "needs_attention"],
+    ])("repairs the booking after %s persisted only the payment, without repeating the refund", async (providerStatus, paymentStatus, expectedBookingStatus) => {
+      const { id } = newBooking();
+      await withOrder(id);
+      setPayment(id, `status = 'refund_pending', capture_id = '${captureId(id)}', refund_id = 'RF-B005-REPAIR-${id.slice(0, 8)}', compensation_reason = 'slot_gone'`);
+      paypal.getRefund.mockResolvedValue({ id: `RF-B005-REPAIR-${id.slice(0, 8)}`, status: providerStatus });
+
+      const first = await reconcileBookings(clientFailingFirstUpdate("bookings"), { bookingIds: [id] });
+      expect(first.errors).toBe(1);
+      expect(paymentField(id, "status")).toBe(paymentStatus);
+      // The existing reconciliation run can already repair the second write.
+      await reconcile(id);
+      expect(bookingStatus(id)).toBe(expectedBookingStatus);
+      expect(paypal.getRefund).toHaveBeenCalledTimes(1);
+      expect(paypal.refundCapture).not.toHaveBeenCalled();
+
+      const updatedAt = psql(`SELECT updated_at FROM public.bookings WHERE id = '${id}';`);
+      await reconcile(id);
+      expect(psql(`SELECT updated_at FROM public.bookings WHERE id = '${id}';`)).toBe(updatedAt);
+    });
+
     it("a confirmed cancellation whose refund call failed is retried with the same key (Phase 5 cancel_pending)", async () => {
       const confirmedCancel = newBooking();
       const notConfirmed = newBooking();

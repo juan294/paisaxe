@@ -106,6 +106,27 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('error presentation in PresentationRegion', () => {
+  it('renders auth error alert with retry and sign-in buttons', async () => {
+    mocks.serverGetUser.mockResolvedValue({ data: { user: null }, error: new Error('Token expired') });
+    mocks.browserGetUser.mockResolvedValue({ data: { user: null }, error: new Error('Token expired') });
+
+    const seed = await getInitialPresentation();
+    const tree = () => <Providers initialPresentation={seed}><PresentationProbe /></Providers>;
+    render(tree());
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    const alertDiv = screen.getByRole('alert');
+    // The text is translated to French due to the locale cookie in beforeEach
+    expect(alertDiv).toHaveTextContent('Votre session');
+    expect(alertDiv).toHaveTextContent('Vérifier à nouveau');
+    expect(alertDiv).toHaveTextContent('Se connecter');
+
+    // Verify the alert has the correct styling (z-50, bg-neutral-950, etc.)
+    expect(alertDiv).toHaveClass('relative', 'z-50', 'bg-neutral-950');
+  });
+});
+
 describe('real request presentation and stable Providers', () => {
   it('renders the verified narrow French seed through the actual shell before client effects', async () => {
     const shell = await RequestPresentationProviderShell({ children: <PresentationProbe /> });

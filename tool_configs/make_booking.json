@@ -1,7 +1,7 @@
 {
     "type": "webhook",
     "name": "make_booking",
-    "description": "Make an outbound call to a restaurant or business to book a reservation for the visitor. Use this AFTER you have collected ALL required info: venue name, phone (from search_places), party size, date, time, visitor's full name, and visitor's phone number.",
+    "description": "Make an outbound call to a restaurant or business to book a reservation for the visitor. Use this AFTER you have collected ALL required info: venue name, phone (from search_places), party size, date, time, visitor's full name, and visitor's phone number. Include idempotencyKey: choose it once for this booking and reuse it unchanged on every retry.",
     "response_timeout_secs": 20,
     "disable_interruptions": true,
     "force_pre_tool_speech": false,
@@ -31,7 +31,8 @@
                 "date",
                 "time",
                 "customerName",
-                "customerPhone"
+                "customerPhone",
+                "idempotencyKey"
             ],
             "description": "Booking request details. Before calling, you MUST have collected: venueName and phoneNumber (from search_places), partySize, date, time, customerName (full name), and customerPhone (visitor's callback number).",
             "properties": {
@@ -87,6 +88,13 @@
                 "specialRequests": {
                     "type": "string",
                     "description": "Any special requests (e.g., 'trona para bebé', 'mesa en terraza', 'alergia al gluten')",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "idempotencyKey": {
+                    "type": "string",
+                    "description": "Generate one UUID before the first call for this visitor-authorized booking request. Reuse EXACTLY the same token on every retry, including after a timeout or error. Generate a different UUID only for a separately authorized booking, even with identical details in the same conversation. Never use the conversation ID alone or regenerate the token for a retry.",
                     "is_system_provided": false,
                     "dynamic_variable": "",
                     "constant_value": ""

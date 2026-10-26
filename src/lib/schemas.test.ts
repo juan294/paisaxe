@@ -150,6 +150,16 @@ describe("makeBookingRequestSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it.each(["idempotency_key", "idempotencyKey"])("preserves and trims the booking request token from %s, including the MCP envelope", (key) => {
+    const body = { ...validPayload, [key]: " request-123 " };
+    expect(makeBookingRequestSchema.parse(body)).toMatchObject({ idempotency_key: "request-123" });
+    expect(makeBookingRequestSchema.parse({ arguments: body })).toMatchObject({ idempotency_key: "request-123" });
+  });
+
+  it.each(["", "   ", "x".repeat(201), 12, null])("rejects an invalid supplied booking token: %j", (idempotencyKey) => {
+    expect(makeBookingRequestSchema.safeParse({ ...validPayload, idempotencyKey }).success).toBe(false);
+  });
+
   it("unwraps an MCP-style arguments envelope", () => {
     const result = makeBookingRequestSchema.safeParse({
       arguments: validPayload,

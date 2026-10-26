@@ -120,6 +120,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
     needsPurchase,
     isSuspended,
     isAccessDenied,
+    isAccessUnavailable,
     accessStatus,
     agentId,
     expiresAt,
@@ -320,7 +321,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
           isInitializing={isInitializing}
           canUseVoice={canUseVoice}
           isSuspended={isSuspended}
-          isAccessDenied={isAccessDenied}
+          isAccessDenied={isAccessDenied || isAccessUnavailable || retryAfter != null}
           agentId={agentId}
           storySlug={story.slug}
           onToggleMode={handleToggleMode}
@@ -328,7 +329,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
           tryVoiceLabel={bookingActive ? t("booking.chat.voiceDiscovery") : undefined}
         />
 
-        {!isInitializing && isAccessDenied && <p role="status">{t("voice.accessUnavailable")} <button type="button" className="underline" onClick={() => { void refresh(); }}>{t("voice.checkAccess")}</button> <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
+        {!isInitializing && (isAccessDenied || isAccessUnavailable) && <p role="status">{t("voice.accessUnavailable")} <button type="button" className="underline" onClick={() => { void refresh(); }}>{t("voice.checkAccess")}</button> <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
         {!isInitializing && isSuspended && <p role="status">{t("voice.suspended")} <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
         {!isInitializing && accessStatus === "revoked" && <p role="status">{t("voice.revoked")} <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a></p>}
         {!isInitializing && accessStatus === "expired" && <p role="status">{t("voice.expired")}</p>}
@@ -374,6 +375,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
               messages={messages}
               isLoading={isLoading}
               onUpsellDismiss={handleUpsellDismiss}
+              showUpsells={!isAccessUnavailable && !isAccessDenied && !isSuspended && retryAfter == null}
               renderCards={bookingActive ? renderCards : undefined}
             />
 

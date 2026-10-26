@@ -26,6 +26,8 @@ interface UseVoiceAccessResult {
   isSuspended: boolean;
   /** Session issuance denied; the fresh access reason is not yet known. */
   isAccessDenied: boolean;
+  /** The signed-in access check failed; entitlement remains unknown. */
+  isAccessUnavailable: boolean;
   accessStatus: VoiceAccessResponse["status"];
   /** Expiry date for paid access (null if whitelisted or no access) */
   expiresAt: Date | null;
@@ -92,6 +94,7 @@ export function useVoiceAccess(): UseVoiceAccessResult {
           return {
             ...(client.getQueryData<AccessState>(key) ?? emptyState()),
             value: null,
+            retryAfter: null,
           };
         }
       },
@@ -168,12 +171,15 @@ export function useVoiceAccess(): UseVoiceAccessResult {
     needsPurchase:
       !!identity &&
       visitorAccess.featureEnabled &&
+      !!value &&
       !hasAccess &&
       !isSuspended &&
       !denied &&
       state?.retryAfter == null,
     isSuspended,
     isAccessDenied: denied,
+    isAccessUnavailable:
+      !!identity && !!state && !value && !denied && state.retryAfter == null,
     accessStatus: value?.status ?? "none",
     expiresAt,
     hoursUntilExpiry: expiresAt

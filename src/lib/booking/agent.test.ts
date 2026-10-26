@@ -126,7 +126,7 @@ describe("streamBookingTurn", () => {
   });
 
   it("reports a failed tool as status error and an is_error tool_result, and the turn continues", async () => {
-    vi.mocked(executeBookingTool).mockResolvedValue({ isError: true, result: { error: "timeout" } });
+    vi.mocked(executeBookingTool).mockResolvedValue({ isError: true, result: { error: "no_capacity" } });
     const fake = fakeAnthropic([
       { content: [toolUse("tu_1")], stopReason: "tool_use" },
       { texts: ["No he podido mirarlo ahora."], content: [], stopReason: "end_turn" },
@@ -138,6 +138,15 @@ describe("streamBookingTurn", () => {
     expect(events.at(-1)).toEqual({ type: "text", content: "No he podido mirarlo ahora." });
     const toolResult = (requiredValue(fake.calls[1], "src/lib/booking/agent.test.ts:139 fake.calls[1]").params.messages as { content: { is_error: boolean }[] }[]).at(-1)?.content[0];
     expect(toolResult?.is_error).toBe(true);
+  });
+
+  it("stops the batch and model turn after a timeout instead of starting dependent tools", async () => {
+    vi.mocked(executeBookingTool).mockResolvedValue({ isError: true, result: { error: "timeout" } });
+    const fake = fakeAnthropic([{ content: [toolUse("tu_1"), { type: "tool_use", id: "tu_2", name: "get_quote", input: {} }], stopReason: "tool_use" }]);
+    const events = await collect(streamBookingTurn(input(fake.client)));
+    expect(executeBookingTool).toHaveBeenCalledTimes(1);
+    expect(fake.calls).toHaveLength(1);
+    expect(events.at(-1)).toEqual({ type: "text", content: "La operación ha tardado demasiado y su resultado aún no está confirmado. Consulta el estado de tu reserva antes de repetirla." });
   });
 
   it("runs several tool calls of one response sequentially, in order", async () => {
