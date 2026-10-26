@@ -60,6 +60,9 @@ test.describe("Immersive story viewer", () => {
   }) => {
     test.skip(isMobile, "Keyboard navigation is desktop-only");
 
+    // The streamed title can precede hydration; wait for interactive navigation.
+    await expect(page.getByTestId("next-story-button").first()).toBeEnabled();
+
     const title = page.getByTestId("story-title").first();
     await expect(title).toBeVisible({ timeout: 8000 });
     const firstTitle = await title.textContent();
