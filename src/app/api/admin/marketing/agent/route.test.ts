@@ -72,26 +72,20 @@ vi.mock("@/lib/admin-auth", async () => {
   return mockAdminBoundary(vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }));
 });
 
-// Shared mock data for Supabase context queries
+// SDK query fixtures match the real marketing_posts/stories columns.
 let mockStoryCount: number | null = 10;
-let mockScheduledContent: Array<{ platform: string; content_type: string; status: string; scheduled_for: string }> = [
-  { platform: "x", content_type: "photo_caption", status: "draft", scheduled_for: "2024-01-15T14:00:00Z" },
-  { platform: "instagram", content_type: "reel_caption", status: "published", scheduled_for: "2024-01-14T10:00:00Z" },
+let mockScheduledContent = [
+  { platform: "x", content: "Playas de Asturias", status: "scheduled" },
+  { platform: "instagram", content: "Rutas por los Picos", status: "posted" },
 ];
-
-// Mock Supabase
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({
-        order: () => ({
-          limit: () => Promise.resolve({ data: mockScheduledContent }),
-        }),
-        eq: () => Promise.resolve({ count: mockStoryCount }),
-      }),
-    }),
-  },
-}));
+let mockPostError: { message: string } | null = null;
+let mockStoryError: { message: string } | null = null;
+const query = vi.hoisted(() => ({ select: vi.fn(), order: vi.fn(), limit: vi.fn(), eq: vi.fn(), from: vi.fn() }));
+const adminClient = vi.hoisted(() => ({ create: vi.fn() }));
+vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: adminClient.create }));
+// The anonymous client must never be used for private marketing context.
+const anonFrom = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/supabase", () => ({ supabase: { from: anonFrom } }));
 
 // Import after mocks
 import { POST, GET } from "./route";
@@ -105,9 +99,21 @@ describe("/api/admin/marketing/agent", () => {
     fsMode.useRealFiles = false;
     mockStoryCount = 10;
     mockScheduledContent = [
-      { platform: "x", content_type: "photo_caption", status: "draft", scheduled_for: "2024-01-15T14:00:00Z" },
-      { platform: "instagram", content_type: "reel_caption", status: "published", scheduled_for: "2024-01-14T10:00:00Z" },
+      { platform: "x", content: "Playas de Asturias", status: "scheduled" },
+      { platform: "instagram", content: "Rutas por los Picos", status: "posted" },
     ];
+    mockPostError = null;
+    mockStoryError = null;
+    adminClient.create.mockReturnValue({ from: query.from });
+    query.from.mockImplementation((table: string) => {
+      if (!["marketing_posts", "stories"].includes(table)) throw new Error(`Unknown table: ${table}`);
+      return query;
+    });
+    query.select.mockReturnValue(query);
+    query.order.mockReturnValue(query);
+    query.limit.mockImplementation(() => Promise.resolve({ data: mockPostError ? null : mockScheduledContent, error: mockPostError }));
+    query.eq.mockImplementation(() => Promise.resolve({ count: mockStoryError ? null : mockStoryCount, error: mockStoryError }));
+    anonFrom.mockImplementation(() => { throw new Error("Private marketing context used the anonymous client"); });
 
     // Default Claude response
     mocks.anthropicCreate.mockResolvedValue({
@@ -432,7 +438,18 @@ describe("/api/admin/marketing/agent", () => {
       const callArgs = requiredValue(mocks.anthropicCreate.mock.calls[0], "src/app/api/admin/marketing/agent/route.test.ts:431 mocks.anthropicCreate.mock.calls[0]")[0];
       expect(callArgs.system[1].text).toContain("10 active stories");
       expect(callArgs.system[1].text).toContain("Recent marketing content");
-      expect(callArgs.system[1].text).toContain("x: photo_caption (draft)");
+      expect(callArgs.system[1].text).toContain("x (scheduled): Playas de Asturias");
+      expect(callArgs.system[1].text).toContain("instagram (posted): Rutas por los Picos");
+      expect(anonFrom).not.toHaveBeenCalled();
+      expect(query.from).toHaveBeenCalledWith("marketing_posts");
+      expect(query.select).toHaveBeenCalledWith("platform, content, status");
+      expect(query.order.mock.calls).toEqual([
+        ["scheduled_for", { ascending: false, nullsFirst: false }],
+        ["created_at", { ascending: false }],
+        ["id", { ascending: true }],
+      ]);
+      expect(query.limit).toHaveBeenCalledWith(5);
+      expect(query.eq).toHaveBeenCalledWith("is_active", true);
     });
 
     it("should handle null story count gracefully", async () => {
@@ -452,6 +469,44 @@ describe("/api/admin/marketing/agent", () => {
       const systemText = callArgs.system.map((b: { text: string }) => b.text).join("\n");
       expect(systemText).not.toContain("active stories");
       expect(systemText).not.toContain("Recent marketing content");
+    });
+
+    it.each([401, 403])("does not read private context or call the model after auth rejects with %s", async (status) => {
+      vi.mocked(validateAdminAuth).mockResolvedValueOnce({ valid: false, error: NextResponse.json({ error: "Denied" }, { status }) });
+      const response = await POST(new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST", body: JSON.stringify({ agentId: "xander", message: "Hello" }),
+      }));
+      expect(response.status).toBe(status);
+      expect(adminClient.create).not.toHaveBeenCalled();
+      expect(query.from).not.toHaveBeenCalled();
+      expect(mocks.anthropicCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(["marketing_posts", "stories"])("logs %s lookup failure and tells the agent its context is unavailable", async (table) => {
+      const error = { message: "Database unavailable" };
+      if (table === "marketing_posts") mockPostError = error;
+      else mockStoryError = error;
+      const response = await POST(new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST", body: JSON.stringify({ agentId: "xander", message: "Hello" }),
+      }));
+      expect(response.status).toBe(200);
+      expect(logger.error).toHaveBeenCalledWith("[TABLE_FALLBACK] Marketing agent context lookup failed", { table, error });
+      const context = requiredValue(mocks.anthropicCreate.mock.calls[0], "context call")[0].system[1].text;
+      expect(context).toContain(table === "marketing_posts" ? "Marketing content is unavailable" : "Active story count is unavailable");
+      expect(context).toContain(table === "marketing_posts" ? "10 active stories" : "Playas de Asturias");
+    });
+
+    it("reports an authoritative zero story count and bounds post excerpts", async () => {
+      mockStoryCount = 0;
+      mockScheduledContent = [{ platform: "x", content: "a".repeat(500), status: "draft" }];
+      await POST(new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST", body: JSON.stringify({ agentId: "xander", message: "Hello" }),
+      }));
+      const context = requiredValue(mocks.anthropicCreate.mock.calls[0], "context call")[0].system[1].text;
+      expect(context).toContain("0 active stories");
+      expect(context).toContain("a".repeat(280));
+      expect(context).not.toContain("a".repeat(281));
+      expect(logger.error).not.toHaveBeenCalled();
     });
 
     it("records usage under source 'marketing_<agent>'", async () => {
@@ -510,7 +565,8 @@ describe("/api/admin/marketing/agent", () => {
 
     // Automatic caching reads the history across turns only if the unmarked
     // context block before it is byte-identical between requests. It renders
-    // counts and platform/type/status only, never scheduled_for timestamps.
+    // counts and bounded platform/status/content excerpts, without injecting
+    // the request time or scheduled_for timestamps.
     it("renders an identical DB-context block for two requests over unchanged data", async () => {
       const first = await requestFor("xander");
       const second = await requestFor("xander", [
@@ -527,7 +583,7 @@ describe("/api/admin/marketing/agent", () => {
 
       mockStoryCount = 42;
       mockScheduledContent = [
-        { platform: "pinterest", content_type: "pin", status: "scheduled", scheduled_for: "2026-09-30T08:00:00Z" },
+        { platform: "pinterest", content: "Pueblos de Asturias", status: "scheduled" },
       ];
       const second = await requestFor("xander");
 
@@ -646,6 +702,3 @@ describe("/api/admin/marketing/agent", () => {
     expect(logger.error).toHaveBeenCalled();
   });
 });
-
-// Unused service client in routes backed by separate providers or local files.
-vi.mock("@/lib/supabase-admin", () => ({ createAdminClient: vi.fn(() => ({})) }));

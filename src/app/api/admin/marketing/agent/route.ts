@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import * as fs from "fs/promises";
-import { withAdminSession } from "@/lib/admin-auth";
+import { withAdminDeferred, withAdminSession } from "@/lib/admin-auth";
 import {
   getAgentById,
   getAllAgents,
   BRAND_VOICE_FILE,
   type AgentConfig,
 } from "@/agents";
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { agentChatRequestSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 import { CHAT_MODEL } from "@/lib/models";
@@ -59,31 +59,37 @@ async function loadAgentPrompt(agent: AgentConfig): Promise<string> {
 /**
  * Gather context from the database for richer agent responses.
  */
-async function gatherContext(): Promise<string> {
+async function gatherContext(supabase: SupabaseClient): Promise<string> {
+  // Posts own scheduling and status; the content bank only holds templates.
+  const { data: scheduledContent, error: postsError } = await supabase
+    .from("marketing_posts")
+    .select("platform, content, status")
+    .order("scheduled_for", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: true })
+    .limit(5);
 
-  // Get recent scheduled content
-  const { data: scheduledContent } = await supabase
-    .from("marketing_content")
-    .select("platform, content_type, caption, status, scheduled_for")
-    .order("scheduled_for", { ascending: false })
-    .limit(10);
-
-  // Get active stories count
-  const { count: storyCount } = await supabase
+  const { count: storyCount, error: storiesError } = await supabase
     .from("stories")
     .select("*", { count: "exact", head: true })
-    .eq("active", true);
+    .eq("is_active", true);
 
   let context = "## Current Context\n\n";
 
-  if (storyCount) {
+  if (storiesError) {
+    logger.error("[TABLE_FALLBACK] Marketing agent context lookup failed", { table: "stories", error: storiesError });
+    context += "- Active story count is unavailable; do not assume there are no stories.\n";
+  } else if (storyCount !== null) {
     context += `- There are ${storyCount} active stories in the Paisaxe database.\n`;
   }
 
-  if (scheduledContent && scheduledContent.length > 0) {
-    context += `- Recent marketing content:\n`;
-    for (const item of scheduledContent.slice(0, 5)) {
-      context += `  - ${item.platform}: ${item.content_type} (${item.status})\n`;
+  if (postsError) {
+    logger.error("[TABLE_FALLBACK] Marketing agent context lookup failed", { table: "marketing_posts", error: postsError });
+    context += "- Marketing content is unavailable; do not assume there are no scheduled posts.\n";
+  } else if (scheduledContent && scheduledContent.length > 0) {
+    context += "- Recent marketing content:\n";
+    for (const item of scheduledContent) {
+      context += `  - ${item.platform} (${item.status}): ${item.content.slice(0, 280)}\n`;
     }
   }
 
@@ -98,10 +104,10 @@ async function gatherContext(): Promise<string> {
  * DB context, which changes between requests, so it follows unmarked.
  * See .claude/rules/prompt-caching.md.
  */
-async function buildAgentSystem(agent: AgentConfig): Promise<SystemBlock[]> {
+async function buildAgentSystem(agent: AgentConfig, supabase: SupabaseClient): Promise<SystemBlock[]> {
   const [agentPrompt, context] = await Promise.all([
     loadAgentPrompt(agent),
-    gatherContext(),
+    gatherContext(supabase),
   ]);
 
   const stable = `${agentPrompt}
@@ -132,7 +138,7 @@ Respond helpfully while staying true to the Paisaxe brand voice.`;
 export async function POST(
   request: Request
 ): Promise<NextResponse<AgentChatResponse | { error: string }>> {
-  return withAdminSession(async () => {
+  return withAdminDeferred(async (getClient) => {
 
     try {
       const rawBody: unknown = await request.json();
@@ -156,7 +162,7 @@ export async function POST(
         );
       }
 
-      const system = await buildAgentSystem(agent);
+      const system = await buildAgentSystem(agent, getClient());
 
       // Build messages array
       const messages: Array<{ role: "user" | "assistant"; content: string }> = [
