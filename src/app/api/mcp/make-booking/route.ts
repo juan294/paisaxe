@@ -246,7 +246,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Normalize phone numbers for calling
     const normalizedPhone = normalizePhoneNumber(phone_number);
     const normalizedCustomerPhone = normalizePhoneNumber(customer_phone);
-    const idempotencyKey = getMcpIdempotencyKey(request);
+    const headerKey = getMcpIdempotencyKey(request);
+    if (headerKey && params.idempotency_key && headerKey !== params.idempotency_key) {
+      return NextResponse.json<MakeBookingResponse>(
+        {
+          success: false,
+          message: "Conflicting booking idempotency keys.",
+          status: "failed",
+          fallback_action: "Use the same original request token in the header and body when retrying this booking.",
+        },
+        { status: 400 }
+      );
+    }
+    const idempotencyKey = headerKey ?? params.idempotency_key;
 
     if (!idempotencyKey) {
       return NextResponse.json<MakeBookingResponse>(
@@ -255,7 +267,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           message: "Idempotency key is required for booking requests.",
           status: "failed",
           fallback_action:
-            "Retry the booking request with the same Idempotency-Key header to avoid duplicate calls.",
+            "Supply idempotencyKey in the body or Idempotency-Key in the header. Reuse that exact token on every retry; choose a different token only for a separately authorized booking.",
         },
         { status: 400 }
       );
@@ -460,9 +472,11 @@ export async function GET(): Promise<NextResponse> {
       "customer_name",
       "customer_phone",
     ],
-    required_headers: ["x-mcp-secret", "Idempotency-Key"],
-    optional_fields: ["special_requests", "language"],
+    required_headers: ["x-mcp-secret"],
+    idempotency: "Required: Idempotency-Key header or idempotencyKey body field (idempotency_key also accepted). Reuse the same token for retries and a different token for each separately authorized booking. Header and body must match when both are supplied.",
+    optional_fields: ["special_requests", "language", "idempotency_key"],
     example_request: {
+      idempotency_key: "9c410176-7ce8-4cdf-b17e-9243215d9b86",
       venue_name: "Casa Gerardo",
       phone_number: "+34 985 88 77 97",
       party_size: 4,

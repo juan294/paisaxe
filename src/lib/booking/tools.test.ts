@@ -148,6 +148,21 @@ describe("executeBookingTool", () => {
     expect(outcome).toEqual({ isError: true, result: { error: "internal_error" } });
   });
 
+  it("never starts a quote after its draft read finishes beyond the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: (draft: Awaited<ReturnType<typeof getOrCreateOpenDraft>>) => void;
+      const draft = await getOrCreateOpenDraft(client, USER);
+      vi.mocked(getOrCreateOpenDraft).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      const pending = executeBookingTool(ctx, "get_quote", { experienceId: EXPERIENCE_ID, date: "2026-11-21", time: "10:00", partySize: 4 });
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(await pending).toMatchObject({ isError: true, result: { error: "timeout" } });
+      finish(draft);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(createQuote).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
   it("times out a slow tool after its budget with is_error timeout", async () => {
     vi.useFakeTimers();
     try {
@@ -265,7 +280,7 @@ describe("get_quote", () => {
       slotDate: "2026-11-21",
       slotTime: "10:00",
       partySize: 4,
-    });
+    }, expect.any(Date), expect.any(AbortSignal));
     expect(outcome.card).toEqual({
       kind: "quote",
       quoteId: "quote-9",

@@ -163,6 +163,7 @@ describe("useVoiceAccess", () => {
     const { result } = renderHook(() => useVoiceAccess());
 
     expect(result.current.isLoading).toBe(true);
+    expect(result.current.needsPurchase).toBe(false);
   });
 
   it("returns needsSignIn when the feature is enabled for anonymous users", () => {
@@ -241,7 +242,7 @@ describe("useVoiceAccess", () => {
     expect(result.current.agentId).toBe("");
   });
 
-  it("sets no paid access when the API returns a non-ok status (line 62)", async () => {
+  it.each([401, 500])("keeps HTTP %s verification failures unavailable until an authoritative retry", async (status) => {
     mockUseAuth.mockReturnValue({
       user: { id: "user-1", email: "test@example.com" },
       session: { access_token: "token-123" },
@@ -254,7 +255,7 @@ describe("useVoiceAccess", () => {
     });
     mockFetch.mockResolvedValue({
       ok: false,
-      status: 401,
+      status,
       json: async () => ({ error: "Unauthorized" }),
     });
 
@@ -266,7 +267,14 @@ describe("useVoiceAccess", () => {
 
     expect(result.current.hasAccess).toBe(false);
     expect(result.current.canUseVoice).toBe(false);
-    expect(result.current.needsPurchase).toBe(true);
+    expect(result.current.needsPurchase).toBe(false);
+    expect(result.current.isAccessUnavailable).toBe(true);
+
+    mockFetch.mockResolvedValueOnce(Response.json({ hasAccess: true, expiresAt: null, purchaseType: "weekly_pass", status: "active" }));
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.canUseVoice).toBe(true);
+    expect(result.current.needsPurchase).toBe(false);
+    expect(result.current.isAccessUnavailable).toBe(false);
   });
 
   it("handles fetch errors gracefully", async () => {
@@ -291,5 +299,11 @@ describe("useVoiceAccess", () => {
     expect(result.current.hasAccess).toBe(false);
     expect(result.current.canUseVoice).toBe(false);
     expect(result.current.agentId).toBe("");
+    expect(result.current.needsPurchase).toBe(false);
+    expect(result.current.isAccessUnavailable).toBe(true);
+    mockFetch.mockResolvedValueOnce(Response.json({ hasAccess: false, expiresAt: null, purchaseType: null, status: "none" }));
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.needsPurchase).toBe(true);
+    expect(result.current.isAccessUnavailable).toBe(false);
   });
 });

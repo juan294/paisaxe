@@ -29,7 +29,7 @@ import { bookingCapability, bookingLink } from "./links";
 import { createQuote } from "./quotes";
 import { BookingError, hhmmSchema, isoDateSchema, partySizeSchema, type Booking } from "./types";
 
-/** Budget per tool execution; the turn continues with an is_error result. */
+/** Budget per tool execution; a timeout ends the turn. */
 const TOOL_TIMEOUT_MS = 8_000;
 /** Slots per option sent to the model; the card carries the same list. */
 const SLOTS_PER_OPTION = 8;
@@ -38,6 +38,7 @@ export interface ToolContext {
   userId: string;
   redemptionId: string;
   client: SupabaseClient;
+  signal?: AbortSignal;
 }
 
 export interface ToolOutcome {
@@ -180,13 +181,14 @@ const getQuoteTool: BookingTool<z.infer<typeof quoteInputSchema>> = {
   inputSchema: quoteInputSchema,
   async execute(ctx, input) {
     const draft = await getOrCreateOpenDraft(ctx.client, ctx.userId);
+    ctx.signal?.throwIfAborted();
     const quote = await createQuote(ctx.client, ctx.userId, {
       draftId: draft.id,
       experienceId: input.experienceId,
       slotDate: input.date,
       slotTime: input.time,
       partySize: input.partySize,
-    });
+    }, new Date(), ctx.signal);
     const { data } = await ctx.client.from("experiences").select("title").eq("id", quote.experienceId).maybeSingle();
     const experienceTitle = (data?.title as string | undefined) ?? "";
 
@@ -255,6 +257,7 @@ const createPaymentOrderTool: BookingTool<{ bookingId: string }> = {
   async execute(ctx, input) {
     const booking = await getBookingForUser(ctx.client, ctx.userId, input.bookingId);
     if (!booking) throw new BookingError("not_found");
+    ctx.signal?.throwIfAborted();
     const order = await ensurePaymentOrder(ctx.client, booking.id);
 
     return {
@@ -311,6 +314,7 @@ const sendBalanceInvoiceTool: BookingTool<{ bookingId: string }> = {
   async execute(ctx, input) {
     const booking = await getBookingForUser(ctx.client, ctx.userId, input.bookingId);
     if (!booking) throw new BookingError("not_found");
+    ctx.signal?.throwIfAborted();
     const invoice = await sendBalanceInvoice(ctx.client, booking);
 
     return {
@@ -360,10 +364,13 @@ export function bookingToolDefinitions(): Anthropic.Tool[] {
   });
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | "timeout"> {
+function withTimeout<T>(promise: Promise<T>, ms: number, controller: AbortController): Promise<T | "timeout"> {
   let timer!: ReturnType<typeof setTimeout>;
   const timeout = new Promise<"timeout">((resolve) => {
-    timer = setTimeout(() => resolve("timeout"), ms);
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve("timeout");
+    }, ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
@@ -382,8 +389,11 @@ export async function executeBookingTool(ctx: ToolContext, name: string, rawInpu
   }
 
   const startedAt = Date.now();
+  const controller = new AbortController();
+  const signal = ctx.signal ? AbortSignal.any([ctx.signal, controller.signal]) : controller.signal;
   try {
-    const outcome = await withTimeout(tool.execute(ctx, parsed.data), TOOL_TIMEOUT_MS);
+    signal.throwIfAborted();
+    const outcome = await withTimeout(tool.execute({ ...ctx, signal }, parsed.data), TOOL_TIMEOUT_MS, controller);
     // Per-tool latency, to decide whether search needs a range availability RPC (Phase 1 notes).
     logger.info("[BOOKING_TOOL_TIMING]", { tool: name, durationMs: Date.now() - startedAt });
     if (outcome === "timeout") {

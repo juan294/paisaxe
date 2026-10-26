@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import CheckoutReturnPage from "./page";
 import { Suspense, type ReactElement } from "react";
 
@@ -246,9 +246,14 @@ describe("CheckoutReturnPage", () => {
 
       render(<CheckoutReturnPage />);
 
-      expect(
-        screen.getByText("premium.success_retry_hint")
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "premium.pending_title" })).toBeInTheDocument();
+      expect(screen.queryByText("premium.success_title")).not.toBeInTheDocument();
+      expect(screen.queryByText("premium.success_subtitle")).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "premium.success_cta" })).not.toBeInTheDocument();
+      expect(screen.getByText("premium.success_retry_hint")).toBeInTheDocument();
+      mockRefresh.mockClear();
+      fireEvent.click(screen.getByRole("button", { name: "voice.checkAccess" }));
+      expect(mockRefresh).toHaveBeenCalledOnce();
     });
 
     it("should not show retry hint when canUseVoice is true", () => {
@@ -258,6 +263,33 @@ describe("CheckoutReturnPage", () => {
         screen.queryByText("premium.success_retry_hint")
       ).not.toBeInTheDocument();
     });
+  });
+
+
+  it("shows unavailable verification with retry instead of an activation or failed-payment claim", () => {
+    const unavailable = { ...mockUseVoiceAccess(), canUseVoice: false, hasAccess: false, isAccessUnavailable: true, expiresAt: null };
+    mockUseVoiceAccess.mockReturnValue(unavailable);
+    render(<CheckoutReturnPage />);
+    expect(screen.getByRole("heading", { name: "voice.accessUnavailable" })).toBeInTheDocument();
+    expect(screen.queryByText("premium.success_title")).not.toBeInTheDocument();
+    expect(screen.queryByText("premium.success_subtitle")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "voice.checkAccess" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "voice.contactSupport" })).toBeInTheDocument();
+    expect(document.querySelector('a[href^="/pricing"]')).toBeNull();
+  });
+
+  it("keeps pending return-story navigation without claiming voice is ready, then shows verified success", () => {
+    mockSearchParams.set("returnTo", "oviedo-walking-tour");
+    mockUseVoiceAccess.mockReturnValue({ ...mockUseVoiceAccess(), canUseVoice: false, hasAccess: false, expiresAt: null });
+    const view = render(<CheckoutReturnPage />);
+    expect(screen.getByRole("link", { name: "accessibility.go_back" })).toHaveAttribute("href", "/immersive?story=oviedo-walking-tour");
+    expect(screen.getByRole("link", { name: "voice.contactSupport" })).toHaveAttribute("href", "mailto:support@paisaxe.es");
+    expect(screen.queryByRole("link", { name: "premium.success_cta" })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="/pricing"]')).toBeNull();
+    mockUseVoiceAccess.mockReturnValue({ ...mockUseVoiceAccess(), canUseVoice: true, hasAccess: true });
+    view.rerender(<CheckoutReturnPage />);
+    expect(screen.getByRole("link", { name: "premium.success_cta" })).toHaveAttribute("href", "/immersive?story=oviedo-walking-tour&voice=ready");
+    expect(screen.queryByText("premium.pending_title")).not.toBeInTheDocument();
   });
 
   describe("formatted expiry date", () => {

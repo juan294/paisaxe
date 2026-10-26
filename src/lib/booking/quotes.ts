@@ -42,8 +42,10 @@ export async function createQuote(
   client: SupabaseClient,
   userId: string,
   input: QuoteInput,
-  now: Date = new Date()
+  now: Date = new Date(),
+  signal?: AbortSignal
 ): Promise<Quote> {
+  signal?.throwIfAborted();
   const { draftId, experienceId, slotDate, slotTime, partySize } = parseOrThrow(quoteInputSchema, input);
 
   const [draft, experienceRow] = await Promise.all([
@@ -90,30 +92,37 @@ export async function createQuote(
   // A concurrent createQuote on the same draft can take the same version
   // (unique (draft_id, version)); one retry reads the new latest version.
   for (let attempt = 1; ; attempt++) {
-    const [latest, superseded] = await Promise.all([
-      client
-        .from("quotes")
-        .select("version")
-        .eq("draft_id", draftId)
-        .order("version", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      client
-        .from("quotes")
-        .update({ superseded_at: now.toISOString() })
-        .eq("draft_id", draftId)
-        .is("superseded_at", null)
-        .is("accepted_at", null),
-    ]);
+    signal?.throwIfAborted();
+    const latest = await client
+      .from("quotes")
+      .select("version")
+      .eq("draft_id", draftId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (latest.error) throw new Error(`Failed to read quote versions: ${latest.error.message}`);
-    if (superseded.error) throw new Error(`Failed to supersede quotes: ${superseded.error.message}`);
+    signal?.throwIfAborted();
 
     const inserted = await client
       .from("quotes")
       .insert({ ...row, version: ((latest.data?.version as number | undefined) ?? 0) + 1 })
       .select("*")
       .single();
-    if (!inserted.error) return mapQuote(inserted.data);
+    signal?.throwIfAborted();
+    if (!inserted.error) {
+      const quote = mapQuote(inserted.data);
+      // A late UPDATE may still reach the database after timeout. Its version
+      // fence prevents it from superseding a newer, visitor-visible offer.
+      const superseded = await client.from("quotes")
+        .update({ superseded_at: now.toISOString() })
+        .eq("draft_id", draftId)
+        .lt("version", quote.version)
+        .is("superseded_at", null)
+        .is("accepted_at", null);
+      if (superseded.error) throw new Error(`Failed to supersede quotes: ${superseded.error.message}`);
+      signal?.throwIfAborted();
+      return quote;
+    }
     if (inserted.error.code !== UNIQUE_VIOLATION || attempt === 2) {
       throw new Error(`Failed to create quote: ${inserted.error.message}`);
     }

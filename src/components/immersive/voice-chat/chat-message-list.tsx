@@ -17,6 +17,7 @@ interface ChatMessageListProps {
   messages: StreamChatMessage[];
   isLoading: boolean;
   onUpsellDismiss: (index: number) => void;
+  showUpsells?: boolean;
   /** Booking chat: renders a message's cards under its bubble. */
   renderCards?: (msg: StreamChatMessage) => ReactNode;
 }
@@ -25,6 +26,7 @@ interface MessageRowProps {
   msg: StreamChatMessage;
   idx: number;
   onUpsellDismiss: (index: number) => void;
+  showUpsells?: boolean;
   renderCards?: (msg: StreamChatMessage) => ReactNode;
 }
 
@@ -51,6 +53,7 @@ const MessageRow = memo(function MessageRow({
   msg,
   idx,
   onUpsellDismiss,
+  showUpsells = true,
   renderCards,
 }: MessageRowProps) {
   const { t } = useTranslation();
@@ -87,7 +90,7 @@ const MessageRow = memo(function MessageRow({
         )}
       </div>}
       {msg.cards && msg.cards.length > 0 && renderCards?.(msg)}
-      {msg.upsellReason && !msg.upsellDismissed && (
+      {showUpsells && msg.upsellReason && !msg.upsellDismissed && (
         <ChatUpsellCTA
           reason={msg.upsellReason}
           onDismiss={() => onUpsellDismiss(idx)}
@@ -109,6 +112,7 @@ export function ChatMessageList({
   messages,
   isLoading,
   onUpsellDismiss,
+  showUpsells = true,
   renderCards,
 }: ChatMessageListProps) {
   const { t } = useTranslation();
@@ -152,6 +156,7 @@ export function ChatMessageList({
           msg={msg}
           idx={idx}
           onUpsellDismiss={onUpsellDismiss}
+          showUpsells={showUpsells}
           renderCards={renderCards}
         />
       ))}

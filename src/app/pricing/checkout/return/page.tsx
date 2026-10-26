@@ -24,12 +24,12 @@ export default function CheckoutReturnPage() {
 }
 
 function CheckoutReturnPageContent() {
-  const { canUseVoice, expiresAt, isLoading, refresh, retryAfter } = useVoiceAccess();
+  const { canUseVoice, isAccessUnavailable, isAccessDenied, isSuspended, expiresAt, isLoading, refresh, retryAfter } = useVoiceAccess();
   const { t, locale } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const immersiveHref = returnTo
-    ? `/immersive?story=${encodeURIComponent(returnTo)}&voice=ready`
+    ? `/immersive?story=${encodeURIComponent(returnTo)}${canUseVoice ? "&voice=ready" : ""}`
     : "/immersive";
 
   // Refresh access on mount to pick up the new purchase
@@ -52,6 +52,31 @@ function CheckoutReturnPageContent() {
           {t("premium.loading_access")}
         </p>
       </div>
+    );
+  }
+
+  if (!canUseVoice) {
+    return (
+      <main className="min-h-screen bg-scene-canvas flex flex-col items-center justify-center p-6">
+        <div className="max-w-sm w-full text-center text-neutral-400">
+          <h1 className="text-2xl font-semibold text-scene-white mb-4">
+            {t(isAccessUnavailable || isAccessDenied ? "voice.accessUnavailable" : "premium.pending_title")}
+          </h1>
+          <p role="status" className="mb-6">
+            {t(isSuspended ? "voice.suspended" : "premium.success_retry_hint")}
+          </p>
+          <RateLimitNotice retryAfter={retryAfter} onRetry={() => { void refresh(); }} />
+          {retryAfter == null && (
+            <button type="button" className="mb-6 rounded-lg bg-paisaxe-green-500 px-5 py-3 text-scene-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paisaxe-green-300" onClick={() => { void refresh(); }}>
+              {t("voice.checkAccess")}
+            </button>
+          )}
+          <div className="flex flex-col gap-4 text-sm">
+            <Link href={immersiveHref} className="underline">{t("accessibility.go_back")}</Link>
+            <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a>
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -100,13 +125,6 @@ function CheckoutReturnPageContent() {
           <Mic className="h-4 w-4" />
           {t("premium.success_cta")}
         </Link>
-
-        {/* Not showing access - retry hint */}
-        {!canUseVoice && (
-          <p className="mt-6 text-xs text-neutral-500">
-            {t("premium.success_retry_hint")}
-          </p>
-        )}
       </div>
     </div>
   );

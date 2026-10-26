@@ -37,6 +37,7 @@ vi.mock("@/hooks/use-auth", () => ({
 const mockVoiceAccess = {
   isSuspended: false,
   isAccessDenied: false,
+  isAccessUnavailable: false,
   accessStatus: "none",
   canUseVoice: false,
   needsSignIn: false,
@@ -273,6 +274,7 @@ const resetMockVoiceAccess = () => {
   mockBookingAccess.isLoading = false;
   mockVoiceAccess.isSuspended = false;
   mockVoiceAccess.isAccessDenied = false;
+  mockVoiceAccess.isAccessUnavailable = false;
   mockVoiceAccess.accessStatus = "none";
   mockVoiceAccess.canUseVoice = false;
   mockVoiceAccess.needsSignIn = false;
@@ -1239,6 +1241,20 @@ describe("VoiceChat with voice access", () => {
     expect(mockVoiceAccess.refresh).toHaveBeenCalledWith();
   });
 
+
+  it("failed access verification offers retry while keeping text available and purchase hidden", async () => {
+    mockVoiceAccess.canUseVoice = false;
+    mockVoiceAccess.hasAccess = false;
+    mockVoiceAccess.isAccessUnavailable = true;
+    mockVoiceAccess.needsPurchase = false;
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText(mockT("voice.accessUnavailable"))).toBeInTheDocument());
+    expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
+    expect(screen.queryByTestId("voice-purchase-cta")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: mockT("voice.checkAccess") }));
+    expect(mockVoiceAccess.refresh).toHaveBeenCalledWith();
+  });
+
   it.each(["revoked","expired"])("discloses %s purchase state", async status => {
     mockVoiceAccess.canUseVoice = false; mockVoiceAccess.accessStatus = status;
     render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
@@ -1665,6 +1681,22 @@ describe("VoiceChat upsell dismiss", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("keeps assistant text but suppresses contextual purchase prompts while access verification is unavailable", async () => {
+    mockVoiceAccess.isAccessUnavailable = true;
+    mockFetch.mockResolvedValueOnce(createStreamingResponse("Weather response. [[VOICE_UPSELL:weather]]"));
+    const view = render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    fireEvent.change(input, { target: { value: "Weather?" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => expect(screen.getByText("Weather response.")).toBeInTheDocument());
+    expect(screen.queryByTestId("chat-upsell-cta")).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="/pricing"]')).toBeNull();
+    mockVoiceAccess.isAccessUnavailable = false;
+    mockVoiceAccess.needsPurchase = true;
+    view.rerender(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+    expect(screen.getByTestId("chat-upsell-cta")).toBeInTheDocument();
   });
 
   it("should show upsell CTA and allow dismissal when marker is in response", async () => {

@@ -7,6 +7,7 @@ import { clientLogger } from "@/lib/client-logger";
 
 interface ComponentErrorBoundaryProps {
   children: ReactNode;
+  fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
@@ -51,6 +52,7 @@ export class ComponentErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback !== undefined) return this.props.fallback;
       const t = this.context?.t ?? ((key: string) => key);
 
       return (

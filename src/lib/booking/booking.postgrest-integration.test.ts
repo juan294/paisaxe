@@ -558,6 +558,42 @@ describe.skipIf(!dbReachable)("booking domain against live local Supabase", () =
       expect(await verifyBookingCapability(client, capability)).toBeNull();
     });
 
+    it("a timed-out supersede cannot invalidate the newer quote shown to the visitor", async () => {
+      const client = localServiceClient();
+      psql(`UPDATE public.booking_drafts SET status = 'abandoned' WHERE user_id = '${USER_B}' AND status = 'open';`);
+      const draft = await getOrCreateOpenDraft(client, USER_B);
+      const input = { draftId: draft.id, experienceId: EXP_BIG, slotDate: futureDate(43), slotTime: "16:00", partySize: 1 };
+      const realFetch = globalThis.fetch;
+      let release!: () => void;
+      let reached!: () => void;
+      let held = false;
+      const waiting = new Promise<void>((resolve) => { reached = resolve; });
+      const resume = new Promise<void>((resolve) => { release = resolve; });
+      const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+        if (!held && init?.method === "PATCH" && String(url).includes("/quotes?")) {
+          held = true;
+          reached();
+          await resume;
+        }
+        return realFetch(url, init);
+      });
+      const controller = new AbortController();
+      const first = createQuote(client, USER_B, input, new Date(), controller.signal).catch((error: unknown) => error);
+      try {
+        await waiting;
+        controller.abort();
+        const visible = await createQuote(client, USER_B, input);
+        release();
+        await expect(first).resolves.toMatchObject({ name: "AbortError" });
+        expect(psql(`SELECT superseded_at IS NULL FROM public.quotes WHERE id = '${visible.id}';`)).toBe("t");
+        await expect(acceptQuote(client, USER_B, visible.id)).resolves.toMatchObject({ booking: { status: "pending_payment" } });
+      } finally {
+        release();
+        await first;
+        spy.mockRestore();
+      }
+    });
+
     it("createQuote refuses a draft owned by someone else", async () => {
       const client = localServiceClient();
       const draft = await getOrCreateOpenDraft(client, USER_A);

@@ -226,6 +226,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .eq("conversation_id", conversationId)
       .maybeSingle();
 
+    let lookupFailed = Boolean(fetchError);
     if (fetchError) {
       logger.error("[ELEVENLABS_WEBHOOK_FETCH_BOOKING_FAILED]", {
         conversation_id: conversationId,
@@ -257,6 +258,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           .maybeSingle();
 
         if (fallbackFetchError) {
+          lookupFailed = true;
           logger.error("[ELEVENLABS_WEBHOOK_ORPHAN_LOOKUP_FAILED]", {
             booking_id: bookingIdHint,
             conversation_id: conversationId,
@@ -301,6 +303,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (!booking) {
+      if (lookupFailed) return NextResponse.json({ error: "Database error" }, { status: 500 });
       // Return 200 to acknowledge receipt - this might be a call we didn't initiate
       return NextResponse.json({
         success: true,

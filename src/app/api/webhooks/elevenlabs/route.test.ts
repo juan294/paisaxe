@@ -405,9 +405,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.ignored).toBe(true);
   });
 
-  it("logs [ELEVENLABS_WEBHOOK_FETCH_BOOKING_FAILED] and ignores when pending_bookings fetch errors", async () => {
-    // Covers elevenlabs/route.ts:409 — fetchError branch when maybeSingle returns an error
-    // The webhook returns 200+ignored so ElevenLabs doesn't retry indefinitely
+  it("returns a retryable failure when booking lookup fails before the outcome is stored", async () => {
     mockSelect.mockReturnValue({
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({
@@ -421,8 +419,16 @@ describe("POST /api/webhooks/elevenlabs", () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(data.ignored).toBe(true);
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Database error");
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(sendSMS).not.toHaveBeenCalled();
+
+    mockSelect.mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: mockBooking, error: null }) }) });
+    const redelivery = await POST(createSignedRequest({ conversation_id: "conv_error" }));
+    expect(redelivery.status).toBe(200);
+    expect(mockRpc.mock.calls.filter(([name]) => name === "process_elevenlabs_event_idempotent")).toHaveLength(1);
+    expect(sendSMS).toHaveBeenCalledTimes(1);
   });
 
   // BE-H2: a call that timed out on our side before ElevenLabs responded
@@ -483,6 +489,42 @@ describe("POST /api/webhooks/elevenlabs", () => {
       expect(mockUpdate).toHaveBeenCalledWith({
         conversation_id: "conv_late_arriving",
       });
+    });
+
+    it("returns 500 when the fallback lookup fails instead of discarding the outcome", async () => {
+      mockSelect
+        .mockReturnValueOnce({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) }) })
+        .mockReturnValueOnce({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: "connection lost" } }) }) });
+
+      const response = await POST(createSignedRequest({
+        conversation_id: "conv_fallback_error",
+        conversation_initiation_client_data: { dynamic_variables: { booking_id: orphanedBooking.id } },
+      }));
+
+      expect(response.status).toBe(500);
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(sendSMS).not.toHaveBeenCalled();
+
+      mockSelect.mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: mockBooking, error: null }) }) });
+      const redelivery = await POST(createSignedRequest({ conversation_id: "conv_fallback_error" }));
+      expect(redelivery.status).toBe(200);
+      expect(mockRpc.mock.calls.filter(([name]) => name === "process_elevenlabs_event_idempotent")).toHaveLength(1);
+      expect(sendSMS).toHaveBeenCalledTimes(1);
+    });
+
+    it("still processes a valid fallback when the primary lookup failed", async () => {
+      mockSelect
+        .mockReturnValueOnce({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: "connection lost" } }) }) })
+        .mockReturnValueOnce({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: orphanedBooking, error: null }) }) });
+
+      const response = await POST(createSignedRequest({
+        conversation_id: "conv_primary_error",
+        conversation_initiation_client_data: { dynamic_variables: { booking_id: orphanedBooking.id } },
+        analysis: { call_successful: "success" },
+      }));
+
+      expect(response.status).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith("process_elevenlabs_event_idempotent", expect.objectContaining({ p_booking_id: orphanedBooking.id }));
     });
 
     it("also checks the data-wrapped conversation_initiation_client_data location", async () => {

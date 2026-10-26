@@ -1,6 +1,6 @@
 import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { useSearchParams } from "next/navigation";
 import { ReadonlyURLSearchParams } from "next/dist/client/components/navigation.react-server";
 import { useStories } from "@/hooks/use-stories";
@@ -36,7 +36,7 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/components/immersive/story-viewer", () => ({
   StoryViewer: (props: Record<string, unknown>) => (
     <div data-testid="story-viewer" data-index={props.currentIndex} data-chat-open={String(props.chatOpen)}>
-      <button data-testid="open-chat" onClick={() => (props.onAskAbout as (msg?: string) => void)()} />
+      <button ref={props.chatTriggerRef as React.RefObject<HTMLButtonElement>} data-testid="open-chat" onClick={() => (props.onAskAbout as (msg?: string) => void)()} />
     </div>
   ),
 }));
@@ -64,11 +64,7 @@ vi.mock("@/lib/seasonal-weighting", () => ({
 vi.mock("@/lib/mood-mapping", () => ({
   filterByMood: vi.fn((stories: Story[]) => stories),
 }));
-vi.mock("@/components/ui/component-error-boundary", () => ({
-  ComponentErrorBoundary: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+const lazyChatState = vi.hoisted(() => ({ mode: "ready" }));
 const voiceStoryInputs = vi.hoisted((): (Story | undefined)[] => []);
 
 // Mock voice-chat module directly to prevent EnvironmentTeardownError — the dynamic
@@ -84,7 +80,9 @@ vi.mock("@/components/immersive/voice-chat", () => ({
 }));
 // Mock dynamic import for VoiceChat — renders a div so we can detect it
 vi.mock("next/dynamic", () => ({
-  default: () => (props: { story?: Story; open?: boolean; bookingMode?: boolean; onClose: () => void }) => {
+  default: (_loader: unknown, options: { loading: () => React.ReactNode }) => (props: { story?: Story; open?: boolean; bookingMode?: boolean; onClose: () => void }) => {
+    if (lazyChatState.mode === "pending") return options.loading();
+    if (lazyChatState.mode === "error") throw new Error("chunk failed");
     voiceStoryInputs.push(props.story);
     return <div data-story-id={props.story?.id} data-testid="voice-chat" data-open={String(props.open)} data-booking-mode={String(props.bookingMode ?? false)}>
       <button data-testid="voice-chat-close" onClick={props.onClose} />
@@ -191,6 +189,7 @@ beforeEach(async () => {
 describe("ImmersivePageContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    lazyChatState.mode = "ready";
     // Reset sessionStorage between tests
     sessionStorage.clear();
   });
@@ -198,6 +197,31 @@ describe("ImmersivePageContent", () => {
   // -----------------------------------------------------------------------
   // 1. Loading skeleton
   // -----------------------------------------------------------------------
+  it.each(["pending", "error"])("can close chat while lazy module is %s", (mode) => {
+    setupDefaults();
+    lazyChatState.mode = mode;
+    const view = render(<ImmersivePageContent serverShuffleSeed={null} />);
+    fireEvent.click(screen.getByTestId("open-chat"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "accessibility.close_chat" }));
+    expect(screen.getByTestId("story-viewer")).toHaveAttribute("data-chat-open", "false");
+    lazyChatState.mode = "ready";
+    view.rerender(<ImmersivePageContent serverShuffleSeed={null} />);
+    expect(screen.queryByTestId("voice-chat")).not.toBeInTheDocument();
+  });
+
+  it.each(["pending", "error"])("Escape closes %s chat and restores the trigger focus", async (mode) => {
+    setupDefaults();
+    lazyChatState.mode = mode;
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+    const trigger = screen.getByTestId("open-chat");
+    trigger.focus();
+    fireEvent.click(trigger);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.getByTestId("story-viewer")).toHaveAttribute("data-chat-open", "false");
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
   it("shows skeleton when loading", () => {
     setupDefaults({ isLoading: true });
     render(<ImmersivePageContent serverShuffleSeed={null} />);

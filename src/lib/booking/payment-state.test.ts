@@ -149,6 +149,26 @@ describe("applyRefundStatus", () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["COMPLETED", "refunded", "refunded"],
+    ["FAILED", "refund_failed", "needs_attention"],
+    ["CANCELLED", "refund_failed", "needs_attention"],
+  ])("retries the booking write after %s persisted only the payment", async (providerStatus, paymentStatus, bookingStatus) => {
+    fake.onTable("payments", CHANGED);
+    fake.onTable("bookings", { error: { message: "connection lost" } });
+    await expect(applyRefundStatus(fake.client, payment, "b1", providerStatus)).rejects.toThrow("connection lost");
+
+    const repair = fake.onTable("bookings", CHANGED);
+    await expect(applyRefundStatus(fake.client, { ...payment, status: paymentStatus }, "b1", providerStatus)).resolves.toBeNull();
+    expect(repair.update).toHaveBeenCalledWith({ status: bookingStatus });
+    expect(fake.client.from).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not refund the legitimate booking when replaying a refunded duplicate capture", async () => {
+    await expect(applyRefundStatus(fake.client, { id: "duplicate", status: "refunded", compensation_reason: "duplicate_capture" }, "b1", "COMPLETED")).resolves.toBeNull();
+    expect(fake.client.from).not.toHaveBeenCalled();
+  });
+
   it("PENDING (or any other status) changes nothing", async () => {
     expect(await applyRefundStatus(fake.client, payment, "b1", "PENDING")).toBeNull();
     expect(fake.client.from).not.toHaveBeenCalled();

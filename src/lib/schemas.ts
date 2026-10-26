@@ -39,6 +39,7 @@ const spanishPhoneSchema = z.string().trim().min(9).max(20);
 // ---------------------------------------------------------------------------
 
 const makeBookingSchema = z.object({
+  idempotency_key: boundedString(200).optional(),
   venue_name: boundedString(200),
   phone_number: spanishPhoneSchema,
   party_size: z
@@ -65,6 +66,7 @@ const makeBookingSchema = z.object({
  * window before the ElevenLabs tool is re-pushed.
  */
 const MAKE_BOOKING_KEY_ALIASES: Record<string, string> = {
+  idempotencyKey: "idempotency_key",
   venueName: "venue_name",
   phoneNumber: "phone_number",
   partySize: "party_size",

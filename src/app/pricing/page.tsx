@@ -41,7 +41,7 @@ export default function PricingPage() {
 
 function PricingPageContent() {
   const { user, session, signInWithGoogle } = useAuth();
-  const { canUseVoice, isWhitelisted, expiresAt, isLoading, retryAfter, refresh } = useVoiceAccess();
+  const { canUseVoice, needsPurchase, isSuspended, isWhitelisted, expiresAt, isLoading, retryAfter, refresh } = useVoiceAccess();
   const { t, locale } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -96,7 +96,7 @@ function PricingPageContent() {
       return;
     }
 
-    router.push(checkoutUrl);
+    if (needsPurchase && !isLoading) router.push(checkoutUrl);
   };
 
   return (
@@ -168,8 +168,18 @@ function PricingPageContent() {
           </div>
         )}
 
+        {!isResolvingAuthenticatedAccess && user && session && !canUseVoice && !needsPurchase && retryAfter == null && (
+          <div className="mb-8 rounded-xl border border-neutral-800 p-5 text-sm text-neutral-300">
+            <p role="status">{t(isSuspended ? "voice.suspended" : "voice.accessUnavailable")}</p>
+            <button type="button" className="mt-4 underline" onClick={() => { void refresh(); }}>
+              {t("voice.checkAccess")}
+            </button>{" "}
+            <a href="mailto:support@paisaxe.es" className="underline">{t("voice.contactSupport")}</a>
+          </div>
+        )}
+
         {/* Pricing Card */}
-        {retryAfter == null && (!canUseVoice || isResolvingAuthenticatedAccess) && (
+        {retryAfter == null && (!user || !session || needsPurchase || isResolvingAuthenticatedAccess) && (!canUseVoice || isResolvingAuthenticatedAccess) && (
           <div className="rounded-xl border border-neutral-800 overflow-hidden">
             {/* Price + tier selector (#137) */}
             <div className="p-6 text-center border-b border-neutral-800">
