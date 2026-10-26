@@ -118,18 +118,7 @@ tokenizer, and `CACHE_MIN_SAFETY_MARGIN` = 1.2).
 
 ### Marketing history: when cross-turn reads happen
 
-Block 2 (`gatherContext()`) sits between the last stable breakpoint and the
-history, so rule 3 applies. Today it renders only the active-story count:
-the `marketing_content` query (`route.ts`, `gatherContext`) targets a table
-that no migration creates (021 creates `marketing_content_bank`), and the
-query error is ignored, so that part of the block is always empty. The block
-is therefore deterministic until the story count changes, and a test asserts
-two requests over unchanged data produce identical bytes. The history is read
-across turns while the count holds, and rewritten once after it changes.
-Fixing the query is an owner follow-up. When it is fixed, recheck this: rows
-ordered by `scheduled_for` with no tiebreaker can swap order and change block
-2. Moving the context into the final user turn would make history reads
-unconditional; that is also an owner decision.
+Block 2 (`gatherContext()`) remains dynamic and unmarked after the stable brand/persona prefix. It renders the active-story count and up to five `marketing_posts`, ordered by `scheduled_for` descending (nulls last), then `created_at` descending and `id` ascending. Each post includes platform, status and a content excerpt of at most 280 characters. Failed reads are logged and represented by explicit unavailable-context text. Cross-turn history reuse requires identical block 2 bytes, along with the rest of the preceding prefix; unchanged rendered context permits reuse, while changed context invalidates the history prefix.
 
 ### Transport parity
 
