@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.11.0] - 2026-10-26
+## [1.11.0] - 2026-10-27
 
 ### Fixed
 - Voice-access lookup failures now offer recovery instead of treating an unknown entitlement as a reason to purchase. Checkout return pages confirm activation only after access is verified, preserve return-story navigation while pending, and use tier-neutral wording in all six locales. Signed-out visitors can sign in from the return page; failed sign-in attempts show a retryable error.

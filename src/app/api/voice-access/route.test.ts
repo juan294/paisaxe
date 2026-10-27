@@ -221,6 +221,110 @@ describe("Voice Access API", () => {
       expect(json.error).toBe("Failed to check access");
     });
 
+    it("should return 500 when blocked state query fails", async () => {
+      const results = [
+        { data: null, error: null }, // active query returns null
+        { data: null, error: { code: "PGRST500", message: "Database error" } }, // blocked query fails
+      ];
+      const from = vi.fn(() => {
+        const query: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "gt", "lte", "order", "limit"]) {
+          query[method] = vi.fn(() => query);
+        }
+        query.maybeSingle = vi.fn().mockResolvedValue(results.shift());
+        return query;
+      });
+      const client = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from,
+      } as unknown as ReturnType<typeof createServerClient>;
+      mockCreateServerClient.mockReturnValueOnce(client).mockReturnValueOnce(client);
+
+      const request = createRequest({
+        headers: { Authorization: "Bearer valid-token" },
+      });
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const json = await response.json();
+      expect(json.error).toBe("Failed to check access");
+    });
+
+    it("should return blocked status when recent blocked purchase exists", async () => {
+      const results = [
+        { data: null, error: null }, // active query returns null
+        { data: { entitlement_state: "refunded" }, error: null }, // blocked query returns blocked state
+      ];
+      const from = vi.fn(() => {
+        const query: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "gt", "lte", "order", "limit"]) {
+          query[method] = vi.fn(() => query);
+        }
+        query.maybeSingle = vi.fn().mockResolvedValue(results.shift());
+        return query;
+      });
+      const client = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from,
+      } as unknown as ReturnType<typeof createServerClient>;
+      mockCreateServerClient.mockReturnValueOnce(client).mockReturnValueOnce(client);
+
+      const request = createRequest({
+        headers: { Authorization: "Bearer valid-token" },
+      });
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json.hasAccess).toBe(false);
+      expect(json.status).toBe("refunded");
+    });
+
+    it("should return 500 when expired query fails", async () => {
+      const results = [
+        { data: null, error: null }, // active query returns null
+        { data: null, error: null }, // blocked query returns null
+        { data: null, error: { code: "PGRST500", message: "Database error" } }, // expired query fails
+      ];
+      const from = vi.fn(() => {
+        const query: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "gt", "lte", "order", "limit"]) {
+          query[method] = vi.fn(() => query);
+        }
+        query.maybeSingle = vi.fn().mockResolvedValue(results.shift());
+        return query;
+      });
+      const client = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from,
+      } as unknown as ReturnType<typeof createServerClient>;
+      mockCreateServerClient.mockReturnValueOnce(client).mockReturnValueOnce(client);
+
+      const request = createRequest({
+        headers: { Authorization: "Bearer valid-token" },
+      });
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const json = await response.json();
+      expect(json.error).toBe("Failed to check access");
+    });
+
     // BE-M12 (#793): getSupabaseClient() was called with no `request`
     // argument, so a bearer-authenticated caller's voice_purchases lookup
     // ran on an unauthenticated client — RLS then hid the row and produced
