@@ -95,6 +95,19 @@ describe("PricingPage", () => {
     });
   });
 
+
+  it("withholds checkout when signed-in access is unknown and offers retry recovery", () => {
+    mockUseAuth.mockReturnValue({ user: { id: "paid-user", email: "paid@example.com" }, session: { access_token: "token" }, signInWithGoogle: mockSignInWithGoogle, isLoading: false });
+    mockUseVoiceAccess.mockReturnValue({ ...mockUseVoiceAccess(), needsPurchase: false });
+    render(<PricingPage />);
+    expect(screen.queryByRole("button", { name: "premium.pricing_cta" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(screen.getByText("voice.accessUnavailable")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "voice.checkAccess" }));
+    expect(mockRefresh).toHaveBeenCalledOnce();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it("should render static content even during loading", () => {
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: false,

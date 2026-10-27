@@ -120,12 +120,14 @@ interface Script {
   pending?: Step;
   captured?: Step;
   refunds?: Step;
+  refunded?: Step;
+  refundFailed?: Step;
   cancels?: Step;
   stale?: { ids?: string[] | null; count?: number | null; error?: { message: string } };
   invoices?: Step;
 }
 
-type StepName = "inbox" | "open" | "pending" | "captured" | "refunds" | "cancels" | "stale" | "invoices";
+type StepName = "inbox" | "open" | "pending" | "captured" | "refunds" | "refunded" | "refundFailed" | "cancels" | "stale" | "invoices";
 
 /**
  * Local helper: the shared fake resolves only { data, error }, but step 8 reads
@@ -160,6 +162,8 @@ function script(s: Script = {}): Record<StepName, FakeQuery> & { writes: FakeQue
     pending: stage("payments", s.pending),
     captured: stage("payments", s.captured),
     refunds: stage("payments", s.refunds),
+    refunded: stage("payments", s.refunded),
+    refundFailed: stage("payments", s.refundFailed),
     cancels: stage("payments", s.cancels),
   };
   const stale = s.stale ?? {};
@@ -210,7 +214,7 @@ describe("reconcileBookings: the run", () => {
     expect(fake.rpc.mock.invocationCallOrder[0]).toBeLessThan(requiredValue(drafts.abandonStaleDrafts.mock.invocationCallOrder[0], "src/lib/booking/reconcile.test.ts:209 drafts.abandonStaleDrafts.mock.invocationCallOrder[0]"));
     expect(drafts.abandonStaleDrafts.mock.invocationCallOrder[0]).toBeLessThan(requiredValue(vi.mocked(fake.client.from).mock.invocationCallOrder[0], "src/lib/booking/reconcile.test.ts:210 vi.mocked(fake.client.from).mock.invocationCallOrder[0]"));
     expect(drafts.abandonStaleDrafts).toHaveBeenCalledWith(fake.client);
-    expect(tablesQueried()).toEqual(["paypal_webhook_events", "payments", "payments", "payments", "payments", "payments", "bookings", "bookings"]);
+    expect(tablesQueried()).toEqual(["paypal_webhook_events", "payments", "payments", "payments", "payments", "payments", "payments", "payments", "bookings", "bookings"]);
     expect(logger.error).not.toHaveBeenCalled();
   });
 
@@ -219,7 +223,7 @@ describe("reconcileBookings: the run", () => {
 
     await reconcileBookings(fake.client);
 
-    for (const step of ["open", "pending", "captured", "refunds", "cancels"] as const) {
+    for (const step of ["open", "pending", "captured", "refunds", "refunded", "refundFailed", "cancels"] as const) {
       expect(q[step].select).toHaveBeenCalledWith("*, bookings!inner(*)");
       expect(q[step].order).toHaveBeenCalledWith("created_at", { ascending: true });
       expect(q[step].limit).toHaveBeenCalledWith(50);
@@ -238,6 +242,12 @@ describe("reconcileBookings: the run", () => {
     expect(q.captured.is).toHaveBeenCalledWith("bookings.cancellation_confirmed_at", null);
     // Step 6
     expect(q.refunds.in).toHaveBeenCalledWith("status", ["refund_pending"]);
+    expect(q.refunded.in).toHaveBeenCalledWith("status", ["refunded"]);
+    expect(q.refunded.in).toHaveBeenCalledWith("bookings.status", ["pending_payment", "confirmed", "needs_attention", "expired", "cancel_pending", "refund_pending"]);
+    expect(q.refunded.or).toHaveBeenCalledWith("compensation_reason.is.null,compensation_reason.neq.duplicate_capture");
+    expect(q.refundFailed.in).toHaveBeenCalledWith("status", ["refund_failed"]);
+    expect(q.refundFailed.in).toHaveBeenCalledWith("bookings.status", ["pending_payment", "expired", "cancel_pending", "refund_pending"]);
+    expect(q.refundFailed.or).toHaveBeenCalledWith("compensation_reason.is.null,compensation_reason.neq.duplicate_capture");
     // Step 7: only confirmed cancellations with something to refund and no refund yet.
     expect(q.cancels.in).toHaveBeenCalledWith("status", ["captured"]);
     expect(q.cancels.is).toHaveBeenCalledWith("refund_id", null);
@@ -269,7 +279,7 @@ describe("reconcileBookings: the run", () => {
     await reconcileBookings(fake.client, { bookingIds: [B1, B2] });
 
     expect(q.inbox.in).toHaveBeenCalledWith("custom_id", [B1, B2]);
-    for (const step of ["open", "pending", "captured", "refunds", "cancels"] as const) {
+    for (const step of ["open", "pending", "captured", "refunds", "refunded", "refundFailed", "cancels"] as const) {
       expect(q[step].in).toHaveBeenCalledWith("booking_id", [B1, B2]);
     }
     expect(q.stale.in).toHaveBeenCalledWith("id", [B1, B2]);
@@ -650,6 +660,19 @@ describe("step 6: refund_pending", () => {
     expect(summary).toEqual({ ...ZERO, refundFailed: 1 });
     expect(updatesTo("payments")).toEqual([{ status: "refund_failed" }]);
     expect(updatesTo("bookings")).toEqual([{ status: "needs_attention" }]);
+  });
+
+  it.each([
+    ["refunded", "refunded"],
+    ["refund_failed", "needs_attention"],
+  ])("finishes the booking for a terminal %s payment without another provider call", async (status, bookingStatus) => {
+    const terminal = { rows: [refundRow({ status, refund_id: "RF-1" }, { status: "refund_pending" })], writes: [["bookings", changed()]] as Array<[string, Result]> };
+    script(status === "refunded" ? { refunded: terminal } : { refundFailed: terminal });
+    await expect(reconcileBookings(fake.client)).resolves.toEqual(ZERO);
+    expect(updatesTo("bookings")).toEqual([{ status: bookingStatus }]);
+    expect(updatesTo("payments")).toEqual([]);
+    expect(paypal.refundCapture).not.toHaveBeenCalled();
+    expect(paypal.getRefund).not.toHaveBeenCalled();
   });
 
   it("changes nothing while PayPal still reports the refund PENDING", async () => {

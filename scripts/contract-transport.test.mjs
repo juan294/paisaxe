@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, realpathSync } from 'node:fs';
+import { mkdtempSync, rmSync, realpathSync, writeFileSync, readFileSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -76,6 +76,31 @@ beforeEach(async () => {
 });
 afterEach(async () => { try { await stopTransport(manifest, env); } catch {} for (const socket of connections) socket.destroy(); await new Promise(r => daemon.close(r)); rmSync(taskDir, { recursive: true, force: true }); });
 function exchange(port, bytes) { return new Promise((resolve, reject) => { const socket = net.connect(port, '127.0.0.1', () => socket.write(bytes)); socket.setTimeout(2000, () => socket.destroy(new Error('exchange timeout'))); socket.on('error', reject); socket.on('close', () => reject(new Error('closed'))); const chunks = []; let length = 0; socket.on('data', chunk => { chunks.push(chunk); length += chunk.length; if (length >= bytes.length) { resolve(Buffer.concat(chunks)); socket.destroy(); } }); }); }
+test('control socket is private from creation even with a permissive inherited umask', async () => {
+  const preload = join(taskDir, 'observe-socket.cjs');
+  const observed = join(taskDir, 'socket-mode.json');
+  // Observe the real OS socket before chmod, making the former exposure window
+  // deterministic without changing transport timing or its permission check.
+  writeFileSync(preload, `
+    const fs = require('node:fs');
+    const original = fs.chmodSync;
+    process.umask(0);
+    fs.chmodSync = (path, mode) => {
+      if (path === ${JSON.stringify(join(taskDir, 'transport.sock'))}) {
+        fs.writeFileSync(${JSON.stringify(observed)}, JSON.stringify(fs.lstatSync(path).mode & 0o777));
+      }
+      return original(path, mode);
+    };
+    require('node:module').syncBuiltinESMExports();
+  `);
+  const callerMask = process.umask();
+  env.NODE_OPTIONS = '--require=' + preload;
+  await startTransport(manifest, env);
+  assert.equal(JSON.parse(readFileSync(observed, 'utf8')) & 0o077, 0);
+  assert.equal(lstatSync(join(taskDir, 'transport.sock')).mode & 0o777, 0o600);
+  assert.equal(process.umask(), callerMask);
+  assert.deepEqual(await exchange(manifest.dbPort, Buffer.from('private')), Buffer.from('private'));
+});
 test('direct Unix API forwards binary stdout, discards stderr and executes fixed targets by immutable container id', async () => {
   const proof = await startTransport(manifest, env); assert.equal((await verifyTransport(manifest, env)).sourceDigest, proof.sourceDigest);
   const bytes = Buffer.from([0, 255, 1, 13, 10, 128]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, Suspense, useTransition, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense, useTransition, useCallback, createContext, useContext } from "react";
 import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
@@ -17,7 +17,27 @@ import { MoodOverlay } from "@/components/immersive/mood-overlay";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { ComponentErrorBoundary } from "@/components/ui/component-error-boundary";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { trimStoriesTranslations } from "@/lib/localize-story";
+
+// Recovery stays outside the lazy module so loading and chunk errors remain closable.
+const ChatRecoveryContext = createContext<(() => void) | null>(null);
+
+function ChatRecovery({ failed = false }: { failed?: boolean }) {
+  const onClose = useContext(ChatRecoveryContext);
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusTrap(ref, true, onClose ?? undefined);
+  return (
+    <div ref={ref} role="dialog" aria-modal="true" aria-label={t(failed ? "errors.generic_title" : "voice.loading")}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-scene-black/95 text-scene-white">
+      <p role={failed ? "alert" : "status"}>{t(failed ? "errors.generic_title" : "voice.loading")}</p>
+      <button type="button" onClick={() => onClose?.()} className="rounded-full bg-white/20 px-5 py-3">
+        {t("accessibility.close_chat")}
+      </button>
+    </div>
+  );
+}
 
 // Dynamically import VoiceChat - only loads when chat is opened
 // This saves ~15KB+ from initial bundle
@@ -25,7 +45,7 @@ const VoiceChat = dynamic(
   () => import("@/components/immersive/voice-chat").then((mod) => mod.VoiceChat),
   {
     ssr: false,
-    loading: () => null, // No loading UI needed, chat panel handles its own state
+    loading: () => <ChatRecovery />,
   }
 );
 
@@ -214,6 +234,7 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
   const handleCloseChat = useCallback(() => {
     setChatOpen(false);
     setInitialMessage(undefined);
+    requestAnimationFrame(() => chatTriggerRef.current?.focus());
   }, []);
 
   const handleMoodSelect = useCallback((mood: Mood) => {
@@ -286,9 +307,10 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
       </ComponentErrorBoundary>
       {/* Only render VoiceChat when opened - lazy loaded */}
       {chatOpen && (
-        <Suspense fallback={null}>
-          <ComponentErrorBoundary>
-            <VoiceChat
+        <ChatRecoveryContext.Provider value={handleCloseChat}>
+          <Suspense fallback={<ChatRecovery />}>
+            <ComponentErrorBoundary fallback={<ChatRecovery failed />}>
+              <VoiceChat
               story={currentStory}
               open={chatOpen}
               onClose={handleCloseChat}
@@ -296,8 +318,9 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
               triggerRef={chatTriggerRef}
               bookingMode={bookingMode}
             />
-          </ComponentErrorBoundary>
-        </Suspense>
+            </ComponentErrorBoundary>
+          </Suspense>
+        </ChatRecoveryContext.Provider>
       )}
     </>
   );

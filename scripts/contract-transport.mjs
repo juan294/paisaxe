@@ -206,6 +206,9 @@ function forwardFrames(upstream, client, trace) {
   upstream.on('error', () => { trace.note('failed', 'request_failed'); client.destroy(); });
 }
 async function serve(m, env) {
+  // This dedicated child must create its control socket privately: the parent
+  // can observe the socket before the subsequent chmod completes.
+  process.umask(0o077);
   const ports = validate(m, env); const proof = identity(m, env);
   insist(same(m, proof), 'Transport source changed before launch');
   const dockerSocket = env.DOCKER_HOST.slice('unix://'.length);

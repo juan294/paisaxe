@@ -12,6 +12,8 @@ test.describe("Immersive story viewer", () => {
       })
     );
     await page.goto("/immersive");
+    // The streamed title can be visible before the keyboard handlers hydrate.
+    await expect(page.locator('[data-story-navigation-ready="true"]:visible')).toHaveCount(1);
   });
 
   test("renders a story with title and description", async ({ page }) => {

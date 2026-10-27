@@ -6,15 +6,15 @@ import { MOCK_FEATURE_FLAGS } from "./fixtures/mock-data";
 // Goal: verify the critical payment redirect path — that a POST to
 // /api/checkout/embedded (mocked to return a client secret) causes the
 // checkout page to display the Stripe iframe container, and that landing on
-// /pricing/checkout/return with a session_id renders the success screen with
-// a link to /immersive.
+// /pricing/checkout/return preserves navigation without treating session_id
+// as proof of active access.
 //
 // The real Stripe Embedded Checkout SDK contacts Stripe servers and cannot run
 // without live publishable keys. We stub /api/checkout/embedded to return a
-// fake client secret and assert the structural redirect→success wiring:
+// fake client secret and assert the structural redirect/return wiring:
 //   authenticated user → /pricing/checkout → POST /api/checkout/embedded →
 //   client secret returned → #checkout rendered →
-//   /pricing/checkout/return?session_id=xxx → success screen with immersive link
+//   /pricing/checkout/return?session_id=xxx → verified-access or pending return state
 //
 // Full end-to-end (real card, real webhook) lives in e2e/stripe-real-checkout.spec.ts
 // and is gated behind STRIPE_TEST_SECRET_KEY. It is NOT in the default gate.
@@ -181,12 +181,11 @@ test.describe("Checkout flow", () => {
     expect([401, 403]).toContain(response.status());
   });
 
-  test("return page renders success screen and immersive link after mock purchase (QA-M2)", async ({
+  test("return page preserves the story without claiming activation when access is unverified", async ({
     page,
   }) => {
-    // Simulate post-purchase state: voice-access API says user has active access.
-    // This exercises the /pricing/checkout/return page without requiring a real
-    // Stripe session — the return page reads voice access, not the session_id.
+    // This visitor has no authenticated identity. A session_id or an unused
+    // mocked response must never be treated as proof of active access.
     await page.route("**/api/voice-access", (route) =>
       route.fulfill({
         status: 200,
@@ -206,12 +205,11 @@ test.describe("Checkout flow", () => {
     );
     expect(response?.ok()).toBe(true);
 
-    // Wait for the actual success screen, beyond the root readiness fallback.
+    // Wait beyond the root readiness fallback for the pending return state.
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
-    // Success screen must contain a link to the immersive experience.
-    // This verifies the redirect→success wiring: session_id + returnTo →
-    // immersive href with ?story=<slug>&voice=ready.
+    // Keep returnTo navigation available without claiming voice readiness.
+    // Verified-access success is covered by the return page component tests.
     const immersiveLink = page.locator('a[href*="/immersive"]:visible');
     await expect(immersiveLink).toHaveCount(1);
     await expect(immersiveLink).toBeVisible({ timeout: 10_000 });
@@ -219,6 +217,8 @@ test.describe("Checkout flow", () => {
     // Verify the returnTo slug is reflected in the immersive link
     const href = await immersiveLink.getAttribute("href");
     expect(href).toContain("lagos-covadonga");
-    expect(href).toContain("voice=ready");
+    expect(href).not.toContain("voice=ready");
+    await expect(page.locator('a[href="mailto:support@paisaxe.es"]')).toBeVisible();
+    await expect(page.locator('a[href*="/pricing/checkout"]')).toHaveCount(0);
   });
 });

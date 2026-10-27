@@ -508,11 +508,30 @@ describe("PAYMENT.CAPTURE.REFUNDED", () => {
 
   it("records PayPal's confirmation of the payment's own refund, without a write or a warning (#1038)", async () => {
     // The app refunded the deposit itself; this event confirms that same refund.
-    resolvesTo(payment({ status: "refunded", capture_id: "CAP-1", refund_id: "RF-1" }));
+    resolvesTo(payment({ status: "refunded", capture_id: "CAP-1", refund_id: "RF-1" }), { ...booking, status: "refunded" });
 
     await expect(processPaypalEvent(fake.client, refundEvent())).resolves.toBe("recorded");
     expect(tablesQueried()).toEqual(["payments", "bookings"]);
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("redelivers a refund after the payment write succeeded and the booking write failed", async () => {
+    resolvesTo(payment({ status: "refund_pending", capture_id: "CAP-1", refund_id: "RF-1" }));
+    write("payments");
+    fake.onTable("bookings", { error: { message: "connection lost" } });
+    await expect(processPaypalEvent(fake.client, refundEvent())).rejects.toThrow("connection lost");
+
+    resolvesTo(payment({ status: "refunded", capture_id: "CAP-1", refund_id: "RF-1" }));
+    const repair = write("bookings");
+    await expect(processPaypalEvent(fake.client, refundEvent())).resolves.toBe("recorded");
+    expect(repair.update).toHaveBeenCalledWith({ status: "refunded" });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("leaves a confirmed booking intact when its duplicate capture refund is redelivered", async () => {
+    resolvesTo(payment({ status: "refunded", refund_id: "RF-1", compensation_reason: "duplicate_capture" }), { ...booking, status: "confirmed" });
+    await expect(processPaypalEvent(fake.client, refundEvent())).resolves.toBe("recorded");
+    expect(tablesQueried()).toEqual(["payments", "bookings"]);
   });
 
   it.each([

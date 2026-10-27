@@ -857,6 +857,23 @@ describe("StoryViewer", () => {
       expect(article).toHaveClass("opacity-0");
     });
 
+    it("restores hidden information on touch and removes hidden controls from focus", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+      const nav = screen.getByRole("navigation", { name: "Controles de historias" });
+      const hide = screen.getByTestId("hide-info-button");
+      hide.focus();
+      fireEvent.click(hide);
+      const reveal = screen.getByTestId("show-info-button");
+      expect(reveal).not.toHaveClass("desktop-pointer-only");
+      expect(reveal).toHaveFocus();
+      expect(nav).toHaveAttribute("inert");
+      expect(screen.getByLabelText("GitHub").closest("[inert]")).not.toBeNull();
+      fireEvent.click(reveal);
+      expect(nav).not.toHaveAttribute("inert");
+      expect(screen.getByText("Lagos de Covadonga").closest("article")).not.toHaveAttribute("inert");
+      expect(onIndexChange).not.toHaveBeenCalled();
+    });
+
     it("should show upper-right toolbar controls initially", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 

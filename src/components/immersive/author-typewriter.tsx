@@ -109,6 +109,8 @@ export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
 
   return (
     <div
+      inert={!visible}
+      aria-hidden={!visible || undefined}
       className={cn(
         "group hidden md:block desktop-pointer-only absolute bottom-10 right-4 z-20 transition-opacity duration-500 motion-reduce:transition-none",
         visible ? "opacity-100" : "opacity-0 pointer-events-none"

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { requiredValue } from "@/test/required-value";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET, POST } from "./route";
@@ -125,6 +126,8 @@ describe("/api/mcp/make-booking", () => {
       expect(data.required_fields).toContain("customer_phone");
       expect(data.outbound_configured).toBe(false);
       expect(data.agent).toBe("Pelayo (Booking)");
+      expect(data.required_headers).toEqual(["x-mcp-secret"]);
+      expect(data.idempotency).toContain("idempotencyKey");
     });
 
     it("should report outbound as configured when env vars are set", async () => {
@@ -160,6 +163,64 @@ describe("/api/mcp/make-booking", () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ conversation_id: "fixture-conversation" }) });
     const recovered = await POST(request());
     expect((await recovered.json()).success).toBe(true);
+  });
+
+  describe("canonical make_booking request identity", () => {
+    const tool = JSON.parse(readFileSync(`${process.cwd()}/tool_configs/make_booking.json`, "utf8")) as {
+      api_schema: { url: string; method: string; request_body_schema: { required: string[]; properties: Record<string, { description: string }> } };
+    };
+    const values: Record<string, string | number> = {
+      venueName: "Casa Gerardo", phoneNumber: "+34985887797", partySize: 4,
+      date: "mañana", time: "21:00", customerName: "Juan García", customerPhone: "+34612345678",
+      idempotencyKey: "booking-request-one",
+    };
+    const canonicalBody = (token: string) => Object.fromEntries(
+      tool.api_schema.request_body_schema.required.map((key) => [key, key === "idempotencyKey" ? token : values[key]])
+    );
+    const request = (token: string, header?: string) => new Request(tool.api_schema.url, {
+      method: tool.api_schema.method,
+      headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, ...(header ? { "Idempotency-Key": header } : {}) },
+      body: JSON.stringify(canonicalBody(token)),
+    });
+
+    beforeEach(() => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-agent-id";
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ conversation_id: "conv_body_identity" }) });
+    });
+
+    it("accepts the actual canonical body, reuses its token on retry, and allows a separately authorized identical booking", async () => {
+      const claims = new Map<string, { id: string; status: string; venue_name: string }>();
+      mockInsert.mockImplementation((row: { idempotency_key: string; venue_name: string }) => {
+        const existing = claims.has(row.idempotency_key);
+        if (!existing) claims.set(row.idempotency_key, { id: `booking-${claims.size + 1}`, status: "initiating", venue_name: row.venue_name });
+        return { select: async () => existing
+          ? { data: null, error: { code: "23505" } }
+          : { data: [{ id: claims.get(row.idempotency_key)?.id }], error: null } };
+      });
+      mockDbSelect.mockReturnValue({ eq: (_column: string, key: string) => ({ maybeSingle: async () => ({ data: claims.get(key), error: null }) }) });
+
+      expect((await POST(request("booking-request-one"))).status).toBe(200);
+      expect((await POST(request("booking-request-one"))).status).toBe(200);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect((await POST(request("booking-request-two"))).status).toBe(200);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect([...claims.keys()]).toEqual(["booking-request-one", "booking-request-two"]);
+      expect(tool.api_schema.request_body_schema.required).toContain("idempotencyKey");
+    });
+
+    it("rejects conflicting header and body tokens before a booking is claimed", async () => {
+      const response = await POST(request("body-request", "different-header-request"));
+      expect(response.status).toBe(400);
+      expect(mockInsert).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("accepts matching header and body tokens without changing existing header callers", async () => {
+      expect((await POST(request("same-request", "same-request"))).status).toBe(200);
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ idempotency_key: "same-request" }));
+    });
   });
 
   describe("POST", () => {

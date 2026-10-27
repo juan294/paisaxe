@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-27
+
+### Fixed
+- Voice-access lookup failures now offer recovery instead of treating an unknown entitlement as a reason to purchase. Checkout return pages confirm activation only after access is verified, preserve return-story navigation while pending, and use tier-neutral wording in all six locales. Signed-out visitors can sign in from the return page; failed sign-in attempts show a retryable error.
+- Hidden story information can be restored on touch screens, and hidden controls no longer receive keyboard focus. Chat loading and error states can be closed without reloading the page, with focus restored to the trigger.
+- Refund replay and the existing reconciliation path complete booking updates left behind by partial failures, while preserving duplicate-capture handling and notification idempotency.
+- ElevenLabs webhook lookup failures now return a retryable error when the booking outcome could not be stored.
+- Booking-tool timeouts stop dependent tool calls and disclose uncertain outcomes. Late quote writes cannot supersede a newer unaccepted offer.
+- Marketing agents read actual scheduled posts through the existing admin boundary, count active stories correctly, and report unavailable context instead of silently omitting it.
+- Test compilation and browser assertions now preserve the intended access states and wait for story navigation to hydrate before keyboard interaction.
+- The local test transport creates its control socket with private permissions immediately, preventing intermittent startup rejection. Database delivery tests reuse the validated SQL session helper. Existing CI test counts and protected source pins now match the added integration cases.
+
+### Changed
+- The canonical outbound-booking tool supplies a per-booking idempotency token. The route accepts the validated body token alongside existing header clients and rejects conflicting tokens.
+- Includes the separately reviewed Sutura v0.4.0 action pin already integrated into the repository. This release introduces no CI routing or release-process changes.
+
+### Release scope and migration notes
+- No new database migration or dependency upgrade is introduced.
+- The canonical ElevenLabs tool configuration is checked in; deploying this web release does not publish that provider configuration. Live provider behavior remains unmeasured until a separately authorized provider update and verification.
+- A tool timeout does not prove that an already-issued database or provider operation was cancelled. Existing payment and invoice idempotency remains in effect.
+
 ## [1.10.0] - 2026-10-25
 
 ### Added

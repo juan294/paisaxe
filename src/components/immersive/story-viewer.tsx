@@ -108,6 +108,8 @@ export function StoryViewer({
 }: StoryViewerProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
+  const viewerRef = useRef<HTMLElement>(null);
+  const revealInfoRef = useRef<HTMLButtonElement>(null);
   const [failedHero, setFailedHero] = useState<string>();
   const [autoPlay, setAutoPlay] = useState(false);
   const [ambientMode, setAmbientMode] = useState(false);
@@ -167,7 +169,14 @@ export function StoryViewer({
   }, [currentIndex, stories.length, onIndexChange, prefersReducedMotion]);
 
   // Keyboard navigation — extracted to useStoryKeyboardNav (FE-H2)
-  const toggleInfo = useCallback(() => setShowInfo((prev) => !prev), []);
+  const toggleInfo = useCallback(() => {
+    // Move focus before making the information and controls inert.
+    viewerRef.current?.focus();
+    setShowInfo((prev) => !prev);
+  }, []);
+  useEffect(() => {
+    if (!showInfo) revealInfoRef.current?.focus();
+  }, [showInfo]);
   useStoryKeyboardNav({
     onNext: goToNext,
     onPrev: goToPrev,
@@ -275,6 +284,8 @@ export function StoryViewer({
 
   return (
     <main
+      ref={viewerRef}
+      tabIndex={-1}
       className="relative h-dvh w-screen overflow-hidden bg-scene-black"
       aria-hidden={chatOpen ? "true" : undefined}
       // UX-H2 (#888): aria-hidden alone doesn't stop keyboard focus — nav,
@@ -317,10 +328,22 @@ export function StoryViewer({
         onClick={() => {
           // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
           if (window.matchMedia("(pointer: fine)").matches) {
-            setShowInfo((prev) => !prev);
+            toggleInfo();
           }
         }}
       />
+
+      {!showInfo && (
+        <Button
+          ref={revealInfoRef}
+          data-testid="show-info-button"
+          variant="glass"
+          className="absolute top-16 left-4 z-40"
+          onClick={toggleInfo}
+        >
+          {t("accessibility.show_info")}
+        </Button>
+      )}
 
       {/* Background Image with Ken Burns effect */}
       <div
@@ -416,6 +439,8 @@ export function StoryViewer({
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
       <nav
         aria-label={t("accessibility.story_controls")}
+        inert={!showInfo}
+        aria-hidden={!showInfo || undefined}
         className={cn(
           "absolute top-16 right-4 md:right-6 z-40 flex items-center gap-2 md:gap-3 max-w-[calc(100%-8rem)] transition-all duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 motion-reduce:translate-y-0 pointer-events-none"

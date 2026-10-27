@@ -1,0 +1,177 @@
+version: 1
+candidate_tree: bdf073a5c23c49615635991344e2fe002d219f5e
+shipped_tree: bdf073a5c23c49615635991344e2fe002d219f5e
+deployed_tree: bdf073a5c23c49615635991344e2fe002d219f5e
+deployed_commit: 666a2b70a745e4e4414677633acc9ed8a7d43143
+github_deployment_id: "7324576314"
+target_url: https://paisaxe.es
+generated_at: 2026-10-26T05:20:00.000Z
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles:
+      - identity
+    evidence:
+      - artifact: release-1.10.0/identity.stdout
+        sha256: 796909c1c56615261cb0d7268249f2ff3a5d49a51939e90ad025a3f7c3eb4344
+  - id: health-status
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: release-1.10.0/production-probes.log
+        sha256: 5e35ef76131423b2c94daebce859299343182d43f8d390a7672961d552f8a947
+  - id: health-db
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: release-1.10.0/production-probes.log
+        sha256: 5e35ef76131423b2c94daebce859299343182d43f8d390a7672961d552f8a947
+  - id: elevenlabs-voice-preflight
+    status: passed
+    oracles:
+      - http
+    provider: ok
+    fingerprint: sha256:1337f33296d87be8
+    fingerprint_matches: true
+    agents:
+      - pelayo
+      - booking
+      - penny
+      - iris
+      - xander
+    custom_llm: not_applicable
+    target_url: https://paisaxe.es
+    response_url: https://paisaxe.es/api/health/voice
+    github_deployment_id: "7324576314"
+    deployment_commit: 666a2b70a745e4e4414677633acc9ed8a7d43143
+    checked_at: 2026-10-26T05:12:11.033Z
+  - id: csp-canary
+    status: passed
+    oracles:
+      - ui
+    evidence:
+      - artifact: release-1.10.0/production-probes.log
+        sha256: 5e35ef76131423b2c94daebce859299343182d43f8d390a7672961d552f8a947
+  - id: story-read-path
+    status: passed
+    oracles:
+      - http
+      - ui
+    evidence:
+      - artifact: release-1.10.0/production-probes.log
+        sha256: 5e35ef76131423b2c94daebce859299343182d43f8d390a7672961d552f8a947
+  - id: admin-denial
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: release-1.10.0/production-probes.log
+        sha256: 5e35ef76131423b2c94daebce859299343182d43f8d390a7672961d552f8a947
+  - id: webhook-unsigned
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: release-1.10.0/production-probes.log
+        sha256: 5e35ef76131423b2c94daebce859299343182d43f8d390a7672961d552f8a947
+  - id: chat-smoke
+    status: passed
+    oracles:
+      - http
+    evidence:
+      - artifact: release-1.10.0/production-probes.log
+        sha256: 5e35ef76131423b2c94daebce859299343182d43f8d390a7672961d552f8a947
+  - id: booking-gate-closed
+    status: passed
+    oracles:
+      - http
+      - ui
+    evidence:
+      - artifact: release-1.10.0/production-probes.log
+        sha256: 5e35ef76131423b2c94daebce859299343182d43f8d390a7672961d552f8a947
+  - id: booking-access-boundary
+    status: passed
+    oracles:
+      - http
+      - cleanup
+    cleanup: removed
+    evidence:
+      - artifact: release-1.10.0/release-required-local.log
+        sha256: d2ce58539ddca82a6cb2fc7993e5cc2d9c1d088ccdfcf7b23d996f6daf7f7d1b
+  - id: booking-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+    evidence:
+      - artifact: release-1.10.0/release-required-local.log
+        sha256: d2ce58539ddca82a6cb2fc7993e5cc2d9c1d088ccdfcf7b23d996f6daf7f7d1b
+  - id: favorite-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+    evidence:
+      - artifact: release-1.10.0/release-required-local.log
+        sha256: d2ce58539ddca82a6cb2fc7993e5cc2d9c1d088ccdfcf7b23d996f6daf7f7d1b
+  - id: migration-posture
+    status: passed
+    oracles:
+      - static
+    evidence:
+      - artifact: release-1.10.0/migration-posture.txt
+        sha256: 743b14aa27455178e1d9e118843a3a5618b6c33d112220e6aff761e844ee5240
+exceptions: []
+verification:
+  local_unit_tests_passed: 10856
+  local_environment_gated_skips: 1044
+  database_contract_cases: 1043
+  database_contract_skips: 0
+  coverage:
+    statements: 97.94
+    branches: 95.22
+    functions: 97.83
+    lines: 98.7
+  release_artifact_smoke: 3/3
+  browser_e2e_desktop_mobile_ci_environment: 390 passed, 36 explicit skips, 0 failed
+  qa_journey: 11/11
+  release_pr: https://github.com/juan294/paisaxe/pull/1047
+  evidence:
+    - artifact: release-1.10.0/contracts-oneshot.log
+      sha256: 4036fd8502e3b3613d5db650590c28a54b88263d64bb172c084d745f79a57a4f
+    - artifact: release-1.10.0/release-artifact-smoke.log
+      sha256: b413888d51558c2622ac632955354a221e471a009e2d29ac27e9402d41d5a989
+    - artifact: release-1.10.0/release-artifact-manifest.json
+      sha256: a201cebc35e3f712e2add4b167c646a093d7902028403d6b19f9232c19f38cb8
+    - artifact: release-1.10.0/production-migration-131.log
+      sha256: 945f1ebad4ed891d3d38fce3961b4e1243f6d3593f7efe558171222fdf795cda
+operational_dispositions:
+  migration_131:
+    applied_before_merge: true
+    method: supabase db push --linked (CLI 2.122.0)
+    ledger_max_version: "131"
+    legacy_constraint_removed: true
+    partial_unique_conversation_index: true
+    request_key_guard_trigger: true
+    function_bodies_match_repository: true
+    legacy_null_key_rows_preserved: 12
+    legacy_null_key_rows_held: 12
+    rows_redacted: 0
+  booking_retention_active: false
+  keep_alive_edge_function_deployed: false
+  sutura_routing_definitions_on_main: owner-approved 2026-10-26; repository variables unchanged
+  known_flaky_tests: https://github.com/juan294/paisaxe/issues/1046
+  main_ci_cadence_completed_evidence:
+    run: https://github.com/juan294/paisaxe/actions/runs/40273277158
+    commit: 666a2b70a745e4e4414677633acc9ed8a7d43143
+    conclusion: failure
+    error: "Protected control acquisition failed (Control reviewed closure mismatch); no retry or publication"
+    required_check_on_main: false
+    application_workflows_on_main: CI, Coverage, E2E Tests, Lighthouse CI, Security Scan and Push on main succeeded
+    disposition: owner tagged with this failure disclosed 2026-10-26; reported for Sutura coordination; no rerun and no routing or mode change

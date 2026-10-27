@@ -17,7 +17,8 @@
  *      call never placed is placed (phone-confirmation.ts)
  *   5. captured payments whose booking is not confirmed -> finalizeCaptured
  *   6. refund_pending payments -> request the refund with the payment's fixed
- *      key if it has no refund id yet, else follow it to refunded or refund_failed
+ *      key if it has no refund id yet, else follow it to refunded or refund_failed;
+ *      terminal refunds finish any booking write left incomplete
  *   7. confirmed cancellations (Phase 5) whose refund was never created -> request it
  *   8. needs_attention bookings older than 15 minutes -> [CRON_RECONCILE_ATTENTION]
  *   9. confirmed cancellations with a balance invoice (Phase 8a): cancel an
@@ -37,7 +38,7 @@ import { captureApprovedOrder, finalizeCaptured, type CaptureOutcome } from "./c
 import { requestCancellationRefund } from "./cancel";
 import { abandonStaleDrafts } from "./drafts";
 import { closeInvoiceAfterCancellation } from "./invoice";
-import { applyRefundStatus, flagNeedsAttention, guardedUpdate, holdIsLive, type Row } from "./payment-state";
+import { BOOKING_REFUNDED_FROM, applyRefundStatus, flagNeedsAttention, guardedUpdate, holdIsLive, type Row } from "./payment-state";
 import { reconcilePhoneAuthorizations } from "./phone-confirmation";
 import { PaypalWebhookUnmatched, UNMATCHED_TAG, processAndRecordPaypalEvent, type PaypalInboxEvent } from "./webhook-events";
 
@@ -282,6 +283,18 @@ async function followRefunds(run: Run): Promise<void> {
     await guardedUpdate(run.client, "payments", payment.id, { refund_id: refund.id }, ["refund_pending"]);
     await countRefundStatus(run, payment, booking, refund.status);
   });
+
+  // Repair the second write after a partial settlement. Keep these bounded
+  // scans separate from pending refunds, and exclude already-converged rows.
+  for (const status of ["refunded", "refund_failed"]) {
+    const bookingStatuses = status === "refunded" ? BOOKING_REFUNDED_FROM : ["pending_payment", "expired", "cancel_pending", "refund_pending"];
+    const terminal = await payments(run, [status], (query) => query
+      .in("bookings.status", bookingStatuses)
+      .or("compensation_reason.is.null,compensation_reason.neq.duplicate_capture"));
+    await eachItem(run, status, terminal, async (row) => {
+      await applyRefundStatus(run.client, paymentOf(row), row.booking_id, status === "refunded" ? "COMPLETED" : "FAILED");
+    });
+  }
 }
 
 // Step 7

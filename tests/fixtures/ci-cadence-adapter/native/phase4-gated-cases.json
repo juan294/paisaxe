@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "source": "Release 1.9.0 source census refreshed after batching the database authorization catalog query: 1,043 cases qualified by the full isolated local contract run on 2026-10-25, with unchanged case identities, plus the one ordinary operator-link case outside that runner. Source hashes bind all 24 gated test files. The private qualification receipt covers the measured candidate before this derived inventory refresh. Historical hosted recordings remain unchanged; this inventory is not a hosted recording.",
-  "declaredContractCases": 1043,
-  "ordinaryEnvironmentGatedCases": 1044,
+  "source": "Release 1.11.0 composite source census: the 2026-10-25 isolated contract qualification is retained for 21 unchanged gated test files. On 2026-10-26, fresh native Vitest JSON qualified all 85 cases in the changed booking/reconciliation files (51 and 34, previously 50 and 32), plus all 10 unchanged-count pg_net cases after its transaction fixture switched to the existing validated SQL helper. Both fresh measurements had zero failures or skips. The derived contract total is 1,046, plus one ordinary operator-link case outside that runner. This is not a new full contract-runner or hosted measurement. Historical hosted recordings remain unchanged.",
+  "declaredContractCases": 1046,
+  "ordinaryEnvironmentGatedCases": 1047,
   "groups": [
     {
       "file": "scripts/booking/create-operator-link.test.ts",
@@ -27,7 +27,7 @@
     {
       "file": "src/lib/booking/booking.postgrest-integration.test.ts",
       "describe": "booking domain against live local Supabase",
-      "cases": 50
+      "cases": 51
     },
     {
       "file": "src/lib/booking/cancel.postgrest-integration.test.ts",
@@ -57,7 +57,7 @@
     {
       "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
       "describe": "PayPal webhook inbox and reconciliation against live local Supabase",
-      "cases": 32
+      "cases": 34
     },
     {
       "file": "src/lib/booking/tools.postgrest-integration.test.ts",
@@ -129,14 +129,14 @@
     "scripts/booking/create-operator-link.test.ts": "ee2e57c9dbff70ab88b71776bdbec50e608681eeb1c3c7a02199b55688ce7ce4",
     "src/app/api/feature-flags/route.postgrest-rls.test.ts": "d20e499d2f47b25a4a2759cb447175cca76df1faded26a73bb1a54ffb28f26eb",
     "src/app/api/webhooks/stripe/route.postgrest-integration.test.ts": "6b1055a9d1bb93a80d7af37ea5c58aa2be22955b55aa70070b9e587a825aeb5e",
-    "src/lib/booking/booking.postgrest-integration.test.ts": "521fc01848c4bcf20c335665da95d56e7273b5721491986b034e51069a4655b5",
+    "src/lib/booking/booking.postgrest-integration.test.ts": "298cdb695be24334ae5e831aaac9bdad1adb4545a794d7ceca2d100cb18fe968",
     "src/lib/booking/cancel.postgrest-integration.test.ts": "f910fe11c782379284bb909ede63ed8d11015fa3336063491d37e610b2fa64e0",
     "src/lib/booking/capture.postgrest-integration.test.ts": "70e4a4276bd1442bd8fd3a7ca3f79cceae71bbb6c1fe6bb55594c238d02ade84",
     "src/lib/booking/invoice.postgrest-integration.test.ts": "55f6900043b8d3988175e901af24e823bc5928c52f559e4356db1e82ce825348",
     "src/lib/booking/legacy-request-key.postgrest-integration.test.ts": "5f12888a59fb86e4cfc5896838b2efe3ba0bc0849a4c34ec83c457e842d29222",
     "src/lib/booking/operator.postgrest-integration.test.ts": "49deeafd15ca851fdb2f18f6f4d5c6e2664a5b0ac00420103d618eb3e7f07882",
     "src/lib/booking/phone-confirmation.postgrest-integration.test.ts": "dcd8ebd3170ab49bcd91d80e36b194c46b9cdc4f76371287368f59d7b91dd4a9",
-    "src/lib/booking/reconcile.postgrest-integration.test.ts": "58549d4cc9e9483ed4d7aa49593eee554ee0d864cfe6ee7c53fa2fc176806a78",
+    "src/lib/booking/reconcile.postgrest-integration.test.ts": "82e59b64f237834df3f8884b1e545f744cc3c966d521ad147294d49c632a637f",
     "src/lib/booking/retention.postgrest-integration.test.ts": "e08c291409cd073a339a5599058eac10f6ecc83b6805b1a2d692edb38da834b7",
     "src/lib/booking/tools.postgrest-integration.test.ts": "75f80d4839a3577879491b649a8dc25d41eda314f7e0b15040d59a6f28754df3",
     "src/lib/booking/vouchers.postgrest-integration.test.ts": "a2ef2fbffa3cd291edb98d4cbf4d0cb7c34c8dded370ddba4f3fa96af4f58f6f",
@@ -146,21 +146,54 @@
     "src/lib/feature-flag-consumers.postgrest-integration.test.ts": "f2b21c6bed817fb6e2dca6035694e5816fd06b4fc56a1d6bbd62fcd0d2c7dae7",
     "src/lib/feature-flag-realtime.postgrest-integration.test.ts": "ff1deb38075b9d8a9fe93249c398e81a32c4fdae74ba1a1db85f67e0b700e2bb",
     "src/lib/match-chunks.postgrest-rls.test.ts": "c65f7e859dcf8040a6ac098fcbe8998193c42850ad3240ba029ef0b65ac5de50",
-    "src/lib/pg-net.postgrest-integration.test.ts": "a219b0ca81ff3f47e7cdfe891fd71c1662498042dea078bfedab04ad5a8dd62c",
+    "src/lib/pg-net.postgrest-integration.test.ts": "c12fc5a1c1c6d1cd13feeab7f0d49e0a6d9d5e9f38e1c0054d940a873af1d0af",
     "src/lib/proxy/maintenance.postgrest-integration.test.ts": "e51d5e4bfa4cd35c79b0c5f85c542f6ac5c18a2c1672c6a9f2224303dc8db1ce",
     "src/lib/stories-rls.postgrest-rls.test.ts": "3a9f1365a692ee8443d42f2f1db308e288b0f72c44c78b9620149006ac2da552",
     "src/lib/stripe-entitlements.postgrest-integration.test.ts": "a886a3e546d719992a447cebee7e125811b9cb66a380bb28e952adc7a35544fc"
   },
   "qualification": {
-    "receipt": "sutura/docs/agents/2026-10-25-fleet-recovery-implementation/p3-dom/paisaxe-catalog-batch-receipt.json",
-    "receiptSha256": "32d8a556b9b7ab016d464f3e9af2c46f6304a5a60a0f82baaa7f37345aa42cc8",
-    "candidateDigest": "4acfd39e95775bc25b698ab607f0d14fc60b7aa271c48ec38ae35a827b786420",
-    "finishedAt": "2026-10-25T12:14:38.176Z",
-    "contractCases": 1043,
+    "kind": "composite-source-census",
+    "receipt": "paisaxe/docs/agents/release-1.11.0-20261026/census-qualification.json",
+    "receiptSha256": "72eacc32a9aa30171b2d5fe410ec80079889dd530a9346d9bd7954dbb0d0bdee",
+    "nativeReportSha256": "e25e7bddcfa90f1f5963b9b108f0d6f33e58ae9fd46dfb22cf0e44e99f0b604a",
+    "contractCases": 1046,
     "observedChangedGroups": [
       {
-        "file": "src/lib/database-boundaries.postgrest-rls.test.ts",
-        "cases": 730
+        "file": "src/lib/booking/booking.postgrest-integration.test.ts",
+        "cases": 51
+      },
+      {
+        "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
+        "cases": 34
+      },
+      {
+        "file": "src/lib/pg-net.postgrest-integration.test.ts",
+        "cases": 10
+      }
+    ],
+    "reusedQualification": {
+      "receipt": "sutura/docs/agents/2026-10-25-fleet-recovery-implementation/p3-dom/paisaxe-catalog-batch-receipt.json",
+      "receiptSha256": "32d8a556b9b7ab016d464f3e9af2c46f6304a5a60a0f82baaa7f37345aa42cc8",
+      "candidateDigest": "4acfd39e95775bc25b698ab607f0d14fc60b7aa271c48ec38ae35a827b786420",
+      "finishedAt": "2026-10-25T12:14:38.176Z",
+      "contractCases": 1043,
+      "observedChangedGroups": [
+        {
+          "file": "src/lib/database-boundaries.postgrest-rls.test.ts",
+          "cases": 730
+        }
+      ]
+    },
+    "additionalQualifications": [
+      {
+        "file": "src/lib/pg-net.postgrest-integration.test.ts",
+        "cases": 10,
+        "sourceSha256": "c12fc5a1c1c6d1cd13feeab7f0d49e0a6d9d5e9f38e1c0054d940a873af1d0af",
+        "nativeReport": "paisaxe/docs/agents/release-1.11.0-20261026/completion/pgnet-repair.json",
+        "nativeReportSha256": "b2df7ff4e1a749dc191635bff3c1f0990d81f5ea6f00f5cfe1d155028ef13faa",
+        "exitReceipt": "paisaxe/docs/agents/release-1.11.0-20261026/completion/pgnet-gate.json",
+        "exitReceiptSha256": "c262634dcc23965050c497fbd63800eb02b62887033909b28bb81d2ba60b0691",
+        "finishedAt": "2026-10-26T17:46:09.820Z"
       }
     ]
   }
