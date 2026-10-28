@@ -82,7 +82,8 @@
     "contracts:lifecycle": "node scripts/contract-stack-lifecycle.mjs",
     "check-provider-fixtures": "node scripts/check-provider-fixtures.mjs",
     "check-supabase-guidance": "node scripts/check-supabase-guidance.mjs",
-    "test:contracts:runner": "node --test --test-concurrency=1 scripts/check-supabase-guidance.test.mjs scripts/check-provider-fixtures.test.mjs scripts/run-contracts.test.mjs scripts/prepare-contract-stack.test.mjs scripts/contract-transport.test.mjs scripts/contract-stack-lifecycle.test.mjs"
+    "test:contracts:runner": "node --test --test-concurrency=1 scripts/check-supabase-guidance.test.mjs scripts/check-provider-fixtures.test.mjs scripts/run-contracts.test.mjs scripts/prepare-contract-stack.test.mjs scripts/contract-transport.test.mjs scripts/contract-stack-lifecycle.test.mjs",
+    "eval:jev": "tsx --conditions=react-server scripts/eval/jev.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

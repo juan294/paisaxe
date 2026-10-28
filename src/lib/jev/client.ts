@@ -57,6 +57,15 @@ function parseUsage(raw: unknown): JevUsage | null | false {
   return { inputTokens: raw.input_tokens as number | null, outputTokens: raw.output_tokens as number | null };
 }
 
+/** Shared strict protocol validation for the adapter and offline spend settlement. */
+export function validateJevResponse<Q extends JevQuestions>(response: unknown, questions: Q): { answers: SystemOneResult<Q>["answers"]; usage: JevUsage | null; estimatedCostUsd: number | null } | null {
+  if (!record(response) || response.model !== JEV_MODEL || !validAnswers(response.answers, questions)) return null;
+  const usage = parseUsage(response.usage);
+  if (usage === false || (usage?.inputTokens != null && usage.inputTokens > 65536)) return null;
+  return { answers: response.answers as SystemOneResult<Q>["answers"], usage,
+    estimatedCostUsd: usage?.inputTokens == null ? null : usage.inputTokens * JEV_INPUT_USD_PER_MILLION / 1_000_000 };
+}
+
 /** Bound even a custom transport that fails to observe cancellation. */
 function untilAborted<T>(start: () => PromiseLike<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -127,13 +136,9 @@ export async function askJev<Q extends JevQuestions>(
     });
     const response: unknown = await untilAborted(() => client.systemOne({ model: JEV_MODEL, state, questions: questionSet.questions }, { signal: controller.signal, timeout: limit, retry: { maxRetries: 0 } }), controller.signal);
     if (controller.signal.aborted) return unavailable(deadline ? "deadline" : "aborted", "Jev request ended before a valid response.");
-    if (!record(response) || response.model !== JEV_MODEL || !validAnswers(response.answers, questionSet.questions)) {
-      return unavailable("invalid_response", "Jev returned invalid model, answers, candidate IDs or probabilities.");
-    }
-    const usage = parseUsage(response.usage);
-    if (usage === false) return unavailable("invalid_response", "Jev returned invalid token usage.");
-    return finish({ ...metadata, status: "answered", answers: response.answers as SystemOneResult<Q>["answers"], usage,
-      estimatedCostUsd: usage?.inputTokens == null ? null : usage.inputTokens * JEV_INPUT_USD_PER_MILLION / 1_000_000 });
+    const validated = validateJevResponse(response, questionSet.questions);
+    if (!validated) return unavailable("invalid_response", "Jev returned invalid model, answers, candidate IDs, probabilities or usage.");
+    return finish({ ...metadata, status: "answered", ...validated });
   } catch (error) {
     if (controller.signal.aborted || signal?.aborted) return unavailable(deadline ? "deadline" : "aborted", "Jev request ended before a valid response.");
     if (error instanceof APITimeoutError) return unavailable("deadline", "Jev request exceeded its deadline.");

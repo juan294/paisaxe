@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "provider-confirmation-es",
+  "split": "contract",
+  "input": { "text": "La visita está confirmada para el 30 de octubre." },
+  "expected": { "confirmed": true, "cancelled": false },
+  "baseline": null,
+  "fixtureResponses": [{ "status": 200, "body": {
+    "model": "jev-1.14.0",
+    "answers": { "confirmed": { "type": "noul", "noul": 0.99 }, "cancelled": { "type": "noul", "noul": 0.01 } },
+    "usage": { "input_tokens": 100, "output_tokens": 0 }
+  }}]
+}

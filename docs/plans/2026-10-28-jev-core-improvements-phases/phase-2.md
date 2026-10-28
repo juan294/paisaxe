@@ -40,3 +40,11 @@ Focused command: `npx vitest run scripts/lib/jev-evaluation.test.ts scripts/lib/
 Manual acceptance: open the local report and confirm a developer can find disagreement, missing evidence and the next read-only command without knowing internals. This is a visual/readability review, not live model qualification. No private file upload is needed.
 
 After the record schema is frozen, `[batch-eligible]` units are runner/checkpointing (`jev-evaluation*`, CLI) and pure report rendering (`jev-report*`), with separate owners. Integration owner wires them and updates scripts/docs. Stop after Phase 2 acceptance.
+
+## Implementation acceptance
+
+- [x] Inspector, bounded runner, durable reservation/recovery and escaped static reports implemented.
+- [x] INSPECT-01 through INSPECT-05 and actual CLI subprocess checks passed.
+- [x] Independent review, repairs, simplify and seven local gates passed.
+
+See [implementation notes](../2026-10-28-jev-core-improvements-notes.md#phase-2--inspector-and-runner) for exact identity and retained failures. Qualification is plumbing-only; runtime remains off.

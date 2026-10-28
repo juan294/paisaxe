@@ -74,3 +74,52 @@ The developer inspector/evaluation commands are added in Phase 2. Their later
 registered domain suites remain separate from runtime activation and paid
 qualification. No inspector command may create approval receipts or authorize a
 booking or settlement.
+
+## Developer inspector and evaluation commands
+
+`npm run eval:jev -- --list` lists registered suites. The initial
+`provider-contract` suite checks Spanish confirmation/cancellation plumbing only;
+it cannot qualify a runtime feature. The CLI imports run no inference or setup.
+
+- `npm run eval:jev -- fixture --suite provider-contract` runs synthetic HTTP
+  fixtures through the actual SDK, with a temporary dummy key and no network.
+- `npm run eval:jev -- inspect --input 'test-results/jev/<run>/run.json'` validates
+  and renders a supplied record. The result is labelled imported, with provider
+  authenticity unverified; it cannot be resumed as live evidence.
+- `npm run eval:jev -- live --suite provider-contract --max-requests 1 --max-spend-usd 0.003`
+  is a live invocation template, requiring separate prior owner authorization for
+  the synthetic data and named caps. Flags express limits, never permission.
+
+Live mode refuses CI/Vercel processes, absent keys and missing/nonpositive caps
+before dispatch. Request and dollar caps are cumulative ceilings across a resume
+chain: they must cover prior attempts plus every new attempt. `--case <id>` limits
+new execution to one frozen case while preserving all cases in the denominator.
+No customer transcript importer, database fetch, upload or extra-provider
+benchmark is provided by this CLI.
+
+Each run creates a new ignored directory containing `run.json`, `attempts.jsonl`,
+`cases.jsonl` and `report.html`. The append-only attempt log is fsynced before each
+HTTP dispatch. Every request reserves $0.002752512 (65,536 input tokens at the
+pinned price); validated response/model/answers/usage may settle a lower charge.
+Unknown usage, malformed responses and missing completion keep the reservation.
+A timeout/abort never implies zero cost. Multiple requests in one case are charged
+individually; aggregate case tokens can exceed one request's context ceiling.
+The report separates prior/new requests, settled costs and retained reservations.
+
+A partial run exits nonzero and keeps failed, unavailable and missing cases.
+`--resume '<run-directory>'` creates another directory, validates source, model,
+price policy, question/case/input hashes and durable logs, copies completed cases
+with replay provenance and executes unresolved cases only. Live resume needs
+explicit cumulative `--max-requests` and `--max-spend-usd`. An attempt without a
+durable response is unknown completion and is never silently resent: inspect it
+and explicitly select `--retry-unknown '<attempt-id,...>'` within authorized caps.
+A changed identity or corrupt checkpoint requires a new run. Earlier failures
+remain in their original directories and inherited request traces.
+
+The escaped static HTML report uses native expandable details, contains no
+scripts or external assets, and shows exact synthetic inputs, judgments, expected
+labels (separate from provider requests), baseline values, missing cases and
+bounded recovery commands. Fixture/imported/replayed timing is explicitly
+separate from fresh live latency. Curated summaries omit raw inputs and provider
+bodies. Comparison results are only meaningful for identical case IDs/input
+hashes. No automatic enablement or approval receipt is generated.
