@@ -4,6 +4,7 @@ import { z } from "zod";
 import { askJev } from "../../src/lib/jev/client";
 import type { JevQuestionSet, JevState } from "../../src/lib/jev/contracts";
 import { inspectEvaluation, runEvaluation, type EvaluationCase, type EvaluationSuite } from "../lib/jev-evaluation";
+import { evidenceSuite } from "./jev-evidence";
 import { callOutcomeSuite } from "./jev-call-outcome";
 import { bookingIntakeSuite } from "./jev-booking-intake";
 import { isMain } from "../lib/is-main";
@@ -28,7 +29,7 @@ export function providerContractSuite(): EvaluationSuite {
     } };
 }
 /** Integration owner registers bounded domain suites here; importing runs no evaluation. */
-export function registeredJevSuites(): EvaluationSuite[] { return [providerContractSuite(), bookingIntakeSuite(), callOutcomeSuite()]; }
+export function registeredJevSuites(): EvaluationSuite[] { return [providerContractSuite(), bookingIntakeSuite(), callOutcomeSuite(), evidenceSuite()]; }
 function parseArguments(argv: string[]): { command: string; values: Map<string, string> } {
   const command = argv[0] ?? "--list"; const values = new Map<string, string>();
   const allowed = new Set(["--suite", "--input", "--max-requests", "--max-spend-usd", "--case", "--resume", "--retry-unknown"]);

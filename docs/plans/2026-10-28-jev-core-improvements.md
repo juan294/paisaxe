@@ -1,6 +1,6 @@
 # Jev core improvements: implementation plan
 
-Date: 2026-10-28. Repository/workspace: `/Users/juan/code/paisaxe`. Integration branch and baseline: `develop`, `26c624adce298a98d15ef123b902a4a13d2134bb`. Status: **implementation in progress; phases 1–4 accepted locally**. See [implementation notes](2026-10-28-jev-core-improvements-notes.md).
+Date: 2026-10-28. Repository/workspace: `/Users/juan/code/paisaxe`. Integration branch and baseline: `develop`, `26c624adce298a98d15ef123b902a4a13d2134bb`. Status: **implementation in progress; phases 1–5 accepted locally**. See [implementation notes](2026-10-28-jev-core-improvements-notes.md).
 
 ## Objective and accepted scope
 

@@ -33,3 +33,8 @@ it("P2-05 generated fixture resume is executable and preserves evidence mode", a
   const result = spawnSync("/bin/sh", ["-c", command], { encoding: "utf8", env: { ...process.env, TYPESAFE_API_KEY: "", JEV_ENABLED_TASKS: "" } });
   expect(result.status).toBe(0); expect(result.stdout).toContain("evidence: fixture");
 }, 15000);
+it("EVIDENCE-06 report exposes provided-only counts and specific semantic/structural repair without whole-answer approval", async () => {
+  const suite:EvaluationSuite={id:"evidence",task:"evidence",questionVersion:"v1",policyVersion:"v1",questionIdentity:{},qualification:"experimental_unqualified",cases:[{id:"claim-case",split:"contract",input:{},expected:{},baseline:null,requests:[],fixtureResponses:[]}],evaluate:async()=>({unavailable:false,value:{coverage:"provided_claims_only",suppliedClaimCount:1,checkedClaimCount:1,unavailableClaimCount:1,claims:[{id:"c1",label:"unavailable",reason:"ambiguous_evidence",repair:"Change explicit evidence <script>never run</script>"}]}})};
+  const run=await runEvaluation(suite,{mode:"fixture",outputRoot:mkdtempSync(join(tmpdir(),"jev-evidence-report-"))});
+  const html=renderJevReport(run);expect(html).toContain("Supplied claims only: 1 supplied, 1 checked, 1 unavailable.");expect(html).toContain("ambiguous_evidence");expect(html).toContain("Change explicit evidence &lt;script&gt;");expect(html).not.toContain("<script>");
+});

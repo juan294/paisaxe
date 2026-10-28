@@ -16,9 +16,10 @@ import {
   type JevJsonValue,
   type JevState,
 } from "../../src/lib/jev/contracts";
-import type {
-  EvaluationSuite,
-  EvaluationCaseRecord,
+import {
+  jevWilsonInterval,
+  type EvaluationSuite,
+  type EvaluationCaseRecord,
 } from "../lib/jev-evaluation";
 const label = z.enum([
   "merchant_accepted",
@@ -151,22 +152,6 @@ function fixtureResponse(
     } as JevJsonValue,
   };
 }
-function wilson(successes: number, total: number) {
-  if (!total) return null;
-  const z = 1.96,
-    p = successes / total,
-    d = 1 + (z * z) / total,
-    center = (p + (z * z) / (2 * total)) / d,
-    half =
-      (z * Math.sqrt((p * (1 - p)) / total + (z * z) / (4 * total * total))) /
-      d;
-  return {
-    lower: Math.max(0, center - half),
-    upper: Math.min(1, center + half),
-    confidence: 0.95,
-    total,
-  };
-}
 /** Reference labels and tuning never enter a provider request or the heldout denominator. */
 export function summarizeCallAdvice(cases: EvaluationCaseRecord[]) {
   const heldout = cases.filter((c) => c.split === "heldout"),
@@ -207,7 +192,7 @@ export function summarizeCallAdvice(cases: EvaluationCaseRecord[]) {
           correct,
           total: rows.length,
           recall: rows.length ? correct / rows.length : null,
-          interval95: wilson(correct, rows.length),
+          interval95: jevWilsonInterval(correct, rows.length),
         },
       ];
     }),
@@ -233,14 +218,14 @@ export function summarizeCallAdvice(cases: EvaluationCaseRecord[]) {
     usefulnessDenominator: fully.length,
     usefulCorrect,
     usefulness: fully.length ? usefulCorrect / fully.length : null,
-    usefulnessInterval95: wilson(usefulCorrect, fully.length),
+    usefulnessInterval95: jevWilsonInterval(usefulCorrect, fully.length),
     falseAcceptanceCount,
     falseAcceptanceDenominator: negatives.length,
-    falseAcceptanceInterval95: wilson(falseAcceptanceCount, negatives.length),
+    falseAcceptanceInterval95: jevWilsonInterval(falseAcceptanceCount, negatives.length),
     missedAcceptanceCount,
     acceptanceDenominator: positives.length,
     abstentionCount,
-    abstentionInterval95: wilson(abstentionCount, heldout.length),
+    abstentionInterval95: jevWilsonInterval(abstentionCount, heldout.length),
     unavailableCount: heldout.filter((c) => c.status === "unavailable").length,
     missingCount: heldout.filter(
       (c) => c.status === "missing" || c.status === "unknown_completion",

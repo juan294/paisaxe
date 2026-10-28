@@ -289,3 +289,10 @@ export function inspectEvaluation(filename: string, outputRoot = "test-results/j
   for (const item of imported.cases) durableAppend(join(directory, "cases.jsonl"), item);
   durableJson(join(directory, "run.json"), imported); writeFileSync(join(directory, "report.html"), renderJevReport(imported)); return imported;
 }
+
+/** Wilson95% binomial interval for displayed sample counts, not population guarantees. */
+export function jevWilsonInterval(successes:number,total:number){
+ if(!total)return null;
+ const z=1.96,p=successes/total,d=1+z*z/total,center=(p+z*z/(2*total))/d,half=z*Math.sqrt((p*(1-p))/total+z*z/(4*total*total))/d;
+ return{lower:Math.max(0,center-half),upper:Math.min(1,center+half),confidence:0.95,total};
+}

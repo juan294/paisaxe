@@ -34,3 +34,7 @@ Focused command: `npx vitest run src/lib/jev/evidence.test.ts scripts/eval/jev-e
 Human review checks that a developer can distinguish missing passages, semantic disagreement and unsupported claims in the report. Repair instructions are specific: supply the named body/hash, correct the supplied claim span, or start a capped retry after a transport failure. A conflicting passage pair remains visibly ambiguous until the operator changes the explicit evidence set; a retry alone cannot be advertised as resolving it.
 
 After the snapshot/result schema is frozen, `[batch-eligible]` units are the pure checker/tests and independently authored evaluation cases/rubric. Integration owner owns runner/report integration. Stop after acceptance. An inline answer checker or automatic corpus approval remains outside this plan.
+
+## Implementation acceptance
+
+- [x] EVIDENCE-01–EVIDENCE-06 implemented, independently reviewed and accepted locally. All seven refreshed gates, 30-case fixture CLI and static report review passed; existing corpus contracts are unchanged and live quality remains unmeasured. See the [phase evidence and findings](../2026-10-28-jev-core-improvements-notes.md#phase-5--accepted-locally).

@@ -10,11 +10,16 @@ export function summarizeJevRun(run: EvaluationRun) {
 }
 export function renderJevReport(run: EvaluationRun): string {
   const cells = run.cases.map(item => {
+    const evidence = run.identity.task === "evidence" && item.outcome && typeof item.outcome === "object" && !Array.isArray(item.outcome) ? item.outcome : null;
+    const evidenceView = evidence ? `<p><strong>Supplied claims only: ${escape(evidence.suppliedClaimCount ?? 0)} supplied, ${escape(evidence.checkedClaimCount ?? 0)} checked, ${escape(evidence.unavailableClaimCount ?? 0)} unavailable.</strong> Passage manifest identity covers only supplied passages.</p><ul>${Array.isArray(evidence.claims) ? evidence.claims.map(value => {
+      const claim = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+      return `<li>${escape(claim.id ?? "claim")}: <strong>${escape(claim.label ?? "unavailable")}</strong> · ${escape(claim.reason ?? "")} ${claim.repair ? `Repair: ${escape(claim.repair)}` : ""}</li>`;
+    }).join("") : ""}</ul>` : "";
     const attempts = run.attempts.filter(e => e.caseId === item.id);
     const mode = run.evidenceKind === "live" ? "live" : "fixture";
     const retry = `npm run eval:jev -- ${mode} --suite ${quoteJevShellArg(run.identity.suiteId)} --case ${quoteJevShellArg(item.id)}${mode === "live" ? ` --max-requests ${Math.max(1, item.requests.length)} --max-spend-usd ${(Math.max(1, item.requests.length) * 0.003).toFixed(6)}` : ""}`;
     return `<section><h2>${escape(item.id)} · ${escape(item.status)}</h2><p>Split: ${escape(item.split)} · Expected comparison: ${item.passed === null ? "unavailable" : item.passed ? "pass" : "failed"} · Timing: ${escape(item.latencyKind)} ${item.latencyMs === null ? "unmeasured" : `${escape(item.latencyMs.toFixed(1))} ms`}</p>
-<p>${escape(item.reason ?? "")}</p><details><summary>Input, expected label, baseline and outcome</summary><pre>${pretty({ input: item.input, expected: item.expected, baseline: item.baseline, outcome: item.outcome })}</pre></details>
+<p>${escape(item.reason ?? "")}</p>${evidenceView}<details><summary>Input, expected label, baseline and outcome</summary><pre>${pretty({ input: item.input, expected: item.expected, baseline: item.baseline, outcome: item.outcome })}</pre></details>
 <details><summary>Exact supplied requests, judgments/distributions and provider failures</summary><pre>${pretty(attempts)}</pre></details>
 ${item.status !== "complete" || item.passed === false ? `<p>Repeat this read-only synthetic case; live mode additionally requires explicit authorization and approved caps:</p><pre>${escape(retry)}</pre>` : ""}</section>`;
   }).join("\n");
