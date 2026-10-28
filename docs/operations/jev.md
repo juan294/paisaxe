@@ -123,3 +123,59 @@ bounded recovery commands. Fixture/imported/replayed timing is explicitly
 separate from fresh live latency. Curated summaries omit raw inputs and provider
 bodies. Comparison results are only meaningful for identical case IDs/input
 hashes. No automatic enablement or approval receipt is generated.
+
+## Booking intake and controlled comparisons
+
+The `booking-intake` inspector suite contains independently authored 40 tuning
+and 120 held-out cases (60 eligible/60 must-fallback), plus 30 frozen complete
+route scenarios in `scripts/eval/fixtures/jev/booking-intake.json`. Expected labels
+and invariant rubrics stay outside model state. Run
+`npm run eval:jev -- fixture --suite booking-intake` for synthetic HTTP plumbing;
+this does not qualify live semantics, cost or latency. Live use of this suite
+still requires its own explicit Jev caps and data authorization.
+
+Runtime intake is limited to pristine first-turn Spanish discovery. It selects
+original party/date/inclusive-budget and supported constraint spans, then uses
+one existing read-only search tool. Existing draft identity/initialization and
+quota consumption remain the route's responsibility. The fast path creates no
+interpretation-driven draft/quote/payment write. Replay, history, existing
+criteria/bookings, other locales, named experiences, booking actions, uncertain
+judgments and unsupported requirements retain ordinary chat. Search failure
+falls back without partial fast-path events. Cancellation prevents new work and
+late events; already-started legacy database HTTP may still finish.
+
+`booking-eval-harness.ts` is side-effect-free on import. The legacy eight-scenario
+agent runner loads keys, starts mocks and accesses the local stack only in its
+explicit CLI main. It now requires
+`npm run eval:booking -- --mode baseline --max-requests N --max-spend-usd USD`
+after separate Claude authorization. Its timing is labelled agent-only; Spanish
+is explicit by default and the existing English regression retains locale `en`.
+A successful outcome with unknown usage remains incomplete/nonpassing.
+
+`compareBookingRouteScenarios` accepts all 30 frozen scenarios and prebound
+baseline/deterministic/Jev loopback route arms. `startBookingEvalServer` binds the
+real booking handler, access, quota, retrieval and tools to each local arm using
+server-only dependencies. No arm selector or fake provider origin is accepted
+from visitor requests or product environment configuration. The normal Next
+handler uses default implementations. The local adapter's timings include the
+HTTP request and route prework; Next proxy is outside this measured scope.
+The deterministic first-discovery arm calls code directly without Jev or Claude.
+
+Route records separate first-card, full-turn/scenario and time-to-quote timing,
+clarification counts, exact catalog/retrieval/input identity, provider-fact and
+commercial invariants. Per-scenario costs use accounting deltas. Fixture timing
+is deterministic integration evidence; live performance and improvements remain
+unmeasured until a separately authorized comparison completes. Required local
+E2E uses synthetic HTTP responses at the real fixed provider URLs and cold
+retrieval caches (no Redis configuration); production caching is unchanged.
+
+Every Claude HTTP attempt, including SDK and outer-loop retries, passes through
+its separate durable reservation cap before dispatch. The policy pins current
+`claude-sonnet-5-5`, conservatively reserves 1,048,576 context tokens plus the
+requested maximum output, accounts for cache-write prices, and retains unknown
+completion. The model/context and prices were checked against
+[Anthropic model documentation](https://platform.claude.com/docs/en/models/overview)
+and [pricing](https://platform.claude.com/docs/en/about-claude/pricing) on
+2026-10-28: $2 input/$10 output per million tokens; cache writes $2.50 (5m) or $4
+(1h), reads $0.10. Policy changes require a new comparison identity. No paid
+comparison or live retrieval is part of implementation acceptance.

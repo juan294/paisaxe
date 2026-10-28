@@ -47,3 +47,11 @@ Freeze the 40/120 corpus and 30 paired complete scenarios specified in the paren
 Disabled/unsupported/ambiguous input automatically reaches existing chat clarification; tests prove the conversation continues. Provider/search failure also returns to ordinary chat once; a later eligible request can succeed. Cancellation exits loading and drops stale results; this phase guarantees no new work or output after cancellation, but does not claim to cancel HTTP already started by the existing search tool. Phase 6's fresh abortable database client is limited to its new endpoint. No-options/all-rejected displays explicit criteria-edit guidance, with a successful subsequent ordinary chat turn. Test each disclosure and recovery, not just the branch result.
 
 Human review checks Spanish wording and whether unknown constraints remain visible. No paid call or payment is needed. After candidate/question contracts are frozen, `[batch-eligible]` units are domain parser/tests and independently authored evaluation fixtures/rubric (different files, no dependency on parser output). The integration owner owns agent wiring, evaluator registration and cross-layer tests. Stop after acceptance.
+
+## Implementation acceptance
+
+- [x] INTAKE-01 through INTAKE-08 implemented, independently reviewed and verified.
+- [x] Frozen 40 tuning/120 held-out cases and 30 complete scenarios independently authored/reviewed.
+- [x] Simplify, seven ordinary gates, migrations, 1,046 native contracts and canonical local route/browser checks passed.
+
+See [implementation notes](../2026-10-28-jev-core-improvements-notes.md#phase-3-final-acceptance) for exact identities, all repairs, retained failures and the explicit early raw-log availability limitation. Runtime stays off; fixture timing is not live model qualification.

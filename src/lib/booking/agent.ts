@@ -43,6 +43,7 @@ import type { ChatStreamEvent } from "@/types/sse";
 import type { BookingDraft } from "./drafts";
 import { bookingToolDefinitions, executeBookingTool, type ToolContext } from "./tools";
 import { madridDate, type Booking } from "./types";
+import { tryBookingIntake, type IntakeAttempt } from "./intake";
 import type { BookingModelClient } from "./model-client";
 
 export const MAX_TOOL_ITERATIONS = 6;
@@ -193,9 +194,21 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
  * and maps a thrown error to an `ai_unavailable` error event. A model failure
  * before anything was sent is retried once (same rule as src/lib/claude.ts).
  */
-export async function* streamBookingTurn(input: BookingTurnInput): AsyncGenerator<ChatStreamEvent> {
+export interface BookingTurnDependencies { intake?: (input: BookingTurnInput) => Promise<IntakeAttempt> }
+
+export async function* streamBookingTurn(input: BookingTurnInput, dependencies: BookingTurnDependencies = {}): AsyncGenerator<ChatStreamEvent> {
   if (input.acceptedBooking) {
     yield* acceptedTurn(input, input.acceptedBooking);
+    return;
+  }
+  if (input.signal.aborted) return;
+  const intake = await (dependencies.intake ?? tryBookingIntake)(input);
+  if (intake.status === "aborted") return;
+  if (intake.status === "handled") {
+    for (const event of intake.events) {
+      if (input.signal.aborted) return;
+      yield event;
+    }
     return;
   }
   const now = input.now ?? new Date();

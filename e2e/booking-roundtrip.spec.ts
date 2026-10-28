@@ -76,6 +76,7 @@ function issueOperatorLink(): string {
     {
       encoding: "utf8",
       env: {
+        NODE_ENV: "test",
         PATH: process.env.PATH,
         HOME: process.env.HOME,
         TMPDIR: process.env.TMPDIR,

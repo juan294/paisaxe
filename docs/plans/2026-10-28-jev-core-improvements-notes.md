@@ -41,3 +41,49 @@ Review findings P2-01–P2-05 resolved: POSIX shell quoting for recovery command
 Simplify: reuse pass approved shared validation; quality pass checked strict record schemas, immutable run/provenance and safe recovery; efficiency pass found no justified additional abstraction or cache. Browser inspection of imported/synthetic-unavailable reports confirmed readable failure/denominator/retry information and zero outbound requests; screenshots are retained under the phase directory. Later command-copy repairs are covered by executable tests. Fixture/imported/replayed evidence is explicitly distinguished from live model evidence. All runtime tasks remain off; no live inference or qualification occurred.
 
 Phase 2 accepted locally. Next: Phase 3 bounded booking intake, with independently authored frozen reference cases and D1 database-test placement.
+
+### Phase 3 — verification in progress
+
+Implementation owners were `/root/phase1` (application, evaluator and internal server) and `/root/booking_fixtures` (independent reference/judgment fixtures and E2E driver), with disjoint files. Independent reviewer `/root/phase3_review` approved plan compliance and three simplify lenses after repairs. No paid inference or activation occurred.
+
+The seven ordinary gates all passed on source digest `1c1fb15956d518ee4eac0de067e4d6077c30f6fa52b69f6dc43a9c5830e15cfa`, based on `d8561789`: 582 test files passed, 23 skipped; 11,032 cases passed, 1,047 known database-environment skips. Coverage: statements 97.88%, branches 95.18%, functions 97.82%, lines 98.69%. Migrations passed. The required native contract receipt passed all 1,046 cases in 23 suites on task `paisaxe-contracts-1d1a4ddb05bc`, source digest `91b5534acb178c5f85975d93555ab352912ac241226f7346532793977da1f4f0` (the contract runner's distinct source-input algorithm). That receipt and full native reports are archived under ignored `docs/agents/jev-core-evidence/phase-3-native-contracts/`.
+
+Confirmed review findings and dispositions:
+
+| ID | Disposition |
+| --- | --- |
+| P3-01 | Resolved: malformed signed/decimal party suffixes and truncated `somos` prefixes reject in code; RED regressions precede repair. |
+| P3-02 | Resolved: all 160 frozen cases carry explicit invariant rubrics; removing only those additions reproduces the original corpus hash. |
+| P3-03 | Resolved: scenario cost uses accounting deltas, not cumulative totals. |
+| P3-04 | Resolved: comparison checks outcome, clarification limits and price/payment/provider-fact invariants. |
+| P3-05 | Resolved: explicit per-conversation locale preserves the existing English scenario, Spanish remains default. |
+| P3-06 | Resolved: route-driver clarification count/time-to-quote derive from observed turns. |
+| P3-07 | Resolved in reviewed source: empty/all-rejected options have changed-criteria ordinary-quote recovery, with exact catalog restoration. Actual route execution is pending below. |
+| P3-08 | Resolved: legacy report awaits budget settlement and records `complete`, accounting and matching pass/exit disposition (`scripts/lib/booking-eval-harness.ts:733`). |
+| P3-09 | Resolved: actual generator test aborts after its first buffered event and proves no further events or Claude request. |
+| P3-S1 | Resolved: simplify removed the unused model-client binding and duplicate cap parsing; reuse/efficiency passes required no new abstraction. |
+| P3-10 | Resolved: the first complete synthetic run exposed eight mismatches. Seven were incorrect canned semantic judgments; independent hash-bound judgment fixtures repair those responses only. A generic supported-number alternatives guard handles the code ambiguity. Reference labels/state/questions/thresholds were not fitted or weakened. The repaired CLI run passed all 160 cases. |
+| P3-11 | Resolved: actual E2E typecheck uses stable Next/Node declarations and modern libraries, strictness retained; verified without generated `next-env.d.ts`. Local operator-link child explicitly sets `NODE_ENV=test`. |
+| P3-12 | Resolved in reviewed driver: raw active catalog has four rows because migration 126 adds a phone merchant. The test now uses the exact service offerability predicate, retains raw/excluded rows, and pins all three eligible canonical offers (`src/lib/booking/availability.ts:94`, `src/lib/booking/availability.ts:102`). Unknown eligible rows still fail. |
+
+Frozen reference corpus SHA-256 is `ea5e5df7e26656a3900fe863ffb8c9ca1435a64d4b423e7cf905c51e3d9b9a40`; independent semantic fixture SHA-256 is `2c0a090b376e182c4961e43074165f8aa35e21784dcb46cdfc22e712a6ebf661`. They are deterministic transport/rubric evidence, not live qualification. The eight observed first-run failures were h069, h074, h090, h101, h102, h103, h116 and h120.
+
+#### Operational evidence limitation and recovery
+
+The parent's first Playwright invocation used its default `test-results` output root, whose startup cleanup removed earlier `test-results/jev/` raw logs and fixture records. Those original raw files are **UNAVAILABLE**; historical command exits/metrics remain directly observed in the session tools and the already committed Phase 1/2 notes. The Phase 3 ordinary gate exits and surviving native V8 coverage JSON were explicitly archived as observed evidence, not fabricated replacement raw logs. The first eight-case fixture failure remains a documented observation; its original raw record did not survive cleanup. Future Playwright runs use an explicit isolated output path under ignored `docs/agents/jev-core-evidence/`.
+
+The parent's temporary runner also forced `NODE_ENV=development` into the preview build. An isolated dummy-credential build reproduced the resulting `useContext` startup error; application gates had passed under their correct build environment. Removing that operational override allowed tests to start. The first actual test execution passed the complete browser booking round trip, while intake stopped before scenarios on the invalid raw catalog-count assumption (P3-12). The repaired driver alone is being rerun. No application or contract source changed, so the passed ordinary gates, same-stack native receipt and unchanged round-trip result remain valid; the changed E2E driver receives fresh strict typecheck and execution.
+
+The task stack was recovered only after checking its immutable recorded containers, daemon, nonce-owned internal network, volume consumers, schema digest, live transport and anon/service positive controls. No shared stack was reset. Earlier lifecycle wrapper failure remains recorded; it does not overwrite the actual passed native contract receipt. Runtime and live quality remain disabled/unmeasured.
+
+#### Phase 3 final acceptance
+
+- [x] Independent review and all simplify repairs approved; final seven gates, migrations, native contracts and canonical local E2E passed.
+
+P3-13 resolved the observed local evaluation-host 500: an eager fixture dependency initialized Next request storage before the Node baseline. A pure HTTP fixture builder removes that dependency; the actual host/driver entry initializes the official Next baseline first. Fresh-process import-order RED/GREEN tests and private error diagnostics cover the fix. No application route behavior or public mode/environment override was introduced. The diagnostic replay's child exit 0/90 arms was explicitly separated from acceptance; its wrapper exit 1 was intentional and was never called a gate pass.
+
+Fresh final source digest: `d4ee4c555c1a846865c41199b3d0249f07b04c889cce1a8535937fba329c919d` (base `d8561789`). All seven commands exited 0; logs and the complete gate receipt survive under `test-results/jev/phase-3-refresh/`. Coverage: 583 passed files, 23 known skipped files; 11,034 passed cases, 1,047 known skipped cases; statements 97.89%, branches 95.19%, functions 97.85%, lines 98.69%. Thresholds were unchanged. Migrations passed again. The final CLI fixture run passed all 160 cases and is archived in `docs/agents/jev-core-evidence/phase3-final-cli/`.
+
+After the script/bootstrap change, the complete native tier was refreshed: 1,046/1,046 cases in 23 suites, zero skips/failures, clean final schema and source guard. Its current-source digest is `5c34e3253b517094e27e668d7f9df3bad6af427222944050000c573445591a47`; exact receipt/native reports are under `docs/agents/jev-core-evidence/e2e-2026-10-28T19-50-27-100Z/native-contracts/`. The canonical `release-required-local` intake test then passed with retries disabled and one worker: all 90/90 complete scenario arms plus failure, cancellation, empty/all-rejected and ordinary-follow-up recovery. The saved driver report is `test-results/jev/phase-3/e2e-jev-intake-2370a28c/report.json`; all eight cleanup table counts are zero. The unchanged browser booking round trip had independently passed on the same application inputs; its existing dummy-key Voyage retrieval fallback is workflow-regression evidence, not provider/readiness/performance proof.
+
+The guarded lifecycle disposed of task stack `paisaxe-contracts-1d1a4ddb05bc`, including its owned network/volumes; disposal receipt is archived with the canonical E2E result. No shared stack or unrelated failed task was removed. Phase 3 is accepted locally. Phase 4 entry is authorized by the owner's all-phases instruction; runtime activation and paid/live qualification remain separate and unmeasured.
