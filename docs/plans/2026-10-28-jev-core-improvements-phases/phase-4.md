@@ -33,6 +33,12 @@ Implement `CALL-01`–`CALL-06` in [oracles](behavioral-oracles.md). Include age
 
 Focused command: `npx vitest run scripts/lib/jev-call-outcome.test.ts scripts/eval/jev-call-outcome.test.ts src/lib/services/elevenlabs-webhook-service.test.ts src/lib/booking/phone-confirmation.test.ts`; run all parent gates. Freeze 40 tuning and 120 held-out synthetic cases with independently reviewed labels before live tuning. Zero held-out false acceptance only qualifies the advisor for developer assistance; report missed acceptance and abstention so an always-uncertain classifier cannot be presented as useful. At least 80% of truth-labelled, fully evidenced acceptance/decline/no-contact cases must receive the correct non-uncertain label; otherwise retain “experimental/unqualified”.
 
+Implementation clarification: an operationally failed or missing case makes the run partial and nonzero. A completed semantic comparison that misses its reference label remains visible in the denominator; the fixed aggregate quality targets above govern quality acceptance. Execution completeness and target acceptance are separate, versioned record fields. This resolves the earlier generic “failed case” wording without changing the approved thresholds. Fixture and imported runs cannot qualify live quality.
+
 Human review checks role mapping, the synthetic rubric and usefulness of disagreements; it does not approve real bookings. Missing roles/criteria display precisely which fields to supply. Ambiguous evidence shows the contradictory turns and requests a corrected explicit snapshot, not an invented resolution. Provider errors show the failed case and a bounded retry command. Recovery tests prove a corrected snapshot or later successful provider response produces a fresh linked result.
 
 After the input/rubric is frozen, `[batch-eligible]` units are the advisor/tests and independent fixture authorship/label review. Integration owner owns CLI registration and report changes. Stop after Phase 4 acceptance; live webhook adoption would require a separate design and authorization.
+
+## Implementation acceptance
+
+- [x] CALL-01–CALL-06 implemented, independently reviewed and accepted locally. All seven gates and the 160-case fixture CLI passed; live quality remains unmeasured. See the [phase evidence and findings](../2026-10-28-jev-core-improvements-notes.md#phase-4--accepted-locally).

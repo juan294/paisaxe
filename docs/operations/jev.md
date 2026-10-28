@@ -179,3 +179,59 @@ and [pricing](https://platform.claude.com/docs/en/about-claude/pricing) on
 2026-10-28: $2 input/$10 output per million tokens; cache writes $2.50 (5m) or $4
 (1h), reads $0.10. Policy changes require a new comparison identity. No paid
 comparison or live retrieval is part of implementation acceptance.
+
+## Offline telephone-outcome advisory
+
+`npm run eval:jev -- fixture --suite call-outcome` runs 40 tuning and 120 held-out
+independently authored synthetic cases through the real SDK with canned HTTP
+responses. Judgments and evidence selections are fixture data outside request
+state. This checks plumbing and domain safeguards, not live model reliability.
+Use separately authorized caps for any later `live --suite call-outcome` run.
+
+The advisor accepts requested ISO date, HH:MM time and party size; ordered
+utterances with finite IDs, explicit merchant/agent/system speaker mappings,
+original roles and mapping provenance; and separately identified status/summary.
+Missing roles, requested fields or transcript produce visible uncertainty with
+repair reasons before HTTP. The advisor never fetches customer calls or imports
+provider dashboards. Merchant evidence must match the requested criteria in code;
+an acknowledgment can bind to the immediately preceding exact agent request.
+Alternative offers, later corrections, summary conflicts, multiple unresolved
+bookings and contradictory/weak judgments remain uncertain. A summary or an
+agent's "perfecto" cannot establish merchant acceptance.
+
+Labels are `merchant_accepted`, `merchant_declined`, `no_contact` and `uncertain`;
+transport failure remains `unavailable`. Every result is explicitly advisory,
+with supporting utterance IDs, reasons and model/question identity. The unchanged
+pure legacy classifier is shown only for comparison. No advisor output is
+converted into a settlement outcome or wired into webhooks, SMS, calls, database
+writes or payments. It never generates capture/void instructions or approval
+receipts.
+
+The report separates tuning from the frozen held-out denominators: 120 cases,
+30 per label; false acceptance over all 90 nonaccepted references; and at least
+72 correct nonuncertain labels among 90 fully evidenced accepted/declined/no-contact
+references. It also displays missed acceptance, abstention, confusion counts,
+per-label recall, baseline disagreement and Wilson 95% sample intervals. These
+small synthetic samples do not establish population error rates. Qualification
+is limited to developer assistance and never settlement.
+
+## Evaluation records v2: execution versus semantic targets
+
+Portable `run.json` records now use schema version 2. Old v1 records remain
+preserved evidence but are rejected by current inspect/resume with a new-run
+instruction; their previous completeness semantics are not silently reinterpreted.
+Attempt ledger events keep their original version and accounting rules.
+
+`complete` means every supplied case executed without missing/unknown-completion
+attempts or provider unavailability. Semantic abstentions and mislabels still
+appear as failed comparisons and remain in all relevant denominators. The
+versioned suite assessment independently sets `targetsMet`; `pass` requires both
+execution completeness and the predefined targets. Provider plumbing retains its
+all-cases-match target. A call advisor run can therefore be complete and meet its
+80% useful-label target without pretending that every label was correct.
+
+Fixture/imported records are always unqualified. A live record can qualify only
+when the suite explicitly permits qualification, execution is complete and its
+predefined target assessment passes. No report enables runtime settings or grants
+transaction authority. Unknown usage retains conservative reservations and is
+never reported as zero cost.

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { askJev } from "../../src/lib/jev/client";
 import type { JevQuestionSet, JevState } from "../../src/lib/jev/contracts";
 import { inspectEvaluation, runEvaluation, type EvaluationCase, type EvaluationSuite } from "../lib/jev-evaluation";
+import { callOutcomeSuite } from "./jev-call-outcome";
 import { bookingIntakeSuite } from "./jev-booking-intake";
 import { isMain } from "../lib/is-main";
 
@@ -27,7 +28,7 @@ export function providerContractSuite(): EvaluationSuite {
     } };
 }
 /** Integration owner registers bounded domain suites here; importing runs no evaluation. */
-export function registeredJevSuites(): EvaluationSuite[] { return [providerContractSuite(), bookingIntakeSuite()]; }
+export function registeredJevSuites(): EvaluationSuite[] { return [providerContractSuite(), bookingIntakeSuite(), callOutcomeSuite()]; }
 function parseArguments(argv: string[]): { command: string; values: Map<string, string> } {
   const command = argv[0] ?? "--list"; const values = new Map<string, string>();
   const allowed = new Set(["--suite", "--input", "--max-requests", "--max-spend-usd", "--case", "--resume", "--retry-unknown"]);
@@ -44,14 +45,14 @@ export async function jevMain(argv: string[]): Promise<number> {
     if (command === "--list") { console.log(registeredJevSuites().map(s => `${s.id}: ${s.qualification} (${s.cases.length} cases)`).join("\n")); return 0; }
     if (command === "inspect") {
       const input = values.get("--input"); if (!input) throw new Error("inspect requires --input <record.json>.");
-      const run = inspectEvaluation(input); console.log(`evidence: imported\nrecord: ${run.directory}/run.json\nreport: ${run.directory}/report.html\ncomplete:${run.complete}`); return run.complete ? 0 : 1;
+      const run = inspectEvaluation(input); console.log(`evidence: imported\nrecord: ${run.directory}/run.json\nreport: ${run.directory}/report.html\ncomplete:${run.complete}\ntargetsMet:${run.targetsMet}\npass:${run.pass}\nqualified:${run.qualified}`); return run.pass ? 0 : 1;
     }
     if (command !== "fixture" && command !== "live") throw new Error("Unknown operation; use --list, fixture, inspect or capped live.");
     const suite = registeredJevSuites().find(s => s.id === values.get("--suite")); if (!suite) throw new Error("Select a registered --suite; use --list.");
     const run = await runEvaluation(suite, { mode: command, maxRequests: values.has("--max-requests") ? Number(values.get("--max-requests")) : undefined,
       maxSpendUsd: values.has("--max-spend-usd") ? Number(values.get("--max-spend-usd")) : undefined,
       caseId: values.get("--case"), resume: values.get("--resume"), retryUnknown: values.get("--retry-unknown")?.split(",") });
-    console.log(`evidence: ${run.evidenceKind}\nrecord: ${run.directory}/run.json\nreport: ${run.directory}/report.html\ncomplete:${run.complete}`); return run.complete ? 0 : 1;
+    console.log(`evidence: ${run.evidenceKind}\nrecord: ${run.directory}/run.json\nreport: ${run.directory}/report.html\ncomplete:${run.complete}\ntargetsMet:${run.targetsMet}\npass:${run.pass}\nqualified:${run.qualified}`); return run.pass ? 0 : 1;
   } catch (error) { console.error(error instanceof Error ? error.message : "Jev evaluation failed."); return 1; }
 }
 if (isMain(import.meta.url)) process.exitCode = await jevMain(process.argv.slice(2));

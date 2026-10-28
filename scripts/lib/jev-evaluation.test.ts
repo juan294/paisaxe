@@ -175,3 +175,11 @@ it.each(["budget", "complete", "counts"])("P2-03 rejects false declared %s in an
   writeFileSync(filename, JSON.stringify(value));
   expect(() => readEvaluationRecord(filename)).toThrow(/invalid/i);
 });
+
+it("v2 separates execution completeness from a predefined aggregate semantic target",async()=>{
+ const cases=Array.from({length:100},(_,i)=>({id:`case-${i}`,split:"heldout",input:{correct:i<80},expected:true,baseline:null,requests:[],fixtureResponses:[]}));
+ const sample:EvaluationSuite={id:"eighty-percent",task:"call_outcome",questionVersion:"v1",policyVersion:"v1",questionIdentity:{},qualification:"experimental_unqualified",assessmentPolicy:"eighty-percent-v1",canQualify:true,cases,async evaluate(input){return{value:(input as{correct:boolean}).correct,unavailable:false};},assess(rows){const correct=rows.filter(row=>row.passed).length;return{targetsMet:correct/rows.length>=0.8,metrics:{correct,total:rows.length}};}};
+ const run=await runEvaluation(sample,{mode:"fixture",outputRoot:root});expect(run.schemaVersion).toBe(2);expect(run.complete).toBe(true);expect(run.targetsMet).toBe(true);expect(run.pass).toBe(true);expect(run.qualified).toBe(false);expect(run.failedCount).toBe(20);
+ let position=0; sample.evaluate=async input=>({value:(input as{correct:boolean}).correct,unavailable:position++===99,reason:"provider_error"});const incomplete=await runEvaluation(sample,{mode:"fixture",outputRoot:root});expect(incomplete.complete).toBe(false);expect(incomplete.pass).toBe(false);expect(incomplete.targetsMet).toBe(true);expect(incomplete.cases.filter(c=>c.status==="unavailable")).toHaveLength(1);expect(incomplete.cases).toHaveLength(100);
+ const file=join(run.directory,"run.json");const obsolete=JSON.parse(readFileSync(file,"utf8"));obsolete.schemaVersion=1;writeFileSync(file,JSON.stringify(obsolete));expect(()=>readEvaluationRecord(file)).toThrow(/incompatible/i);
+},30000);

@@ -20,6 +20,9 @@ export interface EvaluationSuite {
   cases: EvaluationCase[];
   evaluate(input: JevState, transport: { fetch: typeof globalThis.fetch }): Promise<EvaluationOutcome>;
   compare?(actual: JevJsonValue, expected: JevJsonValue): boolean;
+  assessmentPolicy?: string;
+  canQualify?: boolean;
+  assess?(cases: EvaluationCaseRecord[]): {targetsMet:boolean;metrics:JevJsonValue};
 }
 export const JEV_REQUEST_RESERVATION_USD = 65536 * JEV_INPUT_USD_PER_MILLION / 1_000_000;
 const PRICE_POLICY = "jev-1.14.0-input-65536-at-0.042-per-million-v1";
@@ -29,7 +32,7 @@ const json: z.ZodType<JevJsonValue> = z.lazy(() => z.union([z.string(), z.number
 const sourceSchema = z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/), dirty: z.boolean(), diffHash: sha }).strict();
 const identitySchema = z.object({ suiteId: safeName, task: z.enum(["provider_contract", "booking_intake", "call_outcome", "evidence", "experience_match"]),
   model: z.literal(JEV_MODEL), questionVersion: safeName, policyVersion: safeName, questionIdentity: json,
-  questionDigest: sha, caseSetHash: sha, pricePolicy: z.literal(PRICE_POLICY), source: sourceSchema }).strict();
+  questionDigest: sha, caseSetHash: sha, assessmentPolicy: safeName, qualificationEligible: z.boolean(), pricePolicy: z.literal(PRICE_POLICY), source: sourceSchema }).strict();
 const requestSchema = z.object({ model: z.literal(JEV_MODEL), state: json, questions: json }).strict();
 const aggregateUsageSchema = z.object({ inputTokens: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable(), outputTokens: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable() }).strict();
 const usageSchema = aggregateUsageSchema.extend({ inputTokens: z.number().int().min(0).max(65536).nullable() });
@@ -48,10 +51,10 @@ export type EvaluationCaseRecord = z.infer<typeof caseSchema>;
 const budgetSchema = z.object({ maxRequests: z.number().int().positive().nullable(), maxSpendUsd: z.number().positive().nullable(),
   totalRequests: z.number().int().nonnegative(), newRequests: z.number().int().nonnegative(), priorRequests: z.number().int().nonnegative(),
   settledUsd: z.number().nonnegative(), reservedUsd: z.number().nonnegative(), priorUpperBoundUsd: z.number().nonnegative(), newUpperBoundUsd: z.number().nonnegative() }).strict();
-const runSchema = z.object({ schemaVersion: z.literal(1), runId: safeName, createdAt: z.iso.datetime(), directory: z.string(), evidenceKind: z.enum(["fixture", "live", "imported"]),
+const runSchema = z.object({ schemaVersion: z.literal(2), runId: safeName, createdAt: z.iso.datetime(), directory: z.string(), evidenceKind: z.enum(["fixture", "live", "imported"]),
   importedFrom: z.enum(["fixture", "live", "imported"]).nullable(), resumedFrom: z.string().nullable(), identity: identitySchema,
   qualification: z.enum(["plumbing_only", "experimental_unqualified"]), cases: z.array(caseSchema), attempts: z.array(eventSchema), budget: budgetSchema,
-  complete: z.boolean(), missingCount: z.number().int().nonnegative(), failedCount: z.number().int().nonnegative() }).strict();
+  complete: z.boolean(), targetsMet: z.boolean(), pass: z.boolean(), qualified: z.boolean(), metrics: json, missingCount: z.number().int().nonnegative(), failedCount: z.number().int().nonnegative() }).strict();
 export type EvaluationRun = z.infer<typeof runSchema>;
 export interface EvaluationOptions {
   mode: "fixture" | "live"; outputRoot?: string; maxRequests?: number; maxSpendUsd?: number;
@@ -123,7 +126,9 @@ function validateRun(record: EvaluationRun): void {
   for (const key of Object.keys(expectedAccounting) as (keyof typeof expectedAccounting)[]) if (record.budget[key] !== expectedAccounting[key]) throw new Error("Invalid budget/count checkpoint");
   const missing = record.cases.filter(c => c.status === "missing" || c.status === "unknown_completion").length;
   const failed = record.cases.filter(c => c.status === "unavailable" || c.passed === false).length;
-  if (record.missingCount !== missing || record.failedCount !== failed || record.complete !== record.cases.every(c => c.status === "complete" && c.passed === true)) throw new Error("Invalid completeness checkpoint");
+  if (record.missingCount !== missing || record.failedCount !== failed || record.complete !== record.cases.every(c => c.status === "complete")) throw new Error("Invalid completeness checkpoint");
+  if(record.pass!==(record.complete&&record.targetsMet)||record.qualified!==(record.evidenceKind==="live"&&record.identity.qualificationEligible&&record.pass))throw new Error("Invalid target/qualification checkpoint");
+  if(record.identity.assessmentPolicy==="all-cases-match-v1"&&record.targetsMet!==record.cases.every(c=>c.passed===true))throw new Error("Invalid default target checkpoint");
 }
 export function readEvaluationRecord(filename: string): EvaluationRun {
   try { const result = runSchema.parse(JSON.parse(readFileSync(filename, "utf8"))); validateRun(result); return result; }
@@ -161,13 +166,17 @@ function accounting(events: AttemptEvent[], currentRunId: string) {
   }
   return { totalRequests, newRequests, priorRequests: totalRequests - newRequests, settledUsd, reservedUsd, priorUpperBoundUsd, newUpperBoundUsd };
 }
-function refresh(run: EvaluationRun): void {
+function refresh(run: EvaluationRun, suite?:EvaluationSuite): void {
   run.budget = { ...run.budget, ...accounting(run.attempts, run.runId) };
   run.missingCount = run.cases.filter(c => c.status === "missing" || c.status === "unknown_completion").length;
   run.failedCount = run.cases.filter(c => c.status === "unavailable" || c.passed === false).length;
-  run.complete = run.cases.every(c => c.status === "complete" && c.passed === true);
+  run.complete = run.cases.every(c => c.status === "complete");
+  if(suite?.assess){const assessment=suite.assess(run.cases);run.targetsMet=assessment.targetsMet;run.metrics=json.parse(assessment.metrics);}
+  else if(run.identity.assessmentPolicy==="all-cases-match-v1"){run.targetsMet=run.cases.every(c=>c.passed===true);run.metrics={compared:run.cases.length,correct:run.cases.filter(c=>c.passed===true).length};}
+  run.pass=run.complete&&run.targetsMet;
+  run.qualified=run.evidenceKind==="live"&&run.identity.qualificationEligible&&run.pass;
 }
-function checkpoint(run: EvaluationRun): void { refresh(run); durableJson(join(run.directory, "run.json"), run); }
+function checkpoint(run: EvaluationRun, suite?:EvaluationSuite): void { refresh(run,suite); durableJson(join(run.directory, "run.json"), run); }
 function initializeDirectory(root: string): string {
   const directory = resolve(root, `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`);
   mkdirSync(directory, { recursive: true });
@@ -182,12 +191,14 @@ export async function runEvaluation(suite: EvaluationSuite, options: EvaluationO
     if (!process.env.TYPESAFE_API_KEY?.trim()) throw new Error("TYPESAFE_API_KEY is absent; see docs/operations/jev.md.");
   }
   if (options.retryUnknown?.length && !options.resume) throw new Error("--retry-unknown requires --resume; start a new run otherwise.");
+  if(suite.assess&&!suite.assessmentPolicy)throw new Error("Custom assessment requires an explicit versioned policy.");
+  if(suite.canQualify&&!suite.assess)throw new Error("Qualification requires an explicit suite-specific target assessment.");
   safeName.parse(suite.id); safeName.parse(suite.questionVersion); safeName.parse(suite.policyVersion);
   if (!suite.cases.length || new Set(suite.cases.map(c => c.id)).size !== suite.cases.length) throw new Error("Suite requires distinct cases.");
   for (const item of suite.cases) { safeName.parse(item.id); safeName.parse(item.split); json.parse(item.input); json.parse(item.expected); json.parse(item.baseline); }
   if (options.caseId && !suite.cases.some(c => c.id === options.caseId)) throw new Error("Unknown case ID; use --list.");
   const identity = identitySchema.parse({ suiteId: suite.id, task: suite.task, model: JEV_MODEL, questionVersion: suite.questionVersion, policyVersion: suite.policyVersion,
-    questionIdentity: suite.questionIdentity, questionDigest: hashJev(suite.questionIdentity), caseSetHash: hashJev(suite.cases.map(caseIdentity)), pricePolicy: PRICE_POLICY, source: sourceIdentity() });
+    questionIdentity: suite.questionIdentity, questionDigest: hashJev(suite.questionIdentity), caseSetHash: hashJev(suite.cases.map(caseIdentity)), assessmentPolicy:suite.assessmentPolicy??"all-cases-match-v1",qualificationEligible:suite.canQualify??false, pricePolicy: PRICE_POLICY, source: sourceIdentity() });
   const previous = options.resume ? readResume(options.resume) : null;
   if (previous && (previous.evidenceKind !== options.mode || hashJev(previous.identity) !== hashJev(identity))) throw new Error("Resume identity changed (source/model/questions/cases); start a new run.");
   const inherited = previous?.attempts ?? [];
@@ -197,8 +208,8 @@ export async function runEvaluation(suite: EvaluationSuite, options: EvaluationO
   if (options.mode === "live" && (priorAccounting.totalRequests > options.maxRequests! || priorAccounting.settledUsd + priorAccounting.reservedUsd > options.maxSpendUsd!)) throw new Error("Cumulative caps must cover all prior settled and reserved attempts; start a new capped run.");
   const directory = initializeDirectory(options.outputRoot ?? "test-results/jev");
   const runId = `jev-${randomUUID()}`;
-  const run: EvaluationRun = { schemaVersion: 1, runId, createdAt: new Date().toISOString(), directory, evidenceKind: options.mode, importedFrom: null,
-    resumedFrom: previous?.directory ?? null, identity, qualification: suite.qualification, attempts: [...inherited], complete: false, missingCount: suite.cases.length, failedCount: 0,
+  const run: EvaluationRun = { schemaVersion: 2, runId, createdAt: new Date().toISOString(), directory, evidenceKind: options.mode, importedFrom: null,
+    resumedFrom: previous?.directory ?? null, identity, qualification: suite.qualification, attempts: [...inherited], complete: false, targetsMet:false, pass:false, qualified:false, metrics:{}, missingCount: suite.cases.length, failedCount: 0,
     budget: { maxRequests: options.maxRequests ?? null, maxSpendUsd: options.maxSpendUsd ?? null, ...accounting(inherited, runId) },
     cases: suite.cases.map(c => {
       const old = previous?.cases.find(item => item.id === c.id);
@@ -208,7 +219,7 @@ export async function runEvaluation(suite: EvaluationSuite, options: EvaluationO
     }) };
   for (const event of run.attempts) durableAppend(join(directory, "attempts.jsonl"), event);
   for (const item of run.cases) durableAppend(join(directory, "cases.jsonl"), item);
-  checkpoint(run); options.onDirectory?.(directory);
+  checkpoint(run,suite); options.onDirectory?.(directory);
   const originalKey = process.env.TYPESAFE_API_KEY;
   if (options.mode === "fixture") process.env.TYPESAFE_API_KEY = "jev-local-fixture-only";
   try {
@@ -225,12 +236,12 @@ export async function runEvaluation(suite: EvaluationSuite, options: EvaluationO
         const request = requestSchema.parse(JSON.parse(String(init?.body)));
         const planned = item.requests[requestIndex];
         if (!planned || hashJev(request) !== hashJev(requestBody(planned))) throw new Error("Actual request differs from frozen request plan.");
-        refresh(run);
+        refresh(run,suite);
         if (options.mode === "live" && (run.budget.totalRequests + 1 > options.maxRequests! || run.budget.settledUsd + run.budget.reservedUsd + JEV_REQUEST_RESERVATION_USD > options.maxSpendUsd!)) { budgetBlocked = true; throw new Error("Budget exhausted before dispatch."); }
         const event: z.infer<typeof reservedSchema> = { schemaVersion: 1, event: "reserved", attemptId: `attempt-${randomUUID()}`, runId, caseId: item.id, requestIndex,
           requestHash: hashJev(request), request, recordedAt: new Date().toISOString(), evidenceKind: options.mode,
           reservedUsd: options.mode === "live" ? JEV_REQUEST_RESERVATION_USD : 0 };
-        durableAppend(join(directory, "attempts.jsonl"), event); run.attempts.push(event); caseAttemptIds.push(event.attemptId); checkpoint(run);
+        durableAppend(join(directory, "attempts.jsonl"), event); run.attempts.push(event); caseAttemptIds.push(event.attemptId); checkpoint(run,suite);
         const fixture = item.fixtureResponses[requestIndex++];
         const response = options.mode === "fixture" ? (fixture ? Response.json(fixture.body, { status: fixture.status }) : (() => { throw new Error("Missing fixture HTTP response"); })()) : await (options.fetch ?? globalThis.fetch)(url, init);
         const text = await response.clone().text();
@@ -241,7 +252,7 @@ export async function runEvaluation(suite: EvaluationSuite, options: EvaluationO
         const usage = validated?.usage ?? null;
         const complete: z.infer<typeof completedSchema> = { schemaVersion: 1, event: "completed", attemptId: event.attemptId, runId, caseId: item.id, recordedAt: new Date().toISOString(),
           status: response.status, response: body, usage, costUsd: validated?.estimatedCostUsd ?? null };
-        durableAppend(join(directory, "attempts.jsonl"), complete); run.attempts.push(complete); checkpoint(run);
+        durableAppend(join(directory, "attempts.jsonl"), complete); run.attempts.push(complete); checkpoint(run,suite);
         return response;
       };
       const start = performance.now();
@@ -258,13 +269,13 @@ export async function runEvaluation(suite: EvaluationSuite, options: EvaluationO
       row.usage = completions.length && completions.every(e => e.usage?.inputTokens != null && e.usage.outputTokens != null) ? {
         inputTokens: completions.reduce((sum, e) => sum + (e.usage?.inputTokens ?? 0), 0), outputTokens: completions.reduce((sum, e) => sum + (e.usage?.outputTokens ?? 0), 0) } : null;
       row.costUsd = completions.length && completions.every(e => e.costUsd != null) ? completions.reduce((sum, e) => sum + (e.costUsd ?? 0), 0) : null;
-      durableAppend(join(directory, "cases.jsonl"), row); checkpoint(run);
+      durableAppend(join(directory, "cases.jsonl"), row); checkpoint(run,suite);
       if (budgetBlocked) break;
     }
   } finally {
     if (options.mode === "fixture") { if (originalKey === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = originalKey; }
   }
-  checkpoint(run); writeFileSync(join(directory, "report.html"), renderJevReport(run));
+  checkpoint(run,suite); writeFileSync(join(directory, "report.html"), renderJevReport(run));
   return run;
 }
 /** Imported records are inspectable claims, never authenticated provider evidence. */
