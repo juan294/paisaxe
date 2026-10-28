@@ -9,7 +9,7 @@ import {
   type JevContext,
   type JevResult,
 } from "../jev/contracts";
-import type { BookingTurnInput } from "./agent";
+import type { BookingTurnInput } from "./turn-input";
 import {
   enumerateIntakeCandidates,
   type IntakeCriteria,

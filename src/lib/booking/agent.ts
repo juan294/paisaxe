@@ -38,13 +38,13 @@ import { resolveTranslation } from "@/lib/i18n/resolve";
 import type { Translations } from "@/lib/i18n/types";
 import { logger } from "@/lib/logger";
 import { CHAT_MODEL } from "@/lib/models";
-import type { BookingChatHistoryItem } from "@/types/booking-chat";
 import type { ChatStreamEvent } from "@/types/sse";
-import type { BookingDraft } from "./drafts";
-import { bookingToolDefinitions, executeBookingTool, type ToolContext } from "./tools";
-import { madridDate, type Booking } from "./types";
+import { bookingToolDefinitions, executeBookingTool } from "./tools";
+import { madridDate } from "./types";
 import { tryBookingIntake, type IntakeAttempt } from "./intake";
 import type { BookingModelClient } from "./model-client";
+import type { BookingTurnInput } from "./turn-input";
+export type { BookingTurnInput } from "./turn-input";
 
 export const MAX_TOOL_ITERATIONS = 6;
 export const ITERATION_CAP_MESSAGE =
@@ -62,26 +62,6 @@ export async function createBookingModelClient(): Promise<BookingModelClient> {
   if (replay) return (await import("./replay-model")).createReplayModelClient(replay);
   const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
   return new AnthropicSDK({ maxRetries: 1 });
-}
-
-export interface BookingTurnInput {
-  anthropic: BookingModelClient;
-  tools: ToolContext;
-  /** The visitor's text; empty only on the post-accept turn, which runs no model. */
-  message: string;
-  history: BookingChatHistoryItem[];
-  draft: BookingDraft;
-  bookings: Booking[];
-  /** Retrieved guide passages for descriptive questions, already formatted. */
-  contextText: string | null;
-  /** Set when the server verified a quote_accepted event for this turn. */
-  acceptedBooking: { id: string; reference: string } | null;
-  /** The visitor's interface language (es, en, fr, de, pt, ast), when known. */
-  locale?: string | null;
-  signal: AbortSignal;
-  /** Called on every model stream event, so the caller's idle window sees a held reply being written (#1045). */
-  onProgress?: () => void;
-  now?: Date;
 }
 
 function stateBlock(input: BookingTurnInput, now: Date): string {
