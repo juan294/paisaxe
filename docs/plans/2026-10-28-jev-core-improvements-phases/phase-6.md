@@ -51,3 +51,12 @@ Focused tests cover the new service, route, hook and panel plus `src/lib/supabas
 Recovery must be visible: invalid input highlights the field; disabled feature points to normal chat; expired access links to the existing access flow; exhausted allowance displays the limit; rate limit displays its retry time; empty/rejected results invite criteria changes; uncertain facts remain labelled; Jev failure still displays catalog options; catalog failure offers explicit retry/chat; cancellation exits loading and preserves editable inputs. Retry is a fresh, explicitly charged request. A restored configuration, replenished access, changed criteria or later successful request must recover without page reload or a sticky error cache. Capability is rechecked on panel reopen and explicit retry.
 
 Human review checks Spanish clarity, mobile layout, keyboard/focus behavior and screen-reader status announcements. Run the parent's 40-case blind matching comparison only under separately authorized live limits; a deterministic transport test cannot qualify real ranking quality. After the response schema and UI copy are frozen, `[batch-eligible]` units are server service/route/tests and hook/panel/tests, with disjoint file ownership. Integration owner owns admin-helper changes, voice-chat/i18n wiring, suite registration and E2E. Stop after Phase 6 acceptance; enabling runtime remains a separately authorized settings action.
+
+## Implementation acceptance
+
+- [x] MATCH-01–09, independent source/fixture/mobile review, repair and three simplify passes completed.
+- [x] All seven local gates, unchanged coverage thresholds, Knip, migration and cadence contracts passed.
+- [x] Fresh native contracts: 1,046/1,046 in 23 suites, no failures/skips.
+- [x] All four required local browser tests passed with retries disabled; matching API/browser and all 90 intake scenario arms completed, owned rows cleaned and task stack disposed.
+
+See [implementation notes](../2026-10-28-jev-core-improvements-notes.md) for exact source identities, findings, retained failed attempts and archive mapping. Deterministic acceptance does not qualify or activate runtime; blind live preference/latency remain unmeasured.

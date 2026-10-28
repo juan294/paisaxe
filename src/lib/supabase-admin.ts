@@ -33,6 +33,29 @@ export function createAdminClient(): SupabaseClient {
   return createClient(supabaseUrl, serviceKey);
 }
 
+/** Fresh request-bound client; cancellation never reaches the shared singleton. */
+export function createAbortableAdminClient(signal: AbortSignal): SupabaseClient {
+  const supabaseUrl = getRequiredSupabaseUrl();
+  const serviceKey = getSupabaseServiceKey();
+  if (!serviceKey) {
+    throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+  }
+  const fetchWithSignal: typeof globalThis.fetch = async (input, init) => {
+    const signals = [
+      signal,
+      init?.signal,
+      input instanceof Request ? input.signal : undefined,
+    ].filter((value): value is AbortSignal => value != null);
+    const combined = AbortSignal.any(signals);
+    combined.throwIfAborted();
+    return globalThis.fetch(input, { ...init, signal: combined });
+  };
+  return createClient(supabaseUrl, serviceKey, {
+    db: { retry: false },
+    global: { fetch: fetchWithSignal },
+  });
+}
+
 /** Singleton admin client — lazy-initialised, reused across requests (#787). */
 let _adminClient: ReturnType<typeof createAdminClient> | null = null;
 

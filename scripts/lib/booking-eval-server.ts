@@ -8,11 +8,14 @@ import type { AddressInfo } from "node:net";
 import type { JevOptions } from "../../src/lib/jev/client";
 import type { BookingModelClient } from "../../src/lib/booking/model-client";
 import type { BookingEvaluationMode } from "./booking-eval-harness";
+import type { MatchHandlerDependencies } from "../../src/lib/booking/match-handler";
 export interface BookingEvalServerOptions {
   mode: BookingEvaluationMode;
   createModel(): Promise<BookingModelClient>;
   jev?: JevOptions;
   now?: () => Date;
+  /** Optional matching route, bound locally before the listener starts. */
+  match?: MatchHandlerDependencies;
   /** Private local evidence only; never changes the HTTP error response. */
   onError?: (error: unknown) => void;
 }
@@ -66,12 +69,18 @@ export async function startBookingEvalServer(
         },
       }),
   });
+  const matching = options.match
+    ? (await import("../../src/lib/booking/match-handler")).createMatchHandlers(options.match)
+    : undefined;
   const server = createServer(async (incoming, outgoing) => {
     try {
-      if (
-        incoming.method !== "POST" ||
-        incoming.url !== "/api/booking/chat/stream"
-      ) {
+      const target = new URL(incoming.url ?? "/", "http://127.0.0.1");
+      const boundHandler = incoming.method === "POST" && incoming.url === "/api/booking/chat/stream"
+        ? handler
+        : target.pathname === "/api/booking/match" && matching
+          ? incoming.method === "GET" ? matching.GET : incoming.method === "POST" ? matching.POST : null
+          : null;
+      if (!boundHandler) {
         outgoing.writeHead(404);
         outgoing.end();
         return;
@@ -93,15 +102,15 @@ export async function startBookingEvalServer(
         if (!outgoing.writableEnded) abort.abort();
       });
       const request = new NextRequest(`http://127.0.0.1${incoming.url}`, {
-        method: "POST",
+        method: incoming.method,
         headers,
-        body: Buffer.concat(chunks).toString("utf8"),
+        ...(incoming.method === "POST" ? { body: Buffer.concat(chunks).toString("utf8") } : {}),
         signal: abort.signal,
       });
       const pending: Promise<unknown>[] = [];
       const closeCallbacks: (() => void)[] = [];
       const store = workStore.createWorkStore({
-        page: "/api/booking/chat/stream/route",
+        page: `${target.pathname}/route`,
         buildId: "local-evaluation",
         deploymentId: "local-evaluation",
         previouslyRevalidatedTags: [],
@@ -133,14 +142,14 @@ export async function startBookingEvalServer(
       });
       const units = requestStore.createRequestStoreForAPI(
         request,
-        { pathname: "/api/booking/chat/stream", search: "" },
+        { pathname: target.pathname, search: target.search },
         { tags: [], expirationsByCacheKind: new Map() },
         undefined,
         undefined,
         undefined,
       );
       const response = await workStorage.workAsyncStorage.run(store, () =>
-        unitStorage.workUnitAsyncStorage.run(units, () => handler(request)),
+        unitStorage.workUnitAsyncStorage.run(units, () => boundHandler(request)),
       );
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       if (response.body)

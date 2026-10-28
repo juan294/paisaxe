@@ -7,6 +7,7 @@ import { inspectEvaluation, runEvaluation, type EvaluationCase, type EvaluationS
 import { evidenceSuite } from "./jev-evidence";
 import { callOutcomeSuite } from "./jev-call-outcome";
 import { bookingIntakeSuite } from "./jev-booking-intake";
+import { experienceMatchSuite } from "./jev-experience-match";
 import { isMain } from "../lib/is-main";
 
 export const PROVIDER_CONTRACT_QUESTIONS: JevQuestionSet = { version: "provider-contract-v1", questions: {
@@ -29,7 +30,7 @@ export function providerContractSuite(): EvaluationSuite {
     } };
 }
 /** Integration owner registers bounded domain suites here; importing runs no evaluation. */
-export function registeredJevSuites(): EvaluationSuite[] { return [providerContractSuite(), bookingIntakeSuite(), callOutcomeSuite(), evidenceSuite()]; }
+export function registeredJevSuites(): EvaluationSuite[] { return [providerContractSuite(), bookingIntakeSuite(), callOutcomeSuite(), evidenceSuite(), experienceMatchSuite()]; }
 function parseArguments(argv: string[]): { command: string; values: Map<string, string> } {
   const command = argv[0] ?? "--list"; const values = new Map<string, string>();
   const allowed = new Set(["--suite", "--input", "--max-requests", "--max-spend-usd", "--case", "--resume", "--retry-unknown"]);

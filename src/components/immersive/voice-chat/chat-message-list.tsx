@@ -14,6 +14,7 @@ import { ChatMarkdown } from "./chat-markdown";
 import type { StreamChatMessage } from "@/hooks/use-stream-chat";
 
 interface ChatMessageListProps {
+  compact?: boolean;
   messages: StreamChatMessage[];
   isLoading: boolean;
   onUpsellDismiss: (index: number) => void;
@@ -114,6 +115,7 @@ export function ChatMessageList({
   onUpsellDismiss,
   showUpsells = true,
   renderCards,
+  compact = false,
 }: ChatMessageListProps) {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -141,7 +143,7 @@ export function ChatMessageList({
       aria-live="polite"
       aria-busy={isLoading}
       aria-label={t("accessibility.chat_messages")}
-      className="h-64 md:h-96 lg:h-[28rem] overflow-y-auto p-4 space-y-4"
+      className={compact ? "h-24 min-h-20 shrink overflow-y-auto p-4 space-y-4" : "h-64 md:h-96 lg:h-[28rem] overflow-y-auto p-4 space-y-4"}
     >
       {messages.length === 0 && (
         // UX-M7 (#900): this state copy computed to roughly 2.8:1 contrast

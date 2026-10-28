@@ -6,11 +6,13 @@ import userEvent from "@testing-library/user-event";
 import { VoiceChat } from "./voice-chat";
 import { Story } from "@/types/immersive";
 import { createMockT } from "@/test/i18n-mock";
+import { es } from "@/lib/i18n/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 import { imageProvenanceFixture } from "@/test/image-provenance-fixture";
 import { NEUTRAL_CREDIT, NEUTRAL_IMAGE } from "@/lib/image-provenance";
 
 // Mock i18n
-const mockT = createMockT();
+const mockT = (key: string) => key.startsWith("booking.match.") ? resolveTranslation(key, es) : createMockT()(key);
 vi.mock("@/lib/i18n", () => ({
   useTranslation: () => ({
     locale: "es",
@@ -2074,6 +2076,39 @@ describe("VoiceChat booking mode (PayPal hackathon Phase 3, F06)", () => {
     localStorageMock.clear();
     resetMockVoiceAccess();
     localStorageMock.setItem("paisaxe-privacy-acknowledged", "true");
+  });
+
+  it("matches only after explicit search and prefills/focuses the composer without sending a chat turn", async () => {
+    mockAuthState.session = { access_token: "token-1" };
+    mockBookingAccess.active = true;
+    const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
+    const option = { experience: { id: "exact", title: "Paseo exacto 🛶", description: "Paseo tranquilo", currency: "EUR", priceCents: 4000, depositCents: 1000, maxParty: 6, durationMinutes: 60, facts: [] }, suitability: "suitable", verdicts: [], reasons: [], slots: [{ date, startTime: "10:00", available: 6 }], alternatives: [] };
+    mockFetch.mockImplementation(async (url, init) => {
+      expect(String(url)).toMatch(/^\/api\/booking\/match/);
+      return init?.method === "POST"
+        ? Response.json({ status: "matched", reason: "style_matches", suggestions: [{ ...option, styleFit: "estimated" }], catalog: [option], examinedCount: 1, truncated: false, remaining: 4 })
+        : Response.json({ available: true });
+    });
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} bookingMode />);
+    expect(mockFetch).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Buscar a mi medida" }));
+    await screen.findByLabelText("¿Qué tipo de experiencia te apetece?");
+    await userEvent.type(screen.getByLabelText("¿Qué tipo de experiencia te apetece?"), "Tranquilo");
+    fireEvent.change(screen.getByLabelText("Fecha (opcional)"), { target: { value: date } });
+    fireEvent.change(screen.getByLabelText("Personas (opcional)"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Presupuesto máximo del grupo en euros (opcional)"), { target: { value: "40,50" } });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Acceso sin escalones" }));
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "Buscar experiencias" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Usar en el chat" }));
+    const composer = screen.getByRole("textbox", { name: "Escribe tu pregunta..." });
+    expect(composer).toHaveFocus();
+    expect((composer as HTMLInputElement).value).toContain("Paseo exacto 🛶");
+    expect((composer as HTMLInputElement).value).toContain(". Fecha:");
+    expect((composer as HTMLInputElement).value).toContain(date);
+    expect((composer as HTMLInputElement).value).toContain("Acceso sin escalones");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls.some(call => call[0] === "/api/booking/chat/stream")).toBe(false);
   });
 
   it("with voice access granted and booking mode on, shows the text booking chat instead of switching to voice", async () => {
