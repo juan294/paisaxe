@@ -196,6 +196,36 @@ probes:
       the scripted replay model. Confirmed and refunded are read back from
       Postgres; the cleanup oracle deletes the run's rows and verifies it.
 
+  - id: booking-intake
+    title: Booking intake route comparison and fallback recovery
+    owner: booking
+    tier: local-docker
+    safety: mutating-local
+    runner:
+      kind: playwright
+      project: release-required-local
+      selector: "@release-required @local-docker booking intake:"
+    oracles: [http, datastore, cleanup]
+    notes: >-
+      Real local authentication, quota and booking tools with synthetic provider
+      HTTP. Thirty frozen conversations in three arms, fallback and cancellation
+      recovery; every created row is removed and cleanup is read back.
+
+  - id: experience-matching
+    title: Experience matching quota, facts and composer-only selection
+    owner: booking
+    tier: local-docker
+    safety: mutating-local
+    runner:
+      kind: playwright
+      project: release-required-local
+      selector: "@release-required @local-docker experience matching:"
+    oracles: [ui, datastore, cleanup]
+    notes: >-
+      Real local quota and provider facts, synthetic provider HTTP, cancellation
+      recovery and mobile keyboard interaction. Selection fills the composer;
+      it cannot accept an offer or commit a booking.
+
   - id: favorite-roundtrip
     title: Favorite create, datastore read-back, cleanup
     owner: release

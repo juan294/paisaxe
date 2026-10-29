@@ -84,6 +84,16 @@ function spans<T extends number | string | boolean>(
     value: value(match),
   }));
 }
+/** Recognized Spanish tentative parties need clarification even outside the discovery fast path. */
+export function partySizeClarificationReason(message: string): "uncertain_party" | "ambiguous_party" | null {
+  if (new RegExp(`\\b${NUMBER}\\s*(?:o|y)\\s*${NUMBER}\\s+personas?\\b`, "i").test(message)) return "ambiguous_party";
+  const party = partySpans(message);
+  return party.some(candidate => UNCERTAIN_PARTY_PREFIX.test(message.slice(0, candidate.start)) || uncertainPartySuffix(message.slice(candidate.end))) ? "uncertain_party" : null;
+}
+function partySpans(message: string): IntakeSpan<number>[] {
+  return spans(message, new RegExp(`\\b(?:somos\\s+(${NUMBER})|(${NUMBER})\\s+personas?)\\b`, "gi"), "party",
+    match => NUMBERS[(match[1] ?? match[2] ?? "").toLowerCase()] ?? Number(match[1] ?? match[2]));
+}
 /** Enumerate only original spans; values, horizon and arithmetic are code-owned. */
 export function enumerateIntakeCandidates(
   message: string,
@@ -95,30 +105,10 @@ export function enumerateIntakeCandidates(
   });
   if (!message.trim() || message.length > 500 || EXCLUDED.test(message))
     return fallback("unsupported_request");
-  if (
-    new RegExp(
-      `\\b${NUMBER}\\s*(?:o|y)\\s*${NUMBER}\\s+personas?\\b`,
-      "i",
-    ).test(message)
-  )
-    return fallback("ambiguous_party");
-  const party = spans(
-    message,
-    new RegExp(`\\b(?:somos\\s+(${NUMBER})|(${NUMBER})\\s+personas?)\\b`, "gi"),
-    "party",
-    (match) =>
-      NUMBERS[(match[1] ?? match[2] ?? "").toLowerCase()] ??
-      Number(match[1] ?? match[2]),
-  );
+  const clarification = partySizeClarificationReason(message);
+  if (clarification) return fallback(clarification);
+  const party = partySpans(message);
   if (!party.length) return fallback("missing_party");
-  if (
-    party.some(
-      (candidate) =>
-        UNCERTAIN_PARTY_PREFIX.test(message.slice(0, candidate.start)) ||
-        uncertainPartySuffix(message.slice(candidate.end)),
-    )
-  )
-    return fallback("uncertain_party");
   if (
     party.some(
       (c) =>

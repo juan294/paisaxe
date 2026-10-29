@@ -363,6 +363,8 @@ describe("buildBookingInstructions (PayPal hackathon booking chat)", () => {
   it.each([
     ["never states a price that did not come from a tool", /precio[^.]*herramienta/i],
     ["asks only for missing fields", /solo lo que falte/i],
+    ["keeps requested constraints separate instead of reversing public transport", /sin escalones; con transporte público/],
+    ["asks before treating approximate parties as exact", /aproximad[^\n]*exacto[^\n]*update_booking_draft/],
     ["requires the accept button, never acceptance by text", /botón/i],
     ["never claims confirmation without get_booking_status", /get_booking_status/],
     ["says unsupported plainly and offers an alternative", /unsupported/],

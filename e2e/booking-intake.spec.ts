@@ -8,7 +8,7 @@ import { NOTHING_LEFT, requireLocalBookingEnv } from "./fixtures/booking-local";
  * The subprocess supplies server-only/Next request stores. It never calls a live model.
  * The existing full browser booking-roundtrip separately covers the visitor UI/proxy.
  */
-test("@local-docker booking intake: thirty complete route scenarios in three arms, fallback and cancellation recovery", async ({}, testInfo) => {
+test("@release-required @local-docker booking intake: thirty complete route scenarios in three arms, fallback and cancellation recovery", async ({}, testInfo) => {
   test.setTimeout(600_000);
   requireLocalBookingEnv();
   expect(process.env.SUPABASE_LOCAL_DB_MARKER, "task-owned database marker").toMatch(/^paisaxe-contracts:/);

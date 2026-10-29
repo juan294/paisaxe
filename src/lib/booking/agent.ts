@@ -42,6 +42,7 @@ import type { ChatStreamEvent } from "@/types/sse";
 import { bookingToolDefinitions, executeBookingTool } from "./tools";
 import { madridDate } from "./types";
 import { tryBookingIntake, type IntakeAttempt } from "./intake";
+import { partySizeClarificationReason } from "./intake-candidates";
 import type { BookingModelClient } from "./model-client";
 import type { BookingTurnInput } from "./turn-input";
 export type { BookingTurnInput } from "./turn-input";
@@ -182,6 +183,12 @@ export async function* streamBookingTurn(input: BookingTurnInput, dependencies: 
     return;
   }
   if (input.signal.aborted) return;
+  // A parser abstention must not let the ordinary model turn a tentative count into a draft/search.
+  const managingExistingBooking = input.bookings.length > 0 && /^\s*(?:quiero\s+)?(?:cancelar|cancela|pagar|paga)\s+(?:mi|la|esta)\s+reserva\b/i.test(input.message);
+  if (!managingExistingBooking && partySizeClarificationReason(input.message)) {
+    yield { type: "text", content: "¿Cuántas personas seréis exactamente?" };
+    return;
+  }
   const intake = await (dependencies.intake ?? tryBookingIntake)(input);
   if (intake.status === "aborted") return;
   if (intake.status === "handled") {

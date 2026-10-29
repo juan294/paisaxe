@@ -16,7 +16,7 @@ test.use({ locale: "es-ES", viewport: { width: 390, height: 844 } });
  * Authentication, metering and catalog use the owned database. Next proxy is
  * checked separately below; the bridge is explicitly outside proxy evidence.
  */
-test("@local-docker experience matching: real quota/facts/cancellation, mobile keyboard and composer-only selection", async ({
+test("@release-required @local-docker experience matching: real quota/facts/cancellation, mobile keyboard and composer-only selection", async ({
   page,
   request,
   baseURL,
