@@ -17,10 +17,17 @@ import {
 } from "../../src/lib/booking/intake-questions";
 import {
   JEV_POLICY_VERSION,
+  JEV_EVALUATION_DEADLINE_MS,
   type JevJsonValue,
   type JevState,
 } from "../../src/lib/jev/contracts";
-import { hashJev, type EvaluationSuite } from "../lib/jev-evaluation";
+import type { JevOptions } from "../../src/lib/jev/client";
+import {
+  hashJev,
+  jevWilsonInterval,
+  type EvaluationCaseRecord,
+  type EvaluationSuite,
+} from "../lib/jev-evaluation";
 import { bookingIntakeHttpFixture } from "../lib/booking-intake-http-fixture";
 export { bookingIntakeHttpFixture } from "../lib/booking-intake-http-fixture";
 export interface BookingIntakeFixtureInput {
@@ -155,7 +162,9 @@ export function validateBookingIntakeJudgments(
   }
   return output;
 }
-export function bookingIntakeSuite(): EvaluationSuite {
+export function bookingIntakeSuite(
+  options: Pick<JevOptions, "timeoutMs"> = {},
+): EvaluationSuite {
   const corpus = loadBookingIntakeCorpus();
   const judgments = validateBookingIntakeJudgments(
     JSON.parse(
@@ -176,7 +185,18 @@ export function bookingIntakeSuite(): EvaluationSuite {
     task: "booking_intake",
     questionVersion: INTAKE_QUESTION_VERSION,
     policyVersion: JEV_POLICY_VERSION,
-    questionIdentity: INTAKE_NOUlS,
+    questionIdentity: {
+      ...INTAKE_NOUlS,
+      executionProfile: {
+        timeoutMs: Math.min(
+          options.timeoutMs ?? JEV_EVALUATION_DEADLINE_MS,
+          JEV_EVALUATION_DEADLINE_MS,
+        ),
+      },
+    },
+    assessmentPolicy: "booking-intake-heldout-semantic-80-v1",
+    canQualify: false,
+    assess: (cases) => assessBookingIntake(cases, corpus),
     qualification: "experimental_unqualified",
     cases: [
       ...corpus.tuning.map((c) => ({ ...c, split: "tuning" })),
@@ -226,6 +246,7 @@ export function bookingIntakeSuite(): EvaluationSuite {
           task: "booking_intake",
           authorized: true,
         },
+        ...options,
         fetch,
       });
       return {
@@ -242,25 +263,17 @@ export function bookingIntakeSuite(): EvaluationSuite {
         unavailable:
           result.status === "aborted" ||
           (result.status === "fallback" &&
-            [
-              "provider_error",
-              "deadline",
-              "rate_limited",
-              "invalid_response",
-              "not_configured",
-            ].includes(result.reason)),
+            OPERATIONAL_REASONS.has(result.reason)),
+        reason:
+          result.status === "aborted"
+            ? "aborted"
+            : result.status === "fallback" &&
+                OPERATIONAL_REASONS.has(result.reason)
+              ? result.reason
+              : undefined,
       };
     },
-    compare(actual, expected) {
-      const a = actual as { status?: string; criteria?: unknown },
-        e = expected as { status?: string; criteria?: unknown };
-      return (
-        a.status === e.status &&
-        (e.status !== "accepted" ||
-          JSON.stringify(a.criteria) === JSON.stringify(e.criteria) ||
-          JSON.stringify(sort(a.criteria)) === JSON.stringify(sort(e.criteria)))
-      );
-    },
+    compare: sameIntakeOutcome,
   };
 }
 function sort(value: unknown): unknown {
@@ -271,4 +284,160 @@ function sort(value: unknown): unknown {
           .map(([k, v]) => [k, sort(v)]),
       )
     : value;
+}
+
+const OPERATIONAL_REASONS = new Set([
+  "provider_error",
+  "deadline",
+  "rate_limited",
+  "invalid_response",
+  "not_configured",
+  "invalid_config",
+  "disabled",
+  "aborted",
+]);
+function sameIntakeOutcome(
+  actual: JevJsonValue,
+  expected: JevJsonValue,
+): boolean {
+  const a = actual as { status?: string; criteria?: unknown },
+    e = expected as { status?: string; criteria?: unknown };
+  return (
+    a?.status === e?.status &&
+    (e.status !== "accepted" ||
+      JSON.stringify(a.criteria) === JSON.stringify(e.criteria) ||
+      JSON.stringify(sort(a.criteria)) === JSON.stringify(sort(e.criteria)))
+  );
+}
+const assessedOutcome = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("accepted"), criteria: z.unknown() }).strict(),
+  z
+    .object({ status: z.literal("fallback"), reason: z.string().min(1) })
+    .strict(),
+]);
+/** Apply the published semantic80% threshold only; paired runtime performance remains unmeasured. */
+function assessBookingIntake(
+  cases: EvaluationCaseRecord[],
+  corpus: ReturnType<typeof loadBookingIntakeCorpus>,
+) {
+  const references = [
+      ...corpus.tuning.map((c) => ({ ...c, split: "tuning" })),
+      ...corpus.heldout.map((c) => ({ ...c, split: "heldout" })),
+    ],
+    byId = new Map(references.map((c) => [c.id, c]));
+  const shape =
+    cases.length === 160 &&
+    new Set(cases.map((c) => c.id)).size === 160 &&
+    cases.every((c) => {
+      const reference = byId.get(c.id);
+      return (
+        reference &&
+        c.split === reference.split &&
+        hashJev(c.input) === hashJev(reference.input) &&
+        hashJev(c.expected) === hashJev(reference.expected)
+      );
+    });
+  const tuning = cases.filter((c) => c.split === "tuning"),
+    heldout = cases.filter((c) => c.split === "heldout");
+  const expected = (c: EvaluationCaseRecord) =>
+    byId.get(c.id)?.expected as { status?: string } | undefined;
+  const actual = (c: EvaluationCaseRecord) =>
+    c.outcome as { status?: string; reason?: string } | null;
+  const operational = cases.filter(
+    (c) =>
+      c.status !== "complete" ||
+      actual(c)?.status === "aborted" ||
+      (actual(c)?.status === "fallback" &&
+        OPERATIONAL_REASONS.has(actual(c)?.reason ?? "")),
+  );
+  const malformed = cases.filter(
+    (c) => !assessedOutcome.safeParse(c.outcome).success,
+  );
+  const accepted = cases.filter((c) => actual(c)?.status === "accepted");
+  const falseAccepted = accepted.filter(
+      (c) => expected(c)?.status !== "accepted",
+    ),
+    wrongCriteria = accepted.filter(
+      (c) =>
+        expected(c)?.status === "accepted" &&
+        !sameIntakeOutcome(c.outcome, byId.get(c.id)!.expected),
+    );
+  const eligible = heldout.filter((c) => expected(c)?.status === "accepted"),
+    fallback = heldout.filter((c) => expected(c)?.status === "fallback");
+  const correctAccepted = eligible.filter(
+    (c) =>
+      c.status === "complete" &&
+      sameIntakeOutcome(c.outcome, byId.get(c.id)!.expected),
+  ).length;
+  const correctFallback = fallback.filter(
+    (c) =>
+      c.status === "complete" &&
+      actual(c)?.status === "fallback" &&
+      !OPERATIONAL_REASONS.has(actual(c)?.reason ?? ""),
+  ).length;
+  const eligibleAbstentions = eligible.filter(
+    (c) =>
+      c.status === "complete" &&
+      actual(c)?.status === "fallback" &&
+      !OPERATIONAL_REASONS.has(actual(c)?.reason ?? ""),
+  ).length;
+  return {
+    targetsMet:
+      shape &&
+      operational.length === 0 &&
+      malformed.length === 0 &&
+      eligible.length === 60 &&
+      fallback.length === 60 &&
+      correctAccepted >= 48 &&
+      correctFallback === 60 &&
+      falseAccepted.length === 0 &&
+      wrongCriteria.length === 0,
+    metrics: {
+      suppliedCount: cases.length,
+      tuningCount: tuning.length,
+      tuningCorrectCount: tuning.filter(
+        (c) =>
+          c.status === "complete" &&
+          byId.has(c.id) &&
+          sameIntakeOutcome(c.outcome, byId.get(c.id)!.expected),
+      ).length,
+      heldoutCount: heldout.length,
+      heldoutEligibleCount: eligible.length,
+      heldoutCorrectAcceptedCount: correctAccepted,
+      heldoutEligibleAbstentionCount: eligibleAbstentions,
+      heldoutEligibleAcceptanceRate: correctAccepted / 60,
+      heldoutEligibleAcceptanceInterval95: jevWilsonInterval(
+        correctAccepted,
+        60,
+      ),
+      heldoutFallbackCount: fallback.length,
+      heldoutFallbackCorrectCount: correctFallback,
+      falseAcceptedCountAcrossAll160: falseAccepted.length,
+      incorrectAcceptedCriteriaCountAcrossAll160: wrongCriteria.length,
+      invalidOutcomeOrActionCount: malformed.length,
+      operationalOrIncompleteCount: operational.length,
+      providerErrorCount: cases.filter(
+        (c) =>
+          actual(c)?.status === "fallback" &&
+          OPERATIONAL_REASONS.has(actual(c)?.reason ?? ""),
+      ).length,
+      missingOrUnknownCount: cases.filter(
+        (c) => c.status === "missing" || c.status === "unknown_completion",
+      ).length,
+      completeReferenceSet: shape,
+      targets: {
+        minimumCorrectEligibleHeldout: 48,
+        eligibleHeldoutDenominator: 60,
+        requiredCorrectFallbackHeldout: 60,
+        maximumFalseAcceptedAcrossAll160: 0,
+        maximumIncorrectCriteriaAcrossAll160: 0,
+      },
+      adoptionReady: false,
+      pairedPerformanceStatus: "UNMEASURED",
+      qualificationScope:
+        "semantic_intake_assessment_only_not_runtime_activation",
+      sampleLimit:
+        "40 tuning and120 independently frozen heldout cases. Tuning is not part of the80% denominator. Semantic abstentions stay failed per-case; any operational or missing result makes assessment incomplete. Paired Claude performance and production behavior are unmeasured.",
+    },
+  };
 }

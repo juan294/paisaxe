@@ -45,6 +45,31 @@ const NUMBER =
   "(?:\\d+|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)";
 const EXCLUDED =
   /\b(?:lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo|cancelar|cancela|pagar|pago|pagado|cotizaci[oó]n|presupuesto de|reserva|reservar|cambiar|modificar|descuento|menos de|m[aá]s de|pasado ma[ñn]ana|por la ma[ñn]ana|por la tarde|por la noche|a las|horario|ni[ñn]os?|beb[eé]s?|a[ñn]os|idioma|ingl[eé]s|franc[eé]s|alem[aá]n|espa[ñn]ol|alergia|equipo|prefiero|preferimos|tranquilo|rom[aá]ntico)\b/i;
+// Qualifiers must attach to the party phrase; unrelated duration/budget uncertainty stays separate.
+const PARTY_UNCERTAINTY = String.raw`(?:aproximadamente|aprox\.?|alrededor\s+de|cerca\s+de|en\s+torno\s+a|m[aá]s\s+o\s+menos|un[oa]s|quiz[aá]s?|tal\s+vez|o\s+as[ií]|probablemente|posiblemente|puede\s+que|no\s+s[eé]\s+si|al\s+menos|como\s+m[ií]nimo|hasta|como\s+m[aá]ximo|o\s+m[aá]s|o\s+menos|y\s+pico)`;
+const UNCERTAIN_PARTY_PREFIX = new RegExp(
+  String.raw`\b${PARTY_UNCERTAINTY}\s+(?:(?:somos|seremos|seamos|ser|para|de)\s+)?$`,
+  "i",
+);
+const UNCERTAIN_PARTY_SUFFIX = new RegExp(
+  String.raw`^\s*(?:personas?\b\s*)?[,()]?\s*(${PARTY_UNCERTAINTY})(?=$|[\s,.!?;)])`,
+  "i",
+);
+// An adjacent qualifier may instead introduce a stated duration or monetary amount.
+const FOLLOWING_OTHER_QUANTITY = new RegExp(
+  String.raw`^\s+(?:${PARTY_UNCERTAINTY}\s+)*(?:\d+(?:[.,]\d+)?|${NUMBER}|un|media|medio|un\s+par\s+de|un\s+cuarto\s+de)\s*(?:horas?|minutos?|segundos?|d[ií]as?|euros?|€)(?=$|[\s,.;!?)])`,
+  "i",
+);
+const COUNT_ONLY_PARTY_SUFFIX =
+  /^(?:o\s+m[aá]s|o\s+menos|o\s+as[ií]|y\s+pico)$/i;
+function uncertainPartySuffix(text: string): boolean {
+  const qualifier = UNCERTAIN_PARTY_SUFFIX.exec(text);
+  return (
+    qualifier !== null &&
+    (COUNT_ONLY_PARTY_SUFFIX.test(qualifier[1]!) ||
+      !FOLLOWING_OTHER_QUANTITY.test(text.slice(qualifier[0].length)))
+  );
+}
 function spans<T extends number | string | boolean>(
   text: string,
   regex: RegExp,
@@ -86,6 +111,14 @@ export function enumerateIntakeCandidates(
       Number(match[1] ?? match[2]),
   );
   if (!party.length) return fallback("missing_party");
+  if (
+    party.some(
+      (candidate) =>
+        UNCERTAIN_PARTY_PREFIX.test(message.slice(0, candidate.start)) ||
+        uncertainPartySuffix(message.slice(candidate.end)),
+    )
+  )
+    return fallback("uncertain_party");
   if (
     party.some(
       (c) =>

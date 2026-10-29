@@ -37,18 +37,25 @@ it("all40 independently authored hard-filtered shortlists run through actualSDK 
         expect(JSON.stringify(request)).not.toMatch(
           /"expected"|"judgments"|"rubric"/,
         );
-        expect(request.state.candidates.length).toBeLessThanOrEqual(10);
+        expect(Object.keys(request.questions).length).toBeLessThanOrEqual(10);
+        expect(request.state).not.toHaveProperty("candidates");
         const eligible = (
           item.input as {
-            catalog: { suitability: string; experience: { id: string } }[];
+            catalog: {
+              suitability: string;
+              experience: { title: string; description: string | null };
+            }[];
           }
         ).catalog
           .filter((r) => r.suitability !== "rejected")
-          .slice(0, 10)
-          .map((r) => r.experience.id);
+          .slice(0, 10);
         expect(
-          request.state.candidates.map((r: { id: string }) => r.id),
-        ).toEqual(eligible);
+          Object.values(request.questions).map(
+            (q) =>
+              (q as { instructions: { candidate: { title: string } } })
+                .instructions.candidate.title,
+          ),
+        ).toEqual(eligible.map((r) => r.experience.title));
         const fixture = item.fixtureResponses[calls++];
         expect(fixture, item.id).toBeTruthy();
         return Response.json(fixture!.body, { status: fixture!.status });
@@ -85,10 +92,39 @@ it("all40 independently authored hard-filtered shortlists run through actualSDK 
   expect(summary.targetsMet).toBe(true);
   expect(summary.metrics.hardInvariantPassCount).toBe(40);
   expect(summary.metrics.fixtureAgreementCount).toBe(40);
+  expect(summary.metrics.positiveReferenceJudgedCount).toBeGreaterThan(0);
+  expect(summary.metrics.positiveReferenceRecoveredCount).toBe(
+    summary.metrics.positiveReferenceJudgedCount,
+  );
+  expect(summary.metrics.negativeReferencePromotedCount).toBe(0);
   expect(summary.metrics.blindPreferenceWins).toBeNull();
   expect(summary.metrics.blindPreferenceTies).toBeNull();
   expect(summary.metrics.p95LiveLatencyMs).toBeNull();
   expect(summary.metrics.adoptionReady).toBe(false);
+  const fresh = summarizeExperienceMatch(
+    rows.map((row) => ({ ...row, latencyKind: "fresh" })),
+  );
+  expect(fresh.metrics.judgmentSource).toBe("fresh_live");
+  expect(fresh.metrics.fixtureAgreementCount).toBeNull();
+  expect(fresh.metrics.fixtureAgreementDenominator).toBeNull();
+  expect(fresh.metrics.fixtureAgreementInterval95).toBeNull();
+  expect(fresh.metrics.referenceAgreementDenominator).toBe(40);
+  const mixed = summarizeExperienceMatch(
+    rows.map((row, index) => ({
+      ...row,
+      latencyKind: index ? "fixture" : "fresh",
+    })),
+  );
+  expect(mixed.metrics.fixtureAgreementCount).toBeNull();
+  expect(mixed.metrics.fixtureAgreementDenominator).toBeNull();
+  expect(mixed.metrics.fixtureAgreementInterval95).toBeNull();
+  expect(mixed.metrics.referenceAgreementCount).toBe(40);
+  expect(fresh.metrics.referenceAgreementCount).toBe(40);
+  expect(fresh.metrics.adoptionReadiness.reason).not.toMatch(
+    /canned|no.*authorized or performed/i,
+  );
+  expect(fresh.metrics.adoptionReady).toBe(false);
+
   expect(suite.canQualify).toBe(false);
   const wrong = structuredClone(rows);
   (wrong[0]!.outcome as { catalog: { experience: { priceCents: number } }[] })
@@ -294,4 +330,141 @@ it("P6-EVAL-01 runner preserves deterministic degraded facts but marks provider 
     outcome: { status: "matched", reason: "no_clear_style_match" },
   });
   expect(answered.qualified).toBe(false);
+});
+
+it("offline support diagnostics reject forged, omitted, duplicated, reordered and inconsistent records from actual SDK outcomes", async () => {
+  vi.stubEnv("TYPESAFE_API_KEY", "fixture-only");
+  const suite = experienceMatchSuite(),
+    item = suite.cases[0]!;
+  const actual = await suite.evaluate(item.input, {
+    fetch: async () => Response.json(item.fixtureResponses[0]!.body),
+  });
+  type DiagnosticResult = {
+    offlineDiagnostics?: {
+      candidates: {
+        experienceId: string;
+        probability: number;
+        positive: boolean;
+      }[];
+    };
+  };
+  const pristine = actual.value as DiagnosticResult;
+  expect(pristine.offlineDiagnostics!.candidates).toHaveLength(3);
+  const mutations: [string, (value: DiagnosticResult) => void][] = [
+    [
+      "candidate_support_ids_changed",
+      (value) => {
+        value.offlineDiagnostics!.candidates[0]!.experienceId =
+          "forged-candidate";
+      },
+    ],
+    [
+      "candidate_support_ids_changed",
+      (value) => {
+        value.offlineDiagnostics!.candidates[1]!.experienceId =
+          value.offlineDiagnostics!.candidates[0]!.experienceId;
+      },
+    ],
+    [
+      "candidate_support_ids_changed",
+      (value) => {
+        value.offlineDiagnostics!.candidates.reverse();
+      },
+    ],
+    [
+      "candidate_support_ids_changed",
+      (value) => {
+        value.offlineDiagnostics!.candidates.pop();
+      },
+    ],
+    [
+      "missing_candidate_support_diagnostics",
+      (value) => {
+        delete value.offlineDiagnostics;
+      },
+    ],
+    [
+      "candidate_support_positive_inconsistent",
+      (value) => {
+        value.offlineDiagnostics!.candidates[0]!.probability = 0.01;
+        value.offlineDiagnostics!.candidates[0]!.positive = true;
+      },
+    ],
+    [
+      "candidate_support_positive_inconsistent",
+      (value) => {
+        value.offlineDiagnostics!.candidates[0]!.probability = 0.9;
+        value.offlineDiagnostics!.candidates[0]!.positive = false;
+      },
+    ],
+  ];
+  for (const [violation, mutate] of mutations) {
+    const changed = structuredClone(actual.value) as DiagnosticResult;
+    mutate(changed);
+    expect(checkMatchInvariants(item.input, changed)).toContain(violation);
+    const row: EvaluationCaseRecord = {
+      id: item.id,
+      split: item.split,
+      input: item.input,
+      inputHash: "0".repeat(64),
+      expected: item.expected,
+      baseline: item.baseline,
+      requests: [],
+      status: "complete",
+      outcome: changed as EvaluationCaseRecord["outcome"],
+      passed: false,
+      reason: null,
+      attemptIds: [],
+      latencyMs: 1,
+      latencyKind: "fresh",
+      usage: null,
+      costUsd: null,
+      sourceRunId: "diagnostic-mutation",
+    };
+    expect(
+      summarizeExperienceMatch([row]).metrics.candidateSupportDiagnostics,
+    ).toEqual([]);
+  }
+  for (const caseId of ["match-20", "match-31"]) {
+    const boundedCase = suite.cases.find((c) => c.id === caseId)!;
+    const boundedOutput = await suite.evaluate(boundedCase.input, {
+      fetch: async () => Response.json(boundedCase.fixtureResponses[0]!.body),
+    });
+    const changed = structuredClone(boundedOutput.value) as DiagnosticResult;
+    const catalog = (
+      boundedCase.input as {
+        catalog: { suitability: string; experience: { id: string } }[];
+      }
+    ).catalog;
+    const excluded =
+      caseId === "match-20"
+        ? catalog.find((row) => row.suitability === "rejected")!
+        : catalog.filter((row) => row.suitability !== "rejected")[10]!;
+    changed.offlineDiagnostics!.candidates[0]!.experienceId =
+      excluded.experience.id;
+    expect(checkMatchInvariants(boundedCase.input, changed)).toContain(
+      "candidate_support_ids_changed",
+    );
+  }
+  const degraded = await suite.evaluate(item.input, {
+    fetch: async () => Response.json({}, { status: 429 }),
+  });
+  const contaminated = structuredClone(degraded.value) as DiagnosticResult;
+  contaminated.offlineDiagnostics!.candidates =
+    pristine.offlineDiagnostics!.candidates;
+  expect(checkMatchInvariants(item.input, contaminated)).toContain(
+    "unexpected_candidate_support_diagnostics",
+  );
+  const empty = suite.cases.find((c) => c.requests.length === 0)!;
+  const emptyResult = await suite.evaluate(empty.input, {
+    fetch: async () => {
+      throw new Error("No inference for empty/rejected catalog");
+    },
+  });
+  const fakeEmpty = structuredClone(emptyResult.value) as DiagnosticResult;
+  fakeEmpty.offlineDiagnostics!.candidates =
+    pristine.offlineDiagnostics!.candidates;
+  expect(checkMatchInvariants(empty.input, fakeEmpty)).toContain(
+    "unexpected_candidate_support_diagnostics",
+  );
 });

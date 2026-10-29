@@ -181,7 +181,7 @@ it("caps semantic projection10, suggestions3, preserves all catalog facts/reject
     );
   }
   expect(rows[0]!.experience.id).toBe("a");
-  expect(MATCH_QUESTION_VERSION).toBe("experience-match-v1");
+  expect(MATCH_QUESTION_VERSION).toBe("experience-match-v2");
 });
 it("ties and no confident positives preserve original within-partition order; rejected rows never enter questions", async () => {
   const rows = [
@@ -417,11 +417,11 @@ it("real catalog HTTP preserves nullable descriptions and confirmed null details
       },
     ],
   });
-  const state = JSON.parse(String(semantic.mock.calls[0]?.[1]?.body)).state;
-  expect(state.candidates[0]).toMatchObject({
+  const wire = JSON.parse(String(semantic.mock.calls[0]?.[1]?.body));
+  expect(wire.questions.fit_0.instructions.candidate).toMatchObject({
     description: "",
-    confirmedFacts: [{ detail: null }],
   });
+  expect(wire.state).not.toHaveProperty("candidates");
   description = "Paseo tranquilo";
   expect(
     await matchExperiences(client, input, { now, fetch: http([0.99]) }),
@@ -481,4 +481,145 @@ it("clock deadline reached just after real catalog completion degrades determini
     await matchExperiences(client, request, { now, fetch: semantic }),
   ).toMatchObject({ status: "matched" });
   expect(semantic).toHaveBeenCalledTimes(1);
+});
+
+it("V2 sends one independent candidate per actual SDK question without shared-list lookup, hard data or private fields", async () => {
+  const first = result("opaque-a"),
+    second = result("opaque-b");
+  first.experience.title = "Paseo del agua";
+  second.experience.title = "Paseo del bosque";
+  first.experience.description = "Ritmo pausado con observación del río.";
+  second.experience.description =
+    "Caminata tranquila con pausas entre árboles.";
+  const p = prepareExperienceMatch(request, [
+    first,
+    second,
+    result("never-sent", "rejected"),
+  ]);
+  const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    expect(body.state).toEqual({
+      preference: request.preference,
+      sourcePolicy: expect.any(String),
+    });
+    expect(
+      Object.values(body.questions).map(
+        (q) =>
+          (q as { instructions: { candidate: unknown } }).instructions
+            .candidate,
+      ),
+    ).toEqual([
+      {
+        title: first.experience.title,
+        description: first.experience.description,
+      },
+      {
+        title: second.experience.title,
+        description: second.experience.description,
+      },
+    ]);
+    for (const q of Object.values(body.questions)) {
+      const instructions = (q as { instructions: { question: string } })
+        .instructions;
+      expect(instructions.question).toMatch(/independent|independently/i);
+      expect(instructions.question).toMatch(/many|multiple/i);
+    }
+    expect(JSON.stringify(body)).not.toMatch(
+      /opaque-a|opaque-b|private-merchant|priceCents|depositCents|never-sent|slots|remaining/,
+    );
+    return Response.json({
+      model: JEV_MODEL,
+      answers: {
+        fit_0: { type: "noul", noul: 0.99 },
+        fit_1: { type: "noul", noul: 0.99 },
+      },
+      usage: { input_tokens: 10, output_tokens: 0 },
+    });
+  });
+  const { askJev } = await import("../jev/client");
+  const judgment = await askJev(
+    p.questionSet!,
+    p.state!,
+    { mode: "runtime", task: "experience_match" },
+    undefined,
+    { fetch },
+  );
+  expect(rankExperienceMatches(p, judgment)).toMatchObject({
+    status: "matched",
+    suggestions: [{ styleFit: "estimated" }, { styleFit: "estimated" }],
+  });
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("V2 ten-candidate Unicode payload stays below the shared byte ceiling and never truncates public facts", async () => {
+  const rows = Array.from({ length: 12 }, (_, i) => {
+    const r = result(`unicode-${i}`);
+    r.experience.title = "🧭".repeat(200);
+    r.experience.description = "🌳".repeat(1500);
+    return r;
+  });
+  const prepared = prepareExperienceMatch(
+    { ...request, preference: "🌿".repeat(120) },
+    rows,
+  );
+  const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    expect(
+      Buffer.byteLength(
+        JSON.stringify({ state: body.state, questions: body.questions }),
+        "utf8",
+      ),
+    ).toBeLessThanOrEqual(32768);
+    expect(Object.keys(body.questions)).toHaveLength(10);
+    for (const question of Object.values(body.questions)) {
+      const candidate = (
+        question as {
+          instructions: { candidate: { title: string; description: string } };
+        }
+      ).instructions.candidate;
+      expect(Buffer.byteLength(candidate.title)).toBeLessThanOrEqual(240);
+      expect(Buffer.byteLength(candidate.description)).toBeLessThanOrEqual(
+        1200,
+      );
+      expect(candidate.description).not.toContain("�");
+    }
+    return Response.json({
+      model: JEV_MODEL,
+      answers: Object.fromEntries(
+        Object.keys(body.questions).map((id) => [
+          id,
+          { type: "noul", noul: 0.5 },
+        ]),
+      ),
+      usage: { input_tokens: 10, output_tokens: 0 },
+    });
+  });
+  const { askJev } = await import("../jev/client");
+  const judged = await askJev(
+    prepared.questionSet!,
+    prepared.state!,
+    { mode: "runtime", task: "experience_match" },
+    undefined,
+    { fetch },
+  );
+  expect(judged.status).toBe("answered");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(prepared.catalog[0]!.experience.description).toBe(
+    rows[0]!.experience.description,
+  );
+  const cancelled = new AbortController();
+  cancelled.abort();
+  fetch.mockClear();
+  expect(
+    (
+      await askJev(
+        prepared.questionSet!,
+        prepared.state!,
+        { mode: "runtime", task: "experience_match" },
+        cancelled.signal,
+        { fetch },
+      )
+    ).status,
+  ).toBe("unavailable");
+  expect(fetch).not.toHaveBeenCalled();
 });

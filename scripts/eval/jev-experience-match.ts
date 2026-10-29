@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { askJev } from "../../src/lib/jev/client";
+import { askJev, type JevOptions } from "../../src/lib/jev/client";
 import {
   JEV_MODEL,
   JEV_POLICY_VERSION,
+  JEV_POSITIVE_THRESHOLD,
   type JevJsonValue,
   type JevState,
 } from "../../src/lib/jev/contracts";
@@ -139,6 +140,10 @@ const corpusSchema = z
     cases: z.array(caseSchema).length(40),
   })
   .strict();
+/** Reuse the unchanged strict supplied-snapshot contract in independent offline suites. */
+export function parseExperienceMatchSnapshot(input: unknown) {
+  return snapshotSchema.parse(input);
+}
 export function loadExperienceMatchCorpus() {
   const corpus = corpusSchema.parse(
     JSON.parse(
@@ -202,6 +207,24 @@ const resultShape = z
     truncated: z.boolean(),
     remaining: integer,
     reason: z.string().optional(),
+    offlineDiagnostics: z
+      .object({
+        scope: z.literal("offline_candidate_support_only"),
+        questionVersion: z.literal(MATCH_QUESTION_VERSION),
+        candidates: z
+          .array(
+            z
+              .object({
+                experienceId: nonempty,
+                probability: z.number().min(0).max(1),
+                positive: z.boolean(),
+              })
+              .strict(),
+          )
+          .max(10),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const suggestionShape = z
@@ -223,6 +246,25 @@ export function checkMatchInvariants(
     violations: string[] = [],
     expected = catalog.map(authoritativeOption),
     eligible = catalog.filter((r) => r.suitability !== "rejected").slice(0, 10);
+  const diagnostics = a.offlineDiagnostics;
+  if (a.status === "matched") {
+    if (!diagnostics) violations.push("missing_candidate_support_diagnostics");
+    else if (
+      hashJev(
+        diagnostics.candidates.map((candidate) => candidate.experienceId),
+      ) !== hashJev(eligible.map((row) => row.experience.id))
+    )
+      violations.push("candidate_support_ids_changed");
+  } else if (diagnostics?.candidates.length) {
+    violations.push("unexpected_candidate_support_diagnostics");
+  }
+  if (
+    diagnostics?.candidates.some(
+      (candidate) =>
+        candidate.positive !== candidate.probability >= JEV_POSITIVE_THRESHOLD,
+    )
+  )
+    violations.push("candidate_support_positive_inconsistent");
   if (hashJev(a.catalog) !== hashJev(expected))
     violations.push("catalog_hard_facts_changed");
   if (a.suggestions.length > 3) violations.push("suggestion_cap_exceeded");
@@ -295,6 +337,28 @@ function agrees(actual: unknown, expected: unknown): boolean {
   );
 }
 export function summarizeExperienceMatch(cases: EvaluationCaseRecord[]) {
+  const fixtureOnly =
+    cases.length > 0 && cases.every((c) => c.latencyKind === "fixture");
+  const freshOnly =
+    cases.length > 0 && cases.every((c) => c.latencyKind === "fresh");
+  const candidateSupportDiagnostics = cases.flatMap((c) => {
+    const parsed = resultShape.safeParse(c.outcome);
+    const reference = z
+      .record(z.string(), z.enum(["true", "false", "uncertain"]))
+      .safeParse(
+        (c.expected as { candidateSupport?: unknown } | null)?.candidateSupport,
+      );
+    return parsed.success &&
+      checkMatchInvariants(c.input, c.outcome).length === 0
+      ? (parsed.data.offlineDiagnostics?.candidates ?? []).map((candidate) => ({
+          caseId: c.id,
+          ...candidate,
+          reference: reference.success
+            ? (reference.data[candidate.experienceId] ?? "unlabelled")
+            : "unlabelled",
+        }))
+      : [];
+  });
   const complete = cases.filter((c) => c.status === "complete"),
     agreements = complete.filter((c) => agrees(c.outcome, c.expected)).length,
     hardPass = complete.filter(
@@ -309,9 +373,19 @@ export function summarizeExperienceMatch(cases: EvaluationCaseRecord[]) {
     metrics: {
       scope: "frozen_hard_filtered_shortlist_comparison",
       caseCount: cases.length,
-      fixtureAgreementCount: agreements,
-      fixtureAgreementDenominator: 40,
-      fixtureAgreementInterval95: jevWilsonInterval(agreements, 40),
+      judgmentSource: fixtureOnly
+        ? "synthetic_fixture"
+        : freshOnly
+          ? "fresh_live"
+          : "mixed_or_replayed",
+      referenceAgreementCount: agreements,
+      referenceAgreementDenominator: 40,
+      referenceAgreementInterval95: jevWilsonInterval(agreements, 40),
+      fixtureAgreementCount: fixtureOnly ? agreements : null,
+      fixtureAgreementDenominator: fixtureOnly ? 40 : null,
+      fixtureAgreementInterval95: fixtureOnly
+        ? jevWilsonInterval(agreements, 40)
+        : null,
       hardInvariantPassCount: hardPass,
       hardInvariantDenominator: 40,
       hardInvariantInterval95: jevWilsonInterval(hardPass, 40),
@@ -325,12 +399,27 @@ export function summarizeExperienceMatch(cases: EvaluationCaseRecord[]) {
       blindPreferenceWins: null,
       blindPreferenceTies: null,
       p95LiveLatencyMs: null,
-      liveMeasurementStatus: "UNMEASURED",
+      candidateSupportDiagnostics,
+      positiveReferenceJudgedCount: candidateSupportDiagnostics.filter(
+        (c) => c.reference === "true",
+      ).length,
+      positiveReferenceRecoveredCount: candidateSupportDiagnostics.filter(
+        (c) => c.reference === "true" && c.positive,
+      ).length,
+      negativeReferencePromotedCount: candidateSupportDiagnostics.filter(
+        (c) => c.reference === "false" && c.positive,
+      ).length,
+      liveMeasurementStatus: freshOnly
+        ? "FRESH_SEMANTIC_MEASUREMENT_ONLY"
+        : "UNMEASURED",
       adoptionReady: false,
       adoptionReadiness: {
         status: "UNMEASURED",
-        reason:
-          "Canned judgments exercise contracts only. No blinded fresh live comparison or semantic latency measurement has been authorized or performed.",
+        reason: fixtureOnly
+          ? "Canned judgments exercise contracts only; this run is not a blinded live preference comparison."
+          : freshOnly
+            ? "Fresh live judgments measure reference agreement and candidate support only. Independent blinded preference wins and application latency qualification remain unmeasured."
+            : "Mixed, imported or replayed judgments do not establish a fresh paired blinded preference comparison.",
         requiredTargets: {
           minimumBlindWins: 24,
           blindComparisonDenominator: 40,
@@ -353,11 +442,13 @@ export function summarizeExperienceMatch(cases: EvaluationCaseRecord[]) {
           hardInvariantViolations: checkMatchInvariants(c.input, c.outcome),
         })),
       sampleLimit:
-        "40 independently authored Spanish preference/shortlist fixtures. Wilson intervals describe synthetic fixture agreement, not live preference quality or population safety. No catalog search, quota, user interaction or DB mutation is exercised by this offline snapshot suite.",
+        "40 independently authored frozen Spanish preference/shortlist snapshots. Reference agreement and candidate support are distinct from blinded preference wins; identical baseline and candidate orders cannot establish an ordering win. No catalog search, quota, user interaction or DB mutation is exercised by this offline snapshot suite.",
     },
   };
 }
-export function experienceMatchSuite(): EvaluationSuite {
+export function experienceMatchSuite(
+  options: Pick<JevOptions, "timeoutMs"> = {},
+): EvaluationSuite {
   const corpus = loadExperienceMatchCorpus();
   return {
     id: "experience-match",
@@ -366,11 +457,11 @@ export function experienceMatchSuite(): EvaluationSuite {
     policyVersion: JEV_POLICY_VERSION,
     questionIdentity: {
       version: MATCH_QUESTION_VERSION,
-      projection: "bounded-hard-filtered-snapshot-top10-v1",
+      projection: "bounded-question-local-candidate-top10-v2",
       ranking: "stable-positive-noul-within-suitability-partitions-v1",
     },
     qualification: "experimental_unqualified",
-    assessmentPolicy: "matching-synthetic-contract-v1",
+    assessmentPolicy: "matching-reference-and-candidate-support-v2",
     canQualify: false,
     cases: corpus.cases.map((item) => {
       const p = prepareExperienceMatch(item.input.request, item.input.catalog);
@@ -398,6 +489,7 @@ export function experienceMatchSuite(): EvaluationSuite {
         input: item.input as unknown as JevState,
         expected: {
           ...item.expected,
+          candidateSupport: item.judgments,
           rubric: item.rubric,
           reference: item.input,
         } as unknown as JevJsonValue,
@@ -411,7 +503,7 @@ export function experienceMatchSuite(): EvaluationSuite {
       };
     }),
     async evaluate(input, { fetch }) {
-      const snapshot = snapshotSchema.parse(input);
+      const snapshot = parseExperienceMatchSnapshot(input);
       const p = prepareExperienceMatch(
         snapshot.request as MatchRequest,
         snapshot.catalog,
@@ -422,11 +514,30 @@ export function experienceMatchSuite(): EvaluationSuite {
             p.state!,
             { mode: "evaluation", task: "experience_match", authorized: true },
             undefined,
-            { fetch },
+            { ...options, fetch },
           )
         : null;
       return {
-        value: rankExperienceMatches(p, judgment) as unknown as JevJsonValue,
+        value: {
+          ...rankExperienceMatches(p, judgment),
+          offlineDiagnostics: {
+            scope: "offline_candidate_support_only",
+            questionVersion: MATCH_QUESTION_VERSION,
+            candidates:
+              judgment?.status === "answered"
+                ? p.candidates.map((candidate, index) => {
+                    const answer = judgment.answers[`fit_${index}`];
+                    const probability =
+                      answer?.type === "noul" ? answer.noul : NaN;
+                    return {
+                      experienceId: candidate.experience.id,
+                      probability,
+                      positive: probability >= JEV_POSITIVE_THRESHOLD,
+                    };
+                  })
+                : [],
+          },
+        } as unknown as JevJsonValue,
         unavailable: judgment?.status === "unavailable",
         reason:
           judgment?.status === "unavailable" ? judgment.reason : undefined,

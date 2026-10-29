@@ -154,7 +154,23 @@ const provider: typeof fetch = async (input, init) => {
     "payments",
   ])
     assert.ok(!Object.hasOwn(request.state, secret));
-  assert.ok(request.state.candidates.length <= 10);
+  assert.ok(!Object.hasOwn(request.state, "candidates"));
+  assert.ok(Object.keys(request.questions).length <= 10);
+  for (const question of Object.values(request.questions) as {
+    instructions: { candidate: { title: string; description: string } };
+  }[]) {
+    assert.deepEqual(Object.keys(question.instructions.candidate).sort(), [
+      "description",
+      "title",
+    ]);
+    assert.ok(
+      Buffer.byteLength(question.instructions.candidate.title, "utf8") <= 240,
+    );
+    assert.ok(
+      Buffer.byteLength(question.instructions.candidate.description, "utf8") <=
+        1200,
+    );
+  }
   if (fault === "provider")
     return Response.json({ error: "synthetic rate limit" }, { status: 429 });
   if (fault === "partial")
