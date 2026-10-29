@@ -62,6 +62,8 @@ const releaseSpecs = [
   "**/release-artifact-smoke.spec.ts",
   "**/booking-access-boundary.spec.ts",
   "**/booking-roundtrip.spec.ts",
+  "**/booking-intake.spec.ts",
+  "**/booking-match.spec.ts",
 ];
 
 /**

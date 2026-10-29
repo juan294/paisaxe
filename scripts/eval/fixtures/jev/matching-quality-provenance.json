@@ -1,0 +1,1106 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "experience-match-quality-v1",
+  "authorship": "Independently authored synthetic Spanish preferences and invented Asturias-oriented catalog snapshots; not real offers, visitor records, market prevalence, or observed provider data.",
+  "authorRole": "Clean benchmark author isolated from model/live outputs, old case judgments, credentials and the new matching implementation.",
+  "sourceCommit": "e84f9196",
+  "candidateOrder": {
+    "predeclaredSeed": "paisaxe-independent-quality-v1-2026-10-29",
+    "rule": "For each case assign price rank by ascending hexadecimal SHA256(UTF8(seed + colon + caseId + colon + optionId)); price=1600+700*rank. Then stable-sort catalog by suitable, unconfirmed, rejected and ascending price, using ID as deterministic final tie-break. Rejected over-budget trap uses 9500 cents.",
+    "declaration": "Seed and rule communicated to parent before writing reference judgments; no resampling, no order edits based on expected or observed model behavior.",
+    "semanticInputsExcludedFromOrder": [
+      "preference",
+      "description",
+      "reference labels",
+      "model outputs"
+    ]
+  },
+  "construction": {
+    "caseCount": 40,
+    "strata": {
+      "ordinary": 28,
+      "ambiguous_tradeoff": 8,
+      "no_clear_style": 1,
+      "equivalent_positive_control": 1,
+      "absent_style_control": 1,
+      "insufficient_evidence_control": 1
+    },
+    "referenceMeaning": "Independent description-level soft-fit categories, not normalized scores or a total order; labels cover all catalog IDs including hard-rejected traps. Hard facts and partitions always prevail.",
+    "controls": "No clear preference, equivalent explicitly supported options, absent requested activity, and insufficient description evidence.",
+    "hardFactMethod": "Fixed explicit date and party/budget; slots, capacity, price/deposit, provider-confirmed facts and verdicts authored consistently. Unconfirmed rows explicitly lack provider confirmation. Ineligible traps cycle party size, no availability, unsupported access and budget by case ordinal.",
+    "blindReview": "Reviewer must not see reference labels, model identity or source ordering labels; compare the final user-facing shortlists on actual usefulness to the stated preference, respect hard facts and allow ties. Presentation side randomization is a separate reviewer protocol; corpus order is not reviewer side assignment."
+  },
+  "integrity": {
+    "datasetSha256": "adcc584ce57ff7fa40978163893d1f962fd560defcec42cf55faa333909760a6",
+    "canonicalInputSha256": {
+      "quality-01": "74317f05e2fa7dc79c59c973d3468c7e9e8c7e9759f0fb852c95e88b7a9199a0",
+      "quality-02": "40ae3747a1fa16f52d2e2d9ad409244e589930f58d0c44e06aa118e706ebf925",
+      "quality-03": "2af8c79fd1634ea97151d5ff0438f4e28279eb030e2ec224b64a201b2ec49198",
+      "quality-04": "09104a253165c79c4cf96f713824b9c4d2061f6236ecaff2eb0bdd14141ea56a",
+      "quality-05": "b3e9d58f4c4ecd2026a5d9ba1e0b54fc0ca1fb1c00778036d367cc3bde4428e4",
+      "quality-06": "b924334de91cd31a9bb85b80bc0df22848bc3950e326bfd1d2faf9fff53fb8e9",
+      "quality-07": "be89ab52614440640bb43ec8cc26968cab4dfd471483ce9c89cd40dcba7b5609",
+      "quality-08": "03a4e0f117bcd0399f2c8b8d2d10529a04392832f47bf3a6e0035e0d2b3a2115",
+      "quality-09": "b874c4c95b0d0294ce0b714b06b59ef06840474f75dfe747974cafdbba10e7cf",
+      "quality-10": "677d0c018bebc3077fe5ffaec501d85a6616bb912a03916ddefb2247d948632f",
+      "quality-11": "0106d3ad5839545a97c91d44876dd68180f9dfaf9c3a7975ea6f0436500cd2e7",
+      "quality-12": "2424812b74eaeb9cc3589131f1aa36ad9ef63c4755f05be5fde47a7b4d756685",
+      "quality-13": "b3ca2df9c84be4c1b6e8da629570231a6829c277e99a21fe053052e794931ea3",
+      "quality-14": "f03bef404e85ffcae11f37bc37f22e4797cab1080a44db9dc3ac6558c0040845",
+      "quality-15": "57d9e669167850fc2c532a591aa1bd142901cfa5f34cf206682210a236bc99b4",
+      "quality-16": "1c3421c0820a1e2c5ca98e46df5ed50557d09d8f24dae65eff3e5682902ddf12",
+      "quality-17": "5ba99c33dee9d1f72c46b2f11c66ed96acdc044831341cf65fcf876760fe9701",
+      "quality-18": "8a210f97bf807dbd3d74bdbc0a3c21b97a53a1ba019587e981f969ad693a3beb",
+      "quality-19": "b838a8cc33ddf859f68b32c55e01875790c0a35c8a3413394b2a822f99f30786",
+      "quality-20": "9e501a18ea4a0a3b2096ef305603b7abc93956004a40d4f2c9259f177042d22c",
+      "quality-21": "6f9853818a6b3f7a37b33799a78dfba60a30578525f47b1d48f2e4379c75e95c",
+      "quality-22": "3df6a653fc1564e2797a1c240d0978f22a507a4721b3287283ef19f32196cca6",
+      "quality-23": "bbe9a489ff83d14625f91e6ad2a5f88d97b54086e01af132f7403a9d3d4bde2b",
+      "quality-24": "9e67811ea2912d4bdb0702f0a5a0c8cdd0caf0944bbbc4525894aef2fa6848e2",
+      "quality-25": "ead3aa458746487f731042df68037e1be55c58cca51cfa419e2a4429b4181702",
+      "quality-26": "c476d56c207f87bbf6889fba6cd3cd153369bb9e1d2d89c984e979b647b940b3",
+      "quality-27": "6b658ce9514b75d971980d1831b9f360f78342020cb5f7d3bec36a883c40f6c2",
+      "quality-28": "cdc0bfd33dfc4bef26fc3f1f699bd161465b14dc68493aa84b225af2abcb7b06",
+      "quality-29": "fcce40e6f9b1aa058c91f00306c0860c8596960903f450f89c740f7a14637d53",
+      "quality-30": "2e0c6752f56e20228d2a79ff60e2122d612bb78d553f157c7ee1b3687e06c9ce",
+      "quality-31": "e9bc9e9f4f4308de493207decde4f4ada977f9b1f100df89387808e1f0c2c3de",
+      "quality-32": "b87788c8d28ffeab21bdd24f5d6d2765cfa2f054bbfe681ec52960551d9936b5",
+      "quality-33": "c767603775ff922d2d5ee4ab8b9d4c976b74191ba00bc84da75d8f3f8b8177d0",
+      "quality-34": "981f9dbdcb30bb4f312f140b83f4ede86f6382b17ce7c41e1ab5f075066821e7",
+      "quality-35": "4b39d28b8832ffdc0bb782b06106367e44156ab548bcb6e163355491a3d725c0",
+      "quality-36": "6e1ee56ab3958c46ede7b76424621683653586df3678d271b514659e4a510a86",
+      "quality-37": "267f47955a9ad0bde1e074df8d2a911092561f57c7c6dc792b6706c4b87053fd",
+      "quality-38": "5b3cfd80d2c40ac464dffb972b82656acff50093c9bc7646a8ca1bf79a5a074b",
+      "quality-39": "1a13b5836241a2af88253da830265e69b7d17f92c5d8e57879ff213774aec120",
+      "quality-40": "1b8b849f8521b4e29e1f6486b424bd1da7746d0ec858b92f049a129d12bc3fe4"
+    },
+    "referencesFrozenBeforeAnyNewLiveOutput": true,
+    "newLiveOutputAccessByAuthor": false,
+    "oldJudgmentAccessByAuthor": false,
+    "credentialsAccessByAuthor": false,
+    "frozenAtUtc": "2026-10-29T08:17:08.651001+00:00"
+  },
+  "qualification": "Creation of this dataset does not qualify the matcher. Adoption still requires independently observed 24/40 blind ordering wins, with ties counted as non-wins, 100% hard-fact preservation and added latency p95 <=1200ms. Reference strata are diagnostic ceilings, not blind preference results.",
+  "validation": {
+    "status": "passed",
+    "checks": [
+      "40 unique case IDs",
+      "40 unique SHA256 hashes of canonical substantive input",
+      "strict original evaluator request/catalog schema",
+      "exact disjoint reference ID coverage",
+      "nonrejected descriptions <=10; title <=160 chars; description <=1000 chars",
+      "request preference <=240 chars",
+      "positive party size and coherent maxParty/capacity",
+      "deposit <= price and EUR currency",
+      "provider fact/verdict agreement",
+      "suitability and rejection reason agreement",
+      "requested-date slots and alternative dates agree with slot rule and available capacity",
+      "deterministic seeded candidate price/order reproduction",
+      "all 40 requests and catalog descriptions reviewed for season/time-of-day and explicit duration consistency; rule/slots/alternatives agree",
+      "revision diff reverses exactly to prior frozen dataset SHA256; requests, references and all non-schedule facts unchanged"
+    ],
+    "catalogCounts": {
+      "suitable": 146,
+      "rejected": 18,
+      "reason:party_too_large": 5,
+      "reason:no_availability": 5,
+      "reason:constraint_unsupported": 4,
+      "reason:over_budget": 4,
+      "unconfirmed": 14
+    },
+    "categoryDiagnostic": {
+      "definition": "For diagnosis only map independent supported=2, unknown=1, unsupported=0. Compare baseline top-three category sequence to lexicographically best sequence achievable by reordering within suitability partitions (suitable precedes unconfirmed; rejected excluded). This invented ordinal diagnostic is not a reviewer score, probability, measured adoption ceiling, total order among positives, or evidence of blind wins.",
+      "improvementPossibleCases": 34,
+      "alreadyMaximalCases": 6,
+      "cases": [
+        {
+          "caseId": "quality-01",
+          "baselineTop3Ids": [
+            "quality-01-option-4",
+            "quality-01-option-2",
+            "quality-01-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            2,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-02",
+          "baselineTop3Ids": [
+            "quality-02-option-1",
+            "quality-02-option-4",
+            "quality-02-option-2"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-03",
+          "baselineTop3Ids": [
+            "quality-03-option-3",
+            "quality-03-option-4",
+            "quality-03-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-04",
+          "baselineTop3Ids": [
+            "quality-04-option-1",
+            "quality-04-option-3",
+            "quality-04-option-2"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            0,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-05",
+          "baselineTop3Ids": [
+            "quality-05-option-2",
+            "quality-05-option-3",
+            "quality-05-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            0,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-06",
+          "baselineTop3Ids": [
+            "quality-06-option-1",
+            "quality-06-option-4",
+            "quality-06-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-07",
+          "baselineTop3Ids": [
+            "quality-07-option-1",
+            "quality-07-option-4",
+            "quality-07-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-08",
+          "baselineTop3Ids": [
+            "quality-08-option-3",
+            "quality-08-option-2",
+            "quality-08-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            2,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-09",
+          "baselineTop3Ids": [
+            "quality-09-option-2",
+            "quality-09-option-1",
+            "quality-09-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            2,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-10",
+          "baselineTop3Ids": [
+            "quality-10-option-4",
+            "quality-10-option-1",
+            "quality-10-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            2,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-11",
+          "baselineTop3Ids": [
+            "quality-11-option-3",
+            "quality-11-option-1",
+            "quality-11-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            2,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-12",
+          "baselineTop3Ids": [
+            "quality-12-option-3",
+            "quality-12-option-1",
+            "quality-12-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            2,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-13",
+          "baselineTop3Ids": [
+            "quality-13-option-4",
+            "quality-13-option-3",
+            "quality-13-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            0,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-14",
+          "baselineTop3Ids": [
+            "quality-14-option-3",
+            "quality-14-option-4",
+            "quality-14-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-15",
+          "baselineTop3Ids": [
+            "quality-15-option-3",
+            "quality-15-option-4",
+            "quality-15-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-16",
+          "baselineTop3Ids": [
+            "quality-16-option-3",
+            "quality-16-option-4",
+            "quality-16-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-17",
+          "baselineTop3Ids": [
+            "quality-17-option-1",
+            "quality-17-option-3",
+            "quality-17-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            0,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-18",
+          "baselineTop3Ids": [
+            "quality-18-option-3",
+            "quality-18-option-2",
+            "quality-18-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            2,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-19",
+          "baselineTop3Ids": [
+            "quality-19-option-3",
+            "quality-19-option-2",
+            "quality-19-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            2,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-20",
+          "baselineTop3Ids": [
+            "quality-20-option-2",
+            "quality-20-option-1",
+            "quality-20-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": false
+        },
+        {
+          "caseId": "quality-21",
+          "baselineTop3Ids": [
+            "quality-21-option-4",
+            "quality-21-option-1",
+            "quality-21-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            2,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-22",
+          "baselineTop3Ids": [
+            "quality-22-option-3",
+            "quality-22-option-1",
+            "quality-22-option-2"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            2,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-23",
+          "baselineTop3Ids": [
+            "quality-23-option-1",
+            "quality-23-option-4",
+            "quality-23-option-2"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-24",
+          "baselineTop3Ids": [
+            "quality-24-option-1",
+            "quality-24-option-3",
+            "quality-24-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            0,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-25",
+          "baselineTop3Ids": [
+            "quality-25-option-4",
+            "quality-25-option-1",
+            "quality-25-option-2"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            2,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-26",
+          "baselineTop3Ids": [
+            "quality-26-option-3",
+            "quality-26-option-4",
+            "quality-26-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-27",
+          "baselineTop3Ids": [
+            "quality-27-option-4",
+            "quality-27-option-1",
+            "quality-27-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            2,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-28",
+          "baselineTop3Ids": [
+            "quality-28-option-4",
+            "quality-28-option-3",
+            "quality-28-option-2"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            0,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-29",
+          "baselineTop3Ids": [
+            "quality-29-option-3",
+            "quality-29-option-4",
+            "quality-29-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-30",
+          "baselineTop3Ids": [
+            "quality-30-option-2",
+            "quality-30-option-3",
+            "quality-30-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            0,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-31",
+          "baselineTop3Ids": [
+            "quality-31-option-4",
+            "quality-31-option-3",
+            "quality-31-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            0,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-32",
+          "baselineTop3Ids": [
+            "quality-32-option-1",
+            "quality-32-option-4",
+            "quality-32-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": false
+        },
+        {
+          "caseId": "quality-33",
+          "baselineTop3Ids": [
+            "quality-33-option-3",
+            "quality-33-option-4",
+            "quality-33-option-1"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            1,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-34",
+          "baselineTop3Ids": [
+            "quality-34-option-1",
+            "quality-34-option-2",
+            "quality-34-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            2,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-35",
+          "baselineTop3Ids": [
+            "quality-35-option-3",
+            "quality-35-option-1",
+            "quality-35-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            2,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            1,
+            0
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-36",
+          "baselineTop3Ids": [
+            "quality-36-option-3",
+            "quality-36-option-2",
+            "quality-36-option-4"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            2,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            1
+          ],
+          "referenceCategoryImprovementPossible": true
+        },
+        {
+          "caseId": "quality-37",
+          "baselineTop3Ids": [
+            "quality-37-option-4",
+            "quality-37-option-2",
+            "quality-37-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            1,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            1,
+            1,
+            1
+          ],
+          "referenceCategoryImprovementPossible": false
+        },
+        {
+          "caseId": "quality-38",
+          "baselineTop3Ids": [
+            "quality-38-option-1",
+            "quality-38-option-4",
+            "quality-38-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            2,
+            2,
+            2
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            2,
+            2,
+            2
+          ],
+          "referenceCategoryImprovementPossible": false
+        },
+        {
+          "caseId": "quality-39",
+          "baselineTop3Ids": [
+            "quality-39-option-4",
+            "quality-39-option-1",
+            "quality-39-option-2"
+          ],
+          "baselineTop3ReferenceStrata": [
+            0,
+            0,
+            0
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            0,
+            0,
+            0
+          ],
+          "referenceCategoryImprovementPossible": false
+        },
+        {
+          "caseId": "quality-40",
+          "baselineTop3Ids": [
+            "quality-40-option-1",
+            "quality-40-option-2",
+            "quality-40-option-3"
+          ],
+          "baselineTop3ReferenceStrata": [
+            1,
+            1,
+            1
+          ],
+          "bestPartitionPreservingTop3ReferenceStrata": [
+            1,
+            1,
+            1
+          ],
+          "referenceCategoryImprovementPossible": false
+        }
+      ]
+    },
+    "adoptionTargetDesignIssue": "Four controls cannot establish a strict reference-category ordering improvement. Other cases can also start in a category-maximal baseline order. A 24/40 blind-win target consequently requires a high win fraction among cases with room for useful improvement; ties remain nonwins. These strata alone neither prove impossibility nor justify changing cases, seed, labels or the approved target."
+  },
+  "revisionHistory": [
+    {
+      "revision": 2,
+      "recordedAtUtc": "2026-10-29T08:17:08.651001+00:00",
+      "priorReviewBaseline": {
+        "datasetSha256": "dc9351c9a5fecf1a96150aff067af01586aeae3b9d4864fbf894eb099f2c4870",
+        "provenanceSha256": "6f0f7db83601a0345049f69b6a96b3c79716fc0157918189b07511565de14943"
+      },
+      "reason": "Independent pre-live temporal review repaired synthetic schedule facts inconsistent with explicit dawn, midday, sunset, after-meal, afternoon and night cues, plus one explicit three-hour lecture with a 90-minute duration. Legitimate hard-fact repair before the first new benchmark model output.",
+      "modelOutputsExistedBeforeRepair": false,
+      "authorAccessedModelOutputs": false,
+      "preserved": [
+        "all 40 requests/preferences",
+        "all reference categories, rationale and rubrics",
+        "candidate IDs and catalog order",
+        "predeclared seed and price assignment",
+        "prices/deposits, hard eligibility partitions and provider facts",
+        "all non-schedule input fields"
+      ],
+      "changes": [
+        {
+          "pointer": "/cases/5/input/catalog/3/experience/slotRule/startTimes",
+          "before": [
+            "11:00"
+          ],
+          "after": [
+            "15:00"
+          ]
+        },
+        {
+          "pointer": "/cases/5/input/catalog/3/slots/0/startTime",
+          "before": "11:00",
+          "after": "15:00"
+        },
+        {
+          "pointer": "/cases/6/input/catalog/2/experience/durationMinutes",
+          "before": 90,
+          "after": 180
+        },
+        {
+          "pointer": "/cases/12/input/catalog/2/experience/slotRule/startTimes",
+          "before": [
+            "11:00"
+          ],
+          "after": [
+            "17:00"
+          ]
+        },
+        {
+          "pointer": "/cases/12/input/catalog/2/slots/0/startTime",
+          "before": "11:00",
+          "after": "17:00"
+        },
+        {
+          "pointer": "/cases/17/input/catalog/0/experience/slotRule/startTimes",
+          "before": [
+            "06:30"
+          ],
+          "after": [
+            "13:00"
+          ]
+        },
+        {
+          "pointer": "/cases/17/input/catalog/0/slots/0/startTime",
+          "before": "06:30",
+          "after": "13:00"
+        },
+        {
+          "pointer": "/cases/17/input/catalog/1/experience/slotRule/startTimes",
+          "before": [
+            "06:30"
+          ],
+          "after": [
+            "07:45"
+          ]
+        },
+        {
+          "pointer": "/cases/17/input/catalog/1/slots/0/startTime",
+          "before": "06:30",
+          "after": "07:45"
+        },
+        {
+          "pointer": "/cases/17/input/catalog/2/experience/slotRule/startTimes",
+          "before": [
+            "06:30"
+          ],
+          "after": [
+            "07:45"
+          ]
+        },
+        {
+          "pointer": "/cases/17/input/catalog/2/slots/0/startTime",
+          "before": "06:30",
+          "after": "07:45"
+        },
+        {
+          "pointer": "/cases/17/input/catalog/3/experience/slotRule/startTimes",
+          "before": [
+            "06:30"
+          ],
+          "after": [
+            "07:45"
+          ]
+        },
+        {
+          "pointer": "/cases/17/input/catalog/3/slots/0/startTime",
+          "before": "06:30",
+          "after": "07:45"
+        },
+        {
+          "pointer": "/cases/17/input/catalog/4/experience/slotRule/startTimes",
+          "before": [
+            "06:30"
+          ],
+          "after": [
+            "07:45"
+          ]
+        },
+        {
+          "pointer": "/cases/27/input/catalog/1/experience/slotRule/startTimes",
+          "before": [
+            "11:00"
+          ],
+          "after": [
+            "21:00"
+          ]
+        },
+        {
+          "pointer": "/cases/27/input/catalog/1/slots/0/startTime",
+          "before": "11:00",
+          "after": "21:00"
+        },
+        {
+          "pointer": "/cases/27/input/catalog/2/experience/slotRule/startTimes",
+          "before": [
+            "11:00"
+          ],
+          "after": [
+            "15:00"
+          ]
+        },
+        {
+          "pointer": "/cases/27/input/catalog/2/slots/0/startTime",
+          "before": "11:00",
+          "after": "15:00"
+        },
+        {
+          "pointer": "/cases/28/input/catalog/1/experience/slotRule/startTimes",
+          "before": [
+            "11:00"
+          ],
+          "after": [
+            "16:00"
+          ]
+        },
+        {
+          "pointer": "/cases/28/input/catalog/1/slots/0/startTime",
+          "before": "11:00",
+          "after": "16:00"
+        },
+        {
+          "pointer": "/cases/38/input/catalog/1/experience/slotRule/startTimes",
+          "before": [
+            "11:00"
+          ],
+          "after": [
+            "17:00"
+          ]
+        },
+        {
+          "pointer": "/cases/38/input/catalog/1/slots/0/startTime",
+          "before": "11:00",
+          "after": "17:00"
+        }
+      ],
+      "temporalReview": {
+        "reviewedCases": [
+          "quality-01",
+          "quality-02",
+          "quality-03",
+          "quality-04",
+          "quality-05",
+          "quality-06",
+          "quality-07",
+          "quality-08",
+          "quality-09",
+          "quality-10",
+          "quality-11",
+          "quality-12",
+          "quality-13",
+          "quality-14",
+          "quality-15",
+          "quality-16",
+          "quality-17",
+          "quality-18",
+          "quality-19",
+          "quality-20",
+          "quality-21",
+          "quality-22",
+          "quality-23",
+          "quality-24",
+          "quality-25",
+          "quality-26",
+          "quality-27",
+          "quality-28",
+          "quality-29",
+          "quality-30",
+          "quality-31",
+          "quality-32",
+          "quality-33",
+          "quality-34",
+          "quality-35",
+          "quality-36",
+          "quality-37",
+          "quality-38",
+          "quality-39",
+          "quality-40"
+        ],
+        "timezone": "Europe/Madrid",
+        "date": "2026-11-14",
+        "method": "Read all 40 requests and all catalog titles/descriptions; review explicit dawn, morning, midday, afternoon, after-meal, sunset, night, season and duration cues against synthetic slot-rule, slots and alternatives. Dawn sessions begin 07:45 and last 90 minutes to span November first light; sunset session begins 17:00 and lasts 90 minutes; night sessions begin 21:00/22:00. No weather, exact astronomical event, crop-specific harvest or species-season guarantee is asserted.",
+        "remainingSeasonSpecificConflicts": []
+      },
+      "reportedFindingVerification": "The initial review report described 11:00 slots for cases 18/19. Inspection of the exact prior frozen bytes instead found case 18 rules and slots consistently at 06:30, and case 19 rules and slots consistently at 22:00. Case 19 required no edit; case 18 dawn sessions were moved to 07:45 so the 90-minute activity spans November first light, and its midday distractor was moved to 13:00. The exact changes below are authoritative."
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/lib/i18n";
 
 interface ChatComposerProps {
+  inputRef?: React.Ref<HTMLInputElement>;
   value: string;
   isLoading: boolean;
   onChange: (value: string) => void;
@@ -18,7 +19,7 @@ interface ChatComposerProps {
  * Renders a single-line input and a send button. The submit button is
  * disabled while a response is streaming or the input is empty.
  */
-export function ChatComposer({ value, isLoading, onChange, onSubmit }: ChatComposerProps) {
+export function ChatComposer({ value, isLoading, onChange, onSubmit, inputRef }: ChatComposerProps) {
   const { t } = useTranslation();
 
   return (
@@ -27,6 +28,7 @@ export function ChatComposer({ value, isLoading, onChange, onSubmit }: ChatCompo
       className="p-4 border-t border-white/10 flex gap-2 items-center"
     >
       <Input
+        ref={inputRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={t("chat.placeholder")}

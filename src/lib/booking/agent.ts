@@ -38,12 +38,14 @@ import { resolveTranslation } from "@/lib/i18n/resolve";
 import type { Translations } from "@/lib/i18n/types";
 import { logger } from "@/lib/logger";
 import { CHAT_MODEL } from "@/lib/models";
-import type { BookingChatHistoryItem } from "@/types/booking-chat";
 import type { ChatStreamEvent } from "@/types/sse";
-import type { BookingDraft } from "./drafts";
-import { bookingToolDefinitions, executeBookingTool, type ToolContext } from "./tools";
-import { madridDate, type Booking } from "./types";
+import { bookingToolDefinitions, executeBookingTool } from "./tools";
+import { madridDate } from "./types";
+import { tryBookingIntake, type IntakeAttempt } from "./intake";
+import { partySizeClarificationReason } from "./intake-candidates";
 import type { BookingModelClient } from "./model-client";
+import type { BookingTurnInput } from "./turn-input";
+export type { BookingTurnInput } from "./turn-input";
 
 export const MAX_TOOL_ITERATIONS = 6;
 export const ITERATION_CAP_MESSAGE =
@@ -61,26 +63,6 @@ export async function createBookingModelClient(): Promise<BookingModelClient> {
   if (replay) return (await import("./replay-model")).createReplayModelClient(replay);
   const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
   return new AnthropicSDK({ maxRetries: 1 });
-}
-
-export interface BookingTurnInput {
-  anthropic: BookingModelClient;
-  tools: ToolContext;
-  /** The visitor's text; empty only on the post-accept turn, which runs no model. */
-  message: string;
-  history: BookingChatHistoryItem[];
-  draft: BookingDraft;
-  bookings: Booking[];
-  /** Retrieved guide passages for descriptive questions, already formatted. */
-  contextText: string | null;
-  /** Set when the server verified a quote_accepted event for this turn. */
-  acceptedBooking: { id: string; reference: string } | null;
-  /** The visitor's interface language (es, en, fr, de, pt, ast), when known. */
-  locale?: string | null;
-  signal: AbortSignal;
-  /** Called on every model stream event, so the caller's idle window sees a held reply being written (#1045). */
-  onProgress?: () => void;
-  now?: Date;
 }
 
 function stateBlock(input: BookingTurnInput, now: Date): string {
@@ -193,9 +175,27 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
  * and maps a thrown error to an `ai_unavailable` error event. A model failure
  * before anything was sent is retried once (same rule as src/lib/claude.ts).
  */
-export async function* streamBookingTurn(input: BookingTurnInput): AsyncGenerator<ChatStreamEvent> {
+export interface BookingTurnDependencies { intake?: (input: BookingTurnInput) => Promise<IntakeAttempt> }
+
+export async function* streamBookingTurn(input: BookingTurnInput, dependencies: BookingTurnDependencies = {}): AsyncGenerator<ChatStreamEvent> {
   if (input.acceptedBooking) {
     yield* acceptedTurn(input, input.acceptedBooking);
+    return;
+  }
+  if (input.signal.aborted) return;
+  // A parser abstention must not let the ordinary model turn a tentative count into a draft/search.
+  const managingExistingBooking = input.bookings.length > 0 && /^\s*(?:quiero\s+)?(?:cancelar|cancela|pagar|paga)\s+(?:mi|la|esta)\s+reserva\b/i.test(input.message);
+  if (!managingExistingBooking && partySizeClarificationReason(input.message)) {
+    yield { type: "text", content: "¿Cuántas personas seréis exactamente?" };
+    return;
+  }
+  const intake = await (dependencies.intake ?? tryBookingIntake)(input);
+  if (intake.status === "aborted") return;
+  if (intake.status === "handled") {
+    for (const event of intake.events) {
+      if (input.signal.aborted) return;
+      yield event;
+    }
     return;
   }
   const now = input.now ?? new Date();

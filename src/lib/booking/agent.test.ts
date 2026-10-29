@@ -95,6 +95,48 @@ beforeEach(() => {
 });
 
 describe("streamBookingTurn", () => {
+  it.each([
+    "Seremos aproximadamente tres personas; ¿qué hay mañana?",
+    "¿Qué hay para tres o cuatro personas mañana?",
+    "Seremos aproximadamente tres personas; ¿qué hay mañana a las 16:00?",
+    "¿Qué hay para tres o cuatro personas mañana a las 16:00?",
+    "Seremos aproximadamente tres personas; ¿qué hay mañana y cómo se paga?",
+    "¿Qué hay para tres o cuatro personas mañana y cómo se paga?",
+    "Seremos aproximadamente tres personas; ¿qué hay mañana y cuál es la política de cancelación?",
+  ])("asks for an exact party before any model, intake or tool: %s", async (message) => {
+    const fake = fakeAnthropic([
+      { content: [{ type: "tool_use", id: "premature-party", name: "update_booking_draft", input: { partySize: 3 } }, toolUse("premature-search")], stopReason: "tool_use" },
+      { texts: ["Para tres personas hay opciones."], content: [], stopReason: "end_turn" },
+    ]);
+    const intake = vi.fn().mockResolvedValue({ status: "fallback", reason: "baseline" });
+    const events = await collect(streamBookingTurn(input(fake.client, { message, locale: "es" }), { intake }));
+    expect(events).toEqual([{ type: "text", content: "¿Cuántas personas seréis exactamente?" }]);
+    expect(fake.stream).not.toHaveBeenCalled();
+    expect(intake).not.toHaveBeenCalled();
+    expect(executeBookingTool).not.toHaveBeenCalled();
+  });
+
+  it.each(["Quiero cancelar la reserva para aproximadamente tres personas.", "Quiero pagar la reserva para unas tres personas."])("does not interrupt booking management with a party question: %s", async (message) => {
+    const fake = fakeAnthropic([{ texts: ["Revisemos tu reserva."], content: [], stopReason: "end_turn" }]);
+    expect(await collect(streamBookingTurn(input(fake.client, { message, bookings: [{ id: "existing", reference: "RS-EXISTING", status: "pending_payment", slotDate: "2026-11-21", slotTime: "10:00", partySize: 3 }] })))).toEqual([{ type: "text", content: "Revisemos tu reserva." }]);
+    expect(fake.stream).toHaveBeenCalledTimes(1);
+  });
+
+  it("continues normally after the visitor supplies the exact party", async () => {
+    const fake = fakeAnthropic([{ content: [toolUse("exact-party")], stopReason: "tool_use" }, { texts: ["Hay opciones."], content: [], stopReason: "end_turn" }]);
+    const events = await collect(streamBookingTurn(input(fake.client, {
+      message: "Seremos exactamente tres personas; busca opciones para el 2026-11-02.",
+      history: [{ role: "user", content: "Seremos aproximadamente tres personas; ¿qué hay mañana?" }, { role: "assistant", content: "¿Cuántas personas seréis exactamente?" }],
+    })));
+    expect(events).toContainEqual({ type: "card", card: { kind: "offer", options: [] } });
+    expect(executeBookingTool).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not mistake an approximate duration for an uncertain party", async () => {
+    const fake = fakeAnthropic([{ texts: ["Hay opciones."], content: [], stopReason: "end_turn" }]);
+    expect(await collect(streamBookingTurn(input(fake.client, { message: "Somos tres personas, aproximadamente dos horas; ¿qué hay mañana?" })))).toEqual([{ type: "text", content: "Hay opciones." }]);
+    expect(fake.stream).toHaveBeenCalledTimes(1);
+  });
   it("runs the tool, emits its status and card, continues with the tool result, and shows only the answer", async () => {
     const fake = fakeAnthropic([
       { texts: ["Miro "], content: [{ type: "text", text: "Miro " }, toolUse("tu_1")], stopReason: "tool_use" },

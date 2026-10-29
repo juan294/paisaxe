@@ -1,0 +1,99 @@
+# Paisaxe v1.11.0: release PR #1052, merge commit 33bfaccf46c461a0ec7ae789fc2727c37a365d8e.
+# Deployed identity, eight browser probes and five-agent voice preflight passed on paisaxe.es.
+# Favorite roundtrip passed in the exact candidate artifact smoke on an owned local stack.
+# Booking access-boundary and roundtrip reuse the passing local Docker run at b6664d89:
+# application, browser and provider-test inputs are identical; only three unit cases and
+# the changelog date changed afterward. All fixture deletions were asserted by the probes,
+# then each owned stack was disposed. No mutating production acceptance was required.
+# Migration posture passed in the final candidate local gate.
+
+version: 1
+candidate_tree: fde2d0f9a62b23522951c90a4efb7b9630723b44
+shipped_tree: fde2d0f9a62b23522951c90a4efb7b9630723b44
+deployed_tree: fde2d0f9a62b23522951c90a4efb7b9630723b44
+deployed_commit: 33bfaccf46c461a0ec7ae789fc2727c37a365d8e
+github_deployment_id: "7352109416"
+target_url: https://paisaxe.es
+generated_at: 2026-10-27T06:50:53.618Z
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles:
+      - identity
+  - id: health-status
+    status: passed
+    oracles:
+      - http
+  - id: health-db
+    status: passed
+    oracles:
+      - http
+  - id: elevenlabs-voice-preflight
+    status: passed
+    oracles:
+      - http
+    provider: ok
+    fingerprint: sha256:1337f33296d87be8
+    fingerprint_matches: true
+    agents:
+      - pelayo
+      - booking
+      - penny
+      - iris
+      - xander
+    custom_llm: not_applicable
+    target_url: https://paisaxe.es
+    response_url: https://paisaxe.es/api/health/voice
+    github_deployment_id: "7352109416"
+    deployment_commit: 33bfaccf46c461a0ec7ae789fc2727c37a365d8e
+    checked_at: 2026-10-27T06:45:08.916Z
+  - id: csp-canary
+    status: passed
+    oracles:
+      - ui
+  - id: story-read-path
+    status: passed
+    oracles:
+      - http
+      - ui
+  - id: admin-denial
+    status: passed
+    oracles:
+      - http
+  - id: webhook-unsigned
+    status: passed
+    oracles:
+      - http
+  - id: chat-smoke
+    status: passed
+    oracles:
+      - http
+  - id: booking-gate-closed
+    status: passed
+    oracles:
+      - http
+      - ui
+  - id: booking-access-boundary
+    status: passed
+    oracles:
+      - http
+      - cleanup
+    cleanup: removed
+  - id: booking-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: favorite-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: migration-posture
+    status: passed
+    oracles:
+      - static

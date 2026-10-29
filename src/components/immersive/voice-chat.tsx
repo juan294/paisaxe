@@ -27,6 +27,10 @@ import { ChatMessageList } from "./voice-chat/chat-message-list";
 import { ChatComposer } from "./voice-chat/chat-composer";
 import { ChatErrorBanner } from "./voice-chat/chat-error-banner";
 import { BookingCards } from "./voice-chat/booking-cards";
+import { ExperienceMatchPanel } from "./experience-match-panel";
+import { buildExperienceMatchCopy, formatExperienceMatchPrefill } from "./voice-chat/experience-match-copy";
+import type { MatchSuggestion } from "@/types/experience-match";
+import type { MatchCriteria } from "@/hooks/use-experience-match";
 
 // FE-M1: the streaming hot path pushes a `messages` state update on every SSE
 // token, re-rendering VoiceChat every token. ChatComposer and ChatActions
@@ -88,8 +92,15 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
   const [inputValue, setInputValue] = useState("");
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>("");
+  const [matchingOpen, setMatchingOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
   const { t, locale } = useTranslation();
+  const matchingCopy = useMemo(() => buildExperienceMatchCopy(t), [t]);
+  const useMatchingSuggestion = useCallback((suggestion: MatchSuggestion, criteria: MatchCriteria) => {
+    setInputValue(formatExperienceMatchPrefill(suggestion.experience.title, criteria, t, locale));
+    composerRef.current?.focus();
+  }, [t, locale]);
   // FE-M1: getLocalizedStory returns a brand-new object every call. Without
   // memoizing on [story, locale], `localizedStory` got a new identity on
   // every render (including every streamed token) and fed straight into
@@ -296,6 +307,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
     [acceptQuote, quoteStates, locale, handleRequote, isLoading]
   );
 
+  const matchingActive = bookingActive && locale === "es" && !useElevenLabs;
   if (!open) return null;
 
   return (
@@ -313,7 +325,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
       />
 
       {/* Chat panel */}
-      <div className="relative z-10 w-full max-w-lg bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden animate-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
+      <div className={`relative z-10 w-full max-w-lg bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 animate-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none ${matchingActive ? "flex max-h-[calc(100dvh-2rem)] flex-col overflow-y-auto" : "overflow-hidden"}`}>
         <ChatHeader
           title={localizedStory.title}
           subtitle={localizedStory.subtitle}
@@ -372,6 +384,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
         ) : (
           <>
             <ChatMessageList
+              compact={matchingActive && matchingOpen}
               messages={messages}
               isLoading={isLoading}
               onUpsellDismiss={handleUpsellDismiss}
@@ -398,7 +411,10 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
             {/* Context-aware action buttons */}
             <MemoizedChatActions messages={messages} isLoading={isLoading} />
 
+            {matchingActive && <ExperienceMatchPanel accessToken={session?.access_token} locale={locale} copy={matchingCopy} busy={isLoading} onUseSuggestion={useMatchingSuggestion} onOpenChange={setMatchingOpen} />}
+
             <MemoizedChatComposer
+              inputRef={composerRef}
               value={inputValue}
               isLoading={isLoading}
               onChange={setInputValue}
