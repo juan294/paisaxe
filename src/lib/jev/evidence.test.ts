@@ -468,7 +468,7 @@ it("weak cited-choice distributions abstain semantically rather than attaching f
   });
 });
 it.each([null, undefined, [], { schemaVersion: 2 }])(
-  "missing snapshot fields are named without any transport",
+  "[case %#] missing snapshot fields are named without any transport",
   async (input) => {
     const fetch = http();
     const result = await checkEvidence(input, { fetch });
