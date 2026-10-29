@@ -199,7 +199,7 @@ it.each([
   { ...valid, date: "2026-10-01" },
   { ...valid, extra: true },
 ])(
-  "invalid or injected input is editable400 before atomic consume",
+  "[case %#] invalid or injected input is editable400 before atomic consume",
   async (body) => {
     const response = await createMatchHandlers({
       fetch: jev,

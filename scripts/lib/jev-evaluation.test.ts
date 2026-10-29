@@ -34,7 +34,7 @@ describe("INSPECT-01/02 fixture and bounded runs", () => {
     expect(readFileSync(join(run.directory, "report.html"), "utf8")).toContain("plumbing_only");
     expect(readEvaluationRecord(join(run.directory, "run.json")).identity).toEqual(run.identity);
   });
-  it.each([{ maxRequests: 1 }, { maxSpendUsd: 0.1 }, { maxRequests: 0, maxSpendUsd: 0.1 }])("rejects incomplete or invalid live caps before HTTP", async limits => {
+  it.each([{ maxRequests: 1 }, { maxSpendUsd: 0.1 }, { maxRequests: 0, maxSpendUsd: 0.1 }])("[case %#] rejects incomplete or invalid live caps before HTTP", async limits => {
     const fetch = vi.fn<typeof globalThis.fetch>();
     await expect(runEvaluation(suite(), { mode: "live", outputRoot: root, fetch, ...limits })).rejects.toThrow(/caps|positive/i);
     expect(fetch).not.toHaveBeenCalled();
