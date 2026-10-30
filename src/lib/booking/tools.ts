@@ -28,7 +28,7 @@ import { sendBalanceInvoice } from "./invoice";
 import { bookingDisplayText } from "./display";
 import { bookingCapability, bookingLink } from "./links";
 import { createQuote } from "./quotes";
-import { BookingError, hhmmSchema, isoDateSchema, partySizeSchema, type Booking } from "./types";
+import { BookingError, hhmmSchema, isoDateSchema, mapFact, partySizeSchema, type Booking, type ExperienceFact } from "./types";
 
 /** Budget per tool execution; a timeout ends the turn. */
 const TOOL_TIMEOUT_MS = 8_000;
@@ -59,6 +59,11 @@ interface BookingTool<Input> {
 }
 
 const euros = (cents: number) => (cents / 100).toFixed(2);
+
+/** Provider confirmation exists independently of the visitor's requested constraints. */
+function providerConfirmations(facts: ExperienceFact[]) {
+  return facts.map(({ key, value, confirmedByProvider }) => ({ key, value, confirmedByProvider }));
+}
 
 function draftState(draft: BookingDraft) {
   return {
@@ -144,7 +149,10 @@ const searchExperiencesTool: BookingTool<z.infer<typeof searchInputSchema>> = {
         options: results.map((r) => ({
           experienceId: r.experience.id,
           title: r.experience.title,
-          ...(ctx.locale === "en" ? { displayTitle: bookingDisplayText(r.experience.title, "en") } : {}),
+          ...(ctx.locale === "en" ? {
+            displayTitle: bookingDisplayText(r.experience.title, "en"),
+            providerFacts: providerConfirmations(r.experience.facts),
+          } : {}),
           description: r.experience.description,
           priceEuros: euros(r.experience.priceCents),
           depositEuros: euros(r.experience.depositCents),
@@ -192,15 +200,20 @@ const getQuoteTool: BookingTool<z.infer<typeof quoteInputSchema>> = {
       slotTime: input.time,
       partySize: input.partySize,
     }, new Date(), ctx.signal);
-    const { data } = await ctx.client.from("experiences").select("title").eq("id", quote.experienceId).maybeSingle();
+    const { data } = ctx.locale === "en"
+      ? await ctx.client.from("experiences").select("title,experience_facts(key,value,confirmed_by_provider)").eq("id", quote.experienceId).maybeSingle()
+      : await ctx.client.from("experiences").select("title").eq("id", quote.experienceId).maybeSingle();
     const experienceTitle = (data?.title as string | undefined) ?? "";
+    const providerFacts = data && "experience_facts" in data && Array.isArray(data.experience_facts)
+      ? providerConfirmations(data.experience_facts.map(mapFact))
+      : null;
 
     return {
       result: {
         quoteId: quote.id,
         version: quote.version,
         experienceTitle,
-        ...(ctx.locale === "en" ? { displayTitle: bookingDisplayText(experienceTitle, "en") } : {}),
+        ...(ctx.locale === "en" ? { displayTitle: bookingDisplayText(experienceTitle, "en"), providerFacts } : {}),
         date: quote.slotDate,
         time: quote.slotTime,
         partySize: quote.partySize,

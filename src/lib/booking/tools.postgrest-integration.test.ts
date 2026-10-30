@@ -114,4 +114,41 @@ describe.skipIf(!dbReachable)("booking tools against the fixture merchant", () =
     const foreignList = await executeBookingTool(ctxB(), "get_booking_status", {});
     expect(foreignList.result).toEqual({ bookings: [] });
   });
+
+  it("keeps English provider confirmations available even when no visitor requirements were supplied", async () => {
+    const outcome = await executeBookingTool({ ...ctxB(), locale: "en" }, "search_experiences", {
+      partySize: 2, date, constraints: {},
+    });
+    expect(outcome.isError).toBe(false);
+    expect(outcome.result).toMatchObject({ options: expect.arrayContaining([
+      expect.objectContaining({
+        title: "Descenso en canoa", verdicts: [],
+        providerFacts: expect.arrayContaining([{ key: "step_free", value: "no", confirmedByProvider: true }]),
+      }),
+      expect.objectContaining({
+        title: "Ruta de miradores en 4x4", verdicts: [],
+        providerFacts: expect.arrayContaining([
+          { key: "public_transport", value: "no", confirmedByProvider: true },
+          { key: "step_free", value: "unknown", confirmedByProvider: false },
+        ]),
+      }),
+    ]) });
+    expectNoLinks(outcome.result);
+  });
+
+  it("grounds English quote replies in provider facts without changing prices or Spanish results", async () => {
+    const experienceId = psql(`SELECT id FROM public.experiences WHERE slug = '${FIXTURE_EXPERIENCE_SLUGS.coastalWalk}';`);
+    const input = { experienceId, date, time: "16:00", partySize: 2 };
+    const english = await executeBookingTool({ ...ctxB(), locale: "en" }, "get_quote", input);
+    expect(english.isError).toBe(false);
+    expect(english.result).toMatchObject({
+      experienceTitle: "Paseo por la senda costera", totalEuros: "120.00", depositEuros: "30.00", balanceEuros: "90.00",
+      providerFacts: expect.arrayContaining([{ key: "step_free", value: "yes", confirmedByProvider: true }]),
+    });
+    expectNoLinks(english.result);
+    const spanish = await executeBookingTool({ ...ctxB(), locale: "es" }, "get_quote", input);
+    expect(spanish.isError).toBe(false);
+    expect(spanish.result).not.toHaveProperty("providerFacts");
+    expect(spanish.result).toMatchObject({ totalEuros: "120.00", depositEuros: "30.00", balanceEuros: "90.00" });
+  });
 });
