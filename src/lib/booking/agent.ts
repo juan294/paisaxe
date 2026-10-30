@@ -90,7 +90,12 @@ function stateBlock(input: BookingTurnInput, now: Date): string {
     `Reservas del visitante: ${bookings.length > 0 ? JSON.stringify(bookings) : "ninguna"}`,
   ];
   if (input.locale) lines.push(`Idioma de la interfaz del visitante: ${input.locale}`);
-  if (input.locale === "en") lines.push("Respond to the visitor in English. Use displayTitle for translated experience names; tool arguments must use canonical experience IDs.");
+  if (input.locale === "en") lines.push(
+    "Respond to the visitor in English. Use displayTitle for translated experience names; tool arguments must use canonical experience IDs.",
+    "Describe only facts explicitly supplied by tools. Missing visitor requirements or an empty verdicts list establish neither provider confirmation nor its absence. If the visitor has not specified a requirement, say only that; do not claim the provider has or has not confirmed it without an explicit tool fact.",
+    "Do not infer participant roles, including who drives a vehicle, unless a tool explicitly supplies that fact.",
+    "Successful quote acceptance creates a pending_payment booking with a temporary capacity hold. Only get_booking_status reporting confirmed authorizes saying the booking is confirmed. Never say that no place is held until confirmation.",
+  );
   if (input.contextText) {
     lines.push("", "# CONTEXTO DE LA GUÍA", `<context>${input.contextText}</context>`);
   }
