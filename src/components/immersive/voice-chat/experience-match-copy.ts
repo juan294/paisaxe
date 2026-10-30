@@ -1,3 +1,4 @@
+import { bookingDisplayText } from "@/lib/booking/display";
 import type { ExperienceMatchCopy } from "../experience-match-panel";
 import type { MatchCriteria } from "@/hooks/use-experience-match";
 import type { Locale } from "@/lib/i18n/types";
@@ -105,7 +106,7 @@ export function formatExperienceMatchPrefill(
   t: Translate,
   locale: Locale,
 ): string {
-  const lines = [interpolate(t("booking.match.prefill.title"), { title })];
+  const lines = [interpolate(t("booking.match.prefill.title"), { title: bookingDisplayText(title, locale) })];
   if (criteria.date)
     lines.push(
       interpolate(t("booking.match.prefill.date"), { date: criteria.date }),

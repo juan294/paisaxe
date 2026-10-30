@@ -17,19 +17,19 @@ export function bookingIntakeHttpFixture(
   };
   const text = state.message;
   const positive: Record<string, boolean> = {
-    discovery: /experiencias|qu[eé] hay|opciones|actividades|hacer algo/i.test(
+    discovery: /experiencias|qu[eé] hay|opciones|actividades|hacer algo|experiences|options|activities|what(?:'s| is| are)? available|what can we do|looking for/i.test(
       text,
     ),
     party_present: state.candidates.party.length > 0,
     date_present: state.candidates.date.length > 0,
     budget_present: state.candidates.budget.length > 0,
     specific_experience:
-      /Paseo por la senda costera|Descenso en canoa|Ruta de miradores en 4x4/i.test(
+      /Paseo por la senda costera|Descenso en canoa|Ruta de miradores en 4x4|Coastal path walk|Canoe descent|4x4 viewpoint tour/i.test(
         text,
       ),
-    mixed_intent: /cancel|paga|reserva|cotiza/i.test(text),
-    style_preference: /tranquil|prefer|rom[aá]nt/i.test(text),
-    time_requirement: /a las|por la tarde|por la ma[ñn]ana|por la noche/i.test(
+    mixed_intent: /cancel|paga|reserva|cotiza|\b(?:book|booking|reserve|pay|paid|quote)\b/i.test(text),
+    style_preference: /tranquil|prefer|rom[aá]nt|\b(?:quiet|calm|adventure)\b/i.test(text),
+    time_requirement: /a las|por la tarde|por la ma[ñn]ana|por la noche|\bat\s+\d|\b(?:morning|afternoon|evening|tonight)\b/i.test(
       text,
     ),
     unsupported_requirement: false,

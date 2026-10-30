@@ -90,6 +90,7 @@ function stateBlock(input: BookingTurnInput, now: Date): string {
     `Reservas del visitante: ${bookings.length > 0 ? JSON.stringify(bookings) : "ninguna"}`,
   ];
   if (input.locale) lines.push(`Idioma de la interfaz del visitante: ${input.locale}`);
+  if (input.locale === "en") lines.push("Respond to the visitor in English. Use displayTitle for translated experience names; tool arguments must use canonical experience IDs.");
   if (input.contextText) {
     lines.push("", "# CONTEXTO DE LA GUÍA", `<context>${input.contextText}</context>`);
   }
@@ -153,7 +154,7 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
       yield { type: "tool", name: block.name, status: outcome.isError ? "error" : "done" };
       if (outcome.isError && typeof outcome.result === "object" && outcome.result !== null &&
           "error" in outcome.result && outcome.result.error === "timeout") {
-        yield { type: "text", content: "La operación ha tardado demasiado y su resultado aún no está confirmado. Consulta el estado de tu reserva antes de repetirla." };
+        yield { type: "text", content: input.locale === "en" ? "The operation took too long and its outcome is not yet confirmed. Check your booking status before trying again." : "La operación ha tardado demasiado y su resultado aún no está confirmado. Consulta el estado de tu reserva antes de repetirla." };
         return;
       }
       if (outcome.card) yield { type: "card", card: outcome.card };
@@ -167,7 +168,7 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
     messages.push({ role: "user", content: results });
   }
 
-  yield { type: "text", content: ITERATION_CAP_MESSAGE };
+  yield { type: "text", content: input.locale === "en" ? "I could not complete this step. Please specify the date and number of people." : ITERATION_CAP_MESSAGE };
 }
 
 /**
@@ -186,7 +187,7 @@ export async function* streamBookingTurn(input: BookingTurnInput, dependencies: 
   // A parser abstention must not let the ordinary model turn a tentative count into a draft/search.
   const managingExistingBooking = input.bookings.length > 0 && /^\s*(?:quiero\s+)?(?:cancelar|cancela|pagar|paga)\s+(?:mi|la|esta)\s+reserva\b/i.test(input.message);
   if (!managingExistingBooking && partySizeClarificationReason(input.message)) {
-    yield { type: "text", content: "¿Cuántas personas seréis exactamente?" };
+    yield { type: "text", content: input.locale === "en" ? "Exactly how many people will be in your group?" : "¿Cuántas personas seréis exactamente?" };
     return;
   }
   const intake = await (dependencies.intake ?? tryBookingIntake)(input);

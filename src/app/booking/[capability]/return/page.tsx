@@ -8,7 +8,7 @@ import { ReturnStatus } from "./return-status";
 export const instant = false;
 
 export const metadata: Metadata = {
-  title: "Pago | Paisaxe",
+  title: "Paisaxe",
   robots: { index: false, follow: false },
 };
 

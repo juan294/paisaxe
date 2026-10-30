@@ -8,7 +8,7 @@ import type {
   SlotAvailability,
 } from "../lib/booking/availability";
 export interface MatchRequest {
-  locale: "es";
+  locale: "es" | "en";
   preference: string;
   date?: string;
   partySize?: number;

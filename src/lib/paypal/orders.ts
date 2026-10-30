@@ -118,6 +118,7 @@ export async function createOrder(input: CreateOrderInput): Promise<{ orderId: s
         paymentSource: {
           paypal: {
             experienceContext: {
+              ...(input.locale ? { locale: input.locale } : {}),
               returnUrl: input.returnUrl,
               cancelUrl: input.cancelUrl,
               userAction: PaypalExperienceUserAction.PayNow,

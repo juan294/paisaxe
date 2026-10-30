@@ -11,7 +11,7 @@ import { VercelAnalytics } from "@/components/analytics";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
 import { getSiteUrl, getSupabaseUrl } from "@/lib/env";
-import { es } from "@/lib/i18n/es";
+import { en } from "@/lib/i18n/en";
 import { resolveTranslation } from "@/lib/i18n/resolve";
 import { Suspense } from "react";
 import { RequestPresentationProviderShell } from "./request-presentation-provider-shell";
@@ -23,7 +23,7 @@ const SITE_URL = getSiteUrl() ?? `https://${LOCATION_CONFIG.domain}`;
 const SUPABASE_URL = getSupabaseUrl();
 
 // LOCATION-SPECIFIC: Title and description from config
-const title = `${LOCATION_CONFIG.siteName} | Descubre ${LOCATION_CONFIG.name}`;
+const title = `${LOCATION_CONFIG.siteName} | ${LOCATION_CONFIG.name}`;
 const description = LOCATION_CONFIG.seo.description;
 
 export const viewport: Viewport = {
@@ -150,8 +150,8 @@ export default function RootLayout({
         <JsonLd type="website" />
         <Suspense fallback={
           <div role="status" aria-busy="true" className="p-6 text-white">
-            <p>{resolveTranslation("navigation.preparing", es)}</p>
-            <p>{resolveTranslation("navigation.recovery", es)} <a href="/immersive" className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{resolveTranslation("navigation.reload", es)}</a>.</p>
+            <p>{resolveTranslation("navigation.preparing", en)}</p>
+            <p>{resolveTranslation("navigation.recovery", en)} <a href="/immersive" className="underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{resolveTranslation("navigation.reload", en)}</a>.</p>
           </div>
         }>
         <RequestPresentationProviderShell>

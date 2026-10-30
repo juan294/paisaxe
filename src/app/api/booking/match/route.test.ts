@@ -171,7 +171,7 @@ it("GET runs real access gate but only reveals available and never consumes/invo
 it.each([
   "disabled",
   "missing-key",
-  "non-es",
+  "unsupported-locale",
   "expired",
   "unauthenticated",
   "preview",
@@ -185,7 +185,7 @@ it.each([
     if (kind === "unauthenticated") state.auth = false;
     if (kind === "preview") vi.stubEnv("VERCEL_ENV", "preview");
     const response = await h.POST(
-      req("POST", kind === "non-es" ? { ...valid, locale: "en" } : valid),
+      req("POST", kind === "unsupported-locale" ? { ...valid, locale: "fr" } : valid),
     );
     expect(response.status).toBe(404);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -628,4 +628,11 @@ it("empty real catalog returns no_results without Jev and changed catalog recove
   });
   expect(state.quotaCalls).toBe(2);
   expect(state.jevCalls).toBe(1);
+});
+
+it('English capability and matching work with one turn and one semantic request',async()=>{
+ const handlers=createMatchHandlers({now:()=>now,fetch:async(_url,init)=>{state.jevCalls++;const b=JSON.parse(String(init?.body));return Response.json({model:'jev-1.14.0',answers:Object.fromEntries(Object.keys(b.questions).map(k=>[k,{type:'noul',noul:.99}])),usage:{input_tokens:100,output_tokens:0}});}});
+ const get=new NextRequest('http://localhost/api/booking/match?locale=en',{headers:{Authorization:'Bearer synthetic-token'}});
+ expect(await (await handlers.GET(get)).json()).toEqual({available:true});expect(state.quotaCalls).toBe(0);
+ const r=await handlers.POST(req('POST',{...valid,locale:'en',preference:'A quiet walk'}));expect(r.status).toBe(200);expect((await r.json()).status).toBe('matched');expect(state.quotaCalls).toBe(1);expect(state.jevCalls).toBe(1);
 });

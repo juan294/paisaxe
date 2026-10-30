@@ -1,4 +1,5 @@
 "use client";
+import { bookingDisplayText } from "@/lib/booking/display";
 
 import { interpolate } from "@/lib/i18n/interpolate";
 
@@ -205,7 +206,7 @@ export function BookingStatus() {
             <p className="text-sm text-white/70">{t("booking.page.title")}</p>
             <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-white/80">{statusLabel}</span>
           </div>
-          <h1 className="text-2xl font-semibold leading-tight">{view.experienceTitle}</h1>
+          <h1 className="text-2xl font-semibold leading-tight">{bookingDisplayText(view.experienceTitle, locale)}</h1>
           <p className="text-white/80">
             {interpolate(t("booking.page.when"), { day: slotDay(view.slotDate, locale), time: view.slotTime, people: String(view.partySize) })}
           </p>

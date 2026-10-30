@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { VoucherForm } from "./voucher-form";
 
 export const metadata: Metadata = {
-  title: "Acceso | Paisaxe",
+  title: "Paisaxe",
   robots: { index: false, follow: false },
 };
 

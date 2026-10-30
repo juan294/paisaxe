@@ -10,41 +10,24 @@ import { StatCard } from "@/components/ui/stat-card";
 import { clockTime, dateTime, money, slotDay } from "@/lib/booking-format";
 import { csrfHeaders } from "@/lib/csrf-client";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
+import { bookingDisplayText } from "@/lib/booking/display";
 import type { OperatorBooking, OperatorCapacity, OperatorHold, OperatorView } from "@/lib/booking/operator";
 import type { LedgerMatch, OperatorLedgerResponse } from "@/types/operator-ledger";
 
-// Merchant-facing copy is Spanish only: the operator is the Asturian provider.
-const BOOKING_STATUS: Record<string, string> = {
-  pending_payment: "Pendiente de pago",
-  confirmed: "Confirmada",
-  cancel_pending: "Cancelación en curso",
-  cancelled: "Cancelada",
-  expired: "Caducada",
-  refund_pending: "Reembolso en curso",
-  refunded: "Reembolsada",
-  needs_attention: "Requiere atención",
-};
+/** Existing operator locales retain Spanish copy; the English demo uses its own dictionary. */
+function useOperatorCopy() {
+  const { t, locale } = useTranslation();
+  return { t: (key: string) => t(`operator.${key}`), locale: locale === "en" ? "en" as const : "es" as const };
+}
 
-const PAYMENT_STATUS: Record<string, string> = {
-  created: "Pedido creado",
-  approved: "Aprobado",
-  capture_pending: "Cobro pendiente",
-  captured: "Cobrado",
-  capture_failed: "Cobro fallido",
-  expired: "Caducado",
-  refund_pending: "Reembolso en curso",
-  refunded: "Reembolsado",
-  refund_failed: "Reembolso fallido",
-};
-
-/** The PayPal check's chip per booking (APIMatic plan, Phase 2); none for not_applicable. */
-const LEDGER_CHIP: Record<Exclude<LedgerMatch, "not_applicable">, { label: string; attention: boolean }> = {
-  matches: { label: "PayPal confirma", attention: false },
-  refunded: { label: "Reembolso en PayPal", attention: false },
-  pending: { label: "Pendiente en PayPal", attention: false },
-  mismatch: { label: "No coincide con PayPal", attention: true },
-  outside_window: { label: "Fuera del periodo consultado", attention: false },
-};
+/** Unknown provider states keep the previous raw-state fallback rather than a translation key. */
+function operatorStatus(t: (key: string) => string, kind: "bookingStatus" | "paymentStatus", status: string): string {
+  const key = `${kind}.${status}`;
+  const value = t(key);
+  return value === `operator.${key}` ? status : value;
+}
 
 /**
  * The Madrid calendar day of an instant, "YYYY-MM-DD" like the view's `today`. Same as madridDate in
@@ -59,17 +42,14 @@ const CONFIRMED = new Set<LedgerMatch>(["matches", "refunded"]);
 const PILL = "inline-flex rounded-full px-2 py-0.5 text-xs font-medium";
 const ATTENTION = "bg-admin-warning/30";
 
-const ACTION_FAILED = "No se pudo completar la acción. Inténtalo de nuevo.";
-const HOLD_NOT_LIVE = "Ese bloqueo ya no estaba activo.";
-
 type Load = { kind: "loading" } | { kind: "notFound" } | { kind: "failed" } | { kind: "ready"; view: OperatorView };
 type Ledger = { checking: boolean; result: OperatorLedgerResponse | null };
 
-const eur = (cents: number, currency = "EUR") => money(cents, currency, "es");
-const when = (date: string, time: string) => `${slotDay(date, "es")} · ${time}`;
+const eur = (cents: number, currency = "EUR", locale: "es" | "en" = "es") => money(cents, currency, locale);
+const when = (date: string, time: string, locale: "es" | "en") => `${slotDay(date, locale)} · ${time}`;
 
-function dayLabel(date: string): string {
-  return new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", timeZone: "UTC" }).format(
+function dayLabel(date: string, locale: "es" | "en"): string {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "es-ES", { weekday: "short", day: "numeric", timeZone: "UTC" }).format(
     new Date(`${date}T00:00:00Z`)
   );
 }
@@ -81,6 +61,7 @@ function dayLabel(date: string): string {
  * visitor link is shown once and kept only in this component's state.
  */
 export function OperatorDashboard() {
+  const { t, locale } = useOperatorCopy();
   const { capability } = useParams<{ capability: string }>();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [onlyExceptions, setOnlyExceptions] = useState(false);
@@ -140,7 +121,7 @@ export function OperatorDashboard() {
 
   const release = async (hold: OperatorHold) => {
     const response = await post(`/holds/${hold.id}/release`);
-    if (!response?.ok) setNotice(response?.status === 409 ? HOLD_NOT_LIVE : ACTION_FAILED);
+    if (!response?.ok) setNotice(response?.status === 409 ? t("holdNotLive") : t("actionFailed"));
     await refresh();
   };
 
@@ -154,7 +135,7 @@ export function OperatorDashboard() {
     setReissueOpen(false);
     const body = response?.ok ? ((await response.json().catch(() => null)) as { link?: string } | null) : null;
     if (!body?.link) {
-      setNotice(ACTION_FAILED);
+      setNotice(t("actionFailed"));
       if (response?.status === 404) await refresh();
       return;
     }
@@ -166,14 +147,14 @@ export function OperatorDashboard() {
       <Shell>
         <p aria-live="polite">
           {load.kind === "loading"
-            ? "Cargando…"
+            ? t("loading")
             : load.kind === "notFound"
-              ? "Este enlace de operador no es válido o ha caducado."
-              : "No se pudo cargar el panel."}
+              ? t("invalidLink")
+              : t("loadFailed")}
         </p>
         {load.kind === "failed" && (
           <Button type="button" variant="outline" onClick={() => void refresh()}>
-            Reintentar
+            {t("retry")}
           </Button>
         )}
       </Shell>
@@ -193,9 +174,9 @@ export function OperatorDashboard() {
   return (
     <Shell>
       <header className="space-y-1">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-admin-muted">Panel de operador</p>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-admin-muted">{t("title")}</p>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{view.merchant.name}</h1>
+          <h1 className="text-2xl font-semibold">{bookingDisplayText(view.merchant.name, locale)}</h1>
           {view.merchant.isFixture && (
             <span className="rounded-full bg-admin-warning/20 px-2 py-0.5 font-mono text-xs uppercase text-[#8b7355]">demo</span>
           )}
@@ -206,32 +187,32 @@ export function OperatorDashboard() {
         <StatCard
           icon={<CalendarCheck className="size-5" />}
           value={view.summary.upcoming}
-          label="Próximas"
+          label={t("upcoming")}
           variant="default"
           isActive={false}
           onClick={() => setOnlyExceptions(false)}
-          ariaLabel={`Próximas: ${view.summary.upcoming}`}
+          ariaLabel={`${t("upcoming")}: ${view.summary.upcoming}`}
         />
         <MoneyTile
           testId="tile-deposits"
           icon={<Wallet className="size-5" />}
-          label="Depósitos cobrados"
+          label={t("depositsCollected")}
           cents={view.summary.depositsCollectedCents}
         />
         <MoneyTile
           testId="tile-balance"
           icon={<Hourglass className="size-5" />}
-          label="Pendiente de cobro"
+          label={t("balanceDue")}
           cents={view.summary.balanceDueCents}
         />
         <StatCard
           icon={<TriangleAlert className="size-5" />}
           value={view.summary.exceptions}
-          label="Incidencias"
+          label={t("exceptions")}
           variant="warning"
           isActive={onlyExceptions}
           onClick={() => setOnlyExceptions((current) => !current)}
-          ariaLabel={`Incidencias: ${view.summary.exceptions}`}
+          ariaLabel={`${t("exceptions")}: ${view.summary.exceptions}`}
         />
       </div>
 
@@ -243,40 +224,40 @@ export function OperatorDashboard() {
           <Card className="border-admin-warning">
             <CardContent className="space-y-2 pt-6">
               <p>
-                Nuevo enlace para {issued.reference}. Cópialo ahora: no se volverá a mostrar. El anterior ya no funciona.
+                {interpolate(t("newLink"), { reference: issued.reference })}
               </p>
               <code className="block break-all rounded bg-black/5 p-2 text-sm">{issued.url}</code>
               <Button type="button" size="sm" onClick={() => setIssued(null)}>
-                Hecho
+                {t("done")}
               </Button>
             </CardContent>
           </Card>
         )}
       </div>
 
-      <Section title="Próximas reservas">{upcoming.length > 0 ? table(upcoming) : <Empty>No hay reservas próximas.</Empty>}</Section>
-      <Section title="Últimos 7 días">{recent.length > 0 ? table(recent) : <Empty>No hay reservas recientes.</Empty>}</Section>
+      <Section title={t("upcomingBookings")}>{upcoming.length > 0 ? table(upcoming) : <Empty>{t("noUpcoming")}</Empty>}</Section>
+      <Section title={t("recentBookings")}>{recent.length > 0 ? table(recent) : <Empty>{t("noRecent")}</Empty>}</Section>
 
-      <Section title="Bloqueos activos">
+      <Section title={t("activeHolds")}>
         {view.holds.length === 0 ? (
-          <Empty>No hay bloqueos activos.</Empty>
+          <Empty>{t("noHolds")}</Empty>
         ) : (
           <ul className="divide-y rounded-xl border">
             {view.holds.map((hold) => (
               <li key={hold.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
                 <span>
-                  <span className="font-mono">{hold.reference ?? hold.id}</span> · {hold.experienceTitle} ·{" "}
-                  {when(hold.slotDate, hold.slotTime)} · {hold.partySize} pers. · caduca a las {clockTime(hold.expiresAt, "es")}
+                  <span className="font-mono">{hold.reference ?? hold.id}</span> · {bookingDisplayText(hold.experienceTitle, locale)} ·{" "}
+                  {when(hold.slotDate, hold.slotTime, locale)} · {hold.partySize} {t("peopleShort")} · {interpolate(t("expiresAt"), { time: clockTime(hold.expiresAt, locale) })}
                 </span>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   disabled={busy}
-                  aria-label={`Liberar bloqueo ${hold.reference ?? hold.id}`}
+                  aria-label={interpolate(t("releaseHoldLabel"), { reference: hold.reference ?? hold.id })}
                   onClick={() => void release(hold)}
                 >
-                  Liberar
+                  {t("release")}
                 </Button>
               </li>
             ))}
@@ -284,7 +265,7 @@ export function OperatorDashboard() {
         )}
       </Section>
 
-      <Section title="Plazas libres (14 días)">
+      <Section title={t("places14")}>
         {view.capacity.map((experience) => (
           <CapacityTable key={experience.id} experience={experience} />
         ))}
@@ -293,15 +274,13 @@ export function OperatorDashboard() {
       <Dialog open={reissueOpen} onOpenChange={(open) => !open && !busy && setReissueOpen(false)}>
         <DialogContent hideCloseButton className="w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white text-admin-ink">
           <DialogHeader>
-            <DialogTitle>Reemitir enlace de {reissueTarget?.reference}</DialogTitle>
-            <DialogDescription className="text-admin-muted">El enlace anterior dejará de funcionar.</DialogDescription>
+            <DialogTitle>{interpolate(t("reissueTitle"), { reference: reissueTarget?.reference ?? "" })}</DialogTitle>
+            <DialogDescription className="text-admin-muted">{t("previousLinkWarning")}</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" disabled={busy} onClick={() => setReissueOpen(false)}>
-              Cancelar
-            </Button>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => setReissueOpen(false)}>{t("cancel")}</Button>
             <Button type="button" disabled={busy} onClick={() => reissueTarget && void reissue(reissueTarget)}>
-              {busy ? "Reemitiendo…" : "Reemitir"}
+              {busy ? t("reissuing") : t("reissue")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -310,7 +289,7 @@ export function OperatorDashboard() {
   );
 }
 
-const COLUMNS = ["Referencia", "Actividad", "Fecha", "Personas", "Estado", "Depósito", "Pendiente", "Pago", "Acciones"] as const;
+const COLUMNS = ["reference", "activity", "date", "people", "status", "deposit", "balance", "payment", "actions"] as const;
 
 // Below md each row stacks into a card and each cell into a captioned line (one DOM, D8).
 // The explicit roles keep the table semantics once `display` changes.
@@ -318,8 +297,9 @@ const CELL =
   "p-2 max-md:flex max-md:items-baseline max-md:justify-between max-md:gap-3 max-md:px-0 max-md:py-1 max-md:text-right max-md:before:shrink-0 max-md:before:text-left max-md:before:font-mono max-md:before:text-[10px] max-md:before:uppercase max-md:before:tracking-widest max-md:before:text-admin-muted max-md:before:content-[attr(data-label)]";
 
 function Cell({ label, className, children }: { label: (typeof COLUMNS)[number]; className?: string; children: React.ReactNode }) {
+  const { t } = useOperatorCopy();
   return (
-    <td role="cell" data-label={label} className={cn(CELL, className)}>
+    <td role="cell" data-label={t(`columns.${label}`)} className={cn(CELL, className)}>
       <div className="min-w-0">{children}</div>
     </td>
   );
@@ -337,6 +317,7 @@ function BookingTable({
   matches: Record<string, LedgerMatch> | null;
   onReissue: (booking: OperatorBooking) => void;
 }) {
+  const { t, locale } = useOperatorCopy();
   return (
     <div className="md:overflow-x-auto md:rounded-xl md:border">
       <table role="table" className="w-full text-left text-sm max-md:block">
@@ -344,7 +325,7 @@ function BookingTable({
           <tr role="row">
             {COLUMNS.map((label) => (
               <th key={label} role="columnheader" scope="col" className="p-2">
-                {label === "Acciones" ? <span className="sr-only">{label}</span> : label}
+                {label === "actions" ? <span className="sr-only">{t(`columns.${label}`)}</span> : t(`columns.${label}`)}
               </th>
             ))}
           </tr>
@@ -360,51 +341,51 @@ function BookingTable({
                 booking.exception ? "bg-admin-warning/15" : "max-md:bg-white"
               )}
             >
-              <Cell label="Referencia" className="font-mono">
+              <Cell label="reference" className="font-mono">
                 {booking.reference}
               </Cell>
-              <Cell label="Actividad">{booking.experienceTitle}</Cell>
-              <Cell label="Fecha" className="whitespace-nowrap">
-                {when(booking.slotDate, booking.slotTime)}
+              <Cell label="activity">{bookingDisplayText(booking.experienceTitle, locale)}</Cell>
+              <Cell label="date" className="whitespace-nowrap">
+                {when(booking.slotDate, booking.slotTime, locale)}
               </Cell>
-              <Cell label="Personas">{booking.partySize}</Cell>
-              <Cell label="Estado">
-                <span>{BOOKING_STATUS[booking.status] ?? booking.status}</span>
+              <Cell label="people">{booking.partySize}</Cell>
+              <Cell label="status">
+                <span>{operatorStatus(t, "bookingStatus", booking.status)}</span>
                 {booking.exception && (
                   <span className={cn(PILL, ATTENTION, "ml-2 items-center gap-1")}>
-                    Incidencia
+                    {t("exception")}
                   </span>
                 )}
               </Cell>
-              <Cell label="Depósito" className="tabular-nums">
-                {eur(booking.depositCents, booking.currency)}
+              <Cell label="deposit" className="tabular-nums">
+                {eur(booking.depositCents, booking.currency, locale)}
               </Cell>
-              <Cell label="Pendiente" className="tabular-nums">
-                {eur(booking.balanceCents, booking.currency)}
+              <Cell label="balance" className="tabular-nums">
+                {eur(booking.balanceCents, booking.currency, locale)}
               </Cell>
-              <Cell label="Pago" className="space-y-0.5 font-mono text-xs">
+              <Cell label="payment" className="space-y-0.5 font-mono text-xs">
                 {booking.payment ? (
                   <>
-                    <span className="block font-sans">{PAYMENT_STATUS[booking.payment.status] ?? booking.payment.status}</span>
-                    {booking.payment.orderId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Pedido {booking.payment.orderId}</span>}
-                    {booking.payment.captureId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Cobro {booking.payment.captureId}</span>}
-                    {booking.payment.refundId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">Reembolso {booking.payment.refundId}</span>}
+                    <span className="block font-sans">{operatorStatus(t, "paymentStatus", booking.payment.status)}</span>
+                    {booking.payment.orderId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">{t("orderId")} {booking.payment.orderId}</span>}
+                    {booking.payment.captureId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">{t("captureId")} {booking.payment.captureId}</span>}
+                    {booking.payment.refundId && <span className="block whitespace-nowrap max-md:whitespace-normal max-md:break-all">{t("refundId")} {booking.payment.refundId}</span>}
                     <LedgerChip match={matches?.[booking.id]} reserve={matches === null && booking.payment.captureId !== null} />
                   </>
                 ) : (
                   "—"
                 )}
               </Cell>
-              <Cell label="Acciones" className="max-md:items-center">
+              <Cell label="actions" className="max-md:items-center">
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
                   disabled={disabled}
-                  aria-label={`Reemitir enlace ${booking.reference}`}
+                  aria-label={interpolate(t("reissueLinkLabel"), { reference: booking.reference })}
                   onClick={() => onReissue(booking)}
                 >
-                  Reemitir enlace
+                  {t("reissueLink")}
                 </Button>
               </Cell>
             </tr>
@@ -418,18 +399,18 @@ function BookingTable({
 const CHIP = cn(PILL, "mt-1 font-sans text-admin-ink");
 
 function LedgerChip({ match, reserve }: { match: LedgerMatch | undefined; reserve: boolean }) {
+  const { t } = useOperatorCopy();
   if (reserve) {
     return (
       <span data-testid="ledger-chip-placeholder" aria-hidden="true" className={cn(CHIP, "invisible")}>
-        {LEDGER_CHIP.matches.label}
+        {t("ledger.matches")}
       </span>
     );
   }
   if (!match || match === "not_applicable") return null;
-  const chip = LEDGER_CHIP[match];
   return (
-    <span data-testid="ledger-chip" className={cn(CHIP, chip.attention ? ATTENTION : "bg-black/5")}>
-      {chip.label}
+    <span data-testid="ledger-chip" className={cn(CHIP, match === "mismatch" ? ATTENTION : "bg-black/5")}>
+      {t(`ledger.${match}`)}
     </span>
   );
 }
@@ -441,33 +422,34 @@ function LedgerChip({ match, reserve }: { match: LedgerMatch | undefined; reserv
  */
 function LedgerSummary({ view, ledger, onCheck }: { view: OperatorView; ledger: Ledger; onCheck: () => void }) {
   const { result, checking } = ledger;
-  let text = "Comprobando los depósitos con PayPal…";
-  let action = "Comprobar de nuevo";
+  const { t, locale } = useOperatorCopy();
+  let text = t("ledgerChecking");
+  let action = t("ledgerAgain");
   if (result?.state === "unavailable") {
-    text = "La comprobación con PayPal no está disponible ahora.";
-    action = "Reintentar";
+    text = t("ledgerUnavailable");
+    action = t("retry");
   } else if (result?.state === "ok") {
     const matched = view.bookings.map((booking) => result.bookings[booking.id]).filter((match): match is LedgerMatch => Boolean(match) && match !== "not_applicable");
     const confirmed = matched.filter((match) => CONFIRMED.has(match));
-    text = `PayPal confirma ${confirmed.length} de ${matched.length} depósitos`;
+    text = interpolate(t("ledgerSummary"), { confirmed: String(confirmed.length), total: String(matched.length) });
     if (result.refreshedAt) {
       text +=
         madridDay(result.refreshedAt) === view.today
-          ? ` · datos de PayPal de las ${clockTime(result.refreshedAt, "es")}`
-          : ` · datos de PayPal del ${dateTime(result.refreshedAt, "es")}`;
+          ? interpolate(t("ledgerTime"), { time: clockTime(result.refreshedAt, locale) })
+          : interpolate(t("ledgerDate"), { date: dateTime(result.refreshedAt, locale) });
     }
   }
   // The minimum heights hold the longest answer ("PayPal confirma N de M depósitos · datos de PayPal del <date>")
   // wrapped on a phone, so the bookings below do not move when it arrives. Re-measure if that copy changes.
   return (
     <section
-      aria-label="Comprobación con PayPal"
+      aria-label={t("ledgerRegion")}
       className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 text-sm max-md:min-h-[4.75rem]"
     >
       <p aria-live="polite" className="text-admin-ink">
         {text}
         {result?.state === "ok" && result.truncated && (
-          <span className="block text-xs text-admin-muted">PayPal tiene más de 500 movimientos en el periodo: solo se comprobaron los primeros 500.</span>
+          <span className="block text-xs text-admin-muted">{t("ledgerTruncated")}</span>
         )}
       </p>
       {/* aria-disabled, not disabled: a keyboard user keeps focus on the button while it checks. */}
@@ -486,6 +468,7 @@ function LedgerSummary({ view, ledger, onCheck }: { view: OperatorView; ledger: 
 }
 
 function CapacityTable({ experience }: { experience: OperatorCapacity }) {
+  const { t, locale } = useOperatorCopy();
   const dates = [...new Set(experience.slots.map((slot) => slot.date))];
   const times = [...new Set(experience.slots.map((slot) => slot.startTime))].sort();
   const placesAt = new Map(experience.slots.map((slot) => [`${slot.date} ${slot.startTime}`, slot.available]));
@@ -493,18 +476,18 @@ function CapacityTable({ experience }: { experience: OperatorCapacity }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">{experience.title}</CardTitle>
+        <CardTitle className="text-base">{bookingDisplayText(experience.title, locale)}</CardTitle>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <table className="text-center text-xs tabular-nums">
           <thead>
             <tr>
               <th scope="col" className="sticky left-0 bg-card p-1 text-left">
-                Hora
+                {t("time")}
               </th>
               {dates.map((date) => (
                 <th key={date} scope="col" className="p-1 font-normal">
-                  {dayLabel(date)}
+                  {dayLabel(date, locale)}
                 </th>
               ))}
             </tr>
@@ -534,11 +517,12 @@ function CapacityTable({ experience }: { experience: OperatorCapacity }) {
 
 /** StatCard's look without the button: same container, icon slot and type, so the four tiles line up. */
 function MoneyTile({ testId, icon, label, cents }: { testId: string; icon: React.ReactNode; label: string; cents: number }) {
+  const { locale } = useOperatorCopy();
   return (
     <div data-testid={testId} className="min-w-0 rounded-2xl bg-white p-5 text-left">
       <div className="mb-4 text-admin-muted">{icon}</div>
       {/* leading-10 keeps text-4xl's line box at the smaller phone size, so the tile height matches StatCard. */}
-      <p className="text-2xl leading-10 font-extralight tabular-nums tracking-tighter text-admin-ink lg:text-4xl">{eur(cents)}</p>
+      <p className="text-2xl leading-10 font-extralight tabular-nums tracking-tighter text-admin-ink lg:text-4xl">{eur(cents, "EUR", locale)}</p>
       <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-admin-muted">{label}</p>
     </div>
   );

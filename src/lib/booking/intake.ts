@@ -1,4 +1,5 @@
 import "server-only";
+import { bookingDisplayText } from "./display";
 import { getEnv } from "../env";
 import { askJev, type JevOptions } from "../jev/client";
 import { isJevTaskEnabled } from "../jev/config";
@@ -139,7 +140,7 @@ export function eligibleIntakeTurn(
   replay = Boolean(getEnv("BOOKING_AGENT_REPLAY")),
 ): boolean {
   return (
-    input.locale === "es" &&
+    (input.locale === "es" || input.locale === "en") &&
     !replay &&
     !input.acceptedBooking &&
     !input.history.length &&
@@ -191,12 +192,13 @@ export async function executeIntakeSearch(
   const offerable = outcome.card.options.filter(
     (option) => option.suitability !== "rejected",
   );
+  const english = input.locale === "en";
   const text =
     outcome.card.options.length === 0
-      ? "No hay opciones en el catálogo con estos criterios. Puedes cambiar la fecha, las personas o el presupuesto."
+      ? english ? "There are no catalogue options for these criteria. You can change the date, group size or budget." : "No hay opciones en el catálogo con estos criterios. Puedes cambiar la fecha, las personas o el presupuesto."
       : offerable.length === 0
-        ? "Las opciones del catálogo están descartadas con estos criterios; consulta sus motivos. Puedes cambiar la fecha, las personas o el presupuesto."
-        : `Opciones del catálogo: ${offerable.map((option) => option.title).join("; ")}. Las necesidades sin confirmar siguen sin confirmar. Dime el nombre exacto de una experiencia y la hora que prefieres para seguir. Todavía no se ha hecho ninguna reserva.`;
+        ? english ? "The catalogue options do not meet these criteria; check their reasons. You can change the date, group size or budget." : "Las opciones del catálogo están descartadas con estos criterios; consulta sus motivos. Puedes cambiar la fecha, las personas o el presupuesto."
+        : english ? `Catalogue options: ${offerable.map(option => bookingDisplayText(option.title, "en")).join("; ")}. Unconfirmed requirements remain unconfirmed. Tell me the exact experience name and your preferred time to continue. No reservation has been made.` : `Opciones del catálogo: ${offerable.map((option) => option.title).join("; ")}. Las necesidades sin confirmar siguen sin confirmar. Dime el nombre exacto de una experiencia y la hora que prefieres para seguir. Todavía no se ha hecho ninguna reserva.`;
   return {
     status: "handled",
     events: [

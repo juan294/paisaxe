@@ -105,7 +105,7 @@ const snapshotSchema = z
   .object({
     request: z
       .object({
-        locale: z.literal("es"),
+        locale: z.enum(["es", "en"]),
         preference: z.string().min(1).max(240),
         date: z.iso.date().optional(),
         partySize: z.number().int().min(1).max(12).optional(),

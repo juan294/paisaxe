@@ -176,6 +176,8 @@ export interface CreateOrderInput {
   amountCents: number;
   currency: "EUR";
   description: string;
+  /** Explicit checkout UI language when selected by the visitor. */
+  locale?: "en-US";
   returnUrl: string;
   cancelUrl: string;
   /** payments.operation_key: becomes PayPal-Request-Id, so retries are idempotent. */

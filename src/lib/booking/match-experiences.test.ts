@@ -623,3 +623,9 @@ it("V2 ten-candidate Unicode payload stays below the shared byte ceiling and nev
   ).toBe("unavailable");
   expect(fetch).not.toHaveBeenCalled();
 });
+it('English semantic projection uses reviewed English demo descriptions while preserving canonical facts',()=>{
+ const row=result('coast','unconfirmed');row.experience.title='Paseo por la senda costera';row.experience.description='Paseo guiado y llano por la senda costera, con paradas en los miradores. Experiencia de demostración (ficticia).';
+ const prepared=prepareExperienceMatch({...request,locale:'en',preference:'An easy coastal walk'},[row]);
+ expect(JSON.stringify(prepared.questionSet)).toContain('Coastal path walk');expect(JSON.stringify(prepared.questionSet)).toContain('A guided, level coastal path walk');
+ expect(prepared.catalog[0]?.experience.title).toBe('Paseo por la senda costera');expect(prepared.catalog[0]?.experience.priceCents).toBe(1000);expect(prepared.catalog[0]?.verdicts[0]?.verdict).toBe('unknown');
+});

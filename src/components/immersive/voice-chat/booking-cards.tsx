@@ -1,4 +1,5 @@
 "use client";
+import { bookingDisplayText } from "@/lib/booking/display";
 
 import { interpolate } from "@/lib/i18n/interpolate";
 
@@ -56,7 +57,7 @@ function OfferCardView({ card, t, locale }: { card: OfferCard; t: T; locale: Loc
         {card.options.map((option) => (
           <li key={option.experienceId} className="rounded-lg bg-white/5 p-2">
             <div className="flex justify-between gap-2">
-              <span className="font-medium">{option.title}</span>
+              <span className="font-medium">{bookingDisplayText(option.title, locale)}</span>
               <span className="tabular-nums">{money(option.priceCents, option.currency, locale)}</span>
             </div>
             <p className="text-white/70">{t(`booking.cards.suitability.${option.suitability}`)}</p>
@@ -70,7 +71,7 @@ function OfferCardView({ card, t, locale }: { card: OfferCard; t: T; locale: Loc
               .map((verdict) => (
                 <p key={verdict.key} className="text-white/60">
                   {t(`booking.cards.verdict.${verdict.verdict}`)}
-                  {verdict.detail ? `: ${verdict.detail}` : ""}
+                  {verdict.detail ? `: ${bookingDisplayText(verdict.detail, locale)}` : ""}
                 </p>
               ))}
           </li>
@@ -101,7 +102,7 @@ function QuoteCardView({
   const lapsed = state === "expired" || state === "noCapacity";
 
   return (
-    <CardShell title={card.experienceTitle} t={t}>
+    <CardShell title={bookingDisplayText(card.experienceTitle, locale)} t={t}>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1 tabular-nums">
         <dt className="text-white/70">{t("booking.cards.when")}</dt>
         <dd>

@@ -1,4 +1,5 @@
 "use client";
+import { bookingDisplayText } from "@/lib/booking/display";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -117,12 +118,13 @@ const initialValues: FormValues = {
 function parseForm(
   values: FormValues,
   copy: ExperienceMatchCopy,
+  locale: MatchRequest["locale"],
 ): { request?: MatchRequest; errors: Partial<Record<Fields, string>> } {
   const errors: Partial<Record<Fields, string>> = {};
   const preference = values.preference.trim();
   if (!preference || preference.length > 240)
     errors.preference = copy.validation.preference;
-  const request: MatchRequest = { locale: "es", preference };
+  const request: MatchRequest = { locale, preference };
   if (values.date) {
     const today = madridDate(new Date());
     const valid =
@@ -196,7 +198,7 @@ function OptionDetails({
       {option.verdicts.map((verdict) => (
         <p key={verdict.key} className="text-sm text-white/80">
           {copy.constraintLabels[verdict.key]}: {copy.verdicts[verdict.verdict]}
-          {verdict.detail ? ` — ${verdict.detail}` : ""}
+          {verdict.detail ? ` — ${bookingDisplayText(verdict.detail, locale)}` : ""}
         </p>
       ))}
       {(["slots", "alternatives"] as const).map(
@@ -259,7 +261,8 @@ export function ExperienceMatchPanel({
       : undefined);
   const submit = (retry: boolean) => {
     if (busy || match.isSearching) return;
-    const parsed = parseForm(values, copy);
+    if (locale !== "es" && locale !== "en") return;
+    const parsed = parseForm(values, copy, locale);
     setLocalErrors(parsed.errors);
     if (!parsed.request) {
       const first = Object.keys(parsed.errors)[0];
@@ -584,7 +587,7 @@ export function ExperienceMatchPanel({
                   >
                     <div className="flex flex-wrap justify-between gap-2">
                       <h3 className="text-sm font-semibold">
-                        {suggestion.experience.title}
+                        {bookingDisplayText(suggestion.experience.title, locale)}
                       </h3>
                       <span className="text-sm tabular-nums">
                         {money(
@@ -640,7 +643,7 @@ export function ExperienceMatchPanel({
                     >
                       <div className="flex flex-wrap justify-between gap-2">
                         <h4 className="text-sm font-medium">
-                          {option.experience.title}
+                          {bookingDisplayText(option.experience.title, locale)}
                         </h4>
                         <span className="text-sm tabular-nums">
                           {money(

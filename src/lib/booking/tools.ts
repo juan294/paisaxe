@@ -25,6 +25,7 @@ import { ensurePaymentOrder } from "./capture";
 import { draftPatchSchema, getOrCreateOpenDraft, updateDraft, type BookingDraft } from "./drafts";
 import { visitorConstraintsSchema } from "./facts";
 import { sendBalanceInvoice } from "./invoice";
+import { bookingDisplayText } from "./display";
 import { bookingCapability, bookingLink } from "./links";
 import { createQuote } from "./quotes";
 import { BookingError, hhmmSchema, isoDateSchema, partySizeSchema, type Booking } from "./types";
@@ -39,6 +40,7 @@ export interface ToolContext {
   redemptionId: string;
   client: SupabaseClient;
   signal?: AbortSignal;
+  locale?: string | null;
 }
 
 export interface ToolOutcome {
@@ -142,6 +144,7 @@ const searchExperiencesTool: BookingTool<z.infer<typeof searchInputSchema>> = {
         options: results.map((r) => ({
           experienceId: r.experience.id,
           title: r.experience.title,
+          ...(ctx.locale === "en" ? { displayTitle: bookingDisplayText(r.experience.title, "en") } : {}),
           description: r.experience.description,
           priceEuros: euros(r.experience.priceCents),
           depositEuros: euros(r.experience.depositCents),
@@ -197,6 +200,7 @@ const getQuoteTool: BookingTool<z.infer<typeof quoteInputSchema>> = {
         quoteId: quote.id,
         version: quote.version,
         experienceTitle,
+        ...(ctx.locale === "en" ? { displayTitle: bookingDisplayText(experienceTitle, "en") } : {}),
         date: quote.slotDate,
         time: quote.slotTime,
         partySize: quote.partySize,
@@ -258,7 +262,7 @@ const createPaymentOrderTool: BookingTool<{ bookingId: string }> = {
     const booking = await getBookingForUser(ctx.client, ctx.userId, input.bookingId);
     if (!booking) throw new BookingError("not_found");
     ctx.signal?.throwIfAborted();
-    const order = await ensurePaymentOrder(ctx.client, booking.id);
+    const order = ctx.locale === "en" ? await ensurePaymentOrder(ctx.client, booking.id, "en") : await ensurePaymentOrder(ctx.client, booking.id);
 
     return {
       // The approval URL carries PayPal's order token: card only (F05).

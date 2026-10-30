@@ -71,3 +71,9 @@ describe("POST /api/booking/bookings/[capability]/payment (the pay button, F06 f
     expect(ensurePaymentOrder).not.toHaveBeenCalled();
   });
 });
+
+it("passes the resolved English browser locale to checkout without taking monetary input", async () => {
+ const request=routeRequest(`/api/booking/bookings/${CAPABILITY}/payment`,{method:"POST"});request.headers.set("accept-language","en-US,en;q=0.9");
+ const response=await POST(request,capabilityParams(CAPABILITY));
+ expect(response.status).toBe(200);expect(ensurePaymentOrder).toHaveBeenCalledWith(capabilityRouteState.admin,testBooking.id,"en");
+});

@@ -56,7 +56,11 @@ const qualitySchema = z
 
 /** Labels/rubrics are validated separately and never become question state. */
 export function validateMatchQualityCorpus(raw: unknown) {
-  const parsed = qualitySchema.parse(raw);
+  const englishSchema = qualitySchema.extend({
+    id: z.literal("experience-match-quality-en-v1"),
+    provenance: z.string().min(1),
+  });
+  const parsed = z.union([qualitySchema, englishSchema]).parse(raw);
   const cases = parsed.cases.map((item) => {
     const input = parseExperienceMatchSnapshot(item.input);
     const ids = input.catalog.map((row) => row.experience.id);
@@ -92,16 +96,16 @@ export function validateMatchQualityCorpus(raw: unknown) {
   return { ...parsed, cases };
 }
 
-export function loadMatchQualityCorpus() {
+export function loadMatchQualityCorpus(locale: "es" | "en" = "es") {
   const path = fileURLToPath(
-    new URL("./fixtures/jev/experience-match-quality.json", import.meta.url),
+    new URL(locale === "en" ? "./fixtures/jev/experience-match-quality-en.json" : "./fixtures/jev/experience-match-quality.json", import.meta.url),
   );
   const bytes = readFileSync(path);
   const provenance = JSON.parse(
     readFileSync(
       fileURLToPath(
         new URL(
-          "./fixtures/jev/matching-quality-provenance.json",
+          locale === "en" ? "./fixtures/jev/matching-quality-en-provenance.json" : "./fixtures/jev/matching-quality-provenance.json",
           import.meta.url,
         ),
       ),
@@ -161,12 +165,12 @@ export function summarizeMatchQuality(cases: EvaluationCaseRecord[]) {
   };
 }
 
-export function experienceMatchQualitySuite(): EvaluationSuite {
-  const corpus = loadMatchQualityCorpus();
+export function experienceMatchQualitySuite(locale: "es" | "en" = "es"): EvaluationSuite {
+  const corpus = loadMatchQualityCorpus(locale);
   const base = experienceMatchSuite({ timeoutMs: JEV_INTERACTIVE_DEADLINE_MS });
   return {
     ...base,
-    id: "experience-match-quality",
+    id: locale === "en" ? "experience-match-quality-en" : "experience-match-quality",
     assessmentPolicy: "quality-candidate-contracts-pending-blind-v1",
     canQualify: false,
     questionIdentity: {

@@ -8,7 +8,7 @@ import { OperatorDashboard } from "./operator-dashboard";
 export const instant = false;
 
 export const metadata: Metadata = {
-  title: "Operador | Paisaxe",
+  title: "Paisaxe",
   robots: { index: false, follow: false },
 };
 
