@@ -11,18 +11,21 @@ REPORT_FILE="$PROJECT_DIR/docs/agents/check-report.md"
 LOG_FILE="$PROJECT_DIR/agent.log"
 CLAUDE_BIN="$TEST_ROOT/claude"
 CODEX_BIN="$TEST_ROOT/codex"
-export FAKE_REPORT_FILE="$REPORT_FILE" FAKE_CALLS="$TEST_ROOT/calls"
+export FAKE_REPORT_FILE="$REPORT_FILE" FAKE_CALLS="$TEST_ROOT/calls" FAKE_CLAUDE_CALLS="$TEST_ROOT/claude-calls"
 export CLAUDE_CODE_OAUTH_TOKEN=fixture ANTHROPIC_API_KEY=fixture OPENAI_API_KEY=fixture CODEX_API_KEY=fixture
 
 cat > "$CLAUDE_BIN" <<'EOF'
 #!/bin/bash
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then exit 8; fi
+printf '%s\n' "$*" >> "$FAKE_CLAUDE_CALLS"
 case "$FAKE_CLAUDE_MODE" in
   quota) echo 'You have hit your weekly limit' >&2; exit 1 ;;
   quota_zero) echo 'You have hit your weekly limit'; exit 0 ;;
   auth) echo 'Failed to authenticate' >&2; exit 1 ;;
   error) echo 'unrelated provider failure' >&2; exit 1 ;;
   success) printf '# Check Report\n\nFresh Claude analysis.\n' > "$FAKE_REPORT_FILE" ;;
+  big) { printf '# Check Report\n\n'; yes 'A long line of ordinary report text that fills the pipe buffer quickly.' | head -n 6000; } > "$FAKE_REPORT_FILE" ;;
+  blank) printf '# Check Report\n\n   \n\t\n' > "$FAKE_REPORT_FILE" ;;
   wrongtitle) printf '# Other Title\n\nWrong heading.\n' > "$FAKE_REPORT_FILE" ;;
   nowrite) : ;;
   exit9) exit 9 ;;
@@ -82,6 +85,20 @@ export FAKE_CLAUDE_MODE=error FAKE_CODEX_MODE=success
 if run_case; then echo 'Unrelated Claude error fell back' >&2; exit 1; fi
 grep -q 'Old report' "$REPORT_FILE"
 
+# A report larger than the pipe buffer is valid. With pipefail, a closed pipe on
+# `tail | grep -q` used to reject it at random (cost-analyst, 5 weekly runs).
+export FAKE_CLAUDE_MODE=big FAKE_CODEX_MODE=error
+for attempt in 1 2 3 4 5 6 7 8; do
+  run_case 2>/dev/null || { echo "Large valid report was rejected (attempt $attempt)" >&2; exit 1; }
+  grep -q 'ordinary report text' "$REPORT_FILE"
+done
+
+# The Claude prompt must name the required first line, as the Codex prompt does.
+export FAKE_CLAUDE_MODE=success FAKE_CODEX_MODE=error
+: > "$FAKE_CLAUDE_CALLS"
+run_case
+grep -q 'must start with # Check Report' "$FAKE_CLAUDE_CALLS" || { echo 'Claude prompt does not state the required title' >&2; exit 1; }
+
 # A rejection must say why and keep the rejected output for inspection.
 REJECTED_FILE="${LOG_FILE%.log}.rejected.md"
 ERR_FILE="$TEST_ROOT/err"
@@ -92,6 +109,11 @@ if run_case 2>"$ERR_FILE"; then echo 'Wrong-title report was accepted' >&2; exit
 grep -q 'Old report' "$REPORT_FILE" || { echo 'Old report not restored after wrong title' >&2; exit 1; }
 grep -q "first line is '# Other Title'" "$ERR_FILE" || { echo 'Wrong-title reason missing' >&2; cat "$ERR_FILE" >&2; exit 1; }
 grep -q 'Wrong heading' "$REJECTED_FILE" || { echo 'Rejected output not kept' >&2; exit 1; }
+
+export FAKE_CLAUDE_MODE=blank
+if run_case 2>"$ERR_FILE"; then echo 'Blank-body report was accepted' >&2; exit 1; fi
+grep -q 'blank or holds a provider limit message' "$ERR_FILE" || { echo 'Blank-body reason missing' >&2; cat "$ERR_FILE" >&2; exit 1; }
+grep -q 'Old report' "$REPORT_FILE"
 
 export FAKE_CLAUDE_MODE=nowrite
 rm -f "$REJECTED_FILE"
