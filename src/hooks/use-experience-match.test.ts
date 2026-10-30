@@ -299,7 +299,7 @@ describe("useExperienceMatch recovery boundaries", () => {
     expect(h.current.error).toEqual({ kind: "rate_limited", retryAfter: 23 }); expect(fetchMock).toHaveBeenCalledTimes(2);
   });
   it("closed submit/retry/cancel remain free, and an unsupported locale cannot submit after capability checking", async () => {
-    const { result: h } = renderHook(() => useExperienceMatch({ accessToken: "token", locale: "en" }));
+    const { result: h } = renderHook(() => useExperienceMatch({ accessToken: "token", locale: "fr" }));
     await act(() => h.current.submit(request)); await act(() => h.current.retry(request)); act(() => h.current.cancel()); expect(fetchMock).not.toHaveBeenCalled(); expect(h.current.cancelled).toBe(false);
     fetchMock.mockResolvedValueOnce(json({ available: false })); await act(() => h.current.open()); await act(() => h.current.submit(request));
     expect(fetchMock).toHaveBeenCalledTimes(1); expect(h.current.capability).toBe("unavailable");

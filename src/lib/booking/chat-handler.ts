@@ -297,7 +297,7 @@ async function handlePost(
 
         for await (const event of streamBookingTurn({
           anthropic,
-          tools: { userId, redemptionId: redemption.id, client: admin },
+          tools: { userId, redemptionId: redemption.id, client: admin, locale: body.locale ?? null },
           message,
           history,
           draft,

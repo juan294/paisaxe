@@ -1,0 +1,125 @@
+# Paisaxe v1.12.0: verified main23e353d7, release PRs1054 and1055.
+# This evidence describes the tested production code before any later Jev activation.
+# The annotated release tag targets shipped main23e353d7, not this later documentation commit.
+
+version: 1
+candidate_tree: ffae516e2d342b8295a7a84c9f588dc958f3f76b
+shipped_tree: ffae516e2d342b8295a7a84c9f588dc958f3f76b
+deployed_tree: ffae516e2d342b8295a7a84c9f588dc958f3f76b
+deployed_commit: 23e353d7ecd1eb7f38693cbc91586096fb4c1a73
+github_deployment_id: "7418033237"
+target_url: https://paisaxe.es
+generated_at: 2026-10-29T16:29:48.947Z
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles:
+      - identity
+  - id: health-status
+    status: passed
+    oracles:
+      - http
+  - id: health-db
+    status: passed
+    oracles:
+      - http
+  - id: elevenlabs-voice-preflight
+    status: passed
+    oracles:
+      - http
+    provider: ok
+    fingerprint: sha256:1337f33296d87be8
+    fingerprint_matches: true
+    agents:
+      - pelayo
+      - booking
+      - penny
+      - iris
+      - xander
+    custom_llm: not_applicable
+    target_url: https://paisaxe.es
+    response_url: https://paisaxe.es/api/health/voice
+    github_deployment_id: "7418033237"
+    deployment_commit: 23e353d7ecd1eb7f38693cbc91586096fb4c1a73
+    checked_at: 2026-10-29T16:28:38.896Z
+  - id: csp-canary
+    status: passed
+    oracles:
+      - ui
+  - id: story-read-path
+    status: passed
+    oracles:
+      - http
+      - ui
+  - id: admin-denial
+    status: passed
+    oracles:
+      - http
+  - id: webhook-unsigned
+    status: passed
+    oracles:
+      - http
+  - id: chat-smoke
+    status: passed
+    oracles:
+      - http
+  - id: booking-gate-closed
+    status: passed
+    oracles:
+      - http
+      - ui
+  - id: booking-access-boundary
+    status: passed
+    oracles:
+      - http
+      - cleanup
+    cleanup: removed
+  - id: booking-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: booking-intake
+    status: passed
+    oracles:
+      - http
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: experience-matching
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: favorite-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: migration-posture
+    status: passed
+    oracles:
+      - static
+provenance:
+  deployed_probes: correction-production-probes.json
+  identity: correction-production-identity.log
+  voice: correction-production-voice.json
+  migration_posture: correction-migrations.log
+  manifest_selection: correction-probe-manifest.log
+  local_docker:
+    tested_commit: 8bb0403cf3ebd0c3c3fcf92f6810f124129db1b0
+    evidence: fixture-corrected/required-local-probes.json
+    reuse: All application code, local probe specs, fixtures, database and provider
+      inputs are unchanged; only three unit-test title templates differ. Prior
+      local rows and QA identity were removed; owned stack was disposed.
+    changed_files:
+      - scripts/lib/jev-evaluation.test.ts
+      - src/app/api/booking/match/route.test.ts
+      - src/lib/jev/evidence.test.ts
+  fresh_candidate_artifact: coverage-correction-artifact.json

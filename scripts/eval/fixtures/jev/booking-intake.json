@@ -734,7 +734,7 @@
       "input": {
         "message": "¿Qué actividades hay para seis personas el 2026-11-15?",
         "now": "2026-10-28T10:00:00Z",
-        "locale": "en"
+        "locale": "fr"
       },
       "expected": {
         "status": "fallback",
@@ -3035,7 +3035,7 @@
       "input": {
         "message": "¿Qué hay para dos personas mañana?",
         "now": "2026-10-28T10:00:00Z",
-        "locale": "en"
+        "locale": "fr"
       },
       "expected": {
         "status": "fallback",

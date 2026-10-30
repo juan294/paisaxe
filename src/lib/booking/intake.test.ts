@@ -263,7 +263,7 @@ describe("INTAKE buffered real tool/HTTP integration", () => {
         fetch = provider();
       if (reason === "off") vi.stubEnv("JEV_ENABLED_TASKS", "");
       if (reason === "replay") vi.stubEnv("BOOKING_AGENT_REPLAY", "e2e");
-      if (reason === "locale") input.locale = "en";
+      if (reason === "locale") input.locale = "fr";
       if (reason === "history")
         input.history = [{ role: "user", content: "Hola" }];
       if (reason === "draft") input.draft.partySize = 2;
@@ -484,4 +484,12 @@ it("INTAKE agent handles once with zero Claude transport and abort fences every 
   controller.abort();
   expect((await iterator.next()).done).toBe(true);
   vi.unstubAllGlobals();
+});
+
+it('English fast path emits English guidance and display names with canonical facts unchanged',async()=>{
+ const input=turn(database());input.locale='en';input.message='What experiences are available for two people tomorrow up to 150 euros?';
+ const result=await tryBookingIntake(input,{fetch:provider()});expect(result.status).toBe('handled');if(result.status!=='handled')throw Error('Expected English intake');
+ expect(result.events.find(e=>e.type==='text')).toMatchObject({content:expect.stringContaining('Coastal path walk')});
+ expect(result.events.find(e=>e.type==='text')).toMatchObject({content:expect.stringContaining('This search has not created a booking')});
+ expect(result.events.find(e=>e.type==='card')).toMatchObject({card:{kind:'offer',options:[{title:'Paseo por la senda costera',priceCents:12000}]}});
 });

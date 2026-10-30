@@ -31,7 +31,7 @@ export function providerContractSuite(): EvaluationSuite {
     } };
 }
 /** Integration owner registers bounded domain suites here; importing runs no evaluation. */
-export function registeredJevSuites(): EvaluationSuite[] { return [providerContractSuite(), bookingIntakeSuite(), callOutcomeSuite(), evidenceSuite(), experienceMatchSuite(), experienceMatchQualitySuite()]; }
+export function registeredJevSuites(): EvaluationSuite[] { return [providerContractSuite(), bookingIntakeSuite(), bookingIntakeSuite({ locale: "en" }), callOutcomeSuite(), evidenceSuite(), experienceMatchSuite(), experienceMatchQualitySuite(), experienceMatchQualitySuite("en")]; }
 function parseArguments(argv: string[]): { command: string; values: Map<string, string> } {
   const command = argv[0] ?? "--list"; const values = new Map<string, string>();
   const allowed = new Set(["--suite", "--input", "--max-requests", "--max-spend-usd", "--case", "--resume", "--retry-unknown"]);

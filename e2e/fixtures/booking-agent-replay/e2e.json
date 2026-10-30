@@ -36,6 +36,77 @@
         { "tools": [{ "name": "get_booking_status", "input": { "bookingId": "{{match.1}}" } }] },
         { "text": "Resultado: {{result.error}}" }
       ]
+    },
+    {
+      "name": "quote-en",
+      "when": "^We are (\\d+) people on (\\d{4}-\\d{2}-\\d{2}) at (\\d{2}:\\d{2})$",
+      "steps": [
+        {
+          "tools": [
+            {
+              "name": "search_experiences",
+              "input": {
+                "partySize": "{{match.1:number}}",
+                "date": "{{match.2}}"
+              }
+            }
+          ]
+        },
+        {
+          "tools": [
+            {
+              "name": "get_quote",
+              "input": {
+                "experienceId": "{{result.options[title=Paseo por la senda costera].experienceId}}",
+                "date": "{{match.2}}",
+                "time": "{{match.3}}",
+                "partySize": "{{match.1:number}}"
+              }
+            }
+          ]
+        },
+        {
+          "text": "I have prepared the Coastal path walk offer. Review the card and select Accept offer."
+        }
+      ]
+    },
+    {
+      "name": "cancel-en",
+      "when": "^I want to cancel my booking$",
+      "steps": [
+        {
+          "tools": [
+            {
+              "name": "preview_cancellation",
+              "input": {
+                "bookingId": "{{state.bookings[status=confirmed].bookingId}}"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Here are the cancellation terms. Confirm with the card button if you want to cancel."
+        }
+      ]
+    },
+    {
+      "name": "status-en",
+      "when": "^Booking status ([0-9a-f-]{36})$",
+      "steps": [
+        {
+          "tools": [
+            {
+              "name": "get_booking_status",
+              "input": {
+                "bookingId": "{{match.1}}"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Result: {{result.error}}"
+        }
+      ]
     }
   ]
 }

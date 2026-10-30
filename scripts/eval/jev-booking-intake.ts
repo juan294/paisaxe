@@ -64,11 +64,11 @@ export function intakeFixtureTurn(
     acceptedBooking: null,
   };
 }
-export function loadBookingIntakeCorpus() {
+export function loadBookingIntakeCorpus(locale: "es" | "en" = "es") {
   const corpus = JSON.parse(
     readFileSync(
       fileURLToPath(
-        new URL("./fixtures/jev/booking-intake.json", import.meta.url),
+        new URL(locale === "en" ? "./fixtures/jev/booking-intake-en.json" : "./fixtures/jev/booking-intake.json", import.meta.url),
       ),
       "utf8",
     ),
@@ -86,6 +86,8 @@ export function loadBookingIntakeCorpus() {
     schemaVersion: z.literal(1),
     clock: z.iso.datetime(),
     catalog: z.string(),
+    language: z.literal("en").optional(),
+    id: z.string().min(1).optional(),
     tuning: z.array(item).length(40),
     heldout: z.array(item).length(120),
     scenarios: z.array(z.unknown()).length(30),
@@ -163,15 +165,15 @@ export function validateBookingIntakeJudgments(
   return output;
 }
 export function bookingIntakeSuite(
-  options: Pick<JevOptions, "timeoutMs"> = {},
+  options: Pick<JevOptions, "timeoutMs"> & { locale?: "es" | "en" } = {},
 ): EvaluationSuite {
-  const corpus = loadBookingIntakeCorpus();
+  const corpus = loadBookingIntakeCorpus(options.locale);
   const judgments = validateBookingIntakeJudgments(
     JSON.parse(
       readFileSync(
         fileURLToPath(
           new URL(
-            "./fixtures/jev/booking-intake-judgments.json",
+            options.locale === "en" ? "./fixtures/jev/booking-intake-en-judgments.json" : "./fixtures/jev/booking-intake-judgments.json",
             import.meta.url,
           ),
         ),
@@ -181,7 +183,7 @@ export function bookingIntakeSuite(
     corpus,
   );
   return {
-    id: "booking-intake",
+    id: options.locale === "en" ? "booking-intake-en" : "booking-intake",
     task: "booking_intake",
     questionVersion: INTAKE_QUESTION_VERSION,
     policyVersion: JEV_POLICY_VERSION,

@@ -1,4 +1,4 @@
-import type { EvaluationRun } from "./jev-evaluation";
+import type { EvaluationRun } from "./jev-evaluation-schema";
 const escape = (value: unknown) => String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]!));
 export const quoteJevShellArg = (value: string): string => "'" + value.replace(/'/g, "'\\''") + "'";
 const pretty = (value: unknown) => escape(JSON.stringify(value, null, 2));

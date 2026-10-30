@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "status": "DRAFT_FOR_PARENT_REVIEW_NOT_LIVE_QUALIFIED",
+  "author": "independent english_qualification_fixtures agent",
+  "authoredAtUtc": "2026-10-30T06:42:59.193713+00:00",
+  "sourceCommit": "5b6ddf655444a9cc69be21d4495a9b1b04d02115",
+  "sourceCorpusSha256": {
+    "booking-intake.json": "ea5e5df7e26656a3900fe863ffb8c9ca1435a64d4b423e7cf905c51e3d9b9a40",
+    "experience-match-quality.json": "adcc584ce57ff7fa40978163893d1f962fd560defcec42cf55faa333909760a6"
+  },
+  "authorship": {
+    "intake": "English wording independently authored against original semantic category/criteria labels, preserving40/120split60/60heldout and30complete scenario quotes. Numeric/word parties and relative/date/horizon/constraint/safety cases retained.",
+    "matching": "Forty new English preference/description sets and reference categories authored on existing vetted numeric/boolean/catalogue-identity hard facts and unchanged candidate order. References are per-option soft-fit categories, never a total ranking or admission output.",
+    "visibilityDisclosure": "Original Spanish schema/cases/reference example were inspected. Inherited parent context contained aggregate Spanish matching wins but no case-level model outputs were read. New English wording and reference judgments were not tuned against implementation or any English model response.",
+    "implementationRead": false,
+    "providerCalls": 0,
+    "credentialsRead": false
+  },
+  "amendments": {
+    "englishLocale": "Normal cases explicitly en; original unsupported-locale controls mapped to fr/de/raw en-US and documented in intake-locale-amendments.json. Spanish source fixtures untouched.",
+    "canonicalTitles": "Expected quote retains original backend title. English follow-up and separate displayExpectation use Canoe descent/Coastal path walk/4x4 viewpoint tour, per integration-owner contract.",
+    "localeControlIds": {
+      "t37-locale": {
+        "old": "en",
+        "new": "fr"
+      },
+      "h112-locale-en": {
+        "old": "en",
+        "new": "de"
+      },
+      "h113-locale-variant": {
+        "old": "es-ES",
+        "new": "en-US"
+      },
+      "h114-locale-fr": {
+        "old": "fr",
+        "new": "fr"
+      }
+    },
+    "spanishText": "Provider fact detail copy translated to English without changing boolean/code/data facts; matching descriptions and titles are English authored text.",
+    "interpretationLimits": "Exact ISO dates and today/tomorrow; inclusive numeric euro caps; cardinal parties1-12; only step_free/public_transport/pets fast-path hard constraints. Weekdays, other currencies, per-person budgets, other requirements and uncertainty remain fallback."
+  },
+  "targets": {
+    "intakeHeldoutEligibleMinimum": 48,
+    "intakeHeldoutEligibleDenominator": 60,
+    "intakeRequiredFallbacks": 60,
+    "unsafeAcceptMaximum": 0,
+    "pairedScenarios": 30,
+    "medianOfferRatioMaximum": 0.8,
+    "medianWholeScenarioCostRatioMaximum": 0.8,
+    "quoteP95RatioMaximum": 1.05,
+    "matchingBlindWinsMinimum": 24,
+    "matchingDenominator": 40,
+    "tiesAreNonWins": true,
+    "hardFactPreservation": 1,
+    "matchingSemanticP95MsMaximum": 1200
+  },
+  "validation": {
+    "caseCounts": {
+      "tuning": 40,
+      "heldoutEligible": 60,
+      "heldoutFallback": 60,
+      "routeScenarios": 30,
+      "matching": 40
+    },
+    "matchingNumericBooleanHardFactsAndCandidateOrderUnchanged": true,
+    "referenceCoverageExact": true,
+    "allMatchingPreferencesWithin240Characters": true,
+    "noModelOutputs": true,
+    "stateMustExcludeExpectedLabels": true
+  },
+  "draftSha256": {
+    "booking-intake-en.json": "a9bb4feea69e571d142986aa6588f3e3edb4399c049d9ec4969007ad77d2ac44",
+    "experience-match-quality-en.json": "988979f5c20e5f041dd0bd8b5d5d2f8e7f9661ebaaa168f678e41d1588f615ae",
+    "intake-locale-amendments.json": "bbdacd06862b661f6d38c6e01abf3a2c748c86908c7448b172f33e62d7b3376f"
+  },
+  "limitations": [
+    "Draft awaits independent parent review and freeze before new live outputs.",
+    "English precision/ranking/performance are unmeasured; no result here qualifies runtime activation.",
+    "The160intakecases preserve category coverage but do not establish population accuracy.",
+    "The40matchingcases are synthetic author judgments; a separate randomized blind final-order review remains required."
+  ],
+  "integrity": {
+    "datasetSha256": "988979f5c20e5f041dd0bd8b5d5d2f8e7f9661ebaaa168f678e41d1588f615ae",
+    "intakeDatasetSha256": "a9bb4feea69e571d142986aa6588f3e3edb4399c049d9ec4969007ad77d2ac44"
+  },
+  "frozenAt": "2026-10-30T06:52:56.710586+00:00"
+}

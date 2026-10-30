@@ -307,7 +307,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef, bo
     [acceptQuote, quoteStates, locale, handleRequote, isLoading]
   );
 
-  const matchingActive = bookingActive && locale === "es" && !useElevenLabs;
+  const matchingActive = bookingActive && (locale === "es" || locale === "en") && !useElevenLabs;
   if (!open) return null;
 
   return (

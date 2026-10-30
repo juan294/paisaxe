@@ -33,9 +33,17 @@ import {
  * with PAYPAL_API_BASE at the stand-in, BOOKING_AGENT_REPLAY and bypassCSP.
  */
 
-test.use({ locale: "es-ES" });
+const COPY = {
+  es: { browserLocale: "es-ES", composer: "Escribe tu pregunta...", enter: "Entrar", accept: "Aceptar oferta", viewBooking: "Ver la reserva", pay: "Pagar con PayPal", received: "¡Pago recibido! Tu reserva está confirmada.", confirmed: "Confirmada", cancel: "Quiero cancelar mi reserva", cancelButton: /^Cancelar y recibir/, cancelled: "Reserva cancelada.", refunded: "Hemos devuelto la señal en PayPal." },
+  en: { browserLocale: "en-GB", composer: "Ask about this place...", enter: "Enter", accept: "Accept offer", viewBooking: "View booking", pay: "Pay with PayPal", received: "Payment received! Your booking is confirmed.", confirmed: "Confirmed", cancel: "I want to cancel my booking", cancelButton: /^Cancel and get/, cancelled: "Booking cancelled.", refunded: "We have refunded the deposit on PayPal." },
+} as const;
 
-const tag = runTag("roundtrip");
+for (const language of ["es", "en"] as const) {
+  test.describe(`booking roundtrip ${language}`, () => {
+    const copy = COPY[language];
+    test.use({ locale: copy.browserLocale });
+
+const tag = runTag(`roundtrip-${language}`);
 const created: CreatedRows = { userIds: [], voucherLabels: [tag], operatorLabels: [tag] };
 let env: LocalBookingEnv;
 let admin: SupabaseClient;
@@ -96,7 +104,7 @@ test("@release-required @local-docker booking-roundtrip: voucher, chat, accept, 
   baseURL,
 }) => {
   test.setTimeout(300_000);
-  const composer = page.getByRole("textbox", { name: "Escribe tu pregunta..." });
+  const composer = page.getByRole("textbox", { name: copy.composer });
   const send = async (text: string) => {
     await composer.fill(text);
     await composer.press("Enter");
@@ -116,7 +124,7 @@ test("@release-required @local-docker booking-roundtrip: voucher, chat, accept, 
   // 1. Voucher: the judge's entry, with an anonymous guest session.
   expect((await page.goto("/acceso"))?.status()).toBe(200);
   await page.locator("#voucher-code").fill(voucherCode);
-  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.getByRole("button", { name: copy.enter }).click();
   await page.waitForURL(/\/immersive\?booking=1/, { timeout: 60_000 });
 
   const { data: redemption } = await admin.from("voucher_redemptions").select("user_id, vouchers!inner(label)").eq("vouchers.label", tag).single();
@@ -125,20 +133,25 @@ test("@release-required @local-docker booking-roundtrip: voucher, chat, accept, 
   // 2. Chat: the replayed model searches and quotes through the real tools.
   const slotDate = randomSlotDate();
   await expect(composer).toBeVisible({ timeout: 60_000 });
-  await send(`Somos 2 personas el ${slotDate} a las 10:00`);
+  await send(language === "en" ? `We are 2 people on ${slotDate} at 10:00` : `Somos 2 personas el ${slotDate} a las 10:00`);
+  if (language === "en") {
+    await expect(page.getByRole("heading", { name: "Coastal path walk" })).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByText("I have prepared the Coastal path walk offer. Review the card and select Accept offer.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Aceptar oferta" })).toHaveCount(0);
+  }
 
   // 3. Accept on the quote card; the post-accept turn prepares the PayPal order.
-  await page.getByRole("button", { name: "Aceptar oferta" }).click({ timeout: 90_000 });
-  const viewBooking = page.getByRole("link", { name: "Ver la reserva" });
+  await page.getByRole("button", { name: copy.accept }).click({ timeout: 90_000 });
+  const viewBooking = page.getByRole("link", { name: copy.viewBooking });
   await expect(viewBooking).toBeVisible({ timeout: 30_000 });
   bookingPath = (await viewBooking.getAttribute("href")) ?? "";
   expect(bookingPath).toMatch(/^\/booking\/[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/);
   expect((await bookingRow(guestId)).status).toBe("pending_payment");
 
   // 4. Pay: the stand-in approves, PayPal returns to the booking's return page, which captures.
-  await page.getByRole("link", { name: "Pagar con PayPal" }).click({ timeout: 60_000 });
+  await page.getByRole("link", { name: copy.pay }).click({ timeout: 60_000 });
   await page.waitForURL(/\/return\?token=/, { timeout: 60_000 });
-  await expect(page.getByText("¡Pago recibido! Tu reserva está confirmada.")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(copy.received)).toBeVisible({ timeout: 60_000 });
 
   const confirmed = await bookingRow(guestId);
   expect(confirmed.status, "datastore: booking confirmed").toBe("confirmed");
@@ -148,19 +161,28 @@ test("@release-required @local-docker booking-roundtrip: voucher, chat, accept, 
   await page.goto(issueOperatorLink());
   const operatorRow = page.getByRole("row").filter({ hasText: confirmed.reference });
   await expect(operatorRow).toBeVisible({ timeout: 60_000 });
-  await expect(operatorRow).toContainText("Confirmada");
+  await expect(operatorRow).toContainText(copy.confirmed);
+  if (language === "en") {
+    await expect(page.getByText("Operator dashboard")).toBeVisible();
+    await expect(operatorRow).toContainText("Coastal path walk");
+    await expect(operatorRow).toContainText("Captured");
+    await expect(page.getByText("Panel de operador")).toHaveCount(0);
+  }
 
   // 6. Cancel from the chat: preview through the replayed tool, confirm on the card.
   await page.goto("/immersive?booking=1");
   await expect(composer).toBeVisible({ timeout: 60_000 });
-  await send("Quiero cancelar mi reserva");
-  await page.getByRole("button", { name: /^Cancelar y recibir/ }).click({ timeout: 60_000 });
-  await expect(page.getByText("Reserva cancelada.")).toBeVisible({ timeout: 30_000 });
+  await send(copy.cancel);
+  await page.getByRole("button", { name: copy.cancelButton }).click({ timeout: 60_000 });
+  await expect(page.getByText(copy.cancelled)).toBeVisible({ timeout: 30_000 });
 
   // 7. Refunded: datastore and the booking page.
   const refunded = await bookingRow(guestId);
   expect(refunded.status, "datastore: booking refunded").toBe("refunded");
   expect(refunded.payments).toEqual([expect.objectContaining({ status: "refunded", refund_id: expect.any(String) })]);
   await page.goto(bookingPath);
-  await expect(page.getByText("Hemos devuelto la señal en PayPal.")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(copy.refunded)).toBeVisible({ timeout: 60_000 });
 });
+
+  });
+}

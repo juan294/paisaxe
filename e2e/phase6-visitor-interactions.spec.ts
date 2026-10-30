@@ -88,9 +88,10 @@ test.describe("Phase 6 visitor navigation readiness", () => {
         (route) => route.abort("blockedbyclient"));
       await page.goto("/immersive", { waitUntil: "domcontentloaded" });
       await expect(page.locator("p:visible").filter({ hasText: /JavaScript/i })).toBeVisible();
-      const recovery = page.getByRole("link", { name: /recargar/i });
+      // The static root fallback is English even before request-specific content streams.
+      const recovery = page.getByRole("link", { name: "Reload the page", exact: true });
       await expect(recovery).toBeVisible();
-      expect(await recovery.getAttribute("href")).toBeTruthy();
+      await expect(recovery).toHaveAttribute("href", "/immersive");
     } finally {
       await context.close();
     }

@@ -1,3 +1,4 @@
+import { LOCALE_COOKIE, resolveRequestLocale } from "@/lib/i18n/preference";
 import { NextResponse, type NextRequest } from "next/server";
 import { ensurePaymentOrder } from "@/lib/booking/capture";
 import { BookingError } from "@/lib/booking/types";
@@ -28,7 +29,8 @@ export async function POST(
   const { admin, booking } = guard;
 
   try {
-    const body: PaymentStartResponse = await ensurePaymentOrder(admin, booking.id);
+    const locale = resolveRequestLocale(request.cookies.get(LOCALE_COOKIE)?.value, request.headers.get("accept-language")).locale;
+    const body: PaymentStartResponse = locale === "en" ? await ensurePaymentOrder(admin, booking.id, "en") : await ensurePaymentOrder(admin, booking.id);
     return NextResponse.json(body, { headers: CAPABILITY_HEADERS });
   } catch (error) {
     const status = error instanceof BookingError ? ERROR_STATUS[error.code] : undefined;

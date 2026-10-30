@@ -319,3 +319,8 @@ describe("captureOrder", () => {
     expect(error.message).toMatch(/capture/);
   });
 });
+it('sends the selected English checkout locale through the actual SDK wire format',async()=>{
+ await createOrder({...input,locale:'en-US',description:'Coastal path walk (demo)'});
+ const wire=mock.requestsTo('POST','/v2/checkout/orders')[0]?.body;
+ expect(wire).toMatchObject({purchase_units:[{description:'Coastal path walk (demo)',amount:{currency_code:'EUR',value:'30.00'}}],payment_source:{paypal:{experience_context:{locale:'en-US'}}}});
+});

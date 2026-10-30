@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clockTime, dateTime, slotDay } from "@/lib/booking-format";
 import type { OperatorBooking, OperatorView } from "@/lib/booking/operator";
+import { LanguageProvider } from "@/lib/i18n/provider";
+import { en } from "@/lib/i18n/en";
 import type { OperatorLedgerResponse } from "@/types/operator-ledger";
 
 const CAPABILITY = "11111111-2222-4333-8444-555555555555.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
@@ -486,5 +488,63 @@ describe("OperatorDashboard PayPal check", () => {
 
     expect(await screen.findByText("Este enlace de operador no es válido o ha caducado.")).toBeInTheDocument();
     expect(ledgerFetch).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("OperatorDashboard in English", () => {
+  const renderEnglish = () => render(<LanguageProvider initialLocale="en" initialDictionary={en} initialDictionaryLocale="en"><OperatorDashboard /></LanguageProvider>);
+
+  it("uses English labels, payment statuses, dates and PayPal evidence", async () => {
+    mockFetch.mockResolvedValueOnce(json(200, view()));
+    ledgerFetch.mockResolvedValueOnce(ledgerOk({ bookings: {
+      "b1111111-2222-4333-8444-555555555555": "matches",
+      "b2222222-2222-4333-8444-555555555555": "mismatch",
+      "b3333333-2222-4333-8444-555555555555": "refunded",
+    } }));
+    renderEnglish();
+    expect(await screen.findByText("Operator dashboard")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upcoming: 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Exceptions: 1" })).toBeInTheDocument();
+    expect(screen.getByTestId("tile-deposits")).toHaveTextContent("Deposits collected");
+    expect(screen.getByTestId("tile-deposits")).toHaveTextContent(/€60\.00/);
+    const upcoming = within(screen.getByRole("region", { name: "Upcoming bookings" }));
+    const row = within(upcoming.getByText("RS-CONF01").closest("tr") as HTMLElement);
+    expect(row.getByText("Confirmed")).toBeInTheDocument();
+    expect(row.getByText("Captured")).toBeInTheDocument();
+    expect(row.getByRole("cell", { name: /Confirmed/ })).toHaveAttribute("data-label", "Status");
+    expect(row.getByText(`${slotDay("2026-11-21", "en")} · 10:00`)).toBeInTheDocument();
+    const summary = within(screen.getByRole("region", { name: "PayPal verification" }));
+    expect(await summary.findByText(`PayPal confirms 2 of 3 deposits · PayPal data as of ${clockTime("2026-11-20T09:00:00.000Z", "en")}`)).toBeInTheDocument();
+    expect(screen.getByText("Does not match PayPal")).toBeInTheDocument();
+    expect(screen.getByText("Refunded in PayPal")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Places available (14 days)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Release hold RS-HOLD04" })).toBeInTheDocument();
+    expect(screen.queryByText("Panel de operador")).not.toBeInTheDocument();
+    expect(screen.queryByText("Depósitos cobrados")).not.toBeInTheDocument();
+  });
+
+  it("preserves unknown provider statuses instead of displaying translation keys", async () => {
+    const unusual = booking({ status: "future_booking_state", payment: { ...booking().payment!, status: "future_payment_state" } });
+    mockFetch.mockResolvedValueOnce(json(200, view({ bookings: [unusual] })));
+    renderEnglish();
+    expect(await screen.findByText("future_booking_state")).toBeInTheDocument();
+    expect(screen.getByText("future_payment_state")).toBeInTheDocument();
+    expect(screen.queryByText("operator.bookingStatus.future_booking_state")).not.toBeInTheDocument();
+  });
+
+  it("keeps English recovery and confirmation copy without changing protected requests", async () => {
+    mockFetch.mockResolvedValueOnce(json(200, view())).mockResolvedValueOnce(json(500, {}));
+    ledgerFetch.mockResolvedValueOnce(json(200, { state: "unavailable", reason: "error" }));
+    renderEnglish();
+    expect(await screen.findByText("PayPal verification is unavailable right now.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reissue link RS-CONF01" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reissue link for RS-CONF01" });
+    expect(within(dialog).getByText("The previous link will stop working.")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reissue" }));
+    expect(await screen.findByText("The action could not be completed. Try again.")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenNthCalledWith(2, `/api/operator/${CAPABILITY}/bookings/b1111111-2222-4333-8444-555555555555/reissue-link`, { method: "POST", headers: { "x-csrf-token": "csrf-1" } });
+    expect(screen.getByText("RS-CONF01")).toBeInTheDocument();
   });
 });

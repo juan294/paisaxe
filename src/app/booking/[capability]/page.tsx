@@ -8,7 +8,7 @@ import { BookingStatus } from "./booking-status";
 export const instant = false;
 
 export const metadata: Metadata = {
-  title: "Reserva | Paisaxe",
+  title: "Paisaxe",
   robots: { index: false, follow: false },
 };
 

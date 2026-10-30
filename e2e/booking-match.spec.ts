@@ -10,7 +10,15 @@ import {
   requireLocalBookingEnv,
 } from "./fixtures/booking-local";
 
-test.use({ locale: "es-ES", viewport: { width: 390, height: 844 } });
+const COPY = {
+  es: { browserLocale: "es-ES", enter: "Entrar", composer: "Escribe tu pregunta...", title: "Buscar a mi medida", preference: "¿Qué tipo de experiencia te apetece?", disclosure: "Cada búsqueda usa un turno de tu acceso; si vuelves a buscar, se usa otro turno.", style: "Un paseo tranquilo con vistas", date: "Fecha (opcional)", people: "Personas (opcional)", stepFree: "Acceso sin escalones", submit: "Buscar experiencias", use: "Usar en el chat", unknown: "No confirmado por el proveedor", estimated: "Se ha estimado el estilo", remaining: "Te quedan", coast: "Paseo por la senda costera", cancel: "Cancelar búsqueda", cancelled: "Búsqueda cancelada", retry: "Volver a buscar", close: "Cerrar" },
+  en: { browserLocale: "en-GB", enter: "Enter", composer: "Ask about this place...", title: "Find my kind of experience", preference: "What kind of experience would you like?", disclosure: "Each search uses one turn from your access; searching again uses another turn.", style: "A quiet walk with views", date: "Date (optional)", people: "People (optional)", stepFree: "Step-free access", submit: "Find experiences", use: "Use in chat", unknown: "Not confirmed by the provider", estimated: "Style was estimated", remaining: "turns left", coast: "Coastal path walk", cancel: "Cancel search", cancelled: "Search cancelled", retry: "Search again", close: "Close" },
+} as const;
+
+for (const language of ["es", "en"] as const) {
+  test.describe(`experience matching ${language}`, () => {
+    const copy = COPY[language];
+    test.use({ locale: copy.browserLocale, viewport: { width: 390, height: 844 } });
 
 /** Browser UI forwards only matching HTTP to the prebound real local handler.
  * Authentication, metering and catalog use the owned database. Next proxy is
@@ -43,6 +51,7 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
       "tsx",
       "--conditions=react-server",
       "e2e/fixtures/jev-match-driver.ts",
+      language,
     ],
     {
       cwd: process.cwd(),
@@ -172,11 +181,11 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
     checkpoint("access-navigation-complete");
     await page.locator("#voucher-code").fill(metadata.voucherCode);
     checkpoint("access-code-filled");
-    await page.getByRole("button", { name: "Entrar" }).click();
+    await page.getByRole("button", { name: copy.enter }).click();
     checkpoint("access-submit-clicked");
     await page.waitForURL(/\/immersive\?booking=1/, { timeout: 60_000 });
     const composer = page.getByRole("textbox", {
-      name: "Escribe tu pregunta...",
+      name: copy.composer,
     });
     await expect(composer).toBeVisible({ timeout: 60_000 });
     checkpoint("booking-composer-ready");
@@ -199,29 +208,29 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
       return browserRows[0]!;
     };
     expect((await redemption()).chat_turns_used).toBe(0);
-    await page.getByRole("button", { name: "Buscar a mi medida" }).click();
+    await page.getByRole("button", { name: copy.title }).click();
     const preference = page.getByRole("textbox", {
-      name: "¿Qué tipo de experiencia te apetece?",
+      name: copy.preference,
     });
     await expect(preference).toBeVisible();
     checkpoint("matching-form-ready");
     await expect(
       page.getByText(
-        "Cada búsqueda usa un turno de tu acceso; si vuelves a buscar, se usa otro turno.",
+        copy.disclosure,
       ),
     ).toBeInViewport();
-    await preference.fill("Un paseo tranquilo con vistas");
+    await preference.fill(copy.style);
     const date = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Europe/Madrid",
     }).format(new Date(Date.now() + 2 * 86_400_000));
-    await page.getByLabel("Fecha (opcional)").fill(date);
-    await page.getByLabel("Personas (opcional)").fill("2");
-    await page.getByRole("checkbox", { name: "Acceso sin escalones" }).check();
+    await page.getByLabel(copy.date).fill(date);
+    await page.getByLabel(copy.people).fill("2");
+    await page.getByRole("checkbox", { name: copy.stepFree }).check();
     expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
     expect((await redemption()).chat_turns_used).toBe(0);
     await expect(
       page.getByText(
-        "Cada búsqueda usa un turno de tu acceso; si vuelves a buscar, se usa otro turno.",
+        copy.disclosure,
       ),
     ).toBeVisible();
     const dialog = page.getByRole("dialog");
@@ -235,19 +244,26 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
     await page.screenshot({
       path: testInfo.outputPath("matching-mobile-form.png"),
     });
-    await page.getByRole("button", { name: "Buscar experiencias" }).click();
-    const use = page.getByRole("button", { name: "Usar en el chat" }).first();
+    await page.getByRole("button", { name: copy.submit }).click();
+    const use = page.getByRole("button", { name: copy.use }).first();
     await expect(use).toBeVisible();
     checkpoint("matching-results-ready");
+    expect(calls.find((call) => call.method === "POST")?.body).toMatchObject({
+      locale: language, preference: copy.style, date, partySize: 2, constraints: { step_free: true },
+    });
+    if (language === "en") {
+      await expect(page.getByText("Coastal path walk", { exact: true }).first()).toBeVisible();
+      await expect(page.getByText("Paseo por la senda costera", { exact: true })).toHaveCount(0);
+    }
     await expect(
       page
-        .getByText("No confirmado por el proveedor", { exact: false })
+        .getByText(copy.unknown, { exact: false })
         .first(),
     ).toBeVisible();
     expect((await redemption()).chat_turns_used).toBe(1);
     await expect(
-      page.getByRole("status").filter({ hasText: "Se ha estimado el estilo" }),
-    ).toContainText("Te quedan");
+      page.getByRole("status").filter({ hasText: copy.estimated }),
+    ).toContainText(copy.remaining);
     await use.scrollIntoViewIfNeeded();
     await expect(use).toBeInViewport();
     await expect(composer).toBeInViewport();
@@ -259,8 +275,8 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
     await page.keyboard.press("Enter");
     await expect(composer).toBeFocused();
     checkpoint("composer-prefilled");
-    await expect(composer).toHaveValue(/Paseo por la senda costera/);
-    expect(await composer.inputValue()).toContain("Acceso sin escalones");
+    await expect(composer).toHaveValue(new RegExp(copy.coast));
+    expect(await composer.inputValue()).toContain(copy.stepFree);
     expect((await redemption()).chat_turns_used).toBe(1);
     const guest = await redemption();
     for (const table of ["booking_drafts", "quotes", "bookings"]) {
@@ -272,32 +288,32 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
       expect(data).toEqual([]);
     }
     // A late successful response after cancellation must not replace editable input.
-    await page.getByRole("button", { name: "Buscar a mi medida" }).click();
+    await page.getByRole("button", { name: copy.title }).click();
     await expect(preference).toBeVisible();
     holdNext = true;
     const held = new Promise<void>((resolve) => {
       heldResolve = resolve;
     });
-    await page.getByRole("button", { name: "Buscar experiencias" }).click();
+    await page.getByRole("button", { name: copy.submit }).click();
     await held;
-    await page.getByRole("button", { name: "Cancelar búsqueda" }).click();
+    await page.getByRole("button", { name: copy.cancel }).click();
     release?.();
     await expect(
-      page.getByRole("status").filter({ hasText: "Búsqueda cancelada" }),
+      page.getByRole("status").filter({ hasText: copy.cancelled }),
     ).toBeVisible();
-    expect(await preference.inputValue()).toBe("Un paseo tranquilo con vistas");
+    expect(await preference.inputValue()).toBe(copy.style);
     expect((await redemption()).chat_turns_used).toBe(2);
     await expect(
-      page.getByRole("button", { name: "Usar en el chat" }),
+      page.getByRole("button", { name: copy.use }),
     ).toHaveCount(0);
-    await page.getByRole("button", { name: "Volver a buscar" }).click();
+    await page.getByRole("button", { name: copy.retry }).click();
     await expect(
-      page.getByRole("button", { name: "Usar en el chat" }).first(),
+      page.getByRole("button", { name: copy.use }).first(),
     ).toBeVisible();
     expect((await redemption()).chat_turns_used).toBe(3);
-    await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+    await page.getByRole("button", { name: copy.close, exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Buscar a mi medida" }),
+      page.getByRole("button", { name: copy.title }),
     ).toBeFocused();
     // Actual Next endpoints retain concealment/CSRF/Preview behavior outside the local bridge.
     if (!browserAuthorization)
@@ -306,7 +322,7 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
       );
     const defaultOff = await page
       .context()
-      .request.get("/api/booking/match?locale=es", {
+      .request.get(`/api/booking/match?locale=${language}`, {
         headers: { authorization: browserAuthorization },
       });
     expect(defaultOff.status()).toBe(200);
@@ -319,7 +335,7 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
             headers: csrfHeaders(baseURL!, {
               authorization: browserAuthorization,
             }),
-            data: { locale: "es", preference: "tranquilo" },
+            data: { locale: language, preference: copy.style },
           })
       ).status(),
     ).toBe(404);
@@ -335,7 +351,7 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
     expect(
       (
         await request.get(
-          BOOKING_PREVIEW_ORIGIN + "/api/booking/match?locale=es",
+          BOOKING_PREVIEW_ORIGIN + `/api/booking/match?locale=${language}`,
         )
       ).status(),
     ).toBe(404);
@@ -372,3 +388,6 @@ test("@release-required @local-docker experience matching: real quota/facts/canc
     }
   }
 });
+
+  });
+}

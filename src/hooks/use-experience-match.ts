@@ -228,7 +228,7 @@ export function useExperienceMatch({
       if (
         !openRef.current ||
         capabilityRef.current !== "available" ||
-        locale !== "es"
+        (locale !== "es" && locale !== "en")
       )
         return;
       const { id, controller } = begin("POST");
@@ -244,7 +244,7 @@ export function useExperienceMatch({
       setError(null);
       setResult(null);
       setCancelled(false);
-      if ((await check(id, controller)) && locale === "es")
+      if ((await check(id, controller)) && (locale === "es" || locale === "en"))
         await post(request, id, controller);
       else if (generation.current === id) active.current = null;
     },

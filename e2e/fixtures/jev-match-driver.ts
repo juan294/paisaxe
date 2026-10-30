@@ -18,6 +18,8 @@ import {
 } from "./booking-local";
 import { redeemVoucher } from "../../src/lib/booking/vouchers";
 
+const language = process.argv[2] ?? "es";
+assert.ok(language === "es" || language === "en", "Only the two local fixture languages are supported");
 const env = requireLocalBookingEnv();
 assert.ok(
   process.env.SUPABASE_LOCAL_DB_MARKER?.startsWith("paisaxe-contracts:"),
@@ -35,7 +37,7 @@ const { startBookingEvalServer } =
 const { madridDate, addDays } = await import("../../src/lib/booking/types");
 const admin = localServiceClient(env),
   originalFetch = globalThis.fetch;
-const tag = runTag("jev-match"),
+const tag = runTag(`jev-match-${language}`),
   directory = resolve("test-results/jev/phase-6", tag);
 mkdirSync(directory, { recursive: true, mode: 0o700 });
 const created: CreatedRows = {
@@ -255,8 +257,8 @@ const delta = (before: ReturnType<typeof counts>) => {
 let server: Awaited<ReturnType<typeof startBookingEvalServer>> | undefined;
 const date = addDays(madridDate(new Date()), 2),
   input = {
-    locale: "es",
-    preference: "Un paseo tranquilo",
+    locale: language,
+    preference: language === "en" ? "A quiet walk" : "Un paseo tranquilo",
     date,
     partySize: 2,
   };
@@ -292,7 +294,7 @@ async function runApi(code: string) {
     identity,
     null,
     "GET",
-    "/api/booking/match?locale=es",
+    `/api/booking/match?locale=${language}`,
   );
   assert.equal(capability.status, 200);
   assert.deepEqual(await capability.json(), { available: true });
@@ -306,7 +308,7 @@ async function runApi(code: string) {
     { ...input, partySize: 13 },
   ])
     assert.equal((await call(identity, body)).status, 400);
-  assert.equal((await call(identity, { ...input, locale: "en" })).status, 404);
+  assert.equal((await call(identity, { ...input, locale: "fr" })).status, 404);
   assert.equal((await call(null)).status, 404);
   const stranger = await createSignedInUser(env, admin, tag);
   created.userIds.push(stranger.userId);
@@ -317,7 +319,7 @@ async function runApi(code: string) {
     try {
       assert.deepEqual(
         await (
-          await call(identity, null, "GET", "/api/booking/match?locale=es")
+          await call(identity, null, "GET", `/api/booking/match?locale=${language}`)
         ).json(),
         { available: false },
       );

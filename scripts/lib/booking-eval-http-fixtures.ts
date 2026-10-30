@@ -91,6 +91,12 @@ export function createBookingHttpFixtureTransport(
     }
     if (target === "https://api.anthropic.com/v1/messages") {
       counts.claude++;
+      const system = typeof body.system === "string"
+        ? body.system
+        : Array.isArray(body.system)
+          ? body.system.map((block: { text?: string }) => block.text ?? "").join("\n")
+          : "";
+      const english = /(?:Idioma de la interfaz del visitante|Visitor interface language):\s*en\b/.test(system);
       const messages = body.messages as {
         role: string;
         content: string | Record<string, unknown>[];
@@ -118,16 +124,18 @@ export function createBookingHttpFixtureTransport(
       if (lastCall?.name === "get_quote")
         return sse({
           type: "text",
-          text: "Aquí tienes la oferta del catálogo. Todavía no se ha confirmado ninguna reserva.",
+          text: english
+            ? "Here is the catalog offer. No booking has been confirmed yet."
+            : "Aquí tienes la oferta del catálogo. Todavía no se ha confirmado ninguna reserva.",
         });
       if (lastCall?.name === "search_experiences" && lastResult) {
         const data = JSON.parse(String(lastResult.content)) as {
-          options?: { title: string; experienceId: string }[];
+          options?: { title: string; displayTitle?: string; experienceId: string }[];
         };
         const named = data.options?.find((option) =>
-          visitor
-            .toLocaleLowerCase("es")
-            .includes(option.title.toLocaleLowerCase("es")),
+          [option.title, ...(english && option.displayTitle ? [option.displayTitle] : [])].some((title) =>
+            visitor.toLocaleLowerCase(english ? "en" : "es").includes(title.toLocaleLowerCase(english ? "en" : "es")),
+          ),
         );
         const criteria = lastCall.input as Record<string, unknown>;
         if (named) {
@@ -144,19 +152,24 @@ export function createBookingHttpFixtureTransport(
         }
         return sse({
           type: "text",
-          text: `Opciones del catálogo: ${(data.options ?? []).map((option) => option.title).join("; ")}. Dime el nombre exacto, fecha, personas y hora para pedir una oferta.`,
+          text: english
+            ? `Catalog options: ${(data.options ?? []).map((option) => option.displayTitle ?? option.title).join("; ")}. Tell me the exact name, date, party size and time to request an offer.`
+            : `Opciones del catálogo: ${(data.options ?? []).map((option) => option.title).join("; ")}. Dime el nombre exacto, fecha, personas y hora para pedir una oferta.`,
         });
       }
       const literal = deterministicIntake(visitor, now);
       if (literal.status === "accepted")
         return tool("search_experiences", { ...literal.criteria });
       const date = visitor.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
-      const party = visitor.match(/\b(\d+)\s+personas?\b/)?.[1];
+      const party = visitor.match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:personas?|people|persons?|adults?|friends?)\b/i)?.[1];
+      const numberWords: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
       if (date && party)
-        return tool("search_experiences", { date, partySize: Number(party) });
+        return tool("search_experiences", { date, partySize: numberWords[party.toLowerCase()] ?? Number(party) });
       return sse({
         type: "text",
-        text: "Indica una fecha exacta y el número de personas para buscar opciones.",
+        text: english
+          ? "Please provide an exact date and party size to search for options."
+          : "Indica una fecha exacta y el número de personas para buscar opciones.",
       });
     }
     if (new URL(target).hostname === "api.voyageai.com") {

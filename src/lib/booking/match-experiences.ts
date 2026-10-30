@@ -1,4 +1,5 @@
 import "server-only";
+import { bookingDisplayText } from "./display";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { detectInjectionAttempt, sanitizeInput } from "../chat-safety";
@@ -23,7 +24,7 @@ export const MATCH_QUESTION_VERSION = "experience-match-v2";
 export const MATCH_STAGE_LIMIT_MS = 10_000;
 const schema = z
   .object({
-    locale: z.literal("es"),
+    locale: z.enum(["es", "en"]),
     preference: z.string().trim().min(1).max(240),
     date: isoDateSchema.optional(),
     partySize: partySizeSchema.optional(),
@@ -134,8 +135,8 @@ export function prepareExperienceMatch(
           question:
             "Independently, does this candidate's supplied description support the visitor's style preference in state.preference? Multiple candidates may each qualify. Judge absolute support for this candidate, not which candidate is best; do not allocate support or probability across candidates.",
           candidate: {
-            title: boundedUtf8(row.experience.title, 240),
-            description: boundedUtf8(row.experience.description ?? "", 1200),
+            title: boundedUtf8(bookingDisplayText(row.experience.title, input.locale), 240),
+            description: boundedUtf8(bookingDisplayText(row.experience.description ?? "", input.locale), 1200),
           },
         },
         criteria: {

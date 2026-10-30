@@ -44,7 +44,7 @@ export function createMatchHandlers(
       if (!access || access instanceof NextResponse) return notFound();
       return json({
         available:
-          request.nextUrl.searchParams.get("locale") === "es" &&
+          ["es", "en"].includes(request.nextUrl.searchParams.get("locale") ?? "") &&
           isJevTaskEnabled("experience_match"),
       });
     },
@@ -101,7 +101,7 @@ export function createMatchHandlers(
           raw &&
           typeof raw === "object" &&
           "locale" in raw &&
-          raw.locale !== "es"
+          raw.locale !== "es" && raw.locale !== "en"
         )
           return notFound();
         const parsed = parseMatchRequest(raw, now());

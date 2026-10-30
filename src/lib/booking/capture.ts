@@ -1,3 +1,4 @@
+import { bookingDisplayText } from "./display";
 /**
  * The deposit's payment flow (PayPal hackathon plan, Phase 4).
  *
@@ -105,7 +106,7 @@ function matchesBooking(order: PaypalOrder, booking: Row): boolean {
  * Requires a pending_payment booking with a live hold (the quote was accepted,
  * since a booking exists only after accept_quote).
  */
-export async function ensurePaymentOrder(client: SupabaseClient, bookingId: string): Promise<PaymentStartResponse> {
+export async function ensurePaymentOrder(client: SupabaseClient, bookingId: string, locale?: string | null): Promise<PaymentStartResponse> {
   const { booking, payment, hold, experienceTitle, phone } = await loadState(client, bookingId);
   if (booking.status !== "pending_payment") throw new BookingError("invalid_state");
   if (!holdIsLive(hold)) throw new BookingError("hold_expired");
@@ -145,7 +146,8 @@ export async function ensurePaymentOrder(client: SupabaseClient, bookingId: stri
       bookingId: booking.id as string,
       amountCents: booking.deposit_cents as number,
       currency: "EUR",
-      description: `${experienceTitle} (demo)`,
+      description: `${bookingDisplayText(experienceTitle, locale)} (demo)`,
+      ...(locale === "en" ? { locale: "en-US" as const } : {}),
       returnUrl: `${link}/return`,
       cancelUrl: `${link}?cancelled=1`,
       operationKey: row.operation_key as string,

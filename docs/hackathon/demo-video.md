@@ -35,7 +35,7 @@ Times assume about 150 words a minute of narration plus short pauses for on-scre
 | --- | --- | --- | --- |
 | 1 | 0:00–0:12 | Booking page, "Booking confirmed": total €120, "Deposit paid €30", PayPal order and capture ids. Slow scroll down to the PayPal receipt. | "A real PayPal sandbox deposit" |
 | 2 | 0:12–0:30 | Paisaxe home: an Asturias photo story (coast). Cut to the booking chat opening ("Opening the booking assistant…"). | "Paisaxe: a live guide to Asturias, Spain" |
-| 3 | 0:30–1:02 | The traveler types the request. The "Available options" card appears: coastal walk "Fits what you are looking for"; canoe "Does not fit" (step-free access "Not met"); 4x4 route "Over budget" and step-free access "Not confirmed by the provider". Zoom on each badge as it is named. | "Claude + tools: catalog, availability, provider facts" |
+| 3 | 0:30–1:02 | The traveler types the request. The "Available options" card appears: coastal walk "Fits what you are looking for"; canoe "Does not fit" (step-free access "Not met"); 4x4 route "Over budget" and step-free access "Not confirmed by the provider". Zoom on each badge as it is named. | "AI + tools: catalog, availability, provider facts" |
 | 4 | 1:02–1:20 | The offer card: total, "Deposit now", "Balance on the day", free cancellation, "Offer valid until". The traveler types "I've paid" and nothing changes. Then the "Accept offer" button. | "Prices come from the server. Only buttons move money." |
 | 5 | 1:20–1:46 | "Deposit payment" card, "Pay with PayPal", the PayPal sandbox approval page, the return: "Payment received! Your booking is confirmed." | "PayPal Orders v2 through the official Server SDK" |
 | 6 | 1:46–1:58 | The booking page with its status steps. Optional title card: return page, webhook and reconciliation job, all leading to "one capture". | "Webhook + reconciliation: no payment left stuck" |
@@ -59,7 +59,7 @@ use the normal spelling. "Paisaxe" is Asturian, pronounced *pai-SAH-sheh*; test
 > have a booking system. So for this hackathon, we built one into the conversation.
 
 **3. The request and an honest answer (about 32 s)**
-> The traveler just says what they need. Claude, using tools, checks the provider's
+> The traveler just says what they need. AI-assisted search checks the provider's
 > catalog, live availability, and the facts the provider has confirmed. The coastal walk
 > fits: the provider confirms it is step-free. The canoe trip doesn't, and says why. The
 > four-by-four route is over budget, and its step-free access is marked as not confirmed,
@@ -102,10 +102,11 @@ use the normal spelling. "Paisaxe" is Asturian, pronounced *pai-SAH-sheh*; test
 These steps belong to Phase 7, and each needs Juan's authorization in the session that
 runs it:
 
-- Release the current `develop` to production. The Transaction Search panel and the
-  official SDK are not live yet.
-- Turn on the `experience_booking` flag in production.
-- Create the owner voucher and the operator link for the fixture merchant.
+- Verify the deployed English release candidate and its complete booking journey.
+  Transaction Search and the official SDK are already live.
+- Verify the existing `experience_booking` flag and English intake/matching configuration.
+- Use the existing owner voucher and operator link for the fixture merchant; verify their
+  remaining allowance and expiry before the take.
 
 The plan of record says to record on production. If the release slips, the fallback is
 the local production build with the real PayPal sandbox, the same setup as the
@@ -139,8 +140,17 @@ the local production build with the real PayPal sandbox, the same setup as the
 
 ### The request to type (scene 3)
 
-> We are four friends, we'd like to do something on Saturday at 10:00, our budget is 120
-> euros, and one of us needs a step-free route.
+> What experiences are available for four people on YYYY-MM-DD up to 120 euros with
+> step-free access?
+
+Use an exact date at least two days ahead. Then follow up in English:
+
+> Please quote the Coastal path walk at 10:00 on YYYY-MM-DD for four people.
+
+English UI and English visitor requests are required for the recording. The initial
+request deliberately leaves the time to the follow-up so the bounded discovery intake
+can run; the ordinary booking agent handles the quote. The matching panel is "Find my kind of
+experience" in English. All payment and refund actions still require the existing buttons.
 
 Pick a date at least two days ahead. The fixture catalog gives the intended answer: the
 coastal walk fits (€120, step-free access confirmed), the canoe does not fit (no

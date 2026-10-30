@@ -6,7 +6,7 @@ import path from "path";
 import RootLayout, { metadata } from "./layout";
 import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { RequestPresentationProviderShell } from "./request-presentation-provider-shell";
-import { es } from "@/lib/i18n/es";
+import { en } from "@/lib/i18n/en";
 import { resolveTranslation } from "@/lib/i18n/resolve";
 
 // Resolve the actual async server shell before RTL renders the client tree.
@@ -67,10 +67,10 @@ describe("RootLayout", () => {
     try {
       const recovery = screen.getByRole("status");
       expect(recovery).toBeVisible();
-      expect(recovery).toHaveTextContent(resolveTranslation("navigation.preparing", es));
-      expect(recovery).toHaveTextContent(resolveTranslation("navigation.recovery", es));
+      expect(recovery).toHaveTextContent(resolveTranslation("navigation.preparing", en));
+      expect(recovery).toHaveTextContent(resolveTranslation("navigation.recovery", en));
       expect(recovery).toHaveTextContent(/JavaScript/);
-      const reload = within(recovery).getByRole("link", { name: resolveTranslation("navigation.reload", es) });
+      const reload = within(recovery).getByRole("link", { name: resolveTranslation("navigation.reload", en) });
       expect(reload).toBeVisible();
       expect(reload).toHaveAttribute("href", "/immersive");
       expect(reload.closest("noscript, [hidden], .sr-only")).toBeNull();
@@ -79,7 +79,7 @@ describe("RootLayout", () => {
       await act(async () => { ready = true; release(); });
       expect(await screen.findByTestId("revealed-content")).toBeVisible();
       expect(recovery).not.toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: resolveTranslation("navigation.reload", es) })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: resolveTranslation("navigation.reload", en) })).not.toBeInTheDocument();
     } finally {
       ready = true;
       release();
@@ -100,7 +100,7 @@ describe("RootLayout", () => {
 
   describe("metadata", () => {
     it("should have correct title", () => {
-      expect(metadata.title).toBe("Paisaxe | Descubre Asturias");
+      expect(metadata.title).toBe("Paisaxe | Asturias");
     });
 
     it("should have correct description", () => {
@@ -131,7 +131,7 @@ describe("RootLayout", () => {
       const og = metadata.openGraph;
       expect(og).toBeDefined();
       expect(og).toMatchObject({
-        title: "Paisaxe | Descubre Asturias",
+        title: "Paisaxe | Asturias",
         type: "website",
         siteName: "Paisaxe",
         locale: "es_ES",
@@ -179,7 +179,7 @@ describe("RootLayout", () => {
     it("should include twitter:title and twitter:description", () => {
       const twitter = metadata.twitter;
       expect(twitter).toBeDefined();
-      expect(twitter!.title).toBe("Paisaxe | Descubre Asturias");
+      expect(twitter!.title).toBe("Paisaxe | Asturias");
       expect(twitter!.description).toBeTruthy();
     });
 

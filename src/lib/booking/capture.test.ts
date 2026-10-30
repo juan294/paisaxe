@@ -683,6 +683,15 @@ describe("ensurePaymentOrder", () => {
     expect(store.eq).toHaveBeenCalledWith("id", "pay-1");
   });
 
+  it("English checkout uses the translated display name and locale without changing deposit authority", async () => {
+    queueState({ hold: liveHold(), payment: null, experience: { title: "Paseo por la senda costera" } });
+    fake.onTable("payments", { data: paymentRow({ order_id: null, approve_url: null, operation_key: "en-key" }) });
+    fake.onTable("payments", { data: null });
+    paypal.createOrder.mockResolvedValue(createdOrder);
+    await ensurePaymentOrder(fake.client, ID, "en");
+    expect(paypal.createOrder).toHaveBeenCalledWith(expect.objectContaining({ bookingId: ID, amountCents: 3000, currency: "EUR", description: "Coastal path walk (demo)", locale: "en-US", operationKey: "en-key" }));
+  });
+
   it("a booking without an experience title still gets a description", async () => {
     queueState({ payment: null, experience: null });
     fake.onTable("payments", { data: paymentRow({ order_id: null }) });
