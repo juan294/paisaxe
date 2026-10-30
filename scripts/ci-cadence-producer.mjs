@@ -23,7 +23,7 @@ export const ENVIRONMENT_GATED = Object.freeze([
   { file: 'src/lib/booking/operator.postgrest-integration.test.ts', describe: 'operator view against live local Supabase', cases: 20 },
   { file: 'src/lib/booking/phone-confirmation.postgrest-integration.test.ts', describe: 'phone confirmation against live local Supabase', cases: 15 },
   { file: 'src/lib/booking/reconcile.postgrest-integration.test.ts', describe: 'PayPal webhook inbox and reconciliation against live local Supabase', cases: 34 },
-  { file: 'src/lib/booking/tools.postgrest-integration.test.ts', describe: 'booking tools against the fixture merchant', cases: 2 },
+  { file: 'src/lib/booking/tools.postgrest-integration.test.ts', describe: 'booking tools against the fixture merchant', cases: 12 },
   { file: 'src/lib/booking/vouchers.postgrest-integration.test.ts', describe: 'vouchers against live local Supabase', cases: 9 },
   { file: 'src/lib/definer-function-privileges.postgrest-rls.test.ts', describe: 'SECURITY DEFINER function privileges (live local Supabase)', cases: 2 },
   { file: 'src/lib/match-chunks.postgrest-rls.test.ts', describe: 'match_chunks (live local Supabase)', cases: 5 },
