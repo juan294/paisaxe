@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "source": "Release 1.11.0 composite source census: the 2026-10-25 isolated contract qualification is retained for 21 unchanged gated test files. On 2026-10-26, fresh native Vitest JSON qualified all 85 cases in the changed booking/reconciliation files (51 and 34, previously 50 and 32), plus all 10 unchanged-count pg_net cases after its transaction fixture switched to the existing validated SQL helper. Both fresh measurements had zero failures or skips. The derived contract total is 1,046, plus one ordinary operator-link case outside that runner. This is not a new full contract-runner or hosted measurement. Historical hosted recordings remain unchanged.",
-  "declaredContractCases": 1046,
-  "ordinaryEnvironmentGatedCases": 1047,
+  "source": "Release English demo census: the successful main CI database contract receipt for a07df7249bdfe4c20aff1e4e5843c5e83761b40e qualifies 1,056 cases in 23 suites. The changed booking tools group has twelve passing cases, independently observed in fresh native Vitest JSON with zero failures or skips; its source bytes match that hosted commit. The unchanged operator-link case outside the contract runner retains its earlier qualification. Ordinary coverage discloses 1,057 environment-gated skips and never counts them. Historical qualifications and hosted recordings remain unchanged.",
+  "declaredContractCases": 1056,
+  "ordinaryEnvironmentGatedCases": 1057,
   "groups": [
     {
       "file": "scripts/booking/create-operator-link.test.ts",
@@ -62,7 +62,7 @@
     {
       "file": "src/lib/booking/tools.postgrest-integration.test.ts",
       "describe": "booking tools against the fixture merchant",
-      "cases": 2
+      "cases": 12
     },
     {
       "file": "src/lib/booking/vouchers.postgrest-integration.test.ts",
@@ -138,7 +138,7 @@
     "src/lib/booking/phone-confirmation.postgrest-integration.test.ts": "dcd8ebd3170ab49bcd91d80e36b194c46b9cdc4f76371287368f59d7b91dd4a9",
     "src/lib/booking/reconcile.postgrest-integration.test.ts": "82e59b64f237834df3f8884b1e545f744cc3c966d521ad147294d49c632a637f",
     "src/lib/booking/retention.postgrest-integration.test.ts": "e08c291409cd073a339a5599058eac10f6ecc83b6805b1a2d692edb38da834b7",
-    "src/lib/booking/tools.postgrest-integration.test.ts": "75f80d4839a3577879491b649a8dc25d41eda314f7e0b15040d59a6f28754df3",
+    "src/lib/booking/tools.postgrest-integration.test.ts": "0e6ccaebea74207c7ed7da0a999e6fd263a94d77d84fd00c410ea0123f05af6e",
     "src/lib/booking/vouchers.postgrest-integration.test.ts": "a2ef2fbffa3cd291edb98d4cbf4d0cb7c34c8dded370ddba4f3fa96af4f58f6f",
     "src/lib/corpus.postgrest-integration.test.ts": "ad66d2e81115bbf256d54d17ddd5d3c0b13ccf6f1d1c0b2e8a1396848869c35a",
     "src/lib/database-boundaries.postgrest-rls.test.ts": "b95f43d1135ab7675f0b6b9a6f9e0aae00f86cf0119f8250e04eaef803fdd6b0",
@@ -152,49 +152,70 @@
     "src/lib/stripe-entitlements.postgrest-integration.test.ts": "a886a3e546d719992a447cebee7e125811b9cb66a380bb28e952adc7a35544fc"
   },
   "qualification": {
-    "kind": "composite-source-census",
-    "receipt": "paisaxe/docs/agents/release-1.11.0-20261026/census-qualification.json",
-    "receiptSha256": "72eacc32a9aa30171b2d5fe410ec80079889dd530a9346d9bd7954dbb0d0bdee",
-    "nativeReportSha256": "e25e7bddcfa90f1f5963b9b108f0d6f33e58ae9fd46dfb22cf0e44e99f0b604a",
-    "contractCases": 1046,
+    "kind": "hosted-contract-source-census",
+    "receipt": "paisaxe/docs/agents/english-booking-demo-2026-10-30/hosted-native-contracts/receipt.json",
+    "receiptSha256": "9f982a1f4c2c1098a0f49aefb4c2efad7d9c2ef9c309d6fef8faba96b46a59ad",
+    "nativeReport": "paisaxe/docs/agents/english-booking-demo-2026-10-30/card-final-green.json",
+    "nativeReportSha256": "60066e1b1e80a73d01518a2f2d22f840d9a88a06b330ebe569720d607d880f06",
+    "contractCases": 1056,
     "observedChangedGroups": [
       {
-        "file": "src/lib/booking/booking.postgrest-integration.test.ts",
-        "cases": 51
-      },
-      {
-        "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
-        "cases": 34
-      },
-      {
-        "file": "src/lib/pg-net.postgrest-integration.test.ts",
-        "cases": 10
+        "file": "src/lib/booking/tools.postgrest-integration.test.ts",
+        "cases": 12
       }
     ],
+    "sourceSha": "a07df7249bdfe4c20aff1e4e5843c5e83761b40e",
+    "treeSha": "94d9b5bc8496161345b40b8d9a3a4016e4893dd2",
+    "runUrl": "https://github.com/juan294/paisaxe/actions/runs/41057197462",
+    "artifactId": 12978476478,
+    "artifactSha256": "4d518a118d072f04e342face55ea483d15f1970e1f83e44ed5fd992652a634b1",
+    "candidateDigest": "0b9ac6b297b05293a0a605a9c1b103bf56b379da37ba44165cad3a877f43ebd5",
+    "migrationDigest": "9882718d7a79f3236100f6f284a1cc747ed62fd5b503d69d3901cf32f2fb20c3",
     "reusedQualification": {
-      "receipt": "sutura/docs/agents/2026-10-25-fleet-recovery-implementation/p3-dom/paisaxe-catalog-batch-receipt.json",
-      "receiptSha256": "32d8a556b9b7ab016d464f3e9af2c46f6304a5a60a0f82baaa7f37345aa42cc8",
-      "candidateDigest": "4acfd39e95775bc25b698ab607f0d14fc60b7aa271c48ec38ae35a827b786420",
-      "finishedAt": "2026-10-25T12:14:38.176Z",
-      "contractCases": 1043,
+      "kind": "composite-source-census",
+      "receipt": "paisaxe/docs/agents/release-1.11.0-20261026/census-qualification.json",
+      "receiptSha256": "72eacc32a9aa30171b2d5fe410ec80079889dd530a9346d9bd7954dbb0d0bdee",
+      "nativeReportSha256": "e25e7bddcfa90f1f5963b9b108f0d6f33e58ae9fd46dfb22cf0e44e99f0b604a",
+      "contractCases": 1046,
       "observedChangedGroups": [
         {
-          "file": "src/lib/database-boundaries.postgrest-rls.test.ts",
-          "cases": 730
+          "file": "src/lib/booking/booking.postgrest-integration.test.ts",
+          "cases": 51
+        },
+        {
+          "file": "src/lib/booking/reconcile.postgrest-integration.test.ts",
+          "cases": 34
+        },
+        {
+          "file": "src/lib/pg-net.postgrest-integration.test.ts",
+          "cases": 10
+        }
+      ],
+      "reusedQualification": {
+        "receipt": "sutura/docs/agents/2026-10-25-fleet-recovery-implementation/p3-dom/paisaxe-catalog-batch-receipt.json",
+        "receiptSha256": "32d8a556b9b7ab016d464f3e9af2c46f6304a5a60a0f82baaa7f37345aa42cc8",
+        "candidateDigest": "4acfd39e95775bc25b698ab607f0d14fc60b7aa271c48ec38ae35a827b786420",
+        "finishedAt": "2026-10-25T12:14:38.176Z",
+        "contractCases": 1043,
+        "observedChangedGroups": [
+          {
+            "file": "src/lib/database-boundaries.postgrest-rls.test.ts",
+            "cases": 730
+          }
+        ]
+      },
+      "additionalQualifications": [
+        {
+          "file": "src/lib/pg-net.postgrest-integration.test.ts",
+          "cases": 10,
+          "sourceSha256": "c12fc5a1c1c6d1cd13feeab7f0d49e0a6d9d5e9f38e1c0054d940a873af1d0af",
+          "nativeReport": "paisaxe/docs/agents/release-1.11.0-20261026/completion/pgnet-repair.json",
+          "nativeReportSha256": "b2df7ff4e1a749dc191635bff3c1f0990d81f5ea6f00f5cfe1d155028ef13faa",
+          "exitReceipt": "paisaxe/docs/agents/release-1.11.0-20261026/completion/pgnet-gate.json",
+          "exitReceiptSha256": "c262634dcc23965050c497fbd63800eb02b62887033909b28bb81d2ba60b0691",
+          "finishedAt": "2026-10-26T17:46:09.820Z"
         }
       ]
-    },
-    "additionalQualifications": [
-      {
-        "file": "src/lib/pg-net.postgrest-integration.test.ts",
-        "cases": 10,
-        "sourceSha256": "c12fc5a1c1c6d1cd13feeab7f0d49e0a6d9d5e9f38e1c0054d940a873af1d0af",
-        "nativeReport": "paisaxe/docs/agents/release-1.11.0-20261026/completion/pgnet-repair.json",
-        "nativeReportSha256": "b2df7ff4e1a749dc191635bff3c1f0990d81f5ea6f00f5cfe1d155028ef13faa",
-        "exitReceipt": "paisaxe/docs/agents/release-1.11.0-20261026/completion/pgnet-gate.json",
-        "exitReceiptSha256": "c262634dcc23965050c497fbd63800eb02b62887033909b28bb81d2ba60b0691",
-        "finishedAt": "2026-10-26T17:46:09.820Z"
-      }
-    ]
+    }
   }
 }

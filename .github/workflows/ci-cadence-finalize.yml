@@ -50,7 +50,7 @@ jobs:
           trap 'rm -rf "$private"' EXIT
           git --no-replace-objects -c core.hooksPath=/dev/null -c core.fsmonitor=false show "$CI_CADENCE_DEFINITION_SHA:scripts/ci-cadence-control-launch.mjs" > "$private/ci-cadence-control-launch.mjs"
           if ! printf '%s  %s
-          ' 'ced1cb1bb66c05241a374c5c9a2b4b17b15e6897457b8132eeb0fadb65232ea5' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
+          ' '68603b374dc8461fe618a2eab646b8427d440dc30ed315dd5c310bdd9371bcdd' "$private/ci-cadence-control-launch.mjs" | sha256sum --check --status; then
             reason='control loader change: the protected base control loader differs from the reviewed pin in this workflow. Bring this protected control loader change to Sutura. Application verification runs through the separately required original workflow gates; reusable native evidence remains unavailable until reviewed installation.'
             echo "::error title=CI cadence::$reason"
             echo "$reason" >> "$GITHUB_STEP_SUMMARY"

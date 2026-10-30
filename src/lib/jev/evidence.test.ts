@@ -303,7 +303,7 @@ it("EVIDENCE-05 provider failures stay partial and an explicit new evaluation pr
   expect(deadline.claims[0]?.reason).toBe("deadline");
 });
 it("EVIDENCE-06 valid complete checker never fetches URLs or imports cache/receipt writers without service credentials", () => {
-  const code = `import {syncBuiltinESMExports} from 'node:module';const blocked=()=>{throw new Error('non-Jev transport forbidden')};globalThis.fetch=blocked;for(const[module,names]of [['node:http',['request','get']],['node:https',['request','get']],['node:net',['connect','createConnection']],['node:tls',['connect']]]){const api=(await import(module)).default;for(const name of names)api[name]=blocked;}syncBuiltinESMExports();const{checkEvidence}=await import('./src/lib/jev/evidence.ts');let calls=0;const fixture=async(url,init)=>{if(String(url)!=='https://api.typesafe.ai/v1/systemone')throw new Error('bad endpoint');calls++;const request=JSON.parse(init.body);const answers=Object.fromEntries(Object.entries(request.questions).map(([id,q])=>[id,q.type==='noul'?{type:'noul',noul:id==='support'?0.99:0.01}:{type:'choice',choice:'p1',confidence:1,probabilities:{p1:1}}]));return Response.json({model:${JSON.stringify(JEV_MODEL)},answers,usage:{input_tokens:100,output_tokens:0}});};const result=await checkEvidence(${JSON.stringify(snapshot())},{fetch:fixture});if(!result.complete||result.claims[0].label!=='supported'||calls!==1)throw new Error(JSON.stringify(result));console.log(result.coverage);`;
+  const code = `import {syncBuiltinESMExports} from 'node:module';const blocked=()=>{throw new Error('non-Jev transport forbidden')};globalThis.fetch=blocked;for(const[module,names]of [['node:http',['request','get']],['node:https',['request','get']],['node:net',['connect','createConnection']],['node:tls',['connect']]]){const api=(await import(module)).default;for(const name of names)api[name]=blocked;}syncBuiltinESMExports();const{checkEvidence}=await import('./src/lib/jev/evidence.ts');let calls=0;const fixture=async(url,init)=>{if(String(url)!=='https://api.typesafe.ai/v1/systemone')throw new Error('bad endpoint');calls++;const request=JSON.parse(init.body);const answers=Object.fromEntries(Object.entries(request.questions).map(([id,q])=>[id,q.type==='noul'?{type:'noul',noul:id==='support'?0.99:0.01}:{type:'choice',choice:'p1',confidence:1,probabilities:{p1:1}}]));return Response.json({model:process.env.EVIDENCE_06_MODEL,answers,usage:{input_tokens:100,output_tokens:0}});};const result=await checkEvidence(JSON.parse(process.env.EVIDENCE_06_SNAPSHOT),{fetch:fixture});if(!result.complete||result.claims[0].label!=='supported'||calls!==1)throw new Error(JSON.stringify(result));console.log(result.coverage);`;
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
       ([key]) =>
@@ -324,7 +324,15 @@ it("EVIDENCE-06 valid complete checker never fetches URLs or imports cache/recei
     ],
     {
       encoding: "utf8",
-      env: { ...env, NODE_ENV: "test", TYPESAFE_API_KEY: "synthetic-only" },
+      // The data travels in the environment so that no value is spliced into the
+      // generated source (CodeQL js/bad-code-sanitization, alerts 41 and 42).
+      env: {
+        ...env,
+        NODE_ENV: "test",
+        TYPESAFE_API_KEY: "synthetic-only",
+        EVIDENCE_06_MODEL: JEV_MODEL,
+        EVIDENCE_06_SNAPSHOT: JSON.stringify(snapshot()),
+      },
     },
   );
   expect(child.status, child.stderr).toBe(0);

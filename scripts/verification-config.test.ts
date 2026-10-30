@@ -286,6 +286,20 @@ describe("verification coverage config", () => {
     expect(docsAgent.indexOf("GAPS_FILE=")).toBeLessThan(docsAgent.indexOf("cleanup_documentation_report() {"));
   });
 
+  // 2026-10-29: `next build` type-checks every file the app tsconfig includes. An
+  // untracked scratch test under the gitignored docs/agents/ failed it, so the QA
+  // and performance agents both aborted on "Production build failed". Hosted CI
+  // never sees these files, and the same applies to logs/.
+  it("keeps gitignored agent output out of the app typecheck", () => {
+    const tsconfig = parse(readText("tsconfig.json")) as { exclude: string[] };
+    const gitignore = readText(".gitignore").split("\n");
+
+    for (const dir of ["logs", "docs/agents"]) {
+      expect(gitignore, `${dir}/ must stay gitignored`).toContain(`${dir}/`);
+      expect(tsconfig.exclude, `${dir} must be excluded from the app typecheck`).toContain(dir);
+    }
+  });
+
   // QA-H3 (#870): the SSE endpoint real users hit, not the legacy
   // non-streaming JSON endpoint.
   it("targets the streaming chat endpoint real users hit", () => {

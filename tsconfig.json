@@ -49,6 +49,7 @@
     "e2e",
     "supabase/functions",
     "logs",
+    "docs/agents",
     "content/processed",
     ".design-sync",
     ".ds-sync",
