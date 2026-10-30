@@ -19,6 +19,10 @@ import {
 import { addDays, madridDate } from "./types";
 import { FIXTURE_EXPERIENCE_SLUGS } from "./fixtures";
 import { executeBookingTool } from "./tools";
+import { streamBookingTurn } from "./agent";
+import { getOrCreateOpenDraft } from "./drafts";
+import { parseReplayFixture, replayModelClient } from "./replay-model";
+import type { ChatStreamEvent } from "@/types/sse";
 
 const dbReachable = await isLocalSupabaseReachable();
 if (!dbReachable) warnLocalSupabaseUnreachable("tools.postgrest-integration.test.ts");
@@ -115,40 +119,101 @@ describe.skipIf(!dbReachable)("booking tools against the fixture merchant", () =
     expect(foreignList.result).toEqual({ bookings: [] });
   });
 
-  it("keeps English provider confirmations available even when no visitor requirements were supplied", async () => {
-    const outcome = await executeBookingTool({ ...ctxB(), locale: "en" }, "search_experiences", {
-      partySize: 2, date, constraints: {},
+  async function modelTurn(steps: unknown[], locale: string, options: { stopReason?: "refusal" | "max_tokens"; events?: ChatStreamEvent[]; controller?: AbortController } = {}) {
+    const { stopReason, events = [], controller } = options;
+    const tools = { ...ctxB(), locale };
+    const anthropic = replayModelClient(parseReplayFixture({ scenarios: [{ name: "untrusted-provider", when: ".*", steps }] }));
+    const original = anthropic.messages.stream.bind(anthropic.messages);
+    const stream = vi.spyOn(anthropic.messages, "stream");
+    if (stopReason) stream.mockImplementation((params, options) => {
+      const upstream = original(params, options);
+      return {
+        [Symbol.asyncIterator]: () => upstream[Symbol.asyncIterator](),
+        async finalMessage() {
+          const message = await upstream.finalMessage();
+          return message.stop_reason === "end_turn" ? { ...message, stop_reason: stopReason } : message;
+        },
+      };
     });
-    expect(outcome.isError).toBe(false);
-    expect(outcome.result).toMatchObject({ options: expect.arrayContaining([
-      expect.objectContaining({
-        title: "Descenso en canoa", verdicts: [],
-        providerFacts: expect.arrayContaining([{ key: "step_free", value: "no", confirmedByProvider: true }]),
-      }),
-      expect.objectContaining({
-        title: "Ruta de miradores en 4x4", verdicts: [],
-        providerFacts: expect.arrayContaining([
-          { key: "public_transport", value: "no", confirmedByProvider: true },
-          { key: "step_free", value: "unknown", confirmedByProvider: false },
-        ]),
-      }),
-    ]) });
-    expectNoLinks(outcome.result);
+    for await (const event of streamBookingTurn({
+      anthropic, tools, message: "Please help with this experience.",
+      history: [{ role: "user", content: "Hello" }, { role: "assistant", content: "How can I help?" }],
+      draft: await getOrCreateOpenDraft(tools.client, USER_B), bookings: [], contextText: null,
+      acceptedBooking: null, locale, signal: controller?.signal ?? AbortSignal.timeout(15000),
+    })) {
+      events.push(event);
+      if (event.type === "card" && event.card.kind === "quote") controller?.abort();
+    }
+    return { events, stream, text: events.flatMap(e => e.type === "text" ? [e.content] : []).join("") };
+  }
+
+  const search = () => ({ tools: [{ name: "search_experiences", input: { partySize: 2, date, constraints: {} } }] });
+  const quote = () => ({ tools: [{ name: "get_quote", input: {
+    experienceId: psql(`SELECT id FROM public.experiences WHERE slug = '${FIXTURE_EXPERIENCE_SLUGS.coastalWalk}';`),
+    date, time: "16:00", partySize: 2,
+  } }] });
+
+  it("keeps untrusted English eligibility prose out of a successful search reply", async () => {
+    const result = await modelTurn([search(), { text: "The minimum age requirement is met. The provider has confirmed nothing." }], "en");
+    expect(result.events.some(e => e.type === "card" && e.card.kind === "offer")).toBe(true);
+    expect(result.text).toContain("Catalogue options:");
+    expect(result.text).not.toMatch(/minimum age|confirmed nothing/);
   });
 
-  it("grounds English quote replies in provider facts without changing prices or Spanish results", async () => {
-    const experienceId = psql(`SELECT id FROM public.experiences WHERE slug = '${FIXTURE_EXPERIENCE_SLUGS.coastalWalk}';`);
-    const input = { experienceId, date, time: "16:00", partySize: 2 };
-    const english = await executeBookingTool({ ...ctxB(), locale: "en" }, "get_quote", input);
-    expect(english.isError).toBe(false);
-    expect(english.result).toMatchObject({
-      experienceTitle: "Paseo por la senda costera", totalEuros: "120.00", depositEuros: "30.00", balanceEuros: "90.00",
-      providerFacts: expect.arrayContaining([{ key: "step_free", value: "yes", confirmedByProvider: true }]),
-    });
-    expectNoLinks(english.result);
-    const spanish = await executeBookingTool({ ...ctxB(), locale: "es" }, "get_quote", input);
-    expect(spanish.isError).toBe(false);
-    expect(spanish.result).not.toHaveProperty("providerFacts");
-    expect(spanish.result).toMatchObject({ totalEuros: "120.00", depositEuros: "30.00", balanceEuros: "90.00" });
+  it("answers an English quote from its real card without another model call", async () => {
+    const result = await modelTurn([quote()], "en");
+    expect(result.stream).toHaveBeenCalledTimes(1);
+    expect(result.events).toContainEqual(expect.objectContaining({ type: "card", card: expect.objectContaining({ kind: "quote", totalCents: 12000, depositCents: 3000 }) }));
+    expect(result.text).toBe("I have prepared the Coastal path walk offer. Review the card and select Accept offer.");
+  });
+
+  it("owns a successful final quote even after an earlier tool in the batch failed", async () => {
+    const result = await modelTurn([{ tools: [{ name: "get_quote", input: { partySize: 0 } }, ...quote().tools] }], "en");
+    expect(result.events).toContainEqual({ type: "tool", name: "get_quote", status: "error" });
+    expect(result.stream).toHaveBeenCalledTimes(1);
+    expect(result.text).toBe("I have prepared the Coastal path walk offer. Review the card and select Accept offer.");
+  });
+
+  it("does not emit quote guidance after the visitor aborts on its card", async () => {
+    const result = await modelTurn([quote()], "en", { controller: new AbortController() });
+    expect(result.events.some(e => e.type === "card" && e.card.kind === "quote")).toBe(true);
+    expect(result.stream).toHaveBeenCalledTimes(1);
+    expect(result.text).toBe("");
+  });
+
+  it("preserves the Spanish model response and tool loop", async () => {
+    const result = await modelTurn([quote(), { text: "Revisa la oferta del modelo." }], "es");
+    expect(result.stream).toHaveBeenCalledTimes(2);
+    expect(result.text).toBe("Revisa la oferta del modelo.");
+  });
+
+  it("preserves an English clarification when no card was produced", async () => {
+    const result = await modelTurn([{ text: "How old is the youngest participant?" }], "en");
+    expect(result.events.some(e => e.type === "card")).toBe(false);
+    expect(result.text).toBe("How old is the youngest participant?");
+  });
+
+  it("preserves English error recovery after a successful search and invalid tool input", async () => {
+    const result = await modelTurn([search(), { tools: [{ name: "get_quote", input: { partySize: 0 } }] }, { text: "Please confirm how many people will attend." }], "en");
+    expect(result.events).toContainEqual({ type: "tool", name: "get_quote", status: "error" });
+    expect(result.text).toBe("Please confirm how many people will attend.");
+  });
+
+  it("does not present an old offer as current after draft criteria change", async () => {
+    const result = await modelTurn([search(), { tools: [{ name: "update_booking_draft", input: { partySize: 3 } }] }, { text: "The old options meet every new requirement." }], "en");
+    expect(result.text).toContain("Refresh");
+    expect(result.text).not.toContain("meet every");
+  });
+
+  it("fails closed without publishing a pending-offer refusal", async () => {
+    const events: ChatStreamEvent[] = [];
+    await expect(modelTurn([search(), { text: "The minimum age requirement is met." }], "en", { stopReason: "refusal", events })).rejects.toThrow("refusal");
+    expect(events.filter(e => e.type === "text")).toEqual([]);
+  });
+
+  it("uses the verified offer when the model's narrative is truncated", async () => {
+    const result = await modelTurn([search(), { text: "The minimum age requirement is met" }], "en", { stopReason: "max_tokens" });
+    expect(result.text).toContain("Catalogue options:");
+    expect(result.text).not.toContain("minimum age");
   });
 });

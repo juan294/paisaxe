@@ -19,6 +19,7 @@ import {
 import { buildIntakeRequest } from "./intake-questions";
 import { executeBookingTool } from "./tools";
 import type { ChatStreamEvent } from "@/types/sse";
+import type { OfferCard } from "@/types/booking-cards";
 export type IntakeInterpretation =
   | {
       status: "accepted";
@@ -189,23 +190,26 @@ export async function executeIntakeSearch(
   if (input.signal.aborted) return { status: "aborted" };
   if (outcome.isError || outcome.card?.kind !== "offer")
     return { status: "fallback", reason: "search_unavailable" };
-  const offerable = outcome.card.options.filter(
-    (option) => option.suitability !== "rejected",
-  );
-  const english = input.locale === "en";
-  const text =
-    outcome.card.options.length === 0
-      ? english ? "There are no catalogue options for these criteria. You can change the date, group size or budget." : "No hay opciones en el catálogo con estos criterios. Puedes cambiar la fecha, las personas o el presupuesto."
-      : offerable.length === 0
-        ? english ? "The catalogue options do not meet these criteria; check their reasons. You can change the date, group size or budget." : "Las opciones del catálogo están descartadas con estos criterios; consulta sus motivos. Puedes cambiar la fecha, las personas o el presupuesto."
-        : english ? `Catalogue options: ${offerable.map(option => bookingDisplayText(option.title, "en")).join("; ")}. Unconfirmed requirements remain unconfirmed. Tell me the exact experience name and your preferred time to continue. No reservation has been made.` : `Opciones del catálogo: ${offerable.map((option) => option.title).join("; ")}. Las necesidades sin confirmar siguen sin confirmar. Dime el nombre exacto de una experiencia y la hora que prefieres para seguir. Todavía no se ha hecho ninguna reserva.`;
   return {
     status: "handled",
     events: [
       { type: "tool", name: "search_experiences", status: "start" },
       { type: "tool", name: "search_experiences", status: "done" },
       { type: "card", card: outcome.card },
-      { type: "text", content: text },
+      { type: "text", content: bookingOfferReply(outcome.card, input.locale) },
     ],
   };
+}
+
+/** Describe the server's offer without inferring visitor eligibility. */
+export function bookingOfferReply(card: OfferCard, locale?: string | null): string {
+  const offerable = card.options.filter(
+    (option) => option.suitability !== "rejected",
+  );
+  const english = locale === "en";
+  return card.options.length === 0
+      ? english ? "There are no catalogue options for these criteria. You can change the date, group size or budget." : "No hay opciones en el catálogo con estos criterios. Puedes cambiar la fecha, las personas o el presupuesto."
+      : offerable.length === 0
+        ? english ? "The catalogue options do not meet these criteria; check their reasons. You can change the date, group size or budget." : "Las opciones del catálogo están descartadas con estos criterios; consulta sus motivos. Puedes cambiar la fecha, las personas o el presupuesto."
+        : english ? `Catalogue options: ${offerable.map(option => bookingDisplayText(option.title, "en")).join("; ")}. Check the provider information on each card. Tell me the exact experience name and your preferred time to continue. This search has not created a booking.` : `Opciones del catálogo: ${offerable.map((option) => option.title).join("; ")}. Las necesidades sin confirmar siguen sin confirmar. Dime el nombre exacto de una experiencia y la hora que prefieres para seguir. Todavía no se ha hecho ninguna reserva.`;
 }

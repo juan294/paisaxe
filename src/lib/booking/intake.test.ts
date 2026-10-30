@@ -490,6 +490,6 @@ it('English fast path emits English guidance and display names with canonical fa
  const input=turn(database());input.locale='en';input.message='What experiences are available for two people tomorrow up to 150 euros?';
  const result=await tryBookingIntake(input,{fetch:provider()});expect(result.status).toBe('handled');if(result.status!=='handled')throw Error('Expected English intake');
  expect(result.events.find(e=>e.type==='text')).toMatchObject({content:expect.stringContaining('Coastal path walk')});
- expect(result.events.find(e=>e.type==='text')).toMatchObject({content:expect.stringContaining('No reservation has been made')});
+ expect(result.events.find(e=>e.type==='text')).toMatchObject({content:expect.stringContaining('This search has not created a booking')});
  expect(result.events.find(e=>e.type==='card')).toMatchObject({card:{kind:'offer',options:[{title:'Paseo por la senda costera',priceCents:12000}]}});
 });

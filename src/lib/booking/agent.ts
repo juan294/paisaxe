@@ -7,7 +7,9 @@ import { interpolate } from "@/lib/i18n/interpolate";
  * end in a tool call (that text announces the tool, #1037); when the model asks for tools they
  * run one after another (so two get_quote calls on one draft never race),
  * their status and cards are yielded, and the model continues with the
- * results. At most MAX_TOOL_ITERATIONS model calls per turn.
+ * results. English offer/quote guidance comes from verified cards; a final
+ * successful English quote needs no narration call. At most
+ * MAX_TOOL_ITERATIONS model calls per turn.
  *
  * Always the SDK transport: the curl transport in src/lib/claude.ts yields text
  * only and cannot carry tool_use (Phase 0 spike, notes deviation 3).
@@ -41,7 +43,9 @@ import { CHAT_MODEL } from "@/lib/models";
 import type { ChatStreamEvent } from "@/types/sse";
 import { bookingToolDefinitions, executeBookingTool } from "./tools";
 import { madridDate } from "./types";
-import { tryBookingIntake, type IntakeAttempt } from "./intake";
+import type { BookingCard } from "@/types/booking-cards";
+import { bookingDisplayText } from "./display";
+import { bookingOfferReply, tryBookingIntake, type IntakeAttempt } from "./intake";
 import { partySizeClarificationReason } from "./intake-candidates";
 import type { BookingModelClient } from "./model-client";
 import type { BookingTurnInput } from "./turn-input";
@@ -118,10 +122,18 @@ function conversation(input: BookingTurnInput): Anthropic.MessageParam[] {
   return turns;
 }
 
+/** Offer facts and quote acceptance instructions come from server cards. */
+function englishCardReply(card: BookingCard | undefined): string | undefined {
+  if (card?.kind === "offer") return bookingOfferReply(card, "en");
+  if (card?.kind === "quote") return `I have prepared the ${bookingDisplayText(card.experienceTitle, "en")} offer. Review the card and select Accept offer.`;
+}
+
 async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<ChatStreamEvent> {
   const system = buildSystemBlocks(`${buildSystemPrompt()}\n\n${buildBookingInstructions()}`, stateBlock(input, now));
   const tools = bookingToolDefinitions();
   const messages = conversation(input);
+  let latestCard: BookingCard | undefined;
+  let staleOffer = false;
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const stream = input.anthropic.messages.stream(
@@ -138,7 +150,15 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
 
     const final = await stream.finalMessage();
     recordAnthropicUsageInBackground({ model: CHAT_MODEL, usage: final.usage, source: "booking_chat" });
+    if (input.signal.aborted) return;
     if (final.stop_reason !== "tool_use") {
+      const cardReply = input.locale === "en" ? englishCardReply(latestCard) : undefined;
+      const controlledReply = input.locale === "en" && (cardReply !== undefined || staleOffer);
+      if (controlledReply && final.stop_reason === "refusal") {
+        logger.warn("[BOOKING_CHAT_REFUSAL]", { userId: input.tools.userId, textSent: false });
+        throw new Error("refusal");
+      }
+      if (controlledReply) text = cardReply ?? "Your search details have changed. Refresh the options before choosing.";
       if (text) yield { type: "text", content: text };
       if (final.stop_reason === "refusal") {
         logger.warn("[BOOKING_CHAT_REFUSAL]", { userId: input.tools.userId, textSent: text !== "" });
@@ -152,23 +172,42 @@ async function* runTurn(input: BookingTurnInput, now: Date): AsyncGenerator<Chat
 
     messages.push({ role: "assistant", content: final.content });
     const results: Anthropic.ToolResultBlockParam[] = [];
+    let lastTool = "";
     for (const block of final.content) {
       if (block.type !== "tool_use") continue;
+      lastTool = block.name;
       yield { type: "tool", name: block.name, status: "start" };
       const outcome = await executeBookingTool({ ...input.tools, signal: input.signal }, block.name, block.input);
+      if (input.signal.aborted) return;
+      if (outcome.isError) {
+        latestCard = undefined;
+        staleOffer = false;
+      } else if (block.name === "update_booking_draft") {
+        staleOffer ||= latestCard?.kind === "offer" || latestCard?.kind === "quote";
+        latestCard = undefined;
+      }
       yield { type: "tool", name: block.name, status: outcome.isError ? "error" : "done" };
       if (outcome.isError && typeof outcome.result === "object" && outcome.result !== null &&
           "error" in outcome.result && outcome.result.error === "timeout") {
         yield { type: "text", content: input.locale === "en" ? "The operation took too long and its outcome is not yet confirmed. Check your booking status before trying again." : "La operación ha tardado demasiado y su resultado aún no está confirmado. Consulta el estado de tu reserva antes de repetirla." };
         return;
       }
-      if (outcome.card) yield { type: "card", card: outcome.card };
+      if (outcome.card) {
+        latestCard = outcome.card;
+        staleOffer = false;
+        yield { type: "card", card: outcome.card };
+      }
       results.push({
         type: "tool_result",
         tool_use_id: block.id,
         content: JSON.stringify(outcome.result),
         is_error: outcome.isError,
       });
+    }
+    if (input.signal.aborted) return;
+    if (input.locale === "en" && lastTool === "get_quote" && latestCard?.kind === "quote") {
+      yield { type: "text", content: englishCardReply(latestCard)! };
+      return;
     }
     messages.push({ role: "user", content: results });
   }

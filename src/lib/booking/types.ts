@@ -171,7 +171,7 @@ export function toHhMm(time: string): string {
   return time.slice(0, 5);
 }
 
-export function mapFact(row: Row): ExperienceFact {
+function mapFact(row: Row): ExperienceFact {
   return {
     key: row.key as FactKey,
     value: row.value as FactValue,
