@@ -276,21 +276,35 @@ async function onInvoiceEvent(client: SupabaseClient, event: PaypalInboxEvent): 
 }
 
 /**
+ * Fixed dispatch on a provider-controlled event type. A `switch` names every
+ * handler in source, so a type such as "constructor" cannot resolve to an
+ * inherited property and no method is chosen by a runtime string lookup.
+ */
+function paymentEventHandler(eventType: string): typeof onCaptureCompleted | null {
+  switch (eventType) {
+    case ORDER_APPROVED:
+      return onOrderApproved;
+    case CAPTURE_COMPLETED:
+      return onCaptureCompleted;
+    case CAPTURE_PENDING:
+      return onCapturePending;
+    case CAPTURE_DENIED:
+      return onCaptureDenied;
+    case CAPTURE_REFUNDED:
+      return onCaptureRefunded;
+    default:
+      return null;
+  }
+}
+
+/**
  * Applies one inbox row. Reads only the row and PayPal (R2-04), so the cron
  * drain can replay it long after the request that stored it has ended.
  * Throws when the row matches no payment; it then stays unprocessed.
  */
 export async function processPaypalEvent(client: SupabaseClient, event: PaypalInboxEvent): Promise<EventOutcome> {
   if (event.event_type === INVOICE_PAID || event.event_type === INVOICE_CANCELLED) return onInvoiceEvent(client, event);
-  // A Map, not an object: an event type such as "constructor" must not resolve to an inherited property.
-  const handlers = new Map<string, typeof onCaptureCompleted>([
-    [ORDER_APPROVED, onOrderApproved],
-    [CAPTURE_COMPLETED, onCaptureCompleted],
-    [CAPTURE_PENDING, onCapturePending],
-    [CAPTURE_DENIED, onCaptureDenied],
-    [CAPTURE_REFUNDED, onCaptureRefunded],
-  ]);
-  const handler = handlers.get(event.event_type);
+  const handler = paymentEventHandler(event.event_type);
   if (!handler) return "ignored";
 
   const { payment, booking } = await resolvePayment(client, event);

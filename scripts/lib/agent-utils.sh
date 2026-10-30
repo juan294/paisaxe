@@ -40,7 +40,10 @@ valid_scheduled_report() {
   local report_file="$1" expected_title="$2"
   [[ -s "$report_file" ]] || return 1
   [[ $(head -n 1 "$report_file") == "$expected_title"* ]] || return 1
-  tail -n +2 "$report_file" | grep -Eq '[^[:space:]]' || return 1
+  # No `tail | grep -q` pipe: under pipefail, grep exits at the first match, tail
+  # then dies of SIGPIPE on a report larger than the pipe buffer, and a valid
+  # report is rejected at random. awk reads the whole file.
+  awk 'NR > 1 && /[^[:space:]]/ { found = 1 } END { exit !found }' "$report_file" || return 1
   ! grep -Eiq "you have hit your weekly limit|you've hit your weekly limit|^usage limit|^quota exceeded|^rate limit exceeded|^failed to authenticate" "$report_file"
 }
 
@@ -84,8 +87,11 @@ run_scheduled_analysis() {
   if [[ -f "$report_file" ]]; then cp -p "$report_file" "$backup"; had_report=1; fi
 
   if [[ -x ${CLAUDE_BIN:-} ]]; then
-    local claude_status=0
-    (unset ANTHROPIC_API_KEY; "$CLAUDE_BIN" -p "$prompt" --model "$model" \
+    local claude_status=0 claude_prompt
+    claude_prompt="$prompt
+
+Scheduled-run instructions: The first line of $report_file must start with $expected_title. The runner rejects any other first line."
+    (unset ANTHROPIC_API_KEY; "$CLAUDE_BIN" -p "$claude_prompt" --model "$model" \
       --allowedTools "$claude_tools") > "$attempt_log" 2>&1 || claude_status=$?
     if [[ $claude_status == 0 ]]; then
       if ! grep -Eiq "weekly limit|usage limit|quota exceeded|rate limit|too many requests|429|not logged in|failed to authenticate" "$attempt_log" && \
