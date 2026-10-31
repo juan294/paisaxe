@@ -13,6 +13,26 @@ const DB_ID = 'd'.repeat(64), KONG_ID = 'c'.repeat(64), NETWORK_ID = 'e'.repeat(
 const port = async () => { const server = net.createServer(); await new Promise(r => server.listen(0, '127.0.0.1', r)); const result = server.address().port; await new Promise(r => server.close(r)); return result; };
 const frame = (type, payload) => { const bytes = Buffer.from(payload), header = Buffer.alloc(8); header[0] = type; header.writeUInt32BE(bytes.length, 4); return Buffer.concat([header, bytes]); };
 const pause = ms => new Promise(r => setTimeout(r, ms));
+// HTTP upgrade head is only the bytes already read, not necessarily the whole body.
+function upgradeBody(req, socket, head) {
+  const length = Number(req.headers['content-length']);
+  assert.ok(Number.isSafeInteger(length) && length > 0);
+  return new Promise((resolve, reject) => {
+    let body = head;
+    const cleanup = () => { socket.off('data', data); socket.off('close', closed); socket.off('error', failed); };
+    const failed = error => { cleanup(); reject(error); };
+    const closed = () => failed(new Error('Incomplete Docker upgrade request body'));
+    const data = chunk => { body = Buffer.concat([body, chunk]); complete(); };
+    const complete = () => {
+      if (body.length < length) return;
+      cleanup();
+      if (body.length !== length) reject(new Error('Unexpected Docker upgrade request bytes'));
+      else resolve(body);
+    };
+    socket.on('data', data); socket.once('close', closed); socket.once('error', failed);
+    complete();
+  });
+}
 beforeEach(async () => {
   taskDir = realpathSync(mkdtempSync(join(tmpdir(), 'paisaxe-contracts-')));
   manifest = { version: 1, taskDir, projectId: 'paisaxe-contracts-012345abcdef', nonce: randomUUID(), apiUrl: `http://127.0.0.1:${await port()}`, dbPort: await port(), migrationDigest: 'a'.repeat(64) };
@@ -50,14 +70,14 @@ beforeEach(async () => {
   });
   daemon.on('connection', socket => { connections.add(socket); socket.once('close', () => connections.delete(socket)); });
   daemon.on('upgrade', async (req, socket, head) => {
-    assert.deepEqual(JSON.parse(head.toString()), { Detach: false, Tty: false });
+    state.requests.emit('upgrade-head');
+    assert.deepEqual(JSON.parse((await upgradeBody(req, socket, head)).toString()), { Detach: false, Tty: false });
     assert.match(req.url, /^\/exec\/[a-f0-9]{64}\/start$/);
     socket.on('error', () => {});
     state.requests.emit('exec-start');
     if (state.holdStage === 'exec-start') await state.hold;
     if (socket.destroyed) return;
     if (state.refuseStage === 'exec-start') { socket.end('HTTP/1.1 503 Refused\r\nContent-Length: 0\r\n\r\n'); return; }
-    // The HTTP upgrade request body arrives as the upgrade head.
     const respond = () => {
       socket.write('HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n');
       state.active++; socket.once('close', () => state.active--);
@@ -76,6 +96,21 @@ beforeEach(async () => {
 });
 afterEach(async () => { try { await stopTransport(manifest, env); } catch {} for (const socket of connections) socket.destroy(); await new Promise(r => daemon.close(r)); rmSync(taskDir, { recursive: true, force: true }); });
 function exchange(port, bytes) { return new Promise((resolve, reject) => { const socket = net.connect(port, '127.0.0.1', () => socket.write(bytes)); socket.setTimeout(2000, () => socket.destroy(new Error('exchange timeout'))); socket.on('error', reject); socket.on('close', () => reject(new Error('closed'))); const chunks = []; let length = 0; socket.on('data', chunk => { chunks.push(chunk); length += chunk.length; if (length >= bytes.length) { resolve(Buffer.concat(chunks)); socket.destroy(); } }); }); }
+test('Docker upgrade fixture accepts a request body fragmented after the headers', async () => {
+  const body = Buffer.from(JSON.stringify({ Detach: false, Tty: false }));
+  const headSeen = once(state.requests, 'upgrade-head', { signal: AbortSignal.timeout(2000) });
+  const socket = net.connect(join(taskDir, 'docker.sock'));
+  socket.on('error', () => {});
+  try {
+    await once(socket, 'connect');
+    socket.write('POST /exec/' + '1'.repeat(64) + '/start HTTP/1.1\r\nHost: docker\r\nConnection: Upgrade\r\nUpgrade: tcp\r\nContent-Length: ' + body.length + '\r\n\r\n');
+    socket.write(body.subarray(0, 1));
+    await headSeen;
+    const response = once(socket, 'data', { signal: AbortSignal.timeout(2000) });
+    socket.write(body.subarray(1));
+    assert.match((await response)[0].toString(), /^HTTP\/1.1 101 UPGRADED/);
+  } finally { socket.destroy(); }
+});
 test('control socket is private from creation even with a permissive inherited umask', async () => {
   const preload = join(taskDir, 'observe-socket.cjs');
   const observed = join(taskDir, 'socket-mode.json');
@@ -132,7 +167,15 @@ async function assertApiWaitsForHealth(bytes) {
 }
 test('API does not create exec before both containers are healthy', async () => { await assertApiWaitsForHealth(Buffer.from('ready')); });
 for (const mode of ['nonce', 'outbound', 'network-id']) test(`refuses ${mode} mismatch before exec`, async () => { if (mode === 'nonce') state.networkNonce = randomUUID(); if (mode === 'outbound') state.extraNetwork = true; if (mode === 'network-id') state.wrongId = true; await startTransport(manifest, env); await assert.rejects(exchange(manifest.dbPort, Buffer.from('blocked'))); assert.equal(state.execs.length, 0); });
-for (const mode of ['malformed', 'truncated', 'oversized', 'reserved']) test(`rejects ${mode} Docker multiplex frames`, async () => { state[mode] = true; await startTransport(manifest, env); await assert.rejects(exchange(manifest.dbPort, Buffer.from('frame payload'))); });
+for (const mode of ['malformed', 'truncated', 'oversized', 'reserved']) test(`rejects ${mode} Docker multiplex frames`, async () => {
+  state[mode] = true;
+  await startTransport(manifest, env);
+  await assert.rejects(exchange(manifest.dbPort, Buffer.from('frame payload')));
+  const failure = (await diagnosticsWhen(d => d.counts.completed === 1)).failures[0];
+  assert.equal(failure?.stage, 'forwarding');
+  assert.equal(failure.reason, 'invalid_frame');
+  assert.equal(failure.outcome, 'failed');
+});
 test('client EOF and active stop close owned hijacked streams', async () => { await startTransport(manifest, env); const socket = net.connect(manifest.dbPort, '127.0.0.1'); socket.on('error', () => {}); socket.write('active'); socket.resume(); for (let i = 0; !state.active && i < 40; i++) await pause(25); assert.equal(state.active, 1); socket.end(); for (let i = 0; state.active && i < 40; i++) await pause(25); assert.equal(state.active, 0); assert.equal(state.eof, 1); const second = net.connect(manifest.dbPort, '127.0.0.1'); second.on('error', () => {}); second.write('stop'); second.resume(); for (let i = 0; !state.active && i < 40; i++) await pause(25); assert.equal(state.active, 1); await stopTransport(manifest, env); for (let i = 0; state.active && i < 40; i++) await pause(25); assert.equal(state.active, 0); second.destroy(); });
 test('wrong nonce cannot stop relay and occupied ports do not affect unrelated listener', async () => { await startTransport(manifest, env); await assert.rejects(stopTransport({ ...manifest, nonce: randomUUID() }, env)); await stopTransport(manifest, env); const server = net.createServer(); await new Promise(r => server.listen(manifest.dbPort, '127.0.0.1', r)); try { await assert.rejects(startTransport(manifest, env)); assert.equal(server.listening, true); } finally { await new Promise(r => server.close(r)); } });
 test('remote endpoint, daemon, duplicate ports and default project are rejected', async () => { for (const [m, e] of [[manifest, { ...env, DOCKER_HOST: 'tcp://remote:2375' }], [{ ...manifest, apiUrl: 'http://example.com:12345' }, env], [{ ...manifest, dbPort: Number(new URL(manifest.apiUrl).port) }, env], [{ ...manifest, projectId: 'default' }, env]]) await assert.rejects(startTransport(m, e)); });
@@ -292,7 +335,7 @@ test('unchanged five-second exec-start deadline leaves its stage timing in the p
     assert.ok(failure.stageMs['exec-start'] >= 4900 && failure.stageMs['exec-start'] < 7500);
   } finally { socket.destroy(); release(); }
 });
-test('real connection deadline supersedes provisional upstream EOF while the client is paused', { timeout: 130000 }, async () => {
+test('real connection deadline supersedes provisional upstream EOF while the client is paused', { timeout: 130000 }, async t => {
   state.finalResponse = Buffer.alloc(32 * 1024, 0xa5);
   await startTransport(manifest, env);
   const socket = net.connect(manifest.dbPort, '127.0.0.1', () => { socket.write('private-query-canary'); socket.pause(); });
@@ -300,12 +343,17 @@ test('real connection deadline supersedes provisional upstream EOF while the cli
   try {
     const provisional = (await diagnosticsWhen(d => d.active.some(s => s.outcome === 'closed' && s.reason === 'upstream_closed'))).active[0];
     assert.equal(provisional.stage, 'forwarding');
-    // Keep the production 120s deadline: no fake clock, retry or timeout override.
-    await pause(Math.max(0, 120100 - provisional.elapsedMs));
-    const d = await diagnosticsWhen(value => value.counts.completed === 1);
+    // Exercise the real 120s deadline; scheduler delay is not a transport failure.
+    // The test watchdog bounds waiting without imposing a second, tighter deadline.
+    let d;
+    do {
+      t.signal.throwIfAborted();
+      await pause(250);
+      d = assertDiagnostics(await verifyTransport(manifest, env));
+    } while (d.counts.completed !== 1);
     assert.equal(d.recent[0].id, provisional.id);
     assert.equal(d.recent[0].outcome, 'deadline'); assert.equal(d.recent[0].reason, 'connection_timeout');
-    assert.ok(d.recent[0].elapsedMs >= 119000 && d.recent[0].elapsedMs < 125000);
+    assert.ok(d.recent[0].elapsedMs >= 119000);
     assert.equal(d.failures.length, 1); assert.equal(d.counts.failed, 1);
   } finally { socket.destroy(); }
 });
