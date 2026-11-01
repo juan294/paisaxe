@@ -17,6 +17,7 @@ import {
 } from "./booking-local";
 import { redeemVoucher } from "../../src/lib/booking/vouchers";
 import type { BookingEvaluationMode, BookingRouteScenario, BookingRouteTurn } from "../../scripts/lib/booking-eval-harness";
+import { createBookingEvalClock } from "../../scripts/lib/booking-eval-clock";
 
 // Cache configuration is captured on app-module import. Each arm uses the same cold-cache retrieval.
 delete process.env.UPSTASH_REDIS_REST_URL;
@@ -35,6 +36,7 @@ const sha = (value: string | Buffer) => createHash("sha256").update(value).diges
 const corpusPath = "scripts/eval/fixtures/jev/booking-intake.json";
 const corpusBytes = readFileSync(corpusPath);
 const corpus = JSON.parse(corpusBytes.toString()) as { clock: string; catalog: string; scenarios: BookingRouteScenario[] };
+const clock = createBookingEvalClock(corpus.clock);
 const env = requireLocalBookingEnv();
 assert.ok(process.env.SUPABASE_LOCAL_DB_MARKER?.startsWith("paisaxe-contracts:"), "an owned contracts database marker is required");
 assert.equal(env.supabaseUrl, process.env.SUPABASE_LOCAL_API_URL, "the exact owned local API must be selected");
@@ -116,8 +118,8 @@ function delta(before: ReturnType<typeof counters>) {
   const after = counters(); return { jev: after.jev - before.jev, claude: after.claude - before.claude, voyage: after.voyage - before.voyage };
 }
 async function withArm<T>(mode: BookingEvaluationMode, run: (origin: string) => Promise<T>) {
-  activeFixture = createBookingHttpFixtureTransport(new Date(corpus.clock));
-  const server = await startBookingEvalServer({ mode, now: () => new Date(corpus.clock),
+  activeFixture = createBookingHttpFixtureTransport(new Date(clock.executionClock));
+  const server = await startBookingEvalServer({ mode, now: () => new Date(clock.executionClock),
     createModel: async () => new Anthropic({ apiKey: "synthetic-local-only", maxRetries: 1, fetch: providerFetch }),
     jev: { fetch: providerFetch },
     onError: error => {
@@ -131,7 +133,7 @@ async function say(origin: string, token: string, message: string, history: { ro
   const started = performance.now();
   const response = await originalFetch(`${origin}/api/booking/chat/stream`, {
     method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ message, history, locale: "es" }), signal,
+    body: JSON.stringify({ ...clock.shiftUserInput(message, history), locale: "es" }), signal,
   });
   const turn = await collectBookingSse(response, started);
   assert.ok(turn.complete, JSON.stringify(turn.events));
@@ -175,7 +177,7 @@ async function completeScenario(mode: BookingEvaluationMode, scenario: BookingRo
     }
     const quote = turns.flatMap(t => cards(t, "quote")); assert.equal(quote.length, 1);
     const wanted = scenario.expected.quote!;
-    for (const [key, value] of Object.entries(wanted)) assert.equal(quote[0]![key === "date" ? "slotDate" : key === "time" ? "slotTime" : key], value);
+    for (const [key, value] of Object.entries(wanted)) assert.equal(quote[0]![key === "date" ? "slotDate" : key === "time" ? "slotTime" : key], key === "date" ? clock.shiftDate(String(value)) : value);
     assert.equal(quote[0]!.accepted, false);
     const final = await snapshot(identity.userId); noCommitments(final);
     assert.equal(final.quotes.length, 1);
@@ -273,7 +275,7 @@ async function edgeCases(code: string) {
     assert.deepEqual(toolStarts(recovered), ["search_experiences", "get_quote"]);
     const quote = cards(recovered, "quote"); assert.equal(quote.length, 1);
     assert.equal(quote[0]!.experienceTitle, "Paseo por la senda costera");
-    assert.equal(quote[0]!.slotDate, "2026-11-07"); assert.equal(quote[0]!.slotTime, "16:00");
+    assert.equal(quote[0]!.slotDate, clock.shiftDate("2026-11-07")); assert.equal(quote[0]!.slotTime, "16:00");
     assert.equal(quote[0]!.partySize, 2); assert.equal(quote[0]!.totalCents, 12000); assert.equal(quote[0]!.depositCents, 3000);
     const state = await snapshot(identity.userId); noCommitments(state); assert.equal(state.quotes.length, 1);
     assert.deepEqual(state.redemptions.map(r => r.chat_turns_used), [2]);
@@ -346,10 +348,11 @@ finally {
   catch (error) { failure ??= error; }
   const report = {
     schemaVersion: 1, complete: !failure, timingMode: "synthetic-provider-http-real-local-route", timingScope: "route", proxyIncluded: false, retrievalCache: "disabled-before-app-import",
-    liveQuality: "unmeasured", livePerformance: "UNAVAILABLE", clock: corpus.clock, catalog: corpus.catalog,
+    liveQuality: "unmeasured", livePerformance: "UNAVAILABLE", clock: clock.executionClock, catalog: corpus.catalog,
+    sourceClock: clock.sourceClock, executionClock: clock.executionClock, dateShiftDays: clock.dateShiftDays,
     corpusHash: sha(corpusBytes), catalogHash: (() => { try { return sha(readFileSync(resolve(directory, "catalog.json"))); } catch { return null; } })(),
     sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-    sourceHashes: Object.fromEntries(["e2e/fixtures/jev-booking-driver.ts", "scripts/lib/booking-eval-server.ts", "scripts/lib/booking-eval-http-fixtures.ts"].map(file => [file, sha(readFileSync(file))])),
+    sourceHashes: Object.fromEntries(["e2e/fixtures/jev-booking-driver.ts", "scripts/lib/booking-eval-clock.ts", "scripts/lib/booking-eval-server.ts", "scripts/lib/booking-eval-http-fixtures.ts"].map(file => [file, sha(readFileSync(file))])),
     scenarioCount: 30, completedArms: rows.filter(r => "scenarioId" in r).length, expectedArms: 90,
     rows, cleanup, serverErrorsPath, failure: failure instanceof Error ? { message: failure.message, stack: failure.stack } : failure ?? null,
   };
