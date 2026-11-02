@@ -1,0 +1,149 @@
+# Paisaxe v1.13.0 production probe evidence, PR1057.
+# The tag targets shipped commit 5607988868dca8dfee30396b4ce5c866ff8e889e, rather than this later evidence documentation.
+# Post-merge CI is verified separately before tagging.
+
+version: 1
+candidate_tree: 1725f29852c120eb9fe55ba2a9ecc52cb0d42d53
+shipped_tree: 1725f29852c120eb9fe55ba2a9ecc52cb0d42d53
+deployed_tree: 1725f29852c120eb9fe55ba2a9ecc52cb0d42d53
+deployed_commit: 5607988868dca8dfee30396b4ce5c866ff8e889e
+github_deployment_id: "7440447236"
+target_url: https://paisaxe.es
+generated_at: 2026-10-30T14:17:29.189Z
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles:
+      - identity
+  - id: health-status
+    status: passed
+    oracles:
+      - http
+  - id: health-db
+    status: passed
+    oracles:
+      - http
+  - id: elevenlabs-voice-preflight
+    status: passed
+    oracles:
+      - http
+    provider: ok
+    fingerprint: sha256:1337f33296d87be8
+    fingerprint_matches: true
+    agents:
+      - pelayo
+      - booking
+      - penny
+      - iris
+      - xander
+    custom_llm: not_applicable
+    target_url: https://paisaxe.es
+    response_url: https://paisaxe.es/api/health/voice
+    github_deployment_id: "7440447236"
+    deployment_commit: 5607988868dca8dfee30396b4ce5c866ff8e889e
+    checked_at: 2026-10-30T14:15:04.316Z
+  - id: csp-canary
+    status: passed
+    oracles:
+      - ui
+  - id: story-read-path
+    status: passed
+    oracles:
+      - http
+      - ui
+  - id: admin-denial
+    status: passed
+    oracles:
+      - http
+  - id: webhook-unsigned
+    status: passed
+    oracles:
+      - http
+  - id: chat-smoke
+    status: passed
+    oracles:
+      - http
+  - id: booking-gate-closed
+    status: passed
+    oracles:
+      - http
+      - ui
+  - id: booking-access-boundary
+    status: passed
+    oracles:
+      - http
+      - cleanup
+    cleanup: removed
+  - id: booking-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: booking-intake
+    status: passed
+    oracles:
+      - http
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: experience-matching
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: favorite-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: migration-posture
+    status: passed
+    oracles:
+      - static
+provenance:
+  release_pr: https://github.com/juan294/paisaxe/pull/1057
+  deployed_probes: combined-production/probes.json
+  identity: combined-production/identity.log
+  voice: combined-production/voice.json
+  english_ui: combined-production/english-ui.json
+  local_docker:
+    tested_commit: a9a779108558e2d5386c0315a112cb374b82ebdf
+    tested_tree: 1725f29852c120eb9fe55ba2a9ecc52cb0d42d53
+    evidence:
+      - combined-local/required-local-booking-probes.json
+      - combined-local/required-local-favorite-artifact.json
+    temporary_qa_deleted: true
+  stripe:
+    test_only: true
+    tested_commit: a9a779108558e2d5386c0315a112cb374b82ebdf
+    evidence: combined-stripe/run-result.json
+    product_archived: true
+    price_archived: true
+    temporary_qa_deleted: true
+  english_qualification:
+    runtime_commit: 98bbd66cbf1202d80bf77c1f27eb5fca7a727cb5
+    paired_arms: 92
+    assistant_replies_reviewed: 184
+    factual_findings: 0
+    intake_eligible_correct: 55
+    intake_eligible_total: 60
+    intake_fallback_correct: 60
+    intake_fallback_total: 60
+    matching_strict_wins: 29
+    matching_total: 40
+    matching_hard_facts_preserved: true
+    scope: Authored synthetic agent-proxy qualification. Runtime questions, models, English reply logic
+      and frozen case inputs remain unchanged; platform dependencies were updated and fresh local
+      release checks, English/Spanish booking journeys and Stripe test checkout passed.
+  ci:
+    develop: https://github.com/juan294/paisaxe/actions/runs/41065932042
+    release_pr: https://github.com/juan294/paisaxe/actions/runs/41067666709
+    post_merge: https://github.com/juan294/paisaxe/actions/runs/41069693312
+    standalone_coverage: https://github.com/juan294/paisaxe/actions/runs/41069693109
+    tag_gate: Post-merge CI and coverage publication must succeed before tagging.

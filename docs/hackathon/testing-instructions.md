@@ -10,7 +10,7 @@ out of the repository on purpose.
 PAISAXE: BOOK A LOCAL EXPERIENCE THROUGH CONVERSATION, WITH A PAYPAL SANDBOX DEPOSIT
 
 Everything you book is fictitious and every payment is PayPal SANDBOX money. The merchant
-"Rutas del Sella (demo, ficticio)" and its three experiences are demo fixtures; no real
+"Rutas del Sella (fictional demo)" and its three experiences are demo fixtures; no real
 provider is involved and nothing is charged. Booking cards show a "Demo" badge, and the
 payment card says "PayPal sandbox: test payment, no real money".
 
@@ -19,9 +19,10 @@ Credentials:
 - PayPal sandbox buyer: «SANDBOX_BUYER_EMAIL» / «SANDBOX_BUYER_PASSWORD»
 - Operator (merchant) view: «OPERATOR_LINK»
 
-The site follows your browser language (a language switcher is available), and the
-assistant answers in the language you write in. The experience names and the operator view
-are in Spanish.
+Select English in the site's language switcher and write your requests in English.
+The booking cards, experience names, booking page and operator dashboard are available in
+English. The assistant answers in the language you write in. If PayPal's sandbox approval
+page remembers another language, select English there too.
 
 1. GET IN
 - Open https://paisaxe.es/acceso ("Booking access"), paste the voucher code and press
@@ -45,7 +46,8 @@ is 120 euros, and one of us needs a step-free route."
   on the day", the free-cancellation window (up to 24 h before the start) and "Offer valid
   until HH:MM" (20 minutes).
 - Prices come only from the server. Telling the assistant a different price, or saying
-  "I've paid" or "cancel it", does not change anything: only the buttons do.
+  "I've paid" or "cancel it", cannot accept an offer, mark a deposit paid or confirm a
+  cancellation. Accepting, payment approval and cancellation require explicit button actions.
 - Tip: book at least two days ahead. Inside the 24-hour window a cancellation is
   correctly refunded €0, so you would not see the refund step.
 
@@ -59,8 +61,8 @@ is 120 euros, and one of us needs a step-free route."
   (never a real PayPal account) and approve the payment.
 - PayPal sends you back to the site, which captures the payment: "Payment received! Your
   booking is confirmed." Press "View booking".
-- If you close the browser after approving, the booking is still confirmed, by the PayPal
-  webhook or by the reconciliation job (every 5 minutes). Open the booking link to see it.
+- If you close the browser after approving, the PayPal webhook or reconciliation job
+  (every 5 minutes) can complete the capture. Open the booking link to check its status.
 
 4. THE BOOKING PAGE
 - The booking link (/booking/<id>.<token>) needs no login and no voucher. It works in any
@@ -82,18 +84,19 @@ is 120 euros, and one of us needs a step-free route."
   second time never refunds twice.
 
 6. OPERATOR (MERCHANT) VIEW
-- Open the operator link. "Panel de operador" for "Rutas del Sella (demo, ficticio)",
-  marked "demo", shows:
-  - upcoming bookings ("Próximas"), "Depósitos cobrados" (deposits collected), "Pendiente
-    de cobro" (balance due) and "Incidencias" (exceptions, which also filters the list);
-  - the booking tables with status and payment, and a PayPal check on each deposit: "PayPal
-    confirma" once PayPal's own records list it, "Reembolso en PayPal" after a refund, or
-    "Pendiente en PayPal" before PayPal lists it (PayPal takes up to a few hours; the line above
-    the tables says how current PayPal's data is, and "Comprobar de nuevo" checks again);
-  - active holds, with "Liberar" to release one;
+- Open the operator link. The operator dashboard for "Rutas del Sella (fictional demo)",
+  marked "Demo", shows:
+  - "Upcoming", "Deposits collected", "Balance due" and "Exceptions" (which also
+    filters the list);
+  - the booking tables with status and payment, and a PayPal check on each deposit:
+    "PayPal confirms" once PayPal's own records list it, "Refunded in PayPal" after a
+    refund, or "Pending in PayPal" before PayPal lists it (PayPal can take a few hours;
+    the line above the tables says how current PayPal's data is, and "Check again"
+    checks again);
+  - "Active holds", with "Release" to release one;
   - free places for the next 14 days.
 - Your booking appears there with its deposit and status, and changes when you cancel.
-- "Reemitir enlace" issues a new link for a booking and stops the old one from working, so
+- "Reissue link" issues a new link for a booking and stops the old one from working, so
   use it only on a booking whose link you no longer need.
 - The view shows only the fixture merchant's data, and nothing under /admin.
 
