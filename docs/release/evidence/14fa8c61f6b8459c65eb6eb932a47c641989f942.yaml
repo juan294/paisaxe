@@ -1,0 +1,156 @@
+# Production probe evidence for PR #1060. The shipped commit is recorded below.
+# Post-merge CI is verified separately before tagging.
+
+version: 1
+candidate_tree: 14fa8c61f6b8459c65eb6eb932a47c641989f942
+shipped_tree: 14fa8c61f6b8459c65eb6eb932a47c641989f942
+deployed_tree: 14fa8c61f6b8459c65eb6eb932a47c641989f942
+deployed_commit: 3edaa17a8d9ff2749f5ac61aeb1035ffde3f8264
+github_deployment_id: "7485550386"
+target_url: https://paisaxe.es
+generated_at: 2026-11-02T06:14:23.794Z
+probes:
+  - id: candidate-identity
+    status: passed
+    oracles:
+      - identity
+  - id: health-status
+    status: passed
+    oracles:
+      - http
+  - id: health-db
+    status: passed
+    oracles:
+      - http
+  - id: elevenlabs-voice-preflight
+    status: passed
+    oracles:
+      - http
+    provider: ok
+    fingerprint: sha256:1337f33296d87be8
+    fingerprint_matches: true
+    agents:
+      - pelayo
+      - booking
+      - penny
+      - iris
+      - xander
+    custom_llm: not_applicable
+    target_url: https://paisaxe.es
+    response_url: https://paisaxe.es/api/health/voice
+    github_deployment_id: "7485550386"
+    deployment_commit: 3edaa17a8d9ff2749f5ac61aeb1035ffde3f8264
+    checked_at: 2026-11-02T06:12:43.885Z
+  - id: csp-canary
+    status: passed
+    oracles:
+      - ui
+  - id: story-read-path
+    status: passed
+    oracles:
+      - http
+      - ui
+  - id: admin-denial
+    status: passed
+    oracles:
+      - http
+  - id: webhook-unsigned
+    status: passed
+    oracles:
+      - http
+  - id: chat-smoke
+    status: passed
+    oracles:
+      - http
+  - id: booking-gate-closed
+    status: passed
+    oracles:
+      - http
+      - ui
+  - id: booking-access-boundary
+    status: passed
+    oracles:
+      - http
+      - cleanup
+    cleanup: removed
+  - id: booking-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: booking-intake
+    status: passed
+    oracles:
+      - http
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: experience-matching
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: favorite-roundtrip
+    status: passed
+    oracles:
+      - ui
+      - datastore
+      - cleanup
+    cleanup: removed
+  - id: migration-posture
+    status: passed
+    oracles:
+      - static
+provenance:
+  release_pr: https://github.com/juan294/paisaxe/pull/1060
+  deployment: https://paisaxe-6s7pg0o8v-thecreativetoken.vercel.app
+  deployed_probes: docs/agents/release-2026-11-01/production/probes.json
+  identity: docs/agents/release-2026-11-01/production/identity.log
+  voice: docs/agents/release-2026-11-01/production/voice.json
+  local_docker:
+    tested_commit: 08d0da9e8b4a0d77c719ad285cd43f733aae4041
+    tested_tree: 14fa8c61f6b8459c65eb6eb932a47c641989f942
+    evidence:
+      - docs/agents/release-2026-11-01/local-final/required-local-booking-probes.json
+      - docs/agents/release-2026-11-01/local-final/required-local-favorite-artifact.json
+    intake_comparison_arms: 90
+    frozen_corpus_unchanged: true
+    temporary_qa_deleted: true
+    owned_stack_disposed: true
+  stripe:
+    test_only: true
+    tested_commit: 08d0da9e8b4a0d77c719ad285cd43f733aae4041
+    evidence: docs/agents/release-2026-11-01/stripe/run-result.json
+    product_archived: true
+    price_archived: true
+    temporary_qa_deleted: true
+  migration_posture:
+    evidence: docs/agents/release-2026-11-01/local-final/prelaunch.log
+    exit: 0
+  ci:
+    develop: https://github.com/juan294/paisaxe/actions/runs/41342918232
+    release_pr: https://github.com/juan294/paisaxe/actions/runs/41343682216
+    tag_gate: Post-merge application CI and coverage publication must succeed before
+      tagging.
+    post_merge: https://github.com/juan294/paisaxe/actions/runs/41398309634
+    standalone_coverage: https://github.com/juan294/paisaxe/actions/runs/41398309616
+  english_ui: docs/agents/release-2026-11-01/production/english-ui.json
+  residual_security_finding:
+    advisory: https://github.com/advisories/GHSA-g3hv-75wg-m249
+    github_alert: https://github.com/juan294/paisaxe/security/dependabot/145
+    severity: medium
+    package: minimatch
+    affected_version: 10.2.6
+    scope: development only; seven ESLint and TypeScript ESLint dependency copies
+    production_version: 11.0.3
+    first_patched_version: 11.0.1
+    automation: https://github.com/juan294/paisaxe/actions/runs/41398383454
+    automation_result: security_update_not_possible
+    disposition: Valid residual development-tool vulnerability. A compatible
+      major-version upgrade is separate work; owner review is required before
+      publishing this release with the finding deferred. Production audit
+      success does not resolve it.
