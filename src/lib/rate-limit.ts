@@ -185,7 +185,8 @@ export async function probeRateLimitBackend(
 
   try {
     const redis = new Redis({ url: upstashUrl!, token: upstashToken!, signal });
-    await redis.ping();
+    // @upstash/redis 1.40 resolves null (not a rejection) when the signal aborts the request.
+    if ((await redis.ping()) !== "PONG") throw new Error("Redis PING did not return PONG");
     return { backend: "upstash", configured: true, degraded: false };
   } catch (err) {
     logger.error("[RATE_LIMIT_HEALTH_PROBE_FAILED]", {

@@ -450,6 +450,19 @@ describe("rate-limit", () => {
         });
       });
 
+      it("reports degraded when the PING resolves without PONG (@upstash/redis 1.40 resolves null for an aborted request)", async () => {
+        mockPing.mockResolvedValue(null);
+
+        const status = await probeRateLimitBackend();
+
+        expect(status).toEqual({
+          backend: "upstash",
+          configured: true,
+          degraded: true,
+          reason: "upstash_unavailable",
+        });
+      });
+
       it("does not depend on per-process state / checkRateLimit ever having run in this process", async () => {
         // No checkRateLimit call has happened in this test — simulating a
         // fresh serverless isolate that only ever runs /api/health. The old
