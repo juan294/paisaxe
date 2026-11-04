@@ -551,18 +551,31 @@ test('only explicit absence or a different start time proves a dead owner; unkno
   assert.equal(isAlive({ pid: 10, startedAt: ALIVE }, () => null), false);
 });
 
-for (const late of ['lease', 'recovery hold']) {
-  test('a ' + late + ' that appears after the pre-check still blocks disposal inside the locked transition', async (t) => {
-    const fake = fakeDocker();
-    const { root, taskDir, project } = preparedTask(t, fake);
+test('disposal closes lease admission before stopping the relay', async (t) => {
+  const fake = fakeDocker(); const { root, taskDir, project } = preparedTask(t, fake);
+  writeFileSync(join(taskDir, 'transport.sock'), '');
+  let stopped = false;
+  const stopRelay = async () => {
+    assert.equal(readReceipt(root, project).state, 'disposing');
+    assert.throws(() => acquireConsumerLease(root, project, 'late', { owner: { pid: 777, startedAt: ALIVE } }), /disposed|stopping/);
+    stopped = true;
+  };
+  const result = await disposeOwned(root, project, { docker: fake.docker, now: at(2), processProbe: probe(new Set()), stopRelay });
+  assert.equal(stopped, true); assert.equal(result.terminalState, 'disposed');
+});
+
+for (const late of ['hold', 'replacement']) {
+  test('disposal rechecks ' + late + ' after asynchronous relay shutdown', async (t) => {
+    const fake = fakeDocker(); const { root, taskDir, project } = preparedTask(t, fake);
     writeFileSync(join(taskDir, 'transport.sock'), '');
-    const before = snapshot(fake.state);
     const stopRelay = async () => {
-      if (late === 'lease') acquireConsumerLease(root, project, 'paid-voice', { owner: { pid: 777, startedAt: ALIVE }, now: at(1) });
-      else setRecoveryHold(root, project, 'late hold', at(1));
+      if (late === 'hold') setRecoveryHold(root, project, 'late hold');
+      else fake.state.volumes.get(`supabase_db_${project}`).CreatedAt = 'replaced';
     };
-    await assert.rejects(disposeOwned(root, project, { docker: fake.docker, now: at(2), processProbe: probe(new Set([777])), stopRelay }), late === 'lease' ? /live consumer lease/ : /recovery hold/);
-    assert.equal(snapshot(fake.state), before); assert.equal(readReceipt(root, project).state, 'prepared');
+    await assert.rejects(disposeOwned(root, project, { docker: fake.docker, processProbe: probe(new Set()), stopRelay }), /hold|replaced/);
+    assert.equal(fake.state.calls.some(a => ['stop', 'rm'].includes(a[0]) || a[1] === 'rm'), false);
+    assert.equal(readReceipt(root, project).state, 'disposing');
+    assert.ok(readReceipt(root, project).lastRefusal);
   });
 }
 
@@ -629,3 +642,157 @@ test('a retained task protects its referenced detail directory even through a pa
   const report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(60 * DAY), processProbe: probe(new Set()), tmpRoot });
   assert.deepEqual(report.prunedDetails, []); assert.equal(existsSync(detail), true);
 });
+
+for (const winner of ['lease', 'hold']) {
+  test('a ' + winner + ' before the disposal claim prevents relay and Docker mutation', async (t) => {
+    const fake = fakeDocker(); const { root, taskDir, project } = preparedTask(t, fake);
+    writeFileSync(join(taskDir, 'transport.sock'), '');
+    let injected = false; let relayStops = 0;
+    const docker = (args) => {
+      if (!injected && args[0] === 'info') {
+        injected = true;
+        if (winner === 'lease') acquireConsumerLease(root, project, 'winner', { owner: { pid: 777, startedAt: ALIVE } });
+        else setRecoveryHold(root, project, 'winner');
+      }
+      return fake.docker(args);
+    };
+    await assert.rejects(disposeOwned(root, project, { docker, processProbe: probe(new Set([777])), stopRelay: async () => { relayStops++; } }), /lease|hold/);
+    assert.equal(relayStops, 0); assert.equal(readReceipt(root, project).state, 'prepared');
+    assert.equal(fake.state.calls.some(a => ['stop', 'rm'].includes(a[0])), false);
+  });
+}
+
+test('relay stop failure retains the disposal claim and exact retry instruction', async (t) => {
+  const fake = fakeDocker(); const { root, taskDir, project } = preparedTask(t, fake);
+  writeFileSync(join(taskDir, 'transport.sock'), '');
+  await assert.rejects(disposeOwned(root, project, { docker: fake.docker, processProbe: probe(new Set()), stopRelay: async () => { throw Error('relay unavailable'); } }), /relay/);
+  const r = readReceipt(root, project); assert.equal(r.state, 'disposing'); assert.match(r.lastRefusal.nextAction, /contracts:finish/);
+  const result = await finishReusable(root, project, { docker: fake.docker, processProbe: probe(new Set()), stopRelay: async () => {} });
+  assert.equal(result.terminalState, 'disposed');
+  assert.equal((await finishReusable(root, project, { docker: fake.docker })).terminalState, 'disposed');
+});
+
+for (const reason of ['failed', 'abandoned', 'interrupted']) {
+  test('preservation stop closes admission and retains ' + reason + ' data', async (t) => {
+    const { stopPreserved } = await import('./contract-stack-lifecycle.mjs');
+    const fake = fakeDocker(); const { root, taskDir, project } = preparedTask(t, fake);
+    writeFileSync(join(taskDir, 'transport.sock'), '');
+    updateReceipt(root, project, r => { r.state = reason; r.retainUntil = at(7 * DAY).toISOString(); });
+    const result = await stopPreserved(root, project, { docker: fake.docker, processProbe: probe(new Set()), stopRelay: async () => {
+      assert.equal(readReceipt(root, project).state, 'stopping');
+      assert.throws(() => acquireConsumerLease(root, project, 'late'), /stopping|disposed/);
+    } });
+    assert.equal(result, 'stopped'); assert.equal(readReceipt(root, project).state, reason);
+    assert.equal(fake.state.volumes.size, 2); assert.equal(fake.state.containers.size, 2);
+    assert.equal([...fake.state.containers.values()].every(x => !x.State.Running), true);
+  });
+}
+
+test('preservation stop late hold blocks Docker and remains resumable after release', async (t) => {
+  const { stopPreserved } = await import('./contract-stack-lifecycle.mjs');
+  const fake = fakeDocker(); const { root, taskDir, project } = preparedTask(t, fake);
+  writeFileSync(join(taskDir, 'transport.sock'), '');
+  updateReceipt(root, project, r => { r.state = 'failed'; r.retainUntil = at(7 * DAY).toISOString(); });
+  await assert.rejects(stopPreserved(root, project, { docker: fake.docker, processProbe: probe(new Set()), stopRelay: async () => setRecoveryHold(root, project, 'late') }), /hold/);
+  assert.equal(readReceipt(root, project).state, 'stopping');
+  assert.equal(fake.state.calls.some(a => a[0] === 'stop'), false);
+  setRecoveryHold(root, project, null);
+  const report = await sweep({ root, docker: fake.docker, processProbe: probe(new Set()), now: at(DAY), stopRelay: async () => {} });
+  assert.equal(report.tasks[0].action, 'stopped'); assert.equal(readReceipt(root, project).state, 'failed');
+  assert.equal(readReceipt(root, project).retainUntil, at(7 * DAY).toISOString());
+});
+
+test('abandonment stops unused disposable services but keeps diagnostics and data', async (t) => {
+  const fake = fakeDocker(); const { root, project } = preparedTask(t, fake);
+  const report = await sweep({ root, docker: fake.docker, processProbe: probe(new Set()), now: at(DAY) });
+  assert.equal(report.tasks[0].action, 'abandoned');
+  assert.equal([...fake.state.containers.values()].every(x => !x.State.Running), true);
+  assert.equal(fake.state.volumes.size, 2); assert.equal(readReceipt(root, project).state, 'abandoned');
+});
+
+for (const signal of ['SIGINT', 'SIGTERM']) test(`one-shot ${signal} archives interruption, stops settled services, and removes handlers`, async (t) => {
+  const h = oneShotHarness(t); const original = h.options.run;
+  const before = process.listenerCount(signal);
+  h.options.run = async (options) => { const receipt = await original(options); process.emit(signal); return receipt; };
+  const result = await runOneShot(h.options);
+  assert.equal(result.ok, false); assert.equal(result.failure, 'interrupted');
+  const receipt = readReceipt(h.root, result.projectId);
+  assert.equal(receipt.state, 'interrupted'); assert.equal(receipt.interruption.signal, signal);
+  assert.equal(receipt.preservation, 'stopped'); assert.equal(receipt.leases.length, 0);
+  assert.equal(process.listenerCount(signal), before);
+});
+
+test('one-shot records an unsettled child and refuses all preservation mutations', async (t) => {
+  const h = oneShotHarness(t); const original = h.options.run;
+  const scope = { interruption: null, checkpoint() { if (this.interruption) throw new Error('uncertain'); }, close() {} };
+  h.options.processScope = scope;
+  h.options.run = async (options) => { const result = await original(options); scope.interruption = { signal: 'SIGTERM', child: { pid: null, pgid: null }, settled: false }; return result; };
+  const result = await runOneShot(h.options);
+  assert.equal(result.ok, false); assert.equal(result.failure, 'interrupted');
+  const receipt = readReceipt(h.root, result.projectId);
+  assert.equal(receipt.interruption.settled, false); assert.match(receipt.preservation, /settlement is unknown/);
+  assert.equal([...h.fake.state.containers.values()].every(x => x.State.Running), true);
+});
+
+test('dry-run of an interrupted preservation stop never mutates', async (t) => {
+  const fake = fakeDocker(); const { root, project } = preparedTask(t, fake);
+  updateReceipt(root, project, r => { r.state = 'stopping'; r.preservationStop = { priorState: 'failed', retainUntil: at(7 * DAY).toISOString(), active: false, outcomes: {} }; }, T0);
+  const before = readReceipt(root, project);
+  const report = await sweep({ root, docker: fake.docker, now: at(DAY), processProbe: probe(new Set()), dryRun: true });
+  assert.equal(report.tasks[0].action, 'would-stop'); assert.deepEqual(readReceipt(root, project), before);
+  assert.equal([...fake.state.containers.values()].every(x => x.State.Running), true);
+});
+
+
+test('plain runner removes owned signal handlers when lease finalization fails', (t) => {
+  const h = leaseObservingDocker(t);
+  const binary = join(h.env.PATH.split(':')[0], 'docker');
+  const file = join(h.state, 'tasks', h.projectId + '.json');
+  const source = readFileSync(binary, 'utf8').replace('process.exit(1);', `fs.writeFileSync(${JSON.stringify(file)}, '{broken receipt');process.exit(1);`);
+  writeFileSync(binary, source);
+  const script = `import assert from 'node:assert/strict';import {runContracts} from ${JSON.stringify(new URL('./run-contracts.mjs', import.meta.url).href)};
+    const count=()=>['SIGINT','SIGTERM'].map(s=>process.listenerCount(s));const before=count();let failure;
+    try{await runContracts({taskDir:process.env.CONTRACT_STACK_DIR,outputDir:process.env.TEST_RECEIPT_DIR});}catch(error){failure=error;}
+    assert.ok(failure);assert.deepEqual(count(),before);`;
+  const child = spawnSync(process.execPath, ['--input-type=module','-e',script], { cwd:fileURLToPath(new URL('..',import.meta.url)),env:h.env,encoding:'utf8',timeout:60000 });
+  assert.equal(child.status, 0, child.stderr);
+});
+
+test('one-shot discloses interruption during committed disposal without claiming cleanup failed', async (t) => {
+  const h = oneShotHarness(t); const prepare = h.options.prepare;
+  h.options.prepare = async (...args) => { const manifest = await prepare(...args); writeFileSync(join(manifest.taskDir,'transport.sock'),'fixture'); return manifest; };
+  h.options.stopRelay = async () => { process.emit('SIGTERM'); };
+  const result = await runOneShot(h.options);
+  assert.equal(result.ok, false); assert.equal(result.failure, 'interrupted');
+  assert.equal(result.contracts, 'passed'); assert.equal(result.cleanup, 'disposed');
+  assert.equal(readReceipt(h.root, result.projectId), null);
+});
+
+test('disposal completes after Docker reports the removed exact network as not found', async (t) => {
+  const fake = fakeDocker(); const { root, project } = preparedTask(t, fake);
+  const docker = (args) => {
+    if (args[0] === 'network' && args[1] === 'inspect' && !fake.state.networks.has(args[2])) {
+      throw Object.assign(new Error('docker failed'), { status: 1, stderr: `Error response from daemon: network ${args[2]} not found\n` });
+    }
+    return fake.docker(args);
+  };
+  const terminal = await disposeOwned(root, project, { docker, processProbe: probe(new Set()) });
+  assert.equal(terminal.terminalState, 'disposed');
+  assert.equal(fake.state.volumes.size, 0); assert.equal(fake.state.networks.size, 0);
+  assert.equal(readReceipt(root, project), null);
+});
+
+for (const detail of ['Error response from daemon: network another-id not found', 'Docker daemon endpoint not found']) {
+  test(`missing-network classification preserves unrelated error: ${detail}`, async (t) => {
+    const fake = fakeDocker(); const { root, project } = preparedTask(t, fake);
+    const docker = (args) => {
+      if (args[0] === 'network' && args[1] === 'inspect' && !fake.state.networks.has(args[2])) {
+        throw Object.assign(new Error(detail), { status: 1, stderr: detail });
+      }
+      return fake.docker(args);
+    };
+    await assert.rejects(disposeOwned(root, project, { docker, processProbe: probe(new Set()) }), /not found/);
+    assert.equal(readReceipt(root, project).state, 'disposing');
+    assert.ok(fake.state.volumes.size > 0, 'unknown failure must preserve remaining owned volumes');
+  });
+}

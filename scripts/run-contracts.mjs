@@ -1,11 +1,12 @@
+import { createOwnedProcessScope } from './contract-owned-process.mjs';
 import { createHash } from 'node:crypto';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyTransport } from './contract-transport.mjs';
-import { leaseForCaller } from './contract-stack-lifecycle.mjs';
+import { leaseForCaller, lifecycleRoot, readReceipt, updateReceipt } from './contract-stack-lifecycle.mjs';
 
 export const REQUIRED_SUITES = [
   'src/lib/database-boundaries.postgrest-rls.test.ts',
@@ -211,7 +212,7 @@ async function positiveControls(manifest, keys) {
   }
 }
 
-export async function runContracts({ root = process.cwd(), taskDir = process.env.CONTRACT_STACK_DIR, outputDir } = {}) {
+export async function runContracts({ root = process.cwd(), taskDir = process.env.CONTRACT_STACK_DIR, outputDir, processScope } = {}) {
   const receiptDir = outputDir || mkdtempSync(join(tmpdir(), 'paisaxe-contract-receipt-'));
   mkdirSync(receiptDir, { recursive: true });
   // The report is always a new, private file. A report from an earlier run cannot pass this run.
@@ -219,12 +220,15 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
   const receipt = { version: 1, status: 'failed', startedAt: new Date().toISOString(), root: resolve(root), suites: [] };
   const failures = [];
   let lease, manifest, dockerEnv;
+  const scope = processScope ?? createOwnedProcessScope();
   try {
+    scope.checkpoint();
     receipt.suites = discoverSuites(root);
     receipt.candidateDigest = candidateDigest(root);
     const fixtureCheck = join(root, 'scripts/check-provider-fixtures.mjs');
     if (existsSync(fixtureCheck)) {
-      const provider = spawnSync(process.execPath, [fixtureCheck], { cwd: root, env: { PATH: process.env.PATH, HOME: process.env.HOME }, encoding: 'utf8', timeout: 30000 });
+      const provider = await scope.run(process.execPath, [fixtureCheck], { cwd: root, env: { PATH: process.env.PATH, HOME: process.env.HOME }, encoding: 'utf8', timeout: 30000 });
+      scope.checkpoint();
       receipt.providerFixtures = { exitCode: provider.status, output: provider.stdout };
       if (provider.status !== 0) failures.push('Provider fixture freshness/qualification is unverified; see providerFixtures receipt');
     } else failures.push('Required provider fixture freshness checker is missing');
@@ -237,7 +241,7 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     receipt.migrationDigest = inventory.digest; receipt.projectId = manifest.projectId;
     const config = readFileSync(join(taskDir, 'supabase/config.toml'), 'utf8');
     insist(config.match(/^project_id\s*=\s*"([^"]+)"/m)?.[1] === manifest.projectId, 'Task Supabase project config mismatch');
-    dockerEnv = { ...localDockerEnvironment(), HOME: runDir }; await inspectStack(manifest, dockerEnv);
+    dockerEnv = { ...localDockerEnvironment(), HOME: runDir }; await inspectStack(manifest, dockerEnv); scope.checkpoint();
     const marker = `paisaxe-contracts:${manifest.nonce}:${manifest.migrationDigest}`;
     insist(dockerSql(manifest.projectId, "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname=current_database();", dockerEnv) === marker, 'Database task marker mismatch; refusing database fixtures');
     const versions = JSON.parse(dockerSql(manifest.projectId, 'SELECT coalesce(json_agg(version ORDER BY version), \'[]\'::json) FROM supabase_migrations.schema_migrations;', dockerEnv));
@@ -251,24 +255,25 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     const sqlVersion = execFileSync('psql', ['--version'], { env: dockerEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000 });
     const sqlClient = /^psql \(PostgreSQL\) \d+\.\d+(?:\.\d+)?/.exec(sqlVersion)?.[0];
     insist(sqlClient, 'Native PostgreSQL client is unavailable'); receipt.nativeSqlClient = sqlClient;
-    await positiveControls(manifest, keys);
+    await positiveControls(manifest, keys); scope.checkpoint();
     receipt.positiveControls = ['anon seeded maintenance flag', 'service_role seeded maintenance flag'];
     const reportPath = join(runDir, 'vitest.json');
     const configPath = join(runDir, 'vitest.config.mjs');
     // Keep the repository's real adapters/config, but never load its ignored provider dotenv files.
     writeFileSync(configPath, `import original from ${JSON.stringify(pathToFileURL(join(root, 'vitest.config.ts')).href)};\nexport default {...original,root:${JSON.stringify(resolve(root))},envDir:${JSON.stringify(runDir)}};\n`);
-    const result = spawnSync(process.execPath, [join(root, 'node_modules/vitest/vitest.mjs'), 'run', ...receipt.suites,
+    const result = await scope.run(process.execPath, [join(root, 'node_modules/vitest/vitest.mjs'), 'run', ...receipt.suites,
       '--config', configPath, '--maxWorkers=1', '--no-file-parallelism', '--reporter=json', '--outputFile', reportPath],
     { cwd: root, env: isolatedEnvironment({ ...process.env, HOME: runDir }, manifest, keys, dockerEnv.DOCKER_HOST), encoding: 'utf8', timeout: 1200000, maxBuffer: 32 * 1024 * 1024 });
     // Vitest output can contain query diagnostics. Preserve it privately while
     // keeping only the validated case inventory in the public receipt.
     writeFileSync(join(runDir, 'vitest-output.log'), [result.stdout ?? '', result.stderr ?? ''].join('\n'), { mode: 0o600 });
     receipt.vitestExitCode = result.status; receipt.vitestSignal = result.signal;
+    scope.checkpoint();
     if (result.error || result.status !== 0) failures.push('Vitest contract process failed, timed out or was terminated');
     try { receipt.cases = validateReport(json(reportPath), receipt.suites, resolve(root)); }
     catch (error) { failures.push(error instanceof SyntaxError ? 'Missing/malformed or unsuccessful contract report' : error.message); }
     try {
-      await inspectStack(manifest, dockerEnv);
+      await inspectStack(manifest, dockerEnv); scope.checkpoint();
       insist(schemaDigest(manifest.projectId, dockerEnv) === manifest.schemaDigest, 'Cleanup left database schema changed');
     } catch { failures.push('Contract cleanup/stack health check failed'); }
     insist(candidateDigest(root) === receipt.candidateDigest, 'Candidate source inputs changed during contract run; rerun the complete tier');
@@ -277,17 +282,27 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     failures.push(error instanceof SyntaxError ? 'Malformed local contract data; inspect private diagnostics' :
       error.status !== undefined || error.code ? 'Local stack command unavailable/failed; check local Docker and prepare a fresh task stack' : error.message);
   } finally {
-    // Preserve the source-bound control proof privately before the caller stops
-    // the stack. Observability failure must not replace the native gate result.
-    receipt.transportDiagnostics = { status: 'unavailable', reason: !manifest ? 'not_started' : manifest.transport !== 'docker-exec-v1' ? 'not_applicable' : 'control_unavailable' };
-    if (manifest?.transport === 'docker-exec-v1' && dockerEnv) {
-      try {
-        const proof = await verifyTransport(manifest, dockerEnv);
-        if (proof.diagnostics?.version === 1) receipt.transportDiagnostics = { status: 'available', proof };
-        else receipt.transportDiagnostics = { status: 'unavailable', reason: 'unknown' };
-      } catch { /* The fixed unavailable reason retains no command/error data. */ }
+    try {
+      // Preserve the source-bound control proof privately before the caller stops
+      // the stack. Observability failure must not replace the native gate result.
+      receipt.transportDiagnostics = { status: 'unavailable', reason: !manifest ? 'not_started' : manifest.transport !== 'docker-exec-v1' ? 'not_applicable' : 'control_unavailable' };
+      if (!scope.interruption && manifest?.transport === 'docker-exec-v1' && dockerEnv) {
+        try {
+          const proof = await verifyTransport(manifest, dockerEnv);
+          if (proof.diagnostics?.version === 1) receipt.transportDiagnostics = { status: 'available', proof };
+          else receipt.transportDiagnostics = { status: 'unavailable', reason: 'unknown' };
+        } catch { /* The fixed unavailable reason retains no command/error data. */ }
+      }
+      // A signal can arrive while the final diagnostic request is in flight.
+      receipt.interruption = scope.interruption;
+      if (scope.interruption) {
+        failures.push('Contract work interrupted; inspect the private lifecycle receipt');
+        if (manifest && readReceipt(lifecycleRoot(), manifest.projectId)) updateReceipt(lifecycleRoot(), manifest.projectId, r => { r.interruption = scope.interruption; });
+      }
+    } finally {
+      try { lease?.release(); }
+      finally { if (!processScope) scope.close(); }
     }
-    lease?.release();
   }
   receipt.failures = failures; receipt.status = failures.length ? 'failed' : 'passed'; receipt.finishedAt = new Date().toISOString();
   writeFileSync(join(runDir, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });

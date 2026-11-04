@@ -1,3 +1,4 @@
+import { createOwnedProcessScope } from './contract-owned-process.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -5,9 +6,9 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync, realpathSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startTransport, stopTransport } from './contract-transport.mjs';
+import { startTransport } from './contract-transport.mjs';
 import { dockerSql, inspectStack, localDockerEnvironment, migrationInventory, schemaDigest } from './run-contracts.mjs';
-import { POLICY, createLifecycleReceipt, lifecycleRoot, recordInventory, updateReceipt } from './contract-stack-lifecycle.mjs';
+import { POLICY, createLifecycleReceipt, lifecycleRoot, recordInventory, readReceipt, updateReceipt } from './contract-stack-lifecycle.mjs';
 
 function gitHead(root) {
   try { return execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim(); }
@@ -47,7 +48,7 @@ export async function initializeRealtime(manifest, anonKey, env, clientFactory =
   }
 }
 
-export async function prepareStack(root = process.cwd(), { clientFactory = createClient, readinessTimeoutMs = 15000, lifecycle = {} } = {}) {
+export async function prepareStack(root = process.cwd(), { clientFactory = createClient, readinessTimeoutMs = 15000, lifecycle = {}, processScope } = {}) {
   // No caller-provided directory or project: this command can only create a new disposable task.
   const taskDir = realpathSync(mkdtempSync(join(tmpdir(), 'paisaxe-contracts-')));
   const projectId = 'paisaxe-contracts-' + randomBytes(6).toString('hex');
@@ -97,12 +98,19 @@ enabled = true
   const lifecycleDir = lifecycle.root ?? lifecycleRoot();
   const disposable = lifecycle.disposable === true;
   let transportStarted = false; let env; let stage = 'network'; let docker; let tracked = false;
+  const scope = processScope ?? createOwnedProcessScope();
   try {
+    scope.checkpoint();
     const cliHome = join(taskDir, '.local-cli-home'); mkdirSync(cliHome);
     env = { ...localDockerEnvironment(), HOME: cliHome };
     docker = (args) => execFileSync('docker', args, { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 }).trim();
-    const cli = (args) => execFileSync('supabase', [...args, '--workdir', taskDir, '--network-id', projectId],
-      { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 600000, maxBuffer: 32 * 1024 * 1024 });
+    const command = async (binary, args, timeout) => {
+      const result = await scope.run(binary, args, { env, timeout });
+      scope.checkpoint();
+      if (result.error || result.status !== 0) throw Object.assign(new Error('Owned preparation command failed'), result);
+      return result.stdout.trim();
+    };
+    const cli = (args) => command('supabase', [...args, '--workdir', taskDir, '--network-id', projectId], 600000);
     // The private lifecycle receipt exists before any Docker allocation; each allocated identity is added to it.
     stage = 'lifecycle';
     createLifecycleReceipt(lifecycleDir, { projectId, nonce, taskDir, disposable, task: lifecycle.task ?? 'reusable',
@@ -111,17 +119,17 @@ enabled = true
     tracked = true;
     // Internal networking prevents migration 025's historical production webhook URL from sending traffic.
     stage = 'network';
-    const networkId = docker(['network', 'create', '--internal', '--label', `com.paisaxe.contracts.nonce=${nonce}`, projectId]);
+    const networkId = await command('docker', ['network', 'create', '--internal', '--label', `com.paisaxe.contracts.nonce=${nonce}`, projectId], 30000);
     updateReceipt(lifecycleDir, projectId, (r) => { r.resources.network = { id: networkId, name: projectId }; });
-    stage = 'transport'; await startTransport(manifest, env); transportStarted = true;
-    stage = 'start'; cli(['start']);
+    stage = 'transport'; await startTransport(manifest, env); transportStarted = true; scope.checkpoint();
+    stage = 'start'; await cli(['start']);
     recordInventory(lifecycleDir, projectId, docker);
-    stage = 'inspect-start'; await inspectStack(manifest, env);
+    stage = 'inspect-start'; await inspectStack(manifest, env); scope.checkpoint();
     // Reset only a newly generated project after Docker has proved its ownership and network identity.
-    stage = 'reset'; cli(['db', 'reset', '--local', '--yes']);
+    stage = 'reset'; await cli(['db', 'reset', '--local', '--yes']);
     // Reset recreates the database container and its labelled volume under the same names.
     recordInventory(lifecycleDir, projectId, docker);
-    stage = 'inspect-reset'; await inspectStack(manifest, env);
+    stage = 'inspect-reset'; await inspectStack(manifest, env); scope.checkpoint();
     stage = 'sanitize';
     dockerSql(projectId, "BEGIN; UPDATE public.webhook_config SET value='' WHERE key IN ('base_url','secret'); SELECT cron.alter_job(jobid, active:=false) FROM cron.job WHERE active; " +
       `COMMENT ON DATABASE postgres IS 'paisaxe-contracts:${nonce}:${manifest.migrationDigest}'; COMMIT;`, env);
@@ -129,7 +137,7 @@ enabled = true
     const status = JSON.parse(execFileSync('supabase', ['status', '--workdir', taskDir, '--output', 'json'],
       { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 }));
     if (status.API_URL !== manifest.apiUrl || typeof status.ANON_KEY !== 'string' || !status.ANON_KEY) throw new Error('Realtime local status identity mismatch');
-    await initializeRealtime(manifest, status.ANON_KEY, env, clientFactory, readinessTimeoutMs);
+    await initializeRealtime(manifest, status.ANON_KEY, env, clientFactory, readinessTimeoutMs); scope.checkpoint();
     stage = 'schema'; manifest.schemaDigest = schemaDigest(projectId, env);
     writeFileSync(join(taskDir, 'contracts-stack.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
     recordInventory(lifecycleDir, projectId, docker);
@@ -140,28 +148,45 @@ enabled = true
     // private in the mode-0700 task directory, never in public error messages.
     writeFileSync(join(taskDir, 'preparation-diagnostic.log'),
       [error.message, error.stdout, error.stderr].filter(Boolean).join('\n'), { mode: 0o600 });
-    if (transportStarted) { try { await stopTransport(manifest, env); } catch { /* Preserve failed identity for inspection. */ } }
+    // Never bypass lifecycle admission here: the one-shot owner performs a guarded
+    // preservation stop. Reusable failures retain the relay until explicit finish.
     // Preserve a failed task's identity for recovery; never reset, stop or delete an existing user stack.
-    writeFileSync(join(taskDir, 'preparation-failed.json'), JSON.stringify({ projectId, nonce, taskDir, status: 'failed', stage,
+    writeFileSync(join(taskDir, 'preparation-failed.json'), JSON.stringify({ projectId, nonce, taskDir, status: 'failed', stage, relayRetained: transportStarted,
+      nextAction: `Inspect: npm run contracts:lifecycle -- inspect ${projectId}; finish: npm run contracts:finish -- ${projectId}`,
       recovery: 'Restore local Docker access, then rerun preparation from the repository. Inspect this exact task before stopping its containers/network.' }, null, 2) + '\n', { mode: 0o600 });
     if (tracked) {
       // Partial preparation: record whatever was allocated so the owner verifier can account for it.
-      try { recordInventory(lifecycleDir, projectId, docker); } catch { /* Recorded identities stay; inventory is retried by inspection. */ }
+      try {
+        if (scope.interruption?.settled !== false) {
+          const receipt = readReceipt(lifecycleDir, projectId);
+          if (!receipt.resources.network && docker(['info', '--format', '{{.ID}}']) === receipt.daemonId) {
+            const network = JSON.parse(docker(['network', 'inspect', projectId]))[0];
+            if (network?.Id && network.Name === projectId && network.Internal === true && network.Labels?.['com.paisaxe.contracts.nonce'] === nonce) {
+              updateReceipt(lifecycleDir, projectId, r => { r.resources.network = { id: network.Id, name: projectId }; });
+            }
+          }
+          recordInventory(lifecycleDir, projectId, docker);
+        }
+      } catch { /* Recorded identities stay; inventory is retried by inspection. */ }
       const now = new Date();
       updateReceipt(lifecycleDir, projectId, (r) => {
-        r.state = 'preparation-failed'; r.failedStage = stage; r.failedAt = now.toISOString();
+        r.state = scope.interruption ? 'interrupted' : 'preparation-failed';
+        if (scope.interruption) r.interruption = scope.interruption;
+        r.relayRetained = transportStarted;
+        r.nextAction = `Inspect: npm run contracts:lifecycle -- inspect ${projectId}; finish: npm run contracts:finish -- ${projectId}`;
+        r.failedStage = stage; r.failedAt = now.toISOString();
         r.retainUntil = disposable ? new Date(now.getTime() + POLICY.failedRetentionMs).toISOString() : null;
         r.diagnostics.push(join(taskDir, 'preparation-failed.json'));
       }, now);
     }
-    throw Object.assign(new Error(`Task stack preparation failed; no contract acceptance. Local-only recovery receipt: ${taskDir}/preparation-failed.json`), { projectId, taskDir });
-  }
+    throw Object.assign(new Error(`Task stack preparation failed; no contract acceptance. Local-only recovery receipt: ${taskDir}/preparation-failed.json`), { projectId, taskDir, ...(scope.interruption ? { code: 'CONTRACT_INTERRUPTED' } : {}) });
+  } finally { if (!processScope) scope.close(); }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const manifest = await prepareStack();
-    console.log(`Prepared disposable stack ${manifest.projectId}. From the repository directory run:`);
+    console.log(`Prepared reusable stack ${manifest.projectId}. From the repository directory run:`);
     console.log(`CONTRACT_STACK_DIR='${manifest.taskDir}' npm run test:contracts`);
     console.log(`This reusable stack stays allocated until you finish it: npm run contracts:finish -- ${manifest.projectId}`);
   } catch (error) { console.error(error.message); process.exitCode = 1; }

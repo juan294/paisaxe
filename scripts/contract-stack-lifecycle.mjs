@@ -1,3 +1,4 @@
+import { createOwnedProcessScope } from './contract-owned-process.mjs';
 // Ownership lifecycle for local contract stacks (docs/engineering/database-contracts.md).
 // A private receipt is written before any Docker allocation and updated with each
 // allocated identity. Ownership inspection is separate from running-service health,
@@ -18,7 +19,7 @@ const NONCE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const PROJECT_LABEL = 'com.supabase.cli.project';
 const NONCE_LABEL = 'com.paisaxe.contracts.nonce';
 const IN_PROGRESS = ['preparing', 'running'];
-const DISPOSABLE_EXPIRING = ['failed', 'preparation-failed', 'abandoned'];
+const DISPOSABLE_EXPIRING = ['failed', 'preparation-failed', 'abandoned', 'interrupted'];
 const insist = (ok, message) => { if (!ok) throw new Error(message); };
 const iso = (date) => date.toISOString();
 const plus = (date, ms) => new Date(date.getTime() + ms);
@@ -115,11 +116,18 @@ export async function createDocker(env = process.env) {
   docker.env = dockerEnv;
   return docker;
 }
-function absent(read) {
+function absent(read, { kind, id } = {}) {
   try { return read(); }
-  catch (error) { if (/No such/i.test(String(error.stderr ?? '') + error.message)) return null; throw error; }
+  catch (error) {
+    const stderr = String(error.stderr ?? '').trim();
+    // Docker network inspect uses this wording after removal. Bind it to the
+    // exact requested identity; other not-found errors remain failures.
+    if (/No such/i.test(stderr + error.message) ||
+      (kind === 'network' && stderr === `Error response from daemon: network ${id} not found`)) return null;
+    throw error;
+  }
 }
-const inspect = (docker, kind, id) => absent(() => JSON.parse(docker([kind, 'inspect', id]))[0] ?? null);
+const inspect = (docker, kind, id) => absent(() => JSON.parse(docker([kind, 'inspect', id]))[0] ?? null, { kind, id });
 const lines = (text) => text.split('\n').map((line) => line.trim()).filter(Boolean);
 const projectContainers = (docker, id) => lines(docker(['ps', '-a', '--no-trunc', '--filter', `label=${PROJECT_LABEL}=${id}`, '--format', '{{.ID}}']));
 // `network inspect` lists running endpoints only; stopped attached containers need ps -a.
@@ -163,7 +171,7 @@ export function acquireConsumerLease(root, projectId, purpose, { owner = selfOwn
   if (!readReceipt(root, projectId)) return null;
   const lease = { id: randomUUID(), purpose, pid: owner.pid, startedAt: owner.startedAt, acquiredAt: iso(now) };
   updateReceipt(root, projectId, (r) => {
-    insist(!['disposing', 'finished'].includes(r.state), `Contract stack ${projectId} is being disposed; prepare a fresh stack`);
+    insist(!['disposing', 'stopping', 'finished'].includes(r.state), `Contract stack ${projectId} is being disposed or stopping; prepare a fresh stack`);
     r.leases.push(lease); r.lastUsedAt = iso(now);
   }, now);
   return { projectId, id: lease.id };
@@ -274,71 +282,153 @@ function removeOwnedTaskDir(taskDir) {
   rmSync(taskDir, { recursive: true });
 }
 
+function retryAction(projectId) {
+  return `Inspect: npm run contracts:lifecycle -- inspect ${projectId}; retry: npm run contracts:finish -- ${projectId}`;
+}
+
+function assertIdle(r, processProbe) {
+  insist(!r.recoveryHold, `Disposal refused: recovery hold on ${r.projectId}`);
+  insist(liveLeases(r, processProbe).length === 0, `Disposal refused: live consumer lease on ${r.projectId}`);
+  if (r.interruption?.settled === false) {
+    const pgid = r.interruption.child?.pgid;
+    let absent = false;
+    if (Number.isInteger(pgid) && pgid > 1) {
+      try { process.kill(-pgid, 0); } catch (error) { absent = error.code === 'ESRCH'; }
+    }
+    insist(absent, `Disposal refused: interrupted child settlement is unknown for ${r.projectId}; ${retryAction(r.projectId)}`);
+  }
+}
+
+function verifyPlan(r, docker) {
+  const plan = planDisposal(r, docker);
+  insist(plan.refusals.length === 0, `Disposal refused for ${r.projectId}: ${plan.refusals.join('; ')}`);
+  return plan;
+}
+
+/** Closing admission is a receipt transition, not a lock held across external IO. */
+function claimTransition(root, projectId, state, docker, processProbe, now) {
+  const key = state === 'disposing' ? 'disposal' : 'preservationStop';
+  const id = randomUUID();
+  const before = readReceipt(root, projectId);
+  insist(before && hasProof(before), `Disposal refused: ${projectId} receipt lacks ownership proof`);
+  assertIdle(before, processProbe);
+  verifyPlan(before, docker);
+  const receipt = updateReceipt(root, projectId, (r) => {
+    assertIdle(r, processProbe);
+    if (['disposing', 'stopping'].includes(r.state)) {
+      const active = r.state === 'disposing' ? r.disposal : r.preservationStop;
+      insist(!active?.active || !isAlive(r.owner, processProbe), `Disposal refused: another live owner is ${r.state} ${projectId}`);
+    }
+    insist(state !== 'stopping' || r.disposable, `Preservation stop refused: reusable stack ${projectId}`);
+    insist(state !== 'disposing' || r.disposable || r.state === 'finished' || r.disposal?.priorState === 'finished',
+      `Disposal refused: reusable stack ${projectId} requires explicit finish (npm run contracts:finish -- ${projectId})`);
+    r[key] ??= { startedAt: iso(now), priorState: r.state, outcomes: {}, retainUntil: r.retainUntil };
+    Object.assign(r[key], { id, active: true });
+    r.state = state; r.owner = selfOwner(processProbe); r.nextAction = retryAction(projectId);
+  }, now);
+  return { key, id, receipt };
+}
+
+function guardedPlan(root, projectId, claim, docker, processProbe) {
+  const r = readReceipt(root, projectId);
+  insist(r?.[claim.key]?.id === claim.id, `Disposal refused: lifecycle owner changed for ${projectId}`);
+  assertIdle(r, processProbe);
+  return verifyPlan(r, docker);
+}
+
+async function stopOwnedRelay(r, docker, stopRelay) {
+  if (!existsSync(join(r.taskDir, 'transport.sock'))) return;
+  try { await (stopRelay ?? ((m) => defaultStopRelay(m, docker)))(relayManifest(r)); }
+  catch (error) {
+    if (!['ECONNREFUSED', 'ENOENT'].includes(error.code)) throw new Error(`Disposal refused: owned relay could not be stopped (${error.message})`);
+  }
+}
+
+function recordTransitionFailure(root, projectId, error, now) {
+  if (readReceipt(root, projectId)) updateReceipt(root, projectId, (r) => {
+    r.lastRefusal = { at: iso(now), reasons: [error.message], nextAction: retryAction(projectId) };
+  }, now);
+}
+
+function releaseTransition(root, projectId, claim, now) {
+  if (claim && readReceipt(root, projectId)) updateReceipt(root, projectId, (r) => {
+    if (r[claim.key]?.id === claim.id) r[claim.key].active = false;
+  }, now);
+}
+
 export async function disposeOwned(root, projectId, { docker, now = new Date(), processProbe = processIdentity, stopRelay } = {}) {
   docker ??= await createDocker();
-  let r = readReceipt(root, projectId);
-  insist(r, `No lifecycle receipt for ${projectId}; legacy resources are inventory-only`);
-  insist(hasProof(r), `Disposal refused: ${projectId} receipt lacks ownership proof`);
-  insist(r.disposable || r.state === 'finished' || r.disposal?.priorState === 'finished', `Disposal refused: reusable stack ${projectId} requires explicit finish (npm run contracts:finish -- ${projectId})`);
-  insist(!r.recoveryHold, `Disposal refused: recovery hold on ${projectId}`);
-  insist(liveLeases(r, processProbe).length === 0, `Disposal refused: live consumer lease on ${projectId}`);
-  const plan = planDisposal(r, docker);
-  if (plan.refusals.length) {
-    updateReceipt(root, projectId, (x) => { x.lastRefusal = { at: iso(now), reasons: plan.refusals }; }, now);
-    throw new Error(`Disposal refused for ${projectId}: ${plan.refusals.join('; ')}`);
-  }
-  if (existsSync(join(r.taskDir, 'transport.sock'))) {
-    try { await (stopRelay ?? ((m) => defaultStopRelay(m, docker)))(relayManifest(r)); }
-    catch (error) { if (!['ECONNREFUSED', 'ENOENT'].includes(error.code)) throw new Error(`Disposal refused: owned relay could not be stopped (${error.message})`); }
-  }
-  r = updateReceipt(root, projectId, (x) => {
-    // Re-check under the receipt lock: a lease or hold taken after the pre-check wins.
-    insist(!x.recoveryHold, `Disposal refused: recovery hold on ${projectId}`);
-    insist(liveLeases(x, processProbe).length === 0, `Disposal refused: live consumer lease on ${projectId}`);
-    x.disposal ??= { startedAt: iso(now), priorState: x.state, outcomes: {} };
-    x.state = 'disposing'; x.owner = selfOwner(processProbe);
-  }, now);
-  const outcome = (key, value) => updateReceipt(root, projectId, (x) => { x.disposal.outcomes[key] = value; }, now);
-  // A recorded identity that vanished ("No such ...") is already absent, not a failure.
-  const removed = (args) => (absent(() => docker(args)) === null ? 'already-absent' : 'removed');
-  stopOwned(docker, plan.containers);
-  for (const { id } of r.resources.containers) outcome('container:' + id, plan.containers.some((x) => x.id === id) ? removed(['rm', id]) : 'already-absent');
-  if (plan.network) {
-    const net = inspect(docker, 'network', plan.network);
-    if (net) insist(networkConsumers(docker, plan.network).length === 0, 'Owned network gained a consumer during disposal');
-    outcome('network:' + plan.network, net ? removed(['network', 'rm', plan.network]) : 'already-absent');
-  }
-  for (const { name, createdAt } of plan.volumes) {
-    const data = inspect(docker, 'volume', name);
-    if (data) insist(data.CreatedAt === createdAt && volumeConsumers(docker, name).length === 0, `Volume ${name} changed or gained a consumer during disposal`);
-    outcome('volume:' + name, data ? removed(['volume', 'rm', name]) : 'already-absent');
-  }
-  r = readReceipt(root, projectId);
-  const terminal = sanitizedTerminal(r, 'disposed', now, { disposedAt: iso(now), outcomes: r.disposal.outcomes });
-  writePrivate(terminalFile(root, projectId), terminal);
-  removeOwnedTaskDir(r.taskDir);
-  withLock(root, projectId, () => rmSync(taskFile(root, projectId), { force: true }), processProbe);
-  return terminal;
+  let claim;
+  try {
+    claim = claimTransition(root, projectId, 'disposing', docker, processProbe, now);
+    await stopOwnedRelay(claim.receipt, docker, stopRelay);
+    let plan = guardedPlan(root, projectId, claim, docker, processProbe);
+    const outcome = (key, value) => updateReceipt(root, projectId, r => { r.disposal.outcomes[key] = value; }, now);
+    const removed = args => (absent(() => docker(args), { kind: args[0], id: args.at(-1) }) === null ? 'already-absent' : 'removed');
+    for (const { id } of claim.receipt.resources.containers) {
+      plan = guardedPlan(root, projectId, claim, docker, processProbe);
+      if (plan.containers.find(x => x.id === id)?.running) absent(() => docker(['stop', '--time', '10', id]));
+      plan = guardedPlan(root, projectId, claim, docker, processProbe);
+      outcome('container:' + id, plan.containers.some(x => x.id === id) ? removed(['rm', id]) : 'already-absent');
+    }
+    plan = guardedPlan(root, projectId, claim, docker, processProbe);
+    if (plan.network) {
+      insist(networkConsumers(docker, plan.network).length === 0, 'Owned network gained a consumer during disposal');
+      outcome('network:' + plan.network, removed(['network', 'rm', plan.network]));
+    }
+    for (const { name } of claim.receipt.resources.volumes) {
+      plan = guardedPlan(root, projectId, claim, docker, processProbe);
+      outcome('volume:' + name, plan.volumes.some(x => x.name === name) ? removed(['volume', 'rm', name]) : 'already-absent');
+    }
+    const remaining = guardedPlan(root, projectId, claim, docker, processProbe);
+    insist(!remaining.network && !remaining.containers.length && !remaining.volumes.length, 'Owned resources remain after disposal; retry finish');
+    const r = readReceipt(root, projectId);
+    const terminal = sanitizedTerminal(r, 'disposed', now, { disposedAt: iso(now), outcomes: r.disposal.outcomes });
+    writePrivate(terminalFile(root, projectId), terminal);
+    removeOwnedTaskDir(r.taskDir);
+    withLock(root, projectId, () => rmSync(taskFile(root, projectId), { force: true }), processProbe);
+    return terminal;
+  } catch (error) {
+    recordTransitionFailure(root, projectId, error, now);
+    throw error;
+  } finally { releaseTransition(root, projectId, claim, now); }
 }
 
-function stopOwned(docker, containers) {
-  for (const { id, running } of containers) if (running) absent(() => docker(['stop', '--time', '10', id]));
-}
-
-/** Stops (does not remove) a failed task's verified containers to free memory while preserving its data. */
-function stopPreserved(r, docker) {
-  const plan = planDisposal(r, docker);
-  if (plan.refusals.length) return `not stopped: ${plan.refusals.join('; ')}`;
-  stopOwned(docker, plan.containers);
-  return 'stopped';
+/** Stop verified unused services, retaining data and the original diagnostic deadline. */
+export async function stopPreserved(root, projectId, { docker, now = new Date(), processProbe = processIdentity, stopRelay } = {}) {
+  docker ??= await createDocker();
+  let claim;
+  try {
+    claim = claimTransition(root, projectId, 'stopping', docker, processProbe, now);
+    await stopOwnedRelay(claim.receipt, docker, stopRelay);
+    for (const { id } of claim.receipt.resources.containers) {
+      const plan = guardedPlan(root, projectId, claim, docker, processProbe);
+      if (plan.containers.find(x => x.id === id)?.running) absent(() => docker(['stop', '--time', '10', id]));
+      updateReceipt(root, projectId, r => { r.preservationStop.outcomes[id] = 'stopped-or-absent'; }, now);
+    }
+    guardedPlan(root, projectId, claim, docker, processProbe);
+    updateReceipt(root, projectId, r => {
+      r.state = r.preservationStop.priorState; r.retainUntil = r.preservationStop.retainUntil;
+      r.preservation = 'stopped'; r.preservationStop.completedAt = iso(now);
+    }, now);
+    return 'stopped';
+  } catch (error) { recordTransitionFailure(root, projectId, error, now); throw error; }
+  finally { releaseTransition(root, projectId, claim, now); }
 }
 
 export async function finishReusable(root, projectId, { docker, now = new Date(), processProbe = processIdentity, stopRelay } = {}) {
   const r = readReceipt(root, projectId);
-  insist(r, `No lifecycle receipt for ${projectId}; legacy resources are inventory-only`);
-  insist(liveLeases(r, processProbe).length === 0, `Finish refused: live consumer lease on ${projectId}`);
-  insist(!r.recoveryHold, `Finish refused: recovery hold on ${projectId}`);
-  if (!r.disposable) updateReceipt(root, projectId, (x) => { if (x.state !== 'disposing') x.state = 'finished'; x.finishedAt = iso(now); }, now);
+  if (!r) {
+    const file = terminalFile(root, projectId);
+    const terminal = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
+    insist(terminal?.projectId === projectId && terminal.terminalState === 'disposed', `No lifecycle receipt for ${projectId}; legacy resources are inventory-only`);
+    return terminal; // Already disposed; never inspect/adopt a later same-name resource.
+  }
+  assertIdle(r, processProbe);
+  if (!r.disposable) updateReceipt(root, projectId, (x) => {
+    assertIdle(x, processProbe);
+    if (x.state !== 'disposing') x.state = 'finished'; x.finishedAt = iso(now);
+  }, now);
   return disposeOwned(root, projectId, { docker, now, processProbe, stopRelay });
 }
 
@@ -375,8 +465,15 @@ export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = n
     };
     if (r.recoveryHold) Object.assign(entry, { action: 'preserve', reason: `recovery hold: ${r.recoveryHold.reason}` });
     else if (liveLeases(r, processProbe).length) Object.assign(entry, { action: 'preserve', reason: 'live consumer lease' });
-    else if (r.state === 'disposing') {
-      if (ownerAlive) Object.assign(entry, { action: 'live', reason: 'disposal in progress' });
+    else if (r.state === 'stopping') {
+      if (ownerAlive && r.preservationStop?.active) Object.assign(entry, { action: 'live', reason: 'preservation stop in progress' });
+      else if (dryRun) Object.assign(entry, { action: 'would-stop', reason: 'resume interrupted preservation stop' });
+      else {
+        try { await stopPreserved(root, projectId, { docker, now, processProbe, stopRelay }); entry.action = 'stopped'; }
+        catch (error) { entry.action = 'failed'; report.failures.push({ projectId, error: error.message }); }
+      }
+    } else if (r.state === 'disposing') {
+      if (ownerAlive && r.disposal?.active) Object.assign(entry, { action: 'live', reason: 'disposal in progress' });
       else await disposeNow('resume interrupted disposal');
     } else if (IN_PROGRESS.includes(r.state) || (r.disposable && r.state === 'prepared')) {
       if (ownerAlive) Object.assign(entry, { action: 'live', reason: 'owner process alive' });
@@ -386,6 +483,10 @@ export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = n
         r = updateReceipt(root, projectId, (x) => { x.state = 'abandoned'; x.failedAt = iso(now); x.retainUntil = x.disposable ? iso(plus(now, POLICY.failedRetentionMs)) : null; }, now);
         writeTerminal(root, r, 'abandoned', now);
         Object.assign(entry, { action: 'abandoned', state: 'abandoned', retainUntil: r.retainUntil, reason: 'owner dead for 24 hours' });
+        if (r.disposable) {
+          try { entry.preservation = await stopPreserved(root, projectId, { docker, now, processProbe, stopRelay }); }
+          catch (error) { entry.preservation = 'failed'; report.failures.push({ projectId, error: error.message }); }
+        }
       }
     } else if (r.disposable && r.state === 'passed') {
       if (ownerAlive) Object.assign(entry, { action: 'live', reason: 'one-shot owner is archiving or disposing' });
@@ -432,45 +533,58 @@ export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = n
 
 /** prepare -> contracts -> archive receipt -> release lease -> dispose. Success requires both
  * passing contracts and complete disposal; a failure preserves the task for seven days. */
-export async function runOneShot({ root = process.cwd(), lifecycleDir = lifecycleRoot(), prepare, run, docker, now = () => new Date(), processProbe = processIdentity, stopRelay } = {}) {
+export async function runOneShot(options = {}) {
+  const scope = options.processScope ?? createOwnedProcessScope();
+  try { return await runOneShotOwned({ ...options, processScope: scope }); }
+  finally { if (!options.processScope) scope.close(); }
+}
+
+async function runOneShotOwned({ root = process.cwd(), lifecycleDir = lifecycleRoot(), prepare, run, docker, now = () => new Date(), processProbe = processIdentity, stopRelay, processScope } = {}) {
   prepare ??= (await import('./prepare-contract-stack.mjs')).prepareStack;
   run ??= (await import('./run-contracts.mjs')).runContracts;
   const { publicContractReceipt } = await import('./ci-contracts.mjs');
   docker ??= await createDocker();
   let manifest;
-  try { manifest = await prepare(root, { lifecycle: { disposable: true, task: 'one-shot', root: lifecycleDir } }); }
+  try { manifest = await prepare(root, { lifecycle: { disposable: true, task: 'one-shot', root: lifecycleDir }, processScope }); processScope.checkpoint(); }
   catch (error) {
-    let r = error.projectId ? readReceipt(lifecycleDir, error.projectId) : null;
+    const projectId = error.projectId ?? manifest?.projectId;
+    let r = projectId ? readReceipt(lifecycleDir, projectId) : null;
+    if (r && processScope.interruption) r = updateReceipt(lifecycleDir, projectId, x => { x.interruption = processScope.interruption; x.state = 'interrupted'; x.failedAt = iso(now()); x.retainUntil = iso(plus(now(), POLICY.failedRetentionMs)); });
     let preservation = null;
     if (r) {
       // Preserve (stop, never remove) whatever the failed preparation allocated.
-      try { preservation = stopPreserved(r, docker); } catch (stopError) { preservation = `not stopped: ${stopError.message}`; }
+      try { preservation = await stopPreserved(lifecycleDir, r.projectId, { docker, now: now(), processProbe, stopRelay }); } catch (stopError) { preservation = `not stopped: ${stopError.message}`; }
       r = updateReceipt(lifecycleDir, r.projectId, (x) => { x.preservation = preservation; });
     }
-    return { ok: false, projectId: error.projectId ?? null, contracts: 'not-run', failure: 'preparation', cleanup: 'preserved', retainUntil: r?.retainUntil ?? null, preservation, detail: error.message };
+    return { ok: false, projectId: projectId ?? null, contracts: 'not-run', failure: processScope.interruption ? 'interrupted' : 'preparation', cleanup: 'preserved', retainUntil: r?.retainUntil ?? null, preservation, detail: error.message };
   }
   const { projectId } = manifest;
   const lease = acquireConsumerLease(lifecycleDir, projectId, 'one-shot', { owner: selfOwner(processProbe), now: now() });
   updateReceipt(lifecycleDir, projectId, (r) => { r.state = 'running'; r.owner = selfOwner(processProbe); }, now());
   let receipt; let failure;
-  try { receipt = await run({ root, taskDir: manifest.taskDir }); if (receipt?.status !== 'passed') failure = 'contracts'; }
+  try { receipt = await run({ root, taskDir: manifest.taskDir, processScope }); processScope.checkpoint(); if (receipt?.status !== 'passed') failure = 'contracts'; }
   catch { failure = 'contracts'; }
+  if (processScope.interruption) failure = 'interrupted';
   const archivedAt = now();
   let r = updateReceipt(lifecycleDir, projectId, (x) => {
     x.result = publicContractReceipt(receipt, failure);
     if (receipt?.receiptPath) x.diagnostics.push(receipt.receiptPath);
-    x.state = failure ? 'failed' : 'passed';
+    x.state = failure === 'interrupted' ? 'interrupted' : failure ? 'failed' : 'passed';
+    if (processScope.interruption) x.interruption = processScope.interruption;
     if (failure) { x.failedAt = iso(archivedAt); x.retainUntil = iso(plus(archivedAt, POLICY.failedRetentionMs)); }
   }, archivedAt);
   releaseConsumerLease(lifecycleDir, lease, archivedAt);
   if (failure) {
-    const stopped = stopPreserved(r, docker);
+    let stopped;
+    try { stopped = await stopPreserved(lifecycleDir, projectId, { docker, now: archivedAt, processProbe, stopRelay }); }
+    catch (error) { stopped = `not stopped: ${error.message}`; }
     r = updateReceipt(lifecycleDir, projectId, (x) => { x.preservation = stopped; }, archivedAt);
     writeTerminal(lifecycleDir, r, 'failed', archivedAt);
     return { ok: false, projectId, contracts: 'failed', failure, cleanup: 'preserved', retainUntil: r.retainUntil, preservation: stopped };
   }
   try {
     await disposeOwned(lifecycleDir, projectId, { docker, now: now(), processProbe, stopRelay });
+    if (processScope.interruption) return { ok: false, projectId, contracts: 'passed', failure: 'interrupted', cleanup: 'disposed' };
     return { ok: true, projectId, contracts: 'passed', cleanup: 'disposed', caseCount: r.result.caseCount };
   } catch (error) {
     return { ok: false, projectId, contracts: 'passed', failure: 'cleanup', cleanup: 'failed', detail: error.message };

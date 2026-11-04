@@ -238,3 +238,7 @@ Measured coverage admits skips only from the reviewed `ENVIRONMENT_GATED` groups
 Release PRs run `Release artifact smoke` (`.github/workflows/preview-smoke.yml`): a plain secret-free job that builds the exact PR candidate, starts local Supabase, serves the production build on loopback and runs `npm run test:e2e:release-artifact` (the `release-required-local` probes plus `e2e/release-artifact-smoke.spec.ts`, which fails when candidate identity is unavailable). It replaced `Smoke test Vercel preview` in main's required checks on 2026-10-07, after passing on release PR #1007 (owner-authorized).
 
 Run every cadence contract test with `npm run test:ci-cadence`. Source fixture passes do not prove native reusable job names, hosted timing or deployed behavior. No local source change authorizes provider calls, remote variable/settings changes, publication, paid repair or automatic reruns.
+
+## Local contract resource lifecycle
+
+Use [the project contract](docs/engineering/database-contracts.md) for temporary and reusable database test resources. `npm run contracts:oneshot` owns ordinary temporary verification; deliberate reuse requires an explicit finish. Preserve primary databases and recovery holds.

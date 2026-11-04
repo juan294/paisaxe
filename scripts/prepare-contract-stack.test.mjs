@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepareStack, initializeRealtime } from './prepare-contract-stack.mjs';
+import { setRecoveryHold, acquireConsumerLease } from './contract-stack-lifecycle.mjs';
 import { stopTransport } from './contract-transport.mjs';
 
 test('actual preparer isolates fresh project, validates before reset and preserves safe failures', async () => {
@@ -22,27 +23,27 @@ test('actual preparer isolates fresh project, validates before reset and preserv
       if(state.mode==='unavailable')process.exit(1);
       if(args[0]==='context')console.log('[{"Endpoints":{"docker":{"Host":"unix:///tmp/fixture.sock"}}}]');
       else if(args[0]==='info')console.log('fixture-daemon');
-      else if(args[0]==='network'&&args[1]==='create'){state.project=args.at(-1);state.nonce=args[args.indexOf('--label')+1].split('=')[1];state.receiptBeforeNetwork=fs.existsSync(${JSON.stringify(lifecycleDir)}+'/tasks/'+state.project+'.json');save();console.log('e'.repeat(64));}
+      else if(args[0]==='network'&&args[1]==='create'){state.project=args.at(-1);state.nonce=args[args.indexOf('--label')+1].split('=')[1];state.receiptBeforeNetwork=fs.existsSync(${JSON.stringify(lifecycleDir)}+'/tasks/'+state.project+'.json');save();console.log('e'.repeat(64));if(state.mode==='network-interrupt')process.kill(process.ppid,'SIGTERM');}
       else if(args[0]==='ps'&&args.includes('{{.ID}}'))console.log(['db','kong'].map(kind=>(kind==='db'?'a':'b').repeat(64)).join('\\n'));
       else if(args[0]==='container'&&args[1]==='inspect'){const kind=args[2][0]==='a'?'db':'kong';console.log(JSON.stringify([{Id:args[2],Name:'/supabase_'+kind+'_'+state.project,Config:{Labels:{'com.supabase.cli.project':state.project}},Mounts:[]}]));}
       else if(args[0]==='volume'&&args[1]==='ls')console.log('');
-      else if(args[0]==='network')console.log(JSON.stringify([{Internal:true,Labels:{'com.paisaxe.contracts.nonce':state.nonce},Containers:Object.fromEntries((state.mode==='detached'?['db','kong']:['db','kong','auth']).map(kind=>[kind,{Name:'supabase_'+kind+'_'+state.project}]))}]));
+      else if(args[0]==='network')console.log(JSON.stringify([{Id:'e'.repeat(64),Name:state.project,Internal:true,Labels:{'com.paisaxe.contracts.nonce':state.nonce},Containers:Object.fromEntries((state.mode==='detached'?['db','kong']:['db','kong','auth']).map(kind=>[kind,{Name:'supabase_'+kind+'_'+state.project}]))}]));
       else if(args[0]==='ps')console.log(['db','kong','auth'].map(kind=>'supabase_'+kind+'_'+state.project).join('\\n'));
       else if(args[0]==='inspect'){
         const kind=args[1].split('_')[1];const config=fs.readFileSync(state.taskDir+'/supabase/config.toml','utf8');const api=config.match(/\\[api\\][\\s\\S]*?port = (\\d+)/)[1];const db=config.match(/\\[db\\][\\s\\S]*?port = (\\d+)/)[1];
         const networks=state.mode==='detached'&&kind==='auth'?{bridge:{}}:{[state.project]:{}};if(state.mode==='escape'&&kind==='auth')networks.bridge={};
         console.log(JSON.stringify([{Name:'/'+args[1],State:{Running:true},Config:{Labels:{'com.supabase.cli.project':state.mode==='identity'?'paisaxe':state.project}},NetworkSettings:{Networks:networks,Ports:{[kind==='db'?'5432/tcp':'8000/tcp']:[]}}}]));
       }else if(args.includes('pg_dump'))console.log('fixture schema');else if(args.includes('psql')&&args.at(-1).includes('pg_publication_tables'))console.log('0');else if(args.includes('psql')&&args.at(-1).includes('pg_publication_rel')){console.log(state.mode==='missing-publication'?'0':'1');}else if(args.includes('psql')){if(state.mode==='cron-api'&&args.at(-1).includes('UPDATE cron.job'))process.exit(1);console.log('');}else process.exit(2);`, { mode: 0o755 });
-    writeFileSync(join(root, 'bin/supabase'), header + `state.taskDir=args[args.indexOf('--workdir')+1];save();if(state.mode==='start-failure'){console.error('private-command-diagnostic');process.exit(1);}if(args[0]==='status'){const config=fs.readFileSync(state.taskDir+'/supabase/config.toml','utf8');console.log(JSON.stringify({API_URL:'http://127.0.0.1:'+config.match(/\\[api\\][\\s\\S]*?port = (\\d+)/)[1],ANON_KEY:'private-local-anon-key'}));}else console.log('fixture local CLI');`, { mode: 0o755 });
+    writeFileSync(join(root, 'bin/supabase'), header + `state.taskDir=args[args.indexOf('--workdir')+1];save();if(state.mode==='start-interrupt'){process.kill(process.ppid,'SIGINT');process.exit(1);}if(state.mode==='start-failure'){console.error('private-command-diagnostic');process.exit(1);}if(args[0]==='status'){const config=fs.readFileSync(state.taskDir+'/supabase/config.toml','utf8');console.log(JSON.stringify({API_URL:'http://127.0.0.1:'+config.match(/\\[api\\][\\s\\S]*?port = (\\d+)/)[1],ANON_KEY:'private-local-anon-key'}));}else console.log('fixture local CLI');`, { mode: 0o755 });
     process.env.PATH = join(root, 'bin') + ':' + saved.PATH; delete process.env.DOCKER_HOST;
     process.env.SUPABASE_ACCESS_TOKEN = 'production-token'; process.env.STRIPE_SECRET_KEY = 'live-secret';
-    for (const mode of ['cron-api', 'success', 'start-failure', 'unavailable', 'identity', 'escape', 'detached', 'subscription-failure', 'missing-publication']) {
+    for (const mode of ['cron-api', 'success', 'start-failure', 'network-interrupt', 'start-interrupt', 'unavailable', 'identity', 'escape', 'detached', 'subscription-failure', 'late-hold', 'late-lease', 'missing-publication']) {
       writeFileSync(stateFile, JSON.stringify({ mode })); writeFileSync(logFile, '');
       let manifest; let failure;
       const events = [];
       const clientFactory = (url,key,options) => {
         assert.match(url,/^http:\/\/127\.0\.0\.1:\d+$/); assert.equal(key,'private-local-anon-key'); assert.equal(options.auth.persistSession,false);
-        const channel={subscribe(callback){events.push('subscribe');writeFileSync(logFile,JSON.stringify({program:'websocket',args:['subscribe'],env:{}})+'\n',{flag:'a'});callback(mode==='subscription-failure'?'CHANNEL_ERROR':'SUBSCRIBED',new Error('private-websocket-error'));return this;},async unsubscribe(){events.push('unsubscribe');return 'ok';},teardown(){events.push('teardown');}};
+        const channel={subscribe(callback){const project=JSON.parse(readFileSync(stateFile,'utf8')).project;if(mode==='late-hold')setRecoveryHold(lifecycleDir,project,'recovery during preparation');if(mode==='late-lease')acquireConsumerLease(lifecycleDir,project,'other consumer');events.push('subscribe');writeFileSync(logFile,JSON.stringify({program:'websocket',args:['subscribe'],env:{}})+'\n',{flag:'a'});callback(['subscription-failure','late-hold','late-lease'].includes(mode)?'CHANNEL_ERROR':'SUBSCRIBED',new Error('private-websocket-error'));return this;},async unsubscribe(){events.push('unsubscribe');return 'ok';},teardown(){events.push('teardown');}};
         return {channel(){return channel;},realtime:{async disconnect(){events.push('disconnect');return 'ok';}}};
       };
       try { manifest = await prepareStack(root, { clientFactory, readinessTimeoutMs: 100 }); } catch (error) { failure = error; }
@@ -54,7 +55,8 @@ test('actual preparer isolates fresh project, validates before reset and preserv
         assert.equal(JSON.parse(readFileSync(stateFile, 'utf8')).receiptBeforeNetwork, true, 'receipt precedes network allocation');
         assert.equal(receipt.disposable, false); assert.equal(receipt.task, 'reusable'); assert.equal(receipt.daemonId, 'fixture-daemon');
         assert.deepEqual(receipt.resources.network, { id: 'e'.repeat(64), name: project });
-        assert.equal(receipt.state, manifest ? 'prepared' : 'preparation-failed');
+        assert.equal(receipt.state, manifest ? 'prepared' : mode.endsWith('-interrupt') ? 'interrupted' : 'preparation-failed');
+        if (mode.endsWith('-interrupt')) { assert.equal(receipt.interruption.settled, true); assert.ok(receipt.interruption.signal); }
         if (!manifest) { assert.equal(receipt.retainUntil, null, 'reusable failures never expire automatically'); assert.equal(failure.taskDir, receipt.taskDir); }
         if (mode !== 'start-failure') assert.deepEqual(receipt.resources.containers.map((x) => x.id), ['a'.repeat(64), 'b'.repeat(64)]);
         assert.equal(JSON.stringify(receipt).includes('private-local-anon-key'), false);
@@ -75,11 +77,15 @@ test('actual preparer isolates fresh project, validates before reset and preserv
         const receipt = JSON.parse(readFileSync(join(path, 'preparation-failed.json'), 'utf8'));
         assert.equal(receipt.taskDir, path); assert.equal(receipt.status, 'failed'); assert.match(receipt.projectId, /^paisaxe-contracts-[a-f0-9]{12}$/);
         assert.equal(failure.message.includes('production-token'), false);
-        if(mode==='subscription-failure'||mode==='missing-publication'){assert.equal(receipt.stage,'realtime');assert.throws(()=>readFileSync(join(path,'contracts-stack.json')));assert.equal(failure.message.includes('private-'),false);assert.equal(existsSync(join(path,'transport.sock')),false,'Failed readiness must stop its owned relay');}
+        if(mode==='subscription-failure'||mode==='missing-publication'){assert.equal(receipt.stage,'realtime');assert.throws(()=>readFileSync(join(path,'contracts-stack.json')));assert.equal(failure.message.includes('private-'),false);assert.equal(existsSync(join(path,'transport.sock')),true,'Reusable failure retains its relay for explicit finish');}
         if(mode==='start-failure'){assert.equal(receipt.stage,'start');assert.ok(readFileSync(join(path,'preparation-diagnostic.log'),'utf8').includes('private-command-diagnostic'));assert.equal(statSync(join(path,'preparation-diagnostic.log')).mode&0o777,0o600);assert.equal(failure.message.includes('private-command-diagnostic'),false);}
       }
-      if (manifest?.transport === 'docker-exec-v1') await stopTransport(manifest, { DOCKER_HOST: 'unix:///tmp/fixture.sock' });
-      if(['success','cron-api','subscription-failure','missing-publication'].includes(mode))assert.deepEqual(events,['subscribe','unsubscribe','teardown','disconnect']);
+      if (['late-hold','late-lease'].includes(mode)) {
+        assert.equal(existsSync(join(failure.taskDir,'transport.sock')),true,'A winning hold or lease prevents relay stop');
+      }
+      const relay = manifest ?? (failure && existsSync(join(failure.taskDir,'transport.sock')) && { version:1, ...JSON.parse(readFileSync(join(failure.taskDir,'preparation-failed.json'),'utf8')), ...lifecycleReceipt(failure.projectId).stack });
+      if (relay && existsSync(join(relay.taskDir,'transport.sock'))) await stopTransport(relay, { DOCKER_HOST: 'unix:///tmp/fixture.sock' });
+      if(['success','cron-api','subscription-failure','late-hold','late-lease','missing-publication'].includes(mode))assert.deepEqual(events,['subscribe','unsubscribe','teardown','disconnect']);
       const calls = readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
       for (const call of calls) {
         assert.equal(call.env.SUPABASE_ACCESS_TOKEN, undefined); assert.equal(call.env.STRIPE_SECRET_KEY, undefined);
@@ -87,7 +93,7 @@ test('actual preparer isolates fresh project, validates before reset and preserv
         if (call.program === 'supabase') assert.equal(call.env.HOME, join(JSON.parse(readFileSync(stateFile, 'utf8')).taskDir, '.local-cli-home'));
       }
       const resets = calls.filter((call) => call.program === 'supabase' && call.args[0] === 'db');
-      assert.equal(resets.length, (['success','cron-api','subscription-failure','missing-publication'].includes(mode)) ? 1 : 0, `Unexpected reset after ${mode}`);
+      assert.equal(resets.length, (['success','cron-api','subscription-failure','late-hold','late-lease','missing-publication'].includes(mode)) ? 1 : 0, `Unexpected reset after ${mode}`);
       if (mode === 'success' || mode === 'cron-api') {
         const create = calls.findIndex((call) => call.args[0] === 'network' && call.args[1] === 'create');
         const start = calls.findIndex((call) => call.program === 'supabase' && call.args[0] === 'start');
