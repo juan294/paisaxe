@@ -76,12 +76,14 @@ beforeEach(async () => {
     if (url.hostname === "test.supabase.co") databasePaths.push(url.pathname);
     if (url.hostname === "cache.invalid") {
       const body = JSON.parse(String(init?.body));
+      // @upstash/redis 1.40 and later answer in plain text; 1.39 and earlier request base64 with this header.
+      const base64Responses = new Headers(init?.headers).get("upstash-encoding") === "base64";
       const run = ([command, key, value, , ttl]: [string, string, string?, string?, number?]) => {
         transportOrder.push(`cache:${command.toLowerCase()}`);
         if (command.toLowerCase() === "get") {
           const entry = store.get(key);
           const valid = entry && entry.expiresAt > Date.now();
-          return { result: valid ? Buffer.from(entry.value).toString("base64") : null };
+          return { result: valid ? (base64Responses ? Buffer.from(entry.value).toString("base64") : entry.value) : null };
         }
         if (command.toLowerCase() === "set") {
           store.set(key, { value: value!, expiresAt: Date.now() + Number(ttl) * 1000 });
