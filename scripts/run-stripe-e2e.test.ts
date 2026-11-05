@@ -1,10 +1,103 @@
 // @vitest-environment node
 import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
+import http from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { assertStripeLocalInputs } from "./run-stripe-e2e";
+import { managedCallerFixture, assertManagedPreflight, stripeWorkloadFixture } from "./test-fixtures/managed-caller.mjs";
+
+it("Stripe rejects a failed server root even when its child settles only after intentional stop", async () => {
+  const fixture = await stripeWorkloadFixture(process.cwd(), { failedServerRootWithChild: true });
+  const readyFile = join(fixture.env.HOME!, "server-child-ready");
+  try {
+    const child = spawnSync(process.execPath, ["--import", "tsx", resolve("scripts/run-stripe-e2e.ts")], {
+      cwd: process.cwd(), env: fixture.env, encoding: "utf8", timeout: 15000,
+    });
+    expect(child.error).toBeUndefined();
+    const ready = JSON.parse(readFileSync(readyFile, "utf8"));
+    const stopped = JSON.parse(readFileSync(join(fixture.env.HOME!, "server-child-stopped"), "utf8"));
+    expect(stopped).toEqual({ pid: ready.pid, signal: "SIGTERM" });
+    expect(fixture.read().some(call => call.tool === "npx")).toBe(true);
+    expect(child.status, child.stdout + child.stderr).toBe(1);
+    expect(child.stderr).toMatch(/server.*(?:exit|code).*7/i);
+  } finally {
+    if (existsSync(readyFile)) {
+      const { pid } = JSON.parse(readFileSync(readyFile, "utf8"));
+      let absent = false;
+      try { process.kill(pid, 0); } catch (error) { absent = (error as NodeJS.ErrnoException).code === "ESRCH"; }
+      if (!absent) throw new Error(`Fixture server child absence unproven; retained ${fixture.env.HOME}`);
+    }
+    fixture.close();
+  }
+}, 20000);
+
+for (const earlyServerExit of [0, 7]) {
+  it(`Stripe rejects premature owned server exit ${earlyServerExit} despite another ready listener`, async () => {
+    const fixture = await stripeWorkloadFixture(process.cwd(), { earlyServerExit });
+    const foreignListener = http.createServer((_request, response) => response.end("separate fixture listener"));
+    try {
+      await new Promise<void>(resolve => foreignListener.listen(Number(fixture.env.PLAYWRIGHT_PORT), resolve));
+      const result = await new Promise<{ status: number | null; stdout: string; stderr: string }>((resolveResult, reject) => {
+        const child = spawn(process.execPath, ["--import", "tsx", resolve("scripts/run-stripe-e2e.ts")], {
+          cwd: process.cwd(), env: fixture.env, stdio: ["ignore", "pipe", "pipe"], timeout: 15000,
+        });
+        let stdout = "", stderr = "";
+        child.stdout.on("data", chunk => { stdout += chunk; }); child.stderr.on("data", chunk => { stderr += chunk; });
+        child.once("error", reject); child.once("close", status => resolveResult({ status, stdout, stderr }));
+      });
+      expect(result.status, result.stdout + result.stderr).toBe(1);
+      expect(result.stderr).toMatch(/server.*(?:premature|unexpected|before|code)/i);
+      expect(result.stderr).toContain(String(earlyServerExit));
+      expect(foreignListener.listening).toBe(true);
+    } finally {
+      if (foreignListener.listening) await new Promise<void>(resolve => foreignListener.close(() => resolve()));
+      fixture.close();
+    }
+  }, 20000);
+}
+
+for (const exit of [0, 7]) {
+  it(`Stripe overlapping server and browser keep independent ownership after browser exit ${exit}`, async () => {
+    const fixture = await stripeWorkloadFixture(process.cwd(), { exit });
+    try {
+      const child = spawnSync(process.execPath, ["--import", "tsx", resolve("scripts/run-stripe-e2e.ts")], {
+        cwd: process.cwd(), env: fixture.env, encoding: "utf8", timeout: 15000,
+      });
+      expect(child.error).toBeUndefined(); expect(child.status, child.stderr).toBe(exit === 0 ? 0 : 1);
+      if (exit !== 0) expect(child.stderr).toMatch(/code 7/);
+      const calls = fixture.read();
+      const build = calls.find(call => call.tool === "npm" && call.args[1] === "build");
+      const browser = calls.find(call => call.tool === "npx");
+      expect(build).toBeDefined(); expect(browser).toBeDefined();
+      expect(Object.values(build.commands)).toHaveLength(1);
+      const commands = Object.values(browser.commands) as { id: string; leaseId: string; settlement: string }[];
+      expect(commands).toHaveLength(2);
+      expect(new Set(commands.map(command => command.id)).size).toBe(2);
+      expect(commands.map(command => command.settlement).sort()).toEqual(["explicit-consumer", "process-group"]);
+      expect(new Set(commands.map(command => command.leaseId)).size).toBe(1);
+      const after = fixture.receipt(); expect(after.leases).toHaveLength(0);
+      const retained = Object.values(after.commandTracking.commands) as { settlement: string; state: string }[];
+      expect(retained).toHaveLength(1); expect(retained[0]?.settlement).toBe("explicit-consumer");
+      expect(retained[0]?.state).toBe("unsettled");
+      expect(child.stdout + child.stderr).toMatch(/retained|unproven/);
+    } finally { fixture.close(); }
+  }, 20000);
+}
+
+for (const boundary of ["schema", "status"]) {
+  it(`Stripe leases and records durable ${boundary} preflight before external execution`, () => {
+    const fixture = managedCallerFixture(process.cwd(), boundary);
+    try {
+      const child = spawnSync(process.execPath, ["--import", "tsx", resolve("scripts/run-stripe-e2e.ts")], {
+        cwd: process.cwd(), env: fixture.env, encoding: "utf8", timeout: 15000,
+      });
+      expect(child.error).toBeUndefined(); expect(child.status, child.stderr).toBe(1);
+      assertManagedPreflight(fixture, "stripe-e2e", boundary);
+    } finally { fixture.close(); }
+  });
+}
 
 // Exercise the actual entrypoint. The only available npm is a harmless sentinel;
 // the old runner reaches it before checking whether its datastore is production.

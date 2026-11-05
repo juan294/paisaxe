@@ -142,15 +142,25 @@ export function localDockerEnvironment(inherited = process.env) {
   return { ...env, DOCKER_HOST: host, SUPABASE_TELEMETRY_DISABLED: '1' };
 }
 
-export function dockerSql(projectId, sql, env) {
-  return execFileSync('docker', ['exec', '-i', `supabase_db_${projectId}`, 'psql', '-X', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', '-t', '-A', '-c', sql],
-    { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 }).trim();
+// Managed callers use the owned scope; the existing synchronous helper ABI stays available.
+export async function runStackCommand(scope, commandTracker, binary, args, options) {
+  const result = await scope.run(binary, args, { ...options, commandTracker });
+  if (result.error || result.status !== 0) throw Object.assign(new Error('Owned stack command failed'), result);
+  scope.checkpoint();
+  return result.stdout;
 }
 
-export function schemaDigest(projectId, env) {
-  const dump = execFileSync('docker', ['exec', `supabase_db_${projectId}`, 'pg_dump', '-U', 'postgres', '--schema-only', '--no-owner', 'postgres'],
-    { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 });
-  return sha256(dump.split('\n').filter((line) => !/^\\(?:un)?restrict\b/.test(line)).join('\n'));
+export function dockerSql(projectId, sql, env, run) {
+  const args = ['exec', '-i', `supabase_db_${projectId}`, 'psql', '-X', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', '-t', '-A', '-c', sql];
+  const options = { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, maxBuffer: 1024 * 1024 };
+  return run ? run('docker', args, options).then(output => output.trim()) : execFileSync('docker', args, options).trim();
+}
+
+export function schemaDigest(projectId, env, run) {
+  const args = ['exec', `supabase_db_${projectId}`, 'pg_dump', '-U', 'postgres', '--schema-only', '--no-owner', 'postgres'];
+  const options = { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, maxBuffer: 1024 * 1024 };
+  const normalize = dump => sha256(dump.split('\n').filter((line) => !/^\\(?:un)?restrict\b/.test(line)).join('\n'));
+  return run ? run('docker', args, options).then(normalize) : normalize(execFileSync('docker', args, options));
 }
 
 export async function inspectStack(manifest, env) {
@@ -236,6 +246,7 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     manifest = validateManifest(json(join(taskDir, 'contracts-stack.json')), taskDir);
     // A reusable stack stays allocated; the lease keeps scheduled disposal away while it is in use.
     lease = leaseForCaller(manifest.projectId, 'contracts');
+    const command = (binary, args, options) => runStackCommand(scope, lease.commandTracker, binary, args, options);
     const inventory = migrationInventory(root);
     insist(inventory.digest === manifest.migrationDigest, 'Candidate migrations changed; prepare a fresh contracts stack');
     receipt.migrationDigest = inventory.digest; receipt.projectId = manifest.projectId;
@@ -243,14 +254,14 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     insist(config.match(/^project_id\s*=\s*"([^"]+)"/m)?.[1] === manifest.projectId, 'Task Supabase project config mismatch');
     dockerEnv = { ...localDockerEnvironment(), HOME: runDir }; await inspectStack(manifest, dockerEnv); scope.checkpoint();
     const marker = `paisaxe-contracts:${manifest.nonce}:${manifest.migrationDigest}`;
-    insist(dockerSql(manifest.projectId, "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname=current_database();", dockerEnv) === marker, 'Database task marker mismatch; refusing database fixtures');
-    const versions = JSON.parse(dockerSql(manifest.projectId, 'SELECT coalesce(json_agg(version ORDER BY version), \'[]\'::json) FROM supabase_migrations.schema_migrations;', dockerEnv));
+    insist(await dockerSql(manifest.projectId, "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname=current_database();", dockerEnv, command) === marker, 'Database task marker mismatch; refusing database fixtures');
+    const versions = JSON.parse(await dockerSql(manifest.projectId, 'SELECT coalesce(json_agg(version ORDER BY version), \'[]\'::json) FROM supabase_migrations.schema_migrations;', dockerEnv, command));
     insist(JSON.stringify(versions) === JSON.stringify(inventory.versions), 'Actual database migration inventory differs from candidate');
-    insist(schemaDigest(manifest.projectId, dockerEnv) === manifest.schemaDigest, 'Task database schema changed; prepare a fresh contracts stack');
-    insist(dockerSql(manifest.projectId, "SELECT count(*) FROM public.webhook_config WHERE key IN ('base_url','secret') AND value <> '';", dockerEnv) === '0',
+    insist(await schemaDigest(manifest.projectId, dockerEnv, command) === manifest.schemaDigest, 'Task database schema changed; prepare a fresh contracts stack');
+    insist(await dockerSql(manifest.projectId, "SELECT count(*) FROM public.webhook_config WHERE key IN ('base_url','secret') AND value <> '';", dockerEnv, command) === '0',
       'Task webhook outbound configuration is not disabled');
-    insist(dockerSql(manifest.projectId, 'SELECT count(*) FROM cron.job WHERE active;', dockerEnv) === '0', 'Task cron jobs must be disabled');
-    const status = JSON.parse(execFileSync('supabase', ['status', '--workdir', taskDir, '--output', 'json'], { env: dockerEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 }));
+    insist(await dockerSql(manifest.projectId, 'SELECT count(*) FROM cron.job WHERE active;', dockerEnv, command) === '0', 'Task cron jobs must be disabled');
+    const status = JSON.parse(await command('supabase', ['status', '--workdir', taskDir, '--output', 'json'], { env: dockerEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, maxBuffer: 1024 * 1024 }));
     const keys = validateKeys(status, manifest);
     const sqlVersion = execFileSync('psql', ['--version'], { env: dockerEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000 });
     const sqlClient = /^psql \(PostgreSQL\) \d+\.\d+(?:\.\d+)?/.exec(sqlVersion)?.[0];
@@ -263,7 +274,7 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     writeFileSync(configPath, `import original from ${JSON.stringify(pathToFileURL(join(root, 'vitest.config.ts')).href)};\nexport default {...original,root:${JSON.stringify(resolve(root))},envDir:${JSON.stringify(runDir)}};\n`);
     const result = await scope.run(process.execPath, [join(root, 'node_modules/vitest/vitest.mjs'), 'run', ...receipt.suites,
       '--config', configPath, '--maxWorkers=1', '--no-file-parallelism', '--reporter=json', '--outputFile', reportPath],
-    { cwd: root, env: isolatedEnvironment({ ...process.env, HOME: runDir }, manifest, keys, dockerEnv.DOCKER_HOST), encoding: 'utf8', timeout: 1200000, maxBuffer: 32 * 1024 * 1024 });
+    { commandTracker: lease.commandTracker, cwd: root, env: isolatedEnvironment({ ...process.env, HOME: runDir }, manifest, keys, dockerEnv.DOCKER_HOST), encoding: 'utf8', timeout: 1200000, maxBuffer: 32 * 1024 * 1024 });
     // Vitest output can contain query diagnostics. Preserve it privately while
     // keeping only the validated case inventory in the public receipt.
     writeFileSync(join(runDir, 'vitest-output.log'), [result.stdout ?? '', result.stderr ?? ''].join('\n'), { mode: 0o600 });
@@ -274,7 +285,7 @@ export async function runContracts({ root = process.cwd(), taskDir = process.env
     catch (error) { failures.push(error instanceof SyntaxError ? 'Missing/malformed or unsuccessful contract report' : error.message); }
     try {
       await inspectStack(manifest, dockerEnv); scope.checkpoint();
-      insist(schemaDigest(manifest.projectId, dockerEnv) === manifest.schemaDigest, 'Cleanup left database schema changed');
+      insist(await schemaDigest(manifest.projectId, dockerEnv, command) === manifest.schemaDigest, 'Cleanup left database schema changed');
     } catch { failures.push('Contract cleanup/stack health check failed'); }
     insist(candidateDigest(root) === receipt.candidateDigest, 'Candidate source inputs changed during contract run; rerun the complete tier');
   } catch (error) {

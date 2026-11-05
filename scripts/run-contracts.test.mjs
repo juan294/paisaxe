@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import http from 'node:http';
 import net from 'node:net';
 import { startTransport, stopTransport } from './contract-transport.mjs';
+import { createLifecycleReceipt, readReceipt, acquireConsumerLease, releaseConsumerLease } from './contract-stack-lifecycle.mjs';
 import { discoverSuites, validateReport, validateManifest, validateKeys, isolatedEnvironment, migrationInventory, runContracts, REQUIRED_SUITES, sha256, candidateDigest } from './run-contracts.mjs';
 
 const suite = 'src/lib/stories-rls.postgrest-rls.test.ts';
@@ -146,6 +147,8 @@ test('real runner with third-party CLI/HTTP fixtures rejects bad reports, failed
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'contract-runner-fixture-')));
   const taskDir = realpathSync(mkdtempSync(join(tmpdir(), 'paisaxe-contracts-')));
   const priorPath = process.env.PATH; const priorHost = process.env.DOCKER_HOST; const priorFetch = globalThis.fetch;
+  const priorLifecycle = process.env.PAISAXE_CONTRACT_LIFECYCLE_DIR;
+  const lifecycleDir = join(root, 'lifecycle'); process.env.PAISAXE_CONTRACT_LIFECYCLE_DIR = lifecycleDir;
   const dockerSocket = join(taskDir, 'docker.sock');
   const daemon = http.createServer((_req, res) => { res.writeHead(503); res.end('private-daemon-canary'); });
   await new Promise(resolve => daemon.listen(dockerSocket, resolve));
@@ -175,8 +178,12 @@ test('real runner with third-party CLI/HTTP fixtures rejects bad reports, failed
     const manifest = { version: 1, taskDir, projectId: 'paisaxe-contracts-123456789abc', nonce: '12345678-1234-4234-9234-123456789abc',
       apiUrl: `http://127.0.0.1:${ports[0]}`, dbPort: ports[1], migrationDigest: migrationInventory(root).digest, schemaDigest: sha256('schema\n') };
     writeFileSync(join(taskDir, 'contracts-stack.json'), JSON.stringify(manifest)); writeFileSync(join(taskDir, 'supabase/config.toml'), `project_id = "${manifest.projectId}"`);
+    createLifecycleReceipt(lifecycleDir, { ...manifest, disposable: false, task: 'reusable', candidate: {}, daemonId: 'fixture-daemon' });
+    const lifecycleFile=join(lifecycleDir,'tasks',manifest.projectId+'.json'), ownershipLog=join(root,'ownership.jsonl');
+    const outerLease=acquireConsumerLease(lifecycleDir,manifest.projectId,'outer-fixture');
+    const ownershipRecorder=`const ownership=JSON.parse(fs.readFileSync(${JSON.stringify(lifecycleFile)},'utf8'));fs.appendFileSync(${JSON.stringify(ownershipLog)},JSON.stringify({tool:require('node:path').basename(process.argv[1]),args,leases:ownership.leases,commands:ownership.commandTracking?.commands??{}})+'\\n');`;
     const modeFile = join(root, 'mode.json'); const commandLog = join(root, 'commands.log'); const countFile = join(root, 'network-count');
-    const scriptHeader = `#!/usr/bin/env node\nconst fs=require('node:fs');const args=process.argv.slice(2);const mode=JSON.parse(fs.readFileSync(${JSON.stringify(modeFile)},'utf8'));fs.appendFileSync(${JSON.stringify(commandLog)},JSON.stringify(args)+'\\n');`;
+    const scriptHeader = `#!/usr/bin/env node\nconst fs=require('node:fs');const args=process.argv.slice(2);const mode=JSON.parse(fs.readFileSync(${JSON.stringify(modeFile)},'utf8'));fs.appendFileSync(${JSON.stringify(commandLog)},JSON.stringify(args)+'\\n');` + ownershipRecorder;
     writeFileSync(join(bin, 'docker'), scriptHeader + `
       if(mode.unavailable)process.exit(1);
       if(args[0]==='context')console.log(JSON.stringify([{Endpoints:{docker:{Host:${JSON.stringify('unix://' + dockerSocket)}}}}]));
@@ -198,7 +205,7 @@ test('real runner with third-party CLI/HTTP fixtures rejects bad reports, failed
     writeFileSync(join(bin, 'psql'), scriptHeader + `if(mode.missingSqlClient)process.exit(1);console.log('psql (PostgreSQL) 17.11');`, { mode: 0o755 });
     const good = report(); good.testResults = REQUIRED_SUITES.map((file) => ({ ...good.testResults[0], name: join(root, file) }));
     good.numTotalTests = REQUIRED_SUITES.length; good.numPassedTests = REQUIRED_SUITES.length;
-    writeFileSync(join(root, 'node_modules/vitest/vitest.mjs'), `import fs from 'node:fs';const mode=JSON.parse(fs.readFileSync(${JSON.stringify(modeFile)},'utf8'));let report=${JSON.stringify(good)};if(mode.mutate)fs.appendFileSync(${JSON.stringify(join(root, REQUIRED_SUITES[0]))},'\\n// changed during test');if(mode.skip)report.testResults[0].assertionResults[0].status='pending';if(mode.hook)report.testResults[0].message='cleanup failed';if(!mode.missing)fs.writeFileSync(process.argv[process.argv.indexOf('--outputFile')+1],mode.malformed?'private-json-canary':JSON.stringify(report));console.error('private-vitest-diagnostic');process.exit(mode.exit||0);`);
+    writeFileSync(join(root, 'node_modules/vitest/vitest.mjs'), `import fs from 'node:fs';const args=process.argv.slice(2);const ownership=JSON.parse(fs.readFileSync(${JSON.stringify(lifecycleFile)},'utf8'));fs.appendFileSync(${JSON.stringify(ownershipLog)},JSON.stringify({tool:'vitest',args,leases:ownership.leases,commands:ownership.commandTracking?.commands??{}})+'\\n');const mode=JSON.parse(fs.readFileSync(${JSON.stringify(modeFile)},'utf8'));let report=${JSON.stringify(good)};if(mode.mutate)fs.appendFileSync(${JSON.stringify(join(root, REQUIRED_SUITES[0]))},'\\n// changed during test');if(mode.skip)report.testResults[0].assertionResults[0].status='pending';if(mode.hook)report.testResults[0].message='cleanup failed';if(!mode.missing)fs.writeFileSync(process.argv[process.argv.indexOf('--outputFile')+1],mode.malformed?'private-json-canary':JSON.stringify(report));console.error('private-vitest-diagnostic');process.exit(mode.exit||0);`);
     process.env.PATH = bin + ':' + priorPath; delete process.env.DOCKER_HOST;
     globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => [{ flag_key: 'maintenance_mode', enabled: false }] });
     let unavailableReceipt;
@@ -207,10 +214,16 @@ test('real runner with third-party CLI/HTTP fixtures rejects bad reports, failed
       [{ relay: true, noBindings: true }, 'passed'], [{ relay: true, noBindings: true, exit: 1 }, 'failed']]) {
       if (mode.missingRelay || mode.relay) manifest.transport = 'docker-exec-v1'; else delete manifest.transport;
       writeFileSync(join(taskDir, 'contracts-stack.json'), JSON.stringify(manifest));
-      writeFileSync(modeFile, JSON.stringify(mode)); rmSync(countFile, { force: true });
+      writeFileSync(modeFile, JSON.stringify(mode)); rmSync(countFile, { force: true }); writeFileSync(ownershipLog,'');
       if (mode.relay) { relayManifest = { ...manifest }; await startTransport(relayManifest, relayEnv); }
       const receipt = await runContracts({ root, taskDir, outputDir: join(root, 'receipts') });
       assert.equal(receipt.status, expected, JSON.stringify({ mode, failures: receipt.failures }));
+      if(expected==='passed'){
+        const seen=readFileSync(ownershipLog,'utf8').trim().split('\n').map(JSON.parse).filter(call=>call.args.includes('psql')||call.args.includes('pg_dump')||['supabase','vitest'].includes(call.tool));
+        assert.ok(seen.some(call=>call.tool==='vitest'));assert.ok(seen.some(call=>call.tool==='supabase'));
+        for(const call of seen){const entries=Object.values(call.commands);assert.equal(entries.length,1,'each stack command has one durable identity');const inner=call.leases.find(lease=>lease.purpose==='contracts');assert.ok(inner);assert.equal(entries[0].leaseId,inner.id);assert.notEqual(entries[0].leaseId,outerLease.id);}
+        const after=readReceipt(lifecycleDir,manifest.projectId);assert.deepEqual(after.leases.map(lease=>lease.id),[outerLease.id]);assert.deepEqual(after.commandTracking.commands,{});
+      }
       if (mode.relay) {
         assert.equal(receipt.transportDiagnostics?.status, 'available');
         const proof = receipt.transportDiagnostics.proof;
@@ -239,11 +252,13 @@ test('real runner with third-party CLI/HTTP fixtures rejects bad reports, failed
     globalThis.fetch = async () => ({ ok: false, status: 401 });
     const deniedPositive = await runContracts({ root, taskDir, outputDir: join(root, 'receipts') });
     assert.equal(deniedPositive.status, 'failed'); assert.match(deniedPositive.failures.join(' '), /positive/);
+    releaseConsumerLease(lifecycleDir,outerLease);
   } finally {
     if (relayManifest) await stopTransport(relayManifest, relayEnv).catch(() => {});
     await new Promise(resolve => daemon.close(resolve));
     process.env.PATH = priorPath;
     if (priorHost === undefined) delete process.env.DOCKER_HOST; else process.env.DOCKER_HOST = priorHost;
+    if(priorLifecycle===undefined)delete process.env.PAISAXE_CONTRACT_LIFECYCLE_DIR;else process.env.PAISAXE_CONTRACT_LIFECYCLE_DIR=priorLifecycle;
     globalThis.fetch = priorFetch; rmSync(root, { recursive: true, force: true }); rmSync(taskDir, { recursive: true, force: true });
   }
 });

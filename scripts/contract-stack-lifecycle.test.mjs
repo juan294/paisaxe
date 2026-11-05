@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,8 +9,9 @@ import { migrationInventory } from './run-contracts.mjs';
 import { randomUUID } from 'node:crypto';
 import {
   POLICY, UNKNOWN_PROCESS, acquireConsumerLease, isAlive, processIdentity, createLifecycleReceipt, disposeOwned, finishReusable, inspectOwnership, lifecycleRoot,
-  readReceipt, recordInventory, releaseConsumerLease, runOneShot, setRecoveryHold, sweepOwnedStacks, updateReceipt,
+  readReceipt, recordInventory, releaseConsumerLease, runOneShot, setRecoveryHold, sweepOwnedStacks, updateReceipt, createReceiptCommandTracker,
 } from './contract-stack-lifecycle.mjs';
+import { createOwnedProcessScope } from './contract-owned-process.mjs';
 
 const DAY = 86400000;
 // Sweeps prune aged runner detail directories; tests must never scan the real temporary directory.
@@ -100,16 +101,16 @@ function snapshot(state) {
   return JSON.stringify({ n: [...state.networks.keys()].sort(), c: [...state.containers.keys()].sort(), v: [...state.volumes.keys()].sort() });
 }
 
-function workspace(t) {
+function workspace(t, retain = () => false) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'contract-lifecycle-test-')));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  t.after(() => { if (retain()) console.error('Retained synthetic process fixture for inspection: ' + root); else rmSync(root, { recursive: true, force: true }); });
   const taskDir = realpathSync(mkdtempSync(join(root, 'paisaxe-contracts-')));
   return { root: join(root, 'state'), taskDir };
 }
 
 /** Simulates prepare: receipt before allocation, then network + start + inventory. */
-function preparedTask(t, fake, { disposable = true, owner = { pid: 4242, startedAt: ALIVE }, now = T0, project = 'paisaxe-contracts-0123456789ab' } = {}) {
-  const { root, taskDir } = workspace(t);
+function preparedTask(t, fake, { disposable = true, owner = { pid: 4242, startedAt: ALIVE }, now = T0, project = 'paisaxe-contracts-0123456789ab', retainWorkspace } = {}) {
+  const { root, taskDir } = workspace(t, retainWorkspace);
   const nonce = randomUUID();
   createLifecycleReceipt(root, { projectId: project, nonce, taskDir, disposable, task: disposable ? 'one-shot' : 'reusable', candidate: { head: null },
     daemonId: fake.state.daemonId, stack: { apiUrl: 'http://127.0.0.1:30001', dbPort: 30002, migrationDigest: hex('d'), transport: 'docker-exec-v1' }, owner, now });
@@ -142,6 +143,269 @@ test('receipt is created exclusively before allocation and never overwritten', (
 test('lifecycle root defaults outside the task payload and honors the override', () => {
   assert.equal(lifecycleRoot({ PAISAXE_CONTRACT_LIFECYCLE_DIR: '/tmp/x' }), '/tmp/x');
   assert.match(lifecycleRoot({ HOME: '/Users/someone' }), /\/\.local\/state\/paisaxe\/contract-stacks$/);
+});
+
+test('legacy nonterminal receipt without command tracking is inspection-only', async (t) => {
+  const fake = fakeDocker();
+  const { root, project } = preparedTask(t, fake, { disposable: false });
+  updateReceipt(root, project, (r) => { delete r.commandTracking; });
+  const before = snapshot(fake.state);
+  await assert.rejects(finishReusable(root, project, { docker: fake.docker, processProbe: () => null }), /command|tracking|legacy|inspection/i);
+  assert.equal(snapshot(fake.state), before);
+  assert.equal(inspectOwnership(root, project, { docker: fake.docker }).projectId, project);
+});
+
+for (const [state, child] of [
+  ['launching', null],
+  ['running', { pid: 2147483647, pgid: 2147483647, startedAt: UNKNOWN_PROCESS }],
+  ['unsettled', { pid: 2147483647, pgid: 2147483647, startedAt: 'recorded-child-birth' }],
+]) test(`orphan ${state} command blocks expiry even when owner and root process group are absent`, async (t) => {
+  const fake = fakeDocker();
+  const { root, project } = preparedTask(t, fake);
+  const commandId = randomUUID();
+  updateReceipt(root, project, (r) => {
+    r.state = 'failed'; r.failedAt = T0.toISOString(); r.retainUntil = at(7 * DAY).toISOString();
+    r.commandTracking = { version: 1, commands: { [commandId]: {
+      id: commandId, purpose: 'contracts', leaseId: null,
+      owner: { pid: 2147483647, startedAt: UNKNOWN_PROCESS }, state, child,
+    } } };
+  });
+  const before = snapshot(fake.state);
+  await assert.rejects(disposeOwned(root, project, { docker: fake.docker, now: at(40 * DAY), processProbe: () => null }), /command|child|launch|settle|inspection/i);
+  assert.equal(snapshot(fake.state), before);
+  const report = await sweepOwnedStacks({ root, docker: fake.docker, now: at(40 * DAY), processProbe: () => null, tmpRoot: ISOLATED_TMP });
+  assert.notEqual(report.tasks[0].action, 'disposed');
+  assert.equal(snapshot(fake.state), before);
+  assert.ok(readReceipt(root, project).commandTracking.commands[commandId]);
+});
+
+test('independent reusable command records survive lease release and dead-lease pruning', async (t) => {
+  const fake = fakeDocker();
+  const { root, project } = preparedTask(t, fake, { disposable: false });
+  const first = acquireConsumerLease(root, project, 'paid-voice', { owner: { pid: 555, startedAt: ALIVE } });
+  const second = acquireConsumerLease(root, project, 'stripe', { owner: { pid: 556, startedAt: ALIVE } });
+  const firstId = randomUUID(), secondId = randomUUID();
+  const record = (id, lease) => ({ id, purpose: 'contracts', leaseId: lease.id, owner: { pid: 555, startedAt: ALIVE }, state: 'launching', child: null });
+  updateReceipt(root, project, (r) => { r.commandTracking = { version: 1, commands: { [firstId]: record(firstId, first), [secondId]: record(secondId, second) } }; });
+  releaseConsumerLease(root, first);
+  await sweepOwnedStacks({ root, docker: fake.docker, now: at(40 * DAY), processProbe: () => null, tmpRoot: ISOLATED_TMP });
+  assert.deepEqual(Object.keys(readReceipt(root, project).commandTracking.commands).sort(), [firstId, secondId].sort());
+  await assert.rejects(finishReusable(root, project, { docker: fake.docker, processProbe: () => null }), /command|child|launch|settle|inspection/i);
+  assert.equal(inspectOwnership(root, project, { docker: fake.docker }).projectId, project);
+});
+
+test('receipt lock finalization cannot unlink a replacement owner token', (t) => {
+  const fake = fakeDocker();
+  const { root, project } = preparedTask(t, fake);
+  const lock = join(root, 'tasks', project + '.lock');
+  const replacement = { pid: process.pid, startedAt: processIdentity(process.pid), token: randomUUID() };
+  updateReceipt(root, project, () => { writeFileSync(lock, JSON.stringify(replacement)); });
+  assert.equal(existsSync(lock), true, 'old finally must not remove a replacement lock');
+  assert.deepEqual(JSON.parse(readFileSync(lock, 'utf8')), replacement);
+});
+
+for (const birth of [ALIVE, UNKNOWN_PROCESS]) test(`recovery guard with ${birth} identity prevents stale-main lock reclamation`, (t) => {
+  const fake = fakeDocker();
+  const { root, project } = preparedTask(t, fake);
+  const lock = join(root, 'tasks', project + '.lock');
+  const guard = lock + '.recovery';
+  const stale = { pid: 2147483647, startedAt: 'dead-owner', token: randomUUID() };
+  const recovering = { pid: birth === ALIVE ? process.pid : 2147483647, startedAt: birth === ALIVE ? processIdentity(process.pid) : UNKNOWN_PROCESS, token: randomUUID() };
+  writeFileSync(lock, JSON.stringify(stale));
+  writeFileSync(guard, JSON.stringify(recovering));
+  let mutated = false;
+  assert.throws(() => updateReceipt(root, project, () => { mutated = true; }), /recovery|locked|inspection/i);
+  assert.equal(mutated, false);
+  assert.deepEqual(JSON.parse(readFileSync(lock, 'utf8')), stale);
+  assert.deepEqual(JSON.parse(readFileSync(guard, 'utf8')), recovering);
+});
+
+test('SIGKILL of a command owner preserves the stack while an escaped descendant survives', { timeout: 30000 }, async (t) => {
+  let cleanupComplete = false;
+  const fake = fakeDocker();
+  const { root, project, taskDir } = preparedTask(t, fake, { disposable: false, retainWorkspace: () => !cleanupComplete });
+  const marker = join(taskDir, 'synthetic-child-identities.json');
+  // This evidence is outside every auto-cleaned fixture directory. On failure it
+  // and the task receipt survive, so recovery never has to rediscover ownership.
+  const recoveryDir = realpathSync(mkdtempSync(join(tmpdir(), 'paisaxe-process-recovery-')));
+  const recoveryFile = join(recoveryDir, 'identities.json');
+  const lifecycleUrl = new URL('./contract-stack-lifecycle.mjs', import.meta.url).href;
+  const processUrl = new URL('./contract-owned-process.mjs', import.meta.url).href;
+  const childSource = `const {spawn}=require('node:child_process');const fs=require('node:fs');
+    const escaped=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{detached:true,stdio:'ignore'});escaped.unref();
+    fs.writeFileSync(${JSON.stringify(marker + '.tmp')},JSON.stringify({root:process.pid,escaped:escaped.pid}));fs.renameSync(${JSON.stringify(marker + '.tmp')},${JSON.stringify(marker)});setInterval(()=>{},1000);`;
+  const ownerSource = `import{createOwnedProcessScope}from ${JSON.stringify(processUrl)};
+    import{createReceiptCommandTracker}from ${JSON.stringify(lifecycleUrl)};
+    const root=${JSON.stringify(root)},project=${JSON.stringify(project)};
+    const tracker=createReceiptCommandTracker(root,project,{purpose:'synthetic-browser',settlement:'explicit-consumer'});
+    const scope=createOwnedProcessScope();await scope.run(process.execPath,['-e',${JSON.stringify(childSource)}],{commandTracker:tracker});scope.close();`;
+  const owner = spawn(process.execPath, ['--input-type=module', '-e', ownerSource], { stdio: 'ignore' });
+  const exited = new Promise((resolve) => owner.once('exit', resolve));
+  const evidence = { root, taskDir, project, owner: { pid: owner.pid, startedAt: processIdentity(owner.pid) }, children: [], errors: [] };
+  const persist = () => writeFileSync(recoveryFile, JSON.stringify(evidence, null, 2), { mode: 0o600 });
+  persist();
+  const errors = [];
+  const pause = () => new Promise(resolve => setTimeout(resolve, 10));
+  const awaitOwnerGone = async () => {
+    let timer;
+    try { await Promise.race([exited, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('fixture owner exit deadline')), 5000); })]); }
+    finally { clearTimeout(timer); }
+  };
+  const absentGroup = pid => {
+    try { process.kill(-pid, 0); return false; }
+    catch (error) { if (error.code === 'ESRCH') return true; if (error.code === 'EPERM') return false; throw error; }
+  };
+  const awaitGone = async pid => {
+    const deadline = Date.now() + 5000;
+    while (!absentGroup(pid)) { assert.ok(Date.now() < deadline, 'fixture group must be reaped'); await pause(); }
+  };
+  const signalOwned = child => {
+    if (absentGroup(child.pid)) return;
+    assert.ok(child.startedAt && child.startedAt !== UNKNOWN_PROCESS, 'fixture birth identity must be known before signaling');
+    assert.equal(processIdentity(child.pid), child.startedAt, 'fixture PID must still have its recorded birth');
+    try { process.kill(-child.pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+  };
+  const readChildren = () => {
+    if (evidence.children.length || !existsSync(marker)) return;
+    const identities = JSON.parse(readFileSync(marker, 'utf8'));
+    evidence.children = ['root', 'escaped'].map(role => ({ role, pid: identities[role], pgid: identities[role], startedAt: processIdentity(identities[role]) }));
+    persist();
+  };
+  try {
+    const deadline = Date.now() + 8000;
+    for (;;) {
+      assert.equal(owner.exitCode, null, 'synthetic owner exited before tracked launch');
+      readChildren();
+      const recorded = Object.values(readReceipt(root, project).commandTracking.commands).find(command => command.owner.pid === owner.pid);
+      if (evidence.children.length && recorded?.child?.pid === evidence.children[0].pid && recorded.state === 'running') break;
+      assert.ok(Date.now() < deadline, 'durable child identity deadline');
+      await pause();
+    }
+    owner.kill('SIGKILL');
+    await awaitOwnerGone();
+    const rootChild = evidence.children.find(child => child.role === 'root');
+    const escaped = evidence.children.find(child => child.role === 'escaped');
+    signalOwned(rootChild);
+    await awaitGone(rootChild.pid);
+    assert.doesNotThrow(() => process.kill(escaped.pid, 0));
+    const before = snapshot(fake.state);
+    await assert.rejects(finishReusable(root, project, { docker: fake.docker, processProbe: processIdentity }), /command|child|launch|settle|inspection/i);
+    assert.equal(snapshot(fake.state), before);
+    const commands = Object.values(readReceipt(root, project).commandTracking.commands);
+    assert.equal(commands.length, 1);
+    assert.equal(commands[0].owner.pid, owner.pid);
+    assert.equal(commands[0].child.pid, rootChild.pid);
+  } catch (error) { errors.push(error); }
+  finally {
+    try { if (owner.exitCode === null && owner.signalCode === null) owner.kill('SIGKILL'); await awaitOwnerGone(); }
+    catch (error) { errors.push(error); }
+    try { readChildren(); } catch (error) { errors.push(error); }
+    // Signal every known group before waiting; one failure must not skip another.
+    for (const child of evidence.children) { try { signalOwned(child); } catch (error) { errors.push(error); } }
+    for (const child of evidence.children) { try { await awaitGone(child.pid); } catch (error) { errors.push(error); } }
+    if (evidence.children.length !== 2) errors.push(new Error('Fixture child inventory incomplete; preserve launch evidence'));
+    cleanupComplete = errors.length === 0;
+    evidence.errors = errors.map(error => error.message);
+    evidence.cleanupComplete = cleanupComplete;
+    persist();
+    if (cleanupComplete) rmSync(recoveryDir, { recursive: true });
+    else console.error('Synthetic process recovery evidence: ' + recoveryFile);
+  }
+  if (errors.length) throw new AggregateError(errors, 'SIGKILL oracle or fixture cleanup failed; identities preserved at ' + recoveryFile);
+});
+
+test('actual trackers keep nested and multi-lease commands independent and retain escape-capable completion', async (t) => {
+  const fake = fakeDocker(), { root, project } = preparedTask(t, fake, { disposable: false });
+  const outer = acquireConsumerLease(root, project, 'outer'), inner = acquireConsumerLease(root, project, 'inner');
+  const first = createReceiptCommandTracker(root, project, { purpose: 'outer', leaseId: outer.id });
+  const second = createReceiptCommandTracker(root, project, { purpose: 'inner', leaseId: inner.id });
+  const outerId = first.beforeLaunch();
+  const scope = createOwnedProcessScope();
+  try {
+    const result = await scope.run(process.execPath, ['-e', ''], { commandTracker: second });
+    assert.equal(result.status, 0);
+    assert.deepEqual(Object.keys(readReceipt(root, project).commandTracking.commands), [outerId]);
+    releaseConsumerLease(root, inner);
+    assert.ok(readReceipt(root, project).commandTracking.commands[outerId]);
+    const escaped = createReceiptCommandTracker(root, project, { purpose: 'browser', leaseId: outer.id, settlement: 'explicit-consumer' });
+    const browser = await scope.run(process.execPath, ['-e', ''], { commandTracker: escaped });
+    assert.equal(browser.status, 0);
+    const records = Object.values(readReceipt(root, project).commandTracking.commands);
+    assert.equal(records.length, 2);
+    assert.equal(records.find(r => r.purpose === 'browser').state, 'unsettled');
+    assert.ok(records.some(r => r.id === outerId));
+    await assert.rejects(finishReusable(root, project, { docker: fake.docker, processProbe: () => null }), /command|inspection/i);
+  } finally { scope.close(); }
+});
+
+for (const [settlement, basis, cleared] of [
+  ['process-group', 'supervisor-observed', true],
+  ['process-group', undefined, false],
+  ['process-group', 'unproven', false],
+  ['explicit-consumer', 'supervisor-observed', false],
+]) test(`unknown child birth ${settlement}/${basis ?? 'missing-proof'} clears only with live supervisor proof`, (t) => {
+  const fake = fakeDocker(), { root, project } = preparedTask(t, fake);
+  const unrelated = createReceiptCommandTracker(root, project, { purpose: 'outer' });
+  const untouched = unrelated.beforeLaunch();
+  const tracker = createReceiptCommandTracker(root, project, { purpose: 'short-command', settlement });
+  const id = tracker.beforeLaunch();
+  // Deterministic external process-observation boundary: this child ended before
+  // its birth could be read. No process is launched or signaled by this case.
+  const child = { pid: 2147483646, pgid: 2147483646, startedAt: UNKNOWN_PROCESS };
+  tracker.onStart(id, child);
+  tracker.onSettled(id, { status: 0, child: { ...child, settled: true }, ...(basis ? { settlementBasis: basis } : {}) });
+  const commands = readReceipt(root, project).commandTracking.commands;
+  assert.equal(Object.hasOwn(commands, id), !cleared);
+  assert.ok(commands[untouched], 'settling one command must not erase a nested caller');
+  if (!cleared) assert.equal(commands[id].state, 'unsettled');
+});
+
+test('tracker refuses missing metadata, unknown marker versions and closed lease admission', (t) => {
+  const fake = fakeDocker(), { root, project } = preparedTask(t, fake);
+  const tracker = createReceiptCommandTracker(root, project, { purpose: 'contracts' });
+  for (const marker of [undefined, { version: 2, commands: {} }, { version: 1, commands: [] }]) {
+    updateReceipt(root, project, r => { r.commandTracking = marker; });
+    assert.throws(() => tracker.beforeLaunch(), /tracking|inspection/i);
+  }
+  updateReceipt(root, project, r => { r.commandTracking = { version: 1, commands: {} }; r.state = 'stopping'; });
+  assert.throws(() => tracker.beforeLaunch(), /admission|transition/i);
+  assert.deepEqual(readReceipt(root, project).commandTracking.commands, {});
+});
+
+test('two real stale-lock contenders cannot reclaim the replacement live owner', { timeout: 20000 }, async (t) => {
+  const fake = fakeDocker(), { root, project, taskDir } = preparedTask(t, fake);
+  const lock = join(root, 'tasks', project + '.lock');
+  writeFileSync(lock, JSON.stringify({ pid: 2147483647, startedAt: 'stale-birth', token: randomUUID() }));
+  const moduleUrl = new URL('./contract-stack-lifecycle.mjs', import.meta.url).href;
+  const source = `import fs from 'node:fs';import{syncBuiltinESMExports}from'node:module';
+    const label=process.argv[1],dir=${JSON.stringify(taskDir)},lock=${JSON.stringify(lock)};
+    const mark=name=>fs.writeFileSync(dir+'/'+name,'1');
+    const wait=condition=>{const deadline=Date.now()+7000;while(!condition()){if(Date.now()>deadline)throw Error('barrier deadline');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5)}};
+    const original=fs.readFileSync;let observed=false;
+    fs.readFileSync=function(path,...args){const value=original.call(this,path,...args);if(String(path)===lock){
+      const holder=JSON.parse(String(value));
+      if(!observed&&holder.pid===2147483647){observed=true;mark(label+'.saw');
+        if(label==='a')wait(()=>fs.existsSync(dir+'/b.saw'));else wait(()=>fs.existsSync(dir+'/a.enter'));
+      }else if(label==='b'&&holder.pid!==2147483647)mark('b.checked');
+    }return value};syncBuiltinESMExports();
+    const{updateReceipt}=await import(${JSON.stringify(moduleUrl)});
+    updateReceipt(${JSON.stringify(root)},${JSON.stringify(project)},r=>{
+      mark(label+'.enter');
+      if(label==='a'){wait(()=>fs.existsSync(dir+'/b.checked')||fs.existsSync(dir+'/b.enter'));if(fs.existsSync(dir+'/b.enter'))throw Error('live lock stolen')}
+      r.contenderCount=(r.contenderCount||0)+1;
+    });`;
+  const children = ['a', 'b'].map(label => spawn(process.execPath, ['--input-type=module', '-e', source, label], { stdio: ['ignore', 'pipe', 'pipe'] }));
+  const endings = children.map(child => new Promise(resolve => { let stderr = ''; child.stderr.on('data', chunk => { stderr += chunk; }); child.once('exit', (code, signal) => resolve({ code, signal, stderr })); }));
+  try {
+    const results = await Promise.all(endings);
+    assert.deepEqual(results.map(r => r.code), [0, 0], JSON.stringify(results));
+    assert.equal(readReceipt(root, project).contenderCount, 2);
+    assert.equal(existsSync(lock), false);
+    assert.equal(existsSync(lock + '.recovery'), false);
+  } finally {
+    for (const child of children) if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    await Promise.all(endings);
+  }
 });
 
 test('successful disposable disposal removes only owned containers, network and volumes, then archives', async (t) => {

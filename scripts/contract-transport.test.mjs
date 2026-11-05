@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, realpathSync, writeFileSync, readFileSync, lstatSync } from 'node:fs';
+import { mkdtempSync, rmSync, realpathSync, writeFileSync, readFileSync, lstatSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -8,7 +8,9 @@ import { EventEmitter, once } from 'node:events';
 import net from 'node:net';
 import http from 'node:http';
 import { startTransport, verifyTransport, stopTransport } from './contract-transport.mjs';
+import { createLifecycleReceipt, createReceiptCommandTracker, readReceipt, setRecoveryHold, updateReceipt, processIdentity } from './contract-stack-lifecycle.mjs';
 let manifest, env, taskDir, daemon, state, connections;
+let retainTask = false;
 const DB_ID = 'd'.repeat(64), KONG_ID = 'c'.repeat(64), NETWORK_ID = 'e'.repeat(64);
 const port = async () => { const server = net.createServer(); await new Promise(r => server.listen(0, '127.0.0.1', r)); const result = server.address().port; await new Promise(r => server.close(r)); return result; };
 const frame = (type, payload) => { const bytes = Buffer.from(payload), header = Buffer.alloc(8); header[0] = type; header.writeUInt32BE(bytes.length, 4); return Buffer.concat([header, bytes]); };
@@ -34,6 +36,7 @@ function upgradeBody(req, socket, head) {
   });
 }
 beforeEach(async () => {
+  retainTask = false;
   taskDir = realpathSync(mkdtempSync(join(tmpdir(), 'paisaxe-contracts-')));
   manifest = { version: 1, taskDir, projectId: 'paisaxe-contracts-012345abcdef', nonce: randomUUID(), apiUrl: `http://127.0.0.1:${await port()}`, dbPort: await port(), migrationDigest: 'a'.repeat(64) };
   env = { PATH: process.env.PATH, HOME: taskDir, DOCKER_HOST: 'unix://' + join(taskDir, 'docker.sock') };
@@ -94,7 +97,76 @@ beforeEach(async () => {
   });
   await new Promise(r => daemon.listen(join(taskDir, 'docker.sock'), r));
 });
-afterEach(async () => { try { await stopTransport(manifest, env); } catch {} for (const socket of connections) socket.destroy(); await new Promise(r => daemon.close(r)); rmSync(taskDir, { recursive: true, force: true }); });
+afterEach(async () => { try { await stopTransport(manifest, env); } catch {} for (const socket of connections) socket.destroy(); await new Promise(r => daemon.close(r)); if(!retainTask)rmSync(taskDir, { recursive: true, force: true }); });
+
+function managedRelayTracker() {
+  const root=join(taskDir,'lifecycle');
+  createLifecycleReceipt(root,{...manifest,stack:manifest,disposable:false,task:'reusable',candidate:{},daemonId:'fixture-daemon'});
+  return {root,tracker:createReceiptCommandTracker(root,manifest.projectId,{purpose:'transport',settlement:'managed-relay'})};
+}
+
+test('relay durably hands its exact live identity to authenticated transport ownership',async()=>{
+  const {root,tracker}=managedRelayTracker();
+  const proof=await startTransport(manifest,env,{commandTracker:tracker});
+  const receipt=readReceipt(root,manifest.projectId);
+  assert.ok(receipt.managedRelay,'successful launch must make a durable authenticated ownership handoff');
+  assert.equal(receipt.managedRelay.child.pid,proof.pid);
+  assert.equal(receipt.managedRelay.child.pgid,proof.pid);
+  assert.equal(typeof receipt.managedRelay.child.startedAt,'string');
+  assert.equal(receipt.managedRelay.sourceDigest,proof.sourceDigest);
+  assert.deepEqual(receipt.commandTracking.commands,{},'live relay leaves command tracking only through verified handoff');
+  const reused=await startTransport(manifest,env,{commandTracker:tracker});
+  assert.equal(reused.pid,proof.pid);
+  assert.deepEqual(readReceipt(root,manifest.projectId).managedRelay,receipt.managedRelay,'authenticated reuse must not create or replace launch ownership');
+});
+
+test('relay launch cannot cross a durable admission hold before spawn',async()=>{
+  const {root,tracker}=managedRelayTracker();
+  setRecoveryHold(root,manifest.projectId,'fixture admission hold');
+  await assert.rejects(startTransport(manifest,env,{commandTracker:tracker}),/admission|hold/);
+  assert.throws(()=>lstatSync(join(taskDir,'transport.sock')),{code:'ENOENT'});
+  assert.equal(readReceipt(root,manifest.projectId).managedRelay,undefined);
+});
+
+for(const failure of ['unknown-birth','changed-launch-record','handoff-mismatch']){
+  test('relay retains durable ownership after '+failure,async()=>{
+    const {root,tracker}=managedRelayTracker();
+    const oldPath=process.env.PATH,proofFile=join(taskDir,'relay-process.json');
+    if(failure==='handoff-mismatch')updateReceipt(root,manifest.projectId,receipt=>{receipt.stack.dbPort++;});
+    else{
+      const bin=join(taskDir,'bin');mkdirSync(bin);
+      // Real external ps is authoritative except for this one newly launched
+      // child boundary. The owner keeps its real birth identity throughout.
+      writeFileSync(join(bin,'ps'),`#!${process.execPath}\nconst fs=require('node:fs');const args=process.argv.slice(2);const pid=Number(args[args.indexOf('-p')+1]);const birth=require('node:child_process').execFileSync('/bin/ps',args,{encoding:'utf8'}).trim();if(pid===${process.pid})console.log(birth);else{fs.writeFileSync(${JSON.stringify(proofFile)},JSON.stringify({pid,startedAt:birth}));if(${JSON.stringify(failure)}==='changed-launch-record'){const path=${JSON.stringify(join(root,'tasks',manifest.projectId+'.json'))};const r=JSON.parse(fs.readFileSync(path,'utf8'));for(const command of Object.values(r.commandTracking.commands))command.state='unsettled';fs.writeFileSync(path,JSON.stringify(r));console.log(birth);}else console.log('unknown');}`,{mode:0o755});
+      process.env.PATH=bin+':'+oldPath;
+    }
+    try{
+      await assert.rejects(startTransport(manifest,env,{commandTracker:tracker}),/handoff|identity|launched/i);
+      const receipt=readReceipt(root,manifest.projectId),commands=Object.values(receipt.commandTracking.commands);
+      assert.equal(commands.length,1,'failed proof must retain the actual command intent');
+      assert.equal(receipt.managedRelay,undefined,'failed proof cannot establish relay ownership handoff');
+      if(failure==='unknown-birth')assert.equal(commands[0].child.startedAt,'unknown');
+      if(failure==='changed-launch-record')assert.equal(commands[0].child,null,'failed onStart must not overwrite the changed record');
+    }finally{
+      process.env.PATH=oldPath;
+      const record=Object.values(readReceipt(root,manifest.projectId).commandTracking.commands)[0];
+      const child=existsSync(proofFile)?JSON.parse(readFileSync(proofFile,'utf8')):record?.child;
+      try{
+        // Existing authenticated stop first. If startup already removed its
+        // socket, only this fixture's separately observed exact birth can signal.
+        try{await stopTransport(manifest,env);}catch{}
+        if(child){
+          let identity=processIdentity(child.pid);
+          if(identity===child.startedAt)process.kill(child.pid,'SIGTERM');
+          else if(identity!==null)throw Error('Fixture relay identity uncertain');
+          const deadline=Date.now()+3000;
+          while((identity=processIdentity(child.pid))!==null){if(Date.now()>=deadline)throw Error('Fixture relay did not settle');await new Promise(resolve=>setTimeout(resolve,20));}
+          writeFileSync(join(taskDir,'relay-settled.json'),JSON.stringify({pid:child.pid,startedAt:child.startedAt,absent:true}));
+        }
+      }catch(error){retainTask=true;throw new Error(error.message+'; retained fixture '+taskDir);}
+    }
+  });
+}
 function exchange(port, bytes) { return new Promise((resolve, reject) => { const socket = net.connect(port, '127.0.0.1', () => socket.write(bytes)); socket.setTimeout(2000, () => socket.destroy(new Error('exchange timeout'))); socket.on('error', reject); socket.on('close', () => reject(new Error('closed'))); const chunks = []; let length = 0; socket.on('data', chunk => { chunks.push(chunk); length += chunk.length; if (length >= bytes.length) { resolve(Buffer.concat(chunks)); socket.destroy(); } }); }); }
 test('Docker upgrade fixture accepts a request body fragmented after the headers', async () => {
   const body = Buffer.from(JSON.stringify({ Detach: false, Tty: false }));

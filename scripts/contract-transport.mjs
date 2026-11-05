@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { processIdentity } from './contract-owned-process.mjs';
 import { chmodSync, existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,7 +119,7 @@ export async function stopTransport(manifest, env) {
   insist(!existsSync(controlPath(manifest)), 'Transport cleanup incomplete');
   return receipt;
 }
-export async function startTransport(manifest, env) {
+export async function startTransport(manifest, env, { commandTracker } = {}) {
   validate(manifest, env);
   if (existsSync(controlPath(manifest))) return verifyTransport(manifest, env);
   // Exclusive creation avoids replacing a different launch identity or following a symlink.
@@ -126,15 +127,35 @@ export async function startTransport(manifest, env) {
   if (existsSync(file)) {
     insist(!lstatSync(file).isSymbolicLink() && same(JSON.parse(readFileSync(file, 'utf8')), identity(manifest, env)), 'Transport launch identity/source mismatch');
   } else writeFileSync(file, JSON.stringify(identity(manifest, env)), { flag: 'wx', mode: 0o600 });
-  const child = spawn(process.execPath, [source, '--serve', file], { env, detached: true, stdio: 'ignore' });
-  let failed = false; child.once('error', () => { failed = true; }); child.once('exit', () => { failed = true; }); child.unref();
-  for (let i = 0; i < 100; i++) {
-    if (existsSync(controlPath(manifest))) return verifyTransport(manifest, env);
-    if (failed) break;
-    await pause(50);
+  const commandId = commandTracker?.beforeLaunch();
+  let child;
+  try { child = spawn(process.execPath, [source, '--serve', file], { env, detached: true, stdio: 'ignore' }); }
+  catch (error) {
+    commandTracker?.onSettled(commandId, { spawnFailed: true, child: { pid: null, pgid: null, startedAt: null, settled: true } });
+    throw error;
   }
-  if (!failed) child.kill();
-  throw new Error('Transport startup failed (occupied port, invalid identity or unavailable listener)');
+  let failed = false; child.once('error', () => { failed = true; }); child.once('exit', () => { failed = true; }); child.unref();
+  const childIdentity = { pid: child.pid ?? null, pgid: child.pid ?? null, startedAt: child.pid ? processIdentity(child.pid) ?? 'unknown' : null };
+  try {
+    if (child.pid) commandTracker?.onStart(commandId, childIdentity);
+    for (let i = 0; i < 100; i++) {
+      if (existsSync(controlPath(manifest))) {
+        const proof = await verifyTransport(manifest, env);
+        insist(proof.pid === child.pid, 'Transport authenticated process identity mismatch');
+        commandTracker?.handoffRelay(commandId, proof);
+        return proof;
+      }
+      if (failed) break;
+      await pause(50);
+    }
+    // No PID is a proved no-spawn only after the original error event. A launched
+    // relay remains protected until an authenticated handoff or explicit review.
+    commandTracker?.onSettled(commandId, { spawnFailed: failed && !child.pid, child: { ...childIdentity, settled: false } });
+    throw new Error('Transport startup failed (occupied port, invalid identity or unavailable listener)');
+  } catch (error) {
+    if (!failed) child.kill();
+    throw error;
+  }
 }
 
 // Docker Engine exec uses the documented non-TTY 8-byte stdout/stderr frame

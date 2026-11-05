@@ -18,7 +18,7 @@ test('actual preparer isolates fresh project, validates before reset and preserv
     writeFileSync(join(root, 'supabase/migrations/001_fixture.sql'), 'select 1;'); writeFileSync(join(root, 'supabase/seed.sql'), '-- local fixture');
     const stateFile = join(root, 'state.json'); const logFile = join(root, 'calls.jsonl');
     const lifecycleDir = join(root, 'lifecycle'); process.env.PAISAXE_CONTRACT_LIFECYCLE_DIR = lifecycleDir;
-    const header = `#!/usr/bin/env node\nconst fs=require('node:fs');const args=process.argv.slice(2);const state=JSON.parse(fs.readFileSync(${JSON.stringify(stateFile)},'utf8'));fs.appendFileSync(${JSON.stringify(logFile)},JSON.stringify({program:require('node:path').basename(process.argv[1]),args,env:process.env})+'\\n');const save=()=>fs.writeFileSync(${JSON.stringify(stateFile)},JSON.stringify(state));`;
+    const header = `#!/usr/bin/env node\nconst fs=require('node:fs');const args=process.argv.slice(2);const state=JSON.parse(fs.readFileSync(${JSON.stringify(stateFile)},'utf8'));fs.appendFileSync(${JSON.stringify(logFile)},JSON.stringify({program:require('node:path').basename(process.argv[1]),args,env:process.env,commands:(()=>{const project=state.project||(args[0]==='network'&&args[1]==='create'?args.at(-1):null);const file=${JSON.stringify(lifecycleDir)}+'/tasks/'+project+'.json';return fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')).commandTracking?.commands??{}:{}})()})+'\\n');const save=()=>fs.writeFileSync(${JSON.stringify(stateFile)},JSON.stringify(state));`;
     writeFileSync(join(root, 'bin/docker'), header + `
       if(state.mode==='unavailable')process.exit(1);
       if(args[0]==='context')console.log('[{"Endpoints":{"docker":{"Host":"unix:///tmp/fixture.sock"}}}]');
@@ -101,7 +101,12 @@ test('actual preparer isolates fresh project, validates before reset and preserv
         const subscribed=calls.findIndex(call=>call.program==='websocket');const dump=calls.findIndex(call=>call.args.includes('pg_dump'));const catalog=calls.findIndex(call=>call.args.includes('psql')&&call.args.at(-1).includes('pg_publication_rel'));assert.ok(reset<subscribed&&subscribed<catalog&&catalog<dump,'Realtime subscription and publication must be ready before the schema baseline');
         assert.ok(create < start && start < reset); assert.ok(calls[create].args.includes('--internal'));
         assert.ok(calls.slice(start, reset).some((call) => call.args[0] === 'inspect'));
-        assert.ok(calls[reset].args.includes('--local')); assert.ok(calls[reset].args.includes(manifest.projectId));
+        assert.equal(calls[reset].args.includes('--local'),false,'CLI3 reset uses its local default'); assert.ok(calls[reset].args.includes(manifest.projectId));
+        const projected=readFileSync(join(manifest.taskDir,'supabase/config.toml'),'utf8');
+        assert.match(projected,/\[local_smtp\]\nenabled = false/); assert.doesNotMatch(projected,/\[inbucket\]/);
+        const consumers=calls.filter(call=>(call.args[0]==='network'&&call.args[1]==='create')||call.program==='supabase'||call.args.includes('psql')||call.args.includes('pg_dump'));
+        assert.ok(consumers.length>=7);
+        for(const call of consumers)assert.ok(Object.values(call.commands).some(command=>['launching','running'].includes(command.state)), 'task command must observe durable launch intent: '+JSON.stringify(call.args));
         assert.ok(calls.some((call) => call.args.includes('psql') && call.args.at(-1).includes('cron.alter_job(jobid, active:=false)')));
       }
     }

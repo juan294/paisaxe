@@ -1,12 +1,13 @@
 import {createServer} from 'node:https';
 import {createHash,randomUUID} from 'node:crypto';
-import {execFileSync,spawn} from 'node:child_process';
+import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,mkdtempSync,mkdirSync,openSync,closeSync,readdirSync,statSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,dirname,resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {validateManifest,validateKeys,inspectStack,localDockerEnvironment,dockerSql,schemaDigest,migrationInventory,isolatedEnvironment,candidateDigest} from './run-contracts.mjs';
-import {leaseForCaller} from './contract-stack-lifecycle.mjs';
+import {validateManifest,validateKeys,inspectStack,localDockerEnvironment,dockerSql,schemaDigest,migrationInventory,isolatedEnvironment,candidateDigest,runStackCommand} from './run-contracts.mjs';
+import {leaseForCaller,createReceiptCommandTracker} from './contract-stack-lifecycle.mjs';
+import {createOwnedProcessScope} from './contract-owned-process.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 function inputDigest(){
  const hash=createHash('sha256').update(candidateDigest(root));
@@ -37,13 +38,21 @@ if(!task) throw Error('Owned CONTRACT_STACK_DIR required');
 const manifest=validateManifest(JSON.parse(readFileSync(join(task,'contracts-stack.json'),'utf8')),task);
 // Paid-voice reuses the prepared stack: hold a consumer lease for the whole run and keep the stack.
 const lease=leaseForCaller(manifest.projectId,'paid-voice');
+let leaseReleased=false;
+const releaseLease=()=>{if(!leaseReleased){leaseReleased=true;lease.release();}};
 let exitCode=1;
 try{
-const dockerEnv=localDockerEnvironment(); await inspectStack(manifest,dockerEnv);
-if(migrationInventory(root).digest!==manifest.migrationDigest || schemaDigest(manifest.projectId,dockerEnv)!==manifest.schemaDigest) throw Error('Paid voice schema identity rejected');
-if(dockerSql(manifest.projectId,"SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database();",dockerEnv)!==`paisaxe-contracts:${manifest.nonce}:${manifest.migrationDigest}`) throw Error('Paid voice marker rejected');
-const status=JSON.parse(execFileSync('supabase',['status','--workdir',task,'--output','json'],{env:dockerEnv,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:30000}));
-const keys=validateKeys(status,manifest);
+const scope=createOwnedProcessScope();
+const command=(binary,args,options)=>runStackCommand(scope,lease.commandTracker,binary,args,options);
+let dockerEnv,keys;
+try{
+ dockerEnv=localDockerEnvironment();
+ await inspectStack(manifest,dockerEnv);
+ if(migrationInventory(root).digest!==manifest.migrationDigest || await schemaDigest(manifest.projectId,dockerEnv,command)!==manifest.schemaDigest) throw Error('Paid voice schema identity rejected');
+ if(await dockerSql(manifest.projectId,"SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database();",dockerEnv,command)!==`paisaxe-contracts:${manifest.nonce}:${manifest.migrationDigest}`) throw Error('Paid voice marker rejected');
+ const status=JSON.parse(await command('supabase',['status','--workdir',task,'--output','json'],{env:dockerEnv,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:30000,maxBuffer:1024*1024}));
+ keys=validateKeys(status,manifest);
+}finally{scope.close();}
 const directory=process.env.PAID_VOICE_EVIDENCE_DIR || mkdtempSync(join(tmpdir(),'paisaxe-paid-voice-'));
 mkdirSync(directory,{recursive:true,mode:0o700});
 const key=join(directory,'tls-key.pem'),cert=join(directory,'tls-cert.pem'),mode=join(directory,'provider-mode'),counts=join(directory,'provider-counts.json');
@@ -77,7 +86,8 @@ const digest=candidateDigest(root), paidVoiceInputDigest=inputDigest(),startedAt
 const binding=createHash('sha256').update(JSON.stringify({url:env.NEXT_PUBLIC_SUPABASE_URL,anon:env.NEXT_PUBLIC_SUPABASE_ANON_KEY,site:env.NEXT_PUBLIC_SITE_URL})).digest('hex');
 const buildReceipt=process.env.PAID_VOICE_BUILD_RECEIPT;
 let result={code:1,signal:null},artifact;
-let fd;
+let fd,workScope,workloadFailure;
+const cleanupFailures=[];
 try{
  if(!development && !buildReceipt) throw Error('PAID_VOICE_BUILD_RECEIPT required; first run --build-artifact with the same owned stack and inputs');
  if(buildOnly && existsSync(buildReceipt))throw Error('Build receipt already exists; preserve attempts with a new path');
@@ -88,22 +98,43 @@ try{
  }
  fd=openSync(join(directory,buildOnly?'build.log':'playwright.log'),'wx',0o600);
  const args=buildOnly?['run','build']:[join(root,'node_modules/@playwright/test/cli.js'),'test','--project=paid-voice-local','--workers=1','--reporter=json'];
- const child=spawn(buildOnly?"npm":process.execPath,args,{cwd:root,env,stdio:['ignore',fd,fd]});
- result=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',(code,signal)=>resolve({code,signal}));});
+ workScope=createOwnedProcessScope();
+ const commandTracker=buildOnly?lease.commandTracker:lease.id?createReceiptCommandTracker(lease.root,manifest.projectId,{purpose:'paid-voice-browser',leaseId:lease.id,settlement:'explicit-consumer'}):null;
+ const outcome=await workScope.run(buildOnly?"npm":process.execPath,args,{cwd:root,env,stdio:['ignore',fd,fd],commandTracker});
+ result={code:outcome.status,signal:outcome.signal};
+ if(outcome.error)throw outcome.error;
+ workScope.checkpoint();
  if(buildOnly && result.code===0)artifact=artifactDigest();
+}catch(error){
+ workloadFailure=error;
 }finally{
- if(fd!==undefined)closeSync(fd);
- server.closeAllConnections();await new Promise(resolve=>server.close(resolve));
- const unchangedInputs=inputDigest()===paidVoiceInputDigest,unchangedArtifact=artifact ? artifactDigest()===artifact : undefined;
- const exitCode=unchangedInputs && (!artifact || unchangedArtifact) ? (result.code??1) : 1;
- const receipt={exitCode,startedAt,finishedAt:new Date().toISOString(),...result,candidateDigest:digest,paidVoiceInputDigest,unchangedInputs,artifactMode:development?'development':'production',artifactDigest:artifact,unchangedArtifact,publicBinding:binding,project:manifest.projectId,taskDir:task,provider:state,listenerClosed:!server.listening,scope:'real local auth/access/RPC/server fetch/SDK UI; exact provider TLS and browser WebSocket boundaries stand in; no provider or model traffic'};
- writeFileSync(join(directory,'receipt.json'),JSON.stringify(receipt,null,2));
- if(buildOnly && exitCode===0)writeFileSync(buildReceipt,JSON.stringify(receipt,null,2),{flag:'wx',mode:0o600});
+ // Every cleanup attempt runs even when a previous one failed. None can turn
+ // a zero native exit into successful proof after supervision failed.
+ const cleanup=async(action)=>{try{await action();}catch(error){cleanupFailures.push(error);}};
+ await cleanup(()=>workScope?.close());
+ if(workScope&&!buildOnly)console.error('Browser consumer closure is unproven; task resources are retained for inspection.');
+ await cleanup(()=>{if(fd!==undefined)closeSync(fd);});
+ await cleanup(()=>server.closeAllConnections());
+ await cleanup(()=>new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve())));
+ let unchangedInputs=false,unchangedArtifact;
+ await cleanup(()=>{unchangedInputs=inputDigest()===paidVoiceInputDigest;});
+ await cleanup(()=>{unchangedArtifact=artifact?artifactDigest()===artifact:undefined;});
+ await cleanup(releaseLease);
+ exitCode=!workloadFailure && cleanupFailures.length===0 && unchangedInputs && (!artifact || unchangedArtifact) ? (result.code??1) : 1;
+ const receipt={exitCode,startedAt,finishedAt:new Date().toISOString(),...result,candidateDigest:digest,paidVoiceInputDigest,unchangedInputs,artifactMode:development?'development':'production',artifactDigest:artifact,unchangedArtifact,publicBinding:binding,project:manifest.projectId,taskDir:task,provider:state,listenerClosed:!server.listening,failures:{workload:Boolean(workloadFailure),cleanup:cleanupFailures.length},scope:'real local auth/access/RPC/server fetch/SDK UI; exact provider TLS and browser WebSocket boundaries stand in; no provider or model traffic'};
+ const writeReceipt=()=>writeFileSync(join(directory,'receipt.json'),JSON.stringify(receipt,null,2));
+ await cleanup(writeReceipt);
+ if(buildOnly && exitCode===0 && cleanupFailures.length===0)await cleanup(()=>writeFileSync(buildReceipt,JSON.stringify(receipt,null,2),{flag:'wx',mode:0o600}));
+ if(cleanupFailures.length && exitCode===0){
+  exitCode=1;receipt.exitCode=1;receipt.failures.cleanup=cleanupFailures.length;
+  await cleanup(writeReceipt);
+ }
 }
-const finalReceipt=JSON.parse(readFileSync(join(directory,'receipt.json'),'utf8'));
-exitCode=finalReceipt.exitCode;
+const failures=[...(workloadFailure?[workloadFailure]:[]),...cleanupFailures];
+if(failures.length===1)throw failures[0];
+if(failures.length>1)throw new AggregateError(failures,failures.map(error=>error instanceof Error?error.message:String(error)).join('; '));
 console.log(JSON.stringify({directory,exitCode,provider:state}));
-}finally{lease.release();}
+}finally{releaseLease();}
 process.exit(exitCode);
 
 }

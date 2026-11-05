@@ -7,15 +7,15 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startTransport } from './contract-transport.mjs';
-import { dockerSql, inspectStack, localDockerEnvironment, migrationInventory, schemaDigest } from './run-contracts.mjs';
-import { POLICY, createLifecycleReceipt, lifecycleRoot, recordInventory, readReceipt, updateReceipt } from './contract-stack-lifecycle.mjs';
+import { dockerSql, inspectStack, localDockerEnvironment, migrationInventory, schemaDigest, runStackCommand } from './run-contracts.mjs';
+import { POLICY, createLifecycleReceipt, createReceiptCommandTracker, lifecycleRoot, recordInventory, readReceipt, updateReceipt } from './contract-stack-lifecycle.mjs';
 
 function gitHead(root) {
   try { return execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim(); }
   catch { return null; }
 }
 
-export async function initializeRealtime(manifest, anonKey, env, clientFactory = createClient, timeoutMs = 15000) {
+export async function initializeRealtime(manifest, anonKey, env, clientFactory = createClient, timeoutMs = 15000, command) {
   const client = clientFactory(manifest.apiUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   const channel = client.channel('contracts-readiness-' + manifest.nonce, { config: { private: false } });
   const deadline = Date.now() + timeoutMs;
@@ -31,7 +31,7 @@ export async function initializeRealtime(manifest, anonKey, env, clientFactory =
     // Check explicit root membership: pg_publication_tables may expand partitions.
     // Let the legitimate service finish its DDL before taking the full baseline.
     while (Date.now() < deadline) {
-      const ready = dockerSql(manifest.projectId, "SELECT count(*) FROM pg_publication p JOIN pg_publication_rel r ON r.prpubid=p.oid JOIN pg_class c ON c.oid=r.prrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE p.pubname='supabase_realtime_messages_publication' AND n.nspname='realtime' AND c.relname='messages';", env);
+      const ready = await dockerSql(manifest.projectId, "SELECT count(*) FROM pg_publication p JOIN pg_publication_rel r ON r.prpubid=p.oid JOIN pg_class c ON c.oid=r.prrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE p.pubname='supabase_realtime_messages_publication' AND n.nspname='realtime' AND c.relname='messages';", env, command);
       if (ready === '1') return;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -83,7 +83,7 @@ anonymous_users = 1000
 token_refresh = 1000
 [studio]
 enabled = false
-[inbucket]
+[local_smtp]
 enabled = false
 [analytics]
 enabled = false
@@ -97,48 +97,44 @@ enabled = true
   writeFileSync(join(taskDir, 'supabase/config.toml'), config);
   const lifecycleDir = lifecycle.root ?? lifecycleRoot();
   const disposable = lifecycle.disposable === true;
-  let transportStarted = false; let env; let stage = 'network'; let docker; let tracked = false;
+  let transportStarted = false; let env; let stage = 'network'; let docker; let tracked = false; let commandTracker;
   const scope = processScope ?? createOwnedProcessScope();
   try {
     scope.checkpoint();
     const cliHome = join(taskDir, '.local-cli-home'); mkdirSync(cliHome);
     env = { ...localDockerEnvironment(), HOME: cliHome };
-    docker = (args) => execFileSync('docker', args, { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 }).trim();
-    const command = async (binary, args, timeout) => {
-      const result = await scope.run(binary, args, { env, timeout });
-      scope.checkpoint();
-      if (result.error || result.status !== 0) throw Object.assign(new Error('Owned preparation command failed'), result);
-      return result.stdout.trim();
-    };
-    const cli = (args) => command('supabase', [...args, '--workdir', taskDir, '--network-id', projectId], 600000);
+    docker = (args) => execFileSync('docker', args, { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, maxBuffer: 1024 * 1024 }).trim();
+    const command = (binary, args, options) => runStackCommand(scope, commandTracker, binary, args, options);
+    const cli = (args) => command('supabase', [...args, '--workdir', taskDir, '--network-id', projectId], { env, timeout: 600000 });
     // The private lifecycle receipt exists before any Docker allocation; each allocated identity is added to it.
     stage = 'lifecycle';
     createLifecycleReceipt(lifecycleDir, { projectId, nonce, taskDir, disposable, task: lifecycle.task ?? 'reusable',
       candidate: { head: gitHead(root), migrationDigest: manifest.migrationDigest }, daemonId: docker(['info', '--format', '{{.ID}}']),
       stack: { apiUrl: manifest.apiUrl, dbPort: manifest.dbPort, migrationDigest: manifest.migrationDigest, transport: manifest.transport } });
     tracked = true;
+    commandTracker = createReceiptCommandTracker(lifecycleDir, projectId, { purpose: 'prepare' });
     // Internal networking prevents migration 025's historical production webhook URL from sending traffic.
     stage = 'network';
-    const networkId = await command('docker', ['network', 'create', '--internal', '--label', `com.paisaxe.contracts.nonce=${nonce}`, projectId], 30000);
-    updateReceipt(lifecycleDir, projectId, (r) => { r.resources.network = { id: networkId, name: projectId }; });
-    stage = 'transport'; await startTransport(manifest, env); transportStarted = true; scope.checkpoint();
+    const networkId = await command('docker', ['network', 'create', '--internal', '--label', `com.paisaxe.contracts.nonce=${nonce}`, projectId], { env, timeout: 30000 });
+    updateReceipt(lifecycleDir, projectId, (r) => { r.resources.network = { id: networkId.trim(), name: projectId }; });
+    stage = 'transport'; await startTransport(manifest, env, { commandTracker: createReceiptCommandTracker(lifecycleDir, projectId, { purpose: 'transport', settlement: 'managed-relay' }) }); transportStarted = true; scope.checkpoint();
     stage = 'start'; await cli(['start']);
     recordInventory(lifecycleDir, projectId, docker);
     stage = 'inspect-start'; await inspectStack(manifest, env); scope.checkpoint();
     // Reset only a newly generated project after Docker has proved its ownership and network identity.
-    stage = 'reset'; await cli(['db', 'reset', '--local', '--yes']);
+    stage = 'reset'; await cli(['db', 'reset', '--yes']);
     // Reset recreates the database container and its labelled volume under the same names.
     recordInventory(lifecycleDir, projectId, docker);
     stage = 'inspect-reset'; await inspectStack(manifest, env); scope.checkpoint();
     stage = 'sanitize';
-    dockerSql(projectId, "BEGIN; UPDATE public.webhook_config SET value='' WHERE key IN ('base_url','secret'); SELECT cron.alter_job(jobid, active:=false) FROM cron.job WHERE active; " +
-      `COMMENT ON DATABASE postgres IS 'paisaxe-contracts:${nonce}:${manifest.migrationDigest}'; COMMIT;`, env);
+    await dockerSql(projectId, "BEGIN; UPDATE public.webhook_config SET value='' WHERE key IN ('base_url','secret'); SELECT cron.alter_job(jobid, active:=false) FROM cron.job WHERE active; " +
+      `COMMENT ON DATABASE postgres IS 'paisaxe-contracts:${nonce}:${manifest.migrationDigest}'; COMMIT;`, env, command);
     stage = 'realtime';
-    const status = JSON.parse(execFileSync('supabase', ['status', '--workdir', taskDir, '--output', 'json'],
-      { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 }));
+    const status = JSON.parse(await command('supabase', ['status', '--workdir', taskDir, '--output', 'json'],
+      { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, maxBuffer: 1024 * 1024 }));
     if (status.API_URL !== manifest.apiUrl || typeof status.ANON_KEY !== 'string' || !status.ANON_KEY) throw new Error('Realtime local status identity mismatch');
-    await initializeRealtime(manifest, status.ANON_KEY, env, clientFactory, readinessTimeoutMs); scope.checkpoint();
-    stage = 'schema'; manifest.schemaDigest = schemaDigest(projectId, env);
+    await initializeRealtime(manifest, status.ANON_KEY, env, clientFactory, readinessTimeoutMs, command); scope.checkpoint();
+    stage = 'schema'; manifest.schemaDigest = await schemaDigest(projectId, env, command);
     writeFileSync(join(taskDir, 'contracts-stack.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
     recordInventory(lifecycleDir, projectId, docker);
     updateReceipt(lifecycleDir, projectId, (r) => { r.state = 'prepared'; });

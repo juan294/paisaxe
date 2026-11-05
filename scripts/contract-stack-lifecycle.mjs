@@ -1,4 +1,4 @@
-import { createOwnedProcessScope } from './contract-owned-process.mjs';
+import { createOwnedProcessScope, processIdentity } from './contract-owned-process.mjs';
 // Ownership lifecycle for local contract stacks (docs/engineering/database-contracts.md).
 // A private receipt is written before any Docker allocation and updated with each
 // allocated identity. Ownership inspection is separate from running-service health,
@@ -6,7 +6,7 @@ import { createOwnedProcessScope } from './contract-owned-process.mjs';
 // recorded, unchanged identities: containers by immutable ID without -v, then the
 // exact unconsumed owned network, then separately checked owned volumes.
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -42,14 +42,7 @@ function writePrivate(path, value, flag) {
 /** Process identity is (pid, start time) in a fixed locale/zone. Returns null only for an explicit
  * "no such process"; any other probe failure is UNKNOWN_PROCESS, which never proves death. */
 export const UNKNOWN_PROCESS = 'unknown';
-export function processIdentity(pid) {
-  try { process.kill(pid, 0); }
-  catch (error) { if (error.code === 'ESRCH') return null; if (error.code !== 'EPERM') return UNKNOWN_PROCESS; }
-  try {
-    return execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim() || UNKNOWN_PROCESS;
-  } catch { return UNKNOWN_PROCESS; }
-}
+export { processIdentity };
 const selfOwner = (probe = processIdentity) => ({ pid: process.pid, startedAt: probe(process.pid) });
 /** Dead only on explicit absence, or a different start time (the PID now belongs to another process). */
 export function isAlive(owner, probe) {
@@ -61,20 +54,36 @@ export function isAlive(owner, probe) {
 }
 
 function withLock(root, id, action, probe = processIdentity) {
-  const lock = join(root, 'tasks', id + '.lock');
+  const lock = join(root, 'tasks', id + '.lock'), recovery = lock + '.recovery';
   mkdirSync(join(root, 'tasks'), { recursive: true, mode: 0o700 });
+  const token = randomUUID(), owner = { ...selfOwner(probe), token };
+  const read = path => { try { return JSON.parse(readFileSync(path, 'utf8')); } catch (error) { if (error.code === 'ENOENT') return null; throw new Error(`Lifecycle lock is unreadable; inspection required: ${id}`); } };
+  const release = (path, expected) => { if (read(path)?.token === expected) rmSync(path); };
+  const known = holder => holder && Number.isInteger(holder.pid) && holder.pid > 0 && typeof holder.startedAt === 'string' && holder.startedAt && holder.startedAt !== UNKNOWN_PROCESS;
   const deadline = Date.now() + 10000;
   for (;;) {
-    try { writeFileSync(lock, JSON.stringify(selfOwner(probe)), { flag: 'wx', mode: 0o600 }); break; }
+    insist(!existsSync(recovery), `Lifecycle recovery guard requires inspection: ${id}`);
+    try { writeFileSync(lock, JSON.stringify(owner), { flag: 'wx', mode: 0o600 }); break; }
     catch (error) {
       if (error.code !== 'EEXIST') throw error;
-      let holder; try { holder = JSON.parse(readFileSync(lock, 'utf8')); } catch { holder = null; }
-      if (holder && !isAlive(holder, probe)) { rmSync(lock, { force: true }); continue; }
+      const holder = read(lock);
+      if (!holder) continue;
+      insist(known(holder), `Lifecycle lock identity unknown; inspection required: ${id}`);
+      if (!isAlive(holder, probe)) {
+        const recoveryToken = randomUUID();
+        try { writeFileSync(recovery, JSON.stringify({ ...owner, token: recoveryToken }), { flag: 'wx', mode: 0o600 }); }
+        catch (error) { if (error.code === 'EEXIST') throw new Error(`Lifecycle recovery guard requires inspection: ${id}`); throw error; }
+        try {
+          const current = read(lock);
+          if (current && known(current) && !isAlive(current, probe) && JSON.stringify(read(lock)) === JSON.stringify(current)) rmSync(lock);
+          if (!existsSync(lock)) { writeFileSync(lock, JSON.stringify(owner), { flag: 'wx', mode: 0o600 }); break; }
+        } finally { release(recovery, recoveryToken); }
+      }
       insist(Date.now() < deadline, `Lifecycle receipt ${id} is locked by a live process`);
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
     }
   }
-  try { return action(); } finally { rmSync(lock, { force: true }); }
+  try { return action(); } finally { release(lock, token); }
 }
 
 export function readReceipt(root, id) {
@@ -99,7 +108,7 @@ export function createLifecycleReceipt(root, { projectId, nonce, taskDir, dispos
   insist(typeof disposable === 'boolean' && typeof daemonId === 'string' && daemonId, 'Lifecycle receipt requires disposability and daemon identity');
   const receipt = { version: 1, kind: 'paisaxe-contract-stack', repository: 'paisaxe', projectId, nonce, taskDir, disposable, task, candidate, daemonId,
     stack, owner, state: 'preparing', createdAt: iso(now), updatedAt: iso(now), resources: { network: null, containers: [], volumes: [] },
-    leases: [], recoveryHold: null, diagnostics: [], result: null, failedAt: null, retainUntil: null, disposal: null };
+    leases: [], commandTracking: { version: 1, commands: {} }, recoveryHold: null, diagnostics: [], result: null, failedAt: null, retainUntil: null, disposal: null };
   writePrivate(taskFile(root, projectId), receipt, 'wx');
   return receipt;
 }
@@ -164,6 +173,76 @@ export function recordInventory(root, id, docker, now = new Date()) {
   }, now);
 }
 
+// Command records are independent of leases: pruning a dead lease cannot erase
+// children which escaped its owner's process group before an uncatchable exit.
+function commandMap(r) {
+  const tracking = r.commandTracking;
+  insist(tracking?.version === 1 && tracking.commands && typeof tracking.commands === 'object' && !Array.isArray(tracking.commands), 'Legacy or malformed command tracking requires inspection');
+  return tracking.commands;
+}
+function commandRefusal(r) {
+  let commands;
+  try { commands = commandMap(r); } catch { return 'legacy or malformed command tracking requires inspection'; }
+  const entries = Object.entries(commands);
+  if (!entries.length) return null;
+  return `unresolved command ownership (${entries.length}); child settlement requires inspection`;
+}
+
+export function createReceiptCommandTracker(root, projectId, { purpose, leaseId = null, settlement = 'process-group' } = {}) {
+  insist(/^[a-z][a-z0-9-]{0,63}$/.test(purpose || ''), 'Invalid command purpose');
+  insist(['process-group', 'explicit-consumer', 'managed-relay'].includes(settlement), 'Invalid command settlement mode');
+  const owner = selfOwner(), issued = new Set();
+  const currentOwner = () => insist(owner.startedAt && owner.startedAt !== UNKNOWN_PROCESS && processIdentity(owner.pid) === owner.startedAt, 'Command owner identity is unknown; inspection required');
+  const entry = (r, id) => {
+    currentOwner();
+    const command = commandMap(r)[id];
+    insist(issued.has(id) && command?.id === id && command.owner?.pid === owner.pid && command.owner?.startedAt === owner.startedAt && command.leaseId === leaseId && command.purpose === purpose, 'Command ownership changed; inspection required');
+    return command;
+  };
+  return Object.freeze({
+    beforeLaunch() {
+      currentOwner();
+      const id = randomUUID();
+      updateReceipt(root, projectId, r => {
+        const commands = commandMap(r);
+        insist(!['disposing', 'stopping', 'finished'].includes(r.state) && !r.recoveryHold, 'Command admission closed by lifecycle transition or recovery hold');
+        if (leaseId !== null) insist(r.leases.some(l => l.id === leaseId && l.pid === owner.pid && l.startedAt === owner.startedAt), 'Command requires its matching live consumer lease');
+        commands[id] = { id, purpose, leaseId, owner, settlement, state: 'launching', child: null, launchedAt: iso(new Date()) };
+      });
+      issued.add(id);
+      return id;
+    },
+    onStart(id, child) {
+      updateReceipt(root, projectId, r => {
+        const command = entry(r, id);
+        insist(command.state === 'launching' && Number.isInteger(child?.pid) && child.pid > 1 && child.pgid === child.pid && typeof child.startedAt === 'string', 'Invalid launched child identity');
+        command.state = 'running'; command.child = { pid: child.pid, pgid: child.pgid, startedAt: child.startedAt };
+      });
+    },
+    onSettled(id, result) {
+      updateReceipt(root, projectId, r => {
+        const command = entry(r, id);
+        const noSpawn = result.spawnFailed === true && command.state === 'launching' && command.child === null && result.child?.pid === null;
+        const sameChild = command.child && result.child?.pid === command.child.pid && result.child?.pgid === command.child.pgid && result.child?.startedAt === command.child.startedAt;
+        if (noSpawn || (settlement === 'process-group' && sameChild && result.settlementBasis === 'supervisor-observed' && result.child.settled === true)) delete commandMap(r)[id];
+        else { command.state = 'unsettled'; command.reason = settlement === 'explicit-consumer' ? 'detached consumer closure unproven' : 'child settlement unproven'; }
+      });
+    },
+    handoffRelay(id, proof) {
+      insist(settlement === 'managed-relay', 'Only managed relay commands can transfer ownership');
+      updateReceipt(root, projectId, r => {
+        const command = entry(r, id), child = command.child;
+        const sourceDigest = createHash('sha256').update(readFileSync(new URL('./contract-transport.mjs', import.meta.url))).digest('hex');
+        insist(child && child.startedAt !== UNKNOWN_PROCESS && processIdentity(child.pid) === child.startedAt && proof?.ok === true && proof.pid === child.pid && proof.version === 1 &&
+          proof.projectId === r.projectId && proof.nonce === r.nonce && proof.taskDir === r.taskDir && proof.apiUrl === r.stack?.apiUrl && proof.dbPort === r.stack?.dbPort && proof.migrationDigest === r.stack?.migrationDigest &&
+          proof.sourceDigest === sourceDigest && /^unix:\/\/\/[^\r\n]+$/.test(proof.dockerHost || ''), 'Authenticated relay ownership handoff mismatch');
+        r.managedRelay = { commandId: id, child, sourceDigest, dockerHost: proof.dockerHost, handedOffAt: iso(new Date()) };
+        delete commandMap(r)[id];
+      });
+    },
+  });
+}
+
 // ---- Leases ----------------------------------------------------------------------
 
 /** Reusable callers hold a lease while using a stack. Legacy tasks (no receipt) take none. */
@@ -186,7 +265,7 @@ export function releaseConsumerLease(root, lease, now = new Date()) {
 export function leaseForCaller(projectId, purpose, env = process.env) {
   const root = lifecycleRoot(env);
   const lease = acquireConsumerLease(root, projectId, purpose);
-  return { release: () => releaseConsumerLease(root, lease) };
+  return Object.freeze({ root, projectId, id: lease?.id ?? null, commandTracker: lease ? createReceiptCommandTracker(root, projectId, { purpose, leaseId: lease.id }) : null, release: () => releaseConsumerLease(root, lease) });
 }
 
 export function setRecoveryHold(root, projectId, reason, now = new Date()) {
@@ -200,7 +279,7 @@ export function inspectOwnership(root, projectId, { docker }) {
   insist(r, `No lifecycle receipt for ${projectId}; legacy resources are inventory-only`);
   const net = r.resources.network ? inspect(docker, 'network', r.resources.network.id) : null;
   return {
-    projectId, state: r.state, disposable: r.disposable, proof: Boolean(hasProof(r)), leases: r.leases.length, recoveryHold: r.recoveryHold, retainUntil: r.retainUntil,
+    projectId, state: r.state, disposable: r.disposable, proof: Boolean(hasProof(r)), commandTracking: r.commandTracking ?? null, commandRefusal: commandRefusal(r), leases: r.leases.length, recoveryHold: r.recoveryHold, retainUntil: r.retainUntil,
     relay: existsSync(join(r.taskDir, 'transport.sock')) ? 'present' : 'absent',
     network: { id: r.resources.network?.id ?? null, present: Boolean(net), internal: net?.Internal === true, nonceMatches: net?.Labels?.[NONCE_LABEL] === r.nonce, attached: net ? [...new Set([...Object.keys(net.Containers || {}), ...networkConsumers(docker, net.Id)])] : [] },
     containers: r.resources.containers.map(({ id, name }) => {
@@ -287,16 +366,10 @@ function retryAction(projectId) {
 }
 
 function assertIdle(r, processProbe) {
+  insist(!commandRefusal(r), `Disposal refused: ${commandRefusal(r)}; ${retryAction(r.projectId)}`);
   insist(!r.recoveryHold, `Disposal refused: recovery hold on ${r.projectId}`);
   insist(liveLeases(r, processProbe).length === 0, `Disposal refused: live consumer lease on ${r.projectId}`);
-  if (r.interruption?.settled === false) {
-    const pgid = r.interruption.child?.pgid;
-    let absent = false;
-    if (Number.isInteger(pgid) && pgid > 1) {
-      try { process.kill(-pgid, 0); } catch (error) { absent = error.code === 'ESRCH'; }
-    }
-    insist(absent, `Disposal refused: interrupted child settlement is unknown for ${r.projectId}; ${retryAction(r.projectId)}`);
-  }
+  insist(r.interruption?.settled !== false, `Disposal refused: interrupted child settlement is unknown for ${r.projectId}; ${retryAction(r.projectId)}`);
 }
 
 function verifyPlan(r, docker) {
@@ -450,6 +523,7 @@ export async function sweepOwnedStacks({ root = lifecycleRoot(), docker, now = n
     for (const path of r.diagnostics) if (typeof path === 'string') { try { protectedDiagnostics.push(realpathSync(path)); } catch { protectedDiagnostics.push(path); } }
     const entry = { projectId, state: r.state, disposable: r.disposable, retainUntil: r.retainUntil };
     report.tasks.push(entry);
+    if (commandRefusal(r)) { Object.assign(entry, { action: 'preserve', reason: commandRefusal(r) }); continue; }
     const dead = r.leases.length - liveLeases(r, processProbe).length;
     if (dead) {
       entry.releasedDeadLeases = dead;
@@ -562,7 +636,7 @@ async function runOneShotOwned({ root = process.cwd(), lifecycleDir = lifecycleR
   const lease = acquireConsumerLease(lifecycleDir, projectId, 'one-shot', { owner: selfOwner(processProbe), now: now() });
   updateReceipt(lifecycleDir, projectId, (r) => { r.state = 'running'; r.owner = selfOwner(processProbe); }, now());
   let receipt; let failure;
-  try { receipt = await run({ root, taskDir: manifest.taskDir, processScope }); processScope.checkpoint(); if (receipt?.status !== 'passed') failure = 'contracts'; }
+  try { receipt = await run({ root, taskDir: manifest.taskDir, processScope, commandTracker: createReceiptCommandTracker(lifecycleDir, projectId, { purpose: 'one-shot', leaseId: lease?.id }) }); processScope.checkpoint(); if (receipt?.status !== 'passed') failure = 'contracts'; }
   catch { failure = 'contracts'; }
   if (processScope.interruption) failure = 'interrupted';
   const archivedAt = now();

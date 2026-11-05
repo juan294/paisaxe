@@ -1,4 +1,11 @@
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+
+export function processIdentity(pid) {
+  try { process.kill(pid, 0); }
+  catch (error) { if (error.code === 'ESRCH') return null; if (error.code !== 'EPERM') return 'unknown'; }
+  try { return execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim() || 'unknown'; }
+  catch { return 'unknown'; }
+}
 
 const coded = (message, code) => Object.assign(new Error(message), { code });
 // A process group belongs to one command launched by this scope. ESRCH alone
@@ -32,17 +39,34 @@ export function createOwnedProcessScope({ settlementMs = 30000 } = {}) {
   return {
     get interruption() { return uncertain ? { signal: interruption?.signal ?? null, reason: interruption?.reason ?? 'unsettled', child: uncertain, settled: false } : interruption; },
     checkpoint,
+    stop(signal = 'SIGTERM') {
+      if (!['SIGTERM', 'SIGINT'].includes(signal)) throw new Error('Unsupported owned stop signal');
+      active?.cancel(signal);
+    },
     close() {
       for (const [signal, handler] of handlers) process.removeListener(signal, handler);
       closed = true;
     },
-    async run(binary, args, { cwd, env, timeout, maxBuffer = 32 * 1024 * 1024 } = {}) {
+    /**
+     * @param {string} binary
+     * @param {string[]} args
+     * @param {{cwd?: string, env?: NodeJS.ProcessEnv, timeout?: number, maxBuffer?: number, encoding?: string, commandTracker?: import('./contract-stack-lifecycle.mjs').ReceiptCommandTracker | null, stdio?: import('node:child_process').StdioOptions}} [options]
+     */
+    async run(binary, args, { cwd, env, timeout, maxBuffer = 32 * 1024 * 1024, commandTracker, stdio = /** @type {import('node:child_process').StdioOptions} */ (['ignore', 'pipe', 'pipe']) } = {}) {
       checkpoint();
       if (active) throw new Error('Owned commands must run sequentially');
       if (process.platform === 'win32') throw new Error('Owned process groups require a Unix host');
-      return new Promise((resolve) => {
-        const child = spawn(binary, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
-        const identity = { pid: child.pid ?? null, pgid: child.pid ?? null };
+      const commandId = commandTracker?.beforeLaunch();
+      return new Promise((resolve, reject) => {
+        let child;
+        try { child = spawn(binary, args, { cwd, env, detached: true, stdio }); }
+        catch (error) {
+          try { commandTracker?.onSettled(commandId, { spawnFailed: true, child: { pid: null, pgid: null, startedAt: null, settled: true } }); }
+          catch (trackingError) { return reject(trackingError); }
+          return reject(error);
+        }
+        const identity = { pid: child.pid ?? null, pgid: child.pid ?? null, startedAt: child.pid ? processIdentity(child.pid) ?? 'unknown' : null };
+        let trackingFailed = false;
         let stdout = ''; let stderr = ''; let bytes = 0;
         let status = null; let signal = null; let error;
         let exited = false; let streamsClosed = false; let done = false;
@@ -56,11 +80,16 @@ export function createOwnedProcessScope({ settlementMs = 30000 } = {}) {
             error = coded('Owned child process group did not settle; resources must remain protected', 'CONTRACT_CHILD_UNSETTLED');
             // Let the command return with its recorded identity even if a child
             // ignores the signal and holds its output pipes open.
-            child.stdout.destroy(); child.stderr.destroy(); child.unref();
+            child.stdout?.destroy(); child.stderr?.destroy(); child.unref();
           }
           if (interruption) interruption.settled = settled;
           active = null;
-          resolve({ status, signal, stdout, stderr, ...(error ? { error } : {}), child: { ...identity, settled } });
+          const result = { status, signal, stdout, stderr, ...(error ? { error } : {}), child: { ...identity, settled }, settlementBasis: settled ? 'supervisor-observed' : 'unproven', ...(identity.pid === null ? { spawnFailed: true } : {}) };
+          if (!trackingFailed) {
+            try { commandTracker?.onSettled(commandId, result); }
+            catch { uncertain = identity; result.error = coded('Owned command settlement receipt failed; resources remain protected', 'CONTRACT_TRACKING_FAILED'); }
+          }
+          resolve(result);
         };
         const inspect = () => {
           if (done) return;
@@ -89,8 +118,8 @@ export function createOwnedProcessScope({ settlementMs = 30000 } = {}) {
           }
           if (target === 'stdout') stdout += chunk.toString(); else stderr += chunk.toString();
         };
-        child.stdout.on('data', (chunk) => capture('stdout', chunk));
-        child.stderr.on('data', (chunk) => capture('stderr', chunk));
+        child.stdout?.on('data', (chunk) => capture('stdout', chunk));
+        child.stderr?.on('data', (chunk) => capture('stderr', chunk));
         child.on('error', (cause) => {
           error = coded('Owned command could not start', cause.code ?? 'CONTRACT_SPAWN_FAILED');
           if (identity.pid === null) { exited = true; streamsClosed = true; finish(true); }
@@ -101,6 +130,10 @@ export function createOwnedProcessScope({ settlementMs = 30000 } = {}) {
           clearTimeout(poll); inspect();
         });
         child.on('close', () => { streamsClosed = true; clearTimeout(poll); inspect(); });
+        if (identity.pid !== null) {
+          try { commandTracker?.onStart(commandId, identity); }
+          catch { trackingFailed = true; uncertain = identity; error = coded('Owned child identity receipt failed; resources remain protected', 'CONTRACT_TRACKING_FAILED'); cancel('SIGTERM'); }
+        }
         if (timeout) timer = setTimeout(() => {
           error = coded('Owned command timed out', 'ETIMEDOUT');
           interrupt('SIGTERM', 'timeout');

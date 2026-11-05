@@ -1,4 +1,3 @@
-import { execFileSync, spawn } from "node:child_process";
 import { request as httpRequest } from "node:http";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,8 +5,9 @@ import { dirname, join } from "node:path";
 import { assertTestsExecuted } from "./lib/playwright-report";
 import { isMain } from "./lib/is-main";
 import { assertLocalDatastore } from "./release/probe-guards";
-import { validateManifest, validateKeys, inspectStack, localDockerEnvironment, dockerSql, schemaDigest, migrationInventory } from "./run-contracts.mjs";
-import { leaseForCaller } from "./contract-stack-lifecycle.mjs";
+import { validateManifest, validateKeys, inspectStack, localDockerEnvironment, dockerSql, schemaDigest, migrationInventory, runStackCommand, type StackCommandExecutor } from "./run-contracts.mjs";
+import { leaseForCaller, createReceiptCommandTracker, type ReceiptCommandTracker } from "./contract-stack-lifecycle.mjs";
+import { createOwnedProcessScope } from "./contract-owned-process.mjs";
 
 const REQUIRED_ENV_KEYS = [
   "STRIPE_TEST_SECRET_KEY",
@@ -68,32 +68,18 @@ function waitForServer(url: string, timeoutMs: number): Promise<void> {
   });
 }
 
-function runCommand(
+async function runCommand(
+  scope: ReturnType<typeof createOwnedProcessScope>,
+  commandTracker: ReceiptCommandTracker | null | undefined,
   command: string,
   args: string[],
   env: NodeJS.ProcessEnv,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      env,
-      stdio: "inherit",
-    });
-
-    child.on("exit", (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(
-        new Error(
-          `${command} ${args.join(" ")} exited with code ${code ?? "null"}${signal ? ` (signal ${signal})` : ""}`,
-        ),
-      );
-    });
-
-    child.on("error", reject);
-  });
+  const result = await scope.run(command, args, { env, stdio: "inherit", commandTracker });
+  if (result.error || result.status !== 0) {
+    throw new Error(`${command} ${args.join(" ")} exited with code ${result.status ?? "null"}${result.signal ? ` (signal ${result.signal})` : ""}`, { cause: result.error });
+  }
+  scope.checkpoint();
 }
 
 /** Returns undefined when no report exists — the guard treats that as a failure. */
@@ -125,18 +111,17 @@ export function assertStripeLocalInputs(env: NodeJS.ProcessEnv = process.env) {
   return manifest;
 }
 
-async function verifyStripeLocalStack() {
-  const manifest = assertStripeLocalInputs();
+async function verifyStripeLocalStack(manifest: ReturnType<typeof assertStripeLocalInputs>, command: StackCommandExecutor) {
   const env = { ...localDockerEnvironment(), NODE_ENV: process.env.NODE_ENV ?? "test" };
   await inspectStack(manifest, env);
   if (migrationInventory(process.cwd()).digest !== manifest.migrationDigest ||
-      schemaDigest(manifest.projectId, env) !== manifest.schemaDigest ||
-      dockerSql(manifest.projectId, "SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database();", env) !==
+      await schemaDigest(manifest.projectId, env, command) !== manifest.schemaDigest ||
+      await dockerSql(manifest.projectId, "SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database();", env, command) !==
         `paisaxe-contracts:${manifest.nonce}:${manifest.migrationDigest}`) {
     throw new Error("Stripe integration owned local database identity mismatch");
   }
-  const status = JSON.parse(execFileSync("supabase", ["status", "--workdir", manifest.taskDir, "--output", "json"],
-    { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 }));
+  const status = JSON.parse(await command("supabase", ["status", "--workdir", manifest.taskDir, "--output", "json"],
+    { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000, maxBuffer: 1024 * 1024 }));
   const keys = validateKeys(status, manifest);
   if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== keys.anon || process.env.SUPABASE_SERVICE_KEY !== keys.service) {
     throw new Error("Stripe integration requires the owned local Supabase credentials");
@@ -145,17 +130,22 @@ async function verifyStripeLocalStack() {
 }
 
 async function main() {
-  const manifest = await verifyStripeLocalStack();
+  const manifest = assertStripeLocalInputs();
   // The prepared stack is reusable: hold a consumer lease so scheduled disposal leaves it alone.
   const lease = leaseForCaller(manifest.projectId, "stripe-e2e");
   try {
-    await runStripeIntegration();
+    const scope = createOwnedProcessScope();
+    try {
+      const command: StackCommandExecutor = (binary, args, options) => runStackCommand(scope, lease.commandTracker, binary, args, options);
+      await verifyStripeLocalStack(manifest, command);
+    } finally { scope.close(); }
+    await runStripeIntegration(lease);
   } finally {
     lease.release();
   }
 }
 
-async function runStripeIntegration() {
+async function runStripeIntegration(lease: ReturnType<typeof leaseForCaller>) {
   for (const key of REQUIRED_ENV_KEYS) {
     getEnv(key);
   }
@@ -180,45 +170,69 @@ async function runStripeIntegration() {
     STRIPE_WEBHOOK_SECRET: getEnv("STRIPE_TEST_WEBHOOK_SECRET"),
   };
 
-  await runCommand("npm", ["run", "build"], sharedEnv);
-
-  const server = spawn("npm", ["run", "start", "--", "--port", port], {
-    env: sharedEnv,
-    stdio: "inherit",
-  });
-
-  // Playwright exits 0 when every selected test was skipped, so the run's exit
-  // code alone cannot distinguish "the integration passed" from "nothing ran".
-  // Capture the JSON report and assert that tests actually executed.
-  const configuredReportPath =
-    process.env.PLAYWRIGHT_JSON_OUTPUT_NAME?.trim();
-  const reportPath =
-    configuredReportPath ??
-    join(tmpdir(), `stripe-e2e-report-${process.pid}.json`);
-  mkdirSync(dirname(reportPath), { recursive: true });
-
+  const workScope = createOwnedProcessScope();
+  const serverScope = createOwnedProcessScope();
+  let serverRun: ReturnType<typeof serverScope.run> | undefined;
+  let workloadFailure: unknown;
+  let serverFailure: unknown;
+  let cleanupFailure: unknown;
+  let intentionalServerStop = false;
+  let browserStarted = false;
+  const configuredReportPath = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME?.trim();
+  const reportPath = configuredReportPath ?? join(tmpdir(), `stripe-e2e-report-${process.pid}.json`);
   try {
+    await runCommand(workScope, lease.commandTracker, "npm", ["run", "build"], sharedEnv);
+    serverRun = serverScope.run("npm", ["run", "start", "--", "--port", port], {
+      env: sharedEnv, stdio: "inherit", commandTracker: lease.commandTracker,
+    }).then(result => {
+      if (!intentionalServerStop) serverFailure = new Error(`Stripe server completed unexpectedly before intentional stop with code ${result.status ?? "null"}${result.signal ? ` (signal ${result.signal})` : ""}`, { cause: result.error });
+      return result;
+    }, error => {
+      if (!intentionalServerStop) serverFailure = error;
+      throw error;
+    });
+    // Keep a rejected launch observed while readiness runs; finally awaits the
+    // original promise so the server failure cannot be hidden.
+    void serverRun.catch(() => {});
+    mkdirSync(dirname(reportPath), { recursive: true });
     await waitForServer(baseUrl, 120_000);
-    await runCommand(
-      "npx",
+    const browserTracker = lease.id ? createReceiptCommandTracker(lease.root, lease.projectId, {
+      purpose: "stripe-browser", leaseId: lease.id, settlement: "explicit-consumer",
+    }) : null;
+    browserStarted = true;
+    await runCommand(workScope, browserTracker, "npx",
       ["playwright", "test", "--project=stripe-integration", "--reporter=json"],
-      {
-        ...sharedEnv,
-        PLAYWRIGHT_PORT: port,
-        PLAYWRIGHT_REUSE_SERVER: "true",
-        PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
-      },
+      { ...sharedEnv, PLAYWRIGHT_PORT: port, PLAYWRIGHT_REUSE_SERVER: "true", PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath },
     );
-
+    // A zero exit with no executed cases still fails the existing report gate.
     assertTestsExecuted(readReport(reportPath), "Stripe integration");
+  } catch (error) {
+    workloadFailure = error;
   } finally {
-    server.kill("SIGTERM");
-    // CI supplies a repository-relative output path so the JSON proof can be
-    // uploaded even when the clean run creates no screenshots or traces.
-    // Ad-hoc local runs keep using a disposable report in the system temp dir.
-    if (!configuredReportPath) {
-      rmSync(reportPath, { force: true });
+    if (serverRun) {
+      try {
+        intentionalServerStop = true;
+        serverScope.stop("SIGTERM");
+        const stopped = await serverRun;
+        const expectedStop = (stopped.status === 0 && stopped.signal === null) ||
+          (stopped.status === null && stopped.signal === "SIGTERM");
+        if (!expectedStop && !serverFailure) serverFailure = new Error(`Stripe server exited with code ${stopped.status ?? "null"}${stopped.signal ? ` (signal ${stopped.signal})` : ""}`);
+        if (stopped.error || !stopped.child.settled) throw new Error("Stripe server cleanup failed; owned child settlement is unproven", { cause: stopped.error });
+        serverScope.checkpoint();
+      } catch (error) { cleanupFailure = error; }
     }
+    workScope.close(); serverScope.close();
+    if (browserStarted) console.error("Browser consumer closure is unproven; task resources are retained for inspection.");
+    if (!configuredReportPath) {
+      try { rmSync(reportPath, { force: true }); }
+      catch (error) { cleanupFailure = cleanupFailure ? new AggregateError([cleanupFailure, error], "Stripe server and report cleanup failed") : error; }
+    }
+  }
+  const failures = [...new Set([workloadFailure, serverFailure, cleanupFailure].filter(Boolean))];
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) {
+    const describe = (error: unknown) => error instanceof Error ? error.message : String(error);
+    throw new AggregateError(failures, failures.map(describe).join("; "));
   }
 }
 
