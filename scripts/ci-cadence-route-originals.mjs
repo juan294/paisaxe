@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parse, stringify } from 'yaml';
 import { resolve } from 'node:path';
 const LEGACY_ROUTED_SHA256 = {".github/workflows/ci.yml":"69a645b1d027704c4973206481cf7f18ef91b45b73b92229fc8dd0e5f2acc84f",".github/workflows/e2e.yml":"8d2326646adc32011865dbf96ea061564a14621c6dc0263094365c66f29e1f8c",".github/workflows/lighthouse.yml":"784117d878c37405363cbca5f3a989bdb3fe45de3b47983ed68e128f8611b650",".github/workflows/bundle-size.yml":"151662136f47983ed7e1758e9c2b287ffaacfbee735d727e63e4bfdc1d2c9d08",".github/workflows/knip.yml":"0657dade5e1c8308f659c1924f49f91063bda45ea74c399c525ff60e2b22c91c",".github/workflows/license-check.yml":"66564c12cb576a7c96e86dbf8e2353f8544d7a35b873e5c86cd49dc7c271a6db",".github/workflows/security.yml":"f778a1f0a5f4f019db4e644e820bf15a148cd84a023a92775a0b12d309576786"};
+const REVIEWED_NODE = '24.21.0';
 const strip = value => typeof value==='string'?value.replace(/^\$\{\{\s*|\s*\}\}$/g,''):value;
 const callable = "(inputs.profile == 'full' || inputs.profile == 'nightly') && inputs.source_sha != '' && inputs.invocation_id != ''";
 // Schedule payloads need not carry sender: the schedule clause rests on repository/owner identity and ref only.
@@ -31,6 +32,15 @@ export function routeOriginalWorkflow(source) {
     if(!shard?.run?.includes('--reporter=blob'))throw Error('Reviewed coverage reporter disappeared');
     // Blob-only output hides the failing test when its success-only upload never runs.
     shard.run=shard.run.replace('--reporter=blob','--reporter=blob --reporter=default');
+    // The measurement job requires application.evidence.nodeVersion to equal its
+    // own process.version. A floating major resolves to whatever the runner
+    // cached, so every job that produces measured application evidence stays
+    // on the exact reviewed runtime.
+    for(const id of ['coverage-shard','coverage-merge']){
+      const setup=value.jobs[id].steps.find(step=>step.name==='Setup Node.js');
+      if(!setup?.with)throw Error('Reviewed coverage runtime setup disappeared');
+      setup.with['node-version']=REVIEWED_NODE;
+    }
     const test=value.jobs.test;
     const ordinary=test.steps.find(step=>step.name==='Verify test/coverage suite succeeded')?.if;
     const checkoutGuard=test.steps.findIndex(step=>step.name==='Verify callable source checkout');
@@ -39,7 +49,7 @@ export function routeOriginalWorkflow(source) {
     const receipt="${{ runner.temp }}/database-contracts-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.invocation_id || 'ordinary' }}";
     test['timeout-minutes']=50;
     test.steps.splice(completed,0,
-      {name:'Setup database contract Node',uses:'actions/setup-node@v7',with:{'node-version':'24.21.0'}},
+      {name:'Setup database contract Node',uses:'actions/setup-node@v7',with:{'node-version':REVIEWED_NODE}},
       {name:'Install database contract dependencies',run:'npm ci'},
       {name:'Setup database contract Supabase',uses:'supabase/setup-cli@v3',with:{version:'2.120.0'}},
       {name:'Check database contract PostgreSQL client',run:'command -v psql\npsql --version'},

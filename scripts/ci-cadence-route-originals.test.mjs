@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { routeOriginalWorkflow } from './ci-cadence-route-originals.mjs';
+import { generateNativeWorkflows } from './ci-cadence-native-workflows.mjs';
 import { evaluate, nativeContext } from '../tests/fixtures/ci-cadence-adapter/native/workflow-graph.mjs';
 const retained=JSON.parse(readFileSync(new URL('../tests/fixtures/ci-cadence-adapter/native/routing-originals.json',import.meta.url))).files;
 const source=()=>retained.find(file=>file.path==='.github/workflows/knip.yml').source;
@@ -34,4 +35,20 @@ test('coverage shards keep blob merging and also print failures in the native lo
  assert.match(run,/--reporter=blob(?: |$)/);
  const original=parse(file.source).jobs['coverage-shard'].steps.find(step=>step.name==='Run tests with coverage (sharded)').run;
  assert.equal(run.replace(' --reporter=default',''),original,'test selection, coverage flags and failure status remain unchanged');
+});
+
+// The measurement job requires application.evidence.nodeVersion to equal its own
+// process.version, so a floating "24" fails it whenever the runner cache moves on.
+test('measured coverage jobs run the exact reviewed runtime of the nightly measurement', () => {
+ const nightly=parse(generateNativeWorkflows().find(file=>file.path==='.github/workflows/ci-nightly.yml').source);
+ const reviewed=nightly.jobs.measurement.steps.find(step=>step.name==='Setup reviewed Node runtime').with['node-version'];
+ assert.match(reviewed,/^\d+\.\d+\.\d+$/,'measurement runtime stays an exact version');
+ const file=retained.find(file=>file.path==='.github/workflows/ci.yml');
+ const original=parse(file.source),routed=parse(routeOriginalWorkflow(file.source));
+ for(const id of ['coverage-shard','coverage-merge']){
+  const setup=routed.jobs[id].steps.find(step=>step.name==='Setup Node.js');
+  assert.equal(setup.with['node-version'],reviewed,id);
+  assert.equal(setup.with.cache,'npm',id);
+  assert.deepEqual(routed.jobs[id].steps.map(step=>step.name),original.jobs[id].steps.map(step=>step.name),'step census unchanged: '+id);
+ }
 });
