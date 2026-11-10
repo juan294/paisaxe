@@ -787,12 +787,24 @@ if [[ "$ENABLE_GAP_ANALYSIS" == "true" ]]; then
   # --- 6a: Feature flags in type definition vs mock fixture ---
   log_info "Checking feature flag coverage in E2E mocks..." | tee -a "$LOG_FILE"
 
-  TYPE_FLAGS=$(sed -n '/^export type FeatureFlagKey/,/;$/p' "$PROJECT_DIR/src/types/feature-flags.ts" | grep -oE '"[a-z_]+"' | tr -d '"' | sort)
-  MOCK_FLAGS=$(grep -oE 'flagKey: "[a-z_]+"' "$PROJECT_DIR/e2e/fixtures/mock-data.ts" | grep -oE '"[a-z_]+"' | tr -d '"' | sort)
+  # `grep -o` exits 1 when nothing matches; under `set -eo pipefail` that would
+  # abort the whole QA run (2026-11-05, line 905), so every extraction is guarded.
+  # The mock fixture lists its keys in the MOCK_FLAG_KEYS array.
+  TYPE_FLAGS=$(sed -n '/^export type FeatureFlagKey/,/;$/p' "$PROJECT_DIR/src/types/feature-flags.ts" | grep -oE '"[a-z_]+"' | tr -d '"' | sort || true)
+  MOCK_FLAGS=$(sed -n '/^const MOCK_FLAG_KEYS/,/^\] as const/p' "$PROJECT_DIR/e2e/fixtures/mock-data.ts" | grep -oE '"[a-z_]+"' | tr -d '"' | sort || true)
 
   # Agent/internal flags don't belong in the E2E mock fixture
   INTERNAL_FLAG_PATTERN="_agent_enabled$|^automated_agents$|^maintenance_mode$"
-  MISSING_FLAGS=$(comm -23 <(echo "$TYPE_FLAGS") <(echo "$MOCK_FLAGS") | grep -vE "$INTERNAL_FLAG_PATTERN" || true)
+  if [[ -z "$TYPE_FLAGS" || -z "$MOCK_FLAGS" ]]; then
+    # An empty list means the extraction no longer matches the source layout.
+    # Comparing against it would report every flag as missing.
+    MISSING_FLAGS=""
+    FLAG_CHECK_SKIPPED=true
+    log_warn "Feature flag coverage check skipped: could not read flag keys (type: $(echo "$TYPE_FLAGS" | grep -c . || true), mock: $(echo "$MOCK_FLAGS" | grep -c . || true))" | tee -a "$LOG_FILE"
+  else
+    FLAG_CHECK_SKIPPED=false
+    MISSING_FLAGS=$(comm -23 <(echo "$TYPE_FLAGS") <(echo "$MOCK_FLAGS") | grep -vE "$INTERNAL_FLAG_PATTERN" || true)
+  fi
 
   if [[ -n "$MISSING_FLAGS" ]]; then
     while IFS= read -r flag; do
@@ -801,7 +813,7 @@ if [[ "$ENABLE_GAP_ANALYSIS" == "true" ]]; then
     done <<< "$MISSING_FLAGS"
     FLAG_COUNT=$(echo "$MISSING_FLAGS" | grep -c . || true)
     log_warn "Found $FLAG_COUNT feature flags missing from E2E mocks" | tee -a "$LOG_FILE"
-  else
+  elif [[ "$FLAG_CHECK_SKIPPED" != "true" ]]; then
     log_success "All user-facing feature flags present in E2E mocks" | tee -a "$LOG_FILE"
   fi
 
