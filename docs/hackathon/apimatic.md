@@ -57,6 +57,8 @@ adapter tests (`src/lib/paypal/*.test.ts`) pinned the behaviour across the move.
 
 ## A finding for APIMatic (draft report, not sent)
 
+**Status: sent.** Filed on 10 November 2026 as [apimatic/apimatic-js-runtime#323](https://github.com/apimatic/apimatic-js-runtime/issues/323). The heading keeps its original wording because that issue links to this section.
+
 **Summary.** In `@apimatic/core` 0.10.30 (the runtime of `@paypal/paypal-server-sdk` 2.5.0), the
 retry interceptor treats the `ApiError` thrown for a declared HTTP status as a timeout.
 
@@ -113,17 +115,12 @@ the retry interceptor: retry declared statuses by `httpStatusCodesToRetry`, and 
   An order, capture and refund through the official SDK, and the operator panel's Transaction
   Search against the real sandbox.
 
-## Draft answer for the submission form's plugin question
+## Saved answer for the submission form's plugin question
 
-> We rebuilt Paisaxe's PayPal integration with the PayPal Context Plugin
-> (`paypaldev/server-sdk-context-plugin-preview`, installed with the session's command) and
-> the official `@paypal/paypal-server-sdk` 2.5.0. Before any code, its eight `typescript-*` skills
-> shaped a contract sheet: the exact pin, a token provider that never rejects, an explicit
-> timeout (the default is none), retries with idempotent PayPal-Request-Ids, and typed `ApiError`s
-> mapped to PayPal's status, issue and debug id. Three PayPal APIs now run through the SDK:
-> Orders and Payments for deposits and refunds, and Transaction Search, new, so operators see
-> whether PayPal's own records confirm each deposit. Testing retries, we found that the APIMatic
-> runtime counts a declared error as a timeout (a 422 sent three times).
-> We chose a safe setting, pinned it with tests and drafted a report for APIMatic.
+The form asks: "If you used the APIMatic Context Plugin during your integration, briefly share your experience — what worked well, any issues you encountered, and how it compared to building without it." This is the answer saved on Devpost on 10 November 2026 (1,465 characters).
 
-(127 words. The form's exact wording was not available on 2026-10-08; trim to fit.)
+> What worked well: we installed the PayPal Context Plugin in Claude Code with the session's command and had its eight TypeScript skills read in full before writing any code. They turned into a contract sheet for the official @paypal/paypal-server-sdk 2.5.0: an exact version pin, one long-lived client, a token provider that never rejects (the skill warns that a rejecting provider disables the client), an explicit timeout (the default is none), retries backed by PayPal-Request-Ids, and typed ApiErrors mapped to PayPal's status, issue and debug id. Orders, Payments and the new Transaction Search now all go through the SDK, and our existing adapter tests passed unchanged across the move.
+>
+> Issues: while testing retries we found that the APIMatic runtime treats a declared error status as a timeout, so with the timeout retry enabled a 422 on a capture was sent three times. We chose a safe configuration, pinned it with tests, and reported it to APIMatic (https://github.com/apimatic/apimatic-js-runtime/issues/323). Webhook verification and Invoicing are not in the SDK yet.
+>
+> Compared with building without it: our first adapter (3 October) was built with an older version of the plugin and an unpublished SDK build that had no retries. With the plugin, the skills answered the questions we would otherwise have had to dig out of the SDK source (authentication, configuration, error shapes, testing), and the code came out more consistent and easier to review.
