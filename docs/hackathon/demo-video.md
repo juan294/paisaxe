@@ -156,15 +156,12 @@ consistent with the same booking.
 
 ### The request to type (scene 3)
 
-> What experiences are available for four people on 2026-11-04 up to 120 euros with
+> What experiences are available for four people on 2026-11-14 up to 120 euros with
 > step-free access?
 
-This is a concrete example for recording preparation on October 31. Confirm that date
-has a 10:00 slot before using it. If it is unavailable, or recording moves later, replace
-the date in both prompts with the same available date at least 48 hours ahead. Then
-follow up in English:
+This is the date for the take recorded on 11 November 2026. The Coastal path walk has 12 places per slot, and on that day the 10:00 slot had room for four people. If recording moves later, replace the date in both prompts with the same available date at least 48 hours ahead. Then follow up in English:
 
-> Please quote the Coastal path walk at 10:00 on 2026-11-04 for four people.
+> Please quote the Coastal path walk at 10:00 on 2026-11-14 for four people.
 
 English UI and English visitor requests are required for the recording. The initial
 request deliberately leaves the time to the follow-up so the bounded discovery intake
