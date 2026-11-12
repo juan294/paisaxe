@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The health endpoint reports the rate-limit backend as degraded when Redis answers a PING without PONG. `@upstash/redis` 1.40 resolves an aborted request instead of rejecting it, which the probe would otherwise have read as healthy.
+- The weekly QA agent reads mock flag keys from `MOCK_FLAG_KEYS`. When either flag list is empty it skips the coverage comparison with a warning instead of aborting the run.
+- Local database contract stacks retain orphaned commands for recovery, serialize lock recovery, guard cleanup admission, and settle interrupted child processes before stopping.
+
+### Security
+- Development tooling resolves minimatch 11.0.1 or later, which patches GHSA-g3hv-75wg-m249 (#1061). `npm audit` reports no vulnerabilities.
+
+### Changed
+- Dependency updates (#1063, #1064), including `@upstash/redis` 1.40, Sentry 11.10, `@elevenlabs/react` 1.20 and `posthog-js` 1.442.
+- The Sutura action pin moves from v0.4.0 to v0.5.2, and the cc-rpi workflow tooling is updated to v2.1.0. No other workflow or cadence setting changes.
+- Hackathon documentation records the APIMatic report as sent (apimatic-js-runtime#323) and the published demo video.
+
+## [1.13.1] - 2026-11-02
+
+### Security
+- Updates `follow-redirects` and Sentry's scoped glob dependencies. Stripe, PayPal and Sentry SDK versions are unchanged. Production uses patched minimatch 11.0.3; the development-only ESLint advisory GHSA-g3hv-75wg-m249 was deferred to #1061.
+
+### Fixed
+- Transport timing fixtures are repaired, and synthetic booking dates stay ahead of the database clock without changing the frozen qualification corpus.
+
+### Changed
+- The English demo script and the judges' testing instructions are updated.
+
+## [1.13.0] - 2026-10-30
+
+### Added
+- English support throughout the booking demo: discovery, preference matching, offer and quote guidance, checkout and return, booking status, cancellation and refund, and the operator view. Spanish remains available. English offer and quote text follows verified server-card facts.
+
+### Changed
+- Platform dependency updates, and a corrected inventory of the reviewed database-test coverage.
+
+## [1.12.0] - 2026-10-29
+
+### Added
+- The bounded Jev server integration, optional Spanish booking intake and preference matching, and offline developer tools for evaluation, call-outcome advice and evidence checks. Runtime activation is separately gated; Jev was disabled in the verified deployment. Pricing, availability, quotas and booking and payment decisions remain controlled by application code.
+
+### Changed
+- The booking chat asks for an exact party size when a visitor gives an approximate count. Its instructions preserve accessibility and public-transport requirements.
+
+### Testing
+- Parameterized tests have unique identities, which restores measured coverage collection.
+
 ## [1.11.0] - 2026-10-27
 
 ### Fixed

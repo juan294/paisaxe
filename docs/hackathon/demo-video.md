@@ -1,21 +1,10 @@
 # Demo video: shot list and voice-over script
 
-Recording copy checked against the English UI shipped in [v1.13.0](https://github.com/juan294/paisaxe/releases/tag/v1.13.0) on 2026-10-31. The live rehearsal, footage and audio timings are still to be completed.
+Published on 2026-11-12 as [youtu.be/oFuhwWKAWZc](https://youtu.be/oFuhwWKAWZc) (2:57) and submitted to Devpost the same day. The final video was made differently from the plan below; see "What shipped". The shot list, script and recording plan stay as the planning record, checked on 2026-10-31 against the English UI shipped in [v1.13.0](https://github.com/juan294/paisaxe/releases/tag/v1.13.0).
 
-The PayPal AI Hackathon video for Paisaxe. It must be public on YouTube and under three
-minutes (official rules, as recorded in
-[the webinar notes](../research/2026-10-07-paypal-webinar-submission-notes.md)). The target
-is **about 2:40 to 2:45** (334 words of narration, about 2:14 at 150 words a minute, plus pauses for on-screen action). Phase 7 sets the content rules
-([phase-7.md](../plans/2026-10-03-paypal-hackathon-booking-phases/phase-7.md), step 5). The
-video opens on the transaction. It shows one unsuitable option rejected with its reason
-and one need the provider has not confirmed. Fixtures and sandbox money stay labelled, and
-the video has English captions.
+The PayPal AI Hackathon video for Paisaxe. It must be public on YouTube and under three minutes (official rules, as recorded in [the webinar notes](../research/2026-10-07-paypal-webinar-submission-notes.md)). The target is **about 2:40 to 2:45** (334 words of narration, about 2:14 at 150 words a minute, plus pauses for on-screen action). Phase 7 sets the content rules ([phase-7.md](../plans/2026-10-03-paypal-hackathon-booking-phases/phase-7.md), step 5). The video opens on the transaction. It shows one unsuitable option rejected with its reason and one need the provider has not confirmed. Fixtures and sandbox money stay labelled, and the video has English captions.
 
-The five judging criteria carry equal weight: technical implementation, design, impact,
-innovation and presentation. A separate prize goes to the best demo. The video therefore
-tells one complete story: a traveler's needs, an honest answer, a PayPal deposit, a safe
-refund, and the provider's view checked against PayPal. Each scene shows something only
-this project does. The engineering is stated once and proved by the footage.
+The five judging criteria carry equal weight: technical implementation, design, impact, innovation and presentation. A separate prize goes to the best demo. The video therefore tells one complete story: a traveler's needs, an honest answer, a PayPal deposit, a safe refund, and the provider's view checked against PayPal. Each scene shows something only this project does. The engineering is stated once and proved by the footage.
 
 ## How it is made
 
@@ -29,6 +18,14 @@ this project does. The engineering is stated once and proved by the footage.
    longer matches what is on screen.
 4. **Assemble in iMovie.** Lay the clips in order with their audio, export 1080p, then
    upload to YouTube as public with the captions file.
+
+## What shipped
+
+- **One take, driven by the agent.** On 2026-11-12 the agent drove a Chrome tab with a 1920×1080 viewport through the whole story while Juan recorded with Screen Studio. Juan's only action was approving the PayPal sandbox payment. The order on screen is scenes 2, 3, 4, 5, 1, 6, 7 and 8, then the closing card. Per-scene recording was tried first and dropped: old test bookings appeared in the chat, and the clips did not match the pre-made audio.
+- **A clean chat.** Before the take, the paisaxe.es site data was cleared and the owner voucher was redeemed again, so the "I've paid" reply listed no earlier test bookings. Booking A is `RS-191A46` (paid, then refunded on camera). Booking B is `RS-B4D7FD` (paid on 2026-11-11, so the dashboard shows "PayPal confirms"). Because A's refund was only minutes old, its chip still read "Pending in PayPal". The narration therefore points to B's "PayPal confirms" chip and to the "Refunded in PayPal" chip of an earlier refunded take, and says the newest refund waits until PayPal's records catch up.
+- **Narration written to the edit.** After editing, each line was rewritten for its time on screen and generated separately, then placed on one track with ffmpeg. It is first person, because this is a solo project. ElevenLabs `eleven_v4`, voice "Will", with light `[warmly]` and `[curious]` tags only; a stronger version sounded like an advert. "Paisaxe" is sent as IPA, `/pajˈsaʃe/`.
+- **Callouts.** Side panels (the request, the three verdicts, server-set prices, "I've paid" changes nothing, the PayPal steps, recovery, the refund and the provider checks) were rendered as transparent images with headless Chrome and laid over the video with ffmpeg. The sandbox buyer email is blurred, and so is the operator token in the address bar.
+- **Captions and thumbnail.** English captions generated from the narration timings, and a 1280×720 thumbnail made from the confirmed booking card.
 
 ## Shot list
 
@@ -159,7 +156,7 @@ consistent with the same booking.
 > What experiences are available for four people on 2026-11-14 up to 120 euros with
 > step-free access?
 
-This is the date for the take recorded on 11 November 2026. The Coastal path walk has 12 places per slot, and on that day the 10:00 slot had room for four people. If recording moves later, replace the date in both prompts with the same available date at least 48 hours ahead. Then follow up in English:
+This is the date used for the takes recorded on 11 and 12 November 2026. The Coastal path walk has 12 places per slot, and on that day the 10:00 slot had room for four people. If recording moves later, replace the date in both prompts with the same available date at least 48 hours ahead. Then follow up in English:
 
 > Please quote the Coastal path walk at 10:00 on 2026-11-14 for four people.
 
@@ -182,8 +179,6 @@ step-free access), and the 4x4 route is over budget with step-free access unconf
 
 ## YouTube
 
-- Title: "Paisaxe: book a local experience through conversation, with PayPal (PayPal AI
-  Hackathon)"
-- Visibility: public. Add the link to the Devpost project's video field.
-- Description: the pitch sentence, the repository link and "Demo merchant and PayPal
-  sandbox money; no real payments."
+- Link: [youtu.be/oFuhwWKAWZc](https://youtu.be/oFuhwWKAWZc), also in the Devpost project's video field.
+- Title: "Paisaxe: Chat it, book it, pay with PayPal | PayPal AI Hackathon demo"
+- Description: on the YouTube page (not kept in the repository).
