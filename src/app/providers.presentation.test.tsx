@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   pathname: '/immersive',
   serverGetUser: vi.fn(),
   browserGetUser: vi.fn(),
+  signInWithOAuth: vi.fn(),
   getSession: vi.fn(),
   unsubscribe: vi.fn(),
   onAuthStateChange: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock('@supabase/ssr', () => ({
     return { auth: {
       getSession: mocks.getSession,
       getUser: mocks.browserGetUser,
+      signInWithOAuth: mocks.signInWithOAuth,
       onAuthStateChange: mocks.onAuthStateChange,
     } };
   },
@@ -124,6 +126,45 @@ describe('error presentation in PresentationRegion', () => {
 
     // Verify the alert has the correct styling (z-50, bg-neutral-950, etc.)
     expect(alertDiv).toHaveClass('relative', 'z-50', 'bg-neutral-950');
+  });
+
+  it('calls retryAuth when retry button is clicked', async () => {
+    mocks.serverGetUser.mockResolvedValue({ data: { user: null }, error: new Error('Token expired') });
+    mocks.browserGetUser.mockResolvedValue({ data: { user: null }, error: new Error('Token expired') });
+
+    const seed = await getInitialPresentation();
+    const tree = () => <Providers initialPresentation={seed}><PresentationProbe /></Providers>;
+    render(tree());
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    const retryButton = screen.getByRole('button', { name: /vérifier à nouveau/i });
+
+    const callsBeforeRetry = mocks.browserGetUser.mock.calls.length;
+    fireEvent.click(retryButton);
+
+    // Retrying runs the browser auth check again, so getUser gains a call.
+    await waitFor(() => {
+      expect(mocks.browserGetUser.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
+    });
+  });
+
+  it('calls signInWithGoogle when sign-in button is clicked', async () => {
+    mocks.serverGetUser.mockResolvedValue({ data: { user: null }, error: new Error('Token expired') });
+    mocks.browserGetUser.mockResolvedValue({ data: { user: null }, error: new Error('Token expired') });
+
+    const seed = await getInitialPresentation();
+    const tree = () => <Providers initialPresentation={seed}><PresentationProbe /></Providers>;
+    render(tree());
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    const signInButton = screen.getByRole('button', { name: /se connecter/i });
+
+    mocks.signInWithOAuth.mockResolvedValue({ data: {}, error: null });
+    fireEvent.click(signInButton);
+
+    await waitFor(() => expect(mocks.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'google' }),
+    ));
   });
 });
 

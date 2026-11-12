@@ -27,9 +27,18 @@ vi.mock("@sentry/nextjs", () => ({
   captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
 }));
 
+const { mockNormalizeStripeAdjustment } = vi.hoisted(() => ({
+  mockNormalizeStripeAdjustment: vi.fn(),
+}));
+
 vi.mock("@/lib/stripe", () => ({
   verifyWebhookSignature: vi.fn(),
   calculateExpiryDate: vi.fn(() => new Date("2024-01-02T00:00:00Z")),
+}));
+
+vi.mock("@/lib/stripe-entitlements", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/stripe-entitlements")>()),
+  normalizeStripeAdjustment: mockNormalizeStripeAdjustment,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -897,6 +906,248 @@ describe("POST /api/webhooks/stripe", () => {
       expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", expect.objectContaining({
         p_event_id: "evt_sequence_async_succeeded",
       }));
+    });
+  });
+
+  describe("ADJUSTMENT_EVENTS: refund and dispute handling", () => {
+    it("processes charge.refunded event with valid paymentIntent", async () => {
+      const refundEvent: Stripe.Event = {
+        id: "evt_refund_123",
+        type: "charge.refunded",
+        created: 1234567890,
+        data: {
+          object: {
+            id: "ch_refunded123",
+            payment_intent: "pi_adjustment_123",
+            amount_refunded: 100,
+            refunds: {
+              data: [{ id: "re_123", amount: 100, status: "succeeded", charge: "ch_refunded123", payment_intent: "pi_adjustment_123", currency: "eur" }],
+              has_more: false,
+            },
+            currency: "eur",
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(refundEvent);
+      mockNormalizeStripeAdjustment.mockReturnValue({
+        paymentIntent: "pi_adjustment_123",
+        facts: [{ kind: "charge", id: "ch_refunded123", amount: 100, currency: "eur", status: "complete", created: 1234567890 }],
+      });
+      mockRpc.mockResolvedValue({ data: "reconciliation_complete", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ status: "reconciliation_complete" });
+      expect(mockRpc).toHaveBeenCalledWith("process_stripe_entitlement_event", {
+        p_event_id: "evt_refund_123",
+        p_event_type: "charge.refunded",
+        p_payment_intent: "pi_adjustment_123",
+        p_facts: [{ kind: "charge", id: "ch_refunded123", amount: 100, currency: "eur", status: "complete", created: 1234567890 }],
+        p_grant: null,
+      });
+    });
+
+    it("returns 200 unrecoverable when charge.refunded has missing paymentIntent", async () => {
+      const refundEvent: Stripe.Event = {
+        id: "evt_refund_no_pi",
+        type: "charge.refunded",
+        created: 1234567890,
+        data: {
+          object: {
+            id: "ch_no_pi",
+            payment_intent: null,
+            refunds: { data: [], has_more: false },
+            currency: "eur",
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(refundEvent);
+      mockNormalizeStripeAdjustment.mockReturnValue({
+        paymentIntent: null,
+        facts: [{ kind: "reconciliation", reason: "missing_payment_intent" }],
+      });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({
+        status: "unrecoverable",
+        reason: "missing_payment_intent",
+      });
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        "[STRIPE_UNRECOVERABLE]",
+        expect.objectContaining({
+          level: "error",
+          tags: expect.objectContaining({ reason: "missing_payment_intent" }),
+        })
+      );
+    });
+
+    it("processes refund.created event with valid paymentIntent", async () => {
+      const refundEvent: Stripe.Event = {
+        id: "evt_refund_created",
+        type: "refund.created",
+        created: 1234567890,
+        data: {
+          object: {
+            id: "re_created",
+            charge: "ch_original",
+            amount: 50,
+            currency: "eur",
+            status: "succeeded",
+            payment_intent: "pi_refund_created",
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(refundEvent);
+      mockNormalizeStripeAdjustment.mockReturnValue({
+        paymentIntent: "pi_refund_created",
+        facts: [{ kind: "refund", id: "re_created", charge_id: "ch_original", amount: 50, currency: "eur", status: "succeeded", created: 1234567890 }],
+      });
+      mockRpc.mockResolvedValue({ data: "refund_recorded", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ status: "refund_recorded" });
+      expect(mockRpc).toHaveBeenCalledWith("process_stripe_entitlement_event", {
+        p_event_id: "evt_refund_created",
+        p_event_type: "refund.created",
+        p_payment_intent: "pi_refund_created",
+        p_facts: [{ kind: "refund", id: "re_created", charge_id: "ch_original", amount: 50, currency: "eur", status: "succeeded", created: 1234567890 }],
+        p_grant: null,
+      });
+    });
+
+    it("processes charge.dispute.created event with valid paymentIntent", async () => {
+      const disputeEvent: Stripe.Event = {
+        id: "evt_dispute_created",
+        type: "charge.dispute.created",
+        created: 1234567890,
+        data: {
+          object: {
+            id: "dp_dispute",
+            charge: "ch_disputed",
+            status: "warning_needs_response",
+            payment_intent: "pi_dispute",
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(disputeEvent);
+      mockNormalizeStripeAdjustment.mockReturnValue({
+        paymentIntent: "pi_dispute",
+        facts: [{ kind: "dispute", id: "dp_dispute", charge_id: "ch_disputed", status: "warning_needs_response", created: 1234567890 }],
+      });
+      mockRpc.mockResolvedValue({ data: "dispute_logged", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ status: "dispute_logged" });
+      expect(mockRpc).toHaveBeenCalledWith("process_stripe_entitlement_event", {
+        p_event_id: "evt_dispute_created",
+        p_event_type: "charge.dispute.created",
+        p_payment_intent: "pi_dispute",
+        p_facts: [{ kind: "dispute", id: "dp_dispute", charge_id: "ch_disputed", status: "warning_needs_response", created: 1234567890 }],
+        p_grant: null,
+      });
+    });
+
+    it("returns 500 when RPC fails for adjustment event", async () => {
+      const refundEvent: Stripe.Event = {
+        id: "evt_refund_fail",
+        type: "charge.refunded",
+        created: 1234567890,
+        data: {
+          object: {
+            id: "ch_fail",
+            payment_intent: "pi_fail",
+            refunds: { data: [], has_more: false },
+            currency: "eur",
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(refundEvent);
+      mockNormalizeStripeAdjustment.mockReturnValue({
+        paymentIntent: "pi_fail",
+        facts: [],
+      });
+      mockRpc.mockResolvedValue({ error: { message: "database error" } });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Database error");
+    });
+
+    it("returns unmatched status when reconciliation is required", async () => {
+      const refundEvent: Stripe.Event = {
+        id: "evt_refund_reconcile",
+        type: "charge.refunded",
+        created: 1234567890,
+        data: {
+          object: {
+            id: "ch_reconcile",
+            payment_intent: "pi_reconcile",
+            refunds: { data: [], has_more: false },
+            currency: "eur",
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(refundEvent);
+      mockNormalizeStripeAdjustment.mockReturnValue({
+        paymentIntent: "pi_reconcile",
+        facts: [],
+      });
+      mockRpc.mockResolvedValue({ data: "unmatched", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ status: "unmatched" });
+      expect(logger.error).toHaveBeenCalledWith(
+        "[STRIPE_ENTITLEMENT_RECONCILIATION]",
+        expect.objectContaining({
+          eventId: "evt_refund_reconcile",
+          status: "unmatched",
+        })
+      );
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        "[STRIPE_ENTITLEMENT_RECONCILIATION]",
+        expect.objectContaining({
+          level: "error",
+          extra: expect.objectContaining({
+            eventId: "evt_refund_reconcile",
+            status: "unmatched",
+          }),
+        })
+      );
     });
   });
 });
