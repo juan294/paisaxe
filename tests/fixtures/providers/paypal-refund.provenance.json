@@ -25,7 +25,7 @@
       "file": "paypal-refund.sanitized.json",
       "sha256": "a1345c94a696b875a474145e8855d2d9cfef72e67494906238b92cc1efb1cbfe",
       "exportedAt": "2026-10-08T15:16:06.016490+00:00",
-      "expiresAt": "2026-12-12T11:14:27+00:00",
+      "expiresAt": "2027-01-07T12:00:00+00:00",
       "eventType": "PAYMENT.CAPTURE.REFUNDED",
       "eventVersion": "1.0",
       "resourceVersion": "2.0",
@@ -41,6 +41,10 @@
     {
       "reviewed_at": "2026-11-12T11:14:27Z",
       "note": "Owner-authorized review on 2026-11-12T11:14:27Z without provider calls: SDK and API pins unchanged since capture (stripe 22.6.2, @paypal/paypal-server-sdk 2.5.0, Stripe client API 2026-08-26.dahlia); later commits do not change how the recorded payload is parsed; the real replay passed against a fresh local contract stack (npm run contracts:oneshot, 1,056 of 1,056 cases). Expiry extended 30 days from the review."
+    },
+    {
+      "reviewed_at": "2026-11-12T11:33:41Z",
+      "note": "One-time owner-approved exception to the 30-day refresh rule for the hackathon code freeze (judging until 2026-12-23). No SDK, adapter or route change can land during the freeze, so the 2026-11-12 review basis (unchanged SDK and API pins, real replay passed 1,056 of 1,056) holds. Residual risk: a provider-side schema change, accepted until the post-freeze review due on or after 2026-12-24. No provider calls were made."
     }
   ]
 }

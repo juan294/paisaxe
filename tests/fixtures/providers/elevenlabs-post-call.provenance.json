@@ -4,7 +4,7 @@
   "retrieval": "Original post_call_transcription HTTP delivery from one separately authorized synthetic text exchange; HMAC verified over original bytes at receipt, with created agent and minted conversation identity matched.",
   "api_version": "v1 conversation API; unversioned post_call_transcription webhook envelope observed 2026-10-14",
   "captured_at": "2026-10-14T05:39:50.151584Z",
-  "expires_at": "2026-12-12T11:14:27Z",
+  "expires_at": "2027-01-07T12:00:00Z",
   "refresh_owner": "Juan (Paisaxe owner)",
   "sha256": "f698701c41d17f8fad4b996a671bcbdef80617e4ac52c44d4202675bc4f64a11",
   "raw_sha256": "0217c232a5d0c648aeed164a3573ffccfe6e03e6e6454dd8bc5a8b0b6398f508",
@@ -28,6 +28,10 @@
     {
       "reviewed_at": "2026-11-12T11:14:27Z",
       "note": "Owner-authorized review on 2026-11-12T11:14:27Z without provider calls: SDK and API pins unchanged since capture (stripe 22.6.2, @paypal/paypal-server-sdk 2.5.0, Stripe client API 2026-08-26.dahlia); later commits do not change how the recorded payload is parsed; the real replay passed against a fresh local contract stack (npm run contracts:oneshot, 1,056 of 1,056 cases). Expiry extended 30 days from the review."
+    },
+    {
+      "reviewed_at": "2026-11-12T11:33:41Z",
+      "note": "One-time owner-approved exception to the 30-day refresh rule for the hackathon code freeze (judging until 2026-12-23). No SDK, adapter or route change can land during the freeze, so the 2026-11-12 review basis (unchanged SDK and API pins, real replay passed 1,056 of 1,056) holds. Residual risk: a provider-side schema change, accepted until the post-freeze review due on or after 2026-12-24. No provider calls were made."
     }
   ]
 }
