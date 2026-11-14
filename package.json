@@ -86,7 +86,7 @@
     "eval:jev": "tsx --conditions=react-server scripts/eval/jev.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0",
+    "@anthropic-ai/sdk": "^1.6.0",
     "@elevenlabs/react": "^1.20.2",
     "@paypal/paypal-server-sdk": "2.5.0",
     "@radix-ui/react-dialog": "^1.3.1",
